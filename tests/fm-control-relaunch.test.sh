@@ -21,6 +21,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-control-lib.sh"
 # shellcheck source=/dev/null
@@ -2526,6 +2528,209 @@ test_herdr_reclaim_of_a_secondmate_names_its_own_owner() {
   pass "reclaim: a herdr secondmate whose endpoint is gone is sent to its own respawn owner"
 }
 
+# --- config/claude-launcher: every relaunch path starts claude through TeamClaude
+#
+# Each case selects TeamClaude for the home, drives one real relaunch path, and
+# runs the launch command the pane received in a clean shell, so the proxy
+# setting claude reports can only have come from teamclaude.
+
+enable_teamclaude() {  # <case-dir>
+  mkdir -p "$1/home/config"
+  printf 'teamclaude\n' > "$1/home/config/claude-launcher"
+  fm_test_fake_teamclaude "$1/fakebin"
+}
+
+# teamclaude_launch_line <log>: the newest launch the pane received.
+teamclaude_launch_line() {
+  grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
+}
+
+# arm_session_end <case-dir> <id>: record that the task's Claude session ended.
+arm_session_end() {
+  local state="$1/home/state" gen
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" "$2" --state idle --source claude-hook --event launch-brief >/dev/null
+  gen=$(cat "$state/$2.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" "$2" idle --gen "$gen" --source claude-hook --event session-end >/dev/null
+}
+
+# run_session_end_scan <case-dir>: the watcher's real session-end auto-relaunch,
+# which runs the real fm-control relaunch. Prints the wake it raised.
+run_session_end_scan() {
+  local dir=$1
+  mkdir -p "$dir/user-home"
+  (
+    unset HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID
+    export PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
+      FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-session-end-relaunch-lib.sh"
+    fm_session_end_relaunch_scan "$dir/home/state" 300 || exit 1
+    printf '%s\n' "$FM_SESSION_END_WAKE"
+  )
+}
+
+test_teamclaude_reaches_tmux_relaunch_paths() {
+  local dir out rc
+  dir=$(new_case tc-tmux-spawn tc1)
+  add_ship_task "$dir" tc1 claude
+  enable_teamclaude "$dir"
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" tc1 --relaunch --harness claude); rc=$?
+  expect_code 0 "$rc" "a TeamClaude fm-spawn --relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+    "tmux fm-spawn --relaunch"
+
+  dir=$(new_case tc-tmux-control tc2)
+  add_ship_task "$dir" tc2 claude
+  enable_teamclaude "$dir"
+  out=$(run_control "$dir" tc2 relaunch --note "resume under TeamClaude"); rc=$?
+  expect_code 0 "$rc" "a TeamClaude fm-control relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+    "tmux fm-control relaunch"
+
+  dir=$(new_case tc-tmux-session-end tc3)
+  add_ship_task "$dir" tc3 claude
+  enable_teamclaude "$dir"
+  arm_session_end "$dir" tc3
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the session-end scan should succeed"$'\n'"$out"
+  assert_contains "$out" "tc3 auto-relaunched after session-end" \
+    "the session-end scan should relaunch the ended worker"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+    "tmux session-end auto-relaunch"
+  pass "config/claude-launcher=teamclaude: tmux fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
+}
+
+test_teamclaude_reaches_herdr_relaunch_paths() {
+  local dir out rc
+  herdr_case_or_skip tc-herdr-spawn tc4 || {
+    echo "skip - herdr relaunch needs jq (the herdr adapter parses JSON with it)"
+    return 0
+  }
+  dir=$HERDR_CASE_DIR
+  enable_teamclaude "$dir"
+  out=$(run_spawn "$dir" tc4 --relaunch --harness claude); rc=$?
+  expect_code 0 "$rc" "a TeamClaude herdr fm-spawn --relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "herdr fm-spawn --relaunch"
+
+  herdr_case_or_skip tc-herdr-control tc5 || return 0
+  dir=$HERDR_CASE_DIR
+  enable_teamclaude "$dir"
+  rm -f "$dir/fake/herdr-stopped"
+  out=$(run_control "$dir" tc5 relaunch --note "resume under TeamClaude"); rc=$?
+  expect_code 0 "$rc" "a TeamClaude herdr fm-control relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "herdr fm-control relaunch"
+
+  herdr_case_or_skip tc-herdr-session-end tc6 || return 0
+  dir=$HERDR_CASE_DIR
+  enable_teamclaude "$dir"
+  rm -f "$dir/fake/herdr-stopped"
+  arm_session_end "$dir" tc6
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the herdr session-end scan should succeed"$'\n'"$out"
+  assert_contains "$out" "tc6 auto-relaunched after session-end" \
+    "the session-end scan should relaunch the ended herdr worker"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "herdr session-end auto-relaunch"
+  pass "config/claude-launcher=teamclaude: herdr fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
+}
+
+# add_teamclaude_secondmate <case-dir> <id>: a live Claude second mate record in
+# a marked home, on the backend the case's session-provider stub models.
+add_teamclaude_secondmate() {
+  local dir=$1 id=$2 home="$1/home" smhome="$1/$2-home"
+  fm_git_worktree "$dir/$id-repo" "$smhome" "sm-$id"
+  mkdir -p "$smhome/state" "$smhome/data" "$smhome/bin" "$home/config"
+  printf '%s\n' "$id" > "$smhome/.fm-secondmate-home"
+  printf '# charter\n' > "$smhome/data/charter.md"
+  printf '# agents\n' > "$smhome/AGENTS.md"
+  printf 'claude\n' > "$home/config/secondmate-harness"
+  {
+    echo "endpoint_task_id=$id"
+    echo "worktree=$smhome"
+    echo "project=$smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=default"
+    echo "effort=default"
+    echo "home=$smhome"
+    echo "projects="
+  } >> "$home/state/$id.meta"
+  printf '%s' "$smhome" > "$dir/fake/cwd"
+}
+
+test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
+  local dir out rc
+  dir=$(new_case tc-tmux-secondmate tc7)
+  printf 'window=fmses:fm-tc7\n' > "$dir/home/state/tc7.meta"
+  add_teamclaude_secondmate "$dir" tc7
+  printf '%s\n' "fm-tc7" > "$dir/fake/windows"
+  enable_teamclaude "$dir"
+  out=$(run_control "$dir" tc7 relaunch); rc=$?
+  expect_code 0 "$rc" "a TeamClaude tmux secondmate relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+    "tmux secondmate respawn"
+
+  herdr_case_or_skip tc-herdr-secondmate tc8 || {
+    echo "skip - herdr relaunch needs jq (the herdr adapter parses JSON with it)"
+    return 0
+  }
+  dir=$HERDR_CASE_DIR
+  grep -E '^(window|backend|herdr_[a-z_]+)=' "$dir/home/state/tc8.meta" > "$dir/meta.endpoint"
+  mv "$dir/meta.endpoint" "$dir/home/state/tc8.meta"
+  add_teamclaude_secondmate "$dir" tc8
+  enable_teamclaude "$dir"
+  rm -f "$dir/fake/herdr-stopped"
+  out=$(run_control "$dir" tc8 relaunch); rc=$?
+  expect_code 0 "$rc" "a TeamClaude herdr secondmate relaunch should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "herdr secondmate respawn"
+  pass "config/claude-launcher=teamclaude: a Claude second mate respawns through TeamClaude on tmux and herdr"
+}
+
+# A fresh herdr spawn needs no relaunch, but it shares this suite's herdr
+# stub: the pane the stub's `tab create` mints reads back in the task's copy.
+test_teamclaude_reaches_fresh_herdr_spawns() {
+  local dir out rc
+  command -v jq >/dev/null 2>&1 || {
+    echo "skip - herdr spawn needs jq (the herdr adapter parses JSON with it)"
+    return 0
+  }
+  dir=$(new_case tc-herdr-fresh tc9)
+  make_herdr_stub "$dir"
+  fm_fake_exit0 "$dir/fakebin" treehouse
+  fm_git_worktree "$dir/proj" "$dir/wt" task-tc9
+  fm_test_spawn_brief "$dir/home" tc9
+  mkdir -p "$dir/home/projects"
+  printf '%s' "$dir/wt" > "$dir/fake/cwd"
+  printf '%s' '%9' > "$dir/fake/herdr-pane"
+  enable_teamclaude "$dir"
+  TASK_TMPS+=("/tmp/fm-tc9")
+  out=$(run_spawn "$dir" tc9 "$dir/proj" claude --backend herdr --mode no-mistakes --yolo off); rc=$?
+  expect_code 0 "$rc" "a TeamClaude fresh herdr spawn should succeed"$'\n'"$out"
+  assert_contains "$(cat "$dir/fake/herdr-log")" "tab create" "the fresh spawn should open its own herdr tab"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "fresh herdr ship spawn"
+
+  dir=$(new_case tc-herdr-fresh-secondmate tc10)
+  make_herdr_stub "$dir"
+  printf '%s' '%9' > "$dir/fake/herdr-pane"
+  add_teamclaude_secondmate "$dir" tc10
+  rm "$dir/home/state/tc10.meta"
+  enable_teamclaude "$dir"
+  out=$(run_spawn "$dir" tc10 "$dir/tc10-home" --secondmate --backend herdr); rc=$?
+  expect_code 0 "$rc" "a TeamClaude fresh herdr secondmate spawn should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+    "fresh herdr secondmate launch"
+  pass "config/claude-launcher=teamclaude: fresh herdr ship and second mate launches reach claude through TeamClaude"
+}
+
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it() {
   local dir out rc=0
   command -v tasks-axi >/dev/null 2>&1 || {
@@ -2647,3 +2852,7 @@ test_herdr_reclaim_of_a_secondmate_names_its_own_owner
 test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it
 test_relaunch_moves_a_drifted_item_back_in_flight
+test_teamclaude_reaches_tmux_relaunch_paths
+test_teamclaude_reaches_herdr_relaunch_paths
+test_teamclaude_reaches_secondmate_respawn_on_both_backends
+test_teamclaude_reaches_fresh_herdr_spawns
