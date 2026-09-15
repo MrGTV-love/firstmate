@@ -393,6 +393,23 @@ Removing the `--force` arm makes the forced generic case refuse; honoring `--for
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
+## TeamClaude launcher
+
+Verified 2026-09-29 on TeamClaude 1.1.21-affinity.0 with its proxy running in its default forward-proxy mode.
+`config/claude-launcher=teamclaude` starts Claude through `bin/fm-teamclaude-launch.sh`, whose verdict depends on what the installed TeamClaude CLI answers and exports.
+The live guard runs the real launcher in a clean environment against the real CLI, with a recording `claude` in place of the real one, so it spends no model tokens.
+
+```sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+```
+
+```
+ok - teamclaude 1.1.21-affinity.0: the launcher hands claude HTTPS_PROXY and a readable TeamClaude CA
+```
+
+The guard runs by default wherever TeamClaude is installed and its proxy answers, skips naming the absent tool or stopped proxy otherwise, and fails instead when `FM_TEAMCLAUDE_LAUNCH_LIVE=1` or `FM_LIVE=1` requested it.
+Rerun it after any TeamClaude upgrade.
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.
