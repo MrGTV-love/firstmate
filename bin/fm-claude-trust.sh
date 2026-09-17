@@ -322,25 +322,13 @@ if [ "$MODE" = worktree ]; then
     # Verify SIBLING_CANON is actually the primary checkout that owns WT_COMMON.
     SIBLING_GIT_DIR=$(git -C "$SIBLING_CANON" rev-parse --absolute-git-dir 2>/dev/null) || true
     SIBLING_GIT_DIR=$(real_dir "${SIBLING_GIT_DIR:-}") || true
-    SIBLING_CHECKOUT_CONFIRMED=false
-    if [ -n "$SIBLING_GIT_DIR" ] && [ "$SIBLING_GIT_DIR" = "$WT_COMMON" ]; then
-      SIBLING_CHECKOUT_CONFIRMED=true
-    fi
+    [ "$SIBLING_GIT_DIR" = "$WT_COMMON" ] || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
 
-    SIBLING_MATCH=
-    if "$SIBLING_CHECKOUT_CONFIRMED"; then
-      WT_ORIGIN=$(git -C "$TARGET_REAL" remote get-url origin 2>/dev/null) || true
-      PROJ_ORIGIN=$(git -C "$PROJ_REAL" remote get-url origin 2>/dev/null) || true
-      if [ -n "$WT_ORIGIN" ] && [ "$WT_ORIGIN" = "$PROJ_ORIGIN" ]; then
-        SIBLING_MATCH=origin
-      fi
-    fi
-
-    if [ -n "$SIBLING_MATCH" ]; then
-      echo "info: worktree '$TARGET_REAL' belongs to sibling clone '$SIBLING_CANON' (origin match)" >&2
-    else
-      refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
-    fi
+    WT_ORIGIN=$(git -C "$TARGET_REAL" remote get-url origin 2>/dev/null) || true
+    PROJ_ORIGIN=$(git -C "$PROJ_REAL" remote get-url origin 2>/dev/null) || true
+    [ -n "$WT_ORIGIN" ] && [ "$WT_ORIGIN" = "$PROJ_ORIGIN" ] \
+      || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
+    echo "info: worktree '$TARGET_REAL' belongs to sibling clone '$SIBLING_CANON' (origin match)" >&2
   fi
 
   # The external-imports flags must land on the primary checkout - its own git
