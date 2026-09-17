@@ -465,12 +465,11 @@ test_worktree_subdirectory_is_refused() {
 # clone. When they share the same origin URL, the worktree is accepted and
 # trust is registered against the sibling checkout that owns the common dir.
 test_sibling_clone_same_origin_accepted() {
-  local rec out sibling sibling_wt bare
+  local rec out sibling sibling_wt
   rec=$(make_case sibling-origin)
   read_case "$rec"
   sibling="$CASE_DIR/sibling"
-  bare="$PROJ.origin.git"
-  git clone --quiet -- "$bare" "$sibling"
+  git clone --quiet -- "$(git -C "$PROJ" remote get-url origin)" "$sibling"
   sibling_wt="$CASE_DIR/sibling-wt"
   git -C "$sibling" worktree add --quiet -b wt-sibling "$sibling_wt"
   out=$(run_trust "$CONFIG" "$sibling_wt" "$PROJ")
@@ -490,7 +489,7 @@ test_sibling_clone_declined_external_imports_refused() {
   rec=$(make_case sibling-declined)
   read_case "$rec"
   sibling="$CASE_DIR/sibling"
-  git clone --quiet -- "$PROJ.origin.git" "$sibling"
+  git clone --quiet -- "$(git -C "$PROJ" remote get-url origin)" "$sibling"
   sibling_wt="$CASE_DIR/sibling-wt"
   git -C "$sibling" worktree add --quiet -b wt-sibling "$sibling_wt"
   store="$CONFIG/.claude.json"
@@ -514,9 +513,9 @@ test_sibling_clone_declined_external_imports_refused() {
   pass "fm-claude-trust.sh: refuses a sibling clone whose project root already declined external imports"
 }
 
-# When the path-based heuristic would accept a different repo at the same
-# basename (a clone with no matching origin, but with a path pattern match),
-# the registration must refuse and leave no trust recorded.
+# A different repository at a firstmate-home/projects path with the same
+# basename as <project> has no matching origin, so the registration must
+# refuse and leave no trust recorded.
 test_different_repo_same_basename_refused() {
   local rec out other_root other_repo other_wt
   rec=$(make_case diff-basename)

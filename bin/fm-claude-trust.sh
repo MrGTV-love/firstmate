@@ -12,8 +12,7 @@
 #        fm-claude-trust.sh --secondmate-home <home> <id>
 #   <worktree>  the isolated task worktree this spawn launches into, which
 #               may be a worktree of <project> or a worktree of a sibling
-#               clone of the same repository (same origin or matching
-#               firstmate-home/projects path)
+#               clone of the same repository (same origin URL)
 #   <project>   the primary checkout that worktree belongs to (or a sibling
 #               clone's checkout when the worktree is from a shared pool)
 #   <home>      the seeded secondmate home this spawn launches into
@@ -43,8 +42,8 @@
 #
 # A SHARED TREEHOUSE POOL across multiple firstmate homes adds an extra case.
 # A task worktree may belong to a sibling clone of the project rather than the
-# spawning home's own clone, and the scope test accepts it through origin or
-# path matching, registering trust against the sibling checkout.
+# spawning home's own clone, and the scope test accepts it when both clones
+# carry the same origin URL, registering trust against the sibling checkout.
 #
 # TWO PROJECT-CONFIG ENTRIES IN WORKTREE MODE, NOT ONE. Registering both flags
 # on the worktree entry alone (the original trust-only design) leaves the
@@ -114,19 +113,18 @@
 # which happens when multiple firstmate homes clone the same repo and share
 # one treehouse worktree pool. A pool slot first created from home A's clone
 # has its git common dir in A's clone, but the spawning firstmate at home B
-# passes its own clone as <project>. Two checks, each sufficient, decide
-# "same repository": (1) the two repos resolve the same normalized origin
-# remote URL, or (2) the worktree's primary checkout path matches
-# <some-firstmate-home>/projects/<basename-of-project> AND git evidence
-# (origin URL) confirms it is the same repository. When either matches, the
-# canonical project path for trust registration becomes the primary checkout
-# that owns the worktree's common dir (the sibling clone), because that is
-# exactly where Claude Code's own git-root canonicalization collapses every
-# linked worktree to. An "info:" line on stderr names which check fired and
-# the sibling clone path. The consent-gated external-imports flags land on
-# that sibling clone's project entry; if the sibling clone already declined
-# external imports, the whole registration refuses with a message naming the
-# sibling path, the same shape as today's refusal for <project>.
+# passes its own clone as <project>. One check decides "same repository":
+# the two repos carry the exact same origin remote URL, which holds because
+# fm-home-seed.sh clones every home's project from the source's own origin
+# URL. When it matches, the canonical project path for trust registration
+# becomes the primary checkout that owns the worktree's common dir (the
+# sibling clone), because that is exactly where Claude Code's own git-root
+# canonicalization collapses every linked worktree to. An "info:" line on
+# stderr names the sibling clone path. The consent-gated external-imports
+# flags land on that sibling clone's project entry; if the sibling clone
+# already declined external imports, the whole registration refuses with a
+# message naming the sibling path, the same shape as today's refusal for
+# <project>.
 #
 # The test is deliberately NOT a treehouse or orca path prefix. Treehouse's
 # root is configurable (--root, TREEHOUSE_ROOT, config, and a relative
@@ -239,17 +237,6 @@ real_dir() { (cd -P -- "$1" 2>/dev/null && pwd -P); }
 # already this script's JSON writer.
 real_file() { node -e 'process.stdout.write(require("node:fs").realpathSync(process.argv[1]))' "$1" 2>/dev/null; }
 
-# Normalize a git remote URL for origin comparison: strip the scheme, the
-# trailing .git suffix, and trailing slashes, so https://, ssh://, and file://
-# URLs for the same path all compare equal.
-normalize_git_url() {
-  local url=$1 ret
-  ret=${url%.git}
-  ret=${ret%/}
-  ret=${ret#*://}
-  printf '%s\n' "$ret"
-}
-
 # The resolved common dir of a git worktree, or empty. --git-common-dir can be
 # relative, so it is resolved from inside the worktree rather than joined here.
 common_dir_of() {
@@ -327,13 +314,8 @@ if [ "$MODE" = worktree ]; then
     # <project>. The dialog must be accepted rather than refusing this
     # perfectly valid worktree.
     #
-    # Two checks, each sufficient on its own, decide "same repository":
-    # 1. ORIGIN MATCH: the worktree's repo and <project> resolve the same
-    #    origin remote URL (normalized).
-    # 2. PATH MATCH: the worktree's primary checkout (dirname of its common
-    #    dir) is a firstmate project clone at a path matching
-    #    <firstmate-home>/projects/<same-basename-as-project>, AND git
-    #    evidence confirms it is the same repository.
+    # One check decides "same repository": the worktree's repo and
+    # <project> carry the exact same origin remote URL.
     SIBLING_CANON=$(real_dir "$(dirname -- "$WT_COMMON")") || true
     [ -n "$SIBLING_CANON" ] || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
 
@@ -347,33 +329,15 @@ if [ "$MODE" = worktree ]; then
 
     SIBLING_MATCH=
     if "$SIBLING_CHECKOUT_CONFIRMED"; then
-      # Check 1: origin URL comparison
       WT_ORIGIN=$(git -C "$TARGET_REAL" remote get-url origin 2>/dev/null) || true
       PROJ_ORIGIN=$(git -C "$PROJ_REAL" remote get-url origin 2>/dev/null) || true
-      if [ -n "$WT_ORIGIN" ] && [ -n "$PROJ_ORIGIN" ]; then
-        if [ "$(normalize_git_url "$WT_ORIGIN")" = "$(normalize_git_url "$PROJ_ORIGIN")" ]; then
-          SIBLING_MATCH=origin
-        fi
-      fi
-
-      # Check 2: path-based heuristic, also verified via origin comparison
-      if [ -z "$SIBLING_MATCH" ]; then
-        PROJ_BASENAME=$(basename "$PROJ_REAL")
-        case "$SIBLING_CANON" in
-          */projects/"$PROJ_BASENAME")
-            SIBLING_ORIGIN=$(git -C "$SIBLING_CANON" remote get-url origin 2>/dev/null) || true
-            if [ -n "$SIBLING_ORIGIN" ] && [ -n "$PROJ_ORIGIN" ]; then
-              if [ "$(normalize_git_url "$SIBLING_ORIGIN")" = "$(normalize_git_url "$PROJ_ORIGIN")" ]; then
-                SIBLING_MATCH=path
-              fi
-            fi
-            ;;
-        esac
+      if [ -n "$WT_ORIGIN" ] && [ "$WT_ORIGIN" = "$PROJ_ORIGIN" ]; then
+        SIBLING_MATCH=origin
       fi
     fi
 
     if [ -n "$SIBLING_MATCH" ]; then
-      echo "info: worktree '$TARGET_REAL' belongs to sibling clone '$SIBLING_CANON' ($SIBLING_MATCH match)" >&2
+      echo "info: worktree '$TARGET_REAL' belongs to sibling clone '$SIBLING_CANON' (origin match)" >&2
     else
       refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
     fi
