@@ -13,8 +13,9 @@
 #   <worktree>  the isolated task worktree this spawn launches into, which
 #               may be a worktree of <project> or a worktree of a sibling
 #               clone of the same repository (same origin URL)
-#   <project>   the primary checkout that worktree belongs to (or a sibling
-#               clone's checkout when the worktree is from a shared pool)
+#   <project>   the spawning home's checkout of the project: the checkout that
+#               worktree belongs to, or a sibling clone of the one it belongs
+#               to when the worktree came from a shared pool
 #   <home>      the seeded secondmate home this spawn launches into
 #   <id>        the secondmate id that home must already be marked for
 # Prints one line naming what it registered; refuses loudly on anything else.
@@ -58,7 +59,8 @@
 # canonicalization (`Fr`/`Se`) walks a linked worktree's `.git` file through
 # its `commondir` pointer back to the PRIMARY CHECKOUT, exactly the <project>
 # argument this script already receives for the worktree-mode scope test
-# below. So the trust flag is registered on BOTH the worktree entry (for
+# below (or, for a shared-pool slot, the sibling clone that test resolves in
+# its place). So the trust flag is registered on BOTH the worktree entry (for
 # trust's ancestor-walk fallback and defense in depth) and the project entry
 # (the trust check's first, canonical-shaped, look); the two external-imports
 # flags land on those same two entries only when the project entry already
@@ -90,7 +92,8 @@
 # different shapes on disk.
 #
 # WORKTREE MODE. <worktree> must be a LINKED git worktree - its own git dir,
-# sharing <project>'s common dir - whose top level is exactly the resolved
+# sharing <project>'s common dir, or that of a sibling clone of the same
+# repository (see below) - whose top level is exactly the resolved
 # argument. Git is the ground truth, so the argument is never trusted on its
 # own word: a primary checkout (git dir == common dir), a worktree of an
 # unrelated repo, a subdirectory of a worktree, a plain directory, and a home

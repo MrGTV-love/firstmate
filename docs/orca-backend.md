@@ -75,7 +75,7 @@ Reinstall the CLI and rerun; [`verification/runtime-backends.md`](verification/r
 - Escape is unsupported.
 - Orca exposes no stable CLI version or protocol marker, so readiness is the compatibility gate rather than a version floor.
 - Only the verified terminal-handle and worktree result fields are accepted; speculative response shapes are rejected.
-- Orca's worktree shape is unverified against the spawn-time Claude workspace-trust check in `bin/fm-claude-trust.sh`, which accepts only a linked git worktree of the project checkout or a sibling clone of the same repository sharing its origin; a claude spawn on Orca fails loudly at that check rather than launching if Orca clones instead of linking.
+- Orca's worktree shape is unverified against the spawn-time Claude workspace-trust check in `bin/fm-claude-trust.sh`, which accepts only a linked git worktree, either of the project checkout or of a sibling clone of the same repository with the same origin URL; a claude spawn on Orca fails loudly at that check rather than launching if Orca clones instead of linking.
 
 ## Regression entry points
 
