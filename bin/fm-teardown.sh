@@ -173,8 +173,9 @@
 #   recorded and named in the teardown line; the flag never relaxes the
 #   unlanded-work refusal, which --force alone can authorize. A legacy- stamp
 #   an abandoned attempt left behind never counts as a published incarnation:
-#   the record still reads as a legacy record, so the endpoint gate runs again
-#   and the retry still needs --legacy-record.
+#   the record still reads as a legacy record, so a recorded endpoint runs the
+#   endpoint gate again and the retry still needs --legacy-record. The safe
+#   windowless exception below retries its retained stamp without the flag.
 #   A tmux record with no window names no live endpoint, so there is nothing
 #   for that classifier to inspect and nothing to kill. Combined with a
 #   missing spawn_gen, that leftover would otherwise deadlock: automatic
