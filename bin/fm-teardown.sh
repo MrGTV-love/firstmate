@@ -175,6 +175,15 @@
 #   an abandoned attempt left behind never counts as a published incarnation:
 #   the record still reads as a legacy record, so the endpoint gate runs again
 #   and the retry still needs --legacy-record.
+#   A record with no window names no live endpoint, so there is nothing for
+#   that classifier to inspect and nothing to kill. Combined with a missing
+#   spawn_gen, that leftover would otherwise deadlock: automatic teardown
+#   refuses for want of spawn_gen, and --legacy-record then refuses for want
+#   of a window. Windowless leftovers are therefore accepted as
+#   missing-endpoint legacy records without --legacy-record; the shared
+#   endpoint validator is skipped so it cannot be read as the current window,
+#   kill is skipped, and a still-present worktree still faces the ordinary
+#   landed-work checks. Ambiguous window= fields are not windowless.
 #
 # Transient / stale worktree git lock recovery (teardown-lock-race): a crew process
 # killed mid-git-operation can leave a .git/worktrees/<wt>/index.lock (or, for a
@@ -442,6 +451,16 @@ TEARDOWN_LEGACY_RETAINED_STAMP=
 TEARDOWN_LEGACY_PRESTAMP_SIZE=0
 TEARDOWN_BACKLOG_APPLIES=0
 TEARDOWN_BACKLOG_SKIP_REASON=
+TEARDOWN_WINDOWLESS=0
+TEARDOWN_WINDOW_COUNT=$(LC_ALL=C grep -c '^window=' "$META" 2>/dev/null || true)
+case "$TEARDOWN_WINDOW_COUNT" in
+  0) TEARDOWN_WINDOWLESS=1 ;;
+  1)
+    case "$(fm_meta_get "$META" window)" in
+      '') TEARDOWN_WINDOWLESS=1 ;;
+    esac
+    ;;
+esac
 if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ]; then
   if fm_backlog_transition_applies "$CONFIG" "$DATA" "$TEARDOWN_META_KIND"; then
     TEARDOWN_BACKLOG_APPLIES=1
@@ -461,6 +480,12 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
       # A record that predates the incarnation field: acceptance is gated later,
       # once the recorded endpoint is known, so its state can be confirmed dead
       # or agent-less before any cleanup decision is made.
+      TEARDOWN_LEGACY_PENDING=1
+    elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ] && [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
+      # No window means this record names no live endpoint, so there is no
+      # incarnation for spawn_gen to identify and nothing for --legacy-record
+      # to classify. Accept it as a missing-endpoint leftover; a still-present
+      # worktree still faces the ordinary landed-work checks below.
       TEARDOWN_LEGACY_PENDING=1
     elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ]; then
       echo "error: task $ID's record has no spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
@@ -968,13 +993,22 @@ fi
 # This is the first cleanup authorization check. It is metadata-only and must
 # complete before fm-guard, a backend command, file removal, branch deletion,
 # worktree return, registry change, or process termination can run.
-fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
-BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-T=$FM_BACKEND_VALIDATED_TARGET
+# A windowless record names no endpoint: the shared validator would refuse it
+# (and must keep refusing it for control/kill callers), so teardown skips the
+# validator rather than probing or closing an ambient current window.
 WT=$(fm_meta_get "$META" worktree)
 PROJ=$(fm_meta_get "$META" project)
 T_ORCA=
-[ "$BACKEND" != orca ] || T_ORCA=$T
+if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
+  BACKEND=$(fm_meta_get "$META" backend)
+  [ -n "$BACKEND" ] || BACKEND=tmux
+  T=
+else
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  BACKEND=$FM_BACKEND_VALIDATED_BACKEND
+  T=$FM_BACKEND_VALIDATED_TARGET
+  [ "$BACKEND" != orca ] || T_ORCA=$T
+fi
 if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
   "$FM_ROOT/bin/fm-guard.sh" || true
 fi
@@ -1011,24 +1045,30 @@ fi
 MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 [ -n "$MODE" ] || MODE=no-mistakes
 
-# A record accepted as a legacy incarnation (no spawn_gen, --legacy-record
-# given) may be torn down only when its recorded endpoint is confidently gone
-# or agent-less; only the recovery-grade classifier's dead and missing license
+# A record accepted as a legacy incarnation (no spawn_gen, and either
+# --legacy-record given or the record is windowless) may be torn down only
+# when its recorded endpoint is confidently gone or agent-less. Windowless
+# leftovers name no endpoint and are treated as missing. For a recorded
+# window, only the recovery-grade classifier's dead and missing license
 # that, and every ambiguous, unreadable, or unverified endpoint state refuses
 # while the record is still intact. Acceptance resolves the incarnation token
 # here; the record itself is stamped only once every landed-work refusal has
 # passed, immediately before the close marker binds to it, so any refusal
 # leaves the record byte-identical.
 if [ "$TEARDOWN_LEGACY_PENDING" = 1 ]; then
-  TEARDOWN_LEGACY_ENDPOINT=$(fm_backend_agent_state "$BACKEND" "$T")
-  case "$TEARDOWN_LEGACY_ENDPOINT" in
-    dead|missing) ;;
-    *)
-      echo "REFUSED: task $ID's record predates spawn_gen and its recorded endpoint reads '$TEARDOWN_LEGACY_ENDPOINT', not confidently dead or agent-less; --legacy-record teardown is refused while an agent may still be bound to it. Nothing was changed." >&2
-      echo "Reconcile the endpoint first (bin/fm-crew-state.sh $ID), or relaunch the task to publish an unambiguous incarnation, then retry teardown." >&2
-      exit 1
-      ;;
-  esac
+  if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
+    TEARDOWN_LEGACY_ENDPOINT=missing
+  else
+    TEARDOWN_LEGACY_ENDPOINT=$(fm_backend_agent_state "$BACKEND" "$T")
+    case "$TEARDOWN_LEGACY_ENDPOINT" in
+      dead|missing) ;;
+      *)
+        echo "REFUSED: task $ID's record predates spawn_gen and its recorded endpoint reads '$TEARDOWN_LEGACY_ENDPOINT', not confidently dead or agent-less; --legacy-record teardown is refused while an agent may still be bound to it. Nothing was changed." >&2
+        echo "Reconcile the endpoint first (bin/fm-crew-state.sh $ID), or relaunch the task to publish an unambiguous incarnation, then retry teardown." >&2
+        exit 1
+        ;;
+    esac
+  fi
   if [ -n "$TEARDOWN_LEGACY_RETAINED_STAMP" ]; then
     TEARDOWN_META_SPAWN_GEN=$TEARDOWN_LEGACY_RETAINED_STAMP
   else
@@ -3297,7 +3337,7 @@ fi
 # refuses before any destructive step.
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
-if [ "$BACKEND" = herdr ]; then
+if [ "$TEARDOWN_WINDOWLESS" != 1 ] && [ "$BACKEND" = herdr ]; then
   teardown_herdr_preflight_target "$T" "$ID" || exit 1
   fm_backend_herdr_parse_target "$T" || exit 1
   TEARDOWN_HERDR_SESSION=$FM_BACKEND_HERDR_SESSION
@@ -3474,7 +3514,9 @@ if [ "$BACKEND" = herdr ] \
   fi
 fi
 
-if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
+if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
+  :
+elif [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
   # The presentation lock was acquired before the worktree return above; a
   # contended lock already refused this teardown while everything was intact.
   if teardown_herdr_session_lock_held "$HERDR_PRESENTATION_SESSION"; then
@@ -3517,7 +3559,7 @@ fi
 # the locked close. Only a structured not-found proves the pane gone; unknown
 # presence, missing or malformed endpoint identity, and missing confirmation
 # machinery all refuse.
-if [ "$BACKEND" = herdr ]; then
+if [ "$TEARDOWN_WINDOWLESS" != 1 ] && [ "$BACKEND" = herdr ]; then
   fm_backend_source herdr || true
   if ! declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1; then
     echo "error: herdr endpoint confirmation is unavailable for $ID; retaining every durable task record" >&2
@@ -3641,10 +3683,10 @@ if [ -d "$STATE" ]; then
   "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
 fi
 if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
-  echo "teardown $ID complete (window $T, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
+  echo "teardown $ID complete (window ${T:-none}, worktree ${WT:-none}, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif teardown_owns_worktree; then
-  echo "teardown $ID complete (window $T, worktree $WT)"
+  echo "teardown $ID complete (window ${T:-none}, worktree ${WT:-none})"
 else
-  echo "teardown $ID complete (window $T; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
+  echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi
 backlog_refresh_reminder

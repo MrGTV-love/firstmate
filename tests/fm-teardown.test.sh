@@ -1247,6 +1247,59 @@ test_legacy_record_without_the_flag_refuses() {
   pass "a record predating spawn_gen refuses teardown until --legacy-record is passed"
 }
 
+write_windowless_legacy_meta() {
+  local case_dir=$1 mode=$2 kind=$3 worktree
+  worktree=${4:-$case_dir/wt}
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "worktree=$worktree" \
+    "project=$case_dir/project" \
+    "kind=$kind" \
+    "mode=$mode" \
+    "harness=codex"
+}
+
+test_windowless_legacy_record_with_gone_worktree_tears_down() {
+  local case_dir out
+  case_dir=$(make_case windowless-gone)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  seed_backlog_in_flight "$case_dir"
+
+  out=$(run_teardown "$case_dir") \
+    || fail "windowless-gone: teardown refused a leftover with no window, no spawn_gen, and no worktree"
+  printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
+    || fail "windowless-gone: the teardown line did not log the missing-endpoint leftover: $out"
+  printf '%s\n' "$out" | grep -Fq 'window none' \
+    || fail "windowless-gone: the teardown line did not say there was no window: $out"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "windowless-gone: teardown returned success with its backlog item still open"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "windowless-gone: teardown left the leftover record"
+  pass "a windowless leftover with no spawn_gen and no worktree tears down without --legacy-record"
+}
+
+test_windowless_legacy_record_still_refuses_unlanded_work() {
+  local case_dir rc before
+  case_dir=$(make_case windowless-unlanded)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship
+  seed_backlog_in_flight "$case_dir"
+  wt_commit_file "$case_dir" feature.txt unique-windowless-content "real unlanded work"
+  before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "windowless-unlanded: a still-present unlanded worktree must refuse"
+  grep -q REFUSED "$case_dir/stderr" \
+    || fail "windowless-unlanded: no REFUSED line for unlanded windowless work"
+  [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
+    || fail "windowless-unlanded: the unlanded refusal modified the task record"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "windowless-unlanded: the unlanded refusal closed the backlog item anyway"
+  pass "a windowless leftover still refuses while its worktree holds unlanded work"
+}
+
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead() {
   local case_dir out
   case_dir=$(make_case legacy-allow)
@@ -3704,6 +3757,8 @@ test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
 test_gh_error_and_content_absent_refuses
 test_legacy_record_without_the_flag_refuses
+test_windowless_legacy_record_with_gone_worktree_tears_down
+test_windowless_legacy_record_still_refuses_unlanded_work
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead
 test_legacy_record_teardown_refuses_unlanded_work
 test_legacy_record_teardown_refuses_an_ambiguous_endpoint
