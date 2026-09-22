@@ -181,7 +181,8 @@
 #   teardown refuses for want of spawn_gen, and --legacy-record then refuses
 #   for want of a window. When backlog incarnation validation applies, such a
 #   leftover (no window, no spawn_gen or only a retained legacy stamp, no
-#   backend other than tmux, and every other identity field passing the shared
+#   backend other than tmux, no Orca terminal= or other backend's <backend>_*
+#   endpoint identity, and every other identity field passing the shared
 #   endpoint validator as if it named the task's own window) is accepted as a
 #   missing-endpoint legacy record with or without --legacy-record; the shared
 #   endpoint validator is skipped so it cannot be read as the current window,
@@ -464,13 +465,20 @@ case "$TEARDOWN_WINDOW_COUNT:$(fm_meta_get "$META" window)" in
   0:|1:)
     case "$TEARDOWN_BACKEND_COUNT:$(fm_meta_get "$META" backend)" in
       0:|1:tmux)
-        TEARDOWN_SHAPE_META=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-teardown-shape.XXXXXX") || exit 1
-        { LC_ALL=C grep -v '^window=' "$META" || true; printf 'window=leftover:fm-%s\n' "$ID"; } \
-          > "$TEARDOWN_SHAPE_META"
-        if fm_backend_validate_task_endpoint "$TEARDOWN_SHAPE_META" "$ID" 2>/dev/null; then
-          TEARDOWN_WINDOWLESS_SHAPE=1
+        TEARDOWN_FOREIGN_ENDPOINT_KEYS='^terminal='
+        for TEARDOWN_FOREIGN_BACKEND in $FM_BACKEND_KNOWN; do
+          [ "$TEARDOWN_FOREIGN_BACKEND" = tmux ] \
+            || TEARDOWN_FOREIGN_ENDPOINT_KEYS="$TEARDOWN_FOREIGN_ENDPOINT_KEYS|^${TEARDOWN_FOREIGN_BACKEND}_"
+        done
+        if ! LC_ALL=C grep -Eq "$TEARDOWN_FOREIGN_ENDPOINT_KEYS" "$META" 2>/dev/null; then
+          TEARDOWN_SHAPE_META=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-teardown-shape.XXXXXX") || exit 1
+          { LC_ALL=C grep -v '^window=' "$META" || true; printf 'window=leftover:fm-%s\n' "$ID"; } \
+            > "$TEARDOWN_SHAPE_META"
+          if fm_backend_validate_task_endpoint "$TEARDOWN_SHAPE_META" "$ID" 2>/dev/null; then
+            TEARDOWN_WINDOWLESS_SHAPE=1
+          fi
+          rm -f "$TEARDOWN_SHAPE_META"
         fi
-        rm -f "$TEARDOWN_SHAPE_META"
         ;;
     esac
     ;;
