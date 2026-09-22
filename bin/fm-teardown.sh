@@ -175,15 +175,19 @@
 #   an abandoned attempt left behind never counts as a published incarnation:
 #   the record still reads as a legacy record, so the endpoint gate runs again
 #   and the retry still needs --legacy-record.
-#   A record with no window names no live endpoint, so there is nothing for
-#   that classifier to inspect and nothing to kill. Combined with a missing
-#   spawn_gen, that leftover would otherwise deadlock: automatic teardown
-#   refuses for want of spawn_gen, and --legacy-record then refuses for want
-#   of a window. Windowless leftovers are therefore accepted as
-#   missing-endpoint legacy records without --legacy-record; the shared
+#   A tmux record with no window names no live endpoint, so there is nothing
+#   for that classifier to inspect and nothing to kill. Combined with a
+#   missing spawn_gen, that leftover would otherwise deadlock: automatic
+#   teardown refuses for want of spawn_gen, and --legacy-record then refuses
+#   for want of a window. When backlog incarnation validation applies, such a
+#   leftover (exactly one worktree and project, no window, no spawn_gen or
+#   only a retained legacy stamp, and no backend other than tmux) is accepted
+#   as a missing-endpoint legacy record without --legacy-record; the shared
 #   endpoint validator is skipped so it cannot be read as the current window,
 #   kill is skipped, and a still-present worktree still faces the ordinary
-#   landed-work checks. Ambiguous window= fields are not windowless.
+#   landed-work checks. Every other windowless record, including one with a
+#   spawn_gen, a non-tmux backend, or an ambiguous field, still faces the
+#   validator and refuses.
 #
 # Transient / stale worktree git lock recovery (teardown-lock-race): a crew process
 # killed mid-git-operation can leave a .git/worktrees/<wt>/index.lock (or, for a
@@ -452,12 +456,18 @@ TEARDOWN_LEGACY_PRESTAMP_SIZE=0
 TEARDOWN_BACKLOG_APPLIES=0
 TEARDOWN_BACKLOG_SKIP_REASON=
 TEARDOWN_WINDOWLESS=0
+TEARDOWN_WINDOWLESS_SHAPE=0
 TEARDOWN_WINDOW_COUNT=$(LC_ALL=C grep -c '^window=' "$META" 2>/dev/null || true)
-case "$TEARDOWN_WINDOW_COUNT" in
-  0) TEARDOWN_WINDOWLESS=1 ;;
-  1)
-    case "$(fm_meta_get "$META" window)" in
-      '') TEARDOWN_WINDOWLESS=1 ;;
+TEARDOWN_BACKEND_COUNT=$(LC_ALL=C grep -c '^backend=' "$META" 2>/dev/null || true)
+case "$TEARDOWN_WINDOW_COUNT:$(fm_meta_get "$META" window)" in
+  0:|1:)
+    case "$TEARDOWN_BACKEND_COUNT:$(fm_meta_get "$META" backend)" in
+      0:|1:tmux)
+        if fm_backend_meta_exact_value "$META" worktree >/dev/null \
+           && fm_backend_meta_exact_value "$META" project >/dev/null; then
+          TEARDOWN_WINDOWLESS_SHAPE=1
+        fi
+        ;;
     esac
     ;;
 esac
@@ -481,11 +491,12 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
       # once the recorded endpoint is known, so its state can be confirmed dead
       # or agent-less before any cleanup decision is made.
       TEARDOWN_LEGACY_PENDING=1
-    elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ] && [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
-      # No window means this record names no live endpoint, so there is no
+    elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ] && [ "$TEARDOWN_WINDOWLESS_SHAPE" = 1 ]; then
+      # A tmux record with no window names no live endpoint, so there is no
       # incarnation for spawn_gen to identify and nothing for --legacy-record
       # to classify. Accept it as a missing-endpoint leftover; a still-present
       # worktree still faces the ordinary landed-work checks below.
+      TEARDOWN_WINDOWLESS=1
       TEARDOWN_LEGACY_PENDING=1
     elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ]; then
       echo "error: task $ID's record has no spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
@@ -504,7 +515,9 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
         # legacy record it was, and is treated as one: the dead-or-agent-less
         # endpoint gate runs again on the retry instead of being skipped by
         # the abandoned attempt's own stamp.
-        if [ "$LEGACY_RECORD_GIVEN" != 1 ]; then
+        if [ "$TEARDOWN_WINDOWLESS_SHAPE" = 1 ]; then
+          TEARDOWN_WINDOWLESS=1
+        elif [ "$LEGACY_RECORD_GIVEN" != 1 ]; then
           echo "error: task $ID's record carries the legacy incarnation stamp $FM_BACKLOG_META_SPAWN_GEN left by an abandoned --legacy-record teardown, not an incarnation published by a spawn; refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
           exit 1
         fi
@@ -1000,8 +1013,7 @@ WT=$(fm_meta_get "$META" worktree)
 PROJ=$(fm_meta_get "$META" project)
 T_ORCA=
 if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
-  BACKEND=$(fm_meta_get "$META" backend)
-  [ -n "$BACKEND" ] || BACKEND=tmux
+  BACKEND=tmux
   T=
 else
   fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
@@ -3337,7 +3349,7 @@ fi
 # refuses before any destructive step.
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
-if [ "$TEARDOWN_WINDOWLESS" != 1 ] && [ "$BACKEND" = herdr ]; then
+if [ "$BACKEND" = herdr ]; then
   teardown_herdr_preflight_target "$T" "$ID" || exit 1
   fm_backend_herdr_parse_target "$T" || exit 1
   TEARDOWN_HERDR_SESSION=$FM_BACKEND_HERDR_SESSION
@@ -3514,9 +3526,7 @@ if [ "$BACKEND" = herdr ] \
   fi
 fi
 
-if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
-  :
-elif [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
+if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
   # The presentation lock was acquired before the worktree return above; a
   # contended lock already refused this teardown while everything was intact.
   if teardown_herdr_session_lock_held "$HERDR_PRESENTATION_SESSION"; then
@@ -3539,7 +3549,7 @@ elif [ "$BACKEND" = herdr ]; then
   else
     echo "warning: herdr session presentation lock path is unavailable; skipping the pane close rather than closing unlocked" >&2
   fi
-elif [ "$BACKEND" != orca ]; then
+elif [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
   fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
     || endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
 fi
@@ -3559,7 +3569,7 @@ fi
 # the locked close. Only a structured not-found proves the pane gone; unknown
 # presence, missing or malformed endpoint identity, and missing confirmation
 # machinery all refuse.
-if [ "$TEARDOWN_WINDOWLESS" != 1 ] && [ "$BACKEND" = herdr ]; then
+if [ "$BACKEND" = herdr ]; then
   fm_backend_source herdr || true
   if ! declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1; then
     echo "error: herdr endpoint confirmation is unavailable for $ID; retaining every durable task record" >&2

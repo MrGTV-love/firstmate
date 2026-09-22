@@ -1300,6 +1300,75 @@ test_windowless_legacy_record_still_refuses_unlanded_work() {
   pass "a windowless leftover still refuses while its worktree holds unlanded work"
 }
 
+assert_windowless_record_refuses() {  # <case-dir> <description> <refusal>
+  local case_dir=$1 description=$2 refusal=$3 rc before
+  before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "$description: a windowless record outside the leftover class must refuse"
+  grep -Fq "$refusal" "$case_dir/stderr" \
+    || fail "$description: the refusal was not '$refusal': $(cat "$case_dir/stderr")"
+  [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
+    || fail "$description: the refusal modified the task record"
+}
+
+test_windowless_record_outside_the_leftover_class_still_refuses() {
+  local case_dir
+  case_dir=$(make_case windowless-spawn-gen)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  printf '%s\n' 'spawn_gen=s1700000000.1.abc' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  assert_windowless_record_refuses "$case_dir" windowless-spawn-gen "missing, empty, or ambiguous window endpoint"
+
+  case_dir=$(make_case windowless-orca)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  printf '%s\n' 'backend=orca' 'terminal=term-7' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  assert_windowless_record_refuses "$case_dir" windowless-orca "no spawn_gen that identifies one exact incarnation"
+
+  case_dir=$(make_case windowless-no-backlog)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  assert_windowless_record_refuses "$case_dir" windowless-no-backlog "missing, empty, or ambiguous window endpoint"
+
+  case_dir=$(make_case windowless-dup-project)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  printf '%s\n' "project=$case_dir/other-project" >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  assert_windowless_record_refuses "$case_dir" windowless-dup-project "no spawn_gen that identifies one exact incarnation"
+  pass "a windowless record with a spawn_gen, a non-tmux backend, no backlog validation, or ambiguous identity still refuses"
+}
+
+test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
+  local case_dir rc out
+  case_dir=$(make_case windowless-retry)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  add_failing_truncate_perl "$case_dir"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "windowless-retry: an unrecordable close must fail the first attempt"
+  [ "$(legacy_meta_gen_count "$case_dir")" = 1 ] \
+    || fail "windowless-retry: the failed attempt did not leave its legacy stamp on the record"
+
+  rm -f "$case_dir/fakebin/perl"
+  sed -i.bak '/^pr=/d' "$case_dir/state/task-x1.meta" && rm -f "$case_dir/state/task-x1.meta.bak"
+  out=$(run_teardown "$case_dir") \
+    || fail "windowless-retry: the flag-less retry refused the retained legacy stamp"
+  printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
+    || fail "windowless-retry: the retry did not accept the missing-endpoint leftover: $out"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "windowless-retry: the retry left the leftover record"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "windowless-retry: the retry returned success with its backlog item still open"
+  pass "a windowless leftover retries its retained legacy stamp without --legacy-record"
+}
+
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead() {
   local case_dir out
   case_dir=$(make_case legacy-allow)
@@ -3759,6 +3828,8 @@ test_gh_error_and_content_absent_refuses
 test_legacy_record_without_the_flag_refuses
 test_windowless_legacy_record_with_gone_worktree_tears_down
 test_windowless_legacy_record_still_refuses_unlanded_work
+test_windowless_record_outside_the_leftover_class_still_refuses
+test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead
 test_legacy_record_teardown_refuses_unlanded_work
 test_legacy_record_teardown_refuses_an_ambiguous_endpoint

@@ -75,6 +75,16 @@ assert_refused_without_mutation() {  # <case> <id> <description>
 test_invalid_endpoint_records_refuse_before_mutation() {
   local dir id=endpoint-a
 
+  dir=$(make_case missing)
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  assert_refused_without_mutation "$dir" "$id" "missing endpoint"
+
+  dir=$(make_case empty)
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=" "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  assert_refused_without_mutation "$dir" "$id" "empty endpoint"
+
   dir=$(make_case malformed)
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=ambient-current-window" "worktree=$dir/worktree" \
@@ -99,36 +109,7 @@ test_invalid_endpoint_records_refuse_before_mutation() {
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   assert_refused_without_mutation "$dir" "$id" "duplicate task binding"
 
-  pass "fm-teardown: malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call"
-}
-
-assert_windowless_cleanup_skips_endpoint_kill() {  # <case> <id> <description>
-  local dir=$1 id=$2 description=$3 rc
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
-  [ "$rc" -eq 0 ] || fail "$description: windowless leftover teardown failed: $(cat "$dir/stderr")"
-  assert_absent "$dir/home/state/$id.meta" "$description: left the leftover record"
-  if grep -q tmux "$dir/runtime.log" 2>/dev/null; then
-    fail "$description: reached tmux: $(cat "$dir/runtime.log")"
-  fi
-}
-
-test_windowless_leftover_tears_down_without_an_endpoint_kill() {
-  local dir id=endpoint-a
-
-  dir=$(make_case missing-window)
-  fm_write_meta "$dir/home/state/$id.meta" \
-    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
-  assert_windowless_cleanup_skips_endpoint_kill "$dir" "$id" "missing window"
-
-  dir=$(make_case empty-window)
-  fm_write_meta "$dir/home/state/$id.meta" \
-    "window=" "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
-  assert_windowless_cleanup_skips_endpoint_kill "$dir" "$id" "empty window"
-
-  pass "fm-teardown: a windowless leftover retires without probing or killing an endpoint"
+  pass "fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call"
 }
 
 test_control_lock_contention_refuses_before_mutation() {
@@ -421,17 +402,11 @@ SH
     > "$dir/invalid.out" 2> "$dir/invalid.err"
   rc=$?
   set -e
-  [ "$rc" -eq 0 ] || fail "isolated windowless leftover teardown failed: $(cat "$dir/invalid.err")"
-  if grep -q tmux "$dir/runtime.log" 2>/dev/null; then
-    fail "isolated windowless leftover reached tmux: $(cat "$dir/runtime.log")"
-  fi
-  isolated_tmux_window_exists "$dir" "$socket" "$session" "$control" || fail "windowless leftover cleanup removed control window"
-  isolated_tmux_window_exists "$dir" "$socket" "$session" "$target" || fail "windowless leftover cleanup removed target window"
-  [ ! -e "$dir/home/state/invalid.meta" ] || fail "windowless leftover teardown left the record"
+  [ "$rc" -ne 0 ] || fail "isolated invalid endpoint unexpectedly succeeded"
+  [ ! -s "$dir/runtime.log" ] || fail "isolated invalid endpoint reached tmux"
+  isolated_tmux_window_exists "$dir" "$socket" "$session" "$control" || fail "invalid cleanup removed control window"
+  isolated_tmux_window_exists "$dir" "$socket" "$session" "$target" || fail "invalid cleanup removed target window"
 
-  # Leftover cleanup may log treehouse/worktree return on this same file.
-  # Reset it so the empty-target kill probe only sees its own runtime calls.
-  : > "$dir/runtime.log"
   set +e
   # shellcheck disable=SC2016 # $1 expands inside the isolated child shell.
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" FM_RUNTIME_LOG="$dir/runtime.log" \
@@ -1392,7 +1367,6 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
 }
 
 test_invalid_endpoint_records_refuse_before_mutation
-test_windowless_leftover_tears_down_without_an_endpoint_kill
 test_control_lock_contention_refuses_before_mutation
 test_non_pool_teardown_ignores_task_set_lock
 test_metadata_lock_serializes_destructive_cleanup
