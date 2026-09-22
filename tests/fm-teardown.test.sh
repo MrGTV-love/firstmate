@@ -1277,6 +1277,23 @@ test_windowless_legacy_record_with_gone_worktree_tears_down() {
   pass "a windowless leftover with no spawn_gen and no worktree tears down without --legacy-record"
 }
 
+test_windowless_legacy_record_tears_down_with_the_legacy_flag() {
+  local case_dir out
+  case_dir=$(make_case windowless-flag)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  seed_backlog_in_flight "$case_dir"
+
+  out=$(run_teardown "$case_dir" --legacy-record) \
+    || fail "windowless-flag: --legacy-record refused a leftover with no window and no spawn_gen"
+  printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
+    || fail "windowless-flag: the teardown line did not log the missing-endpoint leftover: $out"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "windowless-flag: teardown left the leftover record"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "windowless-flag: teardown returned success with its backlog item still open"
+  pass "a windowless leftover with no spawn_gen also tears down when --legacy-record is passed"
+}
+
 test_windowless_legacy_record_still_refuses_unlanded_work() {
   local case_dir rc before
   case_dir=$(make_case windowless-unlanded)
@@ -1337,7 +1354,17 @@ test_windowless_record_outside_the_leftover_class_still_refuses() {
   printf '%s\n' "project=$case_dir/other-project" >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   assert_windowless_record_refuses "$case_dir" windowless-dup-project "no spawn_gen that identifies one exact incarnation"
-  pass "a windowless record with a spawn_gen, a non-tmux backend, no backlog validation, or ambiguous identity still refuses"
+  case_dir=$(make_case windowless-foreign-binding)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
+  printf '%s\n' 'endpoint_task_id=task-other' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  assert_windowless_record_refuses "$case_dir" windowless-foreign-binding "no spawn_gen that identifies one exact incarnation"
+
+  case_dir=$(make_case windowless-control-char)
+  write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing"$'\t'"wt"
+  seed_backlog_in_flight "$case_dir"
+  assert_windowless_record_refuses "$case_dir" windowless-control-char "no spawn_gen that identifies one exact incarnation"
+  pass "a windowless record with a spawn_gen, a non-tmux backend, no backlog validation, or ambiguous, foreign, or malformed identity still refuses"
 }
 
 test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
@@ -3827,6 +3854,7 @@ test_dirty_worktree_refuses
 test_gh_error_and_content_absent_refuses
 test_legacy_record_without_the_flag_refuses
 test_windowless_legacy_record_with_gone_worktree_tears_down
+test_windowless_legacy_record_tears_down_with_the_legacy_flag
 test_windowless_legacy_record_still_refuses_unlanded_work
 test_windowless_record_outside_the_leftover_class_still_refuses
 test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag
