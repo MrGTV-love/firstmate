@@ -1,0 +1,49 @@
+## S1: real graft cache in this worktree (written by the live graft hook)
+graft/.cache/telemetry-repo-id.json
+graft/.cache/session/4b388661-7df8-4d44-872c-1d1abfa49d19.json
+graft/.cache/session/e288f7e5-dfe9-4785-a968-cc34727af5ba.json
+$ git check-ignore -v graft/.cache/telemetry-repo-id.json graft/.cache/session/*.json
+.gitignore:16:graft/.cache/	graft/.cache/telemetry-repo-id.json
+.gitignore:16:graft/.cache/	graft/.cache/session/4b388661-7df8-4d44-872c-1d1abfa49d19.json
+.gitignore:16:graft/.cache/	graft/.cache/session/e288f7e5-dfe9-4785-a968-cc34727af5ba.json
+$ git status --porcelain  (target 55dcfca)
+(empty = cache not shown as untracked)
+
+## S2: baseline vs target in throwaway clones, same cache files
+--- da9607d: git status --porcelain -uall
+?? graft/.cache/session/x.json
+?? graft/.cache/telemetry-repo-id.json
+--- da9607d: git add -A --dry-run
+add 'graft/.cache/session/x.json'
+add 'graft/.cache/telemetry-repo-id.json'
+--- 55dcfca: git status --porcelain -uall
+--- 55dcfca: git add -A --dry-run
+
+## S3 adversarial: pattern must not over-ignore siblings or nested paths (target)
+$ git status --porcelain -uall
+?? bin/.cache/z
+?? graft/README.md
+?? graft/src/x.sh
+?? sub/graft/.cache/y.json
+$ git check-ignore -v --no-index graft/.cache/q graft/README.md graft/src/x.sh sub/graft/.cache/y.json bin/.cache/z
+.gitignore:16:graft/.cache/	graft/.cache/q
+(only graft/.cache/q should match)
+
+## S4 adversarial: a force-added cache file is not silently tracked by base->target; index at target has no graft/.cache
+$ git ls-tree -r --name-only 55dcfca | grep -c '^graft/'
+0
+$ git ls-tree -r --name-only da9607d | grep -c '^graft/'
+0
+
+## S5 scope: files changed base..target (no trust-guard work)
+ .gitignore | 1 +
+ 1 file changed, 1 insertion(+)
+diff --git a/.gitignore b/.gitignore
+index 3eece43..99387af 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -13,3 +13,4 @@ __pycache__/
+ config/
+ 
+ .tools/
++graft/.cache/
