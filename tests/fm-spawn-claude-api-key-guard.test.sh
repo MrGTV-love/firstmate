@@ -265,6 +265,34 @@ test_tmux_env_follows_the_allowlist() {
   assert_contains "$out" "ANTHROPIC_API_KEY is set in the tmux global environment" \
     "the refusal should name the forwarded variable"
   pass "claude spawn tmux-environment check follows config/launch-env-allowlist"
+# Test 9: the launch command includes env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
+# for a non-opt-in claude spawn (R3-1 guard-env-shed).
+test_launch_includes_env_unset() {
+  local rec out status launchtext
+  rec=$(make_case launch-includes-env-unset claude launch-includes-env-unset-a1)
+  read_case "$rec"
+  out=$(run_case_spawn launch-includes-env-unset-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn should succeed"$'\n'"$out"
+  launchtext=$(cat "$LAUNCH_LOG")
+  assert_contains "$launchtext" 'env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN' \
+    "launch command should include env -u to strip credential variables"
+  pass "claude launch command includes env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN"
+}
+
+# Test 10: launch command does NOT include the env -u prefix when --allow-api-key is set.
+test_launch_no_env_unset_with_allow_flag() {
+  local rec out status launchtext
+  rec=$(make_case launch-no-env-unset claude launch-no-env-unset-a1)
+  read_case "$rec"
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
+    run_case_spawn launch-no-env-unset-a1 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn with --allow-api-key should succeed"$'\n'"$out"
+  launchtext=$(cat "$LAUNCH_LOG")
+  assert_not_contains "$launchtext" 'env -u ANTHROPIC_API_KEY' \
+    "launch command should NOT include env -u when --allow-api-key is set"
+  pass "claude launch command omits env -u when --allow-api-key is used"
 }
 
 # --- run --------------------------------------------------------------------
@@ -282,3 +310,5 @@ test_refuse_tmux_global_env
 test_succeed_tmux_session_removal_marker
 test_succeed_tmux_env_with_pin_shed
 test_tmux_env_follows_the_allowlist
+test_launch_includes_env_unset
+test_launch_no_env_unset_with_allow_flag

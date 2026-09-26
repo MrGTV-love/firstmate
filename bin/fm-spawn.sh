@@ -5171,6 +5171,15 @@ if [ -n "$WORKER_ACCOUNT" ]; then
 elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi
+# R3-1: For every claude launch that does not have the api_key=allow opt-in,
+# strip the Anthropic credential variables from the worker environment using
+# the same env -u mechanism as the worker-account pin shed. This closes the
+# gap where a key set in an existing tmux pane's captured environment would
+# reach the worker undetected by the spawning-env and tmux-environment checks.
+# See docs/configuration.md "Claude API key guard" for the known gaps.
+if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$WORKER_ACCOUNT" ]; then
+  LAUNCH="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $LAUNCH"
+fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
