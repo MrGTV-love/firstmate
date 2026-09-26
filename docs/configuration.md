@@ -985,17 +985,32 @@ printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches
 except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that
-the API key is intentional.
+the API key is intentional, or when a `config/claude-account` worker account pin
+is active: the pin strips both variables from the launch environment, so
+neither can reach the worker.
 A raw claude launch command (the unverified-adapter escape hatch) is also
 exempt from the guard.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task
-metadata so the session-start digest and later review show that the API key
-was deliberately enabled.
+metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement
+launch.
+A direct `fm-spawn.sh --relaunch` without the flag drops the line.
 
 When `config/launch-env-allowlist` is active, a variable name the allowlist
 does not list is filtered out of the worker environment; the guard does not
 refuse for a filtered-out variable, because it cannot reach the worker.
+
+On the tmux backend the guard also checks the environment a new worker window
+inherits, which can differ from `fm-spawn.sh`'s own environment (for example,
+when the tmux server started while the shell still exported the key).
+It reads the tmux session environment of the session the worker will join, and
+the tmux global environment: a session entry wins, a session removal marker
+(`-NAME`) means unset, and otherwise the global value applies.
+The global environment is checked even before the `firstmate` session exists.
+The refusal names the scope and the `tmux set-environment` command that clears it.
+The same pin and allowlist exemptions apply.
+Variables that the pane shell's rc files or a direnv `.envrc` export after the
+window opens are not detected.
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the guard mechanics and
 `--allow-api-key` flag, with focused regression coverage in

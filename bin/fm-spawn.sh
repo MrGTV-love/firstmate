@@ -104,10 +104,13 @@
 #   --allow-api-key opts in to deliberate Anthropic API billing for this
 #   claude worker launch. Without this flag, a claude worker REFUSES to launch
 #   when ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would reach the worker
-#   through ambient environment inheritance or config/launch-env-allowlist,
-#   because Claude Code prefers an API key over a claude.ai subscription login
-#   and silently bills the API. The opt-in is recorded as api_key=allow in the
-#   task metadata. Does not apply to non-claude harnesses.
+#   through ambient environment inheritance, config/launch-env-allowlist, or
+#   (tmux backend) the tmux session or global environment the new window
+#   inherits, because Claude Code prefers an API key over a claude.ai
+#   subscription login and silently bills the API. A config/claude-account pin
+#   strips both variables, so a pinned launch is not refused. The opt-in is
+#   recorded as api_key=allow in the task metadata and carried by fm-control
+#   relaunch. Does not apply to non-claude harnesses.
 #   A herdr crewmate or scout is placed in the exact workspace of the firstmate
 #   or secondmate process launching it, resolved from that process's own herdr
 #   pane rather than from a workspace label (herdr enforces no label uniqueness,
@@ -2403,46 +2406,51 @@ if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
       fi
     done
   fi
-  # Also check the tmux pane environment. The pane may have inherited the
-  # variables through the tmux global or session environment even when the
-  # spawning process does not. This is the same pattern muse uses for
-  # META_API_KEY presence (muse_worker_meta_api_key_present). The pin shed
-  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply to the
-  # spawning env and the pane env independently.
+  # Also check the environment a new tmux window gives the worker. The window
+  # inherits the tmux session environment layered over the tmux global
+  # environment, which can hold a key the spawning process no longer has (the
+  # server started while the shell exported it). A session entry wins, and a
+  # session removal marker (-NAME) means unset; otherwise the global value
+  # applies. The global environment is checked even before the target session
+  # exists, because a session created later inherits it. The pin shed
+  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
   # Pane rc files and direnv .envrc exports are not detected by this check.
-  if [ "$BACKEND" = tmux ]; then
+  if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
+    tmux_session=
     if [ -n "${TMUX:-}" ]; then
       tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
-    else
-      tmux_session=
-      if tmux has-session -t firstmate 2>/dev/null; then
-        tmux_session=firstmate
-      fi
+    elif tmux has-session -t firstmate 2>/dev/null; then
+      tmux_session=firstmate
     fi
-    if [ -n "$tmux_session" ]; then
-      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-        pane_val=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null) || continue
-        case "$pane_val" in
-        "$check_var"=?*)
-          # The variable is set to a non-empty value in the pane environment.
-          # Check if it would be stripped: the pin shed strips both, and the
-          # allowlist route may filter it out in the launch command itself.
-          if [ -z "$WORKER_ACCOUNT" ]; then
-            if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-              case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-              *$'\n'"$check_var"$'\n'*) ;;
-              *) continue ;;  # Allowlist filters it out at launch time
-              esac
-            fi
-            echo "error: $check_var is set in the tmux pane environment and would reach the claude worker; unset it (tmux set-environment -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-            exit 1
-          fi
-          # When WORKER_ACCOUNT is set, the pin shed strips it from the
-          # launch, so no refusal needed even if set in the pane.
-          ;;
+    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+        *$'\n'"$check_var"$'\n'*) ;;
+        *) continue ;;  # Allowlist filters it out at launch time
         esac
-      done
-    fi
+      fi
+      tmux_env_scope=
+      if [ -n "$tmux_session" ] \
+         && tmux_env_entry=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null); then
+        case "$tmux_env_entry" in
+        "$check_var"=?*) tmux_env_scope=session ;;
+        esac
+      elif tmux_env_entry=$(tmux show-environment -g "$check_var" 2>/dev/null); then
+        case "$tmux_env_entry" in
+        "$check_var"=?*) tmux_env_scope=global ;;
+        esac
+      fi
+      case "$tmux_env_scope" in
+      session)
+        echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+        ;;
+      global)
+        echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+        ;;
+      esac
+    done
   fi
 fi
 
