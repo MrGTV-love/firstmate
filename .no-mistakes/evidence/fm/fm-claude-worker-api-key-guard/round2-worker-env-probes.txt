@@ -1,0 +1,44 @@
+===== worker environment probes (positive control first) =====
+L9b positive control: key in tmux global env + --allow-api-key
+  Detected a custom API key in your environment
+
+  ANTHROPIC_API_KEY: sk-ant-...-LABFAKE-GLOBAL-0015 (lab fake key)
+
+  Do you want to use this API key?
+
+    Yes
+--- worker fm-l9b-allow (claude process env, via Claude ! shell mode; the prompt above is an overlay answered No before this probe, so it leaves no scrollback):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=SET
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    banner: Claude Max
+--- worker fm-l1-clean (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+--- worker fm-l4-glob (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+--- worker fm-l6-mark (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+--- worker fm-l7-filtered (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+--- worker fm-l8-pin (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+--- worker fm-l9-allow (claude process env, via Claude ! shell mode):
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+    custom-API-key prompt: never shown
+    banner: Claude Max
+

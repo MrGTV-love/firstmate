@@ -1,0 +1,179 @@
+===== scenario s0 =====
+$ bin/fm-spawn.sh s0-clean-a1 $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/s0-clean-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s0-clean-a1
+warning: $LAB/data/s0-clean-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s0-clean-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned s0-clean-a1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-s0-clean-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/1/demo
+exit=0
+
+===== scenario s1 =====
+$ bin/fm-spawn.sh s1-key-a1 $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s2 =====
+$ bin/fm-spawn.sh s2-tok-a1 $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s3 =====
+$ bash -c echo\ \"fm-spawn\ own\ env\ ANTHROPIC_API_KEY=\$\{ANTHROPIC_API_KEY:-\<unset\>\}\"\;\ tmux\ show-environment\ -t\ primary\ ANTHROPIC_API_KEY\;\ tmux\ show-environment\ -g\ ANTHROPIC_API_KEY\ \|\ sed\ \"s/=.\*/=\<redacted\>/\"\;\ exec\ bin/fm-spawn.sh\ s3-glob-a2\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+fm-spawn own env ANTHROPIC_API_KEY=<unset>
+unknown variable: ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s4 =====
+$ bash -c echo\ \"fm-spawn\ own\ env\ ANTHROPIC_AUTH_TOKEN=\$\{ANTHROPIC_AUTH_TOKEN:-\<unset\>\}\"\;\ tmux\ show-environment\ -t\ primary\ ANTHROPIC_AUTH_TOKEN\ \|\ sed\ \"s/=.\*/=\<redacted\>/\"\;\ tmux\ show-environment\ -g\ ANTHROPIC_AUTH_TOKEN\;\ exec\ bin/fm-spawn.sh\ s4-sess-a1\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+fm-spawn own env ANTHROPIC_AUTH_TOKEN=<unset>
+ANTHROPIC_AUTH_TOKEN=<redacted>
+unknown variable: ANTHROPIC_AUTH_TOKEN
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t primary -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s5 =====
+$ bash -c tmux\ show-environment\ -t\ primary\ ANTHROPIC_API_KEY\;\ tmux\ show-environment\ -g\ ANTHROPIC_API_KEY\ \|\ sed\ \"s/=.\*/=\<redacted\>/\"\;\ exec\ bin/fm-spawn.sh\ s5-mark-a1\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+-ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/s5-mark-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s5-mark-a1
+warning: $LAB/data/s5-mark-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s5-mark-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned s5-mark-a1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-s5-mark-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/2/demo
+exit=0
+
+===== scenario s6a =====
+$ bash -c cat\ \$FM_HOME/config/launch-env-allowlist\;\ echo\ \"fm-spawn\ own\ env\ ANTHROPIC_API_KEY=\$\{ANTHROPIC_API_KEY:+\<set\>\}\"\;\ tmux\ show-environment\ -g\ ANTHROPIC_API_KEY\ \|\ sed\ \"s/=.\*/=\<redacted\>/\"\;\ exec\ bin/fm-spawn.sh\ s6-allow-a1\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+# lab allowlist: key not listed
+GIT_AUTHOR_NAME
+fm-spawn own env ANTHROPIC_API_KEY=<set>
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/s6-allow-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s6-allow-a1
+warning: $LAB/data/s6-allow-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s6-allow-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned s6-allow-a1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-s6-allow-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/3/demo
+exit=0
+
+===== scenario s6b =====
+$ bash -c cat\ \$FM_HOME/config/launch-env-allowlist\;\ exec\ bin/fm-spawn.sh\ s6-allow-b1\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+# lab allowlist: key listed
+ANTHROPIC_API_KEY
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 340s ago, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s6c =====
+$ bin/fm-spawn.sh s6-allow-b1 $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 343s ago, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s7a =====
+$ bin/fm-spawn.sh s7-pin-nobrief $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 359s ago, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== scenario s7b =====
+$ bash -c cat\ \$FM_HOME/config/claude-account\;\ exec\ bin/fm-spawn.sh\ s7-pin-nobrief\ \$FM_HOME/projects/demo\ --mode\ local-only\ --yolo\ off
+ordinary
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 363s ago, grace 300s) - full banner already printed this episode.
+error: task s7-pin-nobrief has no brief at inaccessible data path $LAB/data/s7-pin-nobrief/brief.md
+exit=1
+
+===== scenario s8 =====
+$ bin/fm-spawn.sh s8-allow-a1 $LAB/projects/demo --mode local-only --yolo off --allow-api-key
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 378s ago, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s8-allow-a1
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s8-allow-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned s8-allow-a1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-s8-allow-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/4/demo
+exit=0
+
+===== scenario s9 =====
+$ bin/fm-control.sh s8-allow-a1 relaunch --note lab\ probe:\ relaunch\ carries\ api_key\ opt-in
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: task s8-allow-a1's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'relaunch'
+error: relaunch of s8-allow-a1 failed while stopping the old agent, which is still running; its original instructions were restored
+exit=1
+
+===== scenario s9b =====
+$ bin/fm-control.sh s8-allow-a1 relaunch --note lab\ probe:\ relaunch\ carries\ api_key\ opt-in
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 470s ago, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s8-allow-a1
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s8-allow-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched s8-allow-a1 harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-s8-allow-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/4/demo
+exit=0
+
+===== scenario s10 =====
+$ bin/fm-control.sh s0-clean-a1 relaunch --note lab\ probe:\ no\ opt-in\ relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 532s ago, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: the replacement agent for s0-clean-a1 could not be launched on claude
+error: s0-clean-a1's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at $LAB/treehouse/.treehouse/demo-8f4919/1/demo
+exit=1
+
+===== scenario s11 =====
+$ bin/fm-spawn.sh s8-allow-a1 --relaunch --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: 542s ago, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no ship branch; defaulting to legacy branch fm/s8-allow-a1
+warning: $LAB/data/s8-allow-a1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: s8-allow-a1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned s8-allow-a1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-s8-allow-a1 worktree=$LAB/treehouse/.treehouse/demo-8f4919/4/demo
+exit=0
+
+===== scenario s12 =====
+$ (outside tmux, ANTHROPIC_API_KEY unset in own env) bin/fm-spawn.sh s12-nosess-a1 $LAB/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== probe windows: what a NEW tmux window inherits =====
+-- probe-s5
+ANTHROPIC_API_KEY=<unset>
+ANTHROPIC_AUTH_TOKEN=<unset>
+-- probe-ctl
+ANTHROPIC_API_KEY=<set>
+ANTHROPIC_AUTH_TOKEN=<unset>
+-- probe-clean
+ANTHROPIC_API_KEY=<unset>
+ANTHROPIC_AUTH_TOKEN=<unset>
+===== lab tmux windows at end (no window exists for any refused task) =====
+0 bash
+1 fm-s0-clean-a1
+2 fm-s5-mark-a1
+3 fm-s6-allow-a1
+4 fm-s8-allow-a1
+===== state/s8-allow-a1.meta after S9 relaunch then S11 direct relaunch =====
+window=primary:fm-s8-allow-a1
+endpoint_task_id=s8-allow-a1
+worktree=$LAB/treehouse/.treehouse/demo-8f4919/4/demo
+project=$LAB/projects/demo
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/s8-allow-a1
+tasktmp=/tmp/fm-s8-allow-a1
+model=default
+effort=default
+busy_gen=g1790444324.39676.7561
+spawn_gen=s1790444325.34484.13494

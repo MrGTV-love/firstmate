@@ -1,0 +1,13 @@
+test_absent_pin_keeps_the_launch_unchanged                           rc=1 not ok - an unpinned Claude spawn should succeed: error: ANTHROPIC_API_KEY is set and would reach the claude worker thro
+test_claude_pin_selects_the_root_and_sheds_ambient_credentials       rc=0 
+test_claude_pin_refuses_a_signed_out_root_despite_an_ambient_login   rc=0 
+test_claude_ordinary_pin_unsets_the_config_root                      rc=0 
+test_malformed_pins_refuse_before_launch                             rc=0 
+test_pi_pin_selects_the_root_and_the_declared_provider               rc=0 
+test_pi_pin_refusals                                                 rc=0 
+test_pi_extension_provider_and_old_pi_fall_back_to_the_model_listing rc=0 
+test_a_pin_governs_only_its_own_runner                               rc=0 
+test_raw_claude_command_receives_the_pin                             rc=0 
+test_raw_claude_account_override_refuses_under_a_pin                 rc=0 
+test_raw_claude_account_override_is_kept_without_a_pin               rc=1 not ok - an unpinned home should accept a raw Claude account override: error: ANTHROPIC_API_KEY is set and would reach t
+test_local_secondmate_reads_the_launching_home_pin                   rc=0 

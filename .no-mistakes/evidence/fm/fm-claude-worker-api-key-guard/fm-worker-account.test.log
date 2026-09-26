@@ -1,0 +1,1 @@
+not ok - an unpinned Claude spawn should succeed: error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API: expected exit 0, got 1

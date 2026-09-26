@@ -1,0 +1,270 @@
+===== L1-clean-spawn =====
+$ $FM_HOME/mkbrief.sh l1-clean && bin/fm-spawn.sh l1-clean $FM_HOME/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/l1-clean/launch-brief.md records no ship branch; defaulting to legacy branch fm/l1-clean
+warning: $LAB/data/l1-clean/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l1-clean ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l1-clean harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l1-clean worktree=$LAB/treehouse/.treehouse/demo-37ddd5/1/demo
+exit=0
+
+===== L2-own-env-api-key =====
+$ $FM_HOME/mkbrief.sh l2-key && ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0001 bin/fm-spawn.sh l2-key $FM_HOME/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L3-own-env-auth-token =====
+$ $FM_HOME/mkbrief.sh l3-tok && ANTHROPIC_AUTH_TOKEN=sk-ant-LABFAKE-SECRET-0002 bin/fm-spawn.sh l3-tok $FM_HOME/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L4-tmux-global-only =====
+$ echo "own env ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-<unset>}"; tmux show-environment -t primary ANTHROPIC_API_KEY; tmux show-environment -g ANTHROPIC_API_KEY | sed "s/=.*/=<redacted>/"; $FM_HOME/mkbrief.sh l4-glob && bin/fm-spawn.sh l4-glob $FM_HOME/projects/demo --mode local-only --yolo off
+own env ANTHROPIC_API_KEY=<unset>
+unknown variable: ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L4b-follow-refusal-advice-then-spawn =====
+$ tmux set-environment -g -u ANTHROPIC_API_KEY; tmux show-environment -g ANTHROPIC_API_KEY; bin/fm-spawn.sh l4-glob $FM_HOME/projects/demo --mode local-only --yolo off
+unknown variable: ANTHROPIC_API_KEY
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l4-glob/launch-brief.md records no ship branch; defaulting to legacy branch fm/l4-glob
+warning: $LAB/data/l4-glob/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l4-glob ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l4-glob harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l4-glob worktree=$LAB/treehouse/.treehouse/demo-37ddd5/2/demo
+exit=0
+
+===== L5-tmux-session-only =====
+$ echo "own env ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-<unset>}"; tmux show-environment -t primary ANTHROPIC_AUTH_TOKEN | sed "s/=.*/=<redacted>/"; tmux show-environment -g ANTHROPIC_AUTH_TOKEN; $FM_HOME/mkbrief.sh l5-sess && bin/fm-spawn.sh l5-sess $FM_HOME/projects/demo --mode local-only --yolo off
+own env ANTHROPIC_AUTH_TOKEN=<unset>
+ANTHROPIC_AUTH_TOKEN=<redacted>
+unknown variable: ANTHROPIC_AUTH_TOKEN
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t primary -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L6-session-removal-marker-overrides-global =====
+$ tmux show-environment -t primary ANTHROPIC_API_KEY; tmux show-environment -g ANTHROPIC_API_KEY | sed "s/=.*/=<redacted>/"; $FM_HOME/mkbrief.sh l6-mark && bin/fm-spawn.sh l6-mark $FM_HOME/projects/demo --mode local-only --yolo off
+-ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l6-mark/launch-brief.md records no ship branch; defaulting to legacy branch fm/l6-mark
+warning: $LAB/data/l6-mark/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l6-mark ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l6-mark harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l6-mark worktree=$LAB/treehouse/.treehouse/demo-37ddd5/3/demo
+exit=0
+
+===== L6-pre probes: what a NEW tmux window in session primary inherits =====
+[global ANTHROPIC_API_KEY set, no session entry]
+new tmux window probe-glob environment: ANTHROPIC_API_KEY=SET ANTHROPIC_AUTH_TOKEN=unset 
+[global set, session removal marker -ANTHROPIC_API_KEY]
+new tmux window probe-mark environment: ANTHROPIC_API_KEY=unset ANTHROPIC_AUTH_TOKEN=unset 
+
+===== L7a-allowlist-omits-key-own-env-and-global =====
+$ cat $FM_HOME/config/launch-env-allowlist; tmux show-environment -g ANTHROPIC_API_KEY | sed "s/=.*/=<redacted>/"; $FM_HOME/mkbrief.sh l7-filtered && ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0007 ANTHROPIC_AUTH_TOKEN=sk-ant-LABFAKE-SECRET-0008 bin/fm-spawn.sh l7-filtered $FM_HOME/projects/demo --mode local-only --yolo off
+# lab allowlist: Anthropic names NOT listed
+GIT_AUTHOR_NAME
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l7-filtered/launch-brief.md records no ship branch; defaulting to legacy branch fm/l7-filtered
+warning: $LAB/data/l7-filtered/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l7-filtered ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l7-filtered harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l7-filtered worktree=$LAB/treehouse/.treehouse/demo-37ddd5/4/demo
+exit=0
+
+===== L7b-allowlist-lists-key-own-env =====
+$ cat $FM_HOME/config/launch-env-allowlist; $FM_HOME/mkbrief.sh l7-listed && ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0009 bin/fm-spawn.sh l7-listed $FM_HOME/projects/demo --mode local-only --yolo off
+# lab allowlist: key listed
+ANTHROPIC_API_KEY
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L7c-allowlist-lists-key-tmux-global-only =====
+$ cat $FM_HOME/config/launch-env-allowlist; echo "own env ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-<unset>}"; bin/fm-spawn.sh l7-listed $FM_HOME/projects/demo --mode local-only --yolo off
+# lab allowlist: key listed
+ANTHROPIC_API_KEY
+own env ANTHROPIC_API_KEY=<unset>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1
+
+===== L8-claude-account-pin-sheds-keys =====
+$ cat $FM_HOME/config/claude-account; tmux show-environment -g ANTHROPIC_API_KEY | sed "s/=.*/=<redacted>/"; $FM_HOME/mkbrief.sh l8-pin && ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0012 ANTHROPIC_AUTH_TOKEN=sk-ant-LABFAKE-SECRET-0013 bin/fm-spawn.sh l8-pin $FM_HOME/projects/demo --mode local-only --yolo off; rc=$?; grep -E "^(account|api_key)" $FM_HOME/state/l8-pin.meta; exit $rc
+ordinary
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l8-pin/launch-brief.md records no ship branch; defaulting to legacy branch fm/l8-pin
+warning: $LAB/data/l8-pin/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l8-pin ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l8-pin harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l8-pin worktree=$LAB/treehouse/.treehouse/demo-37ddd5/5/demo account=ordinary
+account=ordinary
+exit=0
+
+===== L9-allow-api-key-opt-in =====
+$ export ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0014; $FM_HOME/mkbrief.sh l9-allow && bin/fm-spawn.sh l9-allow $FM_HOME/projects/demo --mode local-only --yolo off --allow-api-key; rc=$?; echo "--- state/l9-allow.meta api_key lines:"; grep -c "^api_key=" $FM_HOME/state/l9-allow.meta; grep "^api_key=" $FM_HOME/state/l9-allow.meta; unset ANTHROPIC_API_KEY; exit $rc
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l9-allow/launch-brief.md records no ship branch; defaulting to legacy branch fm/l9-allow
+warning: $LAB/data/l9-allow/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l9-allow ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l9-allow harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l9-allow worktree=$LAB/treehouse/.treehouse/demo-37ddd5/6/demo
+--- state/l9-allow.meta api_key lines:
+1
+api_key=allow
+exit=0
+
+===== L9b-allow-api-key-with-key-in-tmux-global =====
+$ tmux show-environment -g ANTHROPIC_API_KEY | sed "s/=.*/=<redacted>/"; $FM_HOME/mkbrief.sh l9b-allow && bin/fm-spawn.sh l9b-allow $FM_HOME/projects/demo --mode local-only --yolo off --allow-api-key; rc=$?; grep "^api_key=" $FM_HOME/state/l9b-allow.meta; exit $rc
+ANTHROPIC_API_KEY=<redacted>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l9b-allow/launch-brief.md records no ship branch; defaulting to legacy branch fm/l9b-allow
+warning: $LAB/data/l9b-allow/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l9b-allow ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l9b-allow harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l9b-allow worktree=$LAB/treehouse/.treehouse/demo-37ddd5/7/demo
+api_key=allow
+exit=0
+
+===== L10-fm-control-relaunch-carries-opt-in =====
+$ echo "--- before:"; grep "^api_key=\|^spawn_gen=" $FM_HOME/state/l9-allow.meta; ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0016 bin/fm-control.sh l9-allow relaunch --note "lab probe: relaunch carries api_key opt-in"; rc=$?; echo "--- after (api_key line count, lines):"; grep -c "^api_key=" $FM_HOME/state/l9-allow.meta; grep "^api_key=\|^spawn_gen=" $FM_HOME/state/l9-allow.meta; exit $rc
+--- before:
+api_key=allow
+spawn_gen=s1790445377.26974.5561
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l9-allow/launch-brief.md records no ship branch; defaulting to legacy branch fm/l9-allow
+warning: $LAB/data/l9-allow/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l9-allow ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched l9-allow harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-l9-allow worktree=$LAB/treehouse/.treehouse/demo-37ddd5/6/demo
+--- after (api_key line count, lines):
+1
+api_key=allow
+spawn_gen=s1790445581.41631.984
+exit=0
+
+===== L11-fm-control-relaunch-without-opt-in-refused =====
+$ grep -c "^api_key=" $FM_HOME/state/l1-clean.meta; ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0017 bin/fm-control.sh l1-clean relaunch --note "lab probe: no opt-in relaunch"
+0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: the replacement agent for l1-clean could not be launched on claude
+error: l1-clean's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at $LAB/treehouse/.treehouse/demo-37ddd5/1/demo
+exit=1
+
+===== L12-direct-spawn-relaunch-without-flag-drops-line =====
+$ echo "--- before:"; grep "^api_key=" $FM_HOME/state/l9-allow.meta; bin/fm-control.sh l9-allow exit || exit 9; bin/fm-spawn.sh l9-allow --relaunch --harness claude; rc=$?; echo "--- after (api_key line count):"; grep -c "^api_key=" $FM_HOME/state/l9-allow.meta; exit $rc
+--- before:
+api_key=allow
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+stopped l9-allow harness=claude backend=tmux endpoint=primary:fm-l9-allow worktree=$LAB/treehouse/.treehouse/demo-37ddd5/6/demo
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l9-allow/launch-brief.md records no ship branch; defaulting to legacy branch fm/l9-allow
+warning: $LAB/data/l9-allow/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l9-allow ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l9-allow harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l9-allow worktree=$LAB/treehouse/.treehouse/demo-37ddd5/6/demo
+--- after (api_key line count):
+0
+exit=0
+
+===== L13-outside-tmux-no-firstmate-session-global-key =====
+$ (outside tmux; private default-socket server in $LAB/tmux2 started with the key; no firstmate session) bin/fm-spawn.sh l13-nosess $FM_HOME/projects/demo --mode local-only --yolo off
+sessions: other
+ANTHROPIC_API_KEY=<redacted>
+own env ANTHROPIC_API_KEY=<unset>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+exit=1  (captured on an identical re-run; the first capture used a bash-only variable in zsh)
+sessions after: other (no firstmate session and no worker window were created)
+
+===== L14-non-claude-harness-not-guarded =====
+$ $FM_HOME/mkbrief.sh l14-codex && ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0020 bin/fm-spawn.sh l14-codex $FM_HOME/projects/demo --mode local-only --yolo off --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: $LAB/data/l14-codex/launch-brief.md records no ship branch; defaulting to legacy branch fm/l14-codex
+warning: $LAB/data/l14-codex/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l14-codex ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l14-codex harness=codex kind=ship mode=local-only yolo=off window=primary:fm-l14-codex worktree=$LAB/treehouse/.treehouse/demo-37ddd5/8/demo
+exit=0
+
+===== L15a-batch-without-opt-in-refuses-each-pair =====
+$ ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0021 bin/fm-spawn.sh l15-b1=$FM_HOME/projects/demo l15-b2=$FM_HOME/projects/demo --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+batch: FAILED to spawn l15-b1 ($LAB/projects/demo)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+batch: FAILED to spawn l15-b2 ($LAB/projects/demo)
+exit=1
+
+===== L15b-batch-with-opt-in-propagates-to-each-pair =====
+$ ANTHROPIC_API_KEY=sk-ant-LABFAKE-SECRET-0022 bin/fm-spawn.sh l15-b1=$FM_HOME/projects/demo l15-b2=$FM_HOME/projects/demo --mode local-only --yolo off --allow-api-key; rc=$?; for i in l15-b1 l15-b2; do echo "$i: $(grep "^api_key=" $FM_HOME/state/$i.meta)"; done; exit $rc
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/l15-b1/launch-brief.md records no ship branch; defaulting to legacy branch fm/l15-b1
+warning: $LAB/data/l15-b1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l15-b1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l15-b1 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l15-b1 worktree=$LAB/treehouse/.treehouse/demo-37ddd5/9/demo
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: $LAB/data/l15-b2/launch-brief.md records no ship branch; defaulting to legacy branch fm/l15-b2
+warning: $LAB/data/l15-b2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: l15-b2 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned l15-b2 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-l15-b2 worktree=$LAB/treehouse/.treehouse/demo-37ddd5/10/demo
+l15-b1: api_key=allow
+l15-b2: api_key=allow
+exit=0
+
+===== lab tmux windows at end (no window exists for any refused task: l2-key l3-tok l5-sess l7-listed l13-nosess, and l15 pairs only after opt-in) =====
+0 bash
+1 fm-l1-clean
+2 fm-l4-glob
+3 fm-l7-filtered
+4 fm-l8-pin
+5 fm-l6-mark
+6 fm-l9-allow
+7 fm-l9b-allow
+8 fm-l14-codex
+9 fm-l15-b1
+10 fm-l15-b2
+
+===== state/*.meta api_key lines at end =====
+l1-clean.meta: 
+l14-codex.meta: 
+l15-b1.meta: api_key=allow 
+l15-b2.meta: api_key=allow 
+l4-glob.meta: 
+l6-mark.meta: 
+l7-filtered.meta: 
+l8-pin.meta: 
+l9-allow.meta: 
+l9b-allow.meta: api_key=allow 
+leak check: occurrences of the fake secret values in fm-spawn/fm-control OUTPUT logs (commands excluded):
+0

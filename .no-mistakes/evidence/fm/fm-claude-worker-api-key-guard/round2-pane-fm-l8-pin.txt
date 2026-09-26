@@ -1,0 +1,30 @@
+treehouse get
+charlesabrooker@GTT-CB demo % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.4Mmujx/treehouse/.treehouse/demo-37ddd5/5/demo. Type 'exit' to return.
+charlesabrooker@GTT-CB demo % export GOTMPDIR=/tmp/fm-l8-pin/gotmp
+charlesabrooker@GTT-CB demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB demo % export FM_TASK_ID=l8-pin
+charlesabrooker@GTT-CB demo % . '/tmp/fm-l8-pin+34bfdd917394f67bb1f1bcf0477782d92a6312691f66ba687f5e271067418285/launch.s1790445356.24208.17815.sh'
+ ▐▛███▛█   Claude Code v2.1.283
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-lab.4Mmujx/treehouse/.treehouse/demo-37ddd5/5/demo
+❯ : Firstmate operational input waiting: read '$LAB/state/operational-inbox/1790445357-de66bbb6afe9d9af.msg' and handle its contents as Firstmate operational input.
+  Read 1 file (ctrl+o to expand)
+⏺ ok
+✻ Churned for 5s · done 12:56 PM
+! bash $LAB/envcheck.sh
+  ⎿  ENVCHECK ANTHROPIC_API_KEY=unset
+     ENVCHECK ANTHROPIC_AUTH_TOKEN=unset
+⏺ I see your check output. Both keys are unset in this shell:
+  - ANTHROPIC_API_KEY is unset.
+  - ANTHROPIC_AUTH_TOKEN is unset.
+  I did not change any file. The task still needs nothing from me.
+✻ Brewed for 2s · done 12:59 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 3% 32k/1.0M demo:a0cd7efe
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

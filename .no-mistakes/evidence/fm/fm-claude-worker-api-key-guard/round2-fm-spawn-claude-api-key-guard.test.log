@@ -1,0 +1,14 @@
+ok - claude spawn refuses when ANTHROPIC_API_KEY is set and no allowlist
+ok - claude spawn refuses when ANTHROPIC_AUTH_TOKEN is set and no allowlist
+ok - claude spawn succeeds when no API key is set
+ok - claude spawn succeeds when ANTHROPIC_API_KEY is filtered out by allowlist
+ok - claude spawn succeeds with --allow-api-key flag
+ok - non-claude harness ignores ANTHROPIC_API_KEY
+ok - claude spawn succeeds with pin shed when ANTHROPIC_API_KEY is set
+ok - task meta records api_key=allow when --allow-api-key is used
+ok - claude spawn refuses a key set only in the tmux session environment
+ok - claude spawn refuses a key set only in the tmux global environment
+ok - claude spawn honors a tmux session removal marker over a global key
+ok - claude spawn succeeds with pin shed when the tmux environment holds a key
+ok - claude spawn tmux-environment check follows config/launch-env-allowlist
+rc=0
