@@ -972,6 +972,35 @@ Every fleet launch, Claude included, also receives a pane-scoped `GIT_CONFIG` `c
 That directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 
+### Claude API key guard
+
+Every claude worker Firstmate launches is refused before creation when
+`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through
+ambient environment inheritance or an explicit allowlist entry.
+Claude Code prefers an API key over a claude.ai subscription login and silently
+bills the API, so this guard prevents accidental API charges when the captain
+intends subscription billing.
+The refusal names the variable that triggered it; the credential value is never
+printed or logged.
+
+The guard applies to all claude ship, scout, secondmate, and relaunch launches
+except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that
+the API key is intentional.
+A raw claude launch command (the unverified-adapter escape hatch) is also
+exempt from the guard.
+
+When `--allow-api-key` is used, `api_key=allow` is recorded in the task
+metadata so the session-start digest and later review show that the API key
+was deliberately enabled.
+
+When `config/launch-env-allowlist` is active, a variable name the allowlist
+does not list is filtered out of the worker environment; the guard does not
+refuse for a filtered-out variable, because it cannot reach the worker.
+
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the guard mechanics and
+`--allow-api-key` flag, with focused regression coverage in
+[`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
+
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.

@@ -101,6 +101,13 @@
 #   A backend spawn refusal (missing dependency, version gate, unauthenticated
 #   socket, or unsupported secondmate mode) is terminal for that selected backend;
 #   callers must surface it instead of silently retrying another backend.
+#   --allow-api-key opts in to deliberate Anthropic API billing for this
+#   claude worker launch. Without this flag, a claude worker REFUSES to launch
+#   when ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would reach the worker
+#   through ambient environment inheritance or config/launch-env-allowlist,
+#   because Claude Code prefers an API key over a claude.ai subscription login
+#   and silently bills the API. The opt-in is recorded as api_key=allow in the
+#   task metadata. Does not apply to non-claude harnesses.
 #   A herdr crewmate or scout is placed in the exact workspace of the firstmate
 #   or secondmate process launching it, resolved from that process's own herdr
 #   pane rather than from a workspace label (herdr enforces no label uniqueness,
@@ -640,6 +647,7 @@ YOLO_SET=0
 BRANCH_PREFIX_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
+ALLOW_API_KEY=0
 POS=()
 want_value=
 for a in "$@"; do
@@ -701,6 +709,7 @@ for a in "$@"; do
     KIND_SET=1
     ;;
   --relaunch) RELAUNCH=1 ;;
+  --allow-api-key) ALLOW_API_KEY=1 ;;
   --harness) want_value=harness ;;
   --harness=*)
     HARNESS_ARG=${a#--harness=}
@@ -1448,6 +1457,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$MODE_SET" -eq 0 ] || shared_args+=(--mode "$MODE")
   [ "$YOLO_SET" -eq 0 ] || shared_args+=(--yolo "$YOLO")
   [ "$BRANCH_PREFIX_SET" -eq 0 ] || shared_args+=(--branch-prefix "$BRANCH_PREFIX")
+  [ "$ALLOW_API_KEY" -eq 0 ] || shared_args+=(--allow-api-key)
   for pair in "${POS[@]}"; do
     case "$pair" in
     *=*) : ;;
@@ -2360,6 +2370,46 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
     export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
   else
     unset CLAUDE_CONFIG_DIR
+  fi
+fi
+
+# Claude API key guard: refuse to launch a Claude worker when an Anthropic API
+# key would reach the worker, unless the caller explicitly opts in with
+# --allow-api-key. A key set in the spawning environment silently redirects
+# Claude Code to API billing even when the user has a valid claude.ai
+# subscription (issue #5723).
+if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
+  if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+    # With an allowlist, only variables listed in the allowlist reach the
+    # worker. If ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN is in the
+    # allowlist AND set in the spawning environment, it would reach the
+    # worker. If NOT in the allowlist, it is filtered out -> no refusal.
+    case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+    *$'\nANTHROPIC_API_KEY\n'*)
+      if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        echo "error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+      fi
+      ;;
+    esac
+    case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+    *$'\nANTHROPIC_AUTH_TOKEN\n'*)
+      if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+        echo "error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+      fi
+      ;;
+    esac
+  else
+    # No allowlist: the ambient environment reaches the worker as-is.
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API" >&2
+      exit 1
+    fi
+    if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+      echo "error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -4746,6 +4796,7 @@ preserve_relaunch_meta() {
   # task record stays byte-identical.
   [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
   [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
+  [ "$ALLOW_API_KEY" -eq 0 ] || echo "api_key=allow"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
   # Default-off writes no traceparent= line.
