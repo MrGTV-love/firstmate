@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tests/fm-spawn-claude-api-key-guard.test.sh - every claude worker this fleet
 # launches must be refused when ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would
-# reach it, unless --allow-api-key opts in.
+# reach it, unless --allow-api-key opts in or the worker-account pin shed strips
+# the variable from the launch environment.
 #
 # The assertions never read bin/fm-spawn.sh's source. They drive the real spawn
 # against a fake pane and a real isolated git worktree, then check the exit
@@ -131,6 +132,49 @@ test_non_claude_harness_ignores_api_key() {
   pass "non-claude harness ignores ANTHROPIC_API_KEY"
 }
 
+# Test 7: claude spawn succeeds with worker-account pin when ANTHROPIC_API_KEY
+# is set, because the pin shed strips it from the launch (F2).
+test_succeed_with_pin_shed() {
+  local rec out status
+  rec=$(make_case succeed-pin-shed claude succeed-pin-shed-a1)
+  read_case "$rec"
+  # Install a claude binary that answers 'auth status' as signed in.
+  cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/bin/sh
+case "${1:-}" in
+auth) printf '{\n  "status": "signed_in"\n}\n' && exit 0 ;;
+*)   exit 1 ;;
+esac
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  # Create a config/claude-account pin file with a throwaway root.
+  local auth_root
+  auth_root="$CASE_DIR/auth-pin"
+  mkdir -p "$auth_root"
+  printf '%s\n' "$auth_root" > "$HOME_DIR/config/claude-account"
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
+    run_case_spawn succeed-pin-shed-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn should succeed with worker-account pin when ANTHROPIC_API_KEY is set"$'\n'"$out"
+  pass "claude spawn succeeds with pin shed when ANTHROPIC_API_KEY is set"
+}
+
+# Test 8: --allow-api-key is recorded in task metadata.
+test_allow_api_key_recorded_in_meta() {
+  local rec out status meta
+  rec=$(make_case record-api-key claude record-api-key-a1)
+  read_case "$rec"
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
+    run_case_spawn record-api-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "spawn with --allow-api-key should succeed"$'\n'"$out"
+  meta="$HOME_DIR/state/record-api-key-a1.meta"
+  [ -f "$meta" ] || fail "task meta should exist after spawn"
+  assert_grep 'api_key=allow' "$meta" \
+    "task meta should record api_key=allow when --allow-api-key is used"
+  pass "task meta records api_key=allow when --allow-api-key is used"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_refuse_api_key_no_allowlist
@@ -139,3 +183,5 @@ test_succeed_unset
 test_succeed_api_key_filtered_by_allowlist
 test_succeed_with_allow_api_key_flag
 test_non_claude_harness_ignores_api_key
+test_succeed_with_pin_shed
+test_allow_api_key_recorded_in_meta

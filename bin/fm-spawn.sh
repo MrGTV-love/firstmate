@@ -2377,38 +2377,71 @@ fi
 # key would reach the worker, unless the caller explicitly opts in with
 # --allow-api-key. A key set in the spawning environment silently redirects
 # Claude Code to API billing even when the user has a valid claude.ai
-# subscription (issue #5723).
+# subscription (issue #5723). The worker-account pin shed
+# (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
+# ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
+# refuse when a pin is active: the key cannot reach the worker.
 if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
-  if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-    # With an allowlist, only variables listed in the allowlist reach the
-    # worker. If ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN is in the
-    # allowlist AND set in the spawning environment, it would reach the
-    # worker. If NOT in the allowlist, it is filtered out -> no refusal.
-    case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-    *$'\nANTHROPIC_API_KEY\n'*)
-      if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-        echo "error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-      fi
-      ;;
-    esac
-    case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-    *$'\nANTHROPIC_AUTH_TOKEN\n'*)
-      if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
-        echo "error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-      fi
-      ;;
-    esac
-  else
-    # No allowlist: the ambient environment reaches the worker as-is.
-    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-      echo "error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API" >&2
-      exit 1
+  if [ -z "$WORKER_ACCOUNT" ]; then
+    # No pin shed: determine whether each variable would reach the worker.
+    if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+      route_text=' through config/launch-env-allowlist'
+    else
+      route_text=' through ambient environment inheritance'
     fi
-    if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
-      echo "error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API" >&2
-      exit 1
+    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+      would_reach=1
+      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+        *$'\n'"$check_var"$'\n'*) ;;
+        *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
+        esac
+      fi
+      if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
+        echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+      fi
+    done
+  fi
+  # Also check the tmux pane environment. The pane may have inherited the
+  # variables through the tmux global or session environment even when the
+  # spawning process does not. This is the same pattern muse uses for
+  # META_API_KEY presence (muse_worker_meta_api_key_present). The pin shed
+  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply to the
+  # spawning env and the pane env independently.
+  # Pane rc files and direnv .envrc exports are not detected by this check.
+  if [ "$BACKEND" = tmux ]; then
+    if [ -n "${TMUX:-}" ]; then
+      tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
+    else
+      tmux_session=
+      if tmux has-session -t firstmate 2>/dev/null; then
+        tmux_session=firstmate
+      fi
+    fi
+    if [ -n "$tmux_session" ]; then
+      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+        pane_val=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null) || continue
+        case "$pane_val" in
+        "$check_var"=?*)
+          # The variable is set to a non-empty value in the pane environment.
+          # Check if it would be stripped: the pin shed strips both, and the
+          # allowlist route may filter it out in the launch command itself.
+          if [ -z "$WORKER_ACCOUNT" ]; then
+            if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+              case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+              *$'\n'"$check_var"$'\n'*) ;;
+              *) continue ;;  # Allowlist filters it out at launch time
+              esac
+            fi
+            echo "error: $check_var is set in the tmux pane environment and would reach the claude worker; unset it (tmux set-environment -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+            exit 1
+          fi
+          # When WORKER_ACCOUNT is set, the pin shed strips it from the
+          # launch, so no refusal needed even if set in the pane.
+          ;;
+        esac
+      done
     fi
   fi
 fi
@@ -4773,7 +4806,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
