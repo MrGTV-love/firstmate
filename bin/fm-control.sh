@@ -183,6 +183,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -1026,6 +1028,13 @@ do_relaunch() {
   record_note
   journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
 
+  # Guard pre-check: refuse before stopping the running agent when a Claude API
+  # key would reach the replacement launch. This prevents the guard in fm-spawn
+  # from costing a working worker (issue #5723).
+  # Only the spawning environment is checked here; the tmux pane check, pin shed,
+  # and allowlist filtering happen in fm-spawn --relaunch.
+  fm_api_key_guard "$HARNESS" "$TARGET_API_KEY_ALLOW" "" "" "" "" \
+    || die "refused before stopping $ID: an Anthropic API key is set and would reach the claude replacement worker; unset the key or add --allow-api-key to the relaunch"
   journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
   exit_result=$(do_exit)
   journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
