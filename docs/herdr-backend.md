@@ -185,10 +185,10 @@ The home-labeled workspace remains the parent, with individual task workspaces a
 That path needs the home label to identify exactly one workspace.
 Two workspaces sharing it are an unresolvable placement and refuse rather than adopting either.
 
-A process that carries a stale pane identity still follows the [launcher-identity rule](#missing-agents).
-
 Avoid naming a personal workspace `firstmate` or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
+
+A process that carries a stale pane identity still follows the [launcher-identity rule](#missing-agents).
 
 An older secondmate workspace using `firstmate-<id>` is not migrated automatically.
 Rename it manually before expecting new tasks or recovery to use it.
