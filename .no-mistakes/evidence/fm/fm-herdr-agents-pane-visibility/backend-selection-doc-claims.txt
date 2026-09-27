@@ -1,0 +1,17 @@
+## Doc-claim cross-check against real bin/fm-backend.sh (isolated FM_HOME=lab)
+1. no config/backend, no HERDR_ENV, no TMUX:
+backend=tmux herdr_session=default
+2. no config/backend, TMUX set (Firstmate inside tmux):
+backend=tmux herdr_session=default
+3. no config/backend, HERDR_ENV=1:
+backend=herdr herdr_session=default
+4. TMUX + HERDR_ENV=1 (nested tmux marker wins):
+backend=tmux herdr_session=default
+5. config/backend=herdr, no HERDR_* (Firstmate outside Herdr):
+backend=herdr herdr_session=default
+6. config/backend=herdr, TMUX set:
+backend=herdr herdr_session=default
+7. config/backend=herdr, FM_BACKEND=tmux override:
+backend=tmux herdr_session=default
+8. legacy meta with no backend= line:
+fm_backend_of_meta=tmux
