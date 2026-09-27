@@ -185,8 +185,7 @@ The home-labeled workspace remains the parent, with individual task workspaces a
 That path needs the home label to identify exactly one workspace.
 Two workspaces sharing it are an unresolvable placement and refuse rather than adopting either.
 
-Having no launcher identity is different from claiming a stale one.
-Explicit backend selection does not bypass the [launcher-identity checks](#unresolvable-launcher-identity) when the spawning process carries a pane identity.
+A process that carries a stale pane identity still follows the [launcher-identity rule](#missing-agents).
 
 Avoid naming a personal workspace `firstmate` or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
