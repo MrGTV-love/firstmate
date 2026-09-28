@@ -81,6 +81,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
    The exit verb writes `state/<id>.control-exit` bound to the busy generation before it types the exit command; `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads that marker.
    `--claude-debug` on relaunch is off by default and is passed to `fm-spawn`; the spawn header owns the launch flag.
+   It turns on Claude's `--debug` log and sets `CLAUDE_CODE_DIAGNOSTICS_FILE` to `state/<id>.claude-diagnostics.jsonl`; Claude writes the `shutdown_signal` event that names the signal of the next stop only to that file.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
    When the recorded endpoint is proven gone rather than merely idle or unreachable - which only Herdr can establish - the launch owner creates one fresh endpoint in that same worktree and the republished record rebinds the task to it - see [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**

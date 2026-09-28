@@ -9,6 +9,7 @@
 #                                         (--note <text> | --note-file <path>)
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
+# It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
 # The spawn header owns what the flag adds to the launch.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command, so a later session-end tick can tell this stop from an unexpected one.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.

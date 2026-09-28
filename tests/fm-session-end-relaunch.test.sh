@@ -267,6 +267,8 @@ test_claude_debug_is_off_unless_asked() {
   expect_code 0 "$status" "a default claude spawn should succeed: $out"
   launch=$(cat "$case_dir/launch.log")
   assert_not_contains "$launch" '--debug' "claude debug was on without --claude-debug: $launch"
+  assert_not_contains "$launch" 'CLAUDE_CODE_DIAGNOSTICS_FILE' \
+    "claude diagnostics were on without --claude-debug: $launch"
   id=debug-on
   fm_test_spawn_brief "$home" "$id"
   : > "$case_dir/launch.log"
@@ -276,6 +278,8 @@ test_claude_debug_is_off_unless_asked() {
   expect_code 0 "$status" "a --claude-debug spawn should succeed: $(cat "$case_dir/spawn-on.out")"
   launch=$(cat "$case_dir/launch.log")
   assert_contains "$launch" '--debug ' "claude debug was not enabled when asked: $launch"
+  assert_contains "$launch" "CLAUDE_CODE_DIAGNOSTICS_FILE='$(cd "$home/state" && pwd -P)/$id.claude-diagnostics.jsonl' " \
+    "the claude launch did not name the diagnostics file that records the stop signal: $launch"
 
   id=debug-pi
   fm_test_spawn_brief "$home" "$id"
@@ -286,7 +290,7 @@ test_claude_debug_is_off_unless_asked() {
     "the refusal did not name the flag"
   [ ! -e "$home/state/$id.meta" ] \
     || fail "a refused --claude-debug spawn published a task record: $(cat "$home/state/$id.meta")"
-  pass "claude debug is off by default, on when asked, and refused for another harness"
+  pass "claude debug and diagnostics are off by default, on when asked, and refused for another harness"
 }
 
 test_session_end_relaunches_a_dead_lane_once

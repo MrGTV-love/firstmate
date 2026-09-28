@@ -43,7 +43,7 @@
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug]
-#   --claude-debug is off by default. It adds Claude Code's own --debug to a claude launch so shutdown_signal is written under ~/.claude/debug, and it is refused unless the resolved harness is claude.
+#   --claude-debug is off by default. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
@@ -5042,6 +5042,12 @@ LAUNCH=${LAUNCH//__PIRESUME__/$RESUME_ARGS}
 CLAUDE_DEBUG_FLAG=
 [ "$CLAUDE_DEBUG" = 1 ] && CLAUDE_DEBUG_FLAG='--debug '
 LAUNCH=${LAUNCH//__CLAUDEDEBUG__/$CLAUDE_DEBUG_FLAG}
+# Claude writes its shutdown_signal event only to CLAUDE_CODE_DIAGNOSTICS_FILE,
+# not to the --debug log, so a debug launch also names that file.
+# Teardown leaves it in place as evidence of the stop.
+if [ "$CLAUDE_DEBUG" = 1 ]; then
+  LAUNCH="CLAUDE_CODE_DIAGNOSTICS_FILE=$(shell_quote "$STATE_REAL/$ID.claude-diagnostics.jsonl") $LAUNCH"
+fi
 LAUNCH=${LAUNCH//__CLAUDEPERMFLAG__/$CLAUDE_PERM_FLAG}
 if [ "$KEEP_AI_TRAILERS" = 1 ]; then
   LAUNCH=${LAUNCH//__CLAUDEATTRIBUTION__/}
