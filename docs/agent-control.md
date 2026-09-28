@@ -70,6 +70,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A ship or scout keeps the harness already recorded for it, because that harness comes from firstmate's dispatch-profile judgment at intake and must not be silently re-read from configuration.
    A recorded raw-command basename that differs from its resolved adapter cannot reproduce the command actually running, so relaunch refuses before the checkpoint unless the caller passes an explicit `--harness` to choose the replacement runtime deliberately.
    A harness change resets model and effort unless they are named too, because a model chosen for one adapter does not transfer to another.
+   `--claude-debug` is off by default, refused unless the resolved replacement harness is claude, and passed through to the launch; the [`bin/fm-spawn.sh`](../bin/fm-spawn.sh) header owns what it turns on, including the diagnostics file that names the signal of the next stop.
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
 2. **Safe checkpoint.**
    The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
@@ -80,8 +81,6 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A secondmate relaunch does not require one and never rewrites its standing charter.
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
    The exit verb writes `state/<id>.control-exit` bound to the busy generation before it types the exit command; `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads that marker.
-   `--claude-debug` on relaunch is off by default and is passed to `fm-spawn`; the spawn header owns the launch flag.
-   It turns on Claude's `--debug` log and sets `CLAUDE_CODE_DIAGNOSTICS_FILE` to `state/<id>.claude-diagnostics.jsonl`; Claude writes the `shutdown_signal` event that names the signal of the next stop only to that file.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
    When the recorded endpoint is proven gone rather than merely idle or unreachable - which only Herdr can establish - the launch owner creates one fresh endpoint in that same worktree and the republished record rebinds the task to it - see [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**
