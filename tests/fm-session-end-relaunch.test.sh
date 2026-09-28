@@ -62,17 +62,22 @@ SH
   printf '%s\n' "$bin/fm-control.sh"
 }
 
-# <name> -> dir. One ship, session-end recorded, worktree present.
-make_lane() {
-  local name=$1 dir state wt gen
-  dir="$TMP_ROOT/$name"
+# <dir> <id>. One ship in <dir>/state, session-end recorded, worktree present.
+add_lane() {
+  local dir=$1 id=$2 state wt gen
   state="$dir/state"
-  wt="$dir/wt"
+  wt="$dir/wt-$id"
   mkdir -p "$state" "$wt" "$dir/data"
-  printf 'window=firstmate:fm-lane\nkind=ship\nharness=claude\nbackend=tmux\nworktree=%s\n' "$wt" > "$state/lane.meta"
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" lane --state idle --source claude-hook --event launch-brief >/dev/null
-  gen=$(cat "$state/lane.busy-gen")
-  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" --source claude-hook --event session-end >/dev/null
+  printf 'window=firstmate:fm-lane\nkind=ship\nharness=claude\nbackend=tmux\nworktree=%s\n' "$wt" > "$state/$id.meta"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" "$id" --state idle --source claude-hook --event launch-brief >/dev/null
+  gen=$(cat "$state/$id.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" idle --gen "$gen" --source claude-hook --event session-end >/dev/null
+}
+
+# <name> -> dir. One ship named lane.
+make_lane() {
+  local dir="$TMP_ROOT/$1"
+  add_lane "$dir" lane
   printf '%s\n' "$dir"
 }
 
@@ -89,16 +94,6 @@ scan_lane() {  # <dir>
     FM_FAKE_TMUX_CURRENT_COMMAND="${FM_FAKE_TMUX_CURRENT_COMMAND:-zsh}" \
     FM_FAKE_WINDOW_GONE="${FM_FAKE_WINDOW_GONE:-0}" \
     fm_session_end_relaunch_scan "$dir/state"
-}
-
-test_typed_exit_matches_a_submitted_line_only() {
-  fm_session_end_typed_exit $'idle\n❯ /exit\nResume this session with:' /exit \
-    || fail "a submitted /exit line was not recognized"
-  fm_session_end_typed_exit 'the brief mentions /exit in prose' /exit \
-    && fail "a prose mention of /exit was treated as a typed exit"
-  fm_session_end_typed_exit $'❯ /quit' /exit \
-    && fail "a different submitted command was treated as /exit"
-  pass "typed exit matches only a submitted exit command"
 }
 
 test_session_end_relaunches_a_dead_lane_once() {
@@ -149,10 +144,9 @@ test_cap_holds_and_wakes_once() {
   dir=$(make_lane cap-day)
   state="$dir/state"
   now=$(date +%s)
-  printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' $((now - 10)) $((now - 20)) $((now - 30)) \
+  printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' $((now - 1900)) $((now - 4000)) $((now - 8000)) \
     > "$state/.session-end-relaunch-lane"
-  FM_SESSION_END_RELAUNCH_MIN_SECS=1 scan_lane "$dir" || fail "daily-cap scan failed"
-  unset FM_SESSION_END_RELAUNCH_MIN_SECS
+  scan_lane "$dir" || fail "daily-cap scan failed"
   [ -s "$dir/control.log" ] && fail "a daily-capped lane was relaunched: $(cat "$dir/control.log")"
   grep -F 'auto-relaunch paused after 3 attempts in 86400s' <<<"$FM_SESSION_END_WAKE" >/dev/null \
     || fail "the daily cap did not wake: ${FM_SESSION_END_WAKE:-<empty>}"
@@ -167,12 +161,6 @@ test_deliberate_exit_and_waits_are_skipped() {
   scan_lane "$dir" || fail "deliberate-exit scan failed"
   [ -z "$FM_SESSION_END_WAKE" ] || fail "a deliberate exit was relaunched: $FM_SESSION_END_WAKE"
   [ -s "$dir/control.log" ] && fail "a deliberate exit invoked control"
-
-  dir=$(make_lane typed-exit)
-  printf '❯ /exit\n' > "$dir/pane"
-  FM_FAKE_TMUX_CAPTURE="$dir/pane" scan_lane "$dir" || fail "typed-exit scan failed"
-  unset FM_FAKE_TMUX_CAPTURE
-  [ -s "$dir/control.log" ] && fail "a typed /exit was relaunched: $(cat "$dir/control.log")"
 
   dir=$(make_lane paused)
   printf 'paused: waiting on the upstream release\n' > "$dir/state/lane.status"
@@ -193,7 +181,38 @@ test_deliberate_exit_and_waits_are_skipped() {
   FM_FAKE_TMUX_CURRENT_COMMAND=claude scan_lane "$dir" || fail "alive scan failed"
   unset FM_FAKE_TMUX_CURRENT_COMMAND
   [ -s "$dir/control.log" ] && fail "a live agent was relaunched"
-  pass "deliberate exit, typed exit, pause, hold, done, and a live agent are skipped"
+  pass "deliberate exit, pause, hold, done, and a live agent are skipped"
+}
+
+test_stale_exit_in_scrollback_still_relaunches() {
+  local dir gen
+  dir=$(make_lane stale-exit)
+  gen=$(cat "$dir/state/lane.busy-gen")
+  printf 'gen=%s-previous\n' "$gen" > "$dir/state/lane.control-exit"
+  printf '❯ /exit\nResume this session with:\n$ claude --debug\nResume this session with:\n' > "$dir/pane"
+  FM_FAKE_TMUX_CAPTURE="$dir/pane" scan_lane "$dir" || fail "stale-exit scan failed"
+  unset FM_FAKE_TMUX_CAPTURE
+  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after session-end" ] \
+    || fail "an old /exit in the pane suppressed the relaunch: ${FM_SESSION_END_WAKE:-<empty>}"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "an old /exit in the pane did not relaunch exactly once: $(cat "$dir/control.log")"
+  pass "an old /exit in the pane and an older exit marker do not suppress a later session-end relaunch"
+}
+
+test_one_relaunch_per_scan() {
+  local dir="$TMP_ROOT/two-lanes" first
+  add_lane "$dir" lane-a
+  add_lane "$dir" lane-b
+  scan_lane "$dir" || fail "two-lane scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "one scan relaunched more than one lane: $(cat "$dir/control.log")"
+  first=$(cut -d' ' -f1 "$dir/control.log")
+  scan_lane "$dir" || fail "second two-lane scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "the second scan did not relaunch exactly one lane: $(cat "$dir/control.log")"
+  [ "$(cut -d' ' -f1 "$dir/control.log")" != "$first" ] \
+    || fail "the second scan relaunched $first again instead of the other lane"
+  pass "one scan runs at most one relaunch and the next scan takes the next lane"
 }
 
 test_backlog_hold_is_skipped() {
@@ -248,13 +267,16 @@ test_claude_debug_is_off_unless_asked() {
   expect_code 1 $? "a non-claude --claude-debug spawn must be refused"
   assert_contains "$(cat "$case_dir/spawn-pi.out")" '--claude-debug applies only to a claude launch' \
     "the refusal did not name the flag"
+  [ ! -e "$home/state/$id.meta" ] \
+    || fail "a refused --claude-debug spawn published a task record: $(cat "$home/state/$id.meta")"
   pass "claude debug is off by default, on when asked, and refused for another harness"
 }
 
-test_typed_exit_matches_a_submitted_line_only
 test_session_end_relaunches_a_dead_lane_once
 test_missing_endpoint_relaunches
 test_cap_holds_and_wakes_once
 test_deliberate_exit_and_waits_are_skipped
+test_stale_exit_in_scrollback_still_relaunches
+test_one_relaunch_per_scan
 test_backlog_hold_is_skipped
 test_claude_debug_is_off_unless_asked

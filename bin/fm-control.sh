@@ -661,9 +661,11 @@ do_exit() {
       || die "could not record that this exit of $ID was deliberate; nothing was typed"
   fi
   verdict=$(fm_backend_send_text_submit "$BACKEND" "$T" "$cmd" "$EXIT_RETRIES" "$POLL" 1.2 "$LABEL") \
-    || die "the exit command could not be sent to task $ID on $BACKEND"
-  [ "$verdict" != send-failed ] \
-    || die "the exit command could not be sent to task $ID on $BACKEND"
+    || verdict=send-failed
+  if [ "$verdict" = send-failed ]; then
+    [ "$VERB" != exit ] || rm -f -- "$STATE/$ID.control-exit"
+    die "the exit command could not be sent to task $ID on $BACKEND"
+  fi
   state=$(wait_agent_state "$EXIT_WAIT" dead) || {
     die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s"
   }

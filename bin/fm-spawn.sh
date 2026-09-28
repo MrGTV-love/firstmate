@@ -2252,6 +2252,11 @@ case "$ARG3" in
   ;;
 esac
 
+if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
+  echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
+  exit 1
+fi
+
 # muse, gemini, agy, and devin are verified as CREWMATE/SCOUT adapters only. A secondmate is
 # a firstmate instance, so it needs a primary supervision protocol.
 # gemini has none: docs/supervision-protocols/ carries no gemini wake protocol
@@ -5034,10 +5039,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RESUME_ARGS=$(relaunch_resume_args "$HARNESS" "$BACKEND" "$T") || RESUME_ARGS=
 fi
 LAUNCH=${LAUNCH//__PIRESUME__/$RESUME_ARGS}
-if [ "$CLAUDE_DEBUG" = 1 ] && [ "$HARNESS" != claude ]; then
-  echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
-  exit 1
-fi
 CLAUDE_DEBUG_FLAG=
 [ "$CLAUDE_DEBUG" = 1 ] && CLAUDE_DEBUG_FLAG='--debug '
 LAUNCH=${LAUNCH//__CLAUDEDEBUG__/$CLAUDE_DEBUG_FLAG}

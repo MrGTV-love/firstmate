@@ -18,22 +18,20 @@
 #   - the latest status verb is not done or failed
 #   - no declared pause or captain-held status line, and fm-captain-hold.sh
 #     open does not report an open captain call
-#   - state/<id>.control-exit does not name this busy generation, and the
-#     pane does not show the harness exit command as a submitted line
+#   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
-# Caps count attempt rows in state/.session-end-relaunch-<id>:
-#   FM_SESSION_END_RELAUNCH_MIN_SECS (default 1800) - at most one attempt
-#   FM_SESSION_END_RELAUNCH_DAY_SECS (default 86400) and
-#   FM_SESSION_END_RELAUNCH_DAY_MAX (default 3) - at most that many per day
+# Caps count attempt rows in state/.session-end-relaunch-<id>: at most one
+# attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
 # session-end generation. A later generation is a new episode.
-# FM_SESSION_END_RELAUNCH_TIMEOUT (default 120) bounds one fm-control call.
-# Zero or non-numeric values use the defaults.
+# One fm-control call is bounded to 120 seconds.
 #
 # fm_session_end_relaunch_scan sets FM_SESSION_END_WAKE to the first check
 # line that should be printed, or empty when this pass has nothing to say.
-# It also appends each check row to the durable wake queue.
+# It also appends each check row to the durable wake queue. It stops after
+# the first relaunch attempt, so one watcher cycle runs at most one bounded
+# fm-control call; the next cycle takes the next lane.
 #
 # FM_SESSION_END_CONTROL overrides the control binary only when FM_TEST_SEAM=1.
 set -u
@@ -55,29 +53,15 @@ if ! declare -F last_status_line >/dev/null 2>&1; then
   # shellcheck source=bin/fm-classify-lib.sh
   . "$_FM_SESSION_END_DIR/fm-classify-lib.sh"
 fi
-if ! declare -F fm_control_exit_command >/dev/null 2>&1; then
-  # shellcheck source=bin/fm-control-lib.sh
-  . "$_FM_SESSION_END_DIR/fm-control-lib.sh"
-fi
 if ! declare -F fm_run_timed >/dev/null 2>&1; then
   # shellcheck source=bin/fm-timeout-lib.sh
   . "$_FM_SESSION_END_DIR/fm-timeout-lib.sh"
 fi
 
-# Positive integer, or <default> when the value is empty, zero, or not digits.
-fm_session_end_positive() {  # <value> <default>
-  case "${1:-}" in
-    ''|*[!0-9]*|0) printf '%s' "$2" ;;
-    *) printf '%s' "$1" ;;
-  esac
-}
-
-fm_session_end_bounds() {
-  FM_SESSION_END_MIN_SECS=$(fm_session_end_positive "${FM_SESSION_END_RELAUNCH_MIN_SECS:-}" 1800)
-  FM_SESSION_END_DAY_SECS=$(fm_session_end_positive "${FM_SESSION_END_RELAUNCH_DAY_SECS:-}" 86400)
-  FM_SESSION_END_DAY_MAX=$(fm_session_end_positive "${FM_SESSION_END_RELAUNCH_DAY_MAX:-}" 3)
-  FM_SESSION_END_TIMEOUT=$(fm_session_end_positive "${FM_SESSION_END_RELAUNCH_TIMEOUT:-}" 120)
-}
+FM_SESSION_END_MIN_SECS=1800
+FM_SESSION_END_DAY_SECS=86400
+FM_SESSION_END_DAY_MAX=3
+FM_SESSION_END_TIMEOUT=120
 
 fm_session_end_control_bin() {
   if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_SESSION_END_CONTROL:-}" ]; then
@@ -124,52 +108,14 @@ fm_session_end_ledger_add() {  # <state-dir> <id> <attempt|relaunched|failed>
   printf '%s\t%s\n' "$(date +%s)" "$3" >> "$ledger" 2>/dev/null
 }
 
-# 0 when <pane-text> contains the harness exit command as a submitted line,
-# not as a mention inside other text. A leading prompt glyph is stripped.
-fm_session_end_typed_exit() {  # <pane-text> <exit-command>
-  local text=$1 cmd=$2 line rest found=0
-  [ -n "$cmd" ] || return 1
-  while IFS= read -r line || [ -n "$line" ]; do
-    rest=$line
-    rest=${rest#"${rest%%[![:space:]]*}"}
-    case "$rest" in
-      '❯'*) rest=${rest#'❯'} ;;
-      '>'*) rest=${rest#'>'} ;;
-      '$'*) rest=${rest#'$'} ;;
-      '%'*) rest=${rest#'%'} ;;
-      '#'*) rest=${rest#'#'} ;;
-    esac
-    rest=${rest#"${rest%%[![:space:]]*}"}
-    rest=${rest%"${rest##*[![:space:]]}"}
-    if [ "$rest" = "$cmd" ]; then
-      found=1
-      break
-    fi
-  done < <(printf '%s\n' "$text")
-  [ "$found" = 1 ]
-}
-
-# Parse a current session-end record. Prints "gen seq" or nothing.
+# A current session-end record. Prints "gen seq" or nothing.
 fm_session_end_identity() {  # <state-dir> <id>
-  local state=$1 id=$2 rec line gen='' seq='' event='' field out
+  local state=$1 id=$2 gen out r_state r_source r_event r_seq
   out=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 1
-  case "$out" in
-    idle\ *\ session-end\ *) ;;
-    *) return 1 ;;
-  esac
-  rec=$(fm_busy_record_path "$state" "$id")
-  [ -f "$rec" ] && [ ! -L "$rec" ] || return 1
-  IFS= read -r line < "$rec" || return 1
-  for field in $line; do
-    case "$field" in
-      gen=*) gen=${field#gen=} ;;
-      seq=*) seq=${field#seq=} ;;
-      event=*) event=${field#event=} ;;
-    esac
-  done
-  [ "$event" = session-end ] || return 1
-  [ -n "$gen" ] && [ -n "$seq" ] || return 1
-  printf '%s %s\n' "$gen" "$seq"
+  read -r r_state r_source r_event r_seq <<< "$out"
+  [ "$r_state" = idle ] && [ "$r_event" = session-end ] && [ -n "$r_seq" ] || return 1
+  gen=$(fm_busy_current_gen "$state" "$id") || return 1
+  printf '%s %s\n' "$gen" "$r_seq"
 }
 
 fm_session_end_note() {
@@ -198,9 +144,9 @@ fm_session_end_queue_wake() {  # <key> <reason>
 # line or empty. Returns 0 for a completed decision, 1 when a required
 # ledger or wake row could not be written.
 fm_session_end_relaunch_consider() {  # <state-dir> <id>
-  local state=$1 id=$2 meta kind wt backend window harness agent
+  local state=$1 id=$2 meta kind wt backend window agent
   local identity gen seq last verb hold_rc marker marker_gen
-  local capture exit_cmd journal phase lock recent day handled
+  local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
   local now last_attempt bin out rc=0 reason key which
   FM_SESSION_END_ACTION=skip
@@ -241,24 +187,13 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   fi
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
-    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" --identity >/dev/null 2>&1 || hold_rc=$?
+    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
     [ "$hold_rc" -ne 0 ] || return 0
   fi
   marker="$state/$id.control-exit"
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
     [ "$marker_gen" != "$gen" ] || return 0
-  fi
-  harness=$(fm_meta_get "$meta" harness 2>/dev/null || true)
-  exit_cmd=
-  if [ -n "$harness" ]; then
-    exit_cmd=$(fm_control_exit_command "$harness" 2>/dev/null || true)
-  fi
-  if [ -n "$exit_cmd" ]; then
-    capture=$(fm_backend_capture "$backend" "$window" 80 2>/dev/null || true)
-    if fm_session_end_typed_exit "$capture" "$exit_cmd"; then
-      return 0
-    fi
   fi
   lock="$state/.control-$id.lock"
   if [ -e "$lock" ] || [ -L "$lock" ]; then
@@ -275,7 +210,6 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
       *) return 0 ;;
     esac
   fi
-  fm_session_end_bounds
   recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
   day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
   handled=$(fm_session_end_handled_path "$state" "$id")
@@ -358,6 +292,9 @@ fm_session_end_relaunch_scan() {  # <state-dir>
     if [ -n "$reason" ] && [ -z "$first" ]; then
       first=$reason
     fi
+    case "$FM_SESSION_END_ACTION" in
+      relaunch|failed) break ;;
+    esac
   done
   FM_SESSION_END_WAKE=$first
   return 0
