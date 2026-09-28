@@ -17,7 +17,8 @@
 #   - fm_backend_agent_state is dead (pane at a shell, no agent) or missing
 #   - the latest status verb is not done or failed
 #   - no declared pause or captain-held status line, and fm-captain-hold.sh
-#     open does not report an open captain call
+#     open reports no open captain call (exit 1); an open call or an answer
+#     it cannot establish skips the lane
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
@@ -168,47 +169,10 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   identity=$(fm_session_end_identity "$state" "$id") || return 0
   gen=${identity%% *}
   seq=${identity#* }
-  backend=$(fm_meta_get "$meta" backend 2>/dev/null || true)
-  [ -n "$backend" ] || backend=tmux
-  window=$(fm_meta_get "$meta" window 2>/dev/null || true)
-  [ -n "$window" ] || return 0
-  agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
-  case "$agent" in
-    dead|missing) ;;
-    *) return 0 ;;
-  esac
-  last=$(last_status_line "$state/$id.status" 2>/dev/null || true)
-  verb=$(status_line_verb "$last" 2>/dev/null || true)
-  case "$verb" in
-    done|failed) return 0 ;;
-  esac
-  if [ -n "$(status_declared_wait_line "$state/$id.status" 2>/dev/null || true)" ]; then
-    return 0
-  fi
-  if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
-    hold_rc=0
-    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
-    [ "$hold_rc" -ne 0 ] || return 0
-  fi
   marker="$state/$id.control-exit"
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
     [ "$marker_gen" != "$gen" ] || return 0
-  fi
-  lock="$state/.control-$id.lock"
-  if [ -e "$lock" ] || [ -L "$lock" ]; then
-    if ! fm_lock_try_acquire "$lock"; then
-      return 0
-    fi
-    fm_lock_release "$lock" || return 1
-  fi
-  journal="$state/$id.control-relaunch"
-  if [ -f "$journal" ] && [ ! -L "$journal" ]; then
-    phase=$(sed -n 's/^phase=//p' "$journal" | head -1)
-    case "$phase" in
-      ''|complete|failed:*) ;;
-      *) return 0 ;;
-    esac
   fi
   recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
   day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
@@ -233,10 +197,48 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   elif [ "$day" -ge "$FM_SESSION_END_DAY_MAX" ]; then
     which=day
   fi
-  if [ -n "$which" ]; then
-    if [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] && [ "$handled_outcome" = "capped-$which" ]; then
+  if [ -n "$which" ] && [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] \
+     && [ "$handled_outcome" = "capped-$which" ]; then
+    return 0
+  fi
+  backend=$(fm_meta_get "$meta" backend 2>/dev/null || true)
+  [ -n "$backend" ] || backend=tmux
+  window=$(fm_meta_get "$meta" window 2>/dev/null || true)
+  [ -n "$window" ] || return 0
+  agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
+  case "$agent" in
+    dead|missing) ;;
+    *) return 0 ;;
+  esac
+  last=$(last_status_line "$state/$id.status" 2>/dev/null || true)
+  verb=$(status_line_verb "$last" 2>/dev/null || true)
+  case "$verb" in
+    done|failed) return 0 ;;
+  esac
+  if [ -n "$(status_declared_wait_line "$state/$id.status" 2>/dev/null || true)" ]; then
+    return 0
+  fi
+  if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
+    hold_rc=0
+    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
+    [ "$hold_rc" -eq 1 ] || return 0
+  fi
+  lock="$state/.control-$id.lock"
+  if [ -e "$lock" ] || [ -L "$lock" ]; then
+    if ! fm_lock_try_acquire "$lock"; then
       return 0
     fi
+    fm_lock_release "$lock" || return 1
+  fi
+  journal="$state/$id.control-relaunch"
+  if [ -f "$journal" ] && [ ! -L "$journal" ]; then
+    phase=$(sed -n 's/^phase=//p' "$journal" | head -1)
+    case "$phase" in
+      ''|complete|failed:*) ;;
+      *) return 0 ;;
+    esac
+  fi
+  if [ -n "$which" ]; then
     if [ "$which" = min ]; then
       reason="check: $id auto-relaunch paused after 1 attempt in ${FM_SESSION_END_MIN_SECS}s; session-end still recorded"
     else

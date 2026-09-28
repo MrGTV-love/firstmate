@@ -23,6 +23,7 @@ make_tmux() {  # <dir>
 #!/usr/bin/env bash
 set -u
 cmd=${FM_FAKE_TMUX_CURRENT_COMMAND:-zsh}
+[ -z "${FM_FAKE_TMUX_LOG:-}" ] || printf '%s\n' "${1:-}" >> "$FM_FAKE_TMUX_LOG"
 case "${1:-}" in
   display-message)
     for a in "$@"; do
@@ -86,6 +87,7 @@ scan_lane() {  # <dir>
   fakebin=$(make_tmux "$dir")
   recorder=$(make_recorder "$dir")
   : > "$dir/control.log"
+  : > "$dir/tmux.log"
   PATH="$fakebin:$PATH" \
     FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_WAKE_QUEUE="$dir/state/.wake-queue" \
     FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" \
@@ -93,6 +95,7 @@ scan_lane() {  # <dir>
     FM_FAKE_TMUX_CAPTURE="${FM_FAKE_TMUX_CAPTURE:-}" \
     FM_FAKE_TMUX_CURRENT_COMMAND="${FM_FAKE_TMUX_CURRENT_COMMAND:-zsh}" \
     FM_FAKE_WINDOW_GONE="${FM_FAKE_WINDOW_GONE:-0}" \
+    FM_FAKE_TMUX_LOG="$dir/tmux.log" \
     fm_session_end_relaunch_scan "$dir/state"
 }
 
@@ -114,6 +117,7 @@ test_session_end_relaunches_a_dead_lane_once() {
   scan_lane "$dir" || fail "second scan failed"
   [ -z "$FM_SESSION_END_WAKE" ] || fail "a second scan woke again: $FM_SESSION_END_WAKE"
   [ ! -s "$dir/control.log" ] || fail "a second scan relaunched again: $(cat "$dir/control.log")"
+  [ ! -s "$dir/tmux.log" ] || fail "an already-handled lane still probed its endpoint: $(cat "$dir/tmux.log")"
   pass "a dead session-end lane is relaunched once and then left alone"
 }
 
@@ -215,6 +219,19 @@ test_one_relaunch_per_scan() {
   pass "one scan runs at most one relaunch and the next scan takes the next lane"
 }
 
+test_unreadable_hold_answer_is_skipped() {
+  local dir
+  dir=$(make_lane hold-unreadable)
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/data/backlog.md"
+  mkdir -p "$dir/fakebin"
+  printf '#!/bin/sh\nexit 1\n' > "$dir/fakebin/tasks-axi"
+  chmod +x "$dir/fakebin/tasks-axi"
+  scan_lane "$dir" || fail "unreadable-hold scan failed"
+  [ -s "$dir/control.log" ] && fail "a lane whose captain hold could not be read was relaunched: $(cat "$dir/control.log")"
+  [ -z "$FM_SESSION_END_WAKE" ] || fail "an unreadable hold answer woke: $FM_SESSION_END_WAKE"
+  pass "a lane whose captain hold cannot be read is not relaunched"
+}
+
 test_backlog_hold_is_skipped() {
   local dir
   command -v tasks-axi >/dev/null 2>&1 || { pass "backlog hold skip skipped (tasks-axi absent)"; return 0; }
@@ -278,5 +295,6 @@ test_cap_holds_and_wakes_once
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches
 test_one_relaunch_per_scan
+test_unreadable_hold_answer_is_skipped
 test_backlog_hold_is_skipped
 test_claude_debug_is_off_unless_asked
