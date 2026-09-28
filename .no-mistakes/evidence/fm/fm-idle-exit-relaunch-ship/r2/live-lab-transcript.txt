@@ -1,0 +1,133 @@
+# Live lab transcript, round 2, target d531975 (lab home /Users/charlesabrooker/tmp/fm-lab.5vTtsj, private tmux socket fm-lab, operator pane bash, workers real 2.1.284 (Claude Code))
+
+## step spawn-se-a (rc=0)
+$ FM_SPAWN_NO_GUARD=1 bin/fm-spawn.sh se-a $FM_HOME/projects/demo --mode local-only --yolo on --harness claude
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-a
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-a ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned se-a harness=claude kind=ship mode=local-only yolo=on window=primary:fm-se-a worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/1/demo
+
+## step spawn-se-b (rc=0)
+$ FM_SPAWN_NO_GUARD=1 bin/fm-spawn.sh se-b $FM_HOME/projects/demo --mode local-only --yolo on --harness claude
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-b
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-b ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned se-b harness=claude kind=ship mode=local-only yolo=on window=primary:fm-se-b worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo
+
+## step spawn-se-c (rc=0)
+$ FM_SPAWN_NO_GUARD=1 bin/fm-spawn.sh se-c $FM_HOME/projects/demo --mode local-only --yolo on --harness claude --claude-debug
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-c/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-c
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-c/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-c ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned se-c harness=claude kind=ship mode=local-only yolo=on window=primary:fm-se-c worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/3/demo
+
+## step watch1 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+check: se-a auto-relaunched after session-end
+
+## step watch2 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+check: se-a auto-relaunch paused after 1 attempt in 1800s; session-end still recorded
+
+## step watch3 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+signal: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-a.turn-ended /Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-b.turn-ended /Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-c.turn-ended
+
+## step exitb (rc=0)
+$ bin/fm-control.sh se-b exit
+stopped se-b harness=claude backend=tmux endpoint=primary:fm-se-b worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo
+
+## step watch4 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+stale: primary:fm-se-a
+
+## step relb (rc=0)
+$ bin/fm-control.sh se-b relaunch --claude-debug --note 'Lab: relaunched with the Claude debug log on. Reply READY and wait idle.'
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-b
+warning: /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/se-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-b ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched se-b harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-se-b worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo
+
+## step watch5 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+check: se-b auto-relaunched after session-end
+
+## step watch6 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+check: se-c auto-relaunched after session-end
+
+## step watch7 (rc=1)
+$ FM_POLL=5 bin/fm-watch.sh
+watch7: no wake in 50s -> interrupted
+
+## step watch8 (rc=0)
+$ FM_POLL=5 bin/fm-watch.sh
+check: se-b auto-relaunch paused after 1 attempt in 1800s; session-end still recorded
+
+## step r1 (rc=1)
+$ bin/fm-control.sh se-b exit --claude-debug
+error: --harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only
+
+## step r2 (rc=1)
+$ FM_SPAWN_NO_GUARD=1 bin/fm-spawn.sh se-d $FM_HOME/projects/demo --mode local-only --yolo on --harness pi --claude-debug
+error: --claude-debug applies only to a claude launch; se-d resolved harness 'pi'
+
+## step r3 (rc=1)
+$ bin/fm-control.sh se-a relaunch --harness codex --claude-debug --note 'x'
+error: --claude-debug applies only to a claude relaunch; se-a would be replaced on codex
+
+## step tdb (rc=0)
+$ bin/fm-teardown.sh se-b
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+teardown: reaping leaked worktree process(es) for se-b: 11631
+teardown: force-killing leaked worktree process(es) for se-b: 11631
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown se-b complete (window primary:fm-se-b, worktree /Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo)
+Backlog: se-b just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.5vTtsj/data/backlog.md - move se-b to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+## launch env of the --claude-debug workers
+se-c (fresh spawn --claude-debug): CLAUDE_CODE_DIAGNOSTICS_FILE=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-c.claude-diagnostics.jsonl, argv claude --debug ...
+se-b (fm-control relaunch --claude-debug): CLAUDE_CODE_DIAGNOSTICS_FILE=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-b.claude-diagnostics.jsonl, argv claude --debug ...
+se-a, se-b first launch (no flag): no CLAUDE_CODE_DIAGNOSTICS_FILE, no --debug
+
+## shutdown_signal rows
+{"timestamp":"2026-09-28T21:24:50.840Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGTERM","uptime_s":60,"ppid_changed":false,"stdin_at_eof":false,"stdin_destroyed":false,"is_tty":true}}
+{"timestamp":"2026-09-28T21:26:01.387Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGHUP"}}
+
+## ledgers
+### .session-end-handled-se-a
+g1790630297.20930.7241	4	capped-min
+### .session-end-handled-se-c
+g1790630222.37581.1183	4	relaunched
+### .session-end-relaunch-se-a
+1790630282	attempt
+1790630325	relaunched
+### .session-end-relaunch-se-c
+1790630784	attempt
+1790630797	relaunched
+
+## se-a relaunch journal (auto-relaunch)
+v1
+task=se-a
+phase=complete
+ts=2026-09-28T21:18:44Z
+backend=tmux
+endpoint=primary:fm-se-a
+worktree=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/1/demo
+kind=ship
+from_harness=claude
+from_model=default
+from_effort=default
+to_harness=claude
+to_model=default
+to_effort=default
+worktree_head=c1f5f4fdece09daaec021aa031178d46f3ed48c8
+worktree_dirty=yes
+note_file=/Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/se-a.control-relaunch.note
+exit_result=already-stopped
+
+## se-a worktree after auto-relaunch
+?? wip-note.txt

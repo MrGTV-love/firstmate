@@ -1,0 +1,11 @@
+ok - a dead session-end lane is relaunched once and then left alone
+ok - a missing endpoint with session-end is relaunched
+ok - the 30-minute cap holds and wakes once
+ok - the daily cap holds and wakes once
+ok - deliberate exit, pause, hold, done, and a live agent are skipped
+ok - an old /exit in the pane and an older exit marker do not suppress a later session-end relaunch
+ok - one scan runs at most one relaunch and the next scan takes the next lane
+ok - a lane whose captain hold cannot be read is not relaunched
+ok - backlog hold skip skipped (hold could not be recorded)
+ok - claude debug is off by default, on when asked, and refused for another harness
+rc=0

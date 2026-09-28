@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.284
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/1/demo
+
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/operational-inbox/1790628642-2c9316eb2c284213.msg' and handle its contents as Firstmate operational
+  input.
+
+  Read 1 file, ran 1 shell command
+
+⏺ READY
+
+✻ Crunched for 17s · done 3:51 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 3% 33k/1.0M demo:1dc50688
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

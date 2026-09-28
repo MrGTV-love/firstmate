@@ -1,0 +1,134 @@
+treehouse get
+charlesabrooker@GTT-CB demo % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo. Type 'exit' to return.
+cd -- '/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo'
+charlesabrooker@GTT-CB demo % cd -- '/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo'
+charlesabrooker@GTT-CB demo % export GOTMPDIR=/tmp/fm-se-b/gotmp
+charlesabrooker@GTT-CB demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB demo % export FM_TASK_ID=se-b
+charlesabrooker@GTT-CB demo % . '/tmp/fm-se-b+65625b38fff5ae09a3398e9235b57794485d8f05aaaa22925e303cea9ed0e5a6/launch.s1790630204.93039.14834.sh'
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matche
+s only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(/Users/charlesabrooker/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (
+the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pr
+efix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a li
+teral prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal p
+refix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && for *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefi
+x (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && gh pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a litera
+l prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && gh api repos/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a lite
+ral prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && tail *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pref
+ix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && tmux capture-pane *:*) mixes * with the trailing :* prefix syntax, so it is matched as a
+ literal prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and match
+es only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and ma
+tches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh api repos/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and
+matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh-axi pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(tmux capture-pane *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matche
+s only commands containing a literal * at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and match
+es only commands containing a literal * at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume ba50dbec-de48-4cb6-bf28-224b945f77e8
+charlesabrooker@GTT-CB demo % cd -- '/Users/charlesabrooker/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo'
+charlesabrooker@GTT-CB demo % export GOTMPDIR=/tmp/fm-se-b/gotmp
+charlesabrooker@GTT-CB demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB demo % export FM_TASK_ID=se-b
+charlesabrooker@GTT-CB demo % . '/tmp/fm-se-b+65625b38fff5ae09a3398e9235b57794485d8f05aaaa22925e303cea9ed0e5a6/launch.s1790630619.22552.14542.sh'
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matche
+s only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(/Users/charlesabrooker/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (
+the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pr
+efix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a li
+
+ ▐▛███▛█   Claude Code v2.1.284
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-lab.5vTtsj/treehouse/.treehouse/demo-82ddaf/2/demo
+
+▎ Debug mode enabled · logging to /Users/charlesabrooker/.claude/debug/5d19a982-6f15-40b3-8209-be37371f1065.txt
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.5vTtsj/state/operational-inbox/1790630628-834b2fdef0bbe37f.msg' and handle its contents as Firstmate operational
+  input.
+
+  Read 1 file, ran 1 shell command
+
+⏺ The inbox is empty, so I had nothing to act on.
+
+  READY
+
+✻ Cooked for 43s · done 4:24 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 3% 33k/1.0M demo:5d19a982                                                                                                                                     Debug
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

@@ -1,0 +1,1 @@
+{"timestamp":"2026-09-28T21:24:50.840Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGTERM","uptime_s":60,"ppid_changed":false,"stdin_at_eof":false,"stdin_destroyed":false,"is_tty":true}}

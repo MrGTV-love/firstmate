@@ -1,0 +1,10 @@
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+error: task task-x1 cannot be torn down because its backlog data directory is inaccessible: /Users/charlesabrooker/tmp/fm-teardown-tests.Rp7HrL/tasks-axi-close/data (automatic backlog transitions require tasks-axi 0.2.6 or newer with the required update and mv features)
+not ok - teardown failed with a real backlog
+rc=1

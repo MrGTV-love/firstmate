@@ -1,0 +1,50 @@
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && for *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefi
+x (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && gh pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a litera
+l prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && gh api repos/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a lite
+ral prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && tail *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pref
+ix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && tmux capture-pane *:*) mixes * with the trailing :* prefix syntax, so it is matched as a
+ literal prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and match
+es only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and ma
+tches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh api repos/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and
+matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(gh-axi pr view *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../../../../.claude/settings.json): Bash(tmux capture-pane *:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matche
+s only commands containing a literal * at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and match
+es only commands containing a literal * at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) an
+d matches only commands containing a literal * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume 1cc76388-4a00-4b86-b675-b17b80457ff7
+charlesabrooker@GTT-CB demo %

@@ -1,0 +1,18 @@
+# se-b worker relaunched by: bin/fm-control.sh se-b relaunch --claude-debug --note ...
+# process: claude --debug --dangerously-skip-permissions ...
+# SIGTERM sent 2026-09-28T20:55:48Z; debug log ~/.claude/debug/7cccb38d-0b67-4c8a-9fb2-0b5c255da092.txt
+# grep -c -i 'shutdown_signal|SIGTERM|signal' on that log:
+0
+# last 12 lines of the debug log (the shutdown):
+2026-09-28T20:55:48.511Z [DEBUG] [closeSessionTabGroup] bridge not connected, skipping
+2026-09-28T20:55:48.511Z [DEBUG] LSP server manager shut down successfully
+2026-09-28T20:55:48.514Z [DEBUG] Cleaned up session snapshot: /Users/charlesabrooker/.claude/shell-snapshots/snapshot-zsh-1790628910785-n6gxfq.sh
+2026-09-28T20:55:48.531Z [DEBUG] Preserving file permissions: 100600
+2026-09-28T20:55:48.531Z [DEBUG] Writing to temp file: /Users/charlesabrooker/.claude.json.tmp.66448.d08000d368da
+2026-09-28T20:55:48.532Z [DEBUG] Applied original permissions to temp file
+2026-09-28T20:55:48.533Z [DEBUG] Temp file written successfully, size: 209910 bytes
+2026-09-28T20:55:48.533Z [DEBUG] Renaming /Users/charlesabrooker/.claude.json.tmp.66448.d08000d368da to /Users/charlesabrooker/.claude.json
+2026-09-28T20:55:48.534Z [DEBUG] File /Users/charlesabrooker/.claude.json written atomically
+2026-09-28T20:55:48.634Z [DEBUG] SessionEnd:other ['/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3MS0S9T3PRZX3NJAM37VCMH/bin/fm-busy-event.sh' apply '/Users/charlesabrooker/tmp/fm-lab.NxvLtg/state' 'se-b
+2026-09-28T20:55:48.634Z [DEBUG] Hook output does not start with {, treating as plain text
+2026-09-28T20:55:48.638Z [DEBUG] hooks module telemetry@builtin session.end settled in 1.9ms (native link, next() included)

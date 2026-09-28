@@ -1,0 +1,106 @@
+# Live lab transcript: session-end auto-relaunch (lab home /Users/charlesabrooker/tmp/fm-lab.NxvLtg, private tmux socket fm-lab, Claude Code 2.1.284 (Claude Code))
+
+## step spawn-a (rc=0)
+warning: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/se-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-a
+warning: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/se-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-a ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned se-a harness=claude kind=ship mode=local-only yolo=on window=primary:fm-se-a worktree=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/1/demo
+
+## step watch1 (rc=0)
+check: se-a auto-relaunched after session-end
+
+## step watch2 (rc=0)
+check: se-a auto-relaunch paused after 1 attempt in 1800s; session-end still recorded
+
+## step watch5 (rc=0)
+signal: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-a.turn-ended /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-b.turn-ended
+
+## step exitb (rc=0)
+stopped se-b harness=claude backend=tmux endpoint=primary:fm-se-b worktree=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/2/demo
+
+## step watch6 (rc=0)
+stale: primary:fm-se-a
+
+## step relb (rc=0)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+warning: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/se-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/se-b
+warning: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/se-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: se-b ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched se-b harness=claude from=claude model=default effort=default backend=tmux endpoint=primary:fm-se-b worktree=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/2/demo
+
+## step watch7 (rc=0)
+check: se-b auto-relaunched after session-end
+
+## step r1 (rc=1)
+error: --harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only
+
+## step r2 (rc=1)
+error: --claude-debug applies only to a claude launch; se-c resolved harness 'pi'
+
+## step r3 (rc=1)
+error: --claude-debug applies only to a claude relaunch; se-a would be replaced on codex
+
+## step watch8 (rc=0)
+signal: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-c.status /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-b.turn-ended /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-c.turn-ended
+
+## step watch9 (rc=0)
+signal: /Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-c.status
+
+## step watch10 (rc=0)
+check: se-c auto-relaunched after session-end
+
+## step exitc (rc=0)
+stopped se-c harness=claude backend=tmux endpoint=primary:fm-se-c worktree=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/3/demo
+
+## step tdc (rc=0)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: 317s ago, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+teardown: reaping leaked worktree process(es) for se-c: 73711
+teardown: force-killing leaked worktree process(es) for se-c: 73711
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown se-c complete (window primary:fm-se-c, worktree /Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/3/demo)
+Backlog: se-c just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.NxvLtg/data/backlog.md - move se-c to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+## durable wake queue rows (session-end)
+/Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/.wake-queue:1790629434	17	check	session-end-relaunch-se-c-g1790629242.75253.7609-4	check: se-c auto-relaunched after session-end
+
+## ledgers
+### .session-end-handled-se-a
+g1790628634.10085.26409	4	capped-min
+### .session-end-handled-se-b
+g1790628893.56935.14439	4	relaunched
+### .session-end-relaunch-se-a
+1790628627	attempt
+1790628644	relaunched
+### .session-end-relaunch-se-b
+1790629134	attempt
+1790629160	relaunched
+
+## se-a relaunch journal
+v1
+task=se-a
+phase=complete
+ts=2026-09-28T20:50:44Z
+backend=tmux
+endpoint=primary:fm-se-a
+worktree=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/treehouse/.treehouse/demo-9edcc4/1/demo
+kind=ship
+from_harness=claude
+from_model=default
+from_effort=default
+to_harness=claude
+to_model=default
+to_effort=default
+worktree_head=e302706b86db2b54be701e22c8e8a84b47d59919
+worktree_dirty=yes
+note_file=/Users/charlesabrooker/tmp/fm-lab.NxvLtg/state/se-a.control-relaunch.note
+exit_result=already-stopped
