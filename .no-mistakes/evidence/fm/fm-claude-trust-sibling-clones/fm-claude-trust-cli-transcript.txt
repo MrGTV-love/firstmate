@@ -1,0 +1,104 @@
+### Setup: one upstream origin; home A and home B each clone it (like fm-home-seed.sh).
+### Shared pool slot cut from home A's clone:
+$LAB/homeA/projects/app/.git
+### Own-clone worktree of home B:
+### Unrelated repo (different origin), same basename 'app', with a worktree:
+### Unrelated repo with NO origin at all, while home B also stripped of origin copy:
+
+===== S1 BEFORE (base 6c174d8): sibling-clone pool slot, project=home B =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg0 base-trust.sh $LAB/pool/slot1 $LAB/homeB/projects/app
+error: refusing to pre-register Claude trust: '$LAB/pool/slot1' is not a worktree of project '$LAB/homeB/projects/app'
+exit=1
+(no store written)
+
+===== S1 AFTER (this branch): sibling-clone pool slot, project=home B =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg1 fm-claude-trust.sh $LAB/pool/slot1 $LAB/homeB/projects/app
+info: worktree '$LAB/pool/slot1' belongs to sibling clone '$LAB/homeA/projects/app' (origin match)
+trusted: $LAB/pool/slot1
+trusted (project root): $LAB/homeA/projects/app
+exit=0
+{
+ "$LAB/pool/slot1": {
+  "hasTrustDialogAccepted": true
+ },
+ "$LAB/homeA/projects/app": {
+  "hasTrustDialogAccepted": true
+ }
+}
+
+===== S2 regression: own-clone worktree, project=home B =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg2 fm-claude-trust.sh $LAB/pool/own1 $LAB/homeB/projects/app
+trusted: $LAB/pool/own1
+trusted (project root): $LAB/homeB/projects/app
+exit=0
+{
+ "$LAB/pool/own1": {
+  "hasTrustDialogAccepted": true
+ },
+ "$LAB/homeB/projects/app": {
+  "hasTrustDialogAccepted": true
+ }
+}
+
+===== S3 adversarial: unrelated repo (different origin, same basename) =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg3 fm-claude-trust.sh $LAB/pool/foreign1 $LAB/homeB/projects/app
+error: refusing to pre-register Claude trust: '$LAB/pool/foreign1' is not a worktree of project '$LAB/homeB/projects/app'
+exit=1
+(no store written)
+
+===== S4 adversarial: both sides have NO origin (empty == empty must not match) =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg4 fm-claude-trust.sh $LAB/pool/noorigin1 $LAB/homeC/projects/app
+error: refusing to pre-register Claude trust: '$LAB/pool/noorigin1' is not a worktree of project '$LAB/homeC/projects/app'
+exit=1
+(no store written)
+
+===== S5 adversarial: sibling clone A already DECLINED external imports =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg5 fm-claude-trust.sh $LAB/pool/slot1 $LAB/homeB/projects/app
+info: worktree '$LAB/pool/slot1' belongs to sibling clone '$LAB/homeA/projects/app' (origin match)
+error: project entry for $LAB/homeA/projects/app in $LAB/cfg5/.claude.json already declined external CLAUDE.md imports; refusing to override that consent. To recover, remove hasClaudeMdExternalIncludesApproved and hasClaudeMdExternalIncludesWarningShown from that project entry and approve the imports dialog interactively once
+error: refusing to pre-register Claude trust: could not record trust for '$LAB/pool/slot1' and project '$LAB/homeA/projects/app' in '$LAB/cfg5/.claude.json'
+exit=1
+{
+ "$LAB/homeA/projects/app": {
+  "hasTrustDialogAccepted": false,
+  "hasClaudeMdExternalIncludesApproved": false,
+  "hasClaudeMdExternalIncludesWarningShown": true
+ }
+}
+
+===== S6: sibling clone A already APPROVED external imports -> consent carried to worktree =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg6 fm-claude-trust.sh $LAB/pool/slot1 $LAB/homeB/projects/app
+info: worktree '$LAB/pool/slot1' belongs to sibling clone '$LAB/homeA/projects/app' (origin match)
+trusted: $LAB/pool/slot1
+trusted (project root): $LAB/homeA/projects/app
+exit=0
+{
+ "$LAB/homeA/projects/app": {
+  "hasTrustDialogAccepted": true,
+  "hasClaudeMdExternalIncludesApproved": true,
+  "hasClaudeMdExternalIncludesWarningShown": true
+ },
+ "$LAB/pool/slot1": {
+  "hasTrustDialogAccepted": true,
+  "hasClaudeMdExternalIncludesApproved": true,
+  "hasClaudeMdExternalIncludesWarningShown": true
+ }
+}
+
+===== S7 adversarial: home B's own primary checkout passed as the worktree =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg7 fm-claude-trust.sh $LAB/homeB/projects/app $LAB/homeB/projects/app
+error: refusing to pre-register Claude trust: '$LAB/homeB/projects/app' is a primary checkout, not an isolated worktree
+exit=1
+(no store written)
+
+===== S8 adversarial: home A's primary checkout (sibling, same origin) passed as the worktree =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg8 fm-claude-trust.sh $LAB/homeA/projects/app $LAB/homeB/projects/app
+error: refusing to pre-register Claude trust: '$LAB/homeA/projects/app' is a primary checkout, not an isolated worktree
+exit=1
+(no store written)
+
+===== S9 adversarial: subdirectory of the sibling pool slot =====
+$ CLAUDE_CONFIG_DIR=$LAB/cfg9 fm-claude-trust.sh $LAB/pool/slot1/sub $LAB/homeB/projects/app
+error: refusing to pre-register Claude trust: '$LAB/pool/slot1/sub' is not a worktree root (its root is '$LAB/pool/slot1')
+exit=1
+(no store written)

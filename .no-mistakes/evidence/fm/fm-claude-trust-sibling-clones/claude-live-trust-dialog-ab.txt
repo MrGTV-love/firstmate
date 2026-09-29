@@ -1,0 +1,67 @@
+Real Claude Code 2.1.284 (Claude Code) launched in the SAME sibling-clone pool slot ($LAB/pool/slot1, cut from home A's clone), two isolated CLAUDE_CONFIG_DIRs.
+
+=== CONTROL: no trust recorded -> trust dialog blocks the pane ===
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ $LAB/pool/slot1
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not,
+ take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+=== TRUSTED: after 'fm-claude-trust.sh $LAB/pool/slot1 $LAB/homeB/projects/app' -> no dialog, composer reached ===
+ ▐▛███▛█   Claude Code v2.1.284
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   $LAB/pool/slot1
+
+▎ Auto mode is now Claude Code's default permission mode.
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky actions and prompt injection before executing, runs the
+▎ ones it assesses as lower-risk, and blocks the rest.
+▎ https://code.claude.com/docs/en/permission-modes
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents                                                                               Not logged in · Run /login
+                                                          tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
