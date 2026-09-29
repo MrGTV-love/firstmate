@@ -1,0 +1,15 @@
+## second SIGTERM (pid ) within 30 minutes of the first relaunch
+v1 gen=g1790641471.82741.19958 seq=4 state=idle source=claude-hook event=session-end ts=1790641544
+## watcher run: stdout
+check: se1 auto-relaunch paused after 1 attempt in 1800s; session-end still recorded
+## handled marker
+g1790641471.82741.19958	4	capped-min
+## ledger (no new attempt row)
+1790641466	attempt
+1790641478	relaunched
+## wake drained+acked, watcher re-run for 60s (rc=124; 124 = timed out with no wake)
+/Users/charlesabrooker/.no-mistakes/worktrees/f13ab6e08a2b/01M3N6YQ0WRF1869Z93776XSPZ/bin/fm-wake-lib.sh: line 572: 54205 Terminated: 15          sleep "$SIGNAL_GRACE"
+## pane still at shell
+Resume this session with:
+claude --resume 367207ef-7eaa-479f-81c4-4d9ceeea92c7
+charlesabrooker@GTT-CB demo %

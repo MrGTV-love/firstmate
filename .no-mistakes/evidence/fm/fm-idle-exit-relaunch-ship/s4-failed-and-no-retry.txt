@@ -1,0 +1,14 @@
+## watcher run 1 (gate env, no bypass) stdout
+check: se1 auto-relaunch failed after session-end: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/f13ab6e08a2b.git)
+## ledger
+1790641411	attempt
+1790641411	failed
+## handled
+g1790641318.12407.27986	4	failed
+## wake queue
+1790641412	1	check	session-end-relaunch-failed-se1-g1790641318.12407.27986-4	check: se1 auto-relaunch failed after session-end: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/f13ab6e08a2b.git)
+## watcher run 2 (60s, same session-end generation) rc=0 stdout:
+check: rearm-resurface
+## ledger after run 2
+1790641411	attempt
+1790641411	failed

@@ -1,0 +1,14 @@
+## bin/fm-control.sh se1 exit -> stopped
+## state after exit: control-exit marker, busy record retired
+se1.control-exit
+gen=g1790641878.59530.14644
+## watcher run A (60s cap): stdout (only an unrelated turn-end signal)
+signal: /private/tmp/fm-lab.lfPt5v/state/se1.turn-ended
+## watcher run B (75s, rc=0; 124 = no wake)
+stale: primary:fm-se1
+## session-end ledger files present? (none expected)
+none
+## pane remains at shell
+Resume this session with:
+claude --resume 2600f846-a6f4-4f7c-a023-a6b941576d27
+charlesabrooker@GTT-CB demo %

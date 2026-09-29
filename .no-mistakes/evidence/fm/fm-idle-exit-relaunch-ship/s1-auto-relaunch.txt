@@ -1,0 +1,69 @@
+## watcher stdout (run with FM_GATE_REFUSE_BYPASS=1, all paths in lab)
+check: se1 auto-relaunched after session-end
+## ledger
+1790641466	attempt
+1790641478	relaunched
+## handled
+g1790641318.12407.27986	4	relaunched
+## busy record after relaunch
+v1 gen=g1790641471.82741.19958 seq=3 state=idle source=claude-hook event=stop ts=1790641512
+## meta
+window=primary:fm-se1
+endpoint_task_id=se1
+worktree=/private/tmp/fm-lab.lfPt5v/projects/demo/.treehouse/demo-5c411f/1/demo
+project=/private/tmp/fm-lab.lfPt5v/projects/demo
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-se1
+model=haiku
+effort=default
+busy_gen=g1790641471.82741.19958
+spawn_gen=s1790641472.78597.28005
+control_relaunch_tx=78049.20260929T002427Z.16455
+## worktree status (same path, uncommitted file kept)
+?? wip-uncommitted.txt
+f480c7366c36509001260b8ed3c4d4016368683a
+work in progress
+## control-relaunch journal
+v1
+task=se1
+phase=complete
+ts=2026-09-29T00:24:38Z
+backend=tmux
+endpoint=primary:fm-se1
+worktree=/private/tmp/fm-lab.lfPt5v/projects/demo/.treehouse/demo-5c411f/1/demo
+kind=scout
+from_harness=claude
+from_model=haiku
+from_effort=default
+to_harness=claude
+to_model=haiku
+to_effort=default
+worktree_head=f480c7366c36509001260b8ed3c4d4016368683a
+worktree_dirty=yes
+note_file=/private/tmp/fm-lab.lfPt5v/state/se1.control-relaunch.note
+exit_result=already-stopped
+## new worker pane
+ ▐▛███▛█   Claude Code v2.1.284
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/fm-lab.lfPt5v/projects/demo/.treehouse/demo-5c411f/1/demo
+❯ : Firstmate operational input waiting: read '/private/tmp/fm-lab.lfPt5v/state/operational-inbox/1790641476-db768f0cd9d7bc14.msg' and handle its contents as Firstmate operational input.
+  Read 1 file
+⏺ Reading the Firstmate brief.
+  This is a test task: keep an idle lane open. I should not run commands or edit files. First, I'll check the instruction inbox for any steering messages.
+  Listed 1 directory
+⏺ Inbox is empty. No messages waiting.
+  ready
+✻ Cooked for 32s · done 7:25 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 ██░░░░░░░░ 23% 46k/200k demo:367207ef
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent
+## relaunch note delivered
+The previous worker session ended while this task was still open. The local copy and every uncommitted change were left as the previous worker left them. Continue from the instructions and the instruction inbox.
+
+/private/tmp/fm-lab.lfPt5v/data/se1/launch-brief.md
+/private/tmp/fm-lab.lfPt5v/data/se1/brief.md
+/private/tmp/fm-lab.lfPt5v/state/se1.control-relaunch.note
+/private/tmp/fm-lab.lfPt5v/state/operational-inbox/1790641476-db768f0cd9d7bc14.msg

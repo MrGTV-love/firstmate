@@ -1,0 +1,15 @@
+## before SIGTERM
+v1 gen=g1790641318.12407.27986 seq=3 state=idle source=claude-hook event=stop ts=1790641359
+Tue Sep 29 00:23:07 UTC 2026
+## after SIGTERM to claude pid 31363
+Tue Sep 29 00:23:15 UTC 2026
+v1 gen=g1790641318.12407.27986 seq=4 state=idle source=claude-hook event=session-end ts=1790641387
+## pane
+d) and matches only commands containing a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expande
+d) and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expande
+d) and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+Resume this session with:
+claude --resume 80a1414b-bc8c-4b6f-8fc4-58b41d580f89
+charlesabrooker@GTT-CB demo %

@@ -1,0 +1,14 @@
+## status tail at SIGTERM time: last verb = done
+## busy record after SIGTERM of pid 91299: event=session-end (gen g1790642421.82888.10428 seq=4)
+## watcher 60s run: rc=124 (timed out, no wake), stdout:
+(empty)
+## session-end ledger after that run: none
+
+## control: appended a later 'working' line, same session-end record
+done [at=1790642517]: lab report complete
+working [at=1790642603]: resumed after review
+## watcher run: stdout
+check: se1 auto-relaunched after session-end
+## ledger
+1790642609	attempt
+1790642635	relaunched

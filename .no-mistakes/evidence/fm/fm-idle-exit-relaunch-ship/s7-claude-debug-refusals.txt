@@ -1,0 +1,17 @@
+$ bin/fm-control.sh se1 exit --claude-debug
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.lfPt5v
+error: --harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only
+rc=
+$ bin/fm-control.sh se1 relaunch --harness codex --claude-debug --note x
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.lfPt5v
+error: --claude-debug applies only to a claude relaunch; se1 would be replaced on codex
+rc=
+$ bin/fm-spawn.sh se2 <project> --scout --harness codex --claude-debug
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.lfPt5v
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --claude-debug applies only to a claude launch; se2 resolved harness 'codex'
+rc=
+## busy record unchanged by refusals:
+before: v1 gen=g1790642620.72061.31724 seq=3 state=idle source=claude-hook event=stop ts=1790642655
+after:  v1 gen=g1790642620.72061.31724 seq=3 state=idle source=claude-hook event=stop ts=1790642655
+0

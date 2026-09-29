@@ -1,0 +1,21 @@
+## worker relaunched with: bin/fm-control.sh se1 relaunch --claude-debug --note ...
+## claude pid 94539 carries:
+--debug
+CLAUDE_CODE_DIAGNOSTICS_FILE=/private/tmp/fm-lab.lfPt5v/state/se1.claude-diagnostics.jsonl
+## sent SIGHUP to 94539
+## busy record
+v1 gen=g1790641799.89400.32084 seq=4 state=idle source=claude-hook event=session-end ts=1790641852
+## diagnostics file shutdown lines (/private/tmp/fm-lab.lfPt5v/state/se1.claude-diagnostics.jsonl)
+{"timestamp":"2026-09-29T00:30:51.831Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGHUP"}}
+{"timestamp":"2026-09-29T00:30:51.841Z","level":"info","event":"session_activity_at_shutdown","data":{"owner_key":"cli","refcount":0,"active":{},"oldest_activity_ms":null}}
+## --debug log exists under ~/.claude/debug (newest):
+d053fe45-40cf-4da2-a547-41871f51f315.txt
+## watcher after SIGHUP stop (rc=0)
+check: se1 auto-relaunched after session-end
+## ledger
+1790641872	attempt
+1790641888	relaunched
+## busy record of replacement
+v1 gen=g1790641878.59530.14644 seq=3 state=idle source=claude-hook event=stop ts=1790641906
+## replacement argv head
+claude --dangerously-skip-permissions --add-dir /private/tmp
