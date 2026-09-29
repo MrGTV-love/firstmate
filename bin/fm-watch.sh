@@ -151,7 +151,7 @@
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
 #   check: <id> auto-relaunched after session-end
 #                          an in-flight ship or scout recorded event=session-end
-#                          and its endpoint was recovery-grade dead or missing;
+#                          and its endpoint was recovery-grade dead;
 #                          relaunched through bin/fm-control.sh relaunch, which
 #                          keeps the recorded worktree
 #                          (bin/fm-session-end-relaunch-lib.sh)
@@ -257,7 +257,7 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
 
 session_end_relaunch_tick() {
-  fm_session_end_relaunch_scan "$STATE" || return 1
+  fm_session_end_relaunch_scan "$STATE" "$WATCHER_STALE_GRACE" || return 1
   [ -z "${FM_SESSION_END_WAKE:-}" ] || wake "$FM_SESSION_END_WAKE"
 }
 

@@ -61,6 +61,15 @@ printf '%s\n' "$*" >> "${FM_SESSION_END_CONTROL_LOG:?}"
 [ -z "${FM_SESSION_END_CONTROL_ENV_LOG:-}" ] \
   || printf 'FM_HOME=%s\nFM_STATE_OVERRIDE=%s\nFM_CONTROL_LAUNCH_WAIT=%s\n' \
     "$FM_HOME" "${FM_STATE_OVERRIDE:-}" "${FM_CONTROL_LAUNCH_WAIT:-}" > "$FM_SESSION_END_CONTROL_ENV_LOG"
+if [ -n "${FM_SESSION_END_BEACON_REF:-}" ]; then
+  date +%s > "$FM_SESSION_END_BEACON_REF.start"
+  if [ "${FM_STATE_OVERRIDE:-}/.last-watcher-beat" -nt "$FM_SESSION_END_BEACON_REF" ]; then
+    printf 'fresh\n' > "$FM_SESSION_END_BEACON_REF.seen"
+  else
+    printf 'stale\n' > "$FM_SESSION_END_BEACON_REF.seen"
+  fi
+fi
+[ -z "${FM_SESSION_END_CONTROL_SLEEP:-}" ] || sleep "$FM_SESSION_END_CONTROL_SLEEP"
 exit "${FM_SESSION_END_CONTROL_RC:-0}"
 SH
   chmod +x "$bin/fm-control.sh"
@@ -86,7 +95,7 @@ make_lane() {
   printf '%s\n' "$dir"
 }
 
-scan_lane() {  # <dir>
+scan_lane() {  # <dir> [<watcher-grace-secs>]
   local dir=$1 fakebin recorder
   fakebin=$(make_tmux "$dir")
   recorder=$(make_recorder "$dir")
@@ -100,7 +109,7 @@ scan_lane() {  # <dir>
     FM_FAKE_TMUX_CURRENT_COMMAND="${FM_FAKE_TMUX_CURRENT_COMMAND:-zsh}" \
     FM_FAKE_WINDOW_GONE="${FM_FAKE_WINDOW_GONE:-0}" \
     FM_FAKE_TMUX_LOG="$dir/tmux.log" \
-    fm_session_end_relaunch_scan "$dir/state"
+    fm_session_end_relaunch_scan "$dir/state" "${2:-}"
 }
 
 test_session_end_relaunches_a_dead_lane_once() {
@@ -143,6 +152,7 @@ test_relaunch_hands_control_the_watcher_home() {
       FM_CONTROL_LAUNCH_WAIT=600
     fm_session_end_relaunch_scan "$dir/state" || exit 1
     printf '%s\n' "$FM_SESSION_END_WAKE" > "$dir/wake"
+    printf '%s\n' "$FM_SESSION_END_TIMEOUT" > "$dir/bound"
   ) || fail "scan failed with an unexported FM_HOME"
   [ "$(cat "$dir/wake")" = "check: lane auto-relaunched after session-end" ] \
     || fail "an unexported FM_HOME did not relaunch: $(cat "$dir/wake")"
@@ -154,19 +164,58 @@ test_relaunch_hands_control_the_watcher_home() {
   case "$wait" in
     ''|*[!0-9]*) fail "control did not get a launch wait: $(cat "$dir/control-env.log")" ;;
   esac
-  [ "$wait" -lt "$FM_SESSION_END_TIMEOUT" ] \
-    || fail "control's launch wait ${wait}s is not inside the ${FM_SESSION_END_TIMEOUT}s bound"
+  [ "$wait" -lt "$(cat "$dir/bound")" ] \
+    || fail "control's launch wait ${wait}s is not inside the $(cat "$dir/bound")s bound"
   pass "the relaunch hands control the watcher's home, state, and a launch wait inside its bound"
 }
 
-test_missing_endpoint_relaunches() {
+test_missing_endpoint_is_not_relaunched() {
   local dir
   dir=$(make_lane missing-endpoint)
   FM_FAKE_WINDOW_GONE=1 scan_lane "$dir" || fail "scan failed on a missing endpoint"
   unset FM_FAKE_WINDOW_GONE
-  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after session-end" ] \
-    || fail "a missing endpoint was not relaunched: ${FM_SESSION_END_WAKE:-<empty>}"
-  pass "a missing endpoint with session-end is relaunched"
+  [ ! -s "$dir/control.log" ] || fail "a missing endpoint was relaunched: $(cat "$dir/control.log")"
+  [ -z "$FM_SESSION_END_WAKE" ] || fail "a missing endpoint woke: $FM_SESSION_END_WAKE"
+  [ ! -e "$dir/state/.session-end-relaunch-lane" ] \
+    || fail "a missing endpoint ledgered an attempt: $(cat "$dir/state/.session-end-relaunch-lane")"
+  pass "a missing endpoint with session-end is not relaunched"
+}
+
+# The watcher touches its beacon once per cycle, and the relaunch blocks
+# inside that cycle, so the bound must leave the beacon short of the grace.
+test_relaunch_bound_stays_inside_the_watcher_grace() {
+  local dir grace start elapsed called
+  for grace in '' 300 900; do
+    dir=$(make_lane "bound-${grace:-default}")
+    FM_POLL=15 scan_lane "$dir" "$grace" || fail "scan failed with grace '${grace:-default}'"
+    [ -n "$grace" ] || grace=300
+    [ $((grace - FM_SESSION_END_TIMEOUT)) -ge 60 ] \
+      || fail "the ${FM_SESSION_END_TIMEOUT}s bound leaves less than 60s of the ${grace}s watcher grace"
+    [ "$FM_SESSION_END_LAUNCH_WAIT" -lt "$FM_SESSION_END_TIMEOUT" ] \
+      || fail "the ${FM_SESSION_END_LAUNCH_WAIT}s launch wait is not inside the ${FM_SESSION_END_TIMEOUT}s bound"
+  done
+
+  dir=$(make_lane bound-kill)
+  touch -t 200001010000 "$dir/state/.last-watcher-beat"
+  touch -t 200101010000 "$dir/beacon-ref"
+  start=$SECONDS
+  FM_SESSION_END_CONTROL_SLEEP=60 FM_SESSION_END_BEACON_REF="$dir/beacon-ref" \
+    scan_lane "$dir" 66 || fail "scan failed with a short watcher grace"
+  elapsed=$((SECONDS - start))
+  [ "$elapsed" -lt 60 ] || fail "a relaunch that outlived the bound blocked the scan for ${elapsed}s"
+  called=$(( $(date +%s) - $(cat "$dir/beacon-ref.start") ))
+  [ "$called" -le $((66 - 60 + 5)) ] \
+    || fail "the relaunch call blocked for ${called}s, past the 66s grace less its 60s margin"
+  [ "$(cat "$dir/beacon-ref.seen" 2>/dev/null)" = fresh ] \
+    || fail "the watcher beacon was not touched before the blocking relaunch call"
+  grep -F 'check: lane auto-relaunch failed after session-end' <<<"$FM_SESSION_END_WAKE" >/dev/null \
+    || fail "a relaunch cut off by the bound did not wake as failed: ${FM_SESSION_END_WAKE:-<empty>}"
+
+  dir=$(make_lane bound-too-short)
+  scan_lane "$dir" 61 || fail "scan failed with a grace too short for the margin"
+  [ ! -s "$dir/control.log" ] \
+    || fail "a grace with no room for the margin still relaunched: $(cat "$dir/control.log")"
+  pass "the relaunch bound stays at least 60s inside the watcher grace and refreshes the beacon first"
 }
 
 test_cap_holds_and_wakes_once() {
@@ -289,7 +338,7 @@ test_backlog_hold_is_skipped() {
 }
 
 test_claude_debug_is_off_unless_asked() {
-  local case_dir home proj wt fakebin id=debug-off out launch status
+  local case_dir home proj wt fakebin id=debug-off out launch status sm form
   case_dir="$TMP_ROOT/debug-off"
   home="$case_dir/home"
   proj="$case_dir/project"
@@ -307,33 +356,64 @@ test_claude_debug_is_off_unless_asked() {
   assert_not_contains "$launch" '--debug' "claude debug was on without --claude-debug: $launch"
   assert_not_contains "$launch" 'CLAUDE_CODE_DIAGNOSTICS_FILE' \
     "claude diagnostics were on without --claude-debug: $launch"
-  id=debug-on
-  fm_test_spawn_brief "$home" "$id"
+
+  # The relaunch needs the recorded window listed with a bare shell in it.
+  mkdir -p "$case_dir/stopped"
+  cat > "$case_dir/stopped/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *'#{pane_current_command}'*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec '$fakebin/tmux' "\$@"
+SH
+  chmod +x "$case_dir/stopped/tmux"
+  fakebin="$case_dir/stopped:$fakebin"
   : > "$case_dir/launch.log"
   status=0
-  FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off --claude-debug > "$case_dir/spawn-on.out" || status=$?
-  expect_code 0 "$status" "a --claude-debug spawn should succeed: $(cat "$case_dir/spawn-on.out")"
+  FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+    fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch --claude-debug > "$case_dir/relaunch.out" || status=$?
+  expect_code 0 "$status" "a --relaunch --claude-debug spawn should succeed: $(cat "$case_dir/relaunch.out")"
   launch=$(cat "$case_dir/launch.log")
   assert_contains "$launch" '--debug ' "claude debug was not enabled when asked: $launch"
   assert_contains "$launch" "CLAUDE_CODE_DIAGNOSTICS_FILE='$(cd "$home/state" && pwd -P)/$id.claude-diagnostics.jsonl' " \
     "the claude launch did not name the diagnostics file that records the stop signal: $launch"
 
-  id=debug-pi
+  cp "$home/state/$id.meta" "$case_dir/meta.before"
+  status=0
+  FM_FAKE_DUPLICATE_WINDOW="fm-$id" \
+    fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch --harness pi --claude-debug \
+    > "$case_dir/relaunch-pi.out" || status=$?
+  expect_code 1 "$status" "a non-claude --claude-debug relaunch must be refused"
+  assert_contains "$(cat "$case_dir/relaunch-pi.out")" '--claude-debug applies only to a claude launch' \
+    "the harness refusal did not name the flag"
+  cmp -s "$case_dir/meta.before" "$home/state/$id.meta" \
+    || fail "a refused --claude-debug relaunch changed the task record"
+
+  id=debug-fresh
   fm_test_spawn_brief "$home" "$id"
-  fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off \
-    --harness pi --claude-debug > "$case_dir/spawn-pi.out"
-  expect_code 1 $? "a non-claude --claude-debug spawn must be refused"
-  assert_contains "$(cat "$case_dir/spawn-pi.out")" '--claude-debug applies only to a claude launch' \
-    "the refusal did not name the flag"
-  [ ! -e "$home/state/$id.meta" ] \
-    || fail "a refused --claude-debug spawn published a task record: $(cat "$home/state/$id.meta")"
-  pass "claude debug and diagnostics are off by default, on when asked, and refused for another harness"
+  sm="$case_dir/mate-home"
+  mkdir -p "$sm"
+  for form in ship scout secondmate batch; do
+    status=0
+    case "$form" in
+      ship) fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off --claude-debug ;;
+      scout) fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --scout --claude-debug ;;
+      secondmate) fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$sm" --secondmate --claude-debug ;;
+      batch) fm_test_run_spawn "$home" "$wt" "$fakebin" "$id=$proj" "$id-b=$proj" --mode no-mistakes --yolo off --claude-debug ;;
+    esac > "$case_dir/fresh-$form.out" || status=$?
+    expect_code 1 "$status" "a fresh $form spawn with --claude-debug must be refused: $(cat "$case_dir/fresh-$form.out")"
+    assert_contains "$(cat "$case_dir/fresh-$form.out")" '--claude-debug applies to --relaunch only' \
+      "the fresh $form refusal did not name the flag"
+    [ ! -e "$home/state/$id.meta" ] && [ ! -e "$home/state/$id-b.meta" ] \
+      || fail "a refused fresh $form --claude-debug spawn published a task record"
+  done
+  pass "claude debug is off by default, on for a claude relaunch, and refused for another harness or a fresh spawn"
 }
 
 test_session_end_relaunches_a_dead_lane_once
 test_relaunch_hands_control_the_watcher_home
-test_missing_endpoint_relaunches
+test_missing_endpoint_is_not_relaunched
+test_relaunch_bound_stays_inside_the_watcher_grace
 test_cap_holds_and_wakes_once
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches

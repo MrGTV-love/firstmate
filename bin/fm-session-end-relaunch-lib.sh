@@ -16,7 +16,9 @@
 #   - the current busy record is event=session-end
 #   - the latest status verb is not done or failed
 #   - no declared pause or captain-held status line
-#   - fm_backend_agent_state is dead (pane at a shell, no agent) or missing
+#   - fm_backend_agent_state is dead (pane at a shell, no agent); a missing
+#     endpoint is left to the supervisor, because fm-control relaunch cannot
+#     prove it gone on every backend
 #   - fm-captain-hold.sh open reports no open captain call (exit 1); an open
 #     call or an answer it cannot establish skips the lane
 #   - state/<id>.control-exit does not name this busy generation
@@ -32,11 +34,14 @@
 # attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
 # session-end generation. A later generation is a new episode.
-# One fm-control call is bounded to 300 seconds, above its own launch wait
-# (pinned to 90 seconds) plus the fm-spawn --relaunch run, so a slow start
-# ends through fm-control's own rollback rather than the bound.
+# One fm-control call is bounded to the watcher's stale grace minus
+# FM_SESSION_END_MARGIN seconds, and the watcher beacon is touched just
+# before that call, so a live watcher blocked in a relaunch never reads as
+# down. fm-control's launch wait is half that bound, at most 90 seconds, so
+# a slow start ends through fm-control's own rollback rather than the bound.
+# A grace too short to leave that margin runs no relaunch.
 #
-# fm_session_end_relaunch_scan sets FM_SESSION_END_WAKE to the first check
+# fm_session_end_relaunch_scan <state-dir> [<watcher-grace-secs>] sets FM_SESSION_END_WAKE to the first check
 # line that should be printed, or empty when this pass has nothing to say.
 # It also appends each check row to the durable wake queue. It stops after
 # the first relaunch attempt, so one watcher cycle runs at most one bounded
@@ -70,8 +75,25 @@ fi
 FM_SESSION_END_MIN_SECS=1800
 FM_SESSION_END_DAY_SECS=86400
 FM_SESSION_END_DAY_MAX=3
-FM_SESSION_END_LAUNCH_WAIT=90
-FM_SESSION_END_TIMEOUT=300
+FM_SESSION_END_MARGIN=60
+FM_SESSION_END_LAUNCH_WAIT_MAX=90
+FM_SESSION_END_LAUNCH_WAIT=
+FM_SESSION_END_TIMEOUT=
+
+# Set FM_SESSION_END_TIMEOUT and FM_SESSION_END_LAUNCH_WAIT from the watcher's
+# stale grace, or the poll-derived default. Non-zero when the grace leaves no
+# room for a launch wait inside the margin.
+fm_session_end_bounds() {  # [<watcher-grace-secs>]
+  local grace=${1:-}
+  case "$grace" in
+    ''|*[!0-9]*) grace=$(fm_poll_derived_grace) ;;
+  esac
+  FM_SESSION_END_TIMEOUT=$((10#$grace - FM_SESSION_END_MARGIN))
+  FM_SESSION_END_LAUNCH_WAIT=$((FM_SESSION_END_TIMEOUT / 2))
+  [ "$FM_SESSION_END_LAUNCH_WAIT" -le "$FM_SESSION_END_LAUNCH_WAIT_MAX" ] \
+    || FM_SESSION_END_LAUNCH_WAIT=$FM_SESSION_END_LAUNCH_WAIT_MAX
+  [ "$FM_SESSION_END_LAUNCH_WAIT" -ge 1 ]
+}
 
 fm_session_end_control_bin() {
   if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_SESSION_END_CONTROL:-}" ]; then
@@ -218,10 +240,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   window=$(fm_meta_get "$meta" window 2>/dev/null || true)
   [ -n "$window" ] || return 0
   agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
-  case "$agent" in
-    dead|missing) ;;
-    *) return 0 ;;
-  esac
+  [ "$agent" = dead ] || return 0
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
     FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
@@ -258,6 +277,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   fm_session_end_ledger_add "$state" "$id" attempt || return 1
   bin=$(fm_session_end_control_bin)
   rc=0
+  touch "$state/.last-watcher-beat" 2>/dev/null || true
   out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
     FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
     "$bin" "$id" relaunch --note "$(fm_session_end_note)" 2>&1) || rc=$?
@@ -284,10 +304,11 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
 # Scan this home's task records. Sets FM_SESSION_END_WAKE to the first
 # supervisor-visible line, or empty. Returns non-zero only when a required
 # write failed.
-fm_session_end_relaunch_scan() {  # <state-dir>
+fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
   local state=$1 meta id reason first=
   FM_SESSION_END_WAKE=
   [ -d "$state" ] || return 0
+  fm_session_end_bounds "${2:-}" || return 0
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$state/.wake-queue"
   for meta in "$state"/*.meta; do
     [ -e "$meta" ] || continue
