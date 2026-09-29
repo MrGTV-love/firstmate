@@ -117,17 +117,19 @@
 # one treehouse worktree pool. A pool slot first created from home A's clone
 # has its git common dir in A's clone, but the spawning firstmate at home B
 # passes its own clone as <project>. One check decides "same repository":
-# the two repos carry the exact same origin remote URL, which holds because
-# fm-home-seed.sh clones every home's project from the source's own origin
-# URL. When it matches, the canonical project path for trust registration
+# the two repos carry the exact same origin remote URL, compared verbatim.
+# That holds for a network origin because fm-home-seed.sh clones every home's
+# project from the source's own origin URL; it canonicalizes a local-path
+# origin first (absolute, symlinks resolved), so a local-path origin not
+# already spelled that way differs and is refused (fail closed). When it
+# matches, the canonical project path for trust registration
 # becomes the primary checkout that owns the worktree's common dir (the
 # sibling clone), because that is exactly where Claude Code's own git-root
 # canonicalization collapses every linked worktree to. An "info:" line on
 # stderr names the sibling clone path. The consent-gated external-imports
 # flags land on that sibling clone's project entry; if the sibling clone
 # already declined external imports, the whole registration refuses with a
-# message naming the sibling path, the same shape as today's refusal for
-# <project>.
+# message naming the sibling path, the same refusal <project> itself gets.
 #
 # The test is deliberately NOT a treehouse or orca path prefix. Treehouse's
 # root is configurable (--root, TREEHOUSE_ROOT, config, and a relative
