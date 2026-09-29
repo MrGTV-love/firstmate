@@ -1,0 +1,30 @@
+=== $ bin/fm-spawn.sh se-two <demo> --scout --harness claude --claude-debug   (fresh scout)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug
+rc=
+=== $ bin/fm-spawn.sh se-three <demo> --mode local-only --yolo off --harness claude --claude-debug   (fresh ship)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug
+rc=
+=== $ bin/fm-spawn.sh se-four --secondmate --claude-debug   (fresh secondmate)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug
+rc=
+=== $ bin/fm-spawn.sh a1=<demo> a2=<demo> --scout --claude-debug   (batch)
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug
+rc=
+=== $ bin/fm-control.sh se-scout exit --claude-debug
+error: --harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only
+rc=
+=== task records created by these calls (expect none besides se-scout)
+se-scout.meta
+1
+treehouse-state.json
+treehouse-state.key
+treehouse-state.lock
+fresh scout rc=1
+fresh ship rc=1
+fresh secondmate rc=1
+batch rc=1
+control exit --claude-debug rc=1

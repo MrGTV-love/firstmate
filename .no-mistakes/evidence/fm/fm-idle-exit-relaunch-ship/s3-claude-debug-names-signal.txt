@@ -1,21 +1,33 @@
-## worker relaunched with: bin/fm-control.sh se1 relaunch --claude-debug --note ...
-## claude pid 94539 carries:
---debug
-CLAUDE_CODE_DIAGNOSTICS_FILE=/private/tmp/fm-lab.lfPt5v/state/se1.claude-diagnostics.jsonl
-## sent SIGHUP to 94539
-## busy record
-v1 gen=g1790641799.89400.32084 seq=4 state=idle source=claude-hook event=session-end ts=1790641852
-## diagnostics file shutdown lines (/private/tmp/fm-lab.lfPt5v/state/se1.claude-diagnostics.jsonl)
-{"timestamp":"2026-09-29T00:30:51.831Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGHUP"}}
-{"timestamp":"2026-09-29T00:30:51.841Z","level":"info","event":"session_activity_at_shutdown","data":{"owner_key":"cli","refcount":0,"active":{},"oldest_activity_ms":null}}
-## --debug log exists under ~/.claude/debug (newest):
-d053fe45-40cf-4da2-a547-41871f51f315.txt
-## watcher after SIGHUP stop (rc=0)
-check: se1 auto-relaunched after session-end
-## ledger
-1790641872	attempt
-1790641888	relaunched
-## busy record of replacement
-v1 gen=g1790641878.59530.14644 seq=3 state=idle source=claude-hook event=stop ts=1790641906
-## replacement argv head
-claude --dangerously-skip-permissions --add-dir /private/tmp
+=== $ bin/fm-control.sh se-scout relaunch --claude-debug --note '...'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LdoTZs
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LdoTZs
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 14s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+relaunched se-scout harness=claude from=claude model=default effort=low backend=tmux endpoint=primary:fm-se-scout worktree=/Users/charlesabrooker/tmp/fm-lab.LdoTZs/pool/.treehouse/demo-55eed5/1/demo
+rc=0
+=== launch script (/tmp/fm-se-scout+703d7b0e70401f023d1bf2fd58e6cd4e3edc5e60bd668223c869e2559e8e5964/launch.s1790659291.35724.3367.sh) claude line
+CLAUDE_CODE_DIAGNOSTICS_FILE='/Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/se-scout.claude-diagnostics.jsonl' 
+claude --debug --dangerously-skip-permissions --add-di
+=== agent state
+alive
+=== claude process args
+42552 claude --debug --dangerously-skip-permissions --add-dir /Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/operational
+=== kill -HUP 42552 at 2026-09-29T05:21:46Z
+=== pane tail
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+charlesabrooker@GTT-CB demo %
+=== busy record
+v1 gen=g1790659291.38296.31827 seq=2 state=idle source=claude-hook event=session-end ts=1790659307
+=== diagnostics file: /Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/se-scout.claude-diagnostics.jsonl
+-rw-r--r--@ 1 charlesabrooker  staff  13458 Sep 29 00:21 /Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/se-scout.claude-diagnostics.jsonl
+=== shutdown events in diagnostics file
+{"timestamp":"2026-09-29T05:21:46.927Z","level":"info","event":"shutdown_signal","data":{"signal":"SIGHUP"}}
+{"timestamp":"2026-09-29T05:21:46.933Z","level":"info","event":"session_activity_at_shutdown","data":{"owner_key":"cli","refcount":1,"active":{"hook_exec":1},"oldest_activity_ms":8534}}

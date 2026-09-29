@@ -1,0 +1,18 @@
+=== kill -TERM 66639 (relaunched worker) at 2026-09-29T05:21:03Z
+=== busy record
+v1 gen=g1790659228.62371.28887 seq=4 state=idle source=claude-hook event=session-end ts=1790659263
+=== agent state
+dead
+=== watcher pass A stdout:
+check: se-scout auto-relaunch paused after 1 attempt in 1800s; session-end still recorded
+rc=0
+=== watcher pass B stdout:
+check: rearm-resurface
+rc=0
+=== agent state after both passes (still dead = not relaunched)
+dead
+=== ledger
+1790659222	attempt
+1790659233	relaunched
+=== handled
+g1790659228.62371.28887	4	capped-min

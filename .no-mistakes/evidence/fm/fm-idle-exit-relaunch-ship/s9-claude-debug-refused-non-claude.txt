@@ -1,0 +1,7 @@
+=== fixture: shell-only window fm-se-scout recreated in the worktree (agent state: dead)
+=== journal phase before: complete  ts: 2026-09-29T05:24:13Z
+=== $ bin/fm-control.sh se-scout relaunch --harness codex --claude-debug --note ...
+error: --claude-debug applies only to a claude relaunch; se-scout would be replaced on codex
+rc=1
+=== journal ts after (unchanged = refused before checkpoint): 2026-09-29T05:24:13Z
+=== meta harness after: claude

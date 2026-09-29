@@ -1,0 +1,16 @@
+=== before signal: busy record
+v1 gen=g1790658879.69348.25374 seq=3 state=idle source=claude-hook event=stop-failure ts=1790658887
+=== kill -TERM 75921 at 2026-09-29T05:17:14Z
+=== after signal: pane tail
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+Resume this session with:
+claude --resume 164ba3bc-3ac0-4223-9559-b4162c4c6ba2
+charlesabrooker@GTT-CB demo %
+=== after signal: busy record
+v1 gen=g1790658879.69348.25374 seq=4 state=idle source=claude-hook event=session-end ts=1790659035
+=== agent state via firstmate backend classifier
+dead

@@ -1,0 +1,27 @@
+=== before teardown: session-end state files
+se-scout.claude-diagnostics.jsonl
+se-scout.control-exit
+=== $ bin/fm-teardown.sh se-scout
+fm-captain-hold: origin se-scout has no completed captain-call inventory
+REFUSED: scout task se-scout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+=== after teardown: session-end state files
+.session-end-handled-se-scout
+.session-end-relaunch-se-scout
+se-scout.claude-diagnostics.jsonl
+se-scout.control-exit
+=== meta present?
+/Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/se-scout.meta
+=== $ bin/fm-captain-hold.sh complete se-scout --none ; bin/fm-teardown.sh se-scout
+teardown: reaping leaked worktree process(es) for se-scout: 27979 81536 85758
+teardown: force-killing leaked worktree process(es) for se-scout: 27979
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown se-scout complete (window primary:fm-se-scout, worktree /Users/charlesabrooker/tmp/fm-lab.LdoTZs/pool/.treehouse/demo-55eed5/1/demo)
+Backlog: se-scout just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.LdoTZs/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.LdoTZs/data/backlog.md - move se-scout to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+=== after teardown: session-end state files
+se-scout.claude-diagnostics.jsonl
+=== meta present?
+ls: /Users/charlesabrooker/tmp/fm-lab.LdoTZs/state/se-scout.meta: No such file or directory

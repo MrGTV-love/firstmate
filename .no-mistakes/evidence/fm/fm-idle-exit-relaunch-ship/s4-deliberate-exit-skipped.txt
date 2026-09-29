@@ -1,0 +1,22 @@
+=== fixture: live worker, cap ledger cleared
+=== agent state
+alive
+=== $ bin/fm-control.sh se-scout exit
+stopped se-scout harness=claude backend=tmux endpoint=primary:fm-se-scout worktree=/Users/charlesabrooker/tmp/fm-lab.LdoTZs/pool/.treehouse/demo-55eed5/1/demo
+rc=
+=== busy record after exit
+(retired)
+=== control-exit marker
+gen=g1790659332.83244.7000
+=== agent state
+dead
+=== watcher (plain checkout) pass 1:
+check: rearm-resurface
+rc=0
+=== watcher pass 2:
+check: rearm-resurface
+rc=0
+=== agent state (still dead = not relaunched)
+dead
+=== session-end ledger
+(none - no attempt made)

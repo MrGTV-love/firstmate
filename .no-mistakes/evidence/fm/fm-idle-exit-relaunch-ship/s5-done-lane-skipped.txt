@@ -1,0 +1,12 @@
+=== fixture: live worker relaunched, status line 'done' appended, cap ledger cleared, then kill -TERM 77055
+=== last status line
+done [at=1790659415]: lab fixture marks this scout done
+=== busy record
+v1 gen=g1790659404.70706.12481 seq=4 state=idle source=claude-hook event=session-end ts=1790659416
+=== watcher (plain checkout) stdout
+check: rearm-resurface
+rc=0
+=== agent state (dead = not relaunched)
+dead
+=== ledger
+(none - no attempt made)

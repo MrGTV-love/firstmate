@@ -1,0 +1,14 @@
+=== watcher pass 1 (gate worktree code) stdout:
+check: se-scout auto-relaunch failed after session-end: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/31c777dfc236.git)
+rc=0
+=== ledger after pass 1
+1790659049	attempt
+1790659050	failed
+=== handled after pass 1
+g1790658879.69348.25374	4	failed
+=== watcher pass 2 stdout (45s):
+check: rearm-resurface
+rc=0
+=== ledger after pass 2
+1790659049	attempt
+1790659050	failed

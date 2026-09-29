@@ -1,0 +1,12 @@
+=== fixture: live worker relaunched, no status file, cap ledger cleared, then tmux kill-window primary:fm-se-scout
+=== busy record
+v1 gen=g1790659451.35640.11991 seq=4 state=idle source=claude-hook event=session-end ts=1790659460
+=== agent state
+missing
+=== windows in lab session
+zsh
+=== watcher (plain checkout) stdout
+check: rearm-resurface
+rc=0
+=== ledger
+(none - no attempt made)
