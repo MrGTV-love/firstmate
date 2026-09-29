@@ -460,6 +460,80 @@ test_worktree_subdirectory_is_refused() {
   pass "fm-claude-trust.sh: refuses a subdirectory of the worktree"
 }
 
+# A treehouse pool slot created from one home's clone is a linked worktree
+# whose git common dir belongs to that clone, not the spawning home's own
+# clone. When they share the same origin URL, the worktree is accepted and
+# trust is registered against the sibling checkout that owns the common dir.
+test_sibling_clone_same_origin_accepted() {
+  local rec out sibling sibling_wt
+  rec=$(make_case sibling-origin)
+  read_case "$rec"
+  sibling="$CASE_DIR/sibling"
+  git clone --quiet -- "$(git -C "$PROJ" remote get-url origin)" "$sibling"
+  sibling_wt="$CASE_DIR/sibling-wt"
+  git -C "$sibling" worktree add --quiet -b wt-sibling "$sibling_wt"
+  out=$(run_trust "$CONFIG" "$sibling_wt" "$PROJ")
+  expect_code 0 $? "a sibling clone's worktree with matching origin must be trusted: $out"
+  assert_contains "$out" "trusted:" "registration did not report what it trusted"
+  assert_contains "$out" "info:" "registration did not report the sibling match"
+  assert_trusted "$CONFIG/.claude.json" "$sibling_wt" "the worktree was not recorded as trusted"
+  assert_trusted "$CONFIG/.claude.json" "$sibling" "the sibling clone was not recorded as project root"
+  pass "fm-claude-trust.sh: sibling clone's worktree with same origin is accepted and trusts sibling checkout"
+}
+
+# When the sibling clone's project entry already carries an explicit decline
+# of external CLAUDE.md imports, the whole registration must refuse and name
+# the sibling clone path, just as it would for <project>.
+test_sibling_clone_declined_external_imports_refused() {
+  local rec out sibling sibling_wt store
+  rec=$(make_case sibling-declined)
+  read_case "$rec"
+  sibling="$CASE_DIR/sibling"
+  git clone --quiet -- "$(git -C "$PROJ" remote get-url origin)" "$sibling"
+  sibling_wt="$CASE_DIR/sibling-wt"
+  git -C "$sibling" worktree add --quiet -b wt-sibling "$sibling_wt"
+  store="$CONFIG/.claude.json"
+  node -e '
+    const store = process.argv[1];
+    const sibling = process.argv[2];
+    const fs = require("node:fs");
+    const root = {projects: {}};
+    root.projects[sibling] = {
+      hasTrustDialogAccepted: false,
+      hasClaudeMdExternalIncludesApproved: false,
+      hasClaudeMdExternalIncludesWarningShown: true
+    };
+    fs.writeFileSync(store, JSON.stringify(root, null, 2) + "\n", {mode: 0o600});
+  ' "$store" "$sibling"
+  out=$(run_trust "$CONFIG" "$sibling_wt" "$PROJ")
+  expect_code 1 $? "a sibling clone with declined imports must be refused: $out"
+  assert_contains "$out" "$sibling" "the refusal did not name the sibling clone path"
+  assert_contains "$out" "already declined" "the refusal did not name the declined imports"
+  assert_not_trusted "$CONFIG/.claude.json" "$sibling_wt" "the worktree was trusted despite the refusal"
+  pass "fm-claude-trust.sh: refuses a sibling clone whose project root already declined external imports"
+}
+
+# A different repository at a firstmate-home/projects path with the same
+# basename as <project> has no matching origin, so the registration must
+# refuse and leave no trust recorded.
+test_different_repo_same_basename_refused() {
+  local rec out other_root other_repo other_wt
+  rec=$(make_case diff-basename)
+  read_case "$rec"
+  other_root="$CASE_DIR/other-home"
+  other_repo="$other_root/projects/$(basename "$PROJ")"
+  mkdir -p "$(dirname "$other_repo")"
+  fm_git_init_commit "$other_repo"
+  fm_git_add_origin "$other_repo" "$CASE_DIR/different.origin.git"
+  other_wt="$CASE_DIR/other-wt"
+  git -C "$other_repo" worktree add --quiet -b wt-other "$other_wt"
+  out=$(run_trust "$CONFIG" "$other_wt" "$PROJ")
+  expect_code 1 $? "a different repo at same basename must be refused: $out"
+  assert_contains "$out" "is not a worktree of project" "the refusal did not name the project mismatch"
+  assert_not_trusted "$CONFIG/.claude.json" "$other_wt" "a different repo's worktree was trusted"
+  pass "fm-claude-trust.sh: refuses a different repository at the same basename path"
+}
+
 # The write target the external-imports flags depend on is only correct when
 # it names the primary checkout. When <project> is itself a linked worktree
 # (a secondmate home spawned from, rather than as, the primary checkout),
@@ -854,6 +928,9 @@ test_non_git_directory_is_refused
 test_missing_directory_is_refused
 test_foreign_project_worktree_is_refused
 test_worktree_subdirectory_is_refused
+test_sibling_clone_same_origin_accepted
+test_sibling_clone_declined_external_imports_refused
+test_different_repo_same_basename_refused
 test_project_argument_that_is_itself_a_worktree_resolves_to_the_primary_checkout
 test_unrelated_store_content_is_preserved
 test_symlinked_store_to_a_foreign_owned_target_is_refused

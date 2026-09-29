@@ -24,7 +24,9 @@
 # dialog if one renders anyway and never counts a busy turn as ready on a path
 # that was neither pre-registered here nor answered there.
 #
-# THE SCOPE TEST IS THE SAFETY PROPERTY and mirrors bin/fm-claude-trust.sh:
+# THE SCOPE TEST IS THE SAFETY PROPERTY and mirrors bin/fm-claude-trust.sh,
+# minus that script's sibling-clone acceptance (a shared-pool slot cut from
+# another home's clone is refused here, and the post-launch gate covers it):
 # <worktree> must be a LINKED git worktree - its own git dir, sharing
 # <project>'s common dir - whose top level is exactly the resolved argument. A
 # primary checkout, a worktree of an unrelated repo, a subdirectory of a
