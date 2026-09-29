@@ -160,9 +160,8 @@
 #                          relaunch failed; the attempt is ledgered and counts
 #                          toward the caps below
 #   check: <id> auto-relaunch paused after <n> attempt(s) in <s>s; ...
-#                          the task exceeded one automatic relaunch per
-#                          FM_SESSION_END_RELAUNCH_MIN_SECS or
-#                          FM_SESSION_END_RELAUNCH_DAY_MAX per day; one wake
+#                          the task exceeded one automatic relaunch per 30
+#                          minutes or 3 per day; one wake
 #                          per session-end generation, then silence until that
 #                          generation changes or the window allows another try
 # For normal supervision, resume the session-start primary-harness protocol
