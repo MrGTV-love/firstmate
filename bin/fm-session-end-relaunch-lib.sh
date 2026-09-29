@@ -14,19 +14,27 @@
 #   - state/<id>.meta and the recorded worktree still exist, and
 #     state/<id>.backlog-close is absent
 #   - the current busy record is event=session-end
-#   - fm_backend_agent_state is dead (pane at a shell, no agent) or missing
 #   - the latest status verb is not done or failed
-#   - no declared pause or captain-held status line, and fm-captain-hold.sh
-#     open reports no open captain call (exit 1); an open call or an answer
-#     it cannot establish skips the lane
+#   - no declared pause or captain-held status line
+#   - fm_backend_agent_state is dead (pane at a shell, no agent) or missing
+#   - fm-captain-hold.sh open reports no open captain call (exit 1); an open
+#     call or an answer it cannot establish skips the lane
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
+#
+# A completed fm-control exit retires the busy record, so its session-end
+# is never seen here. The control-exit marker covers the exit whose command
+# was delivered but whose agent did not stop within the exit wait: that
+# exit never retired the record, and its later session-end is still
+# deliberate.
 #
 # Caps count attempt rows in state/.session-end-relaunch-<id>: at most one
 # attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
 # session-end generation. A later generation is a new episode.
-# One fm-control call is bounded to 120 seconds.
+# One fm-control call is bounded to 300 seconds, above its own launch wait
+# (pinned to 90 seconds) plus the fm-spawn --relaunch run, so a slow start
+# ends through fm-control's own rollback rather than the bound.
 #
 # fm_session_end_relaunch_scan sets FM_SESSION_END_WAKE to the first check
 # line that should be printed, or empty when this pass has nothing to say.
@@ -62,7 +70,8 @@ fi
 FM_SESSION_END_MIN_SECS=1800
 FM_SESSION_END_DAY_SECS=86400
 FM_SESSION_END_DAY_MAX=3
-FM_SESSION_END_TIMEOUT=120
+FM_SESSION_END_LAUNCH_WAIT=90
+FM_SESSION_END_TIMEOUT=300
 
 fm_session_end_control_bin() {
   if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_SESSION_END_CONTROL:-}" ]; then
@@ -149,7 +158,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   local identity gen seq last verb hold_rc marker marker_gen
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
-  local now last_attempt bin out rc=0 reason key which
+  local bin out rc=0 reason key which
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -181,14 +190,9 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   if [ -f "$handled" ] && [ ! -L "$handled" ]; then
     IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$handled" || true
   fi
-  now=$(date +%s) || return 1
-  last_attempt=0
-  if [ -f "$(fm_session_end_ledger_path "$state" "$id")" ]; then
-    last_attempt=$(awk -F '\t' '$2 == "attempt" { t=$1 } END { print t+0 }' "$(fm_session_end_ledger_path "$state" "$id")") || return 1
-  fi
   if [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] \
      && { [ "$handled_outcome" = relaunched ] || [ "$handled_outcome" = failed ]; } \
-     && [ $((now - last_attempt)) -lt "$FM_SESSION_END_MIN_SECS" ]; then
+     && [ "$recent" -ge 1 ]; then
     return 0
   fi
   which=
@@ -201,6 +205,14 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
      && [ "$handled_outcome" = "capped-$which" ]; then
     return 0
   fi
+  last=$(last_status_line "$state/$id.status" 2>/dev/null || true)
+  verb=$(status_line_verb "$last" 2>/dev/null || true)
+  case "$verb" in
+    done|failed) return 0 ;;
+  esac
+  if [ -n "$(status_declared_wait_line "$state/$id.status" 2>/dev/null || true)" ]; then
+    return 0
+  fi
   backend=$(fm_meta_get "$meta" backend 2>/dev/null || true)
   [ -n "$backend" ] || backend=tmux
   window=$(fm_meta_get "$meta" window 2>/dev/null || true)
@@ -210,14 +222,6 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     dead|missing) ;;
     *) return 0 ;;
   esac
-  last=$(last_status_line "$state/$id.status" 2>/dev/null || true)
-  verb=$(status_line_verb "$last" 2>/dev/null || true)
-  case "$verb" in
-    done|failed) return 0 ;;
-  esac
-  if [ -n "$(status_declared_wait_line "$state/$id.status" 2>/dev/null || true)" ]; then
-    return 0
-  fi
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
     FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
@@ -254,7 +258,9 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   fm_session_end_ledger_add "$state" "$id" attempt || return 1
   bin=$(fm_session_end_control_bin)
   rc=0
-  out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" "$bin" "$id" relaunch --note "$(fm_session_end_note)" 2>&1) || rc=$?
+  out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
+    FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
+    "$bin" "$id" relaunch --note "$(fm_session_end_note)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1
     reason="check: $id auto-relaunched after session-end"

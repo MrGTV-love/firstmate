@@ -11,7 +11,8 @@
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
 # The spawn header owns what the flag adds to the launch.
-# The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command, so a later session-end tick can tell this stop from an unexpected one.
+# The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
+# A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
@@ -649,10 +650,11 @@ do_exit() {
   # authoritative proof is the agent-state wait below. The retried Enter still
   # matters, because a slash command opens a completion popup on some TUIs that
   # swallows the first Enter.
-  # A deliberate exit verb records the busy generation before anything is typed,
-  # so an unexpected SessionEnd can be told apart from this stop even if the
-  # pane echo scrolls away. Relaunch calls this function too and must not mark
-  # its own replacement stop as a deliberate exit.
+  # A deliberate exit verb records the busy generation before anything is typed.
+  # A completed exit retires the busy record anyway; the marker keeps a later
+  # SessionEnd deliberate when the agent outlives the exit wait and this
+  # transaction dies before that retire. Relaunch calls this function too and
+  # must not mark its own replacement stop as a deliberate exit.
   if [ "$VERB" = exit ]; then
     local gen_file gen
     gen_file=$(fm_busy_gen_path "$STATE" "$ID")

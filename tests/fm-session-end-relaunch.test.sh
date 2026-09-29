@@ -56,7 +56,11 @@ make_recorder() {  # <dir>
   cat > "$bin/fm-control.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
+[ -n "${FM_HOME:-}" ] || { echo "error: FM_HOME is not set" >&2; exit 1; }
 printf '%s\n' "$*" >> "${FM_SESSION_END_CONTROL_LOG:?}"
+[ -z "${FM_SESSION_END_CONTROL_ENV_LOG:-}" ] \
+  || printf 'FM_HOME=%s\nFM_STATE_OVERRIDE=%s\nFM_CONTROL_LAUNCH_WAIT=%s\n' \
+    "$FM_HOME" "${FM_STATE_OVERRIDE:-}" "${FM_CONTROL_LAUNCH_WAIT:-}" > "$FM_SESSION_END_CONTROL_ENV_LOG"
 exit "${FM_SESSION_END_CONTROL_RC:-0}"
 SH
   chmod +x "$bin/fm-control.sh"
@@ -119,6 +123,40 @@ test_session_end_relaunches_a_dead_lane_once() {
   [ ! -s "$dir/control.log" ] || fail "a second scan relaunched again: $(cat "$dir/control.log")"
   [ ! -s "$dir/tmux.log" ] || fail "an already-handled lane still probed its endpoint: $(cat "$dir/tmux.log")"
   pass "a dead session-end lane is relaunched once and then left alone"
+}
+
+# The watcher assigns FM_HOME and STATE without exporting them, and the
+# default home has nothing else that exports FM_HOME.
+test_relaunch_hands_control_the_watcher_home() {
+  local dir fakebin recorder wait
+  dir=$(make_lane unexported-home)
+  fakebin=$(make_tmux "$dir")
+  recorder=$(make_recorder "$dir")
+  : > "$dir/control.log"
+  (
+    export -n FM_HOME
+    unset FM_STATE_OVERRIDE FM_WAKE_QUEUE
+    FM_HOME="$dir"
+    export PATH="$fakebin:$PATH" FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" \
+      FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
+      FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" \
+      FM_CONTROL_LAUNCH_WAIT=600
+    fm_session_end_relaunch_scan "$dir/state" || exit 1
+    printf '%s\n' "$FM_SESSION_END_WAKE" > "$dir/wake"
+  ) || fail "scan failed with an unexported FM_HOME"
+  [ "$(cat "$dir/wake")" = "check: lane auto-relaunched after session-end" ] \
+    || fail "an unexported FM_HOME did not relaunch: $(cat "$dir/wake")"
+  grep -Fx "FM_HOME=$dir" "$dir/control-env.log" >/dev/null \
+    || fail "control did not get the watcher's home: $(cat "$dir/control-env.log")"
+  grep -Fx "FM_STATE_OVERRIDE=$dir/state" "$dir/control-env.log" >/dev/null \
+    || fail "control did not get the scanned state dir: $(cat "$dir/control-env.log")"
+  wait=$(sed -n 's/^FM_CONTROL_LAUNCH_WAIT=//p' "$dir/control-env.log")
+  case "$wait" in
+    ''|*[!0-9]*) fail "control did not get a launch wait: $(cat "$dir/control-env.log")" ;;
+  esac
+  [ "$wait" -lt "$FM_SESSION_END_TIMEOUT" ] \
+    || fail "control's launch wait ${wait}s is not inside the ${FM_SESSION_END_TIMEOUT}s bound"
+  pass "the relaunch hands control the watcher's home, state, and a launch wait inside its bound"
 }
 
 test_missing_endpoint_relaunches() {
@@ -294,6 +332,7 @@ test_claude_debug_is_off_unless_asked() {
 }
 
 test_session_end_relaunches_a_dead_lane_once
+test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_relaunches
 test_cap_holds_and_wakes_once
 test_deliberate_exit_and_waits_are_skipped
