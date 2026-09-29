@@ -10,8 +10,12 @@
 #
 # Usage: fm-claude-trust.sh <worktree> <project>
 #        fm-claude-trust.sh --secondmate-home <home> <id>
-#   <worktree>  the isolated task worktree this spawn launches into
-#   <project>   the primary checkout that worktree belongs to
+#   <worktree>  the isolated task worktree this spawn launches into, which
+#               may be a worktree of <project> or a worktree of a sibling
+#               clone of the same repository (same origin URL)
+#   <project>   the spawning home's checkout of the project: the checkout that
+#               worktree belongs to, or a sibling clone of the one it belongs
+#               to when the worktree came from a shared pool
 #   <home>      the seeded secondmate home this spawn launches into
 #   <id>        the secondmate id that home must already be marked for
 # Prints one line naming what it registered; refuses loudly on anything else.
@@ -37,6 +41,11 @@
 # second dialog's flags: a secondmate home has no separate "project" entry to
 # carry consent forward from, so its registration stays trust-only.
 #
+# A SHARED TREEHOUSE POOL across multiple firstmate homes adds an extra case.
+# A task worktree may belong to a sibling clone of the project rather than the
+# spawning home's own clone, and the scope test accepts it when both clones
+# carry the same origin URL, registering trust against the sibling checkout.
+#
 # TWO PROJECT-CONFIG ENTRIES IN WORKTREE MODE, NOT ONE. Registering both flags
 # on the worktree entry alone (the original trust-only design) leaves the
 # external-imports dialog showing. Verified 2026-09-06 by disassembling the
@@ -50,7 +59,8 @@
 # canonicalization (`Fr`/`Se`) walks a linked worktree's `.git` file through
 # its `commondir` pointer back to the PRIMARY CHECKOUT, exactly the <project>
 # argument this script already receives for the worktree-mode scope test
-# below. So the trust flag is registered on BOTH the worktree entry (for
+# below (or, for a shared-pool slot, the sibling clone that test resolves in
+# its place). So the trust flag is registered on BOTH the worktree entry (for
 # trust's ancestor-walk fallback and defense in depth) and the project entry
 # (the trust check's first, canonical-shaped, look); the two external-imports
 # flags land on those same two entries only when the project entry already
@@ -82,7 +92,8 @@
 # different shapes on disk.
 #
 # WORKTREE MODE. <worktree> must be a LINKED git worktree - its own git dir,
-# sharing <project>'s common dir - whose top level is exactly the resolved
+# sharing <project>'s common dir, or that of a sibling clone of the same
+# repository (see below) - whose top level is exactly the resolved
 # argument. Git is the ground truth, so the argument is never trusted on its
 # own word: a primary checkout (git dir == common dir), a worktree of an
 # unrelated repo, a subdirectory of a worktree, a plain directory, and a home
@@ -99,6 +110,26 @@
 # definition used throughout, or this refuses rather than guess. The
 # consent-gated external-imports flags land on that resolved canonical
 # checkout, never on the linked-worktree argument itself.
+#
+# When the worktree's common dir differs from <project>'s common dir, the
+# script checks whether they are SIBLING CLONES of the same repository -
+# which happens when multiple firstmate homes clone the same repo and share
+# one treehouse worktree pool. A pool slot first created from home A's clone
+# has its git common dir in A's clone, but the spawning firstmate at home B
+# passes its own clone as <project>. One check decides "same repository":
+# the two repos carry the exact same origin remote URL, compared verbatim.
+# That holds for a network origin because fm-home-seed.sh clones every home's
+# project from the source's own origin URL; it canonicalizes a local-path
+# origin first (absolute, symlinks resolved), so a local-path origin not
+# already spelled that way differs and is refused (fail closed). When it
+# matches, the canonical project path for trust registration
+# becomes the primary checkout that owns the worktree's common dir (the
+# sibling clone), because that is exactly where Claude Code's own git-root
+# canonicalization collapses every linked worktree to. An "info:" line on
+# stderr names the sibling clone path. The consent-gated external-imports
+# flags land on that sibling clone's project entry; if the sibling clone
+# already declined external imports, the whole registration refuses with a
+# message naming the sibling path, the same refusal <project> itself gets.
 #
 # The test is deliberately NOT a treehouse or orca path prefix. Treehouse's
 # root is configurable (--root, TREEHOUSE_ROOT, config, and a relative
@@ -273,7 +304,37 @@ if [ "$MODE" = worktree ]; then
 
   PROJ_COMMON=$(common_dir_of "$PROJ_REAL") || true
   [ -n "$PROJ_COMMON" ] || refuse "project '$PROJ_REAL' is not inside a git repository"
-  [ "$WT_COMMON" = "$PROJ_COMMON" ] || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
+  if [ "$WT_COMMON" = "$PROJ_COMMON" ]; then
+    # Same project: the worktree belongs directly to the project argument.
+    # This is the common case - a task worktree cut from the same checkout
+    # firstmate spawned from.
+    :
+  else
+    # The worktree's common dir is not the project's common dir, but it may
+    # belong to a SIBLING CLONE of the same repository. This happens when
+    # multiple firstmate homes clone the same repo into separate
+    # projects/ directories and share one treehouse pool: a pool slot was
+    # first created from home A's clone, so its git common dir is A's,
+    # but the spawning firstmate at home B passes its own clone as
+    # <project>. The dialog must be accepted rather than refusing this
+    # perfectly valid worktree.
+    #
+    # One check decides "same repository": the worktree's repo and
+    # <project> carry the exact same origin remote URL.
+    SIBLING_CANON=$(real_dir "$(dirname -- "$WT_COMMON")") || true
+    [ -n "$SIBLING_CANON" ] || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
+
+    # Verify SIBLING_CANON is actually the primary checkout that owns WT_COMMON.
+    SIBLING_GIT_DIR=$(git -C "$SIBLING_CANON" rev-parse --absolute-git-dir 2>/dev/null) || true
+    SIBLING_GIT_DIR=$(real_dir "${SIBLING_GIT_DIR:-}") || true
+    [ "$SIBLING_GIT_DIR" = "$WT_COMMON" ] || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
+
+    WT_ORIGIN=$(git -C "$TARGET_REAL" remote get-url origin 2>/dev/null) || true
+    PROJ_ORIGIN=$(git -C "$PROJ_REAL" remote get-url origin 2>/dev/null) || true
+    [ -n "$WT_ORIGIN" ] && [ "$WT_ORIGIN" = "$PROJ_ORIGIN" ] \
+      || refuse "'$TARGET_REAL' is not a worktree of project '$PROJ_REAL'"
+    echo "info: worktree '$TARGET_REAL' belongs to sibling clone '$SIBLING_CANON' (origin match)" >&2
+  fi
 
   # The external-imports flags must land on the primary checkout - its own git
   # dir equals the common dir - because that is exactly the path Claude Code's
@@ -292,7 +353,17 @@ if [ "$MODE" = worktree ]; then
   [ -n "$PROJ_GIT_DIR" ] || refuse "project '$PROJ_REAL' has no resolvable git directory"
   PROJ_GIT_DIR=$(real_dir "$PROJ_GIT_DIR") || true
   [ -n "$PROJ_GIT_DIR" ] || refuse "project '$PROJ_REAL' has an unresolvable git directory"
-  if [ "$PROJ_GIT_DIR" = "$PROJ_COMMON" ]; then
+  if [ -n "${SIBLING_CANON:-}" ]; then
+    # Sibling clone of the same repository: use the sibling checkout as the
+    # canonical project path for trust registration, because that is exactly
+    # the path Claude Code's own git-root canonicalization collapses every
+    # linked worktree to. The existing PROJ_GIT_DIR and PROJ_COMMON values
+    # from <project> are irrelevant here because the trust entry and the
+    # external-imports consent check must both look at the sibling clone -
+    # that is the checkout Claude Code resolves to from the worktree, and
+    # the only place it ever reads the external-imports flags.
+    PROJ_CANON=$SIBLING_CANON
+  elif [ "$PROJ_GIT_DIR" = "$PROJ_COMMON" ]; then
     PROJ_CANON=$PROJ_REAL
   else
     PROJ_CANON=$(real_dir "$(dirname -- "$PROJ_COMMON")") || true
