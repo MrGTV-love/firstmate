@@ -2056,12 +2056,21 @@ pass "Lavish classification staging stays bounded while nonmatches stream"
 # effect a second time.
 HW="$TMP_ROOT/hw"; new_home "$HW"
 TRIGW="$TMP_ROOT/trigger-restart-cut"
-pe_register "$HW" lavish restart-cut-src -- "$BLOCKER" "$TRIGW" "restart cut payload" >/dev/null
+RESTART_STARTED="$TMP_ROOT/restart-cut-started"
+pe_register "$HW" lavish restart-cut-src -- \
+  "$STARTED_BLOCKER" "$RESTART_STARTED" "$BLOCKER" "$TRIGW" "restart cut payload" >/dev/null
 pe "$HW" start restart-cut-src > "$TMP_ROOT/restart-cut-start.log" 2>&1 &
 restart_cut_start_pid=$!
-sleep 0.5
+# Release an actually started source, not one assumed ready after a settle sleep.
+if ! wait_for "$RESTART_STARTED" 600; then
+  cat "$TMP_ROOT/restart-cut-start.log" >&2
+  fail "the restart-cut source never entered its command"
+fi
 : > "$TRIGW"
-wait_for "$HW/state/.wake-queue" || fail "the restart-cut source published no event"
+if ! wait_for "$HW/state/.wake-queue"; then
+  cat "$TMP_ROOT/restart-cut-start.log" >&2
+  fail "the restart-cut source published no event"
+fi
 assert_contains "$(wake_payloads "$HW")" "procevent lavish restart-cut-src 1" \
   "capture and publish reaches the wake queue before any handling"
 
@@ -2226,12 +2235,29 @@ pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER"
 printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
-for _ in $(seq 1 24); do
-  pe "$HR" start race-src >/dev/null &
+for race_index in $(seq 1 24); do
+  pe "$HR" start race-src > "$TMP_ROOT/race-contender-$race_index.out" 2>&1 &
   race_pids+=("$!")
 done
-wait_for "$RACE_LOG" 300 || fail "no contender acquired the stale claim"
-sleep 0.5
+# Startup is setup, not a 30-second SLO. Wait for the blocked winner and every
+# loser to observe its claim before releasing it; a settle sleep lets slow
+# contenders arrive only after the winner exits and no longer tests contention.
+if ! wait_for "$RACE_LOG" 3000; then
+  cat "$TMP_ROOT"/race-contender-*.out >&2
+  fail "no contender acquired the stale claim"
+fi
+race_expected_losers=$((${#race_pids[@]} - 1))
+race_loser_deadline=$((SECONDS + 300))
+while :; do
+  race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
+    "$TMP_ROOT"/race-contender-*.out)
+  [ "$race_losers" -eq "$race_expected_losers" ] && break
+  if [ "$SECONDS" -ge "$race_loser_deadline" ]; then
+    cat "$TMP_ROOT"/race-contender-*.out >&2
+    fail "not every stale-claim contender observed the winning owner"
+  fi
+  sleep 0.1
+done
 [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || fail "stale-claim race started more than one runner"
 : > "$RACE_TRIGGER"
 for race_pid in "${race_pids[@]}"; do wait "$race_pid" 2>/dev/null || true; done
@@ -2509,10 +2535,10 @@ assert_contains "$sr4_again" "uncertain=1" \
 # must have said so rather than promising a reclaim.
 assert_contains "$sr4_wake" "cannot claim source" \
   "the stranded wake promises an unconditional reclaim: $sr4_wake"
-set +e
-sr4_start=$(pe "$HSR4" start reused-group-src 2>&1)
-sr4_start_rc=$?
-set -e
+# Capture expected refusals without changing the suite's shell options; turning
+# on errexit here used to bypass later fixture-state assertions during setup.
+sr4_start_rc=0
+sr4_start=$(pe "$HSR4" start reused-group-src 2>&1) || sr4_start_rc=$?
 [ "$sr4_start_rc" -ne 0 ] \
   || fail "start reported success against a claim it could not tidy: $sr4_start"
 assert_contains "$sr4_start" "cannot claim source" \
@@ -2522,10 +2548,8 @@ assert_contains "$sr4_start" "cannot claim source" \
 sleep 0.3
 [ "$(wc -l < "$SR4_LOG" | tr -d ' ')" = 1 ] \
   || fail "a refused start ran a second source beside a reused pid's live group: $(cat "$SR4_LOG")"
-set +e
-sr4_retire=$(pe "$HSR4" retire reused-group-src 2>&1)
-sr4_rc=$?
-set -e
+sr4_rc=0
+sr4_retire=$(pe "$HSR4" retire reused-group-src 2>&1) || sr4_rc=$?
 [ "$sr4_rc" -ne 0 ] || fail "retire released a claim whose process group survives: $sr4_retire"
 [ -e "$sr4_claim" ] || fail "retire removed the reused-pid generation's claim"
 [ -e "$HSR4/state/procevent/reused-group-src.source" ] \
@@ -3727,11 +3751,14 @@ pe "$HPACE" retire pace-src >/dev/null
 pe_register "$HPACE" lavish pace-src -- "$FAST_SOURCE" "$PACE_LOG" >/dev/null
 FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src > "$TMP_ROOT/replacement-pacing.out" 2>&1 &
 PACE_START_PID=$!
-pace_deadline=$((SECONDS + 4))
+# Distinguish a stale 3600-second floor from ordinary command startup on a
+# loaded host; this case does not promise that the entire CLI finishes in 4s.
+pace_deadline=$((SECONDS + 60))
 while kill -0 "$PACE_START_PID" 2>/dev/null; do
   if [ "$SECONDS" -ge "$pace_deadline" ]; then
     pe "$HPACE" retire pace-src >/dev/null 2>&1 || true
     wait "$PACE_START_PID" 2>/dev/null || true
+    cat "$TMP_ROOT/replacement-pacing.out" >&2
     fail "a replacement registration inherited the prior launch floor"
   fi
   sleep 0.1
@@ -3801,11 +3828,13 @@ done
 printf '%s\n' "$(( $(date +%s) + 3600 ))" > "$ROLLBACK_STAMP"
 FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HROLLBACK" start rollback-src > "$TMP_ROOT/rollback.out" 2>&1 &
 ROLLBACK_START_PID=$!
-rollback_deadline=$((SECONDS + 4))
+# The same startup bound isolates rollback handling from the 3600-second floor.
+rollback_deadline=$((SECONDS + 60))
 while kill -0 "$ROLLBACK_START_PID" 2>/dev/null; do
   if [ "$SECONDS" -ge "$rollback_deadline" ]; then
     pe "$HROLLBACK" retire rollback-src >/dev/null 2>&1 || true
     wait "$ROLLBACK_START_PID" 2>/dev/null || true
+    cat "$TMP_ROOT/rollback.out" >&2
     fail "a pre-reboot monotonic stamp delayed the first launch"
   fi
   sleep 0.1
@@ -4757,6 +4786,8 @@ kill -KILL -"$CRASH_PID" 2>/dev/null || true
 # A listener that has not claimed the source is not ready, so arm waits for the
 # same live-claim or launch-stamp evidence reconcile uses and fails closed when
 # that evidence does not appear within the confirm window.
+# Successful-start cases exercise ownership and readiness, not a three-second
+# cold-start SLO. Their setup gets 10s; refusal cases keep their short windows.
 READY="$TMP_ROOT/ready-arm"
 mkdir -p "$READY/bin" "$READY/home/state"
 cat > "$READY/bin/lavish-axi" <<'SH'
@@ -4773,7 +4804,7 @@ ready_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$ready_art")
 fm_test_track_procevent_home "$READY/home"
 export READY_MARK="$READY/mark" READY_RELEASE="$READY/release"
 : > "$READY_MARK"
-PATH="$READY/bin:$PATH" FM_HOME="$READY/home" \
+PATH="$READY/bin:$PATH" FM_HOME="$READY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$ready_art" > "$READY/arm.out"
 assert_contains "$(cat "$READY/arm.out")" "armed: $ready_id" "a live listener was not reported ready"
 [ -e "$FM_PROCEVENT_CLAIM_ROOT/$ready_id.claim" ] \
@@ -4808,7 +4839,7 @@ delay_ready="$DELAY/lock-ready"
 delay_rel="$DELAY/lock-release"
 hold_source_lock "$delay_id" "$delay_ready" "$delay_rel"
 wait_for "$delay_ready" || fail "delayed-start fixture could not hold the source lock"
-PATH="$DELAY/bin:$PATH" FM_HOME="$DELAY/home" \
+PATH="$DELAY/bin:$PATH" FM_HOME="$DELAY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$delay_art" > "$DELAY/arm.out" 2>"$DELAY/arm.err" &
 delay_arm=$!
 sleep 0.4
@@ -4855,11 +4886,9 @@ SH
   export READY_MARK="$dir/mark"
   : > "$READY_MARK"
   began=$(date +%s)
-  set +e
+  rc=0
   PATH="$dir/bin:$PATH" FM_HOME="$dir/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$secs" \
-    "$ROOT/bin/fm-procevent-lavish.sh" arm "$art" > "$dir/arm.out" 2>"$dir/arm.err"
-  rc=$?
-  set -e
+    "$ROOT/bin/fm-procevent-lavish.sh" arm "$art" > "$dir/arm.out" 2>"$dir/arm.err" || rc=$?
   elapsed=$(( $(date +%s) - began ))
   [ "$rc" -ne 0 ] || fail "arm reported success when no listener could claim ($dir)"
   assert_not_contains "$(cat "$dir/arm.out")" "armed:" \
@@ -4898,15 +4927,13 @@ live_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$live_art")
 fm_test_track_procevent_home "$LIVE/home"
 export READY_MARK="$LIVE/mark" READY_RELEASE="$LIVE/release"
 : > "$READY_MARK"
-PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" \
+PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$live_art" > "$LIVE/arm1.out"
 assert_contains "$(cat "$LIVE/arm1.out")" "armed: $live_id" "the first arm was not reported ready"
 wait_for_lines "$READY_MARK" 1 || fail "the first generation's listener never ran"
-set +e
+live_rc=0
 PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
-  "$ROOT/bin/fm-procevent-lavish.sh" arm "$live_art" > "$LIVE/arm2.out" 2> "$LIVE/arm2.err"
-live_rc=$?
-set -e
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$live_art" > "$LIVE/arm2.out" 2> "$LIVE/arm2.err" || live_rc=$?
 [ "$live_rc" -eq 0 ] \
   || fail "re-arm over a live earlier listener failed ($live_rc): $(cat "$LIVE/arm2.err")"
 assert_contains "$(cat "$LIVE/arm2.out")" "still-listening: $live_id" \
@@ -4955,7 +4982,7 @@ fm_test_track_procevent_home "$DRAIN/home"
 new_task_endpoint "$DRAIN/home" worker-drain
 printf 'first drain reply\n' > "$DRAIN/reply1"
 printf 'second drain reply\n' > "$DRAIN/reply2"
-PATH="$DRAIN/bin:$PATH" FM_HOME="$DRAIN/home" \
+PATH="$DRAIN/bin:$PATH" FM_HOME="$DRAIN/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$drain_art" --for worker-drain \
   --agent-reply-file "$DRAIN/reply1" >/dev/null \
   || fail "the first generation of the draining fixture did not arm"
@@ -4971,7 +4998,7 @@ done
 [ ! -e "$drain_claim" ] || fail "the first generation of the draining fixture never exited"
 # Stand the first generation's claim back up on a live process so the re-arm
 # meets it still held, then release it partway through the confirm window.
-setsid sleep 60 &
+perl -MPOSIX=setsid -e 'setsid() >= 0 or exit 1; exec @ARGV' sleep 60 &
 drain_holder=$!
 # Read the identity only once the holder has exec'd sleep: mid-exec its cmdline
 # can read empty, and a pre-exec identity would never match the live holder.
@@ -5022,7 +5049,7 @@ undisp_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$undisp_art")
 fm_test_track_procevent_home "$UNDISP/home"
 export READY_MARK="$UNDISP/mark" READY_RELEASE="$UNDISP/release"
 : > "$READY_MARK"
-PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" \
+PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$undisp_art" >/dev/null
 wait_for_lines "$READY_MARK" 1 || fail "the undisplaceable fixture's listener never ran"
 undisp_claim="$FM_PROCEVENT_CLAIM_ROOT/$undisp_id.claim"
@@ -5032,11 +5059,9 @@ awk 'NR == 4 { print "different-live-process-identity"; next } { print }' \
 chmod 0600 "$undisp_claim"
 [ "$(pe "$UNDISP/home" list | awk -v id="$undisp_id" '$1 == id { print $3 }')" = orphaned ] \
   || fail "fixture invalid: the reused-pid claim is not reported orphaned"
-set +e
+undisp_rc=0
 PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
-  "$ROOT/bin/fm-procevent-lavish.sh" arm "$undisp_art" > "$UNDISP/arm2.out" 2>/dev/null
-undisp_rc=$?
-set -e
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$undisp_art" > "$UNDISP/arm2.out" 2>/dev/null || undisp_rc=$?
 sleep 0.5
 [ "$(wc -l < "$READY_MARK" | tr -d ' ')" = 1 ] \
   || fail "arm started a second listener beside a stale claim's live process group"

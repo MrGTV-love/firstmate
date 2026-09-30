@@ -289,6 +289,8 @@ The prompt named neither capture, so the model could not discover them from the 
 
 The successful synchronous hook context was not serialized as a `hook_response` row in the print stream.
 The observed read-and-acknowledge actions, together with the handled-answer counterfactual, establish native delivery rather than merely successful hook output.
+The no-notice branch is chosen once at the initial tool boundary and checked against actual tool-result output, not command text that might contain an unexecuted branch or comment.
+Failed native scenarios print their commands and results before lab cleanup so that the evidence survives the failure.
 This proves delivery at a tool boundary; it does not claim an interruption while Claude is reasoning or a long tool is running.
 
 ```sh

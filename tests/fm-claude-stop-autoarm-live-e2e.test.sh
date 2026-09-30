@@ -20,8 +20,24 @@ fm_live_gate opt-in FM_CLAUDE_LIVE_E2E claude
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+tool_result_text() {  # <native-jsonl>
+  jq -r 'select(.type == "user") | .message.content[]?
+    | select(.type == "tool_result") | .content
+    | if type == "string" then .
+      elif type == "array" then .[]? | select(.type == "text") | .text
+      else empty end' "$1"
+}
+
 fail() {
   printf 'not ok - %s\n' "$1" >&2
+  local evidence
+  for evidence in "${LAB:-/nonexistent}"/posttool*.jsonl; do
+    [ -f "$evidence" ] || continue
+    printf 'native failure evidence: %s\n' "$evidence" >&2
+    jq -r 'select(.type == "assistant") | .message.content[]?
+      | select(.type == "tool_use") | .input.command // empty' "$evidence" >&2 || true
+    tool_result_text "$evidence" >&2 || true
+  done
   exit 1
 }
 
@@ -58,7 +74,7 @@ printf 'lavish\n' > "$POST_HOME/state/procevent-inbox/lavish-midturn.1.adapter"
 printf '%s\t1\tcheck\tprocevent:lavish-midturn:1\tcheck: procevent lavish lavish-midturn 1\n' \
   "$(date +%s)" > "$POST_HOME/state/.wake-queue"
 printf '1\n' > "$POST_HOME/state/.wake-queue.seq"
-POST_PROMPT='This is a bounded hook-integration experiment, not project work. First run exactly `printf "MIDTURN_START\n"` with Bash. If a hook then tells you a captured Lavish result is waiting, follow its instructions to find, read and acknowledge the specific capture before replying. If you received no such hook notice, run exactly `printf "NO_FEEDBACK_NOTICE\n"` instead. End with exactly POSTTOOL_DONE. Use only Bash; do not delegate, inspect the fleet, or run a Stop watcher.'
+POST_PROMPT='This is a bounded hook-integration experiment, not project work. First run exactly `printf "MIDTURN_START\n"` with Bash. Choose the following branch exactly once, based only on the hook context returned from that first Bash call: if it tells you a captured Lavish result is waiting, follow its instructions to find, read and acknowledge that capture. Otherwise run exactly `printf "NO_FEEDBACK_NOTICE\n"`. Never switch to the no-notice branch after handling a capture, even though acknowledgement clears the notice. End with exactly POSTTOOL_DONE. Use only Bash; do not delegate, inspect the fleet, or run a Stop watcher.'
 (
   cd "$POST_PROJECT" || exit 1
   FM_HOME="$POST_HOME" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
@@ -67,9 +83,7 @@ POST_PROMPT='This is a bounded hook-integration experiment, not project work. Fi
 ) > "$POST_TRANSCRIPT" 2>&1 || fail "Claude PostToolUse experiment failed"
 [ -f "$POST_HOME/state/procevent-inbox/lavish-midturn.1.handled" ] \
   || fail "real Claude never handled the mid-turn review notice"
-! jq -r 'select(.type == "assistant") | .message.content[]?
-  | select(.type == "tool_use") | .input.command // empty' "$POST_TRANSCRIPT" \
-  | grep -q 'NO_FEEDBACK_NOTICE' \
+! tool_result_text "$POST_TRANSCRIPT" | grep -qx 'NO_FEEDBACK_NOTICE' \
   || fail "Claude took the no-notice path instead of handling feedback mid-turn"
 # Successful synchronous PostToolUse context is not serialized as hook_response
 # in Claude's print stream. Prove native delivery through the next action and
@@ -96,7 +110,7 @@ unpublished_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
   | select(.type == "tool_use") | .input.command // empty' "$POST_UNPUBLISHED")
 printf '%s\n' "$unpublished_calls" | grep -q 'fm-wake-drain.sh' \
   || fail "Claude did not check the durable queue before direct capture recovery"
-! printf '%s\n' "$unpublished_calls" | grep -q 'NO_FEEDBACK_NOTICE' \
+! tool_result_text "$POST_UNPUBLISHED" | grep -qx 'NO_FEEDBACK_NOTICE' \
   || fail "an unpublished answer was mistaken for absent feedback"
 POST_NEGATIVE="$LAB/posttool-handled.jsonl"
 (
@@ -108,7 +122,7 @@ POST_NEGATIVE="$LAB/posttool-handled.jsonl"
 ) > "$POST_NEGATIVE" 2>&1 || fail "Claude handled-review counterfactual failed"
 negative_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
   | select(.type == "tool_use") | .input.command // empty' "$POST_NEGATIVE")
-printf '%s\n' "$negative_calls" | grep -q 'NO_FEEDBACK_NOTICE' \
+tool_result_text "$POST_NEGATIVE" | grep -qx 'NO_FEEDBACK_NOTICE' \
   || fail "handled feedback did not take the no-notice path"
 ! printf '%s\n' "$negative_calls" | grep -q 'fm-wake-drain.sh' \
   || fail "handled feedback still caused a mid-turn drain"
