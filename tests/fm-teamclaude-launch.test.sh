@@ -96,6 +96,26 @@ test_stopped_proxy_refuses_without_starting_claude() {
   pass "a stopped TeamClaude proxy refuses without starting claude"
 }
 
+# A loaded host answers `teamclaude status` slowly; a live proxy that takes
+# longer than a moment must still start claude rather than read as stopped.
+test_slow_status_still_starts_claude() {
+  local dir out rc
+  dir=$(new_case slow-status)
+  fm_test_fake_teamclaude "$dir/fakebin"
+  mv "$dir/fakebin/teamclaude" "$dir/fakebin/teamclaude-fast"
+  cat > "$dir/fakebin/teamclaude" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" != status ] || /bin/sleep 12
+exec "$dir/fakebin/teamclaude-fast" "\$@"
+SH
+  chmod +x "$dir/fakebin/teamclaude"
+  out=$(run_launcher "$dir" --version); rc=$?
+  expect_code 0 "$rc" "a slow but live proxy should start claude"$'\n'"$out"
+  assert_grep "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$dir/claude-env" \
+    "claude must receive HTTPS_PROXY after a slow status check"
+  pass "a live TeamClaude proxy that answers status slowly still starts claude"
+}
+
 test_missing_teamclaude_refuses_without_starting_claude() {
   local dir out rc
   dir=$(new_case missing)
@@ -119,6 +139,7 @@ test_export_without_a_proxy_setting_refuses() {
   local dir out rc
   dir=$(new_case no-proxy)
   fm_test_fake_teamclaude "$dir/fakebin"
+  # shellcheck disable=SC2016 # The fake script body expands at its own run time.
   printf '#!/usr/bin/env bash\n[ "$1" = status ] && exit 0\nprintf "export API_TIMEOUT_MS=1\\n"\n' \
     > "$dir/fakebin/teamclaude"
   out=$(run_launcher "$dir" --version); rc=$?
@@ -126,6 +147,7 @@ test_export_without_a_proxy_setting_refuses() {
   assert_contains "$out" "did not set HTTPS_PROXY" "the refusal must name the missing proxy"
   assert_absent "$dir/claude-env" "an unrouted export must not start claude"
 
+  # shellcheck disable=SC2016 # The fake script body expands at its own run time.
   printf '#!/usr/bin/env bash\n[ "$1" = status ] && exit 0\nprintf "export ANTHROPIC_BASE_URL=http://127.0.0.1:13456\\n"\n' \
     > "$dir/fakebin/teamclaude"
   out=$(run_launcher "$dir" --version); rc=$?
@@ -137,6 +159,7 @@ test_export_without_a_proxy_setting_refuses() {
   expect_code 1 "$rc" "an ambient HTTPS_PROXY must not stand in for the TeamClaude export"
   assert_absent "$dir/claude-env" "an ambient HTTPS_PROXY must not start claude"
 
+  # shellcheck disable=SC2016 # The fake script body expands at its own run time.
   printf '#!/usr/bin/env bash\n[ "$1" = status ] && exit 0\nexit 1\n' > "$dir/fakebin/teamclaude"
   out=$(run_launcher "$dir" --version); rc=$?
   expect_code 1 "$rc" "a failed export must refuse"
@@ -215,5 +238,6 @@ test_nvm_install_is_found_and_runs_with_its_own_node
 test_check_validates_without_starting_claude
 test_exec_runs_the_given_command_with_the_proxy
 test_config_paths_reach_teamclaude_but_not_claude
+test_slow_status_still_starts_claude
 
 echo "# all fm-teamclaude-launch tests passed"
