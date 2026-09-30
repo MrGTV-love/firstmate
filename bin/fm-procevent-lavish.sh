@@ -15,6 +15,7 @@
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
 #   fm-procevent-lavish.sh check <artifact.html>
+#   fm-procevent-lavish.sh relisten [<result-file>]
 #
 # classify   Print the lifecycle state a handler should act on: feedback, ended,
 #            waiting, disconnected, missing, or unknown.
@@ -107,6 +108,13 @@
 #            produce another result, so the runner may retire it; any other exit
 #            keeps it armed. This is the generic adapter contract bin/fm-procevent.sh
 #            calls, and the only place Lavish's notion of "ended" is decided.
+# relisten   Keep the same runner and exclusive claim through feedback,
+#            disconnects, waiting, and empty poll returns, but surface unknown
+#            failures without retrying them forever. The optional result file
+#            is the runner's unhandled-capture continuation check; without one,
+#            it is an empty or handled round. Quiet rounds wait poll_retry_delay
+#            seconds before another poll. Worker-owned feedback still waits for
+#            its owner's acknowledgement.
 # silent     Exit 0 when the captured result is a routine no-op the runner should
 #            record and never announce; any other exit publishes the wake. This
 #            is the generic no-op contract bin/fm-procevent.sh calls, and the
@@ -147,7 +155,8 @@
 # and use its host and port. Opening the board writes that URL; polling does not.
 # This is a routing lookup before the blocking call, not presence polling or a
 # second route record. Ambient/configured addresses must not retarget a reply.
-# An unreadable or missing session stops before the staged reply is consumed.
+# An unreadable session stops before the staged reply is consumed; an absent
+# saved session emits NOT_FOUND for the runner's existing terminal retire path.
 #
 # `answers` is this adapter's half of the generic keyed-answer contract in
 # bin/fm-procevent.sh. It reports what the captain actually chose, as
@@ -208,7 +217,7 @@ die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; exit 2; }
 
 apply_session_host() {  # <artifact>
-  local endpoint
+  local endpoint rc
   endpoint=$(perl -MJSON::PP -MCwd=realpath -MEncode=decode,FB_CROAK -e '
     use strict;
     use warnings;
@@ -225,6 +234,7 @@ apply_session_host() {  # <artifact>
     my @sessions = grep {
       ref($_) eq "HASH" && defined($_->{file}) && $_->{file} eq $real
     } values %{$state->{sessions}};
+    exit 3 unless @sessions;
     @sessions == 1 or die "board must have one saved Lavish session\n";
     my $url = $sessions[0]->{url} // "";
     $url =~ m{\Ahttp://(\[[0-9a-fA-F:]+\]|[A-Za-z0-9._-]+):([0-9]+)/session/[0-9a-f]{16}(?:\?[^\s#]*)?\z}
@@ -234,8 +244,10 @@ apply_session_host() {  # <artifact>
     $host ne "0.0.0.0" && $host ne "::" && $port >= 1 && $port <= 65535
       or die "invalid saved Lavish server address\n";
     print "$host\n$port\n";
-  ' "${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json" "$1") \
-    || die "cannot resolve the board server from its Lavish session: $1"
+  ' "${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json" "$1")
+  rc=$?
+  [ "$rc" -eq 3 ] && return 3
+  [ "$rc" -eq 0 ] || die "cannot resolve the board server from its Lavish session: $1"
   LAVISH_AXI_HOST=${endpoint%$'\n'*}
   LAVISH_AXI_PORT=${endpoint##*$'\n'}
   export LAVISH_AXI_HOST LAVISH_AXI_PORT
@@ -490,7 +502,8 @@ cmd_arm() {
 cmd_deliver_reply() {
   [ "$#" -eq 4 ] && [ "$1" = poll ] && [ "$3" = --agent-reply-file ] || usage
   lavish_reply_compatible || exit 3
-  apply_session_host "$2"
+  apply_session_host "$2" \
+    || die "cannot resolve the board server from its Lavish session: $2"
   post_lavish_reply "$2" "$4"
 }
 
@@ -620,7 +633,10 @@ cmd_poll() {
     iteration_started=$(poll_iteration_started) || die "cannot start the poll rate governor"
     [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
       || die "artifact is no longer a readable file: $artifact"
-    apply_session_host "$artifact"
+    if ! apply_session_host "$artifact"; then
+      printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n'
+      return 1
+    fi
     # Newer Lavish builds expose a one-shot reply command whose success is the
     # server's acceptance receipt. Consume the staged file only after that
     # confirmation; older compatible builds retain the published poll reply
@@ -1329,6 +1345,19 @@ case "${1-}" in
   source-id) shift; cmd_source_id "$@" ;;
   classify)  shift; cmd_classify "$@" ;;
   terminal)  shift; cmd_terminal "$@" ;;
+  relisten)
+    shift
+    [ "$#" -le 1 ] || usage
+    if [ -n "${1-}" ] && [ -s "$1" ]; then
+      case "$(cmd_classify "$1")" in
+        feedback) exit 0 ;;
+        disconnected|waiting) ;;
+        *) exit 1 ;;
+      esac
+    fi
+    delay=$(poll_retry_delay) || exit 1
+    sleep "$delay"
+    ;;
   silent)    shift; cmd_silent "$@" ;;
   answers)   shift; cmd_answers "$@" ;;
   reconciles) shift; cmd_reconciles "$@" ;;

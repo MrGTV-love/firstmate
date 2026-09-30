@@ -2433,7 +2433,8 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 
 **Open the Lavish artifact first**
 
-Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse missing or invalid session evidence before posting or consuming a staged worker reply.
+Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse invalid session evidence before posting or consuming a staged worker reply.
+A missing saved session refuses a reply attempt, while a poll attempt instead produces the adapter's terminal `missing` result so its registration retires through the normal path.
 
 **Retry interrupted Lavish polls**
 
@@ -2448,6 +2449,29 @@ An already-armed Lavish source keeps its registered listener command until it is
 Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
 For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
 The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
+
+**Keep open Lavish reviews listening**
+
+An ordinary firstmate-owned Lavish review keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
+It does not wait for watcher reconciliation or for firstmate to handle an earlier answer before collecting the next one.
+Disconnected and empty rounds wait the adapter's retry delay before listening again, so an immediately returning source cannot spin.
+Only an ended or missing session retires from its own poll result; an open session is never retired merely because its browser disconnected or its registration is old, and finished open boards leave through the listener retirement above.
+Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
+The runner's existing owner lease and source launch pacing remain in force.
+`bin/fm-procevent.sh list --age` reports registration age alongside ownership and pending-result counts so an operator can deliberately retire old open reviews through the adapter's existing `retire` command.
+
+**Deliver captured feedback during a Claude turn**
+
+The tracked Claude `PostToolUse` hook calls `bin/fm-procevent-posttool-check.sh` after each tool completion.
+Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled.
+It names the capture's source and sequence and directs the primary to drain and handle it immediately, before continuing its previous work.
+If capture succeeded but wake publication did not, the notice supplies the exact durable result path for direct reading after the empty drain and the matching acknowledgement command.
+The hook reads no result payload, performs no network call, starts no listener or watcher, and never acknowledges feedback itself.
+It inspects local directory entries and reads each candidate adapter sidecar at most 16 bytes; an empty or fully handled inbox is silent.
+Active primary tool completions also refresh the existing owner lease between Claude's Stop-owned watcher cycles.
+Worker-owned rounds, away homes, inherited source-runner contexts, Cursor compatibility payloads, and Pi compatibility payloads remain inert.
+A reply arriving while Claude is reasoning or executing one long tool is delivered at the next tool completion, not asynchronously inside that operation.
+Other primary integrations retain their native supervision delivery paths.
 
 ### Crew-hosted Lavish review boards
 
@@ -2528,9 +2552,8 @@ This section is the single owner of the runner's operating contract.
 - The watcher delivers a queued result on its ordinary cycle by reporting it as an actionable `check` wake, so a default or fallback publication reaches firstmate through the same rewake path every other wake uses and never waits for a manual drain.
 - A queued `check` delivery is reported at most once per captured source and sequence while any records for that key remain queued.
 - A durable handled acknowledgement stops future source re-announcement, while a record already queued remains under the durable queue's authority until the ordinary drain's sequence-bound post-handling acknowledgement consumes it.
-- By default, a runner releases its claim after one poll; an adapter that opts into `relisten` keeps that runner and claim across empty waits and captured results, adopting a replacement registration only when the registered command is unchanged and the claim still belongs to it.
-  A failed relisten check releases the claim; the runner never refreshes its own home lease.
-  The `bin/fm-procevent.sh` header owns the exact seam, and [remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior.
+- By default, a runner releases its claim after one poll; adapter-owned continuation and registration-adoption rules are defined in the `bin/fm-procevent.sh` header.
+  [Remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior; ordinary Lavish review continuation is defined above.
 
 **Reconcile sources**
 
@@ -2718,7 +2741,7 @@ KNOWN LIMIT: while any activity continues in a home whose original owning sessio
 
 Detaching a runner into its own process group is what lets a persistent source outlive the turn that armed it, and on its own it is also what lets a runner outlive its whole home: reparented to init, it keeps its blocking child - and every process that child spawns - running with nothing left to reap it.
 
-- So a home's process-event state carries a lease that registration, attached start, reconciliation, acknowledgement, and listing refresh, and the watcher's reconcile cycle is what keeps it fresh in a live home.
+- So a home's process-event state carries a lease that registration, attached start, reconciliation, acknowledgement, and listing refresh; Claude's active primary tool hook also refreshes it between Stop cycles.
 - An attached public `start` continues refreshing the lease while its caller remains attached.
 - Each runner fails closed unless a small guard starts successfully beside it in a separate process group.
 - That guard accepts the lease only while the state root retains the device/inode identity recorded by the runner's claim, and initiates the verified stop after two consecutive reads cannot prove that identity and lease freshness, so one unreadable read cannot kill a live runner.
