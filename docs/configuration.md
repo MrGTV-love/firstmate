@@ -1188,8 +1188,8 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
 - omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
   The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
-  When that account reads `through_reset` on every applicable bound with numeric `spendPriority`, the pool is ranked on it like any other candidate.
-  Any other runway or exhaustion reading on that account (projected, unknown, exhausted, or absent) leaves the pool eligible but unranked with its runway warning, and never vetoes it, because another pooled account may still have headroom.
+  The pool is ranked on that account through the same task-horizon runway classification as any other candidate (see "Candidate eligibility and evidence" below): `through_reset`, an established projection covering the horizon, and an early or unknown projection disclosed as a warning all let it rank.
+  An established projection shorter than the horizon, an `exhausted_now` row, or a known zero bound on that account leaves the pool eligible but unranked with its runway warning, never vetoed, because another pooled account may still have headroom.
   A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
   The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
