@@ -168,8 +168,15 @@ matrix_case K06 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then ki
 matrix_case K07 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then pkill -f fm-watch.sh; fi'
 matrix_case K08 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill $(pgrep -f fm-watch.sh); fi'
 matrix_case K09 deny 'if true; then bin/fm-watch.sh; kill 424242; fi'
-matrix_case K10 deny 'if true; then killall fm-watch.sh; fi'
+matrix_case K10 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then killall fm-watch; kill 424242; fi'
 matrix_case K11 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill "$pid"; fi'
+matrix_case K12 deny 'if ! pkill -f fm-watch; then kill 424242; fi'
+matrix_case K13 deny 'while ! pkill -f fm-watch.sh; do kill 424242; done'
+matrix_case K14 deny 'if true; then if pkill -f fm-watch; then kill 424242; fi; fi'
+matrix_case K15 deny 'if true; then if bin/fm-watch.sh; then kill 424242; fi; fi'
+matrix_case K16 deny 'if ! bin/fm-watch.sh; then kill 424242; fi'
+matrix_case K17 deny 'if true; then then bin/fm-watch.sh; kill 424242; fi'
+matrix_case K18 allow 'if ! ps -p 424242 -o command= | grep -q fm-watch.sh; then :; else kill -TERM 424242; fi'
 run_matrix_entry() {
   local id=$1 expected=$2 entry=$3 cmd=$4 payload out_file err_file rc
   local FM_HOME="$ROOT"
