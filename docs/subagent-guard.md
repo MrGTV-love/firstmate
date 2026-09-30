@@ -16,6 +16,7 @@ Do not install a home-local Claude `permissions.deny` list for helper and sessio
 
 ## Verification
 
-`tests/fm-turnend-guard.test.sh` checks that the remaining tracked Claude hooks run in Claude and not in Grok's compatibility layer.
+`tests/fm-turnend-guard.test.sh` checks that Claude's tracked hook matchers do not intercept `Agent`, `Monitor`, `TaskCreate`, `ScheduleWakeup`, `SendMessage`, or `Workflow`, and that the two Bash command protections remain registered.
+It also checks that the tracked Claude hooks run in Claude and not in Grok's compatibility layer.
 `tests/fm-arm-pretool-check.test.sh` and `tests/fm-cd-pretool-check.test.sh` cover the separate Bash command protections.
-A primary-home Claude session exercising a read-only helper-agent call provides the live check for harness availability; tool availability also depends on any untracked per-home settings outside this repository.
+A primary-home Claude session exercising a read-only helper-agent call provides the live check for harness availability; individual deferred tools still depend on the harness and any untracked per-home settings outside this repository.
