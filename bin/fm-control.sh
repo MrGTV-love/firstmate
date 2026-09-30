@@ -949,6 +949,12 @@ resolve_relaunch_profile() {
   else
     TARGET_EFFORT=default
   fi
+  # A role reference, or a model the index has since retired, is resolved or
+  # refused here, before the stop, exactly as the launch owner would.
+  if [ "$TARGET_MODEL" != default ]; then
+    TARGET_MODEL=$(FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+      "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+  fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi

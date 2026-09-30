@@ -14,6 +14,9 @@
 # through their SSH route. Unchanged config and data/captain-shared.md-only
 # updates send no reread unless a previous send failure is pending for that home.
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
+# config/model-index.json is pushed only after bin/fm-model-index.sh check
+# passes; an index with an id absent from a readable catalog is withheld from
+# every home while the other material still pushes, and the run exits non-zero.
 set -u
 
 usage() {
@@ -31,6 +34,8 @@ This is local-material-only:
   - reports each live home and each inheritable item as pushed, unchanged,
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
+  - withholds config/model-index.json from every home when
+    bin/fm-model-index.sh check finds an id absent from a readable catalog
 
 Live homes come from state/*.meta records with kind=secondmate.
 data/secondmates.md is only a fallback for missing home= fields in older or
@@ -113,6 +118,24 @@ echo "config-push: $FM_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
+# An edited fleet model index is checked against every harness catalog before
+# it reaches any home. An id proven absent keeps every home on its current
+# index; an unavailable catalog is only a notice.
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*)
+    if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } &&
+      ! FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null; then
+      echo "config-push: model-index.json not pushed - its catalog check refused it; fix config/model-index.json and rerun"
+      errors=1
+      inheritable=
+      for item in $FM_INHERITABLE_CONFIG; do
+        [ "$item" = model-index.json ] || inheritable="$inheritable $item"
+      done
+      FM_INHERITABLE_CONFIG=${inheritable# }
+      export FM_INHERITABLE_CONFIG
+    fi
+    ;;
+esac
 while IFS='|' read -r id home _window meta; do
   [ -n "$id" ] || continue
   if [ -z "$home" ]; then

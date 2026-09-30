@@ -21,7 +21,9 @@
 # Literal models work without an index; with one they cannot name a retired id,
 # and a literal that is not an index entry for its harness draws a warning.
 # A retired id also matches a provider-qualified selector ending in it and an
-# id carrying a trailing [...] context suffix such as [1m].
+# id carrying a trailing [...] context suffix such as [1m]. Claude's picker
+# lists no suffixed ids, so a Claude id with that suffix matches its base entry.
+# model passes a literal through unchanged, without jq, when no index exists.
 # FM_HOME / FM_CONFIG_OVERRIDE select the index like other home configuration.
 # FM_MODEL_CATALOG_DIR optionally supplies authoritative catalog exports (or test
 # fixtures), <harness>.json, normalized as {"models":[{"id":"...",
@@ -46,10 +48,15 @@ die() { printf 'model-index: %s\n' "$*" >&2; exit 2; }
 notice() { printf 'model-index: notice: %s\n' "$*" >&2; }
 usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
-command -v jq >/dev/null 2>&1 || die 'jq required'
 VERB=${1:-}
 shift || die 'command required (see --help)'
 case "$VERB:$#" in check:0|check:2|model:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
+  case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
+  printf '%s\n' "$2"
+  exit 0
+fi
+command -v jq >/dev/null 2>&1 || die 'jq required'
 TMP=$(mktemp -d) || die 'mktemp failed'
 trap 'rm -rf "$TMP"' EXIT
 HAVE_INDEX=0
@@ -77,7 +84,8 @@ jq -e '
 # The one retirement and index-entry rule, shared by every check and resolution.
 # shellcheck disable=SC2016 # jq variables, not shell expansions.
 LIB_JQ='
-  def retired($id): ($id | sub("\\[[^\\]]*\\]$"; "")) as $base |
+  def base_id: sub("\\[[^\\]]*\\]$"; "");
+  def retired($id): ($id | base_id) as $base |
     any($idx[0].retired[]; . == $id or . == $base or . == ($base | split("/") | last));
   def entry($h; $m): any($idx[0].roles[] | .[$h] // empty | (.model, .stand_in // empty); . == $m);
 '
@@ -138,8 +146,9 @@ check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
     notice "$h catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '$m' (role '$role') not validated"
     return 0
   fi
-  jq -e --arg m "$m" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'
-    [.models[] | select(.id == $m)] as $found |
+  jq -e --arg m "$m" --arg h "$h" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'
+    [.models[] | select(.id == $m)] as $exact |
+    (if ($exact | length) == 0 and $h == "claude" then [.models[] | select(.id == ($m | base_id))] else $exact end) as $found |
     ($found | length > 0) and all($found[]; retired(.resolved_id // .id) | not)
   ' "$f" >/dev/null && return 0
   case "$h:$m" in omp:*/*)
