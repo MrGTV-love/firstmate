@@ -937,13 +937,13 @@ test_claude_helper_tools_are_not_intercepted() {
     matched=0
     while IFS= read -r matcher; do
       [[ "$tool" =~ $matcher ]] && matched=$((matched + 1))
-    done < <(jq -r '.hooks.PreToolUse[] | .matcher' "$settings")
+    done < <(jq -r '.hooks.PreToolUse[] | .matcher // "" | if . == "" or . == "*" then ".*" else . end' "$settings")
     [ "$matched" -eq 0 ] || fail "Claude PreToolUse intercepts $tool ($matched hooks)"
   done
 
   while IFS= read -r matcher; do
     [[ Bash =~ $matcher ]] && bash_hooks=$((bash_hooks + 1))
-  done < <(jq -r '.hooks.PreToolUse[] | .matcher' "$settings")
+  done < <(jq -r '.hooks.PreToolUse[] | .matcher // "" | if . == "" or . == "*" then ".*" else . end' "$settings")
   [ "$bash_hooks" -eq 1 ] || fail "Claude Bash must retain exactly one PreToolUse matcher"
   [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[]] | length' "$settings")" -eq 2 ] \
     || fail "Claude Bash must retain both command protections"
