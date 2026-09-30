@@ -70,7 +70,8 @@
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, no candidate rankable, a genuine tie, or
 #                a winner whose established runway is shorter than the task horizon
-#   error     -> API, network, response, or quota-axi failure; decide as today
+#   error     -> API, network, response, quota-axi, or chosen-model catalog
+#                failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
 #   existing unreadable rules file, malformed rules, or missing jq), which is
@@ -156,9 +157,10 @@ if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
 fi
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
 jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON)"
-# Resolve roles against the frozen index offline; live catalogs are checked only
-# after the never-send filter permits this intake to reach the network.
-RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES" --schema-only) || die "model index/profile resolution failed"
+# Resolve roles against the frozen index offline; only the chosen profile's
+# catalog is checked, after the never-send filter permits this intake to reach
+# the network.
+RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") || die "model index/profile resolution failed"
 printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
@@ -427,7 +429,6 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
-  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES" >/dev/null || die "model index/catalog validation failed"
   HTTP=$(fm_typesafe_post "$REQUEST" "$RESP_FILE" "$SEND_TEXT")
   LAT_MS=$(fm_timing_seconds_ms "$(cat "$SEND_TEXT")") || LAT_MS=null
   [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
@@ -633,6 +634,13 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       end
     end
   end') || emit_error "resolution failed"
+
+CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
+if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
+  IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
+  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model" \
+    || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
+fi
 
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");

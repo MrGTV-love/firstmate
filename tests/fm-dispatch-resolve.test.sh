@@ -744,14 +744,19 @@ assert_contains "$out" 'candidate: gemini:gemini-3.8-flash-high  provider=google
 assert_contains "$out" "  profile: --harness 'gemini' --model 'gemini-3.8-flash-high'" "Gemini is a typed verified dispatch harness"
 
 cp "$ROOT/docs/examples/crew-dispatch.json" "$RULES"
+cp "$ROOT/docs/examples/model-index.json" "$HOME_DIR/config/model-index.json"
+mkdir -p "$TMP_ROOT/no-catalogs"
 cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"default","confidence":0.9,"probabilities":{"rule_1":0.02,"rule_2":0.02,"rule_3":0.02,"default":0.94}}},"usage":{"input_tokens":812,"output_tokens":60}}
 JSON
 reset_log
-TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/no-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "the documented example passes opted-in resolution"
-assert_contains "$out" 'candidate: pi:anthropic/claude-sonnet-5  provider=claude' "the documented Pi default uses its declared Claude provider"
+assert_contains "$out" 'candidate: pi:anthropic/claude-sonnet-5-5  provider=claude' "the documented Pi default uses its declared Claude provider"
 assert_not_contains "$err" 'malformed rules file' "the documented example reaches resolution"
+assert_not_contains "$err" 'warning: literal model' "the documented example names roles, never literal ids"
+assert_contains "$err" 'catalog unavailable' "an unavailable chosen-model catalog is a notice, not a refusal"
+rm "$HOME_DIR/config/model-index.json"
 cp "$BASE_RULES" "$RULES"
 pass "no-rule fallback, Agy, Gemini, and documented configurations resolve"
 
@@ -1518,6 +1523,15 @@ reset_log
 FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "role-based typed intake resolves"
 assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "typed intake publishes a concrete id"
+assert_contains "$err" "literal model 'sonnet' for claude is not an index entry" "literal profile ids warn while an index exists"
+mkdir -p "$TMP_ROOT/other-catalogs"
+printf '%s\n' '{"models":[{"id":"cursor-other"}]}' > "$TMP_ROOT/other-catalogs/cursor.json"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/other-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "a chosen id absent from its catalog never blocks intake"
+assert_contains "$out" '  status: error' "a chosen id absent from its catalog returns the decision to firstmate"
+assert_not_contains "$out" '  profile:' "a chosen id absent from its catalog publishes no profile"
+assert_contains "$err" "id 'cursor-grok-4.6-medium' absent or retired in cursor catalog" "the catalog refusal names the chosen id"
 # An index edit during the rule request cannot change this intake's resolved id.
 cp "$HOME_DIR/config/model-index.json" "$TMP_ROOT/original-index.json"
 jq '.roles.routine.cursor.model = "new-model-not-in-catalog"' "$TMP_ROOT/original-index.json" > "$TMP_ROOT/changed-index.json"

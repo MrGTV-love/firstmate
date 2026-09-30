@@ -1254,7 +1254,13 @@ test_model_roles_preserve_offline_bootstrap() {
     FM_MODEL_CATALOG_DIR="$case_dir/absent-catalogs" FM_BOOTSTRAP_NETWORK=skip \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "offline role inspection must validate native effort without fetching catalogs: $out"
-  pass "bootstrap resolves model roles for effort validation without a catalog or network request"
+  printf '%s\n' '{"default":{"harness":"pi","model":"codex-native/literal","effort":"ultra","provider":"codex"}}' > "$case_dir/home/config/crew-dispatch.json"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_MODEL_CATALOG_DIR="$case_dir/absent-catalogs" FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ "$out" = "CREW_DISPATCH: warning - literal model 'codex-native/literal' for pi is not an index entry; name its role so the next model release is one index edit" ] \
+    || fail "a literal profile id beside an index must warn once and stay valid: $out"
+  pass "bootstrap resolves model roles offline and warns on literal profile ids beside an index"
 }
 
 test_model_roles_preserve_offline_bootstrap

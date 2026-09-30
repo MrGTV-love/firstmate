@@ -1514,6 +1514,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-model-index-live-e2e.test.sh"
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-spawn-dispatch-profile.test.sh"
+      printf '%s\n' "__script__:fm-worker-account.test.sh"
       printf '%s\n' session-bootstrap
       ;;
     bin/fm-env-lib.sh)
