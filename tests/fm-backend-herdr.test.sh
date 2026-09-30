@@ -4646,15 +4646,11 @@ test_send_text_submit_confirms_never_idle_native_state_via_footer_transition() {
   # 5: pane read - composer content mid-turn: placeholder plus busy token
   # 6: pane read - rendered footer now busy: an idle-to-busy transition ACROSS
   #    our Enter, which is the submission proof
-  # The identity prefix moves each call one later, and the composer read's dark
-  # truecolor rows make it ask the pane identity before the footer read.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_idle_plain > "$resp/3.out"
   herdr_cursor_midturn_ansi > "$resp/5.out"
   herdr_cursor_midturn_plain > "$resp/6.out"
   herdr_submit_identity_prefix "$resp" codex
-  mv "$resp/7.out" "$resp/8.out"
-  cp "$resp/1.out" "$resp/7.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
@@ -4670,15 +4666,11 @@ test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
   # The pane was ALREADY mid-turn before our Enter, so its busy footer is not
   # evidence about OUR message: the verdict must stay pending rather than
   # borrowing someone else's turn as proof of our delivery.
-  # Each composer read's dark truecolor rows make it ask the pane identity.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_midturn_plain > "$resp/3.out"
   herdr_cursor_midturn_ansi > "$resp/5.out"
   herdr_cursor_midturn_ansi > "$resp/7.out"
   herdr_submit_identity_prefix "$resp" codex
-  mv "$resp/8.out" "$resp/9.out"
-  cp "$resp/1.out" "$resp/7.out"
-  cp "$resp/1.out" "$resp/10.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
@@ -5124,7 +5116,7 @@ test_send_text_submit_claude_payload_rendered_late_is_still_proven() {
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/6.out"
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
   fb=$(make_herdr_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=5 \
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "a payload rendered after the settle must still be proven and submitted, got '$out'"
   [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] || fail "the late-render wait must not retype the payload"
@@ -5132,6 +5124,64 @@ test_send_text_submit_claude_payload_rendered_late_is_still_proven() {
     || fail "a late-rendered payload is submitted with one Enter"
   [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a late-rendered payload must not be cleared"
   pass "fm_backend_herdr_send_text_submit: a Claude payload rendered after the settle is still proven and submitted"
+}
+
+# The payload draws left to right, so a prefix is still arriving: keep reading.
+test_send_text_submit_claude_payload_prefix_growth_is_still_proven() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-prefix-growth"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  mv "$resp/4.out" "$resp/5.out"
+  printf '  \xe2\x9d\xaf /com\n' > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a payload still drawing its tail must be waited for and submitted, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] || fail "waiting for the tail must not retype the payload"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 1 ] \
+    || fail "a payload proven after it finished drawing is submitted with one Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a payload that finished drawing must not be cleared"
+  pass "fm_backend_herdr_send_text_submit: a Claude payload drawn as a growing prefix is still proven and submitted"
+}
+
+# A head-truncated suffix can never grow into the payload, so it is refused and
+# cleared on the read that shows it, however long the wait bound is.
+test_send_text_submit_claude_truncated_suffix_refuses_without_waiting() {
+  local dir log resp fb out text reads
+  dir="$TMP_ROOT/submit-suffix-fast"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  text=$(herdr_long_payload 1492)
+  herdr_submit_claude_prefix "$resp" "$text"
+  printf '  \xe2\x9d\xaf %s\n' "${text: -480}" > "$resp/4.out"
+  printf '  \xe2\x9d\xaf\n' > "$resp/6.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
+  [ "$out" = send-failed ] || fail "a truncated suffix should be refused and cleared, got '$out'"
+  reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+  [ "$reads" -eq 3 ] || fail "a truncated suffix is refused on the first proof read, then one clear check; saw $reads composer reads"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 1 ] || fail "this send's own truncated text should be cleared"
+  pass "fm_backend_herdr_send_text_submit: a truncated Claude suffix is refused on the read that shows it"
+}
+
+# Text this send did not type on its own belongs to someone else: refuse on
+# the read that shows it and leave it in place.
+test_send_text_submit_claude_foreign_text_refuses_without_clearing() {
+  local dir log resp fb out reads
+  dir="$TMP_ROOT/submit-foreign-text"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  printf '  \xe2\x9d\xaf please keep my note\n' > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = unknown ] || fail "foreign composer text must not report a clean refusal or a delivery, got '$out'"
+  reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+  [ "$reads" -eq 2 ] || fail "foreign text is refused on the first proof read; saw $reads composer reads"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a human's text must never be cleared"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+    || fail "foreign text must not be submitted"
+  pass "fm_backend_herdr_send_text_submit: foreign Claude composer text is refused at once and never cleared"
 }
 
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
@@ -6057,6 +6107,9 @@ test_composer_state_claude_slash_popup_pushes_composer_above_tail_window
 test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
 test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry
 test_send_text_submit_claude_payload_rendered_late_is_still_proven
+test_send_text_submit_claude_payload_prefix_growth_is_still_proven
+test_send_text_submit_claude_truncated_suffix_refuses_without_waiting
+test_send_text_submit_claude_foreign_text_refuses_without_clearing
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload
