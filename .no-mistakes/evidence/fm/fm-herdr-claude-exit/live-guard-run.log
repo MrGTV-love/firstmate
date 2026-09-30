@@ -1,0 +1,8 @@
+Wed Sep 30 16:17:57 CDT 2026
+FM_TEST_BEGIN 2026-09-30T21:18:00Z tests/fm-herdr-submit-confirm-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the production shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 executes /compact in the production shape
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the production shape in its endpoint and the replacement reads its instructions
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 fm-control exit stops the production shape and preserves its endpoint
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the forced-truecolor shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.286 (Claude Code)) on herdr 0.9.1 executes /compact in the forced-truecolor shape
