@@ -2575,7 +2575,7 @@ fi
 # shed, or a pinned Pi root. Unpinned workers inherit this environment.
 if [ "$MODEL_INDEXED" = 1 ]; then
   if [ -n "$WORKER_ACCOUNT" ]; then
-    fm_worker_account_run "$HARNESS" "$WORKER_ACCOUNT_ROOT" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
+    fm_worker_account_run "$HARNESS" "$WORKER_ACCOUNT_ROOT" -- "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
   else
     "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
   fi

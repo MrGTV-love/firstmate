@@ -81,6 +81,8 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
@@ -118,13 +120,25 @@ echo "config-push: $FM_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
-# An edited fleet model index is checked against every harness catalog before
-# it reaches any home. An id proven absent keeps every home on its current
-# index; an unavailable catalog is only a notice.
+# An edited fleet model index is checked against every harness catalog, under
+# this home's worker account pins, before it reaches any home. An id proven
+# absent, or a declared pin that does not resolve, keeps every home on its
+# current index; an unavailable catalog is only a notice.
+index_check() {
+  local harness selection root
+  local -a accounts=()
+  for harness in claude pi; do
+    selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
+    [ -n "$selection" ] || continue
+    root=${selection#*$'\t'}
+    accounts+=("$harness" "${root%%$'\t'*}")
+  done
+  FM_CONFIG_OVERRIDE="$CONFIG" fm_worker_account_run ${accounts[@]+"${accounts[@]}"} -- \
+    "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null
+}
 case " $FM_INHERITABLE_CONFIG " in
   *" model-index.json "*)
-    if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } &&
-      ! FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null; then
+    if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } && ! index_check; then
       echo "config-push: model-index.json not pushed - its catalog check refused it; fix config/model-index.json and rerun"
       errors=1
       inheritable=
