@@ -1,28 +1,35 @@
 #!/usr/bin/env bash
 # fm-model-index.sh - validate the home model index and resolve dispatch roles.
-# Usage: fm-model-index.sh check
-#        fm-model-index.sh catalog <harness>
-#        fm-model-index.sh resolve <harness> <role> [--stand-in]
+# Usage: fm-model-index.sh check [<harness> <model>]
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
-#        fm-model-index.sh profiles <crew-dispatch.json> [--schema-only]
+#        fm-model-index.sh profiles <crew-dispatch.json>
 # Schema owner: docs/configuration.md "Fleet model index".
-# Intake/spawn invocations check every active id, including stand-ins, against
-# its own harness catalog. No missing catalog or absent id is accepted.
-# --schema-only is bootstrap's offline shape/retirement inspection; it never
-# fetches catalogs and is not intake authorization. Spawn always checks catalogs.
-# A role resolves once; profiles emits concrete JSON, model/resolve emit one id.
+# check with no arguments is the index-edit check (run it before fm-config-push):
+# every active id, including stand-ins, against its own harness catalog.
+# check <harness> <model> is the spawn and intake check of one selected id: a
+# retired id refuses, and an id that is that harness's index entry is checked
+# against that harness catalog in the caller's environment, so the caller
+# chooses the account whose catalog answers.
+# Only concrete contradictory evidence refuses: an id absent from a readable
+# catalog, or an alias whose resolved id is retired. An unavailable, empty, or
+# unreadable catalog, a harness without discovery, or an omp provider its
+# listing does not know (extension-registered providers are never listed)
+# passes with a notice on stderr.
+# model and profiles resolve offline and never fetch a catalog: a role
+# resolves once, profiles emits concrete JSON, model emits one id.
 # Stand-ins are explicit selections, never automatic failure or quota fallbacks.
-# Literal models work without an index; with one they cannot name a retired id.
+# Literal models work without an index; with one they cannot name a retired id,
+# and a literal that is not an index entry for its harness draws a warning.
+# A retired id also matches a provider-qualified selector ending in it and an
+# id carrying a trailing [...] context suffix such as [1m].
 # FM_HOME / FM_CONFIG_OVERRIDE select the index like other home configuration.
 # FM_MODEL_CATALOG_DIR optionally supplies authoritative catalog exports (or test
 # fixtures), <harness>.json, normalized as {"models":[{"id":"...",
 # "resolved_id":"..."}]}. resolved_id is optional except for aliases.
-# An explicit directory must contain every required catalog; never mix exports
-# and live discovery. openrouter.json uses its native {"data":[{"id":"..."}]}.
+# With a directory set, live discovery never runs; a missing export is a notice.
 # Live discovery: Codex models_cache.json; Claude SDK initialize (no prompt);
 # omp models --json; Pi --list-models; OpenCode models; Cursor --list-models;
-# agy models. Other harnesses require an export from their authoritative surface.
-# Provider-qualified openrouter ids additionally require /api/v1/models.
+# agy models. Other harnesses need an export from their authoritative surface.
 # Commands are bounded at 30 seconds; no credential or catalog cache is changed.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,25 +43,22 @@ INDEX="$CONFIG/model-index.json"
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
 
 die() { printf 'model-index: %s\n' "$*" >&2; exit 2; }
+notice() { printf 'model-index: notice: %s\n' "$*" >&2; }
 usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 command -v jq >/dev/null 2>&1 || die 'jq required'
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|catalog:1|resolve:2|resolve:3|model:2|profiles:1|profiles:2) ;; *) die 'invalid arguments (see --help)' ;; esac
-if [ "$VERB" = resolve ] && [ "$#" = 3 ] && [ "$3" != --stand-in ]; then die 'expected --stand-in'; fi
-SCHEMA_ONLY=0
-if [ "$VERB" = profiles ] && [ "$#" = 2 ]; then
-  [ "$2" = --schema-only ] || die 'expected --schema-only'
-  SCHEMA_ONLY=1
-fi
+case "$VERB:$#" in check:0|check:2|model:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 TMP=$(mktemp -d) || die 'mktemp failed'
 trap 'rm -rf "$TMP"' EXIT
+HAVE_INDEX=0
 if [ -e "$INDEX" ] || [ -L "$INDEX" ]; then
   [ -f "$INDEX" ] && [ -r "$INDEX" ] || die "index is not a readable regular file: $INDEX"
   cp "$INDEX" "$TMP/index.json" || die 'could not snapshot index'
+  HAVE_INDEX=1
 else
-  case "$VERB" in check|resolve) die "index required: $INDEX" ;; esac
+  [ "$VERB:$#" != check:0 ] || die "index required: $INDEX"
   printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$TMP/index.json"
 fi
 jq -e '
@@ -69,14 +73,22 @@ jq -e '
       (.value | type == "object" and ((keys - ["model","stand_in"]) | length == 0)) and (.value.model | token) and
       (.value | (has("stand_in") | not) or (.stand_in | token))))
 ' "$TMP/index.json" >/dev/null 2>&1 || die "malformed index: $INDEX"
+
+# The one retirement and index-entry rule, shared by every check and resolution.
+# shellcheck disable=SC2016 # jq variables, not shell expansions.
+LIB_JQ='
+  def retired($id): ($id | sub("\\[[^\\]]*\\]$"; "")) as $base |
+    any($idx[0].retired[]; . == $id or . == $base or . == ($base | split("/") | last));
+  def entry($h; $m): any($idx[0].roles[] | .[$h] // empty | (.model, .stand_in // empty); . == $m);
+'
 jq -r '.roles | to_entries[] | .key as $role | .value | to_entries[] |
   .key as $h | (.value.model, .value.stand_in // empty) | [$role,$h,.] | @tsv' "$TMP/index.json" > "$TMP/entries"
 
 catalog() { # <harness>; output normalized ids and optional alias targets
   local h=$1 raw bin
   if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
-    cat "$FM_MODEL_CATALOG_DIR/$h.json" || return 1
-    return 0
+    cat "$FM_MODEL_CATALOG_DIR/$h.json"
+    return
   fi
   case "$h" in
     codex)
@@ -99,59 +111,71 @@ catalog() { # <harness>; output normalized ids and optional alias targets
       printf '%s\n' "$raw" | awk 'NR > 1 && NF >= 6 {print $1 "/" $2}' | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
       ;;
     opencode)
-      fm_run_timed 30 opencode models </dev/null | jq -Rsc '{models: [split("\n")[] | select(test("^[^[:space:]]+/[^[:space:]]+$")) | {id: .}]}'
+      raw=$(fm_run_timed 30 opencode models </dev/null) || return 1
+      jq -Rsc '{models: [split("\n")[] | select(test("^[^[:space:]]+/[^[:space:]]+$")) | {id: .}]}' <<< "$raw"
       ;;
     cursor)
       bin=$(fm_cursor_resolve_binary) || return 1
       raw=$(fm_cursor_list_models "$bin") || return 1
-      printf '%s\n' "$raw" | awk '/ - / {sub(/ - .*/, ""); sub(/^[[:space:]]+/, ""); print}' | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
+      printf '%s\n' "$raw" | fm_cursor_catalog_ids | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
       ;;
     agy)
       raw=$(fm_run_timed 30 agy models </dev/null) || return 1
       printf '%s\n' "$raw" | awk 'NF >= 2 {print $1}' | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
       ;;
-    *) printf 'model-index: %s requires an authoritative catalog export via FM_MODEL_CATALOG_DIR\n' "$h" >&2; return 1 ;;
+    *) return 1 ;;
   esac
 }
 validate_catalog() {
   jq -e '.models | type == "array" and length > 0 and all(.[]; (.id | type == "string" and length > 0) and ((has("resolved_id") | not) or (.resolved_id | type == "string" and length > 0)))' "$1" >/dev/null 2>&1
 }
-if [ "$VERB" = catalog ]; then
-  catalog "$1" > "$TMP/catalog.json" || die "catalog unavailable for $1"
-  validate_catalog "$TMP/catalog.json" || die "malformed or empty catalog for $1"
-  cat "$TMP/catalog.json"
-  exit 0
-fi
-while IFS=$'\t' read -r role harness model; do
-  [ -n "$harness" ] || continue
-  jq -e --arg m "$model" 'all(.retired[]; . != $m and . != ($m | split("/") | last))' "$TMP/index.json" >/dev/null || die "retired id '$model' in role '$role' ($harness)"
-  [ "$SCHEMA_ONLY" = 0 ] || continue
-  if [ ! -f "$TMP/$harness.json" ]; then
-    catalog "$harness" > "$TMP/$harness.json" || die "catalog unavailable for $harness"
-    validate_catalog "$TMP/$harness.json" || die "malformed or empty catalog for $harness"
+check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
+  local role=$1 h=$2 m=$3 f="$TMP/catalog-$2.json"
+  if [ ! -f "$f" ] && [ ! -f "$f.none" ]; then
+    { catalog "$h" > "$f" 2>/dev/null </dev/null && validate_catalog "$f"; } || { rm -f "$f"; : > "$f.none"; }
   fi
-  jq -e --arg m "$model" --slurpfile idx "$TMP/index.json" '
+  if [ -f "$f.none" ]; then
+    notice "$h catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '$m' (role '$role') not validated"
+    return 0
+  fi
+  jq -e --arg m "$m" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'
     [.models[] | select(.id == $m)] as $found |
-    ($found | length > 0) and all($found[]; (.resolved_id // .id) as $id |
-      all($idx[0].retired[]; . != $id and . != ($id | split("/") | last)))
-  ' "$TMP/$harness.json" >/dev/null || die "id '$model' absent or retired in $harness catalog (role '$role')"
-  case "$model" in openrouter/*)
-    if [ ! -f "$TMP/openrouter.json" ]; then
-      if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
-        cp "$FM_MODEL_CATALOG_DIR/openrouter.json" "$TMP/openrouter.json" || die 'OpenRouter catalog unavailable'
-      else
-        curl -fsS --max-time 30 https://openrouter.ai/api/v1/models > "$TMP/openrouter.json" || die 'OpenRouter catalog unavailable'
-      fi
+    ($found | length > 0) and all($found[]; retired(.resolved_id // .id) | not)
+  ' "$f" >/dev/null && return 0
+  case "$h:$m" in omp:*/*)
+    if ! jq -e --arg p "${m%%/*}/" 'any(.models[]; .id | startswith($p))' "$f" >/dev/null; then
+      notice "omp provider '${m%%/*}' is not in 'omp models --json' (extension-registered providers are never listed); '$m' (role '$role') not validated"
+      return 0
     fi
-    jq -e --arg m "${model#openrouter/}" '.data | type == "array" and any(.[]; .id == $m)' "$TMP/openrouter.json" >/dev/null || die "id '$model' absent in OpenRouter catalog"
     ;;
   esac
-done < "$TMP/entries"
+  die "id '$m' absent or retired in $h catalog (role '$role')"
+}
+refuse_retired() { # <harness> <model> <where>
+  if jq -e --arg m "$2" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'retired($m)' -n >/dev/null; then
+    die "retired id '$2' $3 ($1)"
+  fi
+}
+
+if [ "$VERB" = check ]; then
+  [ "$#" = 0 ] || refuse_retired "$1" "$2" 'selected'
+  while IFS=$'\t' read -r role harness model <&3; do
+    [ -n "$harness" ] || continue
+    if [ "$#" = 2 ]; then
+      [ "$harness" = "$1" ] && [ "$model" = "$2" ] || continue
+    fi
+    refuse_retired "$harness" "$model" "in role '$role'"
+    check_entry "$role" "$harness" "$model"
+    [ "$#" = 0 ] || break
+  done 3< "$TMP/entries"
+  [ "$#" = 2 ] || printf 'model-index: every active id checked; none absent or retired\n'
+  exit 0
+fi
 
 # One transformation shared by manual intake, typed intake, and spawn. Removing
 # role/stand_in ensures downstream consumers see only the concrete model.
 # shellcheck disable=SC2016 # jq variables, not shell expansions.
-RESOLVE_JQ='
+RESOLVE_JQ="$LIB_JQ"'
   def resolve_profile:
     if type != "object" then .
     elif has("role") then
@@ -166,29 +190,30 @@ RESOLVE_JQ='
     elif has("stand_in") then error("stand_in requires role")
     else . end;
   def retired_guard:
-    . as $p | if type == "object" and has("model") and
-      any($idx[0].retired[]; . == $p.model or . == ($p.model | split("/") | last))
+    . as $p | if type == "object" and has("model") and retired($p.model)
     then error("retired model: " + $p.model) else . end;
   def profile: resolve_profile | retired_guard;
   def profile_set: if type == "array" then map(profile) else profile end;
+  def literal_warning:
+    select(type == "object" and has("model") and (has("role") | not) and
+      (.model | type) == "string" and (.harness | type) == "string" and (entry(.harness; .model) | not)) |
+    "model-index: warning: literal model \u0027\(.model)\u0027 for \(.harness) is not an index entry; name its role so the next model release is one index edit";
 '
 case "$VERB" in
-  check) printf 'model-index: catalogs checked; all active ids available and not retired\n' ;;
-  resolve)
-    jq -n --arg h "$1" --arg r "$2" --argjson stand "$([ "$#" = 3 ] && printf true || printf false)" '{harness:$h,role:$r,stand_in:$stand}' > "$TMP/profile.json"
-    jq -er --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ profile | .model" "$TMP/profile.json"
-    ;;
   model)
     case "$2" in
       role:*) p=$(jq -n --arg h "$1" --arg r "${2#role:}" '{harness:$h,role:$r}') ;;
       stand-in:*) p=$(jq -n --arg h "$1" --arg r "${2#stand-in:}" '{harness:$h,role:$r,stand_in:true}') ;;
       *) p=$(jq -n --arg h "$1" --arg m "$2" '{harness:$h,model:$m}') ;;
     esac
+    [ "$HAVE_INDEX" = 0 ] || jq -r --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ literal_warning" <<< "$p" >&2
     jq -er --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ profile | .model" <<< "$p"
     ;;
   profiles)
     jq --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
       if (.rules | type) == \"array\" then .rules |= map(if type == \"object\" and has(\"use\") then .use |= profile_set else . end) else . end |
       if type == \"object\" and has(\"default\") then .default |= profile_set else . end" "$1"
+    [ "$HAVE_INDEX" = 0 ] || jq -r --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
+      [(.rules[]? | objects | .use), .default] | .[] | (if type == \"array\" then .[] else . end) | literal_warning" "$1" >&2
     ;;
 esac

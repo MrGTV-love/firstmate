@@ -2271,21 +2271,42 @@ case "$ARG3" in
   ;;
 esac
 
-# Resolve a role exactly once, before any model-aware launch validation. Literal
-# profiles retain their id, but an active index still refuses retired ids.
-if [ -n "$MODEL" ]; then
-  case "$MODEL" in role:*|stand-in:*)
-    [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
-    MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
-    ;;
-  *)
-    if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
-      MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+# config/secondmate-harness may carry optional model/effort tokens alongside the
+# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
+# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
+# the harness itself came from the secondmate config fallback chain. Resolving
+# here on every spawn makes the pin durable across respawns. Precedence: explicit
+# --model/--effort flags still win over the file's tokens.
+if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
+  if [ "$MODEL_SET" -eq 0 ]; then
+    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
+    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
+  fi
+  if [ "$EFFORT_SET" -eq 0 ]; then
+    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
+    if [ -n "$SM_EFFORT" ]; then
+      case "$SM_EFFORT" in
+      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
+      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
+      esac
     fi
-    ;;
-  esac
-elif [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
-  "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null || exit 1
+  fi
+fi
+# Resolve a role exactly once, after every model source and before any
+# model-aware launch validation. Resolution is offline; with an index, a retired
+# literal refuses here and the selected entry's catalog check runs below under
+# the worker account that will actually launch it.
+MODEL_INDEXED=0
+[ ! -e "$CONFIG/model-index.json" ] && [ ! -L "$CONFIG/model-index.json" ] || MODEL_INDEXED=1
+case "$MODEL" in role:*|stand-in:*)
+  [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
+  MODEL_INDEXED=1
+  ;;
+esac
+if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
+  MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+else
+  MODEL_INDEXED=0
 fi
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
@@ -2375,27 +2396,6 @@ agy)
   ;;
 esac
 
-# config/secondmate-harness may carry optional model/effort tokens alongside the
-# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
-# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
-# the harness itself came from the secondmate config fallback chain. Resolving
-# here on every spawn makes the pin durable across respawns. Precedence: explicit
-# --model/--effort flags still win over the file's tokens.
-if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
-  if [ "$MODEL_SET" -eq 0 ]; then
-    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
-    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
-  fi
-  if [ "$EFFORT_SET" -eq 0 ]; then
-    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
-    if [ -n "$SM_EFFORT" ]; then
-      case "$SM_EFFORT" in
-      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
-      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
-      esac
-    fi
-  fi
-fi
 # Ultra is an explicit native capability, never a Pi thinking-level alias.
 # Validate the fully resolved profile before worktree or endpoint provisioning.
 if [ "$EFFORT" = ultra ]; then
@@ -2428,6 +2428,20 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   else
     unset CLAUDE_CONFIG_DIR
   fi
+fi
+
+# The selected index entry is checked against the catalog of the account the
+# worker launches under: a pinned Claude root with its outranking credentials
+# shed, or a pinned Pi root. Unpinned workers inherit this environment.
+if [ "$MODEL_INDEXED" = 1 ]; then
+  catalog_env=(env)
+  if [ -n "$WORKER_ACCOUNT" ]; then
+    case "$HARNESS" in
+    claude) read -ra catalog_env <<< "$(fm_worker_account_claude_shed)" ;;
+    pi | pi-signed) catalog_env=(env "PI_CODING_AGENT_DIR=$WORKER_ACCOUNT_ROOT") ;;
+    esac
+  fi
+  "${catalog_env[@]}" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API

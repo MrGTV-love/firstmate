@@ -11,6 +11,7 @@
 #                 "BACKEND_INVALID: <name> (known: <names>)",
 #                 "STARTUP_MEMORY_BUDGET: invalid config/startup-memory-budget - <reason>",
 #                 "CREW_DISPATCH: invalid config/crew-dispatch.json - <reason>",
+#                 "CREW_DISPATCH: warning - literal model '<id>' for <harness> is not an index entry; ...",
 #                 "FLEET_SYNC: <repo>: skipped|recovered|STUCK: <detail>",
 #                 "HOME_SUMMARY: <ledger never published|not republished since
 #                 <stamp>>; <n> failed attempt(s) ... last: <recorded failure>",
@@ -1029,7 +1030,7 @@ EOF
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved typed_key typed_active=false
+  local file err verified_harnesses resolved index_notes typed_key typed_active=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1040,10 +1041,14 @@ crew_dispatch_validate() {
     echo "CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON"
     return 0
   fi
-  if ! resolved=$("$SCRIPT_DIR/fm-model-index.sh" profiles "$file" --schema-only 2>&1); then
-    echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $resolved"
+  index_notes=$(mktemp "${TMPDIR:-/tmp}/fm-bootstrap-model-index.XXXXXX" 2>/dev/null) || return 0
+  if ! resolved=$("$SCRIPT_DIR/fm-model-index.sh" profiles "$file" 2>"$index_notes"); then
+    echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $(cat "$index_notes")"
+    rm -f "$index_notes"
     return 0
   fi
+  sed -n 's/^model-index: warning: /CREW_DISPATCH: warning - /p' "$index_notes"
+  rm -f "$index_notes"
   typed_key=$TYPESAFE_API_KEY_PRIVATE
   [ -n "$typed_key" ] || typed_key=$(fmx_env_get TYPESAFE_API_KEY "$FM_HOME/.env")
   [ -z "$typed_key" ] || typed_active=true

@@ -9,8 +9,8 @@ Exact task chronology, branch names, temporary homes, local paths, process ids, 
 ## Fleet model-index catalog discovery
 
 The [configuration contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns role selection and retirement policy.
-The token-free live guard queries each installed native catalog adapter and checks both an available id and an intentionally absent id against that captured authoritative catalog.
-It reuses one snapshot per harness instead of racing repeated account-catalog requests.
+The token-free live guard reads one id from each installed harness's own listing, then runs the public `check` once with that id and an intentionally absent id.
+The adapter must accept the listed id and refuse only the absent one, and that single run queries the catalog once instead of racing repeated account-catalog requests.
 The portable regression also exercises Claude SDK initialization through a timed runner whose background child does not inherit stdin.
 
 Verified on 2026-09-30 with:
