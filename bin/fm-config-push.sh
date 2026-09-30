@@ -17,7 +17,8 @@
 # config/model-index.json is pushed only after bin/fm-model-index.sh check
 # passes; an index with an id absent from a readable catalog is withheld from
 # every home together with config/crew-dispatch.json, whose roles it resolves,
-# while the other material still pushes, and the run exits non-zero.
+# as is a pair whose dispatch roles do not resolve against the index, while the
+# other material still pushes, and the run exits non-zero.
 set -u
 
 usage() {
@@ -126,10 +127,14 @@ errors=0
 # harness's entries against that harness's catalog, under only that harness's
 # worker account pin. An id proven absent, or a declared pin that does not
 # resolve, keeps every home on its current index and the dispatch profiles
-# whose roles it resolves; an unavailable catalog is only a notice.
+# whose roles it resolves; so does an inheritable crew-dispatch.json that does
+# not resolve against the index. An unavailable catalog is only a notice.
 index_check() {
-  local harnesses harness selection root
-  FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles /dev/null >/dev/null || return 1
+  local harnesses harness selection root dispatch=/dev/null
+  case " $FM_INHERITABLE_CONFIG " in
+    *" crew-dispatch.json "*) [ ! -e "$CONFIG/crew-dispatch.json" ] || dispatch="$CONFIG/crew-dispatch.json" ;;
+  esac
+  FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$dispatch" >/dev/null || return 1
   harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$CONFIG/model-index.json" 2>/dev/null) || return 1
   for harness in $harnesses; do
     selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
@@ -145,7 +150,7 @@ index_check() {
 case " $FM_INHERITABLE_CONFIG " in
   *" model-index.json "*)
     if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } && ! index_check; then
-      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index catalog check refused it; every home keeps its current pair; fix config/model-index.json and rerun"
+      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun"
       errors=1
       inheritable=
       for item in $FM_INHERITABLE_CONFIG; do

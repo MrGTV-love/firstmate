@@ -1178,7 +1178,7 @@ Claude's catalog lists no suffixed aliases, so a Claude id such as `opus[1m]` is
 
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
 `bin/fm-config-push.sh` runs the same check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
-When an id is absent from a readable catalog or a declared pin does not resolve, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
+When an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
