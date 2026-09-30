@@ -1,0 +1,2 @@
+ok - a stuck pane capture goes stale; TERM stops its watcher and runs cleanup
+rc=0

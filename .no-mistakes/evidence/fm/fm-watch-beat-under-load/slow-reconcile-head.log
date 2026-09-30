@@ -1,0 +1,20 @@
+registered: probe (when)
+[head +1s] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK lab=/Users/charlesabrooker/tmp/fm-lab.NEPs9u confirm-window=450s grace=300s
+[head +5s] arm says: watcher: started pid=39834 (beacon fresh)
+[head +5s] t=0s watcher alive=yes beacon age=1s reconcile running=no
+[head +36s] t=30s watcher alive=yes beacon age=13s reconcile running=no
+[head +66s] t=61s watcher alive=yes beacon age=7s reconcile running=no
+[head +98s] t=92s watcher alive=yes beacon age=2s reconcile running=no
+[head +128s] t=123s watcher alive=yes beacon age=1s reconcile running=no
+[head +159s] t=153s watcher alive=yes beacon age=13s reconcile running=no
+[head +190s] t=184s watcher alive=yes beacon age=12s reconcile running=no
+[head +221s] t=215s watcher alive=yes beacon age=12s reconcile running=no
+[head +252s] t=246s watcher alive=yes beacon age=10s reconcile running=no
+[head +282s] t=277s watcher alive=yes beacon age=8s reconcile running=no
+[head +312s] t=307s watcher alive=yes beacon age=4s reconcile running=no
+[head +343s] t=338s watcher alive=yes beacon age=14s reconcile running=no
+[head +373s] max beacon age observed during the slow reconcile: 14s (grace 300s)
+[head +373s] --- re-arm (bin/fm-watch.sh) at >340s ---
+  watcher: already running pid 39834
+[head +373s] re-arm exit=0
+watcher: stopped pid=39834

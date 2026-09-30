@@ -1,0 +1,18 @@
+[base +2s] code=/Users/charlesabrooker/tmp/fm-base.6p0q7Z lab=/Users/charlesabrooker/tmp/fm-lab.0z1C2O confirm-window=450s grace=300s
+[base +6s] arm says: watcher: started pid=42521 (beacon fresh)
+[base +6s] t=0s watcher alive=yes beacon age=1s reconcile running=no
+[base +37s] t=30s watcher alive=yes beacon age=31s reconcile running=no
+[base +68s] t=62s watcher alive=yes beacon age=63s reconcile running=no
+[base +99s] t=92s watcher alive=yes beacon age=94s reconcile running=no
+[base +129s] t=123s watcher alive=yes beacon age=124s reconcile running=no
+[base +160s] t=153s watcher alive=yes beacon age=154s reconcile running=no
+[base +191s] t=184s watcher alive=yes beacon age=185s reconcile running=no
+[base +221s] t=215s watcher alive=yes beacon age=216s reconcile running=no
+[base +251s] t=245s watcher alive=yes beacon age=246s reconcile running=no
+[base +282s] t=276s watcher alive=yes beacon age=277s reconcile running=no
+[base +312s] t=306s watcher alive=yes beacon age=307s reconcile running=no
+[base +342s] t=336s watcher alive=yes beacon age=337s reconcile running=no
+[base +373s] max beacon age observed during the slow reconcile: 337s (grace 300s)
+[base +373s] --- re-arm (bin/fm-watch.sh) at >340s ---
+  watcher: lock held by live pid 42521 but heartbeat is stale for 368s (>300s); inspect or stop that watcher before re-arming.
+[base +373s] re-arm exit=1

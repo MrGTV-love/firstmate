@@ -1,0 +1,24 @@
+[head +0s] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK commit=fc0edea lab=/Users/charlesabrooker/tmp/fm-lab.199t3I
+[head +5s] arm says: watcher: started pid=8039 (beacon fresh)
+[head +5s] watcher pid=8039 is inside the slow check (pass is blocked on it)
+[head +5s] check running 0s; watcher alive=yes; beacon age=2s
+[head +35s] check running 30s; watcher alive=yes; beacon age=2s
+[head +67s] check running 62s; watcher alive=yes; beacon age=4s
+[head +96s] check running 91s; watcher alive=yes; beacon age=3s
+[head +125s] check running 120s; watcher alive=yes; beacon age=2s
+[head +157s] check running 152s; watcher alive=yes; beacon age=4s
+[head +186s] check running 181s; watcher alive=yes; beacon age=3s
+[head +215s] check running 210s; watcher alive=yes; beacon age=2s
+[head +307s] check running 302s; watcher alive=yes; beacon age=4s
+[head +336s] check running 331s; watcher alive=yes; beacon age=3s
+[head +336s] max beacon age observed during slow check: 15s (grace 300s)
+[head +336s] --- re-arm (bin/fm-watch.sh) at >330s into one slow pass ---
+  watcher: already running pid 8039
+[head +337s] re-arm exit=0
+[head +337s] --- second arm (bin/fm-watch-arm.sh) status line ---
+  watcher: attached pid=8039 (beacon 4s)
+[head +339s] --- SIGSTOP watcher pid=8039 (stuck loop), check child still running ---
+[head +659s] check child alive=no; beacon age=326s
+  watcher: lock held by live pid 8039 but heartbeat is stale for 328s (>300s); inspect or stop that watcher before re-arming.
+[head +661s] re-arm on stopped watcher exit=1
+[head +696s] resumed; check finished=no

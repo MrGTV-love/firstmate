@@ -1,0 +1,83 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.nbns0v  arm: watcher: started pid=38379 (beacon fresh)
+lab watcher pid N=38379: bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK/bin/fm-watch.sh
+
+=== exact-PID stops of this home's lock pid (must be ALLOWED) ===
+[PASS] case 1 expect=ALLOW
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill -TERM 38379; fi
+    head: ALLOW
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 2 expect=ALLOW
+    command: if pgrep -fl fm-watch.sh; then command kill -- 38379; fi
+    head: ALLOW
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 3 expect=ALLOW
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then\n  kill -TERM 38379\nfi
+    head: ALLOW
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 4 expect=ALLOW
+    command: while ps -p 38379 -o command= | grep -q fm-watch.sh; do\n  kill -TERM 38379\n  sleep 1\ndone
+    head: ALLOW
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 5 expect=ALLOW
+    command: if ! ps -p 38379 -o command= | grep -q fm-watch.sh; then :; else\n  kill 38379\nfi
+    head: ALLOW
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+
+=== broad or disguised kills (must stay DENIED) ===
+[PASS] case 6 expect=DENY
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then pkill -f fm-watch.sh; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 7 expect=DENY
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill -TERM 38380; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 8 expect=DENY
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill -- -38379; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 9 expect=DENY
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill 38379 38380; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 10 expect=DENY
+    command: if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill $(pgrep -f fm-watch.sh); fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 11 expect=DENY
+    command: if ! pkill -f fm-watch; then kill 38379; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 12 expect=DENY
+    command: while ! pkill -f fm-watch.sh; do kill 38379; done
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 13 expect=DENY
+    command: if true; then if pkill -f fm-watch; then kill 38379; fi; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 14 expect=DENY
+    command: if ! bin/fm-watch.sh; then kill 38379; fi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 15 expect=DENY
+    command: if !\n pkill -f fm-watch; then\n  kill 38379\nfi
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 16 expect=DENY
+    command: while true; do\n  bin/fm-watch.sh\n  kill 38379\ndone
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+[PASS] case 17 expect=DENY
+    command: pkill -f fm-watch
+    head: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+    base: DENY rc=2: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[broad-watch
+
+=== run the allowed exact-PID stop for real ===
+hook verdict (head): ALLOW
+$ if ps -p 38379 -o command= | grep -q fm-watch.sh; then kill -TERM 38379; fi
+exit=0
+lab watcher pid 38379 alive after stop: no
+lab lock after stop: released
+arm reported: watcher: started pid=38379 (beacon fresh) watcher: FAILED - watcher cycle exited 143 without an actionable reason 
+summary: 17 pass, 0 fail

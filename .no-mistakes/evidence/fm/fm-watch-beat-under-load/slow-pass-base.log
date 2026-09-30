@@ -1,0 +1,27 @@
+[base +0s] code=/Users/charlesabrooker/tmp/fm-base.6p0q7Z commit=base lab=/Users/charlesabrooker/tmp/fm-lab.hzUbUV
+registered: state/slow.check.sh
+[base +4s] arm says: watcher: started pid=9376 (beacon fresh)
+[base +4s] watcher pid=9376 is inside the slow check (pass is blocked on it)
+[base +4s] check running 0s; watcher alive=yes; beacon age=1s
+[base +66s] check running 62s; watcher alive=yes; beacon age=63s
+[base +95s] check running 90s; watcher alive=yes; beacon age=91s
+[base +126s] check running 122s; watcher alive=yes; beacon age=123s
+[base +155s] check running 151s; watcher alive=yes; beacon age=152s
+[base +185s] check running 181s; watcher alive=yes; beacon age=182s
+[base +215s] check running 210s; watcher alive=yes; beacon age=211s
+[base +276s] check running 272s; watcher alive=yes; beacon age=273s
+[base +306s] check running 302s; watcher alive=yes; beacon age=303s
+[base +335s] check running 331s; watcher alive=yes; beacon age=332s
+[base +335s] max beacon age observed during slow check: 332s (grace 300s)
+[base +335s] --- re-arm (bin/fm-watch.sh) at >330s into one slow pass ---
+  watcher: lock held by live pid 9376 but heartbeat is stale for 332s (>300s); inspect or stop that watcher before re-arming.
+[base +335s] re-arm exit=1
+[base +335s] --- second arm (bin/fm-watch-arm.sh) status line ---
+  watcher: lock held by live pid 9376 but heartbeat is stale for 333s (>300s); inspect or stop that watcher before re-arming.
+  watcher: FAILED - watcher cycle exited 1 without an actionable reason
+[base +337s] --- SIGSTOP watcher pid=9376 (stuck loop), check child still running ---
+[base +657s] check child alive=no; beacon age=654s
+  watcher: lock held by live pid 9376 but heartbeat is stale for 655s (>300s); inspect or stop that watcher before re-arming.
+[base +659s] re-arm on stopped watcher exit=1
+[base +693s] resumed; check finished=no
+watcher: stopped pid=9376

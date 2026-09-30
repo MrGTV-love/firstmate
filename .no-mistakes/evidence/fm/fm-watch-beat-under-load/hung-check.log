@@ -1,0 +1,15 @@
+registered: state/hung.check.sh
+[+6s] watcher alive=yes beacon age=1s check runs so far= live hung-check procs=0
+[+13s] watcher alive=yes beacon age=7s check runs so far=1 live hung-check procs=0
+[+19s] watcher alive=yes beacon age=2s check runs so far=1 live hung-check procs=0
+[+24s] watcher alive=yes beacon age=8s check runs so far=1 live hung-check procs=0
+[+30s] watcher alive=yes beacon age=14s check runs so far=1 live hung-check procs=0
+[+35s] watcher alive=yes beacon age=2s check runs so far=1 live hung-check procs=0
+[+40s] watcher alive=yes beacon age=7s check runs so far=1 live hung-check procs=0
+[+46s] watcher alive=yes beacon age=13s check runs so far=1 live hung-check procs=0
+[+52s] watcher alive=yes beacon age=3s check runs so far=2 live hung-check procs=0
+[+57s] watcher alive=yes beacon age=0s check runs so far=2 live hung-check procs=0
+[+62s] watcher alive=yes beacon age=5s check runs so far=2 live hung-check procs=0
+[+67s] watcher alive=yes beacon age=10s check runs so far=2 live hung-check procs=0
+[+67s] arm output: watcher: started pid=5201 (beacon fresh) 
+watcher: stopped pid=5201

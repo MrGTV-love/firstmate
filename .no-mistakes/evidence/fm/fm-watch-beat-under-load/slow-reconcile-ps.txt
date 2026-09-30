@@ -1,0 +1,10 @@
+Wed Sep 30 00:45:24 CDT 2026
+# lab watcher + reconcile process tree (lab rows only), ~150s into the 450s confirm window
+ 8039  7942       05:28 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK/bin/fm-watch.sh
+ 9376  9141       05:26 bash /Users/charlesabrooker/tmp/fm-base.6p0q7Z/bin/fm-watch.sh
+39834 39576       02:42 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK/bin/fm-watch.sh
+42521 42269       02:39 bash /Users/charlesabrooker/tmp/fm-base.6p0q7Z/bin/fm-watch.sh
+42680 39834       02:39 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK/bin/fm-procevent.sh reconcile
+44519 42680       02:38 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3RBHP2HEVGS72YBVPJ7PKXK/bin/fm-procevent.sh reconcile
+46043 42521       02:37 bash /Users/charlesabrooker/tmp/fm-base.6p0q7Z/bin/fm-procevent.sh reconcile
+47434 46043       02:35 bash /Users/charlesabrooker/tmp/fm-base.6p0q7Z/bin/fm-procevent.sh reconcile
