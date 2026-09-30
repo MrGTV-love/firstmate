@@ -82,8 +82,16 @@ jq '.roles.long = {claude:{model:"opus[1m]"},codex:{model:"current[1m]"}}' "$BAS
 refuses check codex 'current[1m]'
 jq '.roles.long = {claude:{model:"opus[1m]"}} | .retired += ["claude-current"]' "$BASE" > "$INDEX"
 refuses check claude 'opus[1m]'
+# Claude's picker lists some canonical ids only with a context suffix.
+printf '%s\n' '{"models":[{"id":"opus","resolved_id":"claude-current"},{"id":"sonnet","resolved_id":"claude-sonnet-current[1m]"},{"id":"claude-sonnet-current[1m]"}]}' > "$CATALOGS/claude.json"
+jq '.roles.long = {claude:{model:"claude-sonnet-current"}}' "$BASE" > "$INDEX"
+"$TOOL" check claude claude-sonnet-current >/dev/null 2> "$TMP_ROOT/suffix-notice" || fail "a canonical Claude id was refused although its suffixed form is listed: $(cat "$TMP_ROOT/suffix-notice")"
+[ ! -s "$TMP_ROOT/suffix-notice" ] || fail "a listed suffixed Claude id must validate its base: $(cat "$TMP_ROOT/suffix-notice")"
+jq '.roles.long = {claude:{model:"claude-sonnet-current"}} | .retired += ["claude-sonnet-current"]' "$BASE" > "$INDEX"
+refuses check claude claude-sonnet-current
+printf '%s\n' '{"models":[{"id":"opus","resolved_id":"claude-current"}]}' > "$CATALOGS/claude.json"
 cp "$BASE" "$INDEX"
-pass 'retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude suffixes match their listed base'
+pass 'retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude ids match listed suffixed or base forms'
 
 jq '.roles.strong.codex.model = "absent"' "$BASE" > "$INDEX"
 refuses check

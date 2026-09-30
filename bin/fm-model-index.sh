@@ -23,7 +23,8 @@
 # and a literal that is not an index entry for its harness draws a warning.
 # A retired id also matches a provider-qualified selector ending in it and an
 # id carrying a trailing [...] context suffix such as [1m]. Claude's picker
-# lists no suffixed ids, so a Claude id with that suffix matches its base entry.
+# lists some ids only with or only without that suffix, so a Claude id matches
+# a catalog entry with the same base id.
 # model passes a literal through unchanged, without jq, when no index exists.
 # FM_HOME / FM_CONFIG_OVERRIDE select the index like other home configuration.
 # FM_MODEL_CATALOG_DIR optionally supplies authoritative catalog exports (or test
@@ -149,7 +150,7 @@ check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   fi
   jq -e --arg m "$m" --arg h "$h" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'
     [.models[] | select(.id == $m)] as $exact |
-    (if ($exact | length) == 0 and $h == "claude" then [.models[] | select(.id == ($m | base_id))] else $exact end) as $found |
+    (if ($exact | length) == 0 and $h == "claude" then [.models[] | select((.id | base_id) == ($m | base_id))] else $exact end) as $found |
     ($found | length > 0) and all($found[]; retired(.resolved_id // .id) | not)
   ' "$f" >/dev/null && return 0
   case "$h:$m" in omp:*/*)
