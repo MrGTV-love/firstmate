@@ -207,12 +207,19 @@ wait_rendered() {  # <pane> <text> <occurrences> <seconds>
 # The pass line records whether the draft was drawn below the default ghost
 # ceiling, the shape that used to read as an empty composer.
 check_pending_draft_refusal() {  # <id> <pane> <shape>
-  local id=$1 pane=$2 shape=$3 target="$SESSION:$2" out row screen style
+  local id=$1 pane=$2 shape=$3 target="$SESSION:$2" out row='' screen style i=0
   fm_backend_herdr_send_literal "$target" /compact \
     || fail "$SUBJECT: could not type a draft into the $shape pane"
-  sleep 1.2
-  row=$(lab pane read "$pane" --source visible --format ansi 2>/dev/null | grep -F '❯' | grep -F '/compact' | head -1)
-  [ -n "$row" ] || fail "$SUBJECT: the typed /compact draft never rendered in the $shape composer"
+  while [ "$i" -lt 20 ]; do
+    sleep 1
+    row=$(lab pane read "$pane" --source visible --format ansi 2>/dev/null | grep -F '❯' | grep -F '/compact' | head -1)
+    [ -z "$row" ] || break
+    i=$((i + 1))
+  done
+  if [ -z "$row" ]; then
+    lab pane read "$pane" --source visible >&2 || true
+    fail "$SUBJECT: the typed /compact draft never rendered in the $shape composer"
+  fi
   case "$(printf '%s\n' "$row" | fm_composer_strip_ghost)" in
     *'/compact'*) style='above the default ghost ceiling' ;;
     *) style='below the default ghost ceiling' ;;
@@ -232,7 +239,7 @@ check_pending_draft_refusal() {  # <id> <pane> <shape>
   case "$screen" in
     *'/compact/exit'*) fail "$SUBJECT: the exit command was concatenated onto the $shape draft" ;;
   esac
-  fm_backend_herdr_composer_clear "$target" /compact \
+  fm_backend_herdr_composer_clear "$target" /compact "$(fm_backend_herdr_composer_identity "$target")" \
     || fail "$SUBJECT: could not clear the draft from the $shape composer"
   pass "live Herdr submit confirm: $SUBJECT fm-control exit refuses a pending /compact draft by name in the $shape shape (draft drawn $style)"
 }
