@@ -245,10 +245,8 @@ test_relaunch_rebuilds_the_switch() {
     touch "$home/state/.last-watcher-beat"
     [ "$setting" = absent ] || : > "$home/config/launch-env-allowlist"
     expected=1
-    if [ "$harness" != codex ]; then
-      expected=0
-      printf '{"%s":"auto"}\n' "$harness" > "$home/config/compact-adviser"
-    fi
+    printf '{"claude":"auto","omp":"auto"}\n' > "$home/config/compact-adviser"
+    [ "$harness" = codex ] || expected=0
     make_relaunch_stub "$dir"
     install_env_probe "$dir/fakebin" "$harness"
     fm_git_worktree "$proj" "$wt" "wt-relaunch-$harness-$setting"
@@ -279,7 +277,7 @@ test_relaunch_rebuilds_the_switch() {
     # Drive the actual replacement-launch boundary for every harness.
     driver=("$ROOT/bin/fm-spawn.sh" "$id" --relaunch)
     out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$home" FM_FAKE_DIR="$dir/fake" \
-      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 COMPACT_ADVISER_DISABLE=0 \
+      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 COMPACT_ADVISER_DISABLE=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
       "${driver[@]}" 2>&1)
     status=$?
@@ -335,6 +333,8 @@ SH
   pass "a compound raw launch-command still starts its agent with the compact-adviser switch on"
 }
 
+# The spawning process carries the COMPACT_ADVISER_DISABLE=1 that a default-off
+# secondmate's own launch exported, which must not defeat its children's policy.
 test_auto_launch_policy() {
   local harness setting kind rec id out status seen expected launch sm
   for harness in claude omp; do
@@ -354,9 +354,9 @@ test_auto_launch_policy() {
           printf 'charter\n' > "$sm/data/charter.md"
           printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
           git -C "$sm" init -q -b main
-          out=$(COMPACT_ADVISER_DISABLE=0 run_case_spawn "$id" "$sm" --secondmate "$harness")
+          out=$(COMPACT_ADVISER_DISABLE=1 run_case_spawn "$id" "$sm" --secondmate "$harness")
         else
-          out=$(COMPACT_ADVISER_DISABLE=0 run_case_spawn "$id" "$PROJ_DIR" "$harness" --mode no-mistakes --yolo off)
+          out=$(COMPACT_ADVISER_DISABLE=1 run_case_spawn "$id" "$PROJ_DIR" "$harness" --mode no-mistakes --yolo off)
         fi
         status=$?
         expect_code 0 "$status" "$id: automatic policy spawn should succeed: $out"
@@ -388,7 +388,8 @@ test_invalid_policy_refuses_before_launch() {
   rec=$(make_case invalid-policy codex invalid-policy-a1)
   read_case "$rec"
   for policy in '{"codex":"auto"}' '{"grok":"auto"}' '{"claude":"hint"}' \
-    '{"cluade":"auto"}' '[]' '{} {}' '{bad json'; do
+    '{"cluade":"auto"}' '{"codex":"off"}' '{"claude":"auto","grok":"off"}' \
+    '[]' '{} {}' '{bad json'; do
     printf '%s\n' "$policy" > "$HOME_DIR/config/compact-adviser"
     out=$(run_case_spawn invalid-policy-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
     status=$?
@@ -397,7 +398,7 @@ test_invalid_policy_refuses_before_launch() {
     [ ! -s "$LAUNCH_LOG" ] || fail "invalid policy launched a worker"
     [ ! -f "$HOME_DIR/state/invalid-policy-a1.meta" ] || fail "invalid policy published a task"
   done
-  pass "malformed policy and hint-only automatic requests refuse before launch"
+  pass "malformed policy and keys other than claude or omp refuse before launch"
 }
 
 test_auto_emergency_override() {
@@ -405,13 +406,14 @@ test_auto_emergency_override() {
   rec=$(make_case auto-kill claude auto-kill-a1)
   read_case "$rec"
   printf '{"claude":"auto"}\n' > "$HOME_DIR/config/compact-adviser"
-  out=$(COMPACT_ADVISER_DISABLE=' YES ' run_case_spawn auto-kill-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
+  out=$(FM_COMPACT_ADVISER_DISABLE=' YES ' COMPACT_ADVISER_DISABLE=0 \
+    run_case_spawn auto-kill-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "emergency-disabled launch should still succeed: $out"
   install_env_probe "$FAKEBIN_DIR" claude
   seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") || fail "emergency launch replay failed"
-  assert_equals 1 "$seen" "invoking kill switch must defeat automatic policy"
-  pass "the emergency kill switch overrides opted-in auto"
+  assert_equals 1 "$seen" "the operator's emergency switch must defeat automatic policy"
+  pass "the operator's emergency kill switch overrides opted-in auto"
 }
 
 test_auto_launch_policy

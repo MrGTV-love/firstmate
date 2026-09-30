@@ -986,15 +986,15 @@ Regression coverage executes emitted launch commands with synthetic nonsecret va
 
 ### Compact adviser setting (config/compact-adviser)
 
-The optional local, gitignored `config/compact-adviser` is a JSON object mapping harness names to `"off"` or `"auto"`.
-An absent file or absent harness entry keeps the adviser disabled, preserving the default for homes that have not opted in.
+The optional local, gitignored `config/compact-adviser` is a JSON object whose only keys are `claude` and `omp`, each mapped to `"off"` or `"auto"`.
+An absent file or absent entry keeps the adviser disabled, preserving the default for homes that have not opted in.
 
 ```json
 {"claude": "auto", "omp": "auto"}
 ```
 
-Only `claude` and `omp` may select `"auto"`; other harnesses may select `"off"`, and malformed or unsupported settings refuse launch.
-Codex and Grok are hint-only upstream and cannot run automatic compaction.
+Any other key or value, and any malformed file, refuses launch.
+Every other harness always runs with the adviser off; Codex and Grok are hint-only upstream and cannot run automatic compaction.
 The policy is inherited by local and remote secondmates for their subsequent worker launches.
 It applies to fresh launches, relaunches, raw launch commands with an identifiable harness, and filtered launch environments, but does not change an already-running session or the primary Firstmate session.
 For an unidentifiable raw command, the adviser stays off.
@@ -1007,11 +1007,25 @@ Claude auto launches receive `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without chang
 The installed plugin must support the host's settled-turn event and context API; loading its command alone does not prove that it judges completed turns.
 Print and other reliably detected noninteractive sessions remain inert under the plugin's own rules.
 
-A truthy `COMPACT_ADVISER_DISABLE` in the invoking process overrides automatic policy as an emergency kill switch.
-Restart or clear that variable in a primary launched under the old unconditional-disable policy before commissioning enabled workers.
+Every launch replaces any inherited `COMPACT_ADVISER_DISABLE` with the resolved policy, so the `COMPACT_ADVISER_DISABLE=1` that a default-off secondmate carries does not disable its own automatic workers.
+A truthy `FM_COMPACT_ADVISER_DISABLE` (`1`, `true`, `yes`, or `on`) in the process that runs `bin/fm-spawn.sh`, `bin/fm-control.sh <id> relaunch`, or `bin/fm-remote-secondmate-relaunch.sh` is the operator's emergency kill switch.
+It forces that launch off, including a remote secondmate launch, and Firstmate never exports it into a worker.
+For a lasting or fleet-wide stop, set the entry to `"off"` and push the configuration as described below.
 The default upstream minimum is 40,000 context tokens, with an additional 20,000-token conversation minimum; smaller sessions should not issue a judgement.
 Eligible checkpoint excerpts are sent to TypeSafe, with best-effort redaction rather than a guarantee that all sensitive material is removed.
 Keep the policy off for material that must not leave the machine.
+
+#### Enabling a running fleet
+
+1. In the primary home, write `config/compact-adviser`, for example `{"claude": "auto"}`.
+   Add `"omp": "auto"` only after the installed omp plugin is proven to judge settled turns.
+2. Run `bin/fm-config-push.sh` to copy the policy into every live local and remote secondmate home.
+   Each secondmate's next worker launch reads the new policy; a secondmate spawn also re-pushes it.
+3. Running agents keep the environment they launched with.
+   Relaunch a local agent with `bin/fm-control.sh <id> relaunch`, or a remote secondmate with `bin/fm-remote-secondmate-relaunch.sh <id> <harness> <model> <effort>` naming its current runtime, for it to run with the new policy.
+4. Verify a newly launched worker process with `ps eww -p <pid> | tr ' ' '\n' | grep -E '^(COMPACT_ADVISER_DISABLE|CLAUDE_CODE_ENABLE_FUNCTION_HOOKS)='`.
+   An automatic Claude worker shows `COMPACT_ADVISER_DISABLE=0` and `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`; an automatic omp worker shows `COMPACT_ADVISER_DISABLE=0`.
+   The environment proves only that the adviser may act; a plugin judgement on a completed turn above the token minimum proves that it runs.
 
 #### Comparing enabled and disabled workers
 

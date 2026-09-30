@@ -326,13 +326,14 @@
 #   See docs/configuration.md for provider/Git setup, raw-command shell
 #   compatibility, and supported limits.
 # Compact adviser (config/compact-adviser):
-#   Optional JSON object mapping harness names to "off" or "auto"; absent
-#   entries default to off. claude and omp may select auto; other auto entries
-#   refuse before launch. omp requires a compatible installed settled-turn
-#   integration before opting in. See docs/configuration.md for plugin setup.
+#   Optional JSON object whose only keys are claude and omp, each mapped to
+#   "off" or "auto"; other keys refuse before launch, and every absent entry
+#   and other harness stays off. omp requires a compatible installed
+#   settled-turn integration before opting in. See docs/configuration.md.
 #   The resolved switch reaches the pane export, compound launch, and env -i
-#   floor. A truthy invoking COMPACT_ADVISER_DISABLE remains an emergency
-#   override. Claude auto also exports CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.
+#   floor, replacing any inherited COMPACT_ADVISER_DISABLE. A truthy invoking
+#   FM_COMPACT_ADVISER_DISABLE is the operator's emergency override; Firstmate
+#   never exports it. Claude auto also exports CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.
 #   No TypeSafe credential is read or embedded here; use plugin saved keys.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
@@ -578,18 +579,16 @@ fi
 COMPACT_ADVISER_CONFIG='{}'
 if [ "$COMPACT_ADVISER_PRESENT" = 1 ]; then
   if [ ! -f "$CONFIG/compact-adviser" ] || [ ! -r "$CONFIG/compact-adviser" ]; then
-    echo "error: config/compact-adviser must be a readable JSON object of harness names to off or auto" >&2
+    echo "error: config/compact-adviser must be a readable JSON object mapping claude or omp to off or auto" >&2
     exit 1
   fi
   if ! COMPACT_ADVISER_CONFIG=$(jq -ces '
     if length == 1 then .[0] else error("expected one JSON object") end |
     if type == "object" and all(to_entries[];
-      (.key | IN("claude", "omp", "codex", "grok", "pi", "pi-signed",
-        "opencode", "kimi", "cursor", "gemini", "muse", "rovo", "agy", "devin")) and
-      (.value == "off" or (.value == "auto" and (.key == "claude" or .key == "omp"))))
+      (.key | IN("claude", "omp")) and (.value | IN("off", "auto")))
     then . else error("unsupported harness or mode") end
   ' "$CONFIG/compact-adviser" 2>/dev/null); then
-    echo "error: config/compact-adviser expects harness names mapped to off or auto; auto is supported only for claude and omp (codex and grok are hint-only)" >&2
+    echo "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off" >&2
     exit 1
   fi
 fi

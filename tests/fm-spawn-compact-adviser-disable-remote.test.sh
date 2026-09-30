@@ -148,7 +148,7 @@ run_remote_launch() {  # <label>
   local label=$1 out
   reset_remote_herdr_fixture "$HERDR_STATE"
   : > "$HERDR_LOG"
-  out=$(COMPACT_ADVISER_DISABLE="${ADVISER_KILL:-0}" remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate 2>&1) \
+  out=$(COMPACT_ADVISER_DISABLE=1 FM_COMPACT_ADVISER_DISABLE="${ADVISER_KILL:-0}" remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate 2>&1) \
     || fail "$label: the remote second-mate launch failed: $out"
 }
 
@@ -204,7 +204,7 @@ printf '%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTI
 SH
 chmod +x "$PROBEBIN/claude"
 printf 'claude\n' > "$PARENT/config/secondmate-harness"
-printf '{"claude":"auto","codex":"off"}\n' > "$PARENT/config/compact-adviser"
+printf '{"claude":"auto","omp":"off"}\n' > "$PARENT/config/compact-adviser"
 for setting in absent enabled; do
   if [ "$setting" = absent ]; then
     rm "$PARENT/config/launch-env-allowlist"
