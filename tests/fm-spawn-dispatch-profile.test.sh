@@ -102,8 +102,8 @@ run_spawn() {
   # explicitly (empty by default) instead of leaking the invoking shell's value,
   # which would make launch assertions depend on the developer's environment.
   # A test opts in to the set case via FM_TEST_CLAUDE_CONFIG_DIR.
-  # XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG are forwarded onto TeamClaude launches
-  # the same way, so they are pinned for the same reason.
+  # XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG are handed to a TeamClaude launch's
+  # own teamclaude calls, so they are pinned for the same reason.
   CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
     XDG_CONFIG_HOME="${FM_TEST_XDG_CONFIG_HOME:-}" \
     TEAMCLAUDE_CONFIG="${FM_TEST_TEAMCLAUDE_CONFIG:-}" \
@@ -1922,17 +1922,8 @@ test_absent_claude_launcher_keeps_the_direct_launch() {
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the direct launch command failed"
   [ -s "$env_out" ] || fail "the direct launch never started claude"
-  assert_no_grep '^HTTPS_PROXY=' "$env_out" "a direct launch must not route claude through a proxy"
-
-  printf 'direct\n' > "$HOME_DIR/config/claude-launcher"
-  id=teamclaude-direct-z42
-  fm_test_spawn_brief "$HOME_DIR" "$id"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "config/claude-launcher=direct should succeed"$'\n'"$out"
-  assert_contains "$(cat "$LAUNCH_LOG")" "CLAUDE_CODE_SEND_FEEDBACK=0 claude " \
-    "config/claude-launcher=direct must keep the bare claude launch"
-  pass "config/claude-launcher absent or direct keeps the direct claude launch with no proxy"
+  ! grep -q '^HTTPS_PROXY=' "$env_out" || fail "a direct launch must not route claude through a proxy"
+  pass "an absent config/claude-launcher keeps the direct claude launch with no proxy"
 }
 
 test_teamclaude_launcher_proxies_a_claude_secondmate_launch() {
@@ -1977,13 +1968,13 @@ test_teamclaude_launcher_refusals_leave_no_task() {
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 1 "$status" "an unknown launcher token must refuse the spawn"
-  assert_contains "$out" "accepted values are: direct" "the refusal must name the accepted launcher values"
+  assert_contains "$out" "the only accepted value is teamclaude" "the refusal must name the accepted launcher value"
   assert_absent "$HOME_DIR/state/$id.meta" "an unknown launcher token must refuse before the task record"
   pass "config/claude-launcher=teamclaude refuses a stopped proxy, a missing teamclaude, or an unknown token before any task exists"
 }
 
-test_teamclaude_config_paths_reach_the_worker() {
-  local rec id out status launch
+test_teamclaude_config_paths_reach_only_teamclaude() {
+  local rec id out status env_out
   id=teamclaude-paths-z45
   rec=$(make_teamclaude_case teamclaude-paths "$id")
   read_case_record "$rec"
@@ -1992,11 +1983,17 @@ test_teamclaude_config_paths_reach_the_worker() {
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "absolute TeamClaude configuration paths should be accepted"$'\n'"$out"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "XDG_CONFIG_HOME='$CASE_DIR/xdg'" \
-    "the launch must name the XDG_CONFIG_HOME the spawn checked"
-  assert_contains "$launch" "TEAMCLAUDE_CONFIG='$CASE_DIR/teamclaude.json'" \
-    "the launch must name the TEAMCLAUDE_CONFIG the spawn checked"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/xdg" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the XDG_CONFIG_HOME the spawn checked"
+  grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/teamclaude.json" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the TEAMCLAUDE_CONFIG the spawn checked"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$env_out" \
+    || fail "claude must still receive HTTPS_PROXY from teamclaude"
+  ! grep -Eq '^(XDG_CONFIG_HOME|TEAMCLAUDE_CONFIG|FM_TC_[A-Z_]+)=' "$env_out" \
+    || fail "the TeamClaude configuration paths must not reach claude: $(cat "$env_out")"
 
   id=teamclaude-relative-z46
   fm_test_spawn_brief "$HOME_DIR" "$id"
@@ -2006,7 +2003,7 @@ test_teamclaude_config_paths_reach_the_worker() {
   expect_code 1 "$status" "a relative TEAMCLAUDE_CONFIG must refuse"
   assert_contains "$out" "requires an absolute TEAMCLAUDE_CONFIG" "the refusal must name the relative path"
   assert_absent "$HOME_DIR/state/$id.meta" "a relative TEAMCLAUDE_CONFIG must refuse before the task record"
-  pass "TeamClaude configuration paths reach the worker, and a relative one refuses"
+  pass "TeamClaude configuration paths reach only the worker's teamclaude calls, and a relative one refuses"
 }
 
 test_teamclaude_launcher_is_inherited_by_secondmates() {
@@ -2031,7 +2028,7 @@ test_teamclaude_launcher_proxies_a_fresh_claude_spawn
 test_absent_claude_launcher_keeps_the_direct_launch
 test_teamclaude_launcher_proxies_a_claude_secondmate_launch
 test_teamclaude_launcher_refusals_leave_no_task
-test_teamclaude_config_paths_reach_the_worker
+test_teamclaude_config_paths_reach_only_teamclaude
 test_teamclaude_launcher_is_inherited_by_secondmates
 
 echo "# all fm-spawn-dispatch-profile tests passed"

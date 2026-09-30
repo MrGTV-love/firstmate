@@ -49,14 +49,8 @@ out=$(env -i HOME="$HOME" PATH="$LAB/fakebin:$(dirname "$(command -v bash)"):/us
 [ -s "$LAB/claude-env" ] || fail "teamclaude $TC_VERSION: the launcher never started claude"
 
 proxy=$(sed -n 's/^HTTPS_PROXY=//p' "$LAB/claude-env" | head -1)
-base=$(sed -n 's/^ANTHROPIC_BASE_URL=//p' "$LAB/claude-env" | head -1)
-if [ -n "$proxy" ]; then
-  ca=$(sed -n 's/^NODE_EXTRA_CA_CERTS=//p' "$LAB/claude-env" | head -1)
-  [ -n "$ca" ] && [ -r "$ca" ] \
-    || fail "teamclaude $TC_VERSION: forward-proxy mode exported no readable NODE_EXTRA_CA_CERTS"
-  pass "teamclaude $TC_VERSION: the launcher hands claude HTTPS_PROXY and a readable TeamClaude CA"
-elif [ -n "$base" ]; then
-  pass "teamclaude $TC_VERSION: the launcher hands claude TeamClaude's ANTHROPIC_BASE_URL"
-else
-  fail "teamclaude $TC_VERSION: claude received neither HTTPS_PROXY nor ANTHROPIC_BASE_URL"
-fi
+[ -n "$proxy" ] || fail "teamclaude $TC_VERSION: claude received no HTTPS_PROXY"
+ca=$(sed -n 's/^NODE_EXTRA_CA_CERTS=//p' "$LAB/claude-env" | head -1)
+[ -n "$ca" ] && [ -r "$ca" ] \
+  || fail "teamclaude $TC_VERSION: the export named no readable NODE_EXTRA_CA_CERTS"
+pass "teamclaude $TC_VERSION: the launcher hands claude HTTPS_PROXY and a readable TeamClaude CA"

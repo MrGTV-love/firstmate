@@ -343,17 +343,19 @@
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 # Claude launcher (config/claude-launcher):
 #   One token selecting the executable every claude template launch (ship,
-#   scout, secondmate, and relaunch) starts. Absent or `direct` keeps today's
-#   bare `claude`; `teamclaude` starts bin/fm-teamclaude-launch.sh instead,
-#   which applies the local TeamClaude proxy's client environment and then
-#   replaces itself with claude, so the proxy never depends on a pane shell
-#   alias. The spawn runs that wrapper's --check before any endpoint, worktree,
-#   or record exists and refuses when TeamClaude is missing, stopped, or
-#   unanswering; the wrapper refuses again in the pane rather than launch
-#   Claude unproxied. The launch forwards an absolute XDG_CONFIG_HOME or
-#   TEAMCLAUDE_CONFIG so the pane reads the configuration the check read, and a
+#   scout, secondmate, and relaunch) starts. Absent keeps today's bare
+#   `claude`; `teamclaude` starts bin/fm-teamclaude-launch.sh instead, which
+#   applies the local TeamClaude proxy's client environment and then replaces
+#   itself with claude, so the proxy never depends on a pane shell alias.
+#   bin/fm-claude-launcher-lib.sh owns parsing and runs that wrapper's --check
+#   before any endpoint, worktree, or record exists, refusing when TeamClaude
+#   is missing, stopped, or unanswering; the wrapper refuses again in the pane
+#   rather than launch Claude unproxied. An absolute XDG_CONFIG_HOME or
+#   TEAMCLAUDE_CONFIG reaches only the wrapper's own teamclaude calls, as
+#   FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, so the pane reads the
+#   configuration the check read without changing Claude's environment; a
 #   relative one refuses. A raw launch command is the caller's own and is not
-#   rewritten. Parsed, read, and inherited like config/claude-permission-mode.
+#   rewritten. Inherited like config/claude-permission-mode.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
 #     __BRIEF__    absolute path to data/<task-id>/brief.md
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
@@ -590,26 +592,6 @@ case "$CLAUDE_PERMISSION_MODE" in
 auto) CLAUDE_PERM_FLAG='--permission-mode auto' ;;
 *) CLAUDE_PERM_FLAG='--dangerously-skip-permissions' ;;
 esac
-# config/claude-launcher (header above): resolved with the permission mode, so a
-# malformed file refuses before any mutation instead of launching unproxied.
-if ! CLAUDE_LAUNCHER_PRESENT=$(fm_config_source_present "$CONFIG/claude-launcher"); then
-  exit 1
-fi
-CLAUDE_LAUNCHER=direct
-if [ "$CLAUDE_LAUNCHER_PRESENT" = 1 ]; then
-  if [ ! -f "$CONFIG/claude-launcher" ] || [ ! -r "$CONFIG/claude-launcher" ]; then
-    echo "error: config/claude-launcher must be a readable regular file holding one of: direct, teamclaude" >&2
-    exit 1
-  fi
-  CLAUDE_LAUNCHER=$(tr -d '[:space:]' <"$CONFIG/claude-launcher" || true)
-  case "$CLAUDE_LAUNCHER" in
-  direct | teamclaude) ;;
-  *)
-    echo "error: config/claude-launcher holds '$CLAUDE_LAUNCHER'; accepted values are: direct (the default when the file is absent), teamclaude" >&2
-    exit 1
-    ;;
-  esac
-fi
 # config/lavish-axi-host is the primary-owned per-machine address for the
 # shared Lavish server. Read it once per launch and refuse malformed values so
 # every worker reaches the same server instead of starting a second one.
@@ -673,6 +655,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-claude-launcher-lib.sh
+. "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -2311,22 +2295,8 @@ fi
 # config/claude-launcher (header above): prove the TeamClaude proxy before any
 # endpoint, worktree, or record exists.
 CLAUDE_LAUNCH_BIN=claude
-if [ "$RAW_LAUNCH" = 0 ] && [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCHER" = teamclaude ]; then
-  for tc_var in XDG_CONFIG_HOME TEAMCLAUDE_CONFIG; do
-    case ${!tc_var:-} in
-    '' | /*) ;;
-    *)
-      echo "error: config/claude-launcher=teamclaude requires an absolute $tc_var so the worker reads the TeamClaude configuration this spawn checked" >&2
-      exit 1
-      ;;
-    esac
-  done
-  CLAUDE_LAUNCH_BIN="$FM_ROOT/bin/fm-teamclaude-launch.sh"
-  if [ ! -f "$CLAUDE_LAUNCH_BIN" ] || [ ! -x "$CLAUDE_LAUNCH_BIN" ]; then
-    echo "error: config/claude-launcher=teamclaude needs the executable launcher $CLAUDE_LAUNCH_BIN; refusing to launch Claude without the proxy" >&2
-    exit 1
-  fi
-  "$CLAUDE_LAUNCH_BIN" --check || exit 1
+if [ "$RAW_LAUNCH" = 0 ] && [ "$HARNESS" = claude ]; then
+  CLAUDE_LAUNCH_BIN=$(fm_claude_launcher_select "$CONFIG") || exit 1
 fi
 
 # muse, gemini, agy, and devin are verified as CREWMATE/SCOUT adapters only. A secondmate is
@@ -5293,10 +5263,11 @@ elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi
 # The pane's environment comes from the tmux/herdr daemon, not this process, so
-# a TeamClaude launch names the configuration its --check above validated.
-if [ "$RAW_LAUNCH" = 0 ] && [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCHER" = teamclaude ]; then
+# a TeamClaude launch hands its wrapper the configuration its --check above
+# validated, under names only the wrapper's teamclaude calls read.
+if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   for tc_var in XDG_CONFIG_HOME TEAMCLAUDE_CONFIG; do
-    [ -z "${!tc_var:-}" ] || LAUNCH="$tc_var=$(shell_quote "${!tc_var}") $LAUNCH"
+    [ -z "${!tc_var:-}" ] || LAUNCH="FM_TC_$tc_var=$(shell_quote "${!tc_var}") $LAUNCH"
   done
 fi
 if [ "$KIND" = secondmate ]; then

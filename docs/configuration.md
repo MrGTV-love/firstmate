@@ -828,24 +828,21 @@ The [Claude adapter reference](../.agents/skills/harness-adapters/references/har
 
 ## Claude launcher (config/claude-launcher)
 
-The optional local, gitignored `config/claude-launcher` holds one token selecting how every Claude worker launch starts Claude: crewmates, scouts, Claude secondmates, and every relaunch, including `fm-control` relaunch, the session-end auto-relaunch, and secondmate restart, on every runtime backend.
-
-| Token | Launch |
-| --- | --- |
-| `direct` | the bare `claude` command, unchanged from a home with no file |
-| `teamclaude` | [`bin/fm-teamclaude-launch.sh`](../bin/fm-teamclaude-launch.sh), which starts Claude only through the local TeamClaude proxy |
-
-An absent file means `direct`.
+The optional local, gitignored `config/claude-launcher` routes every Claude worker launch through the local TeamClaude proxy: crewmates, scouts, Claude secondmates, and every relaunch, including `fm-control` relaunch, the session-end auto-relaunch, and secondmate restart, on every runtime backend.
+Its one accepted token is `teamclaude`, which starts Claude through [`bin/fm-teamclaude-launch.sh`](../bin/fm-teamclaude-launch.sh).
+An absent file launches the bare `claude` command.
 Any other value, or an unreadable file, refuses the launch before any worker, copy, or record exists.
 
 With `teamclaude`, the spawn first runs the launcher's `--check`, which refuses the launch when TeamClaude is not installed, is ambiguous, or its proxy does not answer `teamclaude status`.
+`fm-control` relaunch runs the same check before it stops the running agent, so a stopped proxy leaves that agent running.
 In the worker's pane, the launcher applies the client environment `teamclaude env` exports and then replaces itself with `claude`.
-In TeamClaude's default forward-proxy mode that is `HTTPS_PROXY` and `NODE_EXTRA_CA_CERTS`, and in its base-URL mode `ANTHROPIC_BASE_URL`.
+That export must set `HTTPS_PROXY`, and TeamClaude also exports `NODE_EXTRA_CA_CERTS` so Claude trusts the proxy's certificate authority.
 The proxy therefore reaches Claude on tmux and Herdr alike, without depending on a shell alias in the pane.
-The launcher refuses again in the pane, rather than start Claude unproxied, if TeamClaude is missing there, the proxy stopped, or the export sets no routing.
+The launcher refuses again in the pane, rather than start Claude unproxied, if TeamClaude is missing there, the proxy stopped, or the export sets no `HTTPS_PROXY`.
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
-Firstmate requires either override to be an absolute path and forwards it onto the launch, so the pane reads the configuration the spawn checked.
+Firstmate requires either override to be an absolute path.
+The launch hands it to the launcher's own `teamclaude` calls only, so the pane reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged, and a raw launch command is the caller's own and is not rewritten.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.

@@ -13,17 +13,19 @@
 #
 # The wrapper resolves TeamClaude on each host, requires its status endpoint to
 # answer, takes the client environment from `teamclaude env` (TeamClaude's own
-# eval-safe export lines for a tool that starts Claude itself: HTTPS_PROXY and
-# NODE_EXTRA_CA_CERTS in its default forward-proxy mode, ANTHROPIC_BASE_URL in
-# its base-URL mode), and then replaces itself with `claude`, so the pane's
-# process is Claude exactly as in a direct launch.
+# eval-safe export lines for a tool that starts Claude itself, which must set
+# HTTPS_PROXY), and then replaces itself with `claude`, so the pane's process is
+# Claude exactly as in a direct launch.
 # `teamclaude run` is not used because it keeps a Node parent process between
 # the pane and Claude.
 # Any failure exits non-zero before Claude starts; it never launches unproxied.
 # --check performs every step except starting Claude, and fm-spawn runs it
 # before any task state exists.
 #
-# TeamClaude's own configuration owns the port, proxy credentials, and mode.
+# TeamClaude's own configuration owns the port and proxy credentials.
+# FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, when fm-spawn sets them,
+# become XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG for the teamclaude calls only and
+# never reach claude.
 # This wrapper never prints the environment it applies.
 set -euo pipefail
 
@@ -62,9 +64,11 @@ teamclaude_bin() {
 
 # An nvm-installed teamclaude is a `#!/usr/bin/env node` script whose node lives
 # beside it, and a pane PATH need not include that directory.
-run_teamclaude() {
+run_teamclaude() (
+  [ -z "${FM_TC_XDG_CONFIG_HOME:-}" ] || export XDG_CONFIG_HOME="$FM_TC_XDG_CONFIG_HOME"
+  [ -z "${FM_TC_TEAMCLAUDE_CONFIG:-}" ] || export TEAMCLAUDE_CONFIG="$FM_TC_TEAMCLAUDE_CONFIG"
   PATH="$TC_DIR:$PATH" fm_run_timed "$FM_TEAMCLAUDE_TIMEOUT" "$TC_BIN" "$@"
-}
+)
 
 apply_proxy_env() {
   local status=0 lines
@@ -83,9 +87,9 @@ apply_proxy_env() {
     fm_timed_out "$status" && fail 'client environment export timed out'
     fail 'could not export its client environment (teamclaude env failed)'
   fi
+  unset HTTPS_PROXY
   eval "$lines"
-  [ -n "${HTTPS_PROXY:-}" ] || [ -n "${ANTHROPIC_BASE_URL:-}" ] \
-    || fail 'client environment set neither HTTPS_PROXY nor ANTHROPIC_BASE_URL'
+  [ -n "${HTTPS_PROXY:-}" ] || fail 'client environment did not set HTTPS_PROXY'
 }
 
 if [ "${1:-}" = --check ]; then
@@ -95,4 +99,5 @@ if [ "${1:-}" = --check ]; then
 fi
 
 apply_proxy_env
+unset FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
 exec claude "$@"
