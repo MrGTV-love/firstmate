@@ -3363,6 +3363,9 @@ fm_backend_herdr_proof_lines() {  # <text>
 # viewport is the one bound that always contains the composer.
 # Styled capture is preferred. An empty or failed styled read falls through to
 # the plain capture so a missing ANSI format does not look like an empty draft.
+# This reader serves Claude's payload proof, not Grok's dark-color placeholders.
+# Claude draws recognized slash commands in theme-dependent truecolor (including
+# dark blue and muted grey), so only SGR-2 dim runs are ghost text here.
 fm_backend_herdr_composer_content() {  # <target>
   local target=$1 cap caps
   if cap=$(fm_backend_herdr_visible_capture_ansi "$target" 2>/dev/null) && [ -n "$cap" ]; then
@@ -3372,7 +3375,7 @@ fm_backend_herdr_composer_content() {  # <target>
   else
     return 1
   fi
-  fm_composer_extract_selected_content "$caps" "$cap"
+  FM_COMPOSER_GHOST_LUMA_MAX=0 fm_composer_extract_selected_content "$caps" "$cap"
 }
 
 # fm_backend_herdr_composer_payload_shown: 0 when <after>, read from a
@@ -3426,6 +3429,7 @@ fm_backend_herdr_composer_clear() {  # <target> <text>
 fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep> <settle>
   local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 i=0 verdict baseline confirm_sleep
   local raw_status footer_baseline='' allow_rendered=0 enter_sent=0 identity proof=0 content
+  local FM_COMPOSER_GHOST_LUMA_MAX=${FM_COMPOSER_GHOST_LUMA_MAX:-128}
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   # Claude on Herdr is the live-verified truncation shape: Enter is withheld
   # unless the composer, empty before the send, shows this payload. A suffix
@@ -3433,6 +3437,9 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
   # unproven type-then-Enter path.
   identity=$(fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || identity=
   if [ "${identity%%$'\t'*}" = claude ]; then
+    # Keep the same Claude color policy during post-Enter confirmation: a popup
+    # that swallowed Enter must remain pending, not look falsely submitted.
+    FM_COMPOSER_GHOST_LUMA_MAX=0
     proof=1
     content=$(fm_backend_herdr_composer_content "$target") \
       || { printf 'send-failed'; return 0; }

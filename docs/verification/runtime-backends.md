@@ -1178,7 +1178,7 @@ ok - fm_backend_herdr_composer_state: a slash-command popup cannot hide a typed 
 ok - fm_backend_herdr_send_text_submit: a typed slash command hidden behind its popup is still proven and submitted
 ```
 
-Live guard (third scenario of the opt-in guard, verifying the agent actually exited):
+Live guard (including the public lifecycle exit command and agent-state read-back):
 
 ```sh
 FM_HERDR_SUBMIT_CONFIRM_LIVE=1 tests/fm-herdr-submit-confirm-live-e2e.test.sh
@@ -1187,6 +1187,38 @@ FM_HERDR_SUBMIT_CONFIRM_LIVE=1 tests/fm-herdr-submit-confirm-live-e2e.test.sh
 ```text
 ok - live Herdr submit confirm: Claude Code (2.1.283 (Claude Code)) on herdr 0.9.0 proves and submits a typed /exit behind its command popup
 ```
+
+### Named and colored Claude slash commands
+
+Verified 2026-09-30 on macOS arm64 with Herdr 0.9.1 and Claude Code 2.1.285 in named, isolated lab sessions.
+Claude launched without color exited successfully, while the same launch with `FORCE_COLOR=3 COLORTERM=truecolor TERM=xterm-256color` rendered `/exit` in RGB(51,102,255) and both `fm-control exit` and `relaunch` refused before sending Enter.
+The payload reader returned empty for that visible command because the generic dark-truecolor placeholder policy removed it.
+Setting `FM_COMPOSER_GHOST_LUMA_MAX=0` for the exit call alone stopped that same worker, isolating the color-policy cause.
+The adapter now applies that policy only to Claude payload extraction and the current Claude submission's confirmation reads; SGR-2 suggestions remain excluded and other harnesses keep their placeholder behavior.
+
+A named launch (`claude -n fm-slash-lab`) independently rendered an idle composer that read `unknown` because its opening rule contained the name.
+The shared scanner now accepts the right-aligned titled opening rule only for a pair enclosing an agent glyph; it cannot close a pair or prove Pi's blank composer.
+After both fixes, the public exit command reported a stopped worker and `agent get` reported `agent_not_found` while the pane survived.
+The real relaunch command also replaced a live Claude session in the same pane, with a different native session identity and a rendered acknowledgement of its instructions.
+
+Refresh the repeatable named-session, colored-command, prompt, and verified-exit evidence with:
+
+```sh
+HERDR_LAB_HELPER=bin/fm-herdr-lab.sh FM_HERDR_SUBMIT_CONFIRM_LIVE=1 \
+  bash bin/fm-test-run.sh tests/fm-herdr-submit-confirm-live-e2e.test.sh
+```
+
+```text
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes a colored /compact in a named session
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 submits a U+2063 away-supervisor payload whose read-back drops the mark
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exits a named truecolor session and preserves its endpoint
+```
+
+`tests/fm-backend-herdr.test.sh` covers a colored skill command whose first Enter is swallowed, plus refusal of dim suggestions; the live guard covers `/exit` and `/compact`.
+`tests/fm-composer-lib.test.sh` covers named-session idle, wrapped drafts, dim suggestions, lower stale rules, and the Pi boundary across cursor and cursorless capability profiles.
+
+The same Claude version was also launched as `claude -n fm-tmux-slash --permission-mode auto --setting-sources user` on a private tmux lab socket.
+Its named idle composer read `empty`, and `FM_CONTROL_EXIT_WAIT=10 FM_CONTROL_POLL=0.2 bash bin/fm-control.sh tmuxclaude exit` reported a stopped worker; an independent backend read confirmed `dead` with the pane preserved.
 
 ### Prune and respawn
 

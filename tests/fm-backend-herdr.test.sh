@@ -5041,6 +5041,45 @@ test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted(
   pass "fm_backend_herdr_send_text_submit: a typed slash command hidden behind its popup is still proven and submitted"
 }
 
+# Real Claude 2.1.285 uses blue RGB(51,102,255) for recognized slash commands
+# in a light theme. Use a skill command here; the live guard covers exit/compact.
+test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
+  local text=/no-mistakes dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-colored-skill"
+  mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" "$text"
+  printf '❯ \033[38;2;51;102;255m%s\033[0m\n' "$text" > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
+  # First Enter fills the popup without submitting. The colored command
+  # must still read pending so the second Enter, and only it, lands.
+  cp "$resp/4.out" "$resp/8.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
+  [ "$out" = empty ] || fail "colored $text must survive proof and submit, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "colored $text must retry swallowed Enter, sent $enter_count"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "colored $text must not be cleared"
+  pass "Claude colored slash commands survive payload proof and a swallowed first Enter"
+}
+
+test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-dim-slash"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /exit
+  printf '❯ \033[2;38;2;51;102;255m/exit\033[0m\n' > "$resp/4.out"
+  printf '❯\n' > "$resp/6.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /exit 3 0.01 0.01' "$ROOT" )
+  [ "$out" = send-failed ] || fail "dim suggestion must not prove /exit, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+    || fail "a dim suggestion must not authorize Enter"
+  pass "Claude payload proof still refuses dim suggestions"
+}
+
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload() {
   local dir log resp fb out enter_count text
   dir="$TMP_ROOT/submit-paste-placeholder"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -5945,6 +5984,8 @@ test_send_text_submit_accepts_marked_payloads_whose_read_back_drops_u2063
 test_send_text_submit_refuses_marked_digest_missing_its_head
 test_composer_state_claude_slash_popup_pushes_composer_above_tail_window
 test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
+test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry
+test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload
 test_send_text_submit_refuses_placeholder_followed_by_a_literal_remainder
