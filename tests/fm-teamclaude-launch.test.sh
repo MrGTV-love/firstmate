@@ -13,7 +13,7 @@ set -u
 
 LAUNCHER="$ROOT/bin/fm-teamclaude-launch.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teamclaude-launch)
-BASH_DIR=$(dirname "$(command -v bash)")
+BASH_DIR=$(fm_test_bash_only_dir "$TMP_ROOT")
 
 # new_case <name> -> a case dir holding an empty fakebin and a throwaway HOME.
 new_case() {

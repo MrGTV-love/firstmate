@@ -407,6 +407,16 @@ fm_fakebin() {
   printf '%s\n' "$fakebin"
 }
 
+# fm_test_bash_only_dir <dir> creates <dir>/bash-only holding only a link to the
+# resolved bash and echoes it, so a clean PATH reaches bash without the rest of
+# bash's install directory (which may also hold teamclaude or claude).
+fm_test_bash_only_dir() {
+  local dir="$1/bash-only"
+  mkdir -p "$dir"
+  ln -sf "$(command -v bash)" "$dir/bash"
+  printf '%s\n' "$dir"
+}
+
 fm_fake_exit0() {
   local fakebin=$1 tool
   shift
