@@ -2154,6 +2154,7 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; each poll attempt derives its host and port from that session and refuses invalid session evidence before consuming a staged worker reply.
 A missing saved session instead produces the adapter's terminal `missing` result so its registration retires through the normal path.
+Lavish rewrites its session store in place, so a store that does not decode is re-read under the same bound as an interrupted poll, up to 12 times with attempts at least 5 seconds apart, and is refused only while it is still undecodable after that; it is never treated as a missing session.
 
 **Retry interrupted Lavish polls**
 

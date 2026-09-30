@@ -1674,7 +1674,7 @@ assert_contains "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.addit
 assert_absent "$POST_HOME/state/.wake-queue" "the fixture models capture before publication"
 post_context=$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')
 post_read_command=$(printf '%s' "$post_context" | perl -0777 -ne \
-  'm{(bin/fm-procevent-lavish\.sh read .*)\. Handle the feedback,}s and print $1')
+  'm{(bin/fm-procevent-lavish\.sh read .*)\. Handle the result,}s and print $1')
 [ -n "$post_read_command" ] || fail "unpublished capture has no executable recovery command"
 post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE FM_ROOT_OVERRIDE="$POST_HOME" bash -c "$post_read_command") \
   || fail "recovery command depends on FM_HOME being exported to the tool"
@@ -1685,6 +1685,10 @@ assert_contains "$post_context" 'handled lavish-review 1' \
   || fail "PostToolUse launched supervision instead of giving context"
 [ ! -e "$POST_BASE.handled" ] || fail "PostToolUse acknowledged a review without handling it"
 [ -n "$(posttool)" ] || fail "unhandled review became invisible after its first notice"
+printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n' > "$POST_BASE.result"
+post_missing_context=$(posttool | jq -r '.hookSpecificOutput.additionalContext')
+assert_contains "$post_missing_context" 'lavish-review 1' "a captured missing-session result still reaches the primary"
+assert_not_contains "$post_missing_context" feedback "a captured non-feedback result is not announced as feedback"
 printf 'worker-1\n' > "$POST_BASE.owner-task"
 [ -z "$(posttool)" ] || fail "worker-owned review leaked to the primary"
 rm -f "$POST_BASE.owner-task"

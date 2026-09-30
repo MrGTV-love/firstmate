@@ -61,10 +61,10 @@ perl -MJSON::PP=encode_json -MEncode=decode,FB_CROAK -e '
     my $result = decode("UTF-8", "$base.result", FB_CROAK);
     $result =~ s/\x27/\x27\x22\x27\x22\x27/g;
     my $quoted_result = chr(39) . $result . chr(39);
-    my $notice = "Captured Lavish feedback is waiting: $id $sequence. Run bin/fm-wake-drain.sh now. ";
+    my $notice = "A captured Lavish result is waiting: $id $sequence. Run bin/fm-wake-drain.sh now. ";
     $notice .= "If the drain has no row for this result, read it directly with bin/fm-procevent-lavish.sh read ";
     $notice .= $quoted_result . ". ";
-    $notice .= "Handle the feedback, then acknowledge it with bin/fm-procevent.sh handled $id $sequence before continuing.";
+    $notice .= "Handle the result, then acknowledge it with bin/fm-procevent.sh handled $id $sequence before continuing.";
     print encode_json({ hookSpecificOutput => { hookEventName => "PostToolUse", additionalContext => $notice } }), "\n";
     last;
   }
