@@ -2038,7 +2038,7 @@ This section is the single owner of the runner's operating contract.
 
 Discovery is never a timer.
 Each registered source has its own child process blocking on that source.
-On every cycle, the watcher's `reconcile`:
+Once per cycle, unless its previous run is still going, the watcher starts a background `reconcile` that:
 
 - Republishes every captured result without a durable handled acknowledgement, regardless of earlier publication.
 - Restarts a source whose owner is gone.
@@ -2264,9 +2264,11 @@ The generation's first launch is immediate, later launches share its monotonic p
 **Keep confirmation below the watcher interval**
 
 Keep this window well below `FM_POLL`.
-`bin/fm-watch.sh` runs `reconcile` once per supervision cycle, so a source that cannot start makes every cycle wait up to the confirm window before the rest of that cycle runs.
+`bin/fm-watch.sh` starts `reconcile` in the background once per supervision cycle and skips that start while the previous run is still going.
+A source that cannot start keeps each `reconcile` running for up to the confirm window, but the watcher's own cycle and liveness beacon do not wait for it.
 
-Raising the confirm window lengthens every supervision cycle and delays wake delivery by up to that much.
+Raising the confirm window past `FM_POLL` makes the watcher skip `reconcile` on the cycles that run overlaps, so source restarts and republication of captured results lag by up to that much.
+Results already queued are still delivered on every cycle.
 
 **Report launch failures**
 
