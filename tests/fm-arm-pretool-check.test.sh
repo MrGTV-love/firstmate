@@ -154,8 +154,27 @@ MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-arm-policy-matrix.XXXXXX")
 FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
 trap fm_test_cleanup EXIT
 
+
+# Match the real failure shape: an unsupported conditional contains a read-only
+# watcher-path diagnostic and then stops exactly the home lock's numeric PID.
+mkdir -p "$MATRIX_TMP/home/state/.watch.lock"
+printf '424242\n' > "$MATRIX_TMP/home/state/.watch.lock/pid"
+matrix_case K01 allow 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424242; fi'
+matrix_case K02 allow 'if pgrep -fl fm-watch.sh; then command kill -- 424242; fi'
+matrix_case K03 allow 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then /bin/kill -s TERM 424242; fi'
+matrix_case K04 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424243; fi'
+matrix_case K05 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -- -424242; fi'
+matrix_case K06 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill 424242 424243; fi'
+matrix_case K07 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then pkill -f fm-watch.sh; fi'
+matrix_case K08 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill $(pgrep -f fm-watch.sh); fi'
+matrix_case K09 deny 'if true; then bin/fm-watch.sh; kill 424242; fi'
+matrix_case K10 deny 'if true; then killall fm-watch.sh; fi'
+matrix_case K11 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill "$pid"; fi'
 run_matrix_entry() {
   local id=$1 expected=$2 entry=$3 cmd=$4 payload out_file err_file rc
+  local FM_HOME="$ROOT"
+  case "$id" in K*) FM_HOME="$MATRIX_TMP/home" ;; esac
+  export FM_HOME
   out_file="$MATRIX_TMP/$id-$entry.out"
   err_file="$MATRIX_TMP/$id-$entry.err"
 

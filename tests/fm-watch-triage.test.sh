@@ -4577,7 +4577,7 @@ test_wedge_escalation_resets_when_pane_becomes_active() {
 # watcher inside the bound; the released lock and acknowledgeable stop record
 # prove its cleanup still ran.
 test_term_stops_a_watcher_blocked_inside_a_poll() {
-  local dir state fakebin out fifo window sig pid holder i rc
+  local dir state fakebin out fifo window sig pid holder i rc age
   dir=$(make_case term-blocked-poll); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; fifo="$dir/pane.fifo"; window="test:fm-blocked-capture"
   mkfifo "$fifo"
@@ -4589,7 +4589,7 @@ test_term_stops_a_watcher_blocked_inside_a_poll() {
   ( exec 3> "$fifo"; : > "$dir/capture-blocked"; exec sleep 30 ) &
   holder=$!
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$fifo" \
-    FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_GUARD_GRACE=6 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
   i=0
@@ -4601,6 +4601,9 @@ test_term_stops_a_watcher_blocked_inside_a_poll() {
     kill "$holder" 2>/dev/null || true; reap "$pid"
     fail "the watcher never blocked inside its pane capture: $(cat "$out")"
   fi
+  sleep 8
+  age=$(( $(date +%s) - $(file_mtime "$state/.last-watcher-beat") ))
+  [ "$age" -ge 6 ] || fail "a stuck unbounded capture kept the poll beacon fresh (${age}s)"
   kill "$pid" 2>/dev/null || true
   wait_for_exit "$pid" 100
   rc=$?
@@ -4609,7 +4612,7 @@ test_term_stops_a_watcher_blocked_inside_a_poll() {
   [ "$rc" -ne 124 ] || fail "TERM did not stop a watcher blocked inside a poll"
   [ ! -e "$state/.watch.lock" ] || fail "a watcher stopped mid-poll kept its singleton lock, so its cleanup did not run"
   ack_stopped_cycle "$state" || fail "could not acknowledge the stop of a watcher blocked inside a poll"
-  pass "TERM stops a watcher blocked inside a poll and still runs its cleanup"
+  pass "a stuck pane capture goes stale; TERM stops its watcher and runs cleanup"
 }
 
 # --- held downtime-marker lock must not wedge a TERM'd watcher -------------
