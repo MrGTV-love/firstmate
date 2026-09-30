@@ -49,7 +49,7 @@ function rawMentionsProtected(command) {
 
 function rawMentionsBroadKill(command) {
   const normalized = normalizeLineContinuations(command);
-  return /fm-watch/.test(normalized) && /\b(?:pkill|killall|kill)\b/.test(normalized);
+  return /fm-watch/.test(normalized) && /\b(?:pkill|kill)\b/.test(normalized);
 }
 
 function normalizeLineContinuations(source) {
@@ -754,15 +754,15 @@ function exactHomePidKill(program, context) {
   for (const original of program.nodes) {
     if (original.some((token) => token.type === "group" || token.type === "word" && token.subs.length)) return false;
     let tokens = original;
+    while (["if", "then", "else", "elif", "while", "until", "do", "!"].includes(tokens[0]?.value)) tokens = tokens.slice(1);
     const first = tokens[0]?.value;
-    if (["if", "then", "else", "elif", "while", "until", "do"].includes(first)) tokens = tokens.slice(1);
-    else if (["fi", "done"].includes(first) && tokens.length === 1) continue;
-    else if (["for", "case", "esac", "function", "coproc", "time"].includes(first)) return false;
+    if (["fi", "done"].includes(first) && tokens.length === 1) continue;
+    if (["if", "then", "else", "elif", "fi", "for", "select", "in", "while", "until", "case", "esac", "do", "done", "function", "coproc", "time", "{", "}", "[[", "]]", "!"].includes(first)) return false;
     const position = commandPosition(tokens);
     if (!position.command?.literal || position.unresolvedWrapperOption || position.wrapperPayloads.length) return false;
     if (protectedIdentity(position.command.value, context.root) || shellInvocation(position) || sourcedScript(position) || evalPayload(position) !== null) return false;
     const name = basename(position.command.value);
-    if (["pkill", "killall"].includes(name)) return false;
+    if (name !== "kill" && tokens.some((token) => /kill/.test(token.value || ""))) return false;
     if (name !== "kill") continue;
     const args = position.words.slice(position.index + 1);
     if (args.some((word) => !word.literal)) return false;
@@ -871,7 +871,7 @@ function analyzeProgram(command, context, depth = 0) {
     if (hasUnclassifiableProtectedExpansion(position.command, context.root)) unclassifiableProtected = true;
     const commandName = basename(executable);
     const args = position.words.slice(position.index + 1);
-    if (["pkill", "killall"].includes(commandName) && args.some((word) => /fm-watch/.test(word.value) || wordReferencesAny(word, nodeContext.watcherPatterns))) broadKill = true;
+    if (commandName === "pkill" && args.some((word) => /fm-watch/.test(word.value) || wordReferencesAny(word, nodeContext.watcherPatterns))) broadKill = true;
     if (commandName === "kill" && (nodePgrepWatcher || args.some((word) => wordReferencesAny(word, nodeContext.watcherPids)))) broadKill = true;
     if (isWatcherPgrep(position, nodeContext)) pgrepWatcher = true;
     if (hasDynamicExecutionPayload(position, nodeContext) || wordReferencesAny(position.command, nodeContext.protectedVariables)) nodeNestedProtected = true;

@@ -116,16 +116,17 @@ Inline environment assignments, `env`, `sudo`, `nohup`, nested shells, `eval`, s
 
 ## Broad watcher kills
 
-An actually executed `pkill` or `killall` command is denied when its parsed pattern arguments target `fm-watch`.
-Path-qualified forms, `command`, and `sudo` are recognized.
+An actually executed `pkill` command is denied when its parsed pattern arguments target `fm-watch`.
+Path-qualified `pkill`, `command pkill`, and `sudo pkill` are recognized.
 
 `kill "$(pgrep -f '/bin/fm-watch.sh')"` is also denied because the executed `kill` consumes an executed watcher-wide `pgrep` substitution.
 A standalone read-only `pgrep` is allowed.
 Quoted text such as `echo 'pkill -f fm-watch'` is data and is allowed.
 
 Unsupported compound grammar - a loop, `case`, `if`, or other construct the classifier does not model - is failed closed for broad kills the same way it is for protected executions.
-When unsupported grammar references both a `fm-watch` target and a `pkill`, `killall`, or `kill` verb, the classifier conservatively denies with `broad-watcher-kill`.
+When unsupported grammar references both a `fm-watch` target and a `pkill` or `kill` verb, the classifier conservatively denies with `broad-watcher-kill`.
 The narrow exception is a parsed conditional or loop whose only kills name one literal positive PID matching the active home's `state/.watch.lock/pid`, with an optional signal and `--`.
+Every other command in it must be a plain literal command that does not mention a kill verb; `!`, nested conditionals, and loop keywords are unwrapped before that check.
 A read-only watcher-path diagnostic in that command no longer turns the exact-PID stop into a pattern kill.
 The exception never expands variables, permits process-group or multiple-PID kills, or licenses a protected watcher execution hidden in control syntax.
 Pattern kills, `pgrep`-derived kill operands, malformed commands, and unproved compound shapes retain the backstop.

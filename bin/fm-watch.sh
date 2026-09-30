@@ -2154,25 +2154,21 @@ watcher_stop_signals() {
   trap 'exit 1' INT
 }
 
-# Capture an owned child without blocking bash inside a command substitution.
-# A zero deadline deliberately publishes no beats: an unbounded pane capture
-# that stops returning is a stuck poll, not proof of supervision.
-run_owned_capture() {  # <deadline-seconds, or 0> <command> [args...]
-  local bound=$1 pgid check_started=$SECONDS interval=1
-  shift
-  [ "$bound" -ne 0 ] || interval=0.1
-  FM_CAPTURE_EXIT_STATUS=0
+# Capture a check without blocking bash inside a command substitution, so the
+# poll shell keeps publishing progress while it waits on the bounded check.
+run_check_capture() {
+  local pgid check_started=$SECONDS interval=0.1
   fm_check_output_cleanup
   FM_CHECK_RESULT=
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
-  # Defer stop signals only until the capture's process group is recorded for
+  # Defer stop signals only until the check's process group is recorded for
   # watcher_cleanup. Keep command substitutions out of this window: bash 5.2
   # can drop a trap that is pending when one is parsed (watcher_stop_signals).
   trap 'FM_CHECK_SIGNAL_PENDING=1' HUP INT TERM
   set -m
-  ( FM_CHECK_OWNED_GROUP=1 "$@" ) > "$FM_CHECK_OUTPUT" 2>/dev/null &
+  ( FM_CHECK_OWNED_GROUP=1 run_check_process "$@" ) > "$FM_CHECK_OUTPUT" 2>/dev/null &
   FM_ACTIVE_CHECK_PID=$!
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
   set +m
@@ -2184,20 +2180,18 @@ run_owned_capture() {  # <deadline-seconds, or 0> <command> [args...]
     fm_check_output_cleanup
     return 1
   fi
-  # Only deadline-bounded work earns intermediate liveness. Also enforce the
-  # deadline here in case the check's timeout controller stops responding.
+  # Also enforce the deadline here in case the check's timeout controller stops
+  # responding. A quick check returns after one short sleep.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
-    if [ "$bound" -gt 0 ]; then
-      watcher_beat || return 1
-      if [ "$((SECONDS - check_started))" -ge "$((bound + 1))" ]; then
-        fm_active_check_stop || return 1
-        FM_CAPTURE_EXIT_STATUS=124
-        break
-      fi
+    watcher_beat || return 1
+    if [ "$((SECONDS - check_started))" -ge "$((CHECK_TIMEOUT + 1))" ]; then
+      fm_active_check_stop || return 1
+      break
     fi
     sleep "$interval"
+    interval=1
   done
-  [ -z "$FM_ACTIVE_CHECK_PID" ] || wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || FM_CAPTURE_EXIT_STATUS=$?
+  [ -z "$FM_ACTIVE_CHECK_PID" ] || wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || true
   FM_ACTIVE_CHECK_PID=
   fm_active_check_stop || return 1
   FM_CHECK_RESULT=$(cat "$FM_CHECK_OUTPUT" 2>/dev/null || true)
@@ -2513,9 +2507,10 @@ home_summary_refresh_detached() {
   HOME_SUMMARY_PID=$!
 }
 
-# Reconcile can spend a launch-confirmation window on each registered source.
-# Results are durable and observed below on every poll; restarting sources does
-# not need to hold the beacon path hostage to the entire source inventory.
+# One reconcile pass can wait on a single shared launch-confirmation window of up
+# to FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS (600 s), longer than the beacon
+# grace. Results are durable and observed below on every poll, so restarting
+# sources need not hold the beacon path hostage to that window.
 PROCEVENT_RECONCILE_PID=
 procevent_reconcile_detached() {
   if [ -n "$PROCEVENT_RECONCILE_PID" ]; then
@@ -2802,7 +2797,7 @@ while :; do
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
-          FM_HOME="$FM_HOME" run_owned_capture "$CHECK_TIMEOUT" run_check_process "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
+          FM_HOME="$FM_HOME" run_check_capture "$FM_ROOT/bin/fm-x-poll.sh" || exit 1
           out=$FM_CHECK_RESULT
         else
           rejected_checks="$rejected_checks $c"
@@ -2826,12 +2821,12 @@ while :; do
             triage_log "PR poll for $id changed before its validated check; skipping the stale snapshot"
             continue
           fi
-          run_owned_capture "$CHECK_TIMEOUT" run_check_process "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
+          run_check_capture "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
             "$provider" "$url" "$host" "$path" "$number" || exit 1
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          run_owned_capture "$CHECK_TIMEOUT" run_check_process "$custom_snapshot" || exit 1
+          run_check_capture "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -3075,9 +3070,7 @@ EOF
     if [ "$kind" = secondmate ] && ! status_is_paused_or_captain_held "$last"; then
       continue
     fi
-    run_owned_capture 0 fm_backend_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" || exit 1
-    [ "$FM_CAPTURE_EXIT_STATUS" -eq 0 ] || continue
-    tail40=$FM_CHECK_RESULT
+    tail40=$(fm_backend_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" 2>/dev/null) || continue
     h=$(printf '%s' "$tail40" | hash_pane)
     hf="$STATE/.hash-$key"
     cf="$STATE/.count-$key"
