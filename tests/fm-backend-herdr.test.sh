@@ -5184,6 +5184,28 @@ test_send_text_submit_claude_foreign_text_refuses_without_clearing() {
   pass "fm_backend_herdr_send_text_submit: foreign Claude composer text is refused at once and never cleared"
 }
 
+# Ambiguous composer text that this send cannot prove it owns is left in place:
+# a strict infix of the payload, or a note beside a paste placeholder.
+test_send_text_submit_claude_ambiguous_text_refuses_without_clearing() {
+  local dir log resp fb out reads shown label
+  for shown in 'ompa' '[Pasted text #1] keep my note'; do
+    label=${shown// /-}
+    dir="$TMP_ROOT/submit-ambiguous-$label"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    herdr_submit_claude_prefix "$resp" /compact
+    printf '  \xe2\x9d\xaf %s\n' "$shown" > "$resp/4.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+    [ "$out" = send-failed ] || fail "ambiguous composer text '$shown' was never submitted, so the send must report send-failed, got '$out'"
+    reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+    [ "$reads" -eq 2 ] || fail "ambiguous text '$shown' is refused on the first proof read; saw $reads composer reads"
+    [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "ambiguous text '$shown' may be a human's and must never be cleared"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+      || fail "ambiguous text '$shown' must not be submitted"
+  done
+  pass "fm_backend_herdr_send_text_submit: a strict infix or a note beside a paste placeholder is refused at once and never cleared"
+}
+
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
   local dir log resp fb out
   dir="$TMP_ROOT/submit-dim-slash"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -6110,6 +6132,7 @@ test_send_text_submit_claude_payload_rendered_late_is_still_proven
 test_send_text_submit_claude_payload_prefix_growth_is_still_proven
 test_send_text_submit_claude_truncated_suffix_refuses_without_waiting
 test_send_text_submit_claude_foreign_text_refuses_without_clearing
+test_send_text_submit_claude_ambiguous_text_refuses_without_clearing
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload
