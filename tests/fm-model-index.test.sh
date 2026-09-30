@@ -245,10 +245,20 @@ for malformed in '{"version":1,"roles":{}}' '{"version":2,"roles":{},"retired":[
   cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail "a malformed empty index reached the secondmate home: $malformed"
   cmp -s "$PUSH/prior-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "dispatch profiles beside a malformed empty index reached the secondmate home: $malformed"
 done
+# Removing a role the dispatch profiles still name withholds the pair.
 printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$PUSH/home/config/model-index.json"
 config_push "$CATALOGS"
-assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid empty index must push'
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' 'an index missing a dispatch role must be withheld'
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'role or stand-in not configured: codex:fast' 'the refusal must name the unresolved dispatch role'
+cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail 'an index missing a dispatch role reached the secondmate home'
+cmp -s "$PUSH/prior-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'dispatch profiles naming a removed role reached the secondmate home'
+[ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+  || fail 'the secondmate home must keep a pair that still resolves'
+printf '%s\n' '{"default":{"harness":"codex","model":"current"}}' > "$PUSH/home/config/crew-dispatch.json"
+config_push "$CATALOGS"
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid empty index with role-free dispatch profiles must push'
 cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'a valid empty index was not pushed'
+cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'role-free dispatch profiles were not pushed with the empty index'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0
