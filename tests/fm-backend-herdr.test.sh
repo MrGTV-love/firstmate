@@ -5175,7 +5175,7 @@ test_send_text_submit_claude_foreign_text_refuses_without_clearing() {
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
-  [ "$out" = unknown ] || fail "foreign composer text must not report a clean refusal or a delivery, got '$out'"
+  [ "$out" = send-failed ] || fail "foreign composer text was never submitted, so the send must report send-failed, got '$out'"
   reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
   [ "$reads" -eq 2 ] || fail "foreign text is refused on the first proof read; saw $reads composer reads"
   [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a human's text must never be cleared"

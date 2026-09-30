@@ -586,7 +586,7 @@ Before that Enter, the adapter continues only when the selected composer shows t
 The payload is typed once.
 While the selected composer is empty or shows a prefix of the payload, the proof keeps reading it for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds (default 20), because a loaded host renders it well after the settle.
 A head-truncated suffix of the payload is refused and cleared on the read that shows it.
-Any other text is not this send's own, so it is refused on that read, never cleared, and reported `unknown`.
+Any other text is not this send's own, so it is refused on that read, never cleared, and reported `send-failed`, because Enter was never pressed.
 Every Herdr composer read of a pane whose native identity is Claude retains normal-intensity truecolor text regardless of its luminance, because recognized slash commands can be dark blue or muted grey.
 The lifecycle pre-send guard, the payload proof, and post-Enter confirmation therefore agree about a colored draft, and the guard refuses it by name.
 Dim or faint suggestions are still removed, and other harnesses retain their existing placeholder policy.

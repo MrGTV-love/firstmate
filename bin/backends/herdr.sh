@@ -3283,11 +3283,14 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # (Enter only, never retyped) until native agent-state, a cleared composer, or
 # fm_composer_queued_enter_verdict confirms delivery. When native identity is
 # Claude, text is typed only into an empty composer and Enter is sent only
-# after the composer shows the payload (fm_backend_herdr_composer_payload_shown).
-# A missing read, a shorter suffix, or a paste placeholder followed by a
-# literal remainder does not press Enter: the composer is cleared back to
-# empty and the verdict is send-failed, or unknown when the clear cannot be
-# verified. Other harnesses skip this proof. Verified hazard
+# after the composer shows the payload (fm_backend_herdr_composer_await_payload,
+# judged by fm_backend_herdr_composer_payload_progress). An empty or partly
+# drawn composer is read again until the payload shows or the bound runs out.
+# This send's own truncated text, or a payload that never showed, does not
+# press Enter: the composer is cleared back to empty and the verdict is
+# send-failed, or unknown when the clear cannot be verified. Text the send did
+# not type on its own does not press Enter either; it is never cleared, and the
+# verdict is send-failed. Other harnesses skip this proof. Verified hazard
 # (herdr-verification-p2.md "slash/$ autocomplete popup"): a `/`- or
 # `$`-prefixed send opens a completion popup within ~0.1s, exactly like tmux's
 # claude/codex popups, so the caller's <settle> before the first Enter matters
@@ -3545,8 +3548,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         return 0
         ;;
       2)
-        # A human's text is never cleared, and the typed payload may remain.
-        printf 'unknown'
+        printf 'send-failed'
         return 0
         ;;
     esac
