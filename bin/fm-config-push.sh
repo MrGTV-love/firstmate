@@ -129,6 +129,7 @@ errors=0
 # whose roles it resolves; an unavailable catalog is only a notice.
 index_check() {
   local harnesses harness selection root
+  FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles /dev/null >/dev/null || return 1
   harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$CONFIG/model-index.json" 2>/dev/null) || return 1
   for harness in $harnesses; do
     selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1

@@ -235,6 +235,20 @@ cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" |
 cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'dispatch profiles for a valid index were not pushed'
 [ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
   || fail 'the pushed pair must resolve its role in the secondmate home'
+# An index with no entries still has to be well formed to push.
+cp "$PUSH/sm/config/model-index.json" "$PUSH/prior-index.json"
+cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/prior-dispatch.json"
+for malformed in '{"version":1,"roles":{}}' '{"version":2,"roles":{},"retired":[]}'; do
+  printf '%s\n' "$malformed" > "$PUSH/home/config/model-index.json"
+  config_push "$CATALOGS"
+  assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' "a malformed empty index must be withheld: $malformed"
+  cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail "a malformed empty index reached the secondmate home: $malformed"
+  cmp -s "$PUSH/prior-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "dispatch profiles beside a malformed empty index reached the secondmate home: $malformed"
+done
+printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$PUSH/home/config/model-index.json"
+config_push "$CATALOGS"
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid empty index must push'
+cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'a valid empty index was not pushed'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0
