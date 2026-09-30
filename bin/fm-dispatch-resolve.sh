@@ -29,8 +29,8 @@
 #   Individual-account candidates bind through that library's quota_row join;
 #   an expanded provider with no matching row stays eligible but unranked, and
 #   omp's Codex pool ranks on its visible account as a lower bound, except that
-#   an exhausted or established-short reading leaves the pool unranked rather
-#   than vetoed. Ranking uses the spendPriority argmax over the matched
+#   an exhausted reading leaves the pool unranked rather than vetoed. Ranking
+#   uses the spendPriority argmax over the matched
 #   rule's candidates; a winner whose established projected runway is shorter
 #   than the task horizon (top-level `task_horizon_minutes`, default 240)
 #   escalates, while early or unknown projections are disclosed warnings. The model never sees quota, catalogs, approvals,
@@ -449,9 +449,9 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
     any($rows[]; runway_class(.) == "short") as $short |
     if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
-    elif $pooled and (($base.eligible | not) or ($ranked and $short)) then
+    elif $pooled and ($base.eligible | not) then
       {profile: $c, provider: $p, eligible: true, unranked: true,
-       reason: "omp Codex account pool is only lower-bounded by its visible account (\(if $ranked then "established runway shorter than the \(horizon_seconds / 60)-minute task horizon" else $base.reason end))"}
+       reason: "omp Codex account pool is only lower-bounded by its visible account (\($base.reason))"}
       + (if ($risks | length) > 0 then {warning: ($risks | join("; "))} else {} end)
     elif $ranked and ($risks | length) > 0 then
       $base + {warning: ($risks | join("; ")), short: $short}

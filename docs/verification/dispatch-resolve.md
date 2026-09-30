@@ -110,7 +110,7 @@ It proves the request uses the fixed endpoint and model, carries only the projec
 It proves a declared `min_confidence` is checked against the rule's own probability both as the pick and as a runner-up, a picked rule below it falls to the most probable runner-up that clears its floor, is `ambiguous` when none does or two tie, and that a file without declared floors keeps the global 0.6 floor on confidence unchanged.
 It proves the clear, fixed-floor ambiguous with candidate evidence, escalate (approval with candidate evidence, unverifiable rule floor, tie, nothing rankable), known rule-floor fall-through, known and unverifiable profile-floor evidence, explicit-provider and provider-ID enforcement, authoritative Agy and explicit-provider Gemini routing, partial providers, eligible unranked candidates and their clear-result note, concrete quota vetoes and profile-floor shortfalls taking precedence over uncertainty, account-wide quota veto, limiting-bound ranking, schema-6 account-row binding with schema-5 compatibility, missing-curl and quota-axi failures, HTTP 429 and 500, transport failure, malformed usage, zero-mass or malformed probabilities or confidence, malformed or duplicate profile, invalid selector, removed-option rejection, and out-of-range rule ID paths behave as the contract states, with configuration errors exiting 2 before any network call.
 It proves runway is judged against the task horizon: an `established` projection shorter than the default 240-minute or a declared `task_horizon_minutes` horizon on any applicable bound of the highest-ranked candidate (including a non-limiting exact-model bound) escalates with no profile, while `through_reset`, an established projection covering the horizon (including exactly at it), an `early` or absent-confidence projection, and `unknown` runway clear with any non-passing bound named in a candidate warning; `exhausted_now` always vetoes; a short winner is never replaced by a lower-ranked candidate in its rule, another rule, or the default array; and the horizon is never sent to the model.
-It proves an `omp` Codex pool ranks on its visible account through the same task-horizon classification (through-reset, established covering, early, and unknown readings clear), an established short or exhausted visible reading leaves the pool eligible but unranked with its warning and no veto, and a declared profile-floor shortfall still makes the pool not eligible.
+It proves an `omp` Codex pool ranks on its visible account through the same task-horizon classification (through-reset, established covering, early, and unknown readings clear, and an established short reading escalates rather than falling back to a lower-ranked candidate), an exhausted visible reading leaves the pool eligible but unranked with its warning and no veto, and a declared profile-floor shortfall still makes the pool not eligible.
 It proves an absent OpenRouter row and a credit-only OpenRouter row stay eligible but unranked, and that an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot is taken.
 `tests/fm-bootstrap.test.sh` proves bootstrap ignores resolver-only fields without the typed key, accepts a positive `task_horizon_minutes` and rejects a nonpositive one, validates each malformed shape when the environment or home `.env` activates typed resolution, and prevents an environment-provided key from reaching child processes.
 
@@ -125,12 +125,12 @@ Replayed 2026-09-30 offline, with no new model or quota call, from frozen inputs
 All four answers matched a rule whose only profile is an `omp` Codex-pool profile, at confidences 0.79, 0.92, 0.78, and 0.93.
 The snapshot's one Codex row read 60% remaining, `projected_exhaustion`, `usableRunwaySeconds` 80796 (about 22 hours), and `projectionConfidence` `early`.
 
-| Build | clear | escalate |
+| Snapshot | clear | escalate |
 | --- | --- | --- |
-| Before task-horizon calibration (pool never ranked) | 0 | 4 |
-| Task-horizon calibration for single accounts and the pool | 4 | 0 |
+| Frozen snapshot as generated (early projection, 80796 seconds) | 4 | 0 |
+| Same snapshot with an `established` projection of 3600 seconds | 0 | 4 |
 
 Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, since 22 hours exceeds the 240-minute horizon.
-The same snapshot with the Codex projection's `projectionConfidence` set to `established` and `usableRunwaySeconds` to 3600 escalated all four with `no rankable eligible candidate`.
+Each escalation named the `omp` profile as the highest-ranked candidate with established runway shorter than the 240-minute task horizon and emitted no profile.
 
 A live run needs a key and is not part of the suite; rerun the table above by pointing the tool at a brief with the key injected for that one command.
