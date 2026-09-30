@@ -132,10 +132,12 @@ remote_pane_exports() {
 }
 
 # Provision and register the remote route from the captain-facing primary.
-FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+if ! FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
   FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
-  remote_env "$ROOT/bin/fm-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects >/dev/null \
-  || fail "remote seed did not provision the route under test"
+  remote_env "$ROOT/bin/fm-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects > "$TMP_ROOT/seed.out" 2>&1; then
+  cat "$TMP_ROOT/seed.out" >&2
+  fail "remote seed did not provision the route under test"
+fi
 
 run_remote_launch() {  # <label>
   local label=$1
