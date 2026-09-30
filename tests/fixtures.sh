@@ -371,7 +371,8 @@ FM_TEST_TEAMCLAUDE_CA=/fm-test/teamclaude-ca.pem
 # cases. `teamclaude status` exits FM_FAKE_TEAMCLAUDE_STATUS (default 0);
 # `teamclaude env` prints the forward-proxy export lines the real command prints.
 # teamclaude appends its environment to FM_FAKE_TEAMCLAUDE_ENV_LOG, and claude
-# to FM_FAKE_CLAUDE_ENV_LOG, when those are set.
+# to FM_FAKE_CLAUDE_ENV_LOG (and its arguments to <that>.args), when those are
+# set.
 fm_test_fake_teamclaude() {
   local fakebin=$1
   cat > "$fakebin/teamclaude" <<SH
@@ -390,7 +391,10 @@ esac
 SH
   cat > "$fakebin/claude" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_FAKE_CLAUDE_ENV_LOG:-}" ] || env >> "$FM_FAKE_CLAUDE_ENV_LOG"
+[ -z "${FM_FAKE_CLAUDE_ENV_LOG:-}" ] || {
+  env >> "$FM_FAKE_CLAUDE_ENV_LOG"
+  printf '%s\n' "$@" >> "$FM_FAKE_CLAUDE_ENV_LOG.args"
+}
 exit 0
 SH
   chmod +x "$fakebin/teamclaude" "$fakebin/claude"

@@ -342,9 +342,10 @@
 #   secondmate reads this launching home's file; pins are never inherited.
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 # Claude launcher (config/claude-launcher):
-#   One token selecting the executable every claude template launch (ship,
-#   scout, secondmate, and relaunch) starts. Absent keeps today's bare
-#   `claude`; `teamclaude` starts bin/fm-teamclaude-launch.sh instead, which
+#   One token selecting the executable every claude launch (ship, scout,
+#   secondmate, relaunch, and a raw command whose harness is claude) starts.
+#   Absent keeps today's bare `claude`; `teamclaude` starts
+#   bin/fm-teamclaude-launch.sh instead, which
 #   applies the local TeamClaude proxy's client environment and then replaces
 #   itself with claude, so the proxy never depends on a pane shell alias.
 #   bin/fm-claude-launcher-lib.sh owns parsing and runs that wrapper's --check
@@ -354,8 +355,8 @@
 #   TEAMCLAUDE_CONFIG reaches only the wrapper's own teamclaude calls, as
 #   FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, so the pane reads the
 #   configuration the check read without changing Claude's environment; a
-#   relative one refuses. A raw launch command is the caller's own and is not
-#   rewritten. Inherited like config/claude-permission-mode.
+#   relative one refuses. A raw claude command runs, word for word, under the
+#   wrapper's --exec. Inherited like config/claude-permission-mode.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
 #     __BRIEF__    absolute path to data/<task-id>/brief.md
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
@@ -2295,7 +2296,7 @@ fi
 # config/claude-launcher (header above): prove the TeamClaude proxy before any
 # endpoint, worktree, or record exists.
 CLAUDE_LAUNCH_BIN=claude
-if [ "$RAW_LAUNCH" = 0 ] && [ "$HARNESS" = claude ]; then
+if [ "$HARNESS" = claude ]; then
   CLAUDE_LAUNCH_BIN=$(fm_claude_launcher_select "$CONFIG") || exit 1
 fi
 
@@ -5175,6 +5176,9 @@ LAUNCH=${LAUNCH//__CLAUDEPERMFLAG__/$CLAUDE_PERM_FLAG}
 # launcher setting existed; only the wrapper's path needs quoting.
 [ "$CLAUDE_LAUNCH_BIN" = claude ] || CLAUDE_LAUNCH_BIN=$(shell_quote "$CLAUDE_LAUNCH_BIN")
 LAUNCH=${LAUNCH//__CLAUDEBIN__/$CLAUDE_LAUNCH_BIN}
+if [ "$RAW_LAUNCH" = 1 ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
+  LAUNCH="$CLAUDE_LAUNCH_BIN --exec /bin/sh -c $(shell_quote "$LAUNCH")"
+fi
 if [ "$KEEP_AI_TRAILERS" = 1 ]; then
   LAUNCH=${LAUNCH//__CLAUDEATTRIBUTION__/}
 else

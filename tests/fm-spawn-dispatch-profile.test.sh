@@ -1955,22 +1955,41 @@ test_teamclaude_launcher_refusals_leave_no_task() {
   [ ! -s "$LAUNCH_LOG" ] || fail "a stopped TeamClaude proxy must not launch anything"
   assert_absent "$HOME_DIR/state/$id.meta" "a stopped TeamClaude proxy must refuse before the task record"
 
-  rm "$FAKEBIN_DIR/teamclaude"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 1 "$status" "a missing teamclaude must refuse the spawn"
-  assert_contains "$out" "TeamClaude is not installed" "the refusal must name the missing launcher"
-  [ ! -s "$LAUNCH_LOG" ] || fail "a missing teamclaude must not launch anything"
-  assert_absent "$HOME_DIR/state/$id.meta" "a missing teamclaude must refuse before the task record"
-
-  fm_test_fake_teamclaude "$FAKEBIN_DIR"
   printf 'proxy\n' > "$HOME_DIR/config/claude-launcher"
   out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 1 "$status" "an unknown launcher token must refuse the spawn"
   assert_contains "$out" "the only accepted value is teamclaude" "the refusal must name the accepted launcher value"
   assert_absent "$HOME_DIR/state/$id.meta" "an unknown launcher token must refuse before the task record"
-  pass "config/claude-launcher=teamclaude refuses a stopped proxy, a missing teamclaude, or an unknown token before any task exists"
+  pass "config/claude-launcher=teamclaude refuses a stopped proxy or an unknown token before any task exists"
+}
+
+# A raw launch command whose program is claude passes the same check and runs
+# word for word under the launcher, so claude gets the proxy and its own flags.
+test_teamclaude_launcher_proxies_a_raw_claude_launch() {
+  local rec id out status env_out
+  id=teamclaude-raw-z47
+  rec=$(make_teamclaude_case teamclaude-raw "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_TEAMCLAUDE_STATUS=1 \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 1 "$status" "a stopped TeamClaude proxy must refuse a raw claude launch"
+  assert_contains "$out" "proxy is not running" "the raw refusal must name the stopped proxy"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw claude launch must not launch anything"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused raw claude launch must leave no task record"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 0 "$status" "a raw claude launch should succeed while the proxy answers"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "raw claude launch"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the raw claude command must keep its own arguments: $(cat "$env_out.args" 2>/dev/null)"
+  pass "config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments"
 }
 
 test_teamclaude_config_paths_reach_only_teamclaude() {
@@ -2029,6 +2048,7 @@ test_absent_claude_launcher_keeps_the_direct_launch
 test_teamclaude_launcher_proxies_a_claude_secondmate_launch
 test_teamclaude_launcher_refusals_leave_no_task
 test_teamclaude_config_paths_reach_only_teamclaude
+test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
 
 echo "# all fm-spawn-dispatch-profile tests passed"
