@@ -96,7 +96,7 @@ Outside Pi's same-name built-in override collision described in [Pi compatibilit
 Calm's built-in wrappers preserve Pi's execution behavior.
 Input delivery, ordering, model context, session storage, diagnostics, and `/export` and `/share` operation remain unchanged.
 Every hidden Firstmate input remains available to the model and in serialized session data and exported artifacts.
-Legacy operational custom messages remain in session data and Pi's sidebar tree, although the main HTML transcript may omit them.
+Legacy operational custom messages remain in session data and Pi's sidebar tree, and newer Pi HTML exports keep them hidden by default with an explicit show/hide control.
 Toggling Calm off restores ordinary rendering, and `Ctrl+O` expansion state is preserved.
 
 ### What stays visible on Pi
