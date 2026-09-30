@@ -1,0 +1,33 @@
+Live validation of 051be1d (fix) vs a4d559e (base) against real Pi 0.99.1
+========================================================================
+Pi 0.99.1 came from an isolated npm prefix. The host global Pi (0.80.3) was not used or changed.
+All live Pi runs used a disposable lab home (bin/fm-lab-home.sh create) on a private tmux socket (tmux -L fm-lab).
+
+A. Real Pi 0.99.1 terminal, one saved session with fm_branch_outcomes {recent:14} (14-line result)
+   and fm_branch_processed {through:14} (error result).
+   Three runs: base extension, fix extension, stock Pi (same tool names, no custom renderer).
+
+   Byte compare of the ANSI pane capture (tmux capture-pane -e), region from the user row to the final reply:
+     collapsed, Calm off   : fix == stock (byte-identical) ; base != stock
+     expanded (Ctrl+O)     : fix == stock (byte-identical) ; base != stock
+     Calm on (/calm)       : fix shows 0 supervision rows (both tool rows and the error result hidden)
+     Calm off again (/calm): fix == stock expanded (byte-identical)
+     collapsed again       : fix == stock (byte-identical)
+
+   base vs stock text diff (this is the Pi 0.99 drift that CI reported):
+     5c5
+     <  fm_branch_outcomes
+     ---
+     >  fm_branch_outcomes recent=14
+     20c20
+     <  fm_branch_processed
+     ---
+     >  fm_branch_processed through=14
+
+B. Real Pi 0.99.1 /export from the fix run (Calm ON) and from the stock run, rendered in headless Chrome:
+     exported conversation DOM (#messages): fix == stock (byte-identical, 4611 bytes)
+
+C. Adversarial check of the new export-DOM browser probe (tests/fm-calm-pi-extension.test.sh),
+   using the real export that the E2E case produced on Pi 0.99.1:
+     untouched export                          -> probe result: passed
+     hidden Firstmate message forced visible   -> probe result: hidden custom entry is visible in the default conversation

@@ -1,0 +1,29 @@
+ Read the supervision outcomes.
+
+
+
+ fm_branch_outcomes
+   recent: 14
+ OUTCOME_LINE_01 seq=1 task=demo verdict=green
+ OUTCOME_LINE_02 seq=2 task=demo verdict=green
+ OUTCOME_LINE_03 seq=3 task=demo verdict=green
+ OUTCOME_LINE_04 seq=4 task=demo verdict=green
+ OUTCOME_LINE_05 seq=5 task=demo verdict=green
+ OUTCOME_LINE_06 seq=6 task=demo verdict=green
+ OUTCOME_LINE_07 seq=7 task=demo verdict=green
+ OUTCOME_LINE_08 seq=8 task=demo verdict=green
+ OUTCOME_LINE_09 seq=9 task=demo verdict=green
+ OUTCOME_LINE_10 seq=10 task=demo verdict=green
+ OUTCOME_LINE_11 seq=11 task=demo verdict=green
+ OUTCOME_LINE_12 seq=12 task=demo verdict=green
+ OUTCOME_LINE_13 seq=13 task=demo verdict=green
+ OUTCOME_LINE_14 seq=14 task=demo verdict=green
+
+
+
+ fm_branch_processed
+   through: 14
+ PROCESSED_ERROR: sequence 14 is past the read cursor
+
+
+ LIVE_RENDER_DONE
