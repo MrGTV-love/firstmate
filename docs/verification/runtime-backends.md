@@ -2234,7 +2234,7 @@ skip: installed Pi 0.81.1 predates the stock renderer contract 0.84.4 this case 
 ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.81.1
 ```
 
-That skip is the renderer case declining to render a verdict on a Pi older than the contract it compares against: since 0.84.4 the stock renderer no longer supplies an implicit reset at multiline boundaries and the extension emits that reset itself, so an older installed Pi differs legitimately.
+That skip is the renderer case declining to render a verdict on a Pi older than the contract it compares against: since 0.84.4 the stock renderer no longer supplies an implicit reset at multiline boundaries and the extension then emitted that reset itself, so an older installed Pi differs legitimately.
 It names the installed version and the floor rather than degrading quietly, and a package whose version cannot be read at all is still a failure.
 
 The same guard against the pre-change extension in the same lab measured a 676.9 ms worst keystroke echo while delivering two outcomes and a 295.3 ms worst echo with nothing to deliver, against a 49.2 ms extension-free floor, and failed as designed.

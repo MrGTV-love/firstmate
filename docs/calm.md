@@ -66,7 +66,7 @@ Calm hides these rows:
 - Collapsed thinking labels.
 - The mid-turn assistant working-note blocks governed by the [shared preservation rule](#shared-preservation-rule-for-assistant-text) above.
 - The shells for the Pi built-in tool names Calm owns.
-- The `fm_watch_arm_pi` and `fm_branch_outcomes` tool shells.
+- The `fm_watch_arm_pi`, `fm_branch_outcomes`, and `fm_branch_processed` tool shells.
 - Canonically classified Firstmate operational user rows.
 
 Pi applies the preservation rule independently to each text block.
