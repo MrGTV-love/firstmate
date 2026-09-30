@@ -54,31 +54,34 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fm-seed-diagnostics"
           real_git=$(command -v git)
           real_rm=$(command -v rm)
+          real_strace=$(command -v strace)
+          real_date=$(command -v date)
+          real_cat=$(command -v cat)
           {
             printf '#!/usr/bin/env bash\n'
-            printf 'real_git=%q\nlogs=%q\n' "$real_git" "$RUNNER_TEMP/fm-seed-diagnostics"
+            printf 'real_git=%q\nreal_strace=%q\nreal_date=%q\nreal_cat=%q\nlogs=%q\n' "$real_git" "$real_strace" "$real_date" "$real_cat" "$RUNNER_TEMP/fm-seed-diagnostics"
             cat <<'SH'
           if [ "${1:-}" != clone ]; then exec "$real_git" "$@"; fi
           trace="$logs/clone-$$.trace"
           printf -v args '%q ' "$@"
-          printf '%s git pid=%s ppid=%s args=%s\n' "$(date +%s.%N)" "$$" "$PPID" "$args" >> "$logs/clone.calls"
-          strace -f -tt -s 512 -e trace=%file,%process -o "$trace" "$real_git" "$@"
+          printf '%s git pid=%s ppid=%s args=%s\n' "$("$real_date" +%s.%N)" "$$" "$PPID" "$args" >> "$logs/clone.calls"
+          "$real_strace" -f -tt -s 512 -e trace=%file,%process -o "$trace" "$real_git" "$@"
           rc=$?
           if [ "$rc" -ne 0 ]; then
             printf 'FAILED CLONE rc=%s args=%s trace=%s\n' "$rc" "$args" "$trace" >&2
-            cat "$trace" >&2
+            "$real_cat" "$trace" >&2
           fi
           exit "$rc"
           SH
           } > bin/git
           {
             printf '#!/usr/bin/env bash\n'
-            printf 'real_rm=%q\nlogs=%q\n' "$real_rm" "$RUNNER_TEMP/fm-seed-diagnostics"
+            printf 'real_rm=%q\nreal_strace=%q\nreal_date=%q\nlogs=%q\n' "$real_rm" "$real_strace" "$real_date" "$RUNNER_TEMP/fm-seed-diagnostics"
             cat <<'SH'
           trace="$logs/rm-$$.trace"
           printf -v args '%q ' "$@"
-          printf '%s rm pid=%s ppid=%s args=%s\n' "$(date +%s.%N)" "$$" "$PPID" "$args" >> "$logs/rm.calls"
-          exec strace -f -tt -s 512 -e trace=%file,%process -o "$trace" "$real_rm" "$@"
+          printf '%s rm pid=%s ppid=%s args=%s\n' "$("$real_date" +%s.%N)" "$$" "$PPID" "$args" >> "$logs/rm.calls"
+          exec "$real_strace" -f -tt -s 512 -e trace=%file,%process -o "$trace" "$real_rm" "$@"
           SH
           } > bin/rm
           chmod +x bin/git bin/rm
