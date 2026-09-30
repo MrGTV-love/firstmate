@@ -137,7 +137,17 @@ fi
 command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
 trap 'rm -f "$RULES"' EXIT
+MODEL_CONFIG=$(mktemp -d) || die "mktemp failed"
+trap 'rm -f "$RULES"; rm -rf "$MODEL_CONFIG"' EXIT
+if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
+  cp "$CONFIG/model-index.json" "$MODEL_CONFIG/model-index.json" || die "could not snapshot model index"
+fi
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
+jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON)"
+# Resolve roles against the frozen index offline; live catalogs are checked only
+# after the never-send filter permits this intake to reach the network.
+RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES" --schema-only) || die "model index/profile resolution failed"
+printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
@@ -243,7 +253,7 @@ RESP_FILE=$(mktemp) || die "mktemp failed"
 QUOTA=$(mktemp) || { rm -f "$RESP_FILE"; die "mktemp failed"; }
 TASK_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA"; die "mktemp failed"; }
 SEND_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA" "$TASK_TEXT"; die "mktemp failed"; }
-trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"' EXIT
+trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$MODEL_CONFIG"' EXIT
 
 never_send_off() {
   echo "dispatch-resolve: off ($1; nothing sent)" >&2
@@ -320,6 +330,7 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
+  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES" >/dev/null || die "model index/catalog validation failed"
   T0=$(fm_timing_now_ms)
   HTTP=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code}' \
     -X POST "$TS_BASE/v1/systemone" -H 'Content-Type: application/json' \

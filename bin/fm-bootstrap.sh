@@ -1029,7 +1029,7 @@ EOF
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses typed_key typed_active=false
+  local file err verified_harnesses resolved typed_key typed_active=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1038,6 +1038,10 @@ crew_dispatch_validate() {
   fi
   if ! jq -e . "$file" >/dev/null 2>&1; then
     echo "CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON"
+    return 0
+  fi
+  if ! resolved=$("$SCRIPT_DIR/fm-model-index.sh" profiles "$file" --schema-only 2>&1); then
+    echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $resolved"
     return 0
   fi
   typed_key=$TYPESAFE_API_KEY_PRIVATE
@@ -1137,7 +1141,7 @@ crew_dispatch_validate() {
         else empty
         end
     end
-  ' "$file" 2>/dev/null || true)
+  ' <<< "$resolved" 2>/dev/null || true)
   if [ -n "$err" ]; then
     echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $err"
     return 0
@@ -1159,7 +1163,7 @@ crew_dispatch_validate() {
       + [(.rules // [])[]? | "BOOTSTRAP_INFO: crew dispatch rule: " + (.when | tostring) + " -> " + profile_set(.use; .select?)]
       + (if has("default") then ["BOOTSTRAP_INFO: crew dispatch default: " + profile_set(.default; null)] else [] end))
     | .[]
-  ' "$file"
+  ' <<< "$resolved"
   fi
 }
 

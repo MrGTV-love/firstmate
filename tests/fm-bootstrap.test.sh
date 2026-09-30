@@ -1239,6 +1239,23 @@ ROWS
   pass "bootstrap gates resolver fields and additive harnesses on the typed key"
 }
 
+test_model_roles_preserve_offline_bootstrap() {
+  local case_dir fakebin out
+  case_dir="$TMP_ROOT/model-index-offline"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' '{"version":1,"roles":{"native":{"pi":{"model":"codex-native/current"}}},"retired":[]}' > "$case_dir/home/config/model-index.json"
+  printf '%s\n' '{"default":{"harness":"pi","role":"native","effort":"ultra","provider":"codex"}}' > "$case_dir/home/config/crew-dispatch.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  add_real_jq "$fakebin"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_MODEL_CATALOG_DIR="$case_dir/absent-catalogs" FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "offline role inspection must validate native effort without fetching catalogs: $out"
+  pass "bootstrap resolves model roles for effort validation without a catalog or network request"
+}
+
+test_model_roles_preserve_offline_bootstrap
 test_bootstrap_reporting
 test_no_mistakes_min_version
 test_gh_axi_min_version

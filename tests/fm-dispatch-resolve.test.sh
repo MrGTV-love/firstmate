@@ -1000,4 +1000,45 @@ expect_code 0 "$code" "--help exits 0"
 assert_contains "$out" 'Usage:' "--help prints usage"
 pass "configuration errors exit 2 before any network call"
 
+# Role resolution feeds concrete model ids into quota matching and publication.
+cp "$BASE_RULES" "$RULES"
+write_quota "$QUOTA" 0.7597
+write_response "$RESPONSE" rule_4 0.9
+mkdir -p "$TMP_ROOT/model-catalogs"
+printf '%s\n' '{"models":[{"id":"cursor-grok-4.6-medium"}]}' > "$TMP_ROOT/model-catalogs/cursor.json"
+printf '%s\n' '{"version":1,"roles":{"routine":{"cursor":{"model":"cursor-grok-4.6-medium"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+jq '.rules[3].use[1] |= (del(.model) | .role = "routine")' "$BASE_RULES" > "$RULES"
+# Withheld intakes must not even try to read live catalog exports.
+printf '%s\n' 'New feature work on the app.' > "$HOME_DIR/config/dispatch-never-send"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/absent-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "never-send suppresses catalog validation as well as the rule request"
+[ -z "$out" ] || fail "withheld indexed intake emitted a profile: $out"
+assert_contains "$err" 'dispatch-resolve: off' "withheld indexed intake must stay off"
+assert_absent "$LOG/argv" "withheld indexed intake must not reach a request"
+rm "$HOME_DIR/config/dispatch-never-send"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "role-based typed intake resolves"
+assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "typed intake publishes a concrete id"
+# An index edit during the rule request cannot change this intake's resolved id.
+cp "$HOME_DIR/config/model-index.json" "$TMP_ROOT/original-index.json"
+jq '.roles.routine.cursor.model = "new-model-not-in-catalog"' "$TMP_ROOT/original-index.json" > "$TMP_ROOT/changed-index.json"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY \
+  FAKE_CURL_MUTATE_SOURCE="$TMP_ROOT/changed-index.json" FAKE_CURL_MUTATE_TARGET="$HOME_DIR/config/model-index.json" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "in-flight index edit must not re-resolve the role"
+assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "intake must keep the id resolved from its frozen index"
+cp "$TMP_ROOT/original-index.json" "$HOME_DIR/config/model-index.json"
+# A role and a literal that resolve to the same candidate remain duplicates.
+jq '.rules[3].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$RULES" > "$TMP_ROOT/duplicate-role.json"
+mv "$TMP_ROOT/duplicate-role.json" "$RULES"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 2 "$code" "duplicate concrete role/literal profiles refuse intake"
+assert_absent "$LOG/argv" "duplicate candidates must refuse before the rule request"
+rm "$HOME_DIR/config/model-index.json"
+pass "typed intake resolves roles before quota ranking and detects concrete duplicates"
+
 printf '# all fm-dispatch-resolve tests passed\n'
