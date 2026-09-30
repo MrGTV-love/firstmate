@@ -140,6 +140,20 @@ case "${1:-}" in
       exit 1
     fi
     [ -f "$D/windows" ] && cat "$D/windows"; exit 0 ;;
+  show-environment)
+    knob=FM_FAKE_TMUX_ENV_
+    for a in "$@"; do
+      [ "$a" = -g ] && knob=FM_FAKE_TMUX_GLOBAL_ENV_
+    done
+    name=${!#}
+    knob=$knob$name
+    [ -n "${!knob+x}" ] || exit 1
+    if [ "${!knob}" = - ]; then
+      printf -- '-%s\n' "$name"
+    else
+      printf '%s=%s\n' "$name" "${!knob}"
+    fi
+    exit 0 ;;
   new-session)
     # Nothing in the relaunch path may ever create a session; recording the
     # call is how a refusal test proves that.
@@ -831,6 +845,58 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   assert_contains "$(cat "$dir/fake/literal")" "Firstmate operational input waiting: read" \
     "the replacement agent should have been launched"
   pass "fm-control relaunch: a recorded api_key=allow opt-in is carried to the replacement launch"
+}
+
+test_api_key_guard_refuses_before_stop() {
+  local dir out rc id=rl-key-refuse
+  dir=$(new_case key-refuse "$id")
+  add_ship_task "$dir" "$id" claude
+  out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-test-token run_control "$dir" "$id" relaunch --note "guarded"); rc=$?
+  expect_code 1 "$rc" "a key must refuse the replacement before stopping the worker"
+  assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" "the refusal names the credential variable"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a guard refusal must leave the original worker running"
+  [ ! -s "$dir/fake/literal" ] || fail "a guard refusal must not send lifecycle input"
+  pass "fm-control relaunch refuses a credential before stopping the original worker"
+}
+
+test_api_key_guard_uses_replacement_profile() {
+  local dir out rc id=rl-key-profile
+  dir=$(new_case key-profile "$id")
+  add_ship_task "$dir" "$id" claude
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key run_control "$dir" "$id" relaunch --harness codex --note "switch runner"); rc=$?
+  expect_code 0 "$rc" "a non-Claude replacement must not be refused for a Claude credential"$'\n'"$out"
+  pass "fm-control checks the replacement harness rather than the previous harness"
+
+  dir=$(new_case key-pin rl-key-pin)
+  add_ship_task "$dir" rl-key-pin claude
+  make_claude_auth_stub "$dir"
+  mkdir -p "$dir/home/config" "$dir/work"
+  : > "$dir/work/.credentials.json"
+  printf '%s\n' "$dir/work" > "$dir/home/config/claude-account"
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key run_control "$dir" rl-key-pin relaunch --note "pinned"); rc=$?
+  expect_code 0 "$rc" "a pin that sheds the key must permit relaunch"$'\n'"$out"
+  pass "fm-control honors the replacement account pin's credential shed"
+
+  dir=$(new_case key-allowlist rl-key-allowlist)
+  add_ship_task "$dir" rl-key-allowlist claude
+  mkdir -p "$dir/home/config"
+  printf '%s\n' HOME PATH > "$dir/home/config/launch-env-allowlist"
+  out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-test-token run_control "$dir" rl-key-allowlist relaunch --note "filtered"); rc=$?
+  expect_code 0 "$rc" "an allowlist that filters the token must permit relaunch"$'\n'"$out"
+  pass "fm-control honors the replacement launch allowlist"
+}
+
+test_api_key_guard_refuses_tmux_key_before_stop() {
+  local dir out rc id=rl-key-tmux
+  dir=$(new_case key-tmux "$id")
+  add_ship_task "$dir" "$id" claude
+  out=$(FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-server-key \
+    run_control "$dir" "$id" relaunch --note "guarded"); rc=$?
+  expect_code 1 "$rc" "a tmux-only key must refuse before stopping the worker"
+  assert_contains "$out" "ANTHROPIC_API_KEY is set in the tmux global environment" \
+    "the refusal must identify the tmux scope"
+  [ ! -s "$dir/fake/literal" ] || fail "a tmux key refusal must not send lifecycle input"
+  pass "fm-control checks tmux environment before stopping the original worker"
 }
 
 test_spawn_relaunch_without_the_opt_in_drops_the_recorded_api_key() {
@@ -2436,6 +2502,9 @@ test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch
 test_recorded_api_key_opt_in_follows_the_relaunch
+test_api_key_guard_refuses_before_stop
+test_api_key_guard_uses_replacement_profile
+test_api_key_guard_refuses_tmux_key_before_stop
 test_spawn_relaunch_without_the_opt_in_drops_the_recorded_api_key
 test_explicit_model_wins_over_the_recorded_one
 test_relaunch_onto_an_unverified_harness_is_refused

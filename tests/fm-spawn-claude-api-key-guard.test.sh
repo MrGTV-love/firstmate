@@ -265,34 +265,70 @@ test_tmux_env_follows_the_allowlist() {
   assert_contains "$out" "ANTHROPIC_API_KEY is set in the tmux global environment" \
     "the refusal should name the forwarded variable"
   pass "claude spawn tmux-environment check follows config/launch-env-allowlist"
-# Test 9: the launch command includes env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
-# for a non-opt-in claude spawn (R3-1 guard-env-shed).
-test_launch_includes_env_unset() {
-  local rec out status launchtext
-  rec=$(make_case launch-includes-env-unset claude launch-includes-env-unset-a1)
-  read_case "$rec"
-  out=$(run_case_spawn launch-includes-env-unset-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
-  status=$?
-  [ "$status" -eq 0 ] || fail "claude spawn should succeed"$'\n'"$out"
-  launchtext=$(cat "$LAUNCH_LOG")
-  assert_contains "$launchtext" 'env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN' \
-    "launch command should include env -u to strip credential variables"
-  pass "claude launch command includes env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN"
 }
 
-# Test 10: launch command does NOT include the env -u prefix when --allow-api-key is set.
-test_launch_no_env_unset_with_allow_flag() {
-  local rec out status launchtext
-  rec=$(make_case launch-no-env-unset claude launch-no-env-unset-a1)
+# Execute the generated launch in a synthetic pane, which may have a captured
+# credential that is absent from the spawning process and tmux server.
+observe_launch() {
+  cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/usr/bin/env bash
+printf 'API_KEY=%s\nAUTH_TOKEN=%s\n' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > "$FM_OBSERVED"
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
+    FM_OBSERVED="$CASE_DIR/observed" ANTHROPIC_API_KEY=sk-ant-pane-only \
+    ANTHROPIC_AUTH_TOKEN=sk-ant-pane-token bash -c "$(cat "$LAUNCH_LOG")" \
+    || fail "synthetic pane could not execute the Claude launch"
+}
+
+# A credential captured by an old pane must be shed for a non-opt-in launch.
+test_launch_sheds_captured_credentials() {
+  local rec out status
+  rec=$(make_case launch-sheds-captured claude launch-sheds-captured-a1)
   read_case "$rec"
-  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
-    run_case_spawn launch-no-env-unset-a1 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
+  out=$(run_case_spawn launch-sheds-captured-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "claude spawn should succeed"$'\n'"$out"
+  observe_launch
+  assert_grep 'API_KEY=unset' "$CASE_DIR/observed" "the pane's API key must not reach Claude"
+  assert_grep 'AUTH_TOKEN=unset' "$CASE_DIR/observed" "the pane's auth token must not reach Claude"
+  pass "a non-opt-in launch sheds credentials captured by the pane"
+}
+
+# An explicit billing opt-in must allow the pane's credentials through.
+test_launch_preserves_credentials_with_opt_in() {
+  local rec out status
+  rec=$(make_case launch-opt-in claude launch-opt-in-a1)
+  read_case "$rec"
+  out=$(run_case_spawn launch-opt-in-a1 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "claude spawn with --allow-api-key should succeed"$'\n'"$out"
-  launchtext=$(cat "$LAUNCH_LOG")
-  assert_not_contains "$launchtext" 'env -u ANTHROPIC_API_KEY' \
-    "launch command should NOT include env -u when --allow-api-key is set"
-  pass "claude launch command omits env -u when --allow-api-key is used"
+  observe_launch
+  assert_grep 'API_KEY=sk-ant-pane-only' "$CASE_DIR/observed" "the opted-in pane API key should reach Claude"
+  assert_grep 'AUTH_TOKEN=sk-ant-pane-token' "$CASE_DIR/observed" "the opted-in pane token should reach Claude"
+  pass "an opted-in launch passes credentials captured by the pane"
+}
+
+# Exercise the shared guard's non-tmux backend without starting Herdr.
+test_non_tmux_guard() {
+  local out status
+  # shellcheck source=bin/fm-api-key-guard-lib.sh
+  . "$ROOT/bin/fm-api-key-guard-lib.sh"
+  out=$(ANTHROPIC_API_KEY=sk-ant-herdr-test \
+    fm_api_key_guard claude 0 '' 0 '' herdr 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an inherited API key"
+  assert_contains "$out" "ANTHROPIC_API_KEY" "the refusal should identify the API key"
+  out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-herdr-test \
+    fm_api_key_guard claude 0 '' 0 '' herdr 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "the Herdr Claude guard must refuse an inherited auth token"
+  assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" "the refusal should identify the auth token"
+  ANTHROPIC_API_KEY=sk-ant-herdr-test fm_api_key_guard claude 1 '' 0 '' herdr \
+    || fail "an explicit API billing opt-in must permit the Herdr launch"
+  ANTHROPIC_API_KEY=sk-ant-herdr-test fm_api_key_guard claude 0 '' 1 'HOME' herdr \
+    || fail "a filtered-out key must not refuse the Herdr launch"
+  pass "the shared guard enforces non-tmux Claude keys and respects opt-in and filtering"
 }
 
 # --- run --------------------------------------------------------------------
@@ -310,5 +346,6 @@ test_refuse_tmux_global_env
 test_succeed_tmux_session_removal_marker
 test_succeed_tmux_env_with_pin_shed
 test_tmux_env_follows_the_allowlist
-test_launch_includes_env_unset
-test_launch_no_env_unset_with_allow_flag
+test_launch_sheds_captured_credentials
+test_launch_preserves_credentials_with_opt_in
+test_non_tmux_guard

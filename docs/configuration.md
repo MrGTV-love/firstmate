@@ -1001,6 +1001,8 @@ The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
 The same pin and allowlist exemptions apply.
 Variables that the pane shell's rc files or a direnv `.envrc` export after the window opens are not detected.
+Before stopping a worker, `fm-control.sh relaunch` checks the replacement harness, account pin, launch allowlist, and tmux environment against the same guard.
+A non-opt-in Claude launch also unsets both Anthropic credential variables in the worker command, so keys captured by an existing pane cannot reach Claude even though the preflight cannot inspect that pane's private environment.
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the guard mechanics and `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
 

@@ -533,24 +533,11 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
-if ! LAUNCH_ENV_ENABLED=$(fm_config_source_present "$CONFIG/launch-env-allowlist"); then
-  exit 1
-fi
-LAUNCH_ENV_NAMES=
-if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  if [ ! -f "$CONFIG/launch-env-allowlist" ] || [ ! -r "$CONFIG/launch-env-allowlist" ]; then
-    echo "error: config/launch-env-allowlist must be a readable regular file" >&2
-    exit 1
-  fi
-  if ! LAUNCH_ENV_NAMES=$(jq -Rrs '
-    split("\n") | map(select(. != "" and (startswith("#") | not))) |
-    if all(.[]; test("^[A-Za-z_][A-Za-z0-9_]*$")) then .[]
-    else error("expected environment names only") end
-  ' "$CONFIG/launch-env-allowlist" 2>/dev/null); then
-    echo "error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments" >&2
-    exit 1
-  fi
-fi
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
+fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
+LAUNCH_ENV_ENABLED=$FM_API_KEY_LAUNCH_ENV_ENABLED
+LAUNCH_ENV_NAMES=$FM_API_KEY_LAUNCH_ENV_NAMES
 # config/claude-permission-mode (header above): resolved once per spawn or
 # relaunch, before any mutation, so a malformed file refuses instead of
 # launching a worker on a permission posture the captain did not choose.
@@ -2410,9 +2397,6 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
     unset CLAUDE_CONFIG_DIR
   fi
 fi
-
-# shellcheck source=bin/fm-api-key-guard-lib.sh
-. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
 # key would reach the worker, unless the caller explicitly opts in with
@@ -5171,12 +5155,9 @@ if [ -n "$WORKER_ACCOUNT" ]; then
 elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi
-# R3-1: For every claude launch that does not have the api_key=allow opt-in,
-# strip the Anthropic credential variables from the worker environment using
-# the same env -u mechanism as the worker-account pin shed. This closes the
-# gap where a key set in an existing tmux pane's captured environment would
-# reach the worker undetected by the spawning-env and tmux-environment checks.
-# See docs/configuration.md "Claude API key guard" for the known gaps.
+# A pre-existing pane may have captured credentials absent from the spawning
+# process and tmux server. Shed both variables for a non-opt-in Claude worker;
+# a worker-account pin already applies the same shed to its launch command.
 if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$WORKER_ACCOUNT" ]; then
   LAUNCH="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $LAUNCH"
 fi

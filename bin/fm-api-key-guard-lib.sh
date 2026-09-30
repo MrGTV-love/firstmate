@@ -1,17 +1,42 @@
 # shellcheck shell=bash
 # Shared Claude API key guard check for firstmate spawns and relaunches.
-# Usage: . bin/fm-api-key-guard-lib.sh   (after FM_HOME and CONFIG are set)
+# Usage: source after bin/fm-config-inherit-lib.sh is available.
 #
-# This is the one implementation of "refuse to launch a Claude worker when an
-# Anthropic API key would reach it" used by every entry point:
-#   - bin/fm-spawn.sh runs the full check including the tmux pane environment.
-#   - bin/fm-control.sh runs a pre-check before stopping the running agent so
-#     the guard does not cost a working worker.
+# This is the shared preflight for refusing a Claude worker when an Anthropic
+# credential could be inherited without deliberate API billing:
+#   - bin/fm-spawn.sh checks before creating a worker.
+#   - bin/fm-control.sh checks before stopping the current worker for relaunch.
 #
-# The guard reads the spawning process's own environment and, optionally, the
-# tmux pane environment. It does NOT detect pane rc files or direnv exports.
+# It reads the invoking environment and, on tmux, the effective session/global
+# environment. Existing panes can hold older values; the launch command sheds
+# both credential variables when billing has not been opted into.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
+
+# fm_api_key_guard_launch_env_config <config-dir>
+# Reads the same allowlist used to construct the launch, setting
+# FM_API_KEY_LAUNCH_ENV_ENABLED and FM_API_KEY_LAUNCH_ENV_NAMES.
+fm_api_key_guard_launch_env_config() {
+  local config=$1
+  FM_API_KEY_LAUNCH_ENV_ENABLED=$(fm_config_source_present "$config/launch-env-allowlist") || return 1
+  FM_API_KEY_LAUNCH_ENV_NAMES=
+  if [ "$FM_API_KEY_LAUNCH_ENV_ENABLED" = 1 ]; then
+    if [ ! -f "$config/launch-env-allowlist" ] || [ ! -r "$config/launch-env-allowlist" ]; then
+      echo "error: config/launch-env-allowlist must be a readable regular file" >&2
+      return 1
+    fi
+    # Output is consumed by fm-spawn and fm-control after sourcing this library.
+    # shellcheck disable=SC2034
+    if ! FM_API_KEY_LAUNCH_ENV_NAMES=$(jq -Rrs '
+      split("\n") | map(select(. != "" and (startswith("#") | not))) |
+      if all(.[]; test("^[A-Za-z_][A-Za-z0-9_]*$")) then .[]
+      else error("expected environment names only") end
+    ' "$config/launch-env-allowlist" 2>/dev/null); then
+      echo "error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments" >&2
+      return 1
+    fi
+  fi
+}
 
 # fm_api_key_guard <harness> <allow_api_key> <worker_account> <launch_env_enabled> <launch_env_names> [backend]
 # Returns:
