@@ -18,7 +18,7 @@
 #   fm-procevent.sh extension-retirement <binding|transfer> <retirement-arguments...>
 #   fm-procevent.sh extension-bind <bind|receive-transfer-bind> <binding-arguments...>
 #   fm-procevent.sh extension-process-event <process-event-arguments...>
-#   fm-procevent.sh list
+#   fm-procevent.sh list [--age]
 #
 # register   Record a built-in source: its adapter, its canonical id, and the
 #            exact argv to execute. argv is stored one argument per line and
@@ -120,6 +120,8 @@
 #            Serialize tracked binding publication against extension resolution,
 #            registration publication, and retirement in this home.
 # list       Show registered sources, owners, and pending captured results.
+#            --age adds registration age in seconds for deliberate retirement;
+#            age never retires a source automatically.
 #
 # Terminal knowledge is adapter-owned. This runner never inspects a result and
 # never names an adapter-specific status: built-ins keep the existing
@@ -170,14 +172,15 @@
 # go silent. An unhandled result stays eligible for bounded re-announcement on
 # every reconcile in both modes, exactly as before.
 #
-# Polling again is adapter-owned through the same kind of seam. An adapter that
-# answers exit 0 to `bin/fm-procevent-<adapter>.sh relisten` keeps this runner
-# and its claim across an empty result and across a capture, and the runner
-# polls the registration that claim still owns. It adopts a replacement
-# registration only when that same claim still owns it and the registered
-# command is unchanged. A missing command, an error, or any other exit releases
-# the claim after that one result, exactly as before. The runner still does not
-# refresh the owner lease, so a home that has gone still ends the poll.
+# Polling again is adapter-owned through the same kind of seam. Exit 0 from
+# `bin/fm-procevent-<adapter>.sh relisten` keeps this runner and its claim after
+# an empty wait or handled capture. For an unhandled firstmate-owned capture,
+# `relisten <result-file>` must explicitly accept that result; adapters exposing
+# only the no-argument command retain their stop-until-handled behavior.
+# Task-owned open rounds never take this unhandled continuation.
+# The runner adopts a replacement registration only when the command is
+# unchanged and the claim still belongs to it. Any other verdict releases the
+# claim. The runner never refreshes its own home lease.
 #
 # Keyed captain answers from built-in adapters use one more seam of the same kind,
 # and this runner still decides nothing about them. Some sources carry the
@@ -1080,7 +1083,7 @@ cmd_start() {
     [ "$extension_owner" -eq 0 ] || return 1
     script=$(adapter_script "$adapter")
     [ -f "$script" ] && [ ! -L "$script" ] || return 1
-    "$script" relisten >/dev/null 2>&1 || return 1
+    "$script" relisten "$@" >/dev/null 2>&1 || return 1
     registration=$(source_file "$id")
     [ -f "$registration" ] && [ ! -L "$registration" ] || return 1
     fm_procevent_source_lock_acquire "$id" || return 1
@@ -1400,8 +1403,10 @@ EOF
     fm_procevent_claim_capture_reservation_remove_locked || true
     exec 6<&-
   fi
-  if [ "$handled_capture" -eq 1 ] && adopt_relisten; then
-    continue
+  if [ "$handled_capture" -eq 1 ]; then
+    adopt_relisten && continue
+  elif [ -z "$task_owner" ]; then
+    adopt_relisten "$durable" && continue
   fi
   break
   done
@@ -2400,13 +2405,23 @@ cmd_sweep_home() {
 }
 
 cmd_list() {
-  local rec id adapter owner pending claim_state kind task
+  local rec id adapter owner pending claim_state kind task show_age=0 now born age
+  case "$#" in
+    0) ;;
+    1) [ "$1" = --age ] || usage; show_age=1 ;;
+    *) usage ;;
+  esac
   owner_lease_refresh
   if ! fm_procevent_any_registered "$STATE"; then
     printf 'no sources registered\n'
     return 0
   fi
-  printf '%-28s %-12s %-10s %s\n' SOURCE ADAPTER OWNER PENDING
+  if [ "$show_age" -eq 1 ]; then
+    now=$(date +%s)
+    printf '%-28s %-12s %-10s %s %s\n' SOURCE ADAPTER OWNER PENDING AGE_SECONDS
+  else
+    printf '%-28s %-12s %-10s %s\n' SOURCE ADAPTER OWNER PENDING
+  fi
   for rec in "$REG"/*.source; do
     [ -e "$rec" ] || continue
     id=${rec##*/}; id=${id%.source}
@@ -2443,7 +2458,17 @@ cmd_list() {
         owner="task:$task/dead"
       fi
     fi
-    printf '%-28s %-12s %-10s %s\n' "$id" "$adapter" "$owner" "$pending"
+    if [ "$show_age" -eq 1 ]; then
+      born=$(fm_path_mtime "$rec" 2>/dev/null || true)
+      age=unknown
+      case "$born" in
+        ''|*[!0-9]*) ;;
+        *) age=$((now - born)); [ "$age" -ge 0 ] || age=0 ;;
+      esac
+      printf '%-28s %-12s %-10s %s %s\n' "$id" "$adapter" "$owner" "$pending" "$age"
+    else
+      printf '%-28s %-12s %-10s %s\n' "$id" "$adapter" "$owner" "$pending"
+    fi
   done
 }
 

@@ -1680,3 +1680,68 @@ test_host_crash_is_retried_then_reported
 test_arguments_never_arm
 test_fm_lock_status_still_works_with_shared_lib
 test_stands_down_only_on_pi_code_transcript_path
+
+# Mid-turn result delivery uses the same primary and session-owner boundary,
+# but it must neither arm supervision nor consume the pending review.
+POST_HOME=$(make_primary_dir "$TMP_ROOT/posttool")
+posttool() {
+  local payload=${1:-'{"session_id":"posttool"}'}
+  printf '%s\n' "$payload" \
+    | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$1/bin/fm-procevent-posttool-check.sh"
+      ' _ "$ROOT"
+}
+[ -z "$(posttool)" ] || fail "empty PostToolUse emitted a notice"
+mkdir -p "$POST_HOME/state/procevent-inbox"
+POST_BASE="$POST_HOME/state/procevent-inbox/lavish-review.1"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,review answer\n' > "$POST_BASE.result"
+printf 'lavish\n' > "$POST_BASE.adapter"
+post_notice=$(posttool)
+[ "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] \
+  || fail "pending review did not use Claude additional-context output"
+assert_contains "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')" \
+  "bin/fm-wake-drain.sh" "pending review directs immediate durable handling"
+assert_absent "$POST_HOME/state/.wake-queue" "the fixture models capture before publication"
+post_context=$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')
+post_read_command=$(printf '%s' "$post_context" | perl -0777 -ne \
+  'm{(bin/fm-procevent-lavish\.sh read .*)\. Handle the feedback,}s and print $1')
+[ -n "$post_read_command" ] || fail "unpublished capture has no executable recovery command"
+post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE FM_ROOT_OVERRIDE="$POST_HOME" bash -c "$post_read_command") \
+  || fail "recovery command depends on FM_HOME being exported to the tool"
+assert_contains "$post_read_out" "review answer" "recovery reads the actual unpublished answer"
+assert_contains "$post_context" 'handled lavish-review 1' \
+  "the notice identifies the exact durable acknowledgement"
+[ -z "$(cat "$POST_HOME/state/arm-ran" 2>/dev/null || true)" ] \
+  || fail "PostToolUse launched supervision instead of giving context"
+[ ! -e "$POST_BASE.handled" ] || fail "PostToolUse acknowledged a review without handling it"
+[ -n "$(posttool)" ] || fail "unhandled review became invisible after its first notice"
+printf 'worker-1\n' > "$POST_BASE.owner-task"
+[ -z "$(posttool)" ] || fail "worker-owned review leaked to the primary"
+rm -f "$POST_BASE.owner-task"
+printf 'other\n' > "$POST_BASE.adapter"
+[ -z "$(posttool)" ] || fail "non-Lavish capture was described as review feedback"
+printf 'lavish\n' > "$POST_BASE.adapter"
+mkdir -p "$POST_HOME/state/procevent"
+printf 'adapter=lavish\nargc=1\nargv:\n/bin/true\n' > "$POST_HOME/state/procevent/lavish-review.source"
+printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
+for post_payload in '{"cursor_version":"2026.09"}' '{"transcript_path":"/home/test/.pi/sessions/test.jsonl"}'; do
+  [ -z "$(posttool "$post_payload")" ] || fail "foreign host received Claude review feedback"
+  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "foreign host refreshed the primary lease"
+done
+[ -z "$(FM_PROCEVENT_IN_RUNNER=1 posttool)" ] || fail "source runner certified its own owner"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "source runner refreshed its own owner lease"
+: > "$POST_HOME/state/.afk"
+[ -z "$(posttool)" ] || fail "away home received attended feedback"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "away hook took ownership from supervision"
+rm -f "$POST_HOME/state/.afk"
+posttool >/dev/null
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" != 0 ] \
+  || fail "active primary did not keep the listener alive between Stop cycles"
+printf '{"session_id":"competing"}\n' \
+  | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent-posttool-check.sh" \
+      > "$TMP_ROOT/posttool-competing.out"
+[ ! -s "$TMP_ROOT/posttool-competing.out" ] || fail "non-owner primary received another session's review"
+FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent.sh" handled lavish-review 1 >/dev/null
+[ -z "$(posttool)" ] || fail "handled review kept interrupting the primary"
+pass "PostToolUse reveals unhandled reviews only to their active primary, keeps listeners leased, and goes silent after handling"

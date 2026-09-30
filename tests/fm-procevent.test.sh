@@ -1355,7 +1355,7 @@ fm_test_track_procevent_home "$HADOPT"
 new_task_endpoint "$HADOPT" worker-5
 PATH="$ADOPT_BIN:$PATH" FM_HOME="$HADOPT" \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$ADOPT_ART" >/dev/null
-wait_capture "$HADOPT" "$adopt_id" \
+wait_for "$HADOPT/state/procevent-inbox/$adopt_id.1.result" \
   || fail "the firstmate fixture capture never landed"
 [ -f "$HADOPT/state/procevent-inbox/$adopt_id.1.result" ] \
   || fail "the firstmate fixture capture never landed"
@@ -4050,10 +4050,28 @@ HORPHAN="$TMP_ROOT/orphan-dead-owner"; new_home "$HORPHAN"
 fm_test_track_procevent_home "$HORPHAN"
 HKEEP="$TMP_ROOT/orphan-live-owner"; new_home "$HKEEP"
 fm_test_track_procevent_home "$HKEEP"
+# Keep both owners present while constructing and checking the reproduction.
+# Otherwise the first home's deliberately short lease can expire during the
+# second launch, before the test has even established a live descendant.
+keep_setup_owner() {
+  local home=$1 marker=$2 started=$SECONDS
+  # shellcheck source=bin/fm-procevent-lib.sh
+  . "$ROOT/bin/fm-procevent-lib.sh"
+  while [ -e "$marker" ] && [ "$((SECONDS - started))" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+    fm_procevent_owner_lease_touch "$home/state" || true
+    sleep 0.25
+  done
+}
+ORPHAN_OWNER_PRESENT="$TMP_ROOT/orphan-owner-present"
+KEEP_OWNER_PRESENT="$TMP_ROOT/keep-owner-present"
+touch "$ORPHAN_OWNER_PRESENT" "$KEEP_OWNER_PRESENT"
+keep_setup_owner "$HORPHAN" "$ORPHAN_OWNER_PRESENT" & ORPHAN_SETUP_OWNER=$!
+keep_setup_owner "$HKEEP" "$KEEP_OWNER_PRESENT" & KEEP_SETUP_OWNER=$!
 orphan_pe "$HORPHAN" register lavish orphan-src -- "$ORPHAN_STUB" "$TMP_ROOT/orphan-dead" >/dev/null
 orphan_pe "$HKEEP" register lavish keep-src -- "$QUIET_STUB" "$TMP_ROOT/orphan-live" >/dev/null
-orphan_pe "$HORPHAN" reconcile >/dev/null
-orphan_pe "$HKEEP" reconcile >/dev/null
+# Startup confirmation is not the two-second owner-loss bound under test.
+FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 orphan_pe "$HORPHAN" reconcile >/dev/null
+FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 orphan_pe "$HKEEP" reconcile >/dev/null
 
 wait_for "$HORPHAN/state/procevent/orphan-src.runner" \
   || fail "the dead-owner listener never recorded its runner"
@@ -4075,6 +4093,11 @@ kill -0 -"$ORPHAN_PID" 2>/dev/null \
 kill -0 "$ORPHAN_DESCENDANT" 2>/dev/null \
   || fail "the listener's descendant was not running"
 pass "a detached listener starts reparented, with a live descendant tree under it"
+# Start owner absence only after every initial liveness assertion succeeds.
+# The lease, check cadence, detection/stop ceilings and descendant assertions
+# below are unchanged; this prevents setup scheduling from consuming the case.
+rm -f "$ORPHAN_OWNER_PRESENT"
+wait "$ORPHAN_SETUP_OWNER"
 
 # Only the second home's session stays present, on the same short bound, so the
 # owning session is the single difference between the two listeners.
@@ -4128,6 +4151,8 @@ wait_gone "-$KEEP_PID" \
 wait_gone "$KEEP_DESCENDANT" \
   || fail "retiring a source left a descendant of its listener running"
 pass "retiring a source reaps its reparented listener and every descendant under it"
+rm -f "$KEEP_OWNER_PRESENT"
+wait "$KEEP_SETUP_OWNER"
 
 # --- an expired runner's guard retries unproved cleanup ---------------------
 #
@@ -5221,5 +5246,89 @@ JS
   assert_contains "$guard_out" '"noSdkStillNotices":true' "the notice still shows when the Lavish SDK is missing"
   pass "the form guard turns an uncancelled submit into a visible error and an agent prompt"
 fi
+
+# Ordinary reviews keep their exclusive listener through disconnected, empty,
+# and multiple unhandled answer rounds without any watcher reconciliation.
+CONT="$TMP_ROOT/continuous-lavish"
+mkdir -p "$CONT/bin" "$CONT/home/state"
+cat > "$CONT/bin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+mkdir "$CONT/current-poller" || { touch "$CONT/duplicate"; exit 1; }
+trap 'rmdir "$CONT/current-poller"' EXIT
+n=$(cat "$CONT/count" 2>/dev/null || echo 0)
+n=$((n + 1))
+printf '%s\n' "$n" > "$CONT/count"
+printf '%s\n' "$n" >> "$CONT/started"
+while [ ! -f "$CONT/round$n" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+cat "$CONT/round$n"
+SH
+chmod +x "$CONT/bin/lavish-axi"
+export CONT
+cont_art="$CONT/review.html"
+printf '<h1>continuous review</h1>\n' > "$cont_art"
+lavish_session "$cont_art"
+cont_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$cont_art")
+fm_test_track_procevent_home "$CONT/home"
+PATH="$CONT/bin:$PATH" FM_HOME="$CONT/home" FM_LAVISH_POLL_RETRY_DELAY=1 FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$cont_art" >/dev/null
+wait_for_lines "$CONT/started" 1 || fail "continuous listener never started"
+cont_claim=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$cont_id.claim")
+printf 'session:\n  status: browser_disconnected\n' > "$CONT/round1"
+wait_for_lines "$CONT/started" 2 || fail "disconnect did not resume listening without reconcile"
+assert_present "$CONT/home/state/procevent-inbox/$cont_id.1.handled" \
+  "the disconnect remains a silent no-op"
+: > "$CONT/round2"
+wait_for_lines "$CONT/started" 3 || fail "empty poll return stranded the listener"
+printf 'session:\n  status: waiting\n' > "$CONT/round3"
+wait_for_lines "$CONT/started" 4 || fail "spurious waiting return stranded the listener"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,first answer\n' > "$CONT/round4"
+wait_for_lines "$CONT/started" 5 || fail "unhandled answer stranded the listener"
+assert_absent "$CONT/home/state/procevent-inbox/$cont_id.4.handled" \
+  "keeping the listener never acknowledges the answer"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,second answer\n' > "$CONT/round5"
+wait_for_lines "$CONT/started" 6 || fail "second answer stranded the listener"
+assert_contains "$(wake_payloads "$CONT/home")" "procevent lavish $cont_id 4" \
+  "first answer is announced with its own sequence"
+assert_contains "$(wake_payloads "$CONT/home")" "procevent lavish $cont_id 5" \
+  "second answer is announced with its own sequence"
+[ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$cont_id.claim")" = "$cont_claim" ] \
+  || fail "nonterminal rounds replaced the exclusive owner"
+PATH="$CONT/bin:$PATH" pe "$CONT/home" start "$cont_id" >/dev/null
+[ "$(cat "$CONT/count")" = 6 ] || fail "a competing start opened a duplicate poll"
+assert_absent "$CONT/duplicate" "each source has at most one active polling child"
+assert_contains "$(pe "$CONT/home" list --age)" "$cont_id" "age report retains the open review"
+age_row=$(pe "$CONT/home" list --age | awk -v id="$cont_id" '$1 == id { print $3, $5 }')
+case "$age_row" in live\ [0-9]*) ;; *) fail "age report did not show live owner and numeric age: $age_row" ;; esac
+printf 'session:\n  status: ended\n  ended_by: user\n' > "$CONT/round6"
+for _ in $(seq 1 100); do
+  [ -e "$CONT/home/state/procevent/$cont_id.source" ] || break
+  sleep 0.1
+done
+assert_absent "$CONT/home/state/procevent/$cont_id.source" "user-ended review retires automatically"
+PATH="$CONT/bin:$PATH" pe "$CONT/home" reconcile >/dev/null
+[ "$(cat "$CONT/count")" = 6 ] || fail "ended review reopened its listener"
+pass "one exclusive listener survives disconnects and multiple unhandled answers, then retires on user end"
+
+# Losing the saved session is a terminal missing result, not an unowned
+# registration that the watcher keeps trying to launch.
+MISSING="$TMP_ROOT/missing-session"
+mkdir -p "$MISSING/home/state" "$MISSING/lavish"
+missing_art="$MISSING/review.html"
+printf '<h1>missing review</h1>\n' > "$missing_art"
+printf '{"sessions":{}}\n' > "$MISSING/lavish/state.json"
+missing_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$missing_art")
+pe_register "$MISSING/home" lavish "$missing_id" -- \
+  "$ROOT/bin/fm-procevent-lavish.sh" poll "$missing_art" >/dev/null
+PATH="$CONT/bin:$PATH" LAVISH_AXI_STATE_DIR="$MISSING/lavish" pe "$MISSING/home" start "$missing_id" >/dev/null
+assert_absent "$MISSING/home/state/procevent/$missing_id.source" "missing session retires its listener"
+assert_contains "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$MISSING/home/state/procevent-inbox/$missing_id.1.result")" \
+  missing "missing saved session produces adapter-owned terminal evidence"
+assert_contains "$(wake_payloads "$MISSING/home")" "procevent lavish $missing_id 1" \
+  "missing session still informs its owner"
+[ "$(cat "$CONT/count")" = 6 ] || fail "a missing saved session contacted the poll backend"
+pass "a missing saved Lavish session retires through the existing adapter path"
 
 printf '\nall procevent tests passed\n'

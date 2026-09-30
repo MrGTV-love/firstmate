@@ -266,17 +266,44 @@ tests/fm-crew-state.test.sh
 
 ## Turn-end guard
 
-The blocking and bounded-follow-up mechanisms were validated across seven harnesses on 2026-07-08 through 2026-09-21, with Claude's replacement Stop-owned path revalidated on 2026-09-21, Cursor's stop-hook park validated on 2026-08-13, and omp's blocking `session_stop` hook validated on 2026-09-05.
+The blocking and bounded-follow-up mechanisms were validated across seven harnesses on 2026-07-08 through 2026-09-21, with Claude's replacement Stop-owned path revalidated on 2026-09-30, Cursor's stop-hook park validated on 2026-08-13, and omp's blocking `session_stop` hook validated on 2026-09-05.
 
 | Harness | Version verified | Mechanism | Observed result |
 | --- | --- | --- | --- |
-| Claude | 2.1.278 | Cooperative blocking `Stop` guard plus `asyncRewake` auto-arm | A fresh unsupervised session received the full session-start digest through the tracked `SessionStart` hook, reclaimed a stale dead-owner lock, completed two tokenless rewake cycles with no model arm command or guard continuation, and left a competing live owner unchanged. |
+| Claude | 2.1.285 | Cooperative blocking `Stop` guard plus `asyncRewake` auto-arm | A fresh unsupervised session received the full session-start digest through the tracked `SessionStart` hook, reclaimed a stale dead-owner lock, completed two tokenless rewake cycles with no model arm command or guard continuation, and left a competing live owner unchanged. |
 | Codex | 0.142.1 | Blocking `Stop` hook | Hook process root stayed anchored to the trusted checkout and one continuation ran. |
 | OpenCode | 1.17.6 | Passive `session.idle` callback | Throwing could not block, while `promptAsync` scheduled one TUI follow-up; headless remained fail-open. |
 | Pi | 0.80.5 | Passive `agent_settled` callback | Exactly one guard follow-up ran for an unhealthy cycle, with no recursion across tool turns. |
 | omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `FM_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `fm_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
+
+### Claude mid-turn Lavish feedback, 2026-09-30
+
+Claude Code 2.1.285 was exercised in an isolated primary with the tracked `PostToolUse` registration and production hook, queue drain, result reader, and acknowledgement commands.
+After an unrelated Bash tool completed, Claude read and acknowledged queued Lavish feedback before ending the turn.
+A second captured answer had no published wake row; the hook alone identified its source, sequence, and durable result path, and Claude recovered and acknowledged it after an empty drain.
+That unpublished-answer scenario used the default home without exporting `FM_HOME` or a state override, proving that the recovery command carries the resolved result path.
+With both answers handled, the same prompt took the no-notice path and ran no queue drain.
+The prompt named neither capture, so the model could not discover them from the experiment's request.
+
+The successful synchronous hook context was not serialized as a `hook_response` row in the print stream.
+The observed read-and-acknowledge actions, together with the handled-answer counterfactual, establish native delivery rather than merely successful hook output.
+This proves delivery at a tool boundary; it does not claim an interruption while Claude is reasoning or a long tool is running.
+
+```sh
+FM_CLAUDE_LIVE_E2E=1 bash bin/fm-test-run.sh tests/fm-claude-stop-autoarm-live-e2e.test.sh
+```
+
+The same command also revalidated the Stop-owned cycles and competing-session boundary.
+Its arm fixture distinguishes a handling successor from a foreground arm, as the portable fixtures do: the successor confirms coverage but must not consume one of the two model-facing fixture events.
+Set `FM_CLAUDE_POSTTOOL_LIVE_E2E=1` as well to refresh only the three mid-turn delivery scenarios.
+
+The listener change was separately exercised against lavish-axi 0.1.79 and a real open browser review.
+An answer was captured while the same exclusive listener remained live, a second answer was captured without reconciliation, and closing the browser produced a captured disconnect without retiring the open session or ending its listener.
+One measured answer reached durable capture in approximately 1.7 seconds; this is an observation, not a latency guarantee.
+The portable process-event regression covers consecutive unhandled answers, disconnect, empty and `waiting` poll returns, exclusive ownership, age reporting, and ended or missing session retirement.
+The existing destructive-poll durability limit still applies: feedback lost before the runner captures the poll output is not recoverable.
 
 ### Cursor primary park, 2026-08-13
 
