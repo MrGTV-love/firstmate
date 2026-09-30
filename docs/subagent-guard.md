@@ -1,11 +1,11 @@
 # Primary helper agents and durable project work
 
-A firstmate primary may use its harness's helper agents and session tools for read-only research, planning, communication, and other work that does not change a project.
+A firstmate primary may use its harness's helper agents and session tools for work that is not project-specific, such as consolidating firstmate-private reports, general research, and communication.
 There is no tool-name guard or required opt-in for `Agent`, `Monitor`, `TaskCreate`, `ScheduleWakeup`, `SendMessage`, `Workflow`, or other helper tools.
 The tracked Claude `PreToolUse` hooks in `.claude/settings.json` apply only to `Bash` commands and retain their separate watcher-arm and directory-change protections.
 
 The boundary is the work, not the tool name.
-`AGENTS.md` sections 1 and 7 require project-specific coding, investigation, planning, and audits to be delegated through the fleet; `bin/fm-brief.sh` and `bin/fm-spawn.sh` provide the task's instructions, durable record, isolated project copy, and supervision.
+`AGENTS.md` sections 1 and 7 require project-specific coding, investigation, planning, bug reproduction, and audits to be delegated through the fleet, even when read-only; `bin/fm-brief.sh` and `bin/fm-spawn.sh` provide the task's instructions, durable record, isolated project copy, and supervision.
 The primary does not write to a project itself outside the concrete captain-approved exceptions in `AGENTS.md` section 1.
 A helper agent does not substitute for that project-work process merely because its tool is available.
 

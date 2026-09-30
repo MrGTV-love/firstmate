@@ -20,7 +20,7 @@ Supported primaries deny watcher-arm anti-patterns before execution, including s
 The tool reference names the integration form.
 Validate changes against the real harness in a scratch project before trusting them.
 
-A primary may use built-in helpers for read-only work; project-specific work still follows `../../../AGENTS.md` sections 1 and 7.
+A primary may use built-in helpers for work that is not project-specific; project-specific coding, investigation, planning, bug reproduction, and audits still follow `../../../AGENTS.md` sections 1 and 7, even when read-only.
 `../../../docs/subagent-guard.md` owns this distinction and the removal of the tool-name guard.
 
 ## Session start
