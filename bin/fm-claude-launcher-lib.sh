@@ -21,7 +21,7 @@ FM_CLAUDE_LAUNCHER_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # refuses on stderr and returns 1.
 fm_claude_launcher_select() {
   local file="$1/claude-launcher" present value var
-  local launcher="$FM_CLAUDE_LAUNCHER_LIB_DIR/fm-teamclaude-launch.sh"
+  local launch_bin="$FM_CLAUDE_LAUNCHER_LIB_DIR/fm-teamclaude-launch.sh"
   present=$(fm_config_source_present "$file") || return 1
   if [ "$present" = 0 ]; then
     printf 'claude\n'
@@ -45,10 +45,10 @@ fm_claude_launcher_select() {
       ;;
     esac
   done
-  if [ ! -f "$launcher" ] || [ ! -x "$launcher" ]; then
-    echo "error: config/claude-launcher=teamclaude needs the executable launcher $launcher; refusing to launch Claude without the proxy" >&2
+  if [ ! -f "$launch_bin" ] || [ ! -x "$launch_bin" ]; then
+    echo "error: config/claude-launcher=teamclaude needs the executable launcher $launch_bin; refusing to launch Claude without the proxy" >&2
     return 1
   fi
-  "$launcher" --check >&2 || return 1
-  printf '%s\n' "$launcher"
+  "$launch_bin" --check >&2 || return 1
+  printf '%s\n' "$launch_bin"
 }

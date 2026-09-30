@@ -36,7 +36,11 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
-FM_TEAMCLAUDE_TIMEOUT=10
+# Bounds each teamclaude call. A stopped proxy refuses its connection at once,
+# so the bound only matters for a proxy that answers slowly or hangs. It stays
+# well above what a loaded host shows: `teamclaude status` took up to 7 seconds
+# under heavy load, and a 10-second bound refused a live proxy.
+FM_TEAMCLAUDE_TIMEOUT=30
 
 fail() {
   printf 'error: TeamClaude %s; refusing to launch Claude without it\n' "$1" >&2
