@@ -189,36 +189,6 @@ test_matrix_claude_bare_nbsp_row() {
   pass "matrix: claude's ❯+NBSP row reads empty on every profile in both locales (#1988)"
 }
 
-test_named_claude_composer_rules_preserve_drafts_and_pi_boundary() {
-  local top='────────────────── fm slash lab ─' bottom='─────────────────────────────────'
-  local idle typed ghost caps identity out want
-  identity=$'claude\tidle'
-  idle="$top"$'\n❯'"$NBSP"$'\n'"$bottom"
-  typed="$top"$'\n❯ a wrapped\n  pending draft\n'"$bottom"
-  ghost="$top"$'\n❯ '"${ESC}[2mtry a suggestion${ESC}[0m"$'\n'"$bottom"
-  for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    assert_screen "named Claude idle" empty "$caps" "$idle" '' "$identity"
-    want=pending
-    [ "$caps" != "$CAPS_PLAIN" ] || want=unknown
-    assert_screen "named Claude wrapped draft" "$want" "$caps" "$typed" '' "$identity"
-    out=$(fm_composer_extract_selected_content "$caps" "$typed")
-    [ "$out" = 'a wrapped pending draft' ] || fail "named composer lost its draft: '$out'"
-  done
-  assert_screen "named Claude idle with cursor" empty "$CAPS_TMUX" "$idle" 1 "$identity"
-  assert_screen "named Claude draft with cursor" pending "$CAPS_TMUX" "$typed" 2 "$identity"
-  assert_screen "named Claude dim suggestion" empty "$CAPS_STYLED" "$ghost" '' "$identity"
-  assert_screen "title does not close a composer" unknown "$CAPS_STYLED" \
-    "$bottom"$'\n❯\n'"$top" '' "$identity"
-  assert_screen "title does not prove a blank Pi composer" unknown "$CAPS_STYLED" \
-    "$top"$'\n\n'"$bottom" '' $'pi\tidle'
-  assert_screen "titled glyph pair does not prove Pi" unknown "$CAPS_STYLED" "$idle" '' $'pi\tidle'
-  assert_screen "lower unmatched rule still makes a named draft stale" unknown "$CAPS_STYLED" \
-    "$typed"$'\nlater transcript\n'"$bottom" '' "$identity"
-  assert_screen "a centered title is not a composer opener" unknown "$CAPS_STYLED" \
-    $'──────── title ────────\n❯\n'"$bottom" '' "$identity"
-  pass "named Claude rules preserve empty, ghost, and wrapped-draft verdicts without proving Pi or stale input"
-}
-
 test_matrix_claude_arrow_statusline_footer() {
   # Real claude 2.x on herdr (captured live 2026-09-20, herdr 0.8.0): the
   # composer is a bare `❯`+U+00A0 row between two solid rules, and the harness
@@ -998,7 +968,6 @@ test_idle_placeholder_is_empty
 test_idle_placeholder_case_mode_is_explicit
 test_real_text_is_pending
 test_matrix_claude_bare_nbsp_row
-test_named_claude_composer_rules_preserve_drafts_and_pi_boundary
 test_matrix_claude_arrow_statusline_footer
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent

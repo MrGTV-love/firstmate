@@ -3174,6 +3174,20 @@ fm_backend_herdr_composer_identity() {  # <target> -> "<agent>\t<status>"
   fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE"
 }
 
+# fm_backend_herdr_composer_ghost_luma: the truecolor ghost ceiling every herdr
+# composer read applies for a native identity - the ONE owner of that policy.
+# Claude draws recognized slash commands in theme-dependent normal-intensity
+# truecolor (dark blue RGB(51,102,255), luminance ~104, and muted grey), so on
+# a Claude pane only SGR-2 dim runs are ghost text and the ceiling is 0. Every
+# other identity, including an absent probe, keeps the shared default that
+# removes Grok's dark placeholders.
+fm_backend_herdr_composer_ghost_luma() {  # <identity> -> luminance ceiling
+  case "${1%%$'\t'*}" in
+    claude) printf '0' ;;
+    *) printf '%s' "${FM_COMPOSER_GHOST_LUMA_MAX:-128}" ;;
+  esac
+}
+
 # fm_backend_herdr_composer_state: thin adapter - capture plus capabilities
 # in, shared verdict out. The ANSI capture is preferred (styled=1 lets the
 # shared classifier strip ghost/placeholder text); when it fails on an older
@@ -3191,23 +3205,31 @@ fm_backend_herdr_composer_identity() {  # <target> -> "<agent>\t<status>"
 # equally defeat this state read's pre-submit concat guard. The composer is
 # by definition inside the viewport, and `--source visible` needs none of the
 # small-N --lines workaround.
+# The ghost-colour policy (fm_backend_herdr_composer_ghost_luma) follows the
+# same lazy rule: a styled capture holding a truecolor run the policies strip
+# differently depends on identity from the start, and no other capture does.
 fm_backend_herdr_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
-  local target=$1 cap caps verdict identity
+  local target=$1 cap caps verdict=need-identity identity
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   if cap=$(fm_backend_herdr_visible_capture_ansi "$target" 2>/dev/null); then
     caps=$(printf 'styled=1\ncursor=0\nidentity=1')
+    if [ "$(printf '%s\n' "$cap" | fm_composer_strip_ghost)" \
+         = "$(printf '%s\n' "$cap" | FM_COMPOSER_GHOST_LUMA_MAX=0 fm_composer_strip_ghost)" ]; then
+      verdict=$(fm_composer_classify_screen "$caps" "$cap")
+    fi
   elif cap=$(fm_backend_herdr_visible_capture "$target"); then
     caps=$(printf 'styled=0\ncursor=0\nidentity=1')
+    verdict=$(fm_composer_classify_screen "$caps" "$cap")
   else
     printf 'unknown'
     return 0
   fi
-  verdict=$(fm_composer_classify_screen "$caps" "$cap")
   if [ "$verdict" = need-identity ]; then
     if ! identity=$(fm_backend_herdr_composer_identity "$target" 2>/dev/null) || [ -z "$identity" ]; then
       identity='probe-absent'
     fi
-    verdict=$(fm_composer_classify_screen "$caps" "$cap" '' "$identity")
+    verdict=$(FM_COMPOSER_GHOST_LUMA_MAX=$(fm_backend_herdr_composer_ghost_luma "$identity") \
+      fm_composer_classify_screen "$caps" "$cap" '' "$identity")
     [ "$verdict" != need-identity ] || verdict=unknown
   fi
   printf '%s' "$verdict"
@@ -3363,11 +3385,10 @@ fm_backend_herdr_proof_lines() {  # <text>
 # viewport is the one bound that always contains the composer.
 # Styled capture is preferred. An empty or failed styled read falls through to
 # the plain capture so a missing ANSI format does not look like an empty draft.
-# This reader serves Claude's payload proof, not Grok's dark-color placeholders.
-# Claude draws recognized slash commands in theme-dependent truecolor (including
-# dark blue and muted grey), so only SGR-2 dim runs are ghost text here.
-fm_backend_herdr_composer_content() {  # <target>
-  local target=$1 cap caps
+# <identity> is the native identity the caller already probed; it selects the
+# ghost-colour policy (fm_backend_herdr_composer_ghost_luma).
+fm_backend_herdr_composer_content() {  # <target> <identity>
+  local target=$1 identity=$2 cap caps
   if cap=$(fm_backend_herdr_visible_capture_ansi "$target" 2>/dev/null) && [ -n "$cap" ]; then
     caps=$(printf 'styled=1\ncursor=0\nidentity=0')
   elif cap=$(fm_backend_herdr_visible_capture "$target") && [ -n "$cap" ]; then
@@ -3375,7 +3396,8 @@ fm_backend_herdr_composer_content() {  # <target>
   else
     return 1
   fi
-  FM_COMPOSER_GHOST_LUMA_MAX=0 fm_composer_extract_selected_content "$caps" "$cap"
+  FM_COMPOSER_GHOST_LUMA_MAX=$(fm_backend_herdr_composer_ghost_luma "$identity") \
+    fm_composer_extract_selected_content "$caps" "$cap"
 }
 
 # fm_backend_herdr_composer_payload_shown: 0 when <after>, read from a
@@ -3429,7 +3451,6 @@ fm_backend_herdr_composer_clear() {  # <target> <text>
 fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep> <settle>
   local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 i=0 verdict baseline confirm_sleep
   local raw_status footer_baseline='' allow_rendered=0 enter_sent=0 identity proof=0 content
-  local FM_COMPOSER_GHOST_LUMA_MAX=${FM_COMPOSER_GHOST_LUMA_MAX:-128}
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   # Claude on Herdr is the live-verified truncation shape: Enter is withheld
   # unless the composer, empty before the send, shows this payload. A suffix
@@ -3437,18 +3458,15 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
   # unproven type-then-Enter path.
   identity=$(fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || identity=
   if [ "${identity%%$'\t'*}" = claude ]; then
-    # Keep the same Claude color policy during post-Enter confirmation: a popup
-    # that swallowed Enter must remain pending, not look falsely submitted.
-    FM_COMPOSER_GHOST_LUMA_MAX=0
     proof=1
-    content=$(fm_backend_herdr_composer_content "$target") \
+    content=$(fm_backend_herdr_composer_content "$target" "$identity") \
       || { printf 'send-failed'; return 0; }
     [ -z "${content//[$' \t\r\n\v\f']/}" ] || { printf 'send-failed'; return 0; }
   fi
   fm_backend_herdr_send_literal "$target" "$text" || { printf 'send-failed'; return 0; }
   sleep "$settle"
   if [ "$proof" = 1 ]; then
-    if ! content=$(fm_backend_herdr_composer_content "$target") \
+    if ! content=$(fm_backend_herdr_composer_content "$target" "$identity") \
       || ! fm_backend_herdr_composer_payload_shown "$text" "$content"; then
       if fm_backend_herdr_composer_clear "$target" "$text"; then
         printf 'send-failed'

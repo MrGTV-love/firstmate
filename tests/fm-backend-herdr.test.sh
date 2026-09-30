@@ -4179,6 +4179,39 @@ test_composer_state_grok_bright_truecolor_real_text_is_pending() {
   pass "fm_backend_herdr_composer_state: grok's real bright typed input still reads pending"
 }
 
+# Real Claude 2.1.285 draws a recognized slash command in RGB(51,102,255),
+# luminance ~104, under the ceiling that removes Grok's dark placeholder. The
+# state read every guard shares must keep it on a native Claude pane, or a
+# lifecycle command is typed onto a human's draft. The same bytes on a pane
+# with another identity keep the placeholder policy.
+test_composer_state_claude_colored_slash_draft_is_pending() {
+  local dir log resp fb out agent want
+  for agent in claude grok; do
+    dir="$TMP_ROOT/composer-colored-slash-$agent"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    printf '\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n\xe2\x9d\xaf \x1b[38;2;51;102;255m/compact\x1b[0m\n\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n' > "$resp/1.out"
+    printf '{"result":{"agent":{"agent":"%s","agent_status":"idle"}}}\n' "$agent" > "$resp/2.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+    want=empty
+    [ "$agent" != claude ] || want=pending
+    [ "$out" = "$want" ] || fail "a dark-truecolor slash draft on a $agent pane must read $want, got '$out'"
+  done
+  pass "fm_backend_herdr_composer_state: a colored slash draft is pending on a Claude pane and the placeholder policy holds elsewhere"
+}
+
+test_composer_state_claude_dim_colored_suggestion_is_empty() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/composer-dim-colored-suggestion"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n\xe2\x9d\xaf \x1b[2;38;2;51;102;255m/compact\x1b[0m\n\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}\n' > "$resp/2.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = empty ] || fail "an SGR-2 dim suggestion on a Claude pane must stay ghost text, got '$out'"
+  pass "fm_backend_herdr_composer_state: a dim colored suggestion on a Claude pane still reads empty"
+}
+
 test_composer_state_codex_bare_prompt_glyph_is_empty() {
   local dir log resp fb out
   dir="$TMP_ROOT/composer-codex-bare"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -4610,11 +4643,15 @@ test_send_text_submit_confirms_never_idle_native_state_via_footer_transition() {
   # 5: pane read - composer content mid-turn: placeholder plus busy token
   # 6: pane read - rendered footer now busy: an idle-to-busy transition ACROSS
   #    our Enter, which is the submission proof
+  # The identity prefix moves each call one later, and the composer read's dark
+  # truecolor rows make it ask the pane identity before the footer read.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_idle_plain > "$resp/3.out"
   herdr_cursor_midturn_ansi > "$resp/5.out"
   herdr_cursor_midturn_plain > "$resp/6.out"
   herdr_submit_identity_prefix "$resp" codex
+  mv "$resp/7.out" "$resp/8.out"
+  cp "$resp/1.out" "$resp/7.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
@@ -4630,11 +4667,15 @@ test_send_text_submit_never_idle_native_state_keeps_pending_without_a_transition
   # The pane was ALREADY mid-turn before our Enter, so its busy footer is not
   # evidence about OUR message: the verdict must stay pending rather than
   # borrowing someone else's turn as proof of our delivery.
+  # Each composer read's dark truecolor rows make it ask the pane identity.
   printf '{"result":{"agent":{"agent_status":"blocked"}}}\n' > "$resp/2.out"
   herdr_cursor_midturn_plain > "$resp/3.out"
   herdr_cursor_midturn_ansi > "$resp/5.out"
   herdr_cursor_midturn_ansi > "$resp/7.out"
   herdr_submit_identity_prefix "$resp" codex
+  mv "$resp/8.out" "$resp/9.out"
+  cp "$resp/1.out" "$resp/7.out"
+  cp "$resp/1.out" "$resp/10.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
@@ -5052,9 +5093,11 @@ test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
   # First Enter fills the popup without submitting. The colored command
-  # must still read pending so the second Enter, and only it, lands.
+  # must still read pending so the second Enter, and only it, lands. That
+  # state read owns the color policy, so it asks the pane's identity (call 9).
   cp "$resp/4.out" "$resp/8.out"
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  cp "$resp/1.out" "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/11.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
@@ -5942,6 +5985,8 @@ test_composer_state_claude_dim_prompt_suggestion_ghost_is_empty
 test_composer_state_claude_dim_ghost_row_with_real_text_is_pending
 test_composer_state_grok_dark_truecolor_placeholder_is_empty
 test_composer_state_grok_bright_truecolor_real_text_is_pending
+test_composer_state_claude_colored_slash_draft_is_pending
+test_composer_state_claude_dim_colored_suggestion_is_empty
 test_composer_state_codex_bare_prompt_glyph_is_empty
 test_composer_state_codex_faint_suggestion_is_empty
 test_composer_state_codex_non_faint_same_text_is_pending
