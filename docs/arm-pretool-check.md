@@ -125,9 +125,10 @@ Quoted text such as `echo 'pkill -f fm-watch'` is data and is allowed.
 
 Unsupported compound grammar - a loop, `case`, `if`, or other construct the classifier does not model - is failed closed for broad kills the same way it is for protected executions.
 When unsupported grammar references both a `fm-watch` target and a `pkill` or `kill` verb, the classifier conservatively denies with `broad-watcher-kill`.
-The narrow exception is a parsed conditional or loop whose only kills name one literal positive PID matching the active home's `state/.watch.lock/pid`, with an optional signal and `--`.
-Every other command in it must be a plain literal command that does not mention a kill verb; `!`, nested conditionals, and loop keywords are unwrapped before that check.
-A read-only watcher-path diagnostic in that command no longer turns the exact-PID stop into a pattern kill.
+The narrow exception is a parsed `if`, `while`, or `until` construct whose only kills name one literal positive PID matching the active home's `state/.watch.lock/pid`, with an optional signal and `--`.
+Every other command in it must be a plain literal command that does not mention a kill verb; `!`, nested `if`/`while`/`until` keywords, and `then`/`else`/`do` are unwrapped before that check, including when they stand alone on a line.
+A `for`, `select`, `case`, grouped, or substituted shape never qualifies.
+A read-only watcher-path diagnostic in that command does not turn the exact-PID stop into a pattern kill.
 The exception never expands variables, permits process-group or multiple-PID kills, or licenses a protected watcher execution hidden in control syntax.
 Pattern kills, `pgrep`-derived kill operands, malformed commands, and unproved compound shapes retain the backstop.
 In supported grammar command-position analysis remains authoritative, so quoted data mentions remain allowed.
