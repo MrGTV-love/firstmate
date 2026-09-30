@@ -34,6 +34,9 @@ TMP_ROOT=$(fm_test_tmproot fm-backend-herdr-tests)
 mkdir -p "$TMP_ROOT/ambient-home"
 export FM_HOME="$TMP_ROOT/ambient-home"
 export FM_BACKEND_HERDR_SUBMIT_MIN_SLEEP=0
+# One payload-proof read per submit keeps the call-numbered fixtures in step;
+# the late-render case sets its own wait.
+export FM_BACKEND_HERDR_PROOF_WAIT=0
 
 # make_herdr_fakebin: a `herdr` stub that logs every invocation (one line,
 # unit-separated args, to $FM_HERDR_LOG) and returns the canned response for
@@ -5094,10 +5097,12 @@ test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
   # First Enter fills the popup without submitting. The colored command
   # must still read pending so the second Enter, and only it, lands. That
-  # state read owns the color policy, so it asks the pane's identity (call 9).
+  # state read keeps the identity the submit already proved: the native probe
+  # is unavailable by then (call 9 answers any re-probe with an error), and a
+  # re-probe would strip the command and report a false delivery.
   cp "$resp/4.out" "$resp/8.out"
-  cp "$resp/1.out" "$resp/9.out"
-  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/11.out"
+  printf '{"error":{"code":"timeout","message":"agent get timed out"}}\n' > "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
@@ -5105,7 +5110,28 @@ test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
   enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
   [ "$enter_count" -eq 2 ] || fail "colored $text must retry swallowed Enter, sent $enter_count"
   [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "colored $text must not be cleared"
-  pass "Claude colored slash commands survive payload proof and a swallowed first Enter"
+  pass "Claude colored slash commands survive payload proof and a swallowed first Enter while the native probe is unavailable"
+}
+
+# A loaded host rendered a typed /compact seconds after the settle. The proof
+# must keep reading until it appears, type nothing more, and then submit.
+test_send_text_submit_claude_payload_rendered_late_is_still_proven() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-late-render"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  mv "$resp/4.out" "$resp/5.out"
+  printf '  \xe2\x9d\xaf\n' > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=5 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a payload rendered after the settle must still be proven and submitted, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] || fail "the late-render wait must not retype the payload"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 1 ] \
+    || fail "a late-rendered payload is submitted with one Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a late-rendered payload must not be cleared"
+  pass "fm_backend_herdr_send_text_submit: a Claude payload rendered after the settle is still proven and submitted"
 }
 
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
@@ -6030,6 +6056,7 @@ test_send_text_submit_refuses_marked_digest_missing_its_head
 test_composer_state_claude_slash_popup_pushes_composer_above_tail_window
 test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
 test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry
+test_send_text_submit_claude_payload_rendered_late_is_still_proven
 test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload
