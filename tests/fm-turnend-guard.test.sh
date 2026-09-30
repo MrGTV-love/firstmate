@@ -926,6 +926,30 @@ test_tracked_claude_entries_inert_under_grok() {
   pass "tracked .claude/settings.json entries: $guarded inert under grok, all live under Claude"
 }
 
+test_claude_helper_tools_are_not_intercepted() {
+  local settings tool matcher matched bash_hooks=0
+  settings="$ROOT/.claude/settings.json"
+  command -v jq >/dev/null 2>&1 || fail "test host must provide jq"
+  jq -e '(.permissions.deny // []) | length == 0' "$settings" >/dev/null \
+    || fail "tracked Claude settings must not deny helper or session tools"
+
+  for tool in Agent Monitor TaskCreate ScheduleWakeup SendMessage Workflow; do
+    matched=0
+    while IFS= read -r matcher; do
+      [[ "$tool" =~ $matcher ]] && matched=$((matched + 1))
+    done < <(jq -r '.hooks.PreToolUse[] | .matcher' "$settings")
+    [ "$matched" -eq 0 ] || fail "Claude PreToolUse intercepts $tool ($matched hooks)"
+  done
+
+  while IFS= read -r matcher; do
+    [[ Bash =~ $matcher ]] && bash_hooks=$((bash_hooks + 1))
+  done < <(jq -r '.hooks.PreToolUse[] | .matcher' "$settings")
+  [ "$bash_hooks" -eq 1 ] || fail "Claude Bash must retain exactly one PreToolUse matcher"
+  [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[]] | length' "$settings")" -eq 2 ] \
+    || fail "Claude Bash must retain both command protections"
+  pass "Claude helper and session tool calls reach their tools; Bash retains both protections"
+}
+
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root() {
   local settings command dir expected_root outside payload out status
   settings="$ROOT/.codex/hooks.json"
@@ -2224,6 +2248,7 @@ test_grok_adapter_snake_case_native_and_camel_precedence
 test_grok_adapter_invalid_inputs_start_neither_path
 test_grok_adapter_missing_jq_and_no_supervision_allow
 test_tracked_claude_entries_inert_under_grok
+test_claude_helper_tools_are_not_intercepted
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root
 test_codex_hook_ignores_nested_git_root_guard
 test_opencode_plugin_anchors_guard_to_worktree
