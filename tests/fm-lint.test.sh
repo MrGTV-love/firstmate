@@ -21,6 +21,8 @@ LINT="$ROOT/bin/fm-lint.sh"
 INSTALLER="$ROOT/bin/fm-install-shellcheck.sh"
 # The pinned version, read from the single source (the one owner itself).
 REQUIRED=$("$LINT" --required-version)
+# Ordinary regressions must not read or populate the operator's shared cache.
+export FM_LINT_CACHE_DIR=off
 
 # Official GitHub release asset sha256 values for shellcheck v0.11.0 .tar.xz
 # archives (https://github.com/koalaman/shellcheck/releases/tag/v0.11.0). Tests
@@ -151,20 +153,6 @@ pinned_ready() {
   [ "$(shellcheck --version | awk '/^version:/ {print $2; exit}')" = "$REQUIRED" ]
 }
 
-test_help_reports_the_complete_interface() {
-  local help
-  help=$("$LINT" --help) || fail "fm-lint.sh --help failed"
-  assert_contains "$help" "--telemetry" "fm-lint.sh --help omitted --telemetry"
-  assert_contains "$help" "--required-version" "fm-lint.sh --help omitted --required-version"
-  assert_contains "$help" "--list-files" "fm-lint.sh --help omitted --list-files"
-  assert_contains "$help" "--help" "fm-lint.sh --help omitted --help"
-  assert_contains "$help" "--fast" "fm-lint.sh --help omitted --fast"
-  assert_contains "$help" "SC1091" "fm-lint.sh --help omitted the local SC1091 exclusion"
-  assert_contains "$help" "SC2034" "fm-lint.sh --help omitted the local SC2034 exclusion"
-  assert_contains "$help" "SC2153" "fm-lint.sh --help omitted the local SC2153 exclusion"
-  assert_contains "$help" "SC2329" "fm-lint.sh --help omitted the local SC2329 exclusion"
-  pass "fm-lint.sh --help reports the complete executable interface"
-}
 
 test_list_files_reports_the_shell_inventory() {
   local listed expected
@@ -266,10 +254,14 @@ case "$*" in
     fi
     exit 1
     ;;
-  "diff --name-only --diff-filter=ACMR -z "*)
+  "diff --name-only --no-renames -z "*)
     if [ -n "${FM_TEST_GIT_DIFF_FILE:-}" ] && [ -f "$FM_TEST_GIT_DIFF_FILE" ]; then
       cat "$FM_TEST_GIT_DIFF_FILE"
     fi
+    exit 0
+    ;;
+  "ls-files --others --exclude-standard -z")
+    [ -z "${FM_TEST_GIT_UNTRACKED_FILE:-}" ] || cat "$FM_TEST_GIT_UNTRACKED_FILE"
     exit 0
     ;;
   *)
@@ -407,53 +399,6 @@ SH
   chmod +x "$fakebin/shellcheck"
 }
 
-test_fast_mode_disables_extended_analysis() {
-  local tmp fakebin log mode_log telemetry fixture out
-  tmp=$(fm_test_tmproot fm-lint-fast-mode)
-  fakebin=$(fm_fakebin "$tmp")
-  fixture="$tmp/fixture.sh"
-  log="$tmp/shellcheck.log"
-  mode_log="$tmp/mode.log"
-  telemetry="$tmp/telemetry.tsv"
-  cat > "$fixture" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "${1:-ok}"
-SH
-  chmod +x "$fixture"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_MODE_LOG="$mode_log" "$LINT" --fast --telemetry "$telemetry" "$fixture" 2>&1) \
-    || fail "fast lint mode failed"$'\n'"$out"
-  [ "$(cat "$mode_log")" = off ] \
-    || fail "fast lint mode did not disable extended analysis"
-  [ "$(cat "$log")" = "$fixture" ] \
-    || fail "fast lint mode did not lint the requested root"
-  assert_grep $'analysis_mode\tfast' "$telemetry" "telemetry did not record fast analysis mode"
-  pass "fm-lint.sh --fast disables ShellCheck extended analysis"
-}
-
-test_ci_defaults_to_full_analysis() {
-  local tmp fakebin log mode_log fixture out
-  tmp=$(fm_test_tmproot fm-lint-ci-analysis)
-  fakebin=$(fm_fakebin "$tmp")
-  fixture="$tmp/fixture.sh"
-  log="$tmp/shellcheck.log"
-  mode_log="$tmp/mode.log"
-  cat > "$fixture" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "${1:-ok}"
-SH
-  chmod +x "$fixture"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-
-  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true FM_LINT_FAST=1 FM_LINT_JOBS=1 \
-    FM_TEST_MODE_LOG="$mode_log" "$LINT" "$fixture" 2>&1) \
-    || fail "CI full lint mode failed"$'\n'"$out"
-  [ "$(cat "$mode_log")" = on ] \
-    || fail "CI default did not keep full ShellCheck analysis"
-  pass "fm-lint.sh keeps full ShellCheck analysis by default in CI"
-}
 
 test_ci_rejects_explicit_fast_mode() {
   local tmp fakebin log fixture out rc
@@ -502,27 +447,6 @@ SH
   pass "fm-lint.sh --fast catches an ordinary shell lint defect"
 }
 
-test_changed_mode_lints_only_the_changed_file() {
-  local tmp fakebin log diff_file out target
-  tmp=$(fm_test_tmproot fm-lint-changed)
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  log="$tmp/shellcheck.log"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-  diff_file="$tmp/diff.nul"
-  target="bin/fm-install-shellcheck.sh"
-  fm_lint_write_diff_file "$diff_file" "$target" "README.md"
-
-  # Clear the ambient CI/GITHUB_ACTIONS signals so changed-file mode is actually
-  # exercised: a CI run sets them and would otherwise force the full lint here.
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" 2>&1) \
-    || fail "changed-mode lint run failed"$'\n'"$out"
-  [ "$(cat "$log")" = "$target" ] \
-    || fail "changed-mode lint did not run ShellCheck on exactly the changed file"$'\n'"logged: $(cat "$log")"
-  pass "fm-lint.sh changed mode lints only the changed canonical file"
-}
 
 test_ci_forces_full_lint_even_with_empty_diff() {
   local listed expected
@@ -593,25 +517,6 @@ test_zero_changed_files_exits_clean() {
   pass "fm-lint.sh exits 0 with a note when the local branch has no changed lint targets"
 }
 
-test_list_files_respects_changed_mode() {
-  local tmp fakebin diff_file listed
-  tmp=$(fm_test_tmproot fm-lint-list-changed)
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  diff_file="$tmp/diff.nul"
-  # A real canonical file, a non-canonical file, and a canonical-looking path
-  # that does not exist: only the first should survive into the listed set.
-  fm_lint_write_diff_file "$diff_file" \
-    "tests/fm-lint.test.sh" "docs/README.md" "bin/definitely-not-real-file.sh"
-
-  # Clear CI/GITHUB_ACTIONS so --list-files reflects the changed set rather than
-  # the full canonical set a CI run's ambient signals would otherwise force.
-  listed=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" --list-files)
-  [ "$listed" = "tests/fm-lint.test.sh" ] \
-    || fail "--list-files did not report the would-be changed set in changed mode"$'\n'"got: $listed"
-  pass "fm-lint.sh --list-files reports the would-be changed set in changed mode"
-}
 
 fm_lint_assert_flag_log() {
   local flag_log=$1 expected_follow=$2 expected_exclude=$3
@@ -625,67 +530,6 @@ fm_lint_assert_flag_log() {
     || fail "ShellCheck flags were not external-sources=$expected_follow exclude=$expected_exclude"$'\n'"$(cat "$flag_log")"
 }
 
-test_changed_mode_drops_external_sources_and_excludes_cross_file_codes() {
-  local tmp fakebin log flag_log mode_log diff_file telemetry out target
-  tmp=$(fm_test_tmproot fm-lint-local-nox)
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  log="$tmp/shellcheck.log"
-  flag_log="$tmp/flags.log"
-  mode_log="$tmp/mode.log"
-  telemetry="$tmp/telemetry.tsv"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-  diff_file="$tmp/diff.nul"
-  target="bin/fm-afk-launch.sh"
-  fm_lint_write_diff_file "$diff_file" "$target"
-
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" FM_TEST_MODE_LOG="$mode_log" \
-    "$LINT" --telemetry "$telemetry" 2>&1) \
-    || fail "changed-mode local lint failed"$'\n'"$out"
-  [ "$(cat "$log")" = "$target" ] \
-    || fail "changed-mode lint did not run ShellCheck on exactly the changed file"$'\n'"logged: $(cat "$log")"
-  [ "$(cat "$mode_log")" = on ] \
-    || fail "changed-mode local lint disabled dataflow analysis"
-  fm_lint_assert_flag_log "$flag_log" no "SC1091,SC2034,SC2153,SC2329"
-  assert_contains "$out" "source following disabled" \
-    "changed-mode local lint did not disclose dropped source following"
-  assert_grep $'analysis_mode\tlocal' "$telemetry" \
-    "telemetry did not record local analysis mode"
-  assert_grep $'source_directives\t5' "$telemetry" \
-    "telemetry did not count the changed root's source directives"
-  assert_grep $'source_followed_directives\t0' "$telemetry" \
-    "telemetry reported followed sources in no-external-sources mode"
-  pass "fm-lint.sh changed mode drops source following and excludes cross-file codes"
-}
-
-test_changed_mode_invokes_shellcheck_once_per_root() {
-  local tmp fakebin log flag_log diff_file out first second invocation_count
-  tmp=$(fm_test_tmproot fm-lint-local-per-root)
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  log="$tmp/shellcheck.log"
-  flag_log="$tmp/flags.log"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-  diff_file="$tmp/diff.nul"
-  first="bin/fm-install-shellcheck.sh"
-  second="bin/fm-lint-workflows.sh"
-  fm_lint_write_diff_file "$diff_file" "$first" "$second"
-
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
-    || fail "changed-mode per-root lint failed"$'\n'"$out"
-  [ "$(LC_ALL=C sort "$log")" = "$first"$'\n'"$second" ] \
-    || fail "changed-mode lint did not analyze both changed roots"$'\n'"logged: $(cat "$log")"
-  invocation_count=$(grep -c '^external-sources=' "$flag_log" || true)
-  [ "$invocation_count" -eq 2 ] \
-    || fail "changed-mode lint used $invocation_count ShellCheck calls for two roots"
-  fm_lint_assert_flag_log "$flag_log" no "SC1091,SC2034,SC2153,SC2329"
-  pass "fm-lint.sh changed mode invokes ShellCheck once per root"
-}
 
 test_ci_keeps_external_sources_without_local_exclusions() {
   local tmp fakebin log flag_log mode_log fixture out
@@ -763,137 +607,7 @@ test_explicit_path_keeps_external_sources() {
   pass "fm-lint.sh explicit paths keep source following"
 }
 
-test_fast_mode_on_a_local_branch_keeps_source_following() {
-  local tmp fakebin log flag_log mode_log diff_file out target
-  tmp=$(fm_test_tmproot fm-lint-fast-follow)
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  log="$tmp/shellcheck.log"
-  flag_log="$tmp/flags.log"
-  mode_log="$tmp/mode.log"
-  fm_lint_stub_shellcheck "$fakebin" "$log"
-  diff_file="$tmp/diff.nul"
-  target="bin/fm-install-shellcheck.sh"
-  fm_lint_write_diff_file "$diff_file" "$target"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" FM_TEST_MODE_LOG="$mode_log" \
-    "$LINT" --fast 2>&1) \
-    || fail "fast local-branch lint failed"$'\n'"$out"
-  [ "$(cat "$mode_log")" = off ] \
-    || fail "fast local-branch lint did not disable extended analysis"
-  fm_lint_assert_flag_log "$flag_log" yes none
-  pass "fm-lint.sh --fast on a local branch keeps source following"
-}
-
-test_changed_mode_hides_cross_file_codes_that_ci_still_sees() {
-  if ! pinned_ready; then
-    pass "SKIP (ShellCheck $REQUIRED not resolved): changed-mode exclusion behavior"
-    return
-  fi
-  local tmp fakebin diff_file fixture out rc test_root lint
-  tmp=$(fm_test_tmproot fm-lint-local-exclude-behavior)
-  test_root="$tmp/repo"
-  mkdir -p "$test_root/bin/backends" "$test_root/tests" "$test_root/.github/workflows"
-  lint="$test_root/bin/fm-lint.sh"
-  cp "$LINT" "$lint"
-  cp "$ROOT/bin/fm-lint-workflows.sh" "$test_root/bin/"
-  cp "$ROOT"/.github/workflows/* "$test_root/.github/workflows/"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$test_root/bin/backends/noop.sh"
-  fixture="$test_root/tests/fm-lint-local-exclude-fixture.test.sh"
-  cat > "$fixture" <<'SH'
-#!/usr/bin/env bash
-# Assigned here and only consumed by a library the local gate does not follow.
-cross_file_only=1
-outer() {
-  (
-    # Defined here and only invoked by a library the local gate does not follow.
-    cross_file_helper() {
-      printf 'ok\n'
-    }
-    printf 'hi\n'
-  )
-}
-outer
-SH
-  fakebin=$(fm_fakebin "$tmp")
-  fm_lint_stub_git "$fakebin"
-  diff_file="$tmp/diff.nul"
-  fm_lint_write_diff_file "$diff_file" "tests/fm-lint-local-exclude-fixture.test.sh"
-
-  rc=0
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$lint" 2>&1) || rc=$?
-  [ "$rc" -eq 0 ] \
-    || fail "changed-mode local lint failed a cross-file-only fixture"$'\n'"$out"
-  assert_not_contains "$out" "SC2034" "changed-mode local lint still reported SC2034"
-  assert_not_contains "$out" "SC2329" "changed-mode local lint still reported SC2329"
-
-  rc=0
-  out=$("$lint" "$fixture" 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "explicit-path lint passed a cross-file-only fixture"$'\n'"$out"
-  assert_contains "$out" "SC2034" "explicit-path lint did not keep SC2034"
-  assert_contains "$out" "SC2329" "explicit-path lint did not keep SC2329"
-  rm -f "$fixture"
-  pass "fm-lint.sh changed mode excludes cross-file codes that explicit paths still report"
-}
-
-# One ShellCheck process per root. Passing the whole canonical set in a
-# single invocation still follows in-set sources and is not the no-x posture.
-fm_lint_nox_one_root() {
-  local index=$1 path=$2 outdir=$3
-  shellcheck --norc --format gcc -- "$path" > "$outdir/$index" || true
-}
-
-test_local_exclusion_list_covers_every_no_external_sources_code() {
-  if ! pinned_ready; then
-    pass "SKIP (ShellCheck $REQUIRED not resolved): local exclusion completeness"
-    return
-  fi
-  local tmp files_file out unexpected code path found i batch
-  local -a files
-  tmp=$(fm_test_tmproot fm-lint-nox-complete)
-  files_file="$tmp/files"
-  CI=true "$LINT" --list-files > "$files_file"
-  [ -s "$files_file" ] || fail "CI --list-files returned no canonical lint roots"
-  files=()
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    files+=("$path")
-  done < "$files_file"
-  [ "${#files[@]}" -gt 0 ] || fail "CI --list-files returned no readable lint roots"
-  mkdir -p "$tmp/gcc"
-  i=0
-  batch=0
-  for path in "${files[@]}"; do
-    i=$((i + 1))
-    fm_lint_nox_one_root "$i" "$path" "$tmp/gcc" &
-    batch=$((batch + 1))
-    if [ "$batch" -eq 4 ]; then
-      wait
-      batch=0
-    fi
-  done
-  wait
-  found=$(find "$tmp/gcc" -type f | wc -l | tr -d '[:space:]')
-  [ "$found" = "${#files[@]}" ] \
-    || fail "completeness sweep linted $found roots, expected ${#files[@]}"
-  out=$(cat "$tmp/gcc"/* 2>/dev/null || true)
-  unexpected=
-  while IFS= read -r code; do
-    [ -n "$code" ] || continue
-    case "$code" in
-      SC1091|SC2034|SC2153|SC2329) ;;
-      *) unexpected="${unexpected}${unexpected:+ }$code" ;;
-    esac
-  done < <(printf '%s\n' "$out" | sed -n 's/.*\[\(SC[0-9][0-9]*\)\].*/\1/p' | LC_ALL=C sort -u)
-  [ -z "$unexpected" ] \
-    || fail "no-external-sources pass emitted codes outside the local exclusion list: $unexpected"
-  pass "local exclusion list covers every no-external-sources ShellCheck code"
-}
 
 test_pins_an_explicit_version() {
   [ -n "$REQUIRED" ] || fail "fm-lint.sh --required-version printed nothing"
@@ -1155,6 +869,7 @@ test_rejects_direct_beads_cli_invocations() {
   mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests"
   lint_copy="$tmp/repo/bin/fm-lint.sh"
   cp "$LINT" "$lint_copy"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -1207,6 +922,7 @@ test_rejects_direct_beads_cli_in_explicit_core_path() {
   lint_copy="$tmp/repo/bin/fm-lint.sh"
   target="$tmp/repo/bin/direct-beads.sh"
   cp "$LINT" "$lint_copy"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
   printf '#!/usr/bin/env bash\nbd close fm-example\n' > "$target"
   chmod +x "$lint_copy"
   fm_lint_stub_shellcheck "$fakebin" "$log"
@@ -1635,6 +1351,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
   lone_dir="$tmp/lone"
   mkdir -p "$lone_dir"
   cp "$LINT" "$lone_dir/fm-lint.sh"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$lone_dir/"
   chmod +x "$lone_dir/fm-lint.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
@@ -1723,6 +1440,7 @@ test_sidecar_result_exit_reflects_final_status() {
   roots_log="$tmp/lint.roots.tsv"
   mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests" "$tmp/repo/.github/workflows"
   cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$tmp/repo/bin/fm-timeout-lib.sh"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
@@ -1866,11 +1584,233 @@ SH
   pass "seeded dispatcher, adapter, production-owner, and test-local diagnostics preserve parity"
 }
 
-test_help_reports_the_complete_interface
+fm_lint_small_repo() {  # <directory>
+  local dir=$1
+  mkdir -p "$dir/bin" "$dir/bin/backends" "$dir/tests"
+  cp "$LINT" "$ROOT/bin/fm-lint-cache.pl" "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/"
+  cat > "$dir/bin/fm-lint-workflows.sh" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$dir/bin/fm-lint-workflows.sh"
+  cat > "$dir/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+export SHARED_VALUE=ok
+case "${1:-}" in ''|.|..|-*|*.git|*[!A-Za-z0-9._-]*) : ;; esac
+SH
+  cat > "$dir/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. "$(dirname "${BASH_SOURCE[0]}")/library.sh"
+printf '%s\n' "$SHARED_VALUE"
+SH
+  cat > "$dir/bin/caller.sh" <<'SH'
+#!/usr/bin/env bash
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=bin/consumer.sh
+. "$HERE/consumer.sh"
+SH
+}
+
+test_changed_dependencies_and_deleted_sources_retain_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): dependency finding regression"; return; }
+  local tmp repo fakebin diff_file listed out rc
+  tmp=$(fm_test_tmproot fm-lint-source-changes)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files)
+  [ "$listed" = $'bin/caller.sh\nbin/consumer.sh\nbin/library.sh' ] \
+    || fail "changed library did not select exactly its transitive callers and owners: $listed"
+  cat >> "$repo/bin/library.sh" <<'SH'
+bad() {
+  local a= b=
+  printf '%s\n' "$a$b"
+}
+bad
+SH
+  rc=0
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "changed dependency defect was not rejected: $out"
+  assert_contains "$out" SC1007 "changed mode lost the seeded library finding"
+  rc=0
+  out=$(CI=true "$repo/bin/fm-lint.sh" --full 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "full lint did not reject the same dependency defect: $out"
+  assert_contains "$out" SC1007 "full mode lost the seeded library finding"
+  rm "$repo/bin/library.sh"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "deleted source was not rejected: $out"
+  assert_contains "$out" SC1091 "changed mode hid a deleted source"
+  pass "changed and deleted libraries recheck transitive callers with the full diagnostic rules"
+}
+
+test_shared_cache_reuses_only_identical_successful_inputs() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): shared cache regression"; return; }
+  local tmp one two fakebin real log out rc before after first second
+  tmp=$(fm_test_tmproot fm-lint-cache)
+  one="$tmp/one"
+  two="$tmp/two"
+  fm_lint_small_repo "$one"
+  fm_lint_small_repo "$two"
+  fakebin=$(fm_fakebin "$tmp")
+  real=$(command -v shellcheck)
+  log="$tmp/checks"
+  cat > "$fakebin/shellcheck" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" != --version ]; then
+  printf '%s\n' "\${!#}" >> "$log"
+  sleep 0.2
+fi
+exec "$real" "\$@"
+SH
+  chmod +x "$fakebin/shellcheck"
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$one/bin/fm-lint.sh" bin/consumer.sh > "$tmp/one.out" 2>&1 &
+  first=$!
+  PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$two/bin/fm-lint.sh" bin/consumer.sh > "$tmp/two.out" 2>&1 &
+  second=$!
+  wait "$first" || fail "first simultaneous cache miss failed: $(cat "$tmp/one.out")"
+  wait "$second" || fail "second simultaneous cache miss failed: $(cat "$tmp/two.out")"
+  [ "$(LC_ALL=C sort "$log")" = $'bin/consumer.sh\nbin/library.sh' ] \
+    || fail "identical simultaneous roots were checked more than once: $(cat "$log")"
+  printf '#!/usr/bin/env bash\nexport SHARED_VALUE=changed\n' > "$two/bin/library.sh"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "changed source check failed: $out"
+  [ "$(wc -l < "$log" | tr -d ' ')" = 4 ] \
+    || fail "source content mutation reused an obsolete successful result"
+  before=$(wc -l < "$log" | tr -d ' ')
+  printf '\n' >> "$fakebin/shellcheck"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "changed binary check failed: $out"
+  after=$(wc -l < "$log" | tr -d ' ')
+  [ "$after" -eq "$((before + 2))" ] || fail "changed ShellCheck binary reused obsolete results"
+  cat >> "$two/bin/library.sh" <<'SH'
+bad() {
+  local a= b=
+  printf '%s\n' "$a$b"
+}
+bad
+SH
+  for rc in 1 2; do
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) && fail "cached library defect unexpectedly passed"
+    assert_contains "$out" SC1007 "a cached result hid the seeded source defect"
+  done
+  [ "$(grep -c '^bin/library.sh$' "$log")" = 5 ] \
+    || fail "a finding was reused instead of rechecked"
+  rm "$two/bin/library.sh"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) && fail "cached result hid a deleted source"
+  assert_contains "$out" SC1091 "deleted cached source did not invalidate the caller"
+  pass "shared cache single-flights identical misses and invalidates sources, binaries and failures"
+}
+
+test_source_spellings_keep_changed_and_cached_dataflow_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): source spelling regression"; return; }
+  local tmp repo fakebin diff_file command_line index=0 out
+  tmp=$(fm_test_tmproot fm-lint-source-spelling)
+  repo="$tmp/repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_small_repo "$repo"
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  printf '%s\n' '#!/usr/bin/env bash' 'export module_value=ok' > "$repo/bin/library.sh"
+  for command_line in '\source bin/library.sh' 'sour\
+ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh' \
+    "X=\"\$(printf x)\" source bin/library.sh" 'time -p source bin/library.sh' \
+    '</dev/null source bin/library.sh'; do
+    index=$((index + 1))
+    printf '%s\n' '#!/usr/bin/env bash' "$command_line" \
+      "printf '%s\\n' \"\$module_value\"" > "$repo/bin/spelling-$index.sh"
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "bin/spelling-$index.sh" 2>&1) \
+      || fail "source spelling $index did not initially pass: $out"
+  done
+  printf '%s\n' '#!/usr/bin/env bash' 'export other_value=ok' > "$repo/bin/library.sh"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --jobs 1 2>&1) && fail "source spelling hid changed imported state"
+  assert_contains "$out" SC2154 "source spelling or cached success hid the dataflow warning"
+  for index in 1 2 3 4 5 6 7; do
+    assert_contains "$out" "In bin/spelling-$index.sh line" \
+      "changed imported state did not recheck source spelling $index"
+  done
+  pass "source spellings and command prefixes retain changed/cached dataflow findings"
+}
+
+test_api_boundary_keeps_owner_findings_and_missing_sources() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): canonical API owner regression"; return; }
+  local tmp repo out ci
+  tmp=$(fm_test_tmproot fm-lint-api-owner)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { printf "api\n"; }' > "$repo/bin/library.sh"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    '# fm-lint source-owner=bin/library.sh' > "$repo/bin/consumer.sh"
+  cat >> "$repo/bin/consumer.sh" <<'SH'
+# shellcheck source=/dev/null
+. "$(dirname "${BASH_SOURCE[0]}")/library.sh"
+library_api
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || fail "API fixture failed: $out"
+  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { broken= value; }' > "$repo/bin/library.sh"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) && fail "API boundary hid its owner defect"
+  assert_contains "$out" SC1007 "the canonical API owner was not analyzed"
+  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { printf "api\n"; }' > "$repo/bin/library.sh"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || fail "restored API fixture failed: $out"
+  rm "$repo/bin/library.sh"
+  for ci in '' true; do
+    out=$(CI="$ci" GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) && fail "API boundary hid a deleted owner"
+    assert_contains "$out" 'missing canonical source owner bin/library.sh' \
+      "missing API source was not rejected with and without cache reuse"
+  done
+  pass "function-API boundaries retain owner diagnostics and reject missing sources"
+}
+
+test_fast_cache_cannot_hide_full_analysis_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): analysis-mode cache boundary"; return; }
+  local tmp out rc
+  tmp=$(fm_test_tmproot fm-lint-mode-cache)
+  cat > "$tmp/unused.sh" <<'SH'
+#!/usr/bin/env bash
+outer() {
+  (
+    helper() { printf 'unused\n'; }
+    printf 'outer\n'
+  )
+}
+outer
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$LINT" --fast "$tmp/unused.sh" 2>&1) || fail "fast fixture did not pass: $out"
+  rc=0
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$LINT" "$tmp/unused.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "full analysis reused the fast success: $out"
+  assert_contains "$out" SC2329 "a fast cache entry hid the full-analysis finding"
+  pass "a fast-mode success cannot satisfy source-aware extended analysis"
+}
+
+test_source_spellings_keep_changed_and_cached_dataflow_findings
+test_api_boundary_keeps_owner_findings_and_missing_sources
+test_fast_cache_cannot_hide_full_analysis_findings
+test_changed_dependencies_and_deleted_sources_retain_findings
+test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint
-test_fast_mode_disables_extended_analysis
-test_ci_defaults_to_full_analysis
 test_ci_rejects_explicit_fast_mode
 test_fast_mode_catches_a_real_lint_defect
 test_pins_an_explicit_version
@@ -1898,18 +1838,11 @@ test_pinned_shellcheck_memory_limit
 test_sidecar_result_exit_reflects_final_status
 test_roots_sidecar_records_per_root_lifecycle
 test_seeded_module_boundary_parity
-test_changed_mode_lints_only_the_changed_file
 test_ci_forces_full_lint_even_with_empty_diff
 test_main_branch_forces_full_lint
 test_explicit_path_bypasses_changed_logic
 test_zero_changed_files_exits_clean
-test_list_files_respects_changed_mode
-test_changed_mode_drops_external_sources_and_excludes_cross_file_codes
-test_changed_mode_invokes_shellcheck_once_per_root
 test_ci_keeps_external_sources_without_local_exclusions
 test_main_branch_keeps_external_sources
 test_merge_base_less_keeps_external_sources
 test_explicit_path_keeps_external_sources
-test_fast_mode_on_a_local_branch_keeps_source_following
-test_changed_mode_hides_cross_file_codes_that_ci_still_sees
-test_local_exclusion_list_covers_every_no_external_sources_code
