@@ -13,7 +13,7 @@ FM_CLAUDE_LAUNCHER_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_CLAUDE_LAUNCHER_LIB_DIR/fm-config-inherit-lib.sh"
 
 # fm_claude_launcher_select <config-dir>
-# Prints the executable a Claude template launch starts: `claude` when
+# Prints the executable a Claude launch starts: `claude` when
 # <config-dir>/claude-launcher is absent, or bin/fm-teamclaude-launch.sh when
 # the file holds `teamclaude` and that launcher's --check passes. Any other
 # content, an unreadable file, a relative XDG_CONFIG_HOME or TEAMCLAUDE_CONFIG

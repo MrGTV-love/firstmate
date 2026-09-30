@@ -4,12 +4,15 @@
 # Usage:
 #   fm-teamclaude-launch.sh --check
 #   fm-teamclaude-launch.sh <claude-argument>...
+#   fm-teamclaude-launch.sh --exec <command>...
 #
 # config/claude-launcher=teamclaude makes fm-spawn's Claude launch command run
 # this wrapper in place of `claude`, so every path that builds that command -
 # fresh spawn, --relaunch, fm-control relaunch, the session-end auto-relaunch,
 # and secondmate launch and restart - reaches Claude through the proxy on every
-# runtime backend, with no dependence on a shell alias in the pane.
+# runtime backend, with no dependence on a shell alias in the pane. A raw
+# launch command whose harness is claude runs through --exec, which applies the
+# same environment and then replaces itself with that command, unchanged.
 #
 # The wrapper resolves TeamClaude on each host, requires its status endpoint to
 # answer, takes the client environment from `teamclaude env` (TeamClaude's own
@@ -98,6 +101,12 @@ if [ "${1:-}" = --check ]; then
   exit 0
 fi
 
+if [ "${1:-}" = --exec ]; then
+  shift
+  [ "$#" -gt 0 ] || fail '--exec needs a command to run'
+else
+  set -- claude "$@"
+fi
 apply_proxy_env
 unset FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
-exec claude "$@"
+exec "$@"

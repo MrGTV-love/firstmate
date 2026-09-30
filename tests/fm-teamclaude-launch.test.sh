@@ -172,6 +172,26 @@ test_nvm_install_is_found_and_runs_with_its_own_node() {
   pass "one nvm-installed teamclaude runs with its own node; two refuse as ambiguous"
 }
 
+test_exec_runs_the_given_command_with_the_proxy() {
+  local dir out rc
+  dir=$(new_case exec)
+  fm_test_fake_teamclaude "$dir/fakebin"
+  out=$(run_launcher "$dir" --exec /bin/sh -c 'claude --model opus'); rc=$?
+  expect_code 0 "$rc" "--exec should run the given command against a live proxy"$'\n'"$out"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$dir/claude-env" \
+    || fail "the --exec command must receive HTTPS_PROXY from teamclaude env"
+  [ "$(cat "$dir/claude-env.args")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the --exec command must run with its own arguments: $(cat "$dir/claude-env.args")"
+  rm -f "$dir/claude-env" "$dir/claude-env.args"
+  out=$(FM_FAKE_TEAMCLAUDE_STATUS=1 run_launcher "$dir" --exec /bin/sh -c 'claude --model opus'); rc=$?
+  expect_code 1 "$rc" "--exec must refuse against a stopped proxy"
+  assert_absent "$dir/claude-env" "a refused --exec must not run its command"
+  out=$(run_launcher "$dir" --exec); rc=$?
+  expect_code 1 "$rc" "--exec with no command must refuse"
+  assert_absent "$dir/claude-env" "an empty --exec must not start claude"
+  pass "--exec runs the given command unchanged with the TeamClaude proxy, and refuses without one"
+}
+
 test_check_validates_without_starting_claude() {
   local dir out rc
   dir=$(new_case check)
@@ -193,6 +213,7 @@ test_missing_teamclaude_refuses_without_starting_claude
 test_export_without_a_proxy_setting_refuses
 test_nvm_install_is_found_and_runs_with_its_own_node
 test_check_validates_without_starting_claude
+test_exec_runs_the_given_command_with_the_proxy
 test_config_paths_reach_teamclaude_but_not_claude
 
 echo "# all fm-teamclaude-launch tests passed"

@@ -844,7 +844,8 @@ TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclau
 Firstmate requires either override to be an absolute path.
 The launch hands it to the launcher's own `teamclaude` calls only, so the pane reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
-The [Claude API key guard](#claude-api-key-guard) applies unchanged, and a raw launch command is the caller's own and is not rewritten.
+The [Claude API key guard](#claude-api-key-guard) applies unchanged.
+A raw launch command whose program is `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
 `tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
 
