@@ -226,5 +226,26 @@ cp "$BASE" "$PUSH/home/config/model-index.json"
 config_push "$CATALOGS"
 assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid index must not be withheld'
 cmp -s "$BASE" "$PUSH/sm/config/model-index.json" || fail 'a valid index was not pushed'
-pass 'fm-config-push withholds an index with an absent id, pushes with a notice when catalogs are unreadable, and pushes a valid index'
+cat > "$PUSH/jqbin/pi" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --list-models ] || exit 0
+printf 'provider  model  context  max-out  thinking  images\n'
+cat "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/listed" 2>/dev/null
+SH
+chmod +x "$PUSH/jqbin/pi"
+mkdir -p "$PUSH/pinned-pi" "$PUSH/ambient-pi"
+printf 'openai-codex  gpt-pinned  272K  32K  yes  no\n' > "$PUSH/pinned-pi/listed"
+printf 'openai-codex  gpt-ambient  272K  32K  yes  no\n' > "$PUSH/ambient-pi/listed"
+printf '%s\nopenai-codex\n' "$PUSH/pinned-pi" > "$PUSH/home/config/pi-account"
+printf '%s\n' '{"version":1,"roles":{"routine":{"pi":{"model":"openai-codex/gpt-pinned"}}},"retired":[]}' > "$PUSH/home/config/model-index.json"
+PI_CODING_AGENT_DIR="$PUSH/ambient-pi" config_push ''
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "an id only the pinned Pi root lists must push: $(cat "$TMP_ROOT/push.out")"
+cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'the pinned-account index was not pushed'
+cp "$PUSH/sm/config/model-index.json" "$PUSH/prior-index.json"
+printf '%s\n' '{"version":1,"roles":{"routine":{"pi":{"model":"openai-codex/gpt-ambient"}}},"retired":[]}' > "$PUSH/home/config/model-index.json"
+PI_CODING_AGENT_DIR="$PUSH/ambient-pi" config_push ''
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json not pushed' 'an id only the ambient Pi root lists must be withheld under the pin'
+cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail 'an index absent from the pinned catalog reached the secondmate home'
+rm "$PUSH/home/config/pi-account"
+pass 'fm-config-push withholds an index with an absent id, pushes with a notice when catalogs are unreadable, pushes a valid index, and reads catalogs under the worker account pin'
 printf '# all fm-model-index tests passed\n'

@@ -1050,7 +1050,7 @@ A retired id also matches an id carrying a trailing context suffix, so retiring 
 Claude's catalog lists no suffixed aliases, so a Claude id such as `opus[1m]` is available when its base `opus` is listed.
 
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
-`bin/fm-config-push.sh` runs the same check before it pushes an index and withholds `model-index.json` from every home, exiting non-zero, when an id is absent from a readable catalog; an unavailable catalog is only a notice.
+`bin/fm-config-push.sh` runs the same check, under this home's `config/claude-account` and `config/pi-account` pins, before it pushes an index and withholds `model-index.json` from every home, exiting non-zero, when an id is absent from a readable catalog or a declared pin does not resolve; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
