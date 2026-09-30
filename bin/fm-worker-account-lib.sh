@@ -270,31 +270,29 @@ fm_worker_account_select() {
   printf '%s\t%s\t%s\n' "$declared" "$root" "$provider"
 }
 
-# fm_worker_account_run [<harness> <root>]... -- <command...>
-# Runs a read-only command under the accounts pinned launches of each <harness>
-# select: a Claude root (unset for ordinary) with the outranking credentials
-# shed, and a Pi root. Credentials and pins are never changed.
+# fm_worker_account_run <harness> <root> <command...>
+# Runs a read-only command under the account a pinned launch of <harness>
+# selects: a Claude root (unset for ordinary) with the outranking credentials
+# shed, or a Pi root. Only that runner's account variables change, so another
+# runner's credentials are never shed; credentials and pins are never changed.
 fm_worker_account_run() {
-  local var
-  local -a prefix=(env) assignments=()
-  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
-    case "$1" in
-    claude)
-      for var in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-        prefix+=(-u "$var")
-      done
-      if [ -n "$2" ]; then
-        assignments+=("CLAUDE_CONFIG_DIR=$2")
-      else
-        prefix+=(-u CLAUDE_CONFIG_DIR)
-      fi
-      ;;
-    pi | pi-signed) assignments+=("PI_CODING_AGENT_DIR=$2") ;;
-    esac
-    shift 2
-  done
-  shift
-  "${prefix[@]}" ${assignments[@]+"${assignments[@]}"} "$@"
+  local harness=$1 root=$2 var
+  local -a prefix=(env)
+  shift 2
+  case "$harness" in
+  claude)
+    for var in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+      prefix+=(-u "$var")
+    done
+    if [ -n "$root" ]; then
+      prefix+=("CLAUDE_CONFIG_DIR=$root")
+    else
+      prefix+=(-u CLAUDE_CONFIG_DIR)
+    fi
+    ;;
+  pi | pi-signed) prefix+=("PI_CODING_AGENT_DIR=$root") ;;
+  esac
+  "${prefix[@]}" "$@"
 }
 
 # fm_worker_account_claude_shed

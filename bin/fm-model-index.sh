@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # fm-model-index.sh - validate the home model index and resolve dispatch roles.
-# Usage: fm-model-index.sh check [<harness> <model>]
+# Usage: fm-model-index.sh check [<harness> [<model>]]
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
 #        fm-model-index.sh profiles <crew-dispatch.json>
 # Schema owner: docs/configuration.md "Fleet model index".
-# check with no arguments is the index-edit check (run it before fm-config-push):
-# every active id, including stand-ins, against its own harness catalog.
+# check with no arguments is the index-edit check: every active id, including
+# stand-ins, against its own harness catalog. check <harness> checks only that
+# harness's entries, so fm-config-push can run each under its own account.
 # check <harness> <model> is the spawn and intake check of one selected id: a
 # retired id refuses, and an id that is that harness's index entry is checked
 # against that harness catalog in the caller's environment, so the caller
@@ -50,7 +51,7 @@ usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|check:2|model:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+case "$VERB:$#" in check:0|check:1|check:2|model:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
   case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
   printf '%s\n' "$2"
@@ -65,7 +66,7 @@ if [ -e "$INDEX" ] || [ -L "$INDEX" ]; then
   cp "$INDEX" "$TMP/index.json" || die 'could not snapshot index'
   HAVE_INDEX=1
 else
-  [ "$VERB:$#" != check:0 ] || die "index required: $INDEX"
+  [ "$VERB" != check ] || [ "$#" = 2 ] || die "index required: $INDEX"
   printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$TMP/index.json"
 fi
 jq -e '
@@ -167,17 +168,16 @@ refuse_retired() { # <harness> <model> <where>
 }
 
 if [ "$VERB" = check ]; then
-  [ "$#" = 0 ] || refuse_retired "$1" "$2" 'selected'
+  [ "$#" != 2 ] || refuse_retired "$1" "$2" 'selected'
   while IFS=$'\t' read -r role harness model <&3; do
     [ -n "$harness" ] || continue
-    if [ "$#" = 2 ]; then
-      [ "$harness" = "$1" ] && [ "$model" = "$2" ] || continue
-    fi
+    [ "$#" = 0 ] || [ "$harness" = "$1" ] || continue
+    [ "$#" != 2 ] || [ "$model" = "$2" ] || continue
     refuse_retired "$harness" "$model" "in role '$role'"
     check_entry "$role" "$harness" "$model"
-    [ "$#" = 0 ] || break
+    [ "$#" != 2 ] || break
   done 3< "$TMP/entries"
-  [ "$#" = 2 ] || printf 'model-index: every active id checked; none absent or retired\n'
+  [ "$#" = 2 ] || printf 'model-index: active ids checked; none absent or retired\n'
   exit 0
 fi
 

@@ -515,7 +515,7 @@ if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
   chosen_root=${chosen_account#*$'\t'}
   chosen_root=${chosen_root%%$'\t'*}
   if [ -n "$chosen_account" ]; then
-    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_run "$chosen_harness" "$chosen_root" -- \
+    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_run "$chosen_harness" "$chosen_root" \
       "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
   else
     FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
