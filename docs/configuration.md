@@ -1131,11 +1131,70 @@ Worker account pins likewise apply their credential shedding and selected accoun
 
 [`bin/fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) owns the guard mechanics shared by `fm-spawn.sh` and `fm-control.sh`, and [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
 
+## Fleet model index (config/model-index.json)
+
+The optional local, gitignored `config/model-index.json` is the fleet's role-to-model policy, not a replacement for a harness's authoritative model catalog.
+It is inherited into secondmate homes through the same primary-authoritative configuration path as `crew-dispatch.json`.
+It does not change commit-attribution preferences.
+
+```json
+{
+  "version": 1,
+  "roles": {
+    "opus-grade": {
+      "claude": { "model": "opus" },
+      "codex": { "model": "gpt-6.1-sol" },
+      "omp": { "model": "openai-codex/gpt-6.1-sol" }
+    },
+    "sonnet-grade": {
+      "claude": { "model": "sonnet" },
+      "omp": {
+        "model": "anthropic/claude-sonnet-5-5",
+        "stand_in": "openrouter/z-ai/glm-5.3"
+      }
+    }
+  },
+  "retired": ["gpt-6-sol"]
+}
+```
+
+`version` must be `1`, `roles` must be an object keyed by non-empty role names, and `retired` must be an array of non-empty model ids.
+Each role contains one or more verified harness names, each with a required `model` string and an optional `stand_in` string, with no other entry fields.
+Names and ids cannot contain whitespace or control characters.
+Use the exact selector returned by that harness's current catalog; the example is illustrative, not a guarantee that every installation offers those ids.
+A retired bare id also refuses a provider-qualified selector ending in that id; a qualified retired id refuses that exact selector.
+Catalog aliases whose resolved underlying id is retired are also refused.
+Retired ids are historical prohibitions, not active entries that must remain in a vendor catalog.
+
+A dispatch profile names either `role` or a literal `model`, never both.
+An optional boolean `stand_in: true` selects that harness's explicitly configured stand-in for the role.
+Stand-ins never become automatic catalog-failure or quota fallbacks.
+The existing profile-array quota decision remains responsible for choosing among concrete candidates.
+An unknown role, absent harness mapping, missing requested stand-in, malformed index, retired id, unavailable catalog, or catalog-absent active id refuses resolution.
+Literal profiles and homes without an index retain their existing behavior, except that a configured retired list also applies to literals.
+
+Run `bin/fm-model-index.sh check` after every index edit, before propagating the index with `bin/fm-config-push.sh`.
+Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
+Typed intake performs this transformation before model-aware effort checks and quota matching.
+Typed intake freezes the index alongside its rules snapshot and applies the never-send filter before any live catalog request.
+For a manually selected profile, pass `--model role:<role>` or `--model stand-in:<role>` to `fm-spawn.sh`, or use the concrete id returned by `fm-model-index.sh resolve`.
+Spawn resolves role references before its existing model validation and records and launches only the resulting concrete id.
+Every intake transformation and spawn model check revalidates all active index ids, including unselected stand-ins, so an unchecked model-index edit cannot silently launch a role.
+The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.
+Bootstrap uses an offline schema-and-retirement inspection for its local diagnostics; live catalog validation stays at intake and spawn rather than introducing network requests into the local bootstrap phase.
+
+The command's header and `--help` own discovery commands and the authoritative-export interface.
+Native discovery covers Codex, Claude, omp, Pi, OpenCode, Cursor, and Antigravity; harnesses without an automated catalog surface require a current export from their own documented discovery surface.
+An export directory supplies all required harness catalogs, never an unrelated harness's catalog as a substitute.
+OpenRouter selectors additionally require their underlying id in OpenRouter's model API.
+An unreachable or missing catalog is an actionable check failure, not evidence that an id exists.
+`tests/fm-model-index.test.sh` exercises role resolution, stand-ins, retirement, missing catalogs, absent ids, native catalog parsing, and inherited index changes.
+
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4 and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`.
+Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes the selected profile to `fm-spawn.sh`.
 
 **Spawn requirements**
 
@@ -1177,7 +1236,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | Rule `when` and `use` | Required for each rule. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
-| Profile `model` and `effort`; rule `why` | Optional. |
+| Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
 
 **Fields applied only by typed resolution**
 
@@ -1397,7 +1456,8 @@ Every result above exits 0.
 **Firstmate retains the dispatch decision**
 
 The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captain-approval gate, or `fm-spawn.sh` validation; `AGENTS.md` section 4 owns what firstmate does with each outcome.
-A `clear` result still leaves catalog/authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
+A `clear` result still leaves authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
+Model-index resolution enforces its own catalog contract before ranking.
 
 Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
 

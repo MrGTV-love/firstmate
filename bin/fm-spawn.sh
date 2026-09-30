@@ -85,6 +85,8 @@
 #   only a shell that will not go refuses.
 #   --harness <name> is the explicit per-spawn harness/profile adapter. The old
 #   positional harness arg still works for back-compat.
+#   --model role:<role> or stand-in:<role> resolves the home model index before
+#   validation; metadata and launch flags always contain the concrete id.
 #   --model <name> and --effort <low|medium|high|xhigh|max|ultra> are concrete profile
 #   axes chosen by firstmate at intake. They are only threaded into harnesses whose
 #   installed CLIs were verified to support that axis; unsupported axes are omitted
@@ -2390,6 +2392,23 @@ if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; t
     # shellcheck disable=SC2016
     COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
   fi
+fi
+
+# Resolve a role exactly once, before any model-aware launch validation. Literal
+# profiles retain their id, but an active index still refuses retired ids.
+if [ -n "$MODEL" ]; then
+  case "$MODEL" in role:*|stand-in:*)
+    [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
+    MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+    ;;
+  *)
+    if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
+      MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+    fi
+    ;;
+  esac
+elif [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
+  "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null || exit 1
 fi
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
