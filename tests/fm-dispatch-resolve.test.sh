@@ -958,20 +958,32 @@ cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.97,"default":0.03}}}}
 JSON
 
-# omp's pooled Codex accounts rank on the visible account only as a through_reset lower bound.
+# omp's pooled Codex accounts rank on the visible account as a lower bound,
+# through the same task-horizon classification as a single account.
 jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"}]' "$GUARD_RULES" > "$RULES"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "a through_reset visible account proves pool runway"
 assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible' "the pool ranks on its visible lower bound"
 assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "the pooled lane can be auto-selected"
-for snapshot in "$TMP_ROOT/guard-early-long.json" "$TMP_ROOT/guard-exhausted_now.json" "$SCHEMA6_NATIVE"; do
+for name in long early-long early-short unknown; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "a $name visible reading ranks the pool"
+  assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "a $name visible reading authorizes the pooled profile"
+done
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-long.json" run code out err "$BRIEF"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "an established short visible projection is not viable"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (established runway shorter than the 240-minute task horizon): disclosed uncertainty [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' "a short pool stays eligible but unranked"
+assert_not_contains "$out" '  profile:' "a short pool cannot authorize a profile"
+for snapshot in "$TMP_ROOT/guard-exhausted_now.json" "$SCHEMA6_NATIVE"; do
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
-  assert_contains "$out" '  status: escalate' "a visible account without through_reset evidence cannot clear the pool"
-  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account, which lacks through_reset evidence' "pool uncertainty is stated on the candidate"
-  assert_contains "$out" '[warning: ' "the visible account's runway is disclosed"
+  assert_contains "$out" '  status: escalate' "an exhausted visible account cannot clear the pool"
+  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models)' "pool uncertainty is stated on the candidate"
+  assert_contains "$out" '[warning: exhausted_now at all_models]' "the visible account's exhaustion is disclosed"
   assert_not_contains "$out" 'remaining=' "single-account headroom is not shown as pool headroom"
   assert_not_contains "$out" 'not eligible' "single-account exhaustion cannot veto the pool"
-  assert_not_contains "$out" '  profile:' "an unproven pool cannot authorize a profile"
+  assert_not_contains "$out" '  profile:' "an exhausted visible account cannot authorize a profile"
 done
 # A declared profile floor stays a captain veto for the pool.
 jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex",floor:{scope:"all_models",min_percent:50}}]' "$GUARD_RULES" > "$RULES"
@@ -981,8 +993,8 @@ for snapshot in "$TMP_ROOT/guard-safe.json" "$TMP_ROOT/guard-exhausted_now.json"
   assert_not_contains "$out" 'unranked' "a floor shortfall is not reported as an eligible alternative"
 done
 jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-long.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: clear' "pool uncertainty does not block a measured candidate"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "an unranked short pool does not block a measured candidate"
 assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "the measured profile clears beside the unranked pool"
 assert_contains "$out" '  note: 1 eligible candidate(s) unranked (codex)' "a clear choice still discloses pool uncertainty"
 

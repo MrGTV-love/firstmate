@@ -28,8 +28,9 @@
 #   compatibility floor in bin/fm-quota-axi-lib.sh (schema 5 or 6).
 #   Individual-account candidates bind through that library's quota_row join;
 #   an expanded provider with no matching row stays eligible but unranked, and
-#   omp's Codex pool ranks on its visible account only when that lower bound is
-#   through_reset. Ranking uses the spendPriority argmax over the matched
+#   omp's Codex pool ranks on its visible account as a lower bound, except that
+#   an exhausted or established-short reading leaves the pool unranked rather
+#   than vetoed. Ranking uses the spendPriority argmax over the matched
 #   rule's candidates; a winner whose established projected runway is shorter
 #   than the task horizon (top-level `task_horizon_minutes`, default 240)
 #   escalates, while early or unknown projections are disclosed warnings. The model never sees quota, catalogs, approvals,
@@ -445,15 +446,15 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     (if $p == null then [] else applicable($p; $lane; ($c.model // "")) end) as $rows |
     ($base.eligible and (($base.unranked // false) | not)) as $ranked |
     ($c.harness == "omp" and $p == "codex") as $pooled |
-    ([$rows[] | select((.runway.status // "unknown") != "through_reset") | runway_note(.)]) as $visible |
     ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
+    any($rows[]; runway_class(.) == "short") as $short |
     if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
-    elif $pooled and (($ranked and ($visible | length) == 0) | not) then
+    elif $pooled and (($base.eligible | not) or ($ranked and $short)) then
       {profile: $c, provider: $p, eligible: true, unranked: true,
-       reason: "omp Codex account pool is only lower-bounded by its visible account, which lacks through_reset evidence (\(if $ranked then "runway" else $base.reason end))"}
-      + (if ($visible | length) > 0 then {warning: ($visible | join("; "))} else {} end)
+       reason: "omp Codex account pool is only lower-bounded by its visible account (\(if $ranked then "established runway shorter than the \(horizon_seconds / 60)-minute task horizon" else $base.reason end))"}
+      + (if ($risks | length) > 0 then {warning: ($risks | join("; "))} else {} end)
     elif $ranked and ($risks | length) > 0 then
-      $base + {warning: ($risks | join("; ")), short: any($rows[]; runway_class(.) == "short")}
+      $base + {warning: ($risks | join("; ")), short: $short}
     else $base end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
