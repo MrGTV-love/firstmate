@@ -391,7 +391,7 @@ The default 300-second grace is unchanged.
 Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
 The main shell enforces the check deadline even if the check's timeout controller stops responding.
-Home-summary publication and process-event source reconciliation run separately, single-flight, so their inventory-sized work does not delay the main poll.
+Home-summary publication is single-flight, and process-event source reconciliation is single-flight within one watcher process; both run separately so their inventory-sized work does not delay the main poll.
 Captured process-event results remain durable and are observed each poll, including while reconciliation is still running.
 There is no independent heartbeat timer: a main shell blocked on an unbounded operation, stopped, or dead stops publishing progress and becomes stale.
 Subprocesses doing scan or capture work cannot beat for a stopped main shell.
