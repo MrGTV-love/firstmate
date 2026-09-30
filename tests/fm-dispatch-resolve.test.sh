@@ -665,22 +665,24 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$PARTIAL" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible' "a known row from a partial provider remains rankable"
 assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "partial provider evidence can win the argmax"
 
+CLAUDE_SAFE="$TMP_ROOT/claude-safe.json"
+jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability[].runway.status) = "through_reset"' "$QUOTA" > "$CLAUDE_SAFE"
 PARTIAL_UNKNOWN="$TMP_ROOT/partial-unknown.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) |= (.status = "partial" | .effectiveAvailability += [
   {"scope":"model:cursor-grok-4.6-medium","status":"unknown","runway":{"status":"unknown"}}
-])' "$QUOTA" > "$PARTIAL_UNKNOWN"
+])' "$CLAUDE_SAFE" > "$PARTIAL_UNKNOWN"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$PARTIAL_UNKNOWN" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=model:cursor-grok-4.6-medium  remaining=-%  spendPriority=-  runway=-  bounds=all_models:91%/through_reset,model:cursor-grok-4.6-medium:-%/unknown  -> eligible, unranked: quota row model:cursor-grok-4.6-medium unknown: not rankable: disclosed uncertainty' "an unknown exact-model row preserves partial known evidence without ranking"
-assert_contains "$out" '  quota_summary:' "every unknown provider is summarized on escalation"
-assert_contains "$out" '  status: escalate' "the remaining measured candidate needs proven runway"
+assert_contains "$out" '  note: 2 eligible candidate(s) unranked (cursor, kimi)' "clear result lists every provider with unranked uncertainty"
+assert_contains "$out" "  profile: --harness 'claude' --model 'sonnet' --effort 'high'" "another measured through_reset candidate can clear"
 
 PARTIAL_EXHAUSTED="$TMP_ROOT/partial-exhausted.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) |= (.status = "partial" | .effectiveAvailability += [
   {"scope":"model:cursor-grok-4.6-medium","status":"unknown","runway":{"status":"unknown"}}
-] | .effectiveAvailability[] |= if .scope == "all_models" then .effectivePercentRemaining = 0 | .runway.status = "exhausted_now" else . end)' "$QUOTA" > "$PARTIAL_EXHAUSTED"
+] | .effectiveAvailability[] |= if .scope == "all_models" then .effectivePercentRemaining = 0 | .runway.status = "exhausted_now" else . end)' "$CLAUDE_SAFE" > "$PARTIAL_EXHAUSTED"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$PARTIAL_EXHAUSTED" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  bounds=all_models:0%/exhausted_now,model:cursor-grok-4.6-medium:-%/unknown  -> not eligible: runway exhausted_now at all_models' "known exhaustion vetoes a candidate despite unknown exact-model evidence"
-assert_contains "$out" '  quota_summary:' "exhaustion and unranked evidence are summarized"
+assert_contains "$out" '  note: 1 eligible candidate(s) unranked (kimi)' "an exhausted candidate is excluded from the unranked uncertainty note"
 
 UNKNOWN_EXHAUSTED="$TMP_ROOT/unknown-exhausted.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics) = {
@@ -694,10 +696,10 @@ assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=curso
 NO_APPLICABLE="$TMP_ROOT/no-applicable.json"
 jq '(.providers[] | select(.provider == "cursor") | .quotaSemantics.effectiveAvailability) = [
   {"scope":"model:other","status":"known","effectivePercentRemaining":91,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.8}}
-]' "$QUOTA" > "$NO_APPLICABLE"
+]' "$CLAUDE_SAFE" > "$NO_APPLICABLE"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$NO_APPLICABLE" run code out err "$BRIEF"
 assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  -> eligible, unranked: no applicable quota row for provider cursor: disclosed uncertainty' "a candidate without an applicable row remains eligible but unranked"
-assert_contains "$out" '  quota_summary:' "no-applicable-row uncertainty appears in the summary"
+assert_contains "$out" '  note: 2 eligible candidate(s) unranked (cursor, kimi)' "no-applicable-row uncertainty appears in the clear-result note"
 pass "partial and missing quota evidence remain eligible but unranked"
 
 # --- provider-wide rows remain bounds beside exact model rows ------------------
@@ -731,6 +733,7 @@ pass "default: no rule matched resolves among the default profiles"
 reset_log
 TIE="$TMP_ROOT/tie.json"
 write_quota "$TIE" 0.5 0.5
+jq '(.providers[] | select(.provider == "claude") | .quotaSemantics.effectiveAvailability[].runway.status) = "through_reset"' "$TIE" > "$TIE.tmp" && mv "$TIE.tmp" "$TIE"
 write_response "$RESPONSE" default 0.88
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TIE" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "tie escalates"
@@ -835,8 +838,11 @@ jq '.schemaVersion = 5 | .providers |= map(select(.accountKey != "openai-codex")
 reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$SCHEMA5_PAIR" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "schema 5 keeps joining by provider alone"
-assert_contains "$out" '  reason: genuine spendPriority tie' "every codex profile reads the one schema 5 codex row"
 assert_contains "$out" 'candidate: codex:gpt-5.6-sol  provider=codex  scope=all_models  remaining=11%  spendPriority=-5.6819  runway=projected_exhaustion  -> eligible' "a schema 5 row never needs accountKey"
+jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[].runway.status) = "through_reset"' "$SCHEMA5_PAIR" > "$TMP_ROOT/schema5-pair-safe.json"
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/schema5-pair-safe.json" run code out err "$BRIEF"
+assert_contains "$out" '  reason: genuine spendPriority tie' "every codex profile reads the one schema 5 codex row"
 
 SCHEMA6_PI_NATIVE="$TMP_ROOT/schema6-pi-native.json"
 jq '.providers |= map(select(.provider != "codex" or .accountKey != "default"))' "$SCHEMA6_NATIVE" > "$SCHEMA6_PI_NATIVE"
@@ -886,8 +892,10 @@ jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvai
   (.effectivePercentRemaining = 6 | .selection.spendPriority = 0.9)' "$QUOTA" > "$GUARD_QUOTA"
 reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
-assert_contains "$out" '  status: escalate' "a projected-exhaustion winner does not authorize dispatch"
-assert_contains "$out" '  quota_summary: codex:gpt-6-luna: projected_exhaustion at all_models' "the summary names the selected candidate's risk"
+assert_contains "$out" '  status: escalate' "a projected-exhaustion candidate does not authorize dispatch"
+assert_contains "$out" '  reason: no rankable candidate in rule_1 has through_reset runway on every applicable bound' "escalation names the missing through_reset evidence"
+assert_contains "$out" 'candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models; completion runway unproven]' "the candidate names its runway risk"
+assert_not_contains "$out" '  profile:' "projected exhaustion emits no dispatch profile"
 # Only runway changes: a low percentage alone is not a fabricated generic floor.
 jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[].runway.status) = "through_reset"' "$GUARD_QUOTA" > "$TMP_ROOT/guard-safe.json"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
@@ -897,7 +905,6 @@ for runway in unknown exhausted_now; do
   jq --arg runway "$runway" '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[].runway.status) = $runway' "$GUARD_QUOTA" > "$TMP_ROOT/guard-$runway.json"
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$runway.json" run code out err "$BRIEF"
   assert_contains "$out" '  status: escalate' "$runway never authorizes a profile"
-  assert_contains "$out" '  quota_summary:' "$runway is summarized"
   assert_contains "$out" "$runway at all_models" "$runway names its bound"
   assert_not_contains "$out" '  profile:' "$runway emits no dispatch profile"
 done
@@ -908,40 +915,65 @@ jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvai
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-bound.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "every applicable bound participates in the runway guard"
 assert_contains "$out" '[warning: projected_exhaustion at model:gpt-6-luna;' "the candidate names the non-limiting risk"
-# Do not silently choose a lower-ranked model when the winner's runway is uncertain.
+
+# The matched rule's own through_reset candidate is ranked when a higher
+# spendPriority candidate in that rule has unproven runway.
 jq '.rules[0].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
-assert_contains "$out" '  status: escalate' "a lower-ranked safe alternative does not silently replace the winner"
-assert_not_contains "$out" '  profile:' "a completion decision remains with firstmate"
+assert_contains "$out" '  status: clear' "a safe same-rule candidate clears"
+assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "the through_reset candidate is chosen over a higher-priority projection"
+assert_contains "$out" 'candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models; completion runway unproven]' "the skipped higher-priority candidate stays visible with its risk"
+# Every same-rule candidate tight: escalate rather than rank a projection.
+jq '.rules[0].use += [{harness:"claude",model:"sonnet",effort:"high"}]' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "no through_reset candidate in the rule escalates"
+assert_contains "$out" '  reason: no rankable candidate in rule_1 has through_reset runway on every applicable bound' "the tight rule is reported"
+assert_not_contains "$out" '  profile:' "a tight rule emits no dispatch profile"
+# A tight matched rule never falls back to another rule or the default array.
+jq '.rules += [{when:"Cheap chores.",use:{harness:"cursor",model:"cursor-grok-4.6-medium"}}]
+  | .default = [{harness:"cursor",model:"cursor-grok-4.6-high"}]' "$GUARD_RULES" > "$RULES"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.9,"rule_2":0.08,"default":0.02}}}}
+JSON
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "a tight matched rule escalates despite safe candidates elsewhere"
+assert_not_contains "$out" 'candidate: cursor' "no other rule's or default candidate is evaluated"
+assert_not_contains "$out" '  profile:' "no cross-rule or weaker-class downgrade is emitted"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.97,"default":0.03}}}}
+JSON
 
-# omp's pooled Codex accounts cannot bind to a native or Pi quota row.
+# omp's pooled Codex accounts rank on the visible account only as a lower bound.
 jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"}]' "$GUARD_RULES" > "$RULES"
-for snapshot in "$TMP_ROOT/guard-safe.json" "$GUARD_QUOTA" "$SCHEMA6_NATIVE"; do
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
-  assert_contains "$out" '  status: escalate' "an unmeasured account pool cannot clear"
-  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is unmeasured; a single-account quota row is not pool headroom' "pool uncertainty is stated on the candidate"
-  assert_contains "$out" '  quota_summary: omp:openai-codex/gpt-6-luna: omp Codex account pool is unmeasured' "pool uncertainty is summarized"
-  assert_not_contains "$out" 'remaining=' "single-account headroom is not shown as pool headroom"
-  assert_not_contains "$out" 'not eligible' "single-account exhaustion cannot veto an unmeasured pool"
-  assert_not_contains "$out" '  profile:' "the pool cannot authorize a profile"
-done
-jq '.rules[0].use += [{harness:"codex",model:"gpt-6-luna"}]' "$RULES" > "$TMP_ROOT/guard-pool-mixed.json"
-cp "$TMP_ROOT/guard-pool-mixed.json" "$RULES"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: clear' "pool uncertainty does not contaminate a measured native account"
-assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-6-luna'" "the measured native profile clears beside the unranked pool"
-assert_contains "$out" '  quota_summary: omp:openai-codex/gpt-6-luna: omp Codex account pool is unmeasured' "a clear native choice still discloses pool uncertainty"
+assert_contains "$out" '  status: clear' "a through_reset visible account proves pool runway"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible' "the pool ranks on its visible lower bound"
+assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "the pooled lane can be auto-selected"
+for snapshot in "$GUARD_QUOTA" "$TMP_ROOT/guard-exhausted_now.json" "$SCHEMA6_NATIVE"; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
+  assert_contains "$out" '  status: escalate' "a tight visible account cannot clear the pool"
+  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account, which lacks through_reset evidence' "pool uncertainty is stated on the candidate"
+  assert_contains "$out" '[warning: ' "the visible account's runway risk is disclosed"
+  assert_not_contains "$out" 'remaining=' "single-account headroom is not shown as pool headroom"
+  assert_not_contains "$out" 'not eligible' "single-account exhaustion cannot veto the pool"
+  assert_not_contains "$out" '  profile:' "an unproven pool cannot authorize a profile"
+done
+jq '.rules[0].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$RULES" > "$TMP_ROOT/guard-pool-mixed.json"
+cp "$TMP_ROOT/guard-pool-mixed.json" "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "pool uncertainty does not block a measured through_reset candidate"
+assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "the measured profile clears beside the unranked pool"
+assert_contains "$out" '  note: 1 eligible candidate(s) unranked (codex)' "a clear choice still discloses pool uncertainty"
 
 # OpenRouter absent rows and credit-only rows are uncertainty, not quota runway.
 jq '.rules[0].use = [{harness:"omp",model:"openrouter/provider/model",provider:"openrouter"}]' "$GUARD_RULES" > "$RULES"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "an absent OpenRouter row cannot clear"
-assert_contains "$out" '  quota_summary: omp:openrouter/provider/model: provider openrouter not in the quota snapshot' "absent OpenRouter coverage is summarized"
+assert_contains "$out" 'candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter not in the quota snapshot' "absent OpenRouter coverage is disclosed"
 jq '.providers += [{provider:"openrouter",windows:[{id:"credits",remaining:100,unit:"USD"}],quotaSemantics:{status:"unknown",effectiveAvailability:[]}}]' "$QUOTA" > "$TMP_ROOT/guard-openrouter.json"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-openrouter.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "a positive OpenRouter credit balance does not establish runway"
 assert_contains "$out" 'eligible, unranked: provider openrouter unmeasured (unknown)' "credit-only evidence stays eligible but unranked"
-assert_contains "$out" '  quota_summary:' "credit-only uncertainty has a summary"
 assert_not_contains "$out" '  profile:' "credit-only evidence never authorizes dispatch"
 
 # An unreadable or older version is an error before snapshot interpretation.

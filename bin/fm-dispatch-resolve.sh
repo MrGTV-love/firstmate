@@ -27,9 +27,11 @@
 #   quota rows from ONE quota-axi --json snapshot after checking the shared
 #   compatibility floor in bin/fm-quota-axi-lib.sh (schema 5 or 6).
 #   Individual-account candidates bind through that library's quota_row join;
-#   an expanded provider with no matching row and omp's unmeasured Codex pool
-#   stay eligible but unranked. Ranking uses the spendPriority argmax, with
-#   uncertain winning runway escalated. The model never sees quota, catalogs, approvals,
+#   an expanded provider with no matching row stays eligible but unranked, and
+#   omp's Codex pool ranks on its visible account only when that lower bound is
+#   through_reset. Ranking uses the spendPriority argmax over the matched
+#   rule's candidates with through_reset runway on every applicable bound; a
+#   candidate with weaker runway is never ranked. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
@@ -51,13 +53,12 @@
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
-#     quota_summary: <unranked, exhausted, or uncertain-runway candidates>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible [warning: ..] | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>]     (status clear only)
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, no candidate rankable, a genuine tie, or
-#                the highest-ranked candidate's runway cannot prove viability
+#                no rankable candidate with through_reset runway
 #   error     -> API, network, response, or quota-axi failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
@@ -380,12 +381,12 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
-  def evaluate($c):
-    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+  def runway_risks($p; $lane; $m):
+    [applicable($p; $lane; $m)[] |
+      select((.runway.status // "unknown") != "through_reset") |
+      "\(.runway.status // "unknown") at \(.scope)"];
+  def assess($c; $p; $lane):
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
-    elif $c.harness == "omp" and $p == "codex" then
-      {profile: $c, provider: $p, eligible: true, unranked: true,
-       reason: "omp Codex account pool is unmeasured; a single-account quota row is not pool headroom"}
     elif prov($p; $lane) == null then
       {profile: $c, provider: $p, eligible: true, unranked: true,
        reason: (if any($q.providers[]; .provider == $p)
@@ -426,15 +427,18 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
         {profile: $c, provider: $p, bounds: $bounds, scope: $limiting.scope, pct: $limiting.effectivePercentRemaining,
          spendPriority: $limiting.selection.spendPriority, runway: $limiting.runway.status, eligible: true, reason: "ok"}
       end
-    end
-    | if .eligible and ((.unranked // false) | not) then
-        [applicable($p; $lane; ($c.model // ""))[] |
-          select(.runway.status != "through_reset") |
-          "\(.runway.status) at \(.scope)"] as $risks |
-        if ($risks | length) > 0 then
-          . + {warning: ($risks | join(", "))}
-        else . end
-      else . end;
+    end;
+  def evaluate($c):
+    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+    (assess($c; $p; $lane)) as $base |
+    (if $p == null then [] else runway_risks($p; $lane; ($c.model // "")) end) as $risks |
+    ($base.eligible and (($base.unranked // false) | not)) as $ranked |
+    ($c.harness == "omp" and $p == "codex") as $pooled |
+    if $pooled and (($ranked and ($risks | length) == 0) | not) then
+      {profile: $c, provider: $p, eligible: true, unranked: true,
+       reason: "omp Codex account pool is only lower-bounded by its visible account, which lacks through_reset evidence (\(if $ranked then "runway" else $base.reason end))"}
+    else $base end
+    | if ($ranked or $pooled) and ($risks | length) > 0 then . + {warning: ($risks | join(", "))} else . end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
       ($c | ltrimstr("rule_") | tonumber) as $n |
@@ -493,25 +497,22 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   else
     ($sel.use | map(evaluate(.))) as $cands |
     ([$cands[] | select(.eligible and ((.unranked // false) | not))]) as $elig |
+    ([$elig[] | select(.warning | not)]) as $safe |
     ([$cands[] | select(.unranked)]) as $unranked |
     if ($elig | length) == 0 then $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
+    elif ($safe | length) == 0 then
+      $ev + {status: "escalate", reason: "no rankable candidate in \($sel.source) has through_reset runway on every applicable bound; completion runway is not proven", note: $sel.note, candidates: $cands}
     else
-      ($elig | max_by(.spendPriority)) as $best |
-      ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
+      ($safe | max_by(.spendPriority)) as $best |
+      ([$safe[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
       if $ties > 1 then $ev + {status: "escalate", reason: "genuine spendPriority tie", note: $sel.note, candidates: $cands}
-      elif $best.warning then
-        $ev + {status: "escalate", reason: "highest-ranked candidate \($best.profile.harness):\($best.profile.model // "-") has \($best.warning); completion runway is not proven", note: $sel.note, candidates: $cands}
       else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $best}
         + (if ($unranked | length) > 0 then
              {unranked_note: "\($unranked | length) eligible candidate(s) unranked (\([$unranked[].provider] | unique | join(", ")))"}
            else {} end)
       end
     end
-  end
-  | ([.candidates[]? |
-       select(.unranked or .warning or ((.eligible // false) | not)) |
-       "\(.profile.harness):\(.profile.model // "-"): \(.warning // .reason)"] | join("; ")) as $summary
-  | if $summary != "" then . + {quota_summary: $summary} else . end') || emit_error "resolution failed"
+  end') || emit_error "resolution failed"
 
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");
@@ -526,7 +527,6 @@ TEXT=$(jq -r '
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
   (if .unranked_note then "  note: \(.unranked_note | flat)" else empty end),
-  (if .quota_summary then "  quota_summary: \(.quota_summary | flat)" else empty end),
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
