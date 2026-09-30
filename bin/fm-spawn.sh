@@ -333,7 +333,10 @@
 #   The resolved switch reaches the pane export, compound launch, and env -i
 #   floor, replacing any inherited COMPACT_ADVISER_DISABLE. A truthy invoking
 #   FM_COMPACT_ADVISER_DISABLE is the operator's emergency override; Firstmate
-#   never exports it. Claude auto also exports CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.
+#   never exports it. Claude auto also launches with
+#   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1; when the worker shell had not already
+#   opted in, it adds FM_COMPACT_ADVISER_HOOKS=1 so the firstmate-calm mod,
+#   which shares that gate, stays inert.
 #   No TypeSafe credential is read or embedded here; use plugin saved keys.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
@@ -2362,7 +2365,8 @@ COMPACT_ADVISER_HOOKS=
 if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
   COMPACT_ADVISER_SWITCH=0
   if [ "$HARNESS" = claude ]; then
-    COMPACT_ADVISER_HOOKS=' CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1'
+    # shellcheck disable=SC2016
+    COMPACT_ADVISER_HOOKS='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
   fi
 fi
 
@@ -5389,7 +5393,7 @@ fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
-LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH$COMPACT_ADVISER_HOOKS; $LAUNCH"
+LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the
@@ -5437,7 +5441,7 @@ spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # Export the compact-adviser kill switch into the pane shell through the same
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
-spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH$COMPACT_ADVISER_HOOKS"
+spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi
@@ -5473,7 +5477,7 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
     HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
     CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
-    FM_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
+    FM_TASK_ID COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS LAVISH_AXI_HOST \
     $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
     # the pane shell and never become source text or spawn-process snapshots.
@@ -5482,8 +5486,8 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX $env_arg"
   done
   # Establish the policy before the wrapper shell starts, even if a pane export
-  # was lost. Claude's opt-in function hooks follow the same boundary.
-  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH$COMPACT_ADVISER_HOOKS"
+  # was lost.
+  LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
   if [ -n "$SPAWN_TRACEPARENT" ]; then
     # shellcheck disable=SC2016
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'

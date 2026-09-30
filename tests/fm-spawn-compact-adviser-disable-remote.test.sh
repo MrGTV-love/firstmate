@@ -200,7 +200,8 @@ pass "the remote route keeps the compact-adviser switch through the cleared allo
 # destination shell carrying an ambient enable flag.
 cat > "$PROBEBIN/claude" <<'SH'
 #!/bin/sh
-printf '%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}"
+printf '%s|%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}"
 SH
 chmod +x "$PROBEBIN/claude"
 printf 'claude\n' > "$PARENT/config/secondmate-harness"
@@ -216,12 +217,12 @@ for setting in absent enabled; do
     || fail "the remote home did not inherit automatic policy for subsequent workers"
   for shape in preamble bare; do
     SEEN=$(replay_remote_launch "$shape") || fail "automatic remote launch replay failed"
-    assert_equals '0|1' "$SEEN" "automatic remote Claude must receive both enablement assignments"
+    assert_equals '0|1|1' "$SEEN" "automatic remote Claude must enable the adviser without enabling Calm"
   done
   ADVISER_KILL=1 run_remote_launch "emergency-disabled Claude, allowlist $setting"
   for shape in preamble bare; do
     SEEN=$(replay_remote_launch "$shape") || fail "emergency-disabled remote launch replay failed"
-    assert_equals '1|unset' "$SEEN" "the parent's emergency switch must defeat remote automatic policy"
+    assert_equals '1|unset|unset' "$SEEN" "the parent's emergency switch must defeat remote automatic policy"
   done
 done
 pass "remote Claude auto and function hooks survive both environment postures and lost pane exports"

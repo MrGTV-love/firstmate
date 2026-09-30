@@ -362,17 +362,24 @@ test_auto_launch_policy() {
         expect_code 0 "$status" "$id: automatic policy spawn should succeed: $out"
         cat > "$FAKEBIN_DIR/$harness" <<'SH'
 #!/bin/sh
-printf '%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}"
+printf '%s|%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}"
 SH
         chmod +x "$FAKEBIN_DIR/$harness"
-        expected='0|unset'
-        [ "$harness" != claude ] || expected='0|1'
+        expected='0|unset|unset'
+        [ "$harness" != claude ] || expected='0|1|1'
         launch=$(cat "$LAUNCH_LOG")
         seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
           COMPACT_ADVISER_DISABLE=1 /bin/sh -c "$launch") || fail "$id: launch replay failed"
         assert_equals "$expected" "$seen" "$id: launch policy did not override a contrary pane value"
         seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") || fail "$id: pane replay failed"
         assert_equals "$expected" "$seen" "$id: automatic mode was lost through the pane"
+        # A shell that already opted into function hooks keeps that opt-in whole,
+        # except where the cleared environment drops the unlisted flag.
+        [ "$setting" != absent ] || expected='0|1|unset'
+        seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 /bin/sh -c "$launch") || fail "$id: opted-in replay failed"
+        assert_equals "$expected" "$seen" "$id: a pre-existing function-hooks opt-in was not preserved"
         if [ "$kind" = secondmate ]; then
           cmp -s "$HOME_DIR/config/compact-adviser" "$sm/config/compact-adviser" \
             || fail "$id: secondmate workers did not inherit adviser policy"
@@ -380,7 +387,7 @@ SH
       done
     done
   done
-  pass "automatic policy reaches Claude and omp ships and secondmates, with or without filtering or pane exports"
+  pass "automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm"
 }
 
 test_invalid_policy_refuses_before_launch() {

@@ -1004,6 +1004,7 @@ Use the plugin's supported saved settings to select `mode: auto`, acknowledge ex
 For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
 Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
 Claude auto launches receive `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting.
+When the worker's shell had not already set that flag to `1`, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
 The installed plugin must support the host's settled-turn event and context API; loading its command alone does not prove that it judges completed turns.
 Print and other reliably detected noninteractive sessions remain inert under the plugin's own rules.
 

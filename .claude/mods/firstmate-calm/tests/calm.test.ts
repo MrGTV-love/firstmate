@@ -22,9 +22,15 @@ import {
 const sessionStart = { cwd: "/work", surface: "terminal" as const, isInteractive: true };
 
 describe("activation", () => {
-  async function expectInert($: Engine, on: Parameters<typeof world>[0], functionHooks: string | undefined) {
+  async function expectInert(
+    $: Engine,
+    on: Parameters<typeof world>[0],
+    functionHooks: string | undefined,
+    env: Record<string, string> = {},
+  ) {
     const { clock, files, journal } = world(on, {
       functionHooks,
+      env,
       preference: "on\n",
       messages: [{ role: "assistant", text: "Working", toolUses: [{ name: "Bash" }] }],
     });
@@ -59,6 +65,10 @@ describe("activation", () => {
 
   test("is fully inert when the function-hooks opt-in is not exactly one", async ($, on) => {
     await expectInert($, on, "true");
+  });
+
+  test("is fully inert when Firstmate enabled function hooks only for the compact adviser", async ($, on) => {
+    await expectInert($, on, "1", { FM_COMPACT_ADVISER_HOOKS: "1" });
   });
 
   test("registers /calm at session start and stays a pass-through while off", async ($, on) => {
