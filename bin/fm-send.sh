@@ -247,7 +247,9 @@ fi
 . "$SCRIPT_DIR/fm-control-lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
 . "$SCRIPT_DIR/fm-marker-lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
+# Function-only API; fm-lint.sh also checks bin/fm-pending-reply-lib.sh.
+# fm-lint source-owner=bin/fm-pending-reply-lib.sh
+# shellcheck source=/dev/null
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
 . "$SCRIPT_DIR/fm-classify-lib.sh"

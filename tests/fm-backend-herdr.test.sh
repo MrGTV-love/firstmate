@@ -5149,7 +5149,8 @@ test_dispatch_routes_herdr_backend() {
 }
 
 test_dispatch_busy_state_unknown_for_tmux() {
-  # shellcheck source=bin/fm-backend.sh
+  # fm-lint source-owner=bin/fm-backend.sh
+  # shellcheck source=/dev/null
   . "$ROOT/bin/fm-backend.sh"
   [ "$(fm_backend_busy_state tmux 'sess:win')" = unknown ] \
     || fail "fm_backend_busy_state should report unknown for tmux (no native agent-state primitive; watcher falls back to regex)"
@@ -5740,7 +5741,8 @@ test_wait_transition_clean_timeout_returns_1() {
   pass "fm_backend_herdr_wait_transition: stock macOS Bash clean timeout closes fd 9 and returns 1"
 }
 
-# shellcheck source=bin/fm-backend.sh
+# fm-lint source-owner=bin/fm-backend.sh
+# shellcheck source=/dev/null
 . "$ROOT/bin/fm-backend.sh"
 
 test_version_check_accepts_current_protocol

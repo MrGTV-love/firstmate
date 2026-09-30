@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 # fm-lint.sh - the single owner of firstmate's lint definition.
 #
-# Runs its file set with ShellCheck's default severity, extended analysis,
-# ambient configuration disabled, and one exact ShellCheck version. CI selects
-# canonical partitions; no-mistakes invokes the context-selected default, so
-# both use this owner without duplicating lint configuration.
-# The explicit --fast mode is local-only and disables ShellCheck's extended
-# dataflow analysis while preserving ordinary shell lint checks and source
-# following. CI, main, and merge-base-less runs keep --norc --external-sources
-# with full dataflow over the whole canonical set. An ordinary local branch
-# (changed-file mode, including the no-mistakes lint step) drops
-# --external-sources, keeps dataflow, and excludes SC1091, SC2034, SC2153,
-# and SC2329, the codes that need library context. Those codes still run in
-# CI over the whole set. Explicit paths keep --external-sources with the
-# selected dataflow mode.
-# Tests stop source analysis at imported production modules because CI analyzes
-# every production shell separately as a canonical, source-aware root.
+# Runs ShellCheck's default severity and extended, source-aware analysis with
+# ambient configuration disabled and one exact ShellCheck version.
+# CI selects the complete canonical set; local branches select changed files,
+# their transitive sourcing callers, and their imported canonical libraries.
+# Every mode keeps --norc --external-sources and the same diagnostic rules.
+# --fast remains an explicit local-only opt-out from extended dataflow.
+# Function-only imports declare a `# fm-lint source-owner=path` boundary instead
+# of expanding the same graph into every caller. Selection includes that owner
+# as a separate source-aware root even for explicit paths; a missing owner fails.
+# Imports needed for exported-variable context remain source-followed.
 # The default (no explicit-path) path also runs bin/fm-lint-workflows.sh so a
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.
@@ -27,20 +22,28 @@
 #     the full canonical set: bin/*.sh bin/backends/*.sh tests/*.sh, with
 #     --external-sources and full dataflow. This is what CI always runs, so
 #     CI coverage never depends on a local diff.
-#   - Otherwise (an ordinary local branch with a real merge-base) it lints
-#     only the canonical-set files changed since that merge-base, including
-#     uncommitted local edits, via plain local `git diff` (no network, no
-#     `gh`). That local pass drops --external-sources and excludes SC1091,
-#     SC2034, SC2153, and SC2329. A branch with zero matching changed files
-#     skips ShellCheck and prints a "no changed lint targets" note, then
-#     still runs the backend-purity check and validates workflows.
-# Explicit paths always bypass this file-set selection and lint exactly the
-# given paths, matching the same config, without the workflow YAML check.
+#   - Otherwise it selects changed files since the merge-base, including staged,
+#     unstaged, untracked, deleted and renamed paths, plus transitive callers and
+#     imported canonical roots. Dependency selection is conservative when a
+#     source expression cannot be resolved. Changes to the lint owner select all.
+#     An empty set skips ShellCheck but still checks backend purity and workflows.
+# Explicit paths bypass changed-file selection and include their canonical source
+# dependencies, without the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
 # backend-purity check. The backend-purity check rejects direct Beads CLI
 # invocations in the core bin/ and bin/backends/ scripts so every configured
 # backlog backend follows the same tasks-axi lifecycle path.
+# Successful source-aware checks are shared across worktrees via content hashes
+# of the root, its source closure, the analysis arguments, owner, helper, platform,
+# and ShellCheck binary. Identical concurrent misses share one check through flock.
+# Only successful, input-stable results are retained; findings always run again.
+# FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
+# "off" disables reuse. CI always disables reuse so every canonical root is checked.
+# A missing, unwritable or unresolvable cache falls back to real analysis.
+# --full selects the complete inventory locally without requiring CI=true.
 #
+# Dependency selection and caching are private Perl helpers using the Perl
+# runtime already required for worker cleanup; no extra tool is installed.
 # Lint defaults to two concurrency-limited workers over two stable logical
 # shards, and each worker runs ONE canonical root per ShellCheck process, so a
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
@@ -97,13 +100,11 @@
 #   fm-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   fm-lint.sh --required-version      print the ShellCheck pin
 #   fm-lint.sh --list-files            print the file set that would be linted
+#   fm-lint.sh --full                  lint the complete canonical shell inventory
 #   fm-lint.sh --help                  print this usage
 set -u
 
 REQUIRED_SHELLCHECK=0.11.0
-# Cross-file codes that need --external-sources. Local changed-file mode
-# cannot judge them, so they stay CI-only.
-LOCAL_NOX_EXCLUDE=SC1091,SC2034,SC2153,SC2329
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SELF="$SELF_DIR/fm-lint.sh"
 ROOT="$(cd "$SELF_DIR/.." && pwd -P)"
@@ -217,6 +218,17 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   local root_err="$output_dir/root.$shard_index.$index.err"
   local rss_file="$output_dir/root.$shard_index.$index.rss"
   local start_ms end_ms duration_ms invocation_rc=0 reason rss_kib
+  local -a analysis_command
+  analysis_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" check \
+    "${FM_LINT_INTERNAL_CACHE:-off}" "$ROOT" "$FM_LINT_SHELLCHECK" \
+    "${FM_LINT_WORKER_ARGS[@]}" -- "$path")
+  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -x /usr/bin/time ]; then
+    if [ "$(uname)" = Darwin ]; then
+      analysis_command=(/usr/bin/time -lp -o "$rss_file" "${analysis_command[@]}")
+    else
+      analysis_command=(/usr/bin/time -f 'max_rss_kib=%M' -o "$rss_file" "${analysis_command[@]}")
+    fi
+  fi
   start_ms=$(fm_lint_now_ms)
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'begin\t%s\t%s\t%s\t%s\t%s\n' \
@@ -239,12 +251,12 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$FM_LINT_INTERNAL_ROOT_SECS" "$FM_LINT_INTERNAL_GRACE" \
         "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
-        "$FM_LINT_SHELLCHECK" "${FM_LINT_WORKER_ARGS[@]}" -- "$path" ) > "$root_out" 2> "$root_err" &
+        "${analysis_command[@]}" ) > "$root_out" 2> "$root_err" &
     FM_LINT_WORKER_RUN_PID=$!
     wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
     FM_LINT_WORKER_RUN_PID=
   else
-    "$FM_LINT_SHELLCHECK" "${FM_LINT_WORKER_ARGS[@]}" -- "$path" > "$root_out" 2> "$root_err" &
+    "${analysis_command[@]}" > "$root_out" 2> "$root_err" &
     FM_LINT_WORKER_RUN_PID=$!
     wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
     FM_LINT_WORKER_RUN_PID=
@@ -281,13 +293,7 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
     trap 'fm_lint_worker_stop; exit 129' HUP
     trap 'fm_lint_worker_stop; exit 130' INT
     trap 'fm_lint_worker_stop; exit 143' TERM
-    FM_LINT_WORKER_ARGS=(--norc)
-    if [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
-      FM_LINT_WORKER_ARGS+=(--external-sources)
-    fi
-    if [ -n "${FM_LINT_INTERNAL_EXCLUDE:-}" ]; then
-      FM_LINT_WORKER_ARGS+=(--exclude="$FM_LINT_INTERNAL_EXCLUDE")
-    fi
+    FM_LINT_WORKER_ARGS=(--norc --external-sources)
     if [ "${FM_LINT_INTERNAL_FAST:-0}" -eq 1 ]; then
       FM_LINT_WORKER_ARGS+=(--extended-analysis=false)
     fi
@@ -632,8 +638,13 @@ ANALYSIS_MODE=full
 PARTITION=
 PARTITION_REQUESTED=0
 LIST_FILES=0
+FULL_REQUESTED=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --full)
+      FULL_REQUESTED=1
+      shift
+      ;;
     --jobs)
       [ "$#" -ge 2 ] || { printf 'fm-lint.sh: --jobs requires 1 or 2.\n' >&2; exit 2; }
       JOBS=$2
@@ -726,35 +737,38 @@ fm_lint_changed_base_ref() {
   return 1
 }
 
-# fm_lint_is_canonical_root tests membership in the canonical set (a direct
-# *.sh child of bin/, bin/backends/, or tests/) without the shell case
-# statement's non-pathname wildcard matching a path separator by accident.
-fm_lint_is_canonical_root() {
-  local path=$1 dir base
-  case "$path" in
-    */*) dir=${path%/*}; base=${path##*/} ;;
-    *) dir=; base=$path ;;
-  esac
-  case "$base" in
-    *.sh) : ;;
-    *) return 1 ;;
-  esac
-  case "$dir" in
-    bin|bin/backends|tests) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 CHANGED_MODE=0
 EXPLICIT_PATHS=0
-FOLLOW_SOURCES=1
-EXCLUDE_CODES=
+if [ "$LIST_FILES" -eq 0 ] && ! command -v shellcheck >/dev/null 2>&1; then
+  printf 'fm-lint.sh: ShellCheck not found; install ShellCheck %s with bin/fm-install-shellcheck.sh <destination-directory> and put that directory on PATH.\n' \
+    "$REQUIRED_SHELLCHECK" >&2
+  exit 1
+fi
+if ! PERL_BIN=$(command -v perl); then
+  printf 'fm-lint.sh: perl is required for source selection, caching and worker cleanup.\n' >&2
+  exit 127
+fi
+[ -r "$SELF_DIR/fm-lint-cache.pl" ] || {
+  printf 'fm-lint.sh: bin/fm-lint-cache.pl is required for source-aware lint.\n' >&2
+  exit 2
+}
 if [ "$#" -gt 0 ]; then
   EXPLICIT_PATHS=1
-  ROOTS=("$@")
+  [ "$FULL_REQUESTED" -eq 0 ] || { printf 'fm-lint.sh: --full does not accept explicit paths.\n' >&2; exit 2; }
+  selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || exit 1
+  if ! "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" expand "$ROOT" "$@" > "$selected_list"; then
+    rm -f "$selected_list"
+    exit 2
+  fi
+  ROOTS=()
+  while IFS= read -r -d '' path; do
+    ROOTS+=("$path")
+  done < "$selected_list"
+  rm -f "$selected_list"
 else
   full_lint=1
-  if [ -z "$PARTITION" ] && [ "${GITHUB_ACTIONS:-}" != true ] && [ "${CI:-}" != true ] \
+  if [ "$FULL_REQUESTED" -eq 0 ] && [ -z "$PARTITION" ] && [ "${GITHUB_ACTIONS:-}" != true ] && [ "${CI:-}" != true ] \
     && command -v git >/dev/null 2>&1 \
     && git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
     && [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" != main ]; then
@@ -769,17 +783,20 @@ else
   else
     CHANGED_MODE=1
     ROOTS=()
+    changed_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-changes.XXXXXX") || exit 1
+    selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || { rm -f "$changed_list"; exit 1; }
+    if ! git diff --name-only --no-renames -z "$merge_base" -- > "$changed_list" \
+      || ! git ls-files --others --exclude-standard -z >> "$changed_list" \
+      || ! perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT" < "$changed_list" > "$selected_list"; then
+      rm -f "$changed_list" "$selected_list"
+      printf 'fm-lint.sh: could not select changed roots and source dependencies.\n' >&2
+      exit 2
+    fi
     while IFS= read -r -d '' changed_path; do
-      fm_lint_is_canonical_root "$changed_path" || continue
-      [ -f "$changed_path" ] || continue
       ROOTS+=("$changed_path")
-    done < <(git diff --name-only --diff-filter=ACMR -z "$merge_base" -- 2>/dev/null | LC_ALL=C sort -z)
+    done < "$selected_list"
+    rm -f "$changed_list" "$selected_list"
   fi
-fi
-if [ "$CHANGED_MODE" -eq 1 ] && [ "$FAST" -eq 0 ]; then
-  FOLLOW_SOURCES=0
-  EXCLUDE_CODES=$LOCAL_NOX_EXCLUDE
-  ANALYSIS_MODE=local
 fi
 # Stable largest-first packing is shared by cross-runner partition selection
 # and the two local workers. Weights are a scheduling proxy, never a skip rule.
@@ -824,17 +841,8 @@ if [ "$LIST_FILES" -eq 1 ]; then
   exit 0
 fi
 
-if ! command -v shellcheck >/dev/null 2>&1; then
-  printf 'fm-lint.sh: ShellCheck not found; install ShellCheck %s with bin/fm-install-shellcheck.sh <destination-directory> and put that directory on PATH.\n' \
-    "$REQUIRED_SHELLCHECK" >&2
-  exit 1
-fi
 unset SHELLCHECK_OPTS
 SHELLCHECK_BIN=$(command -v shellcheck)
-if ! PERL_BIN=$(command -v perl); then
-  printf 'fm-lint.sh: perl is required for bounded worker cleanup.\n' >&2
-  exit 127
-fi
 resolved=$("$SHELLCHECK_BIN" --version | awk '/^version:/ {print $2; exit}')
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
 if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
@@ -842,10 +850,12 @@ if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
     "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
   exit 1
 fi
+CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
+if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+  CACHE_DIR=off
+fi
 if [ "$FAST" -eq 1 ]; then
   printf 'fm-lint.sh: fast local mode; ShellCheck extended analysis disabled\n' >&2
-elif [ "$FOLLOW_SOURCES" -eq 0 ]; then
-  printf 'fm-lint.sh: local changed-file mode; ShellCheck source following disabled\n' >&2
 else
   printf 'fm-lint.sh: full ShellCheck extended analysis enabled\n' >&2
 fi
@@ -884,10 +894,9 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # inside the 16 GiB runner. Local lint defaults to two workers; two such
 # caps allow ~16 GiB resident plus host overhead, so use FM_LINT_JOBS=1 on
 # smaller local machines. A root that exceeds its cap fails by name.
-# Never disable, narrow, or redirect source-following to fit a root under
-# the cap. The roots sidecar records each root's peak RSS; roots peaking
-# above about 3 GiB resident are reduction candidates,
-# bin/fm-pending-reply-lib.sh first (its separate dedup fix is PR 5753).
+# Never drop diagnostic rules or leave a source owner unchecked to fit a root
+# under its cap. The roots sidecar records peak RSS even without bounds; roots
+# peaking above about 3 GiB resident remain source-graph reduction candidates.
 ROOT_MEMORY_KIB=${FM_LINT_ROOT_MEMORY_KIB:-12582912}
 for bound_pair in \
   "FM_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
@@ -1081,8 +1090,6 @@ fm_lint_run_worker() {  # <worker-index>
   worker_env=(
     FM_LINT_INTERNAL=1
     FM_LINT_INTERNAL_FAST="$FAST"
-    FM_LINT_INTERNAL_FOLLOW_SOURCES="$FOLLOW_SOURCES"
-    FM_LINT_INTERNAL_EXCLUDE="$EXCLUDE_CODES"
     FM_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
     FM_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
     FM_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
@@ -1093,6 +1100,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
+  worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR")
   if [ -n "$TELEMETRY" ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then
       exec "$PERL_BIN" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
@@ -1225,11 +1233,7 @@ if [ -n "$TELEMETRY" ]; then
   source_directives=$(wc -l < "$TMP_ROOT/source-targets" | tr -d '[:space:]')
   source_boundaries=$(grep -c '^/dev/null$' "$TMP_ROOT/source-targets" 2>/dev/null || true)
   case "$source_boundaries" in ''|*[!0-9]*) source_boundaries=0 ;; esac
-  if [ "$FOLLOW_SOURCES" -eq 1 ]; then
-    source_followed=$((source_directives - source_boundaries))
-  else
-    source_followed=0
-  fi
+  source_followed=$((source_directives - source_boundaries))
   source_targets=$(LC_ALL=C sort -u "$TMP_ROOT/source-targets" | wc -l | tr -d '[:space:]')
   content_cksum=$(cksum "$TMP_ROOT/content-cksums" | awk '{print $1 "-" $2}')
   git_head=$(git rev-parse HEAD 2>/dev/null || printf 'unavailable')
