@@ -212,25 +212,35 @@ config_push() { # <catalog-dir>; output in $TMP_ROOT/push.out
   PATH="$PUSH/jqbin:${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" \
     FM_MODEL_CATALOG_DIR="$1" "$ROOT/bin/fm-config-push.sh" > "$TMP_ROOT/push.out" 2>&1 || true
 }
-jq '.roles.strong.codex.model = "absent"' "$BASE" > "$PUSH/home/config/model-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"strong"}}' > "$PUSH/sm/config/crew-dispatch.json"
+cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/prior-dispatch.json"
+# A new role with a mistyped id, and dispatch profiles switched to it.
+jq '.roles.fast = {codex:{model:"absent"}}' "$BASE" > "$PUSH/home/config/model-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"fast"}}' > "$PUSH/home/config/crew-dispatch.json"
 printf 'codex\n' > "$PUSH/home/config/crew-harness"
 config_push "$CATALOGS"
-assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json not pushed' 'an index with an absent id must be withheld'
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' 'an index with an absent id must be withheld with its dispatch profiles'
 cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail 'a refused index reached the secondmate home'
+cmp -s "$PUSH/prior-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'dispatch profiles naming a withheld role reached the secondmate home'
 cmp -s "$PUSH/home/config/crew-harness" "$PUSH/sm/config/crew-harness" || fail "a refused index must not withhold other inherited config: $(cat "$TMP_ROOT/push.out")"
 mkdir -p "$TMP_ROOT/no-push-catalogs"
 config_push "$TMP_ROOT/no-push-catalogs"
 assert_contains "$(cat "$TMP_ROOT/push.out")" 'codex catalog unavailable' 'an unreadable catalog must be reported'
 cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'an unreadable catalog blocked the index push'
-cp "$BASE" "$PUSH/home/config/model-index.json"
+cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'an unreadable catalog blocked the dispatch push'
+jq '.roles.fast = {codex:{model:"current"}}' "$BASE" > "$PUSH/home/config/model-index.json"
 config_push "$CATALOGS"
 assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid index must not be withheld'
-cmp -s "$BASE" "$PUSH/sm/config/model-index.json" || fail 'a valid index was not pushed'
+cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'a valid index was not pushed'
+cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'dispatch profiles for a valid index were not pushed'
+[ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+  || fail 'the pushed pair must resolve its role in the secondmate home'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0
 printf 'provider  model  context  max-out  thinking  images\n'
 cat "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/listed" 2>/dev/null
+[ -z "${ANTHROPIC_API_KEY:-}" ] || printf 'anthropic  claude-sonnet-5-5  200K  64K  yes  yes\n'
 SH
 chmod +x "$PUSH/jqbin/pi"
 mkdir -p "$PUSH/pinned-pi" "$PUSH/ambient-pi"
@@ -244,8 +254,17 @@ cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" |
 cp "$PUSH/sm/config/model-index.json" "$PUSH/prior-index.json"
 printf '%s\n' '{"version":1,"roles":{"routine":{"pi":{"model":"openai-codex/gpt-ambient"}}},"retired":[]}' > "$PUSH/home/config/model-index.json"
 PI_CODING_AGENT_DIR="$PUSH/ambient-pi" config_push ''
-assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json not pushed' 'an id only the ambient Pi root lists must be withheld under the pin'
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' 'an id only the ambient Pi root lists must be withheld under the pin'
 cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail 'an index absent from the pinned catalog reached the secondmate home'
 rm "$PUSH/home/config/pi-account"
-pass 'fm-config-push withholds an index with an absent id, pushes with a notice when catalogs are unreadable, pushes a valid index, and reads catalogs under the worker account pin'
+# A Claude pin sheds Claude credentials for the Claude catalog only; Pi keeps
+# the environment key its anthropic provider lists models with.
+mkdir -p "$PUSH/pinned-claude"
+printf '%s\n' "$PUSH/pinned-claude" > "$PUSH/home/config/claude-account"
+printf '%s\n' '{"version":1,"roles":{"sonnet-grade":{"pi":{"model":"anthropic/claude-sonnet-5-5"},"claude":{"model":"sonnet"}}},"retired":[]}' > "$PUSH/home/config/model-index.json"
+ANTHROPIC_API_KEY=pi-provider-key PI_CODING_AGENT_DIR="$PUSH/ambient-pi" config_push ''
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "a Claude pin must not shed the key Pi's catalog uses: $(cat "$TMP_ROOT/push.out")"
+cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'an env-keyed Pi entry beside a Claude pin was not pushed'
+rm "$PUSH/home/config/claude-account"
+pass 'fm-config-push withholds an index with an absent id together with its dispatch profiles, pushes with a notice when catalogs are unreadable, pushes a valid pair, and reads each catalog under only its own worker account pin'
 printf '# all fm-model-index tests passed\n'

@@ -988,7 +988,14 @@ test_model_index_resolves_and_refuses_before_stop() {
   [ "$(meta_field "$dir" "$id" model)" = codex-native/gpt-6-astra ] || fail "the relaunch should record the resolved id"
   assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "the resolved native model should keep its Ultra flag"
   assert_not_contains "$(cat "$dir/fake/literal")" "role:native" "a role reference must not reach the harness"
-  pass "fm-control relaunch: roles resolve and retired ids refuse through the model index before the stop"
+  printf '%s\n' '{"models":[{"id":"codex-native/gpt-7"}]}' > "$dir/catalogs/pi.json"
+  cp "$dir/fake/literal" "$dir/literal-before"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --note "vendor dropped the id"); rc=$?
+  expect_code 1 "$rc" "an index entry its catalog no longer lists must refuse"
+  assert_contains "$out" "id 'codex-native/gpt-6-astra' absent or retired in pi catalog" "the refusal should name the absent id"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a catalog-absent relaunch stopped the running agent"
+  cmp -s "$dir/literal-before" "$dir/fake/literal" || fail "a catalog-absent relaunch sent lifecycle input"
+  pass "fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop"
 }
 
 # A fake claude that answers `claude auth status` the way the real runner

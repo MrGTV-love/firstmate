@@ -16,7 +16,8 @@
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
 # config/model-index.json is pushed only after bin/fm-model-index.sh check
 # passes; an index with an id absent from a readable catalog is withheld from
-# every home while the other material still pushes, and the run exits non-zero.
+# every home together with config/crew-dispatch.json, whose roles it resolves,
+# while the other material still pushes, and the run exits non-zero.
 set -u
 
 usage() {
@@ -34,8 +35,9 @@ This is local-material-only:
   - reports each live home and each inheritable item as pushed, unchanged,
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
-  - withholds config/model-index.json from every home when
-    bin/fm-model-index.sh check finds an id absent from a readable catalog
+  - withholds config/model-index.json and config/crew-dispatch.json from
+    every home when bin/fm-model-index.sh check finds an id absent from a
+    readable catalog
 
 Live homes come from state/*.meta records with kind=secondmate.
 data/secondmates.md is only a fallback for missing home= fields in older or
@@ -120,30 +122,33 @@ echo "config-push: $FM_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
-# An edited fleet model index is checked against every harness catalog, under
-# this home's worker account pins, before it reaches any home. An id proven
-# absent, or a declared pin that does not resolve, keeps every home on its
-# current index; an unavailable catalog is only a notice.
+# An edited fleet model index is checked before it reaches any home: each
+# harness's entries against that harness's catalog, under only that harness's
+# worker account pin. An id proven absent, or a declared pin that does not
+# resolve, keeps every home on its current index and the dispatch profiles
+# whose roles it resolves; an unavailable catalog is only a notice.
 index_check() {
-  local harness selection root
-  local -a accounts=()
-  for harness in claude pi; do
+  local harnesses harness selection root
+  harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$CONFIG/model-index.json" 2>/dev/null) || return 1
+  for harness in $harnesses; do
     selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
-    [ -n "$selection" ] || continue
-    root=${selection#*$'\t'}
-    accounts+=("$harness" "${root%%$'\t'*}")
+    if [ -n "$selection" ]; then
+      root=${selection#*$'\t'}
+      FM_CONFIG_OVERRIDE="$CONFIG" fm_worker_account_run "$harness" "${root%%$'\t'*}" \
+        "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    else
+      FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    fi
   done
-  FM_CONFIG_OVERRIDE="$CONFIG" fm_worker_account_run ${accounts[@]+"${accounts[@]}"} -- \
-    "$SCRIPT_DIR/fm-model-index.sh" check >/dev/null
 }
 case " $FM_INHERITABLE_CONFIG " in
   *" model-index.json "*)
     if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } && ! index_check; then
-      echo "config-push: model-index.json not pushed - its catalog check refused it; fix config/model-index.json and rerun"
+      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index catalog check refused it; every home keeps its current pair; fix config/model-index.json and rerun"
       errors=1
       inheritable=
       for item in $FM_INHERITABLE_CONFIG; do
-        [ "$item" = model-index.json ] || inheritable="$inheritable $item"
+        case "$item" in model-index.json | crew-dispatch.json) ;; *) inheritable="$inheritable $item" ;; esac
       done
       FM_INHERITABLE_CONFIG=${inheritable# }
       export FM_INHERITABLE_CONFIG

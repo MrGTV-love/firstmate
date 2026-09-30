@@ -961,14 +961,26 @@ resolve_relaunch_profile() {
   # The launch owner applies this home's worker account pin too, but only after
   # the old agent has been stopped, so a pin that no longer resolves or is
   # signed out must refuse here, while nothing has changed yet.
-  local account_model=$TARGET_MODEL
+  local account_model=$TARGET_MODEL account account_root config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   [ "$account_model" != default ] || account_model=
-  TARGET_WORKER_ACCOUNT=$(fm_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+  TARGET_WORKER_ACCOUNT=$(fm_worker_account_select "$TARGET_HARNESS" "$config" \
     "$account_model" "$TARGET_HARNESS") || return 1
+  account=$TARGET_WORKER_ACCOUNT
   # The same holds for config/claude-launcher: a malformed file or a stopped
   # TeamClaude proxy must refuse before the old agent stops.
   if [ "$TARGET_HARNESS" = claude ]; then
-    fm_claude_launcher_select "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" >/dev/null || return 1
+    fm_claude_launcher_select "$config" >/dev/null || return 1
+  fi
+  # The launch owner's selected-entry catalog check runs after the stop too, so
+  # the same check runs here first, under the account the replacement uses.
+  if [ -n "$account_model" ] && { [ -e "$config/model-index.json" ] || [ -L "$config/model-index.json" ]; }; then
+    if [ -n "$account" ]; then
+      account_root=${account#*$'\t'}
+      FM_CONFIG_OVERRIDE="$config" fm_worker_account_run "$TARGET_HARNESS" "${account_root%%$'\t'*}" \
+        "$SCRIPT_DIR/fm-model-index.sh" check "$TARGET_HARNESS" "$account_model" || return 1
+    else
+      FM_CONFIG_OVERRIDE="$config" "$SCRIPT_DIR/fm-model-index.sh" check "$TARGET_HARNESS" "$account_model" || return 1
+    fi
   fi
 }
 
