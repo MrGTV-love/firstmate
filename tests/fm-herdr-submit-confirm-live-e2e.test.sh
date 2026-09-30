@@ -5,11 +5,11 @@
 # a busy-queued Enter can keep proven pending text visible. A stub cannot prove
 # either signal. This guard launches real Claude Code in an isolated Herdr lab
 # and requires fm_backend_herdr_send_text_submit to report empty for a landed
-# idle steer. It then requires the same submit path to prove and submit a
-# typed /exit slash command behind the command popup Claude renders below the
-# composer (the fm-control exit breakage on 2.1.283) and verifies the agent
-# actually exited. It fails naming the harness and version rather than
-# degrading quietly.
+# idle steer. It exercises /compact on a fresh conversation, then requires the
+# public fm-control exit path to stop a named, truecolor Claude session with
+# read-back proof that its endpoint survives without an agent. Named rules and
+# colored slash commands previously made both exit and relaunch refuse.
+# It fails naming the harness and version rather than degrading quietly.
 #
 # Run explicitly with FM_HERDR_SUBMIT_CONFIRM_LIVE=1 after a Herdr or Claude
 # upgrade, and before trusting a refreshed docs/verification/runtime-backends.md
@@ -83,7 +83,25 @@ TARGET="$SESSION:$PANE"
 VERSION=$(PATH="$ORIGINAL_PATH" claude --version 2>/dev/null | head -1 || printf 'version-unknown')
 HERDR_VER=$(PATH="$ORIGINAL_PATH" herdr --version 2>/dev/null | head -1 || printf 'herdr-unknown')
 
-lab pane run "$PANE" "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}'" >/dev/null \
+CONTROL_HOME="$TMP_ROOT/control-home"
+mkdir -p "$CONTROL_HOME/state"
+cat > "$CONTROL_HOME/state/submitlive.meta" <<EOF
+window=$TARGET
+endpoint_task_id=submitlive
+worktree=$ROOT
+project=$ROOT
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+backend=herdr
+herdr_session=$SESSION
+herdr_workspace_id=$(printf '%s' "$WS_JSON" | jq -er '.result.workspace.workspace_id')
+herdr_tab_id=$(printf '%s' "$WS_JSON" | jq -er '.result.root_pane.tab_id')
+herdr_pane_id=$PANE
+EOF
+
+lab pane run "$PANE" "FORCE_COLOR=3 COLORTERM=truecolor TERM=xterm-256color CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude -n fm-submitlive --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}'" >/dev/null \
   || fail "could not launch Claude Code ($VERSION) in the isolated Herdr pane"
 
 idle=0
@@ -116,6 +134,19 @@ while [ "$i" -lt 60 ]; do
   sleep 1
 done
 [ "$idle" = 1 ] || fail "Claude Code ($VERSION) on $HERDR_VER never rendered an idle composer in the lab pane"
+
+# /compact on a fresh conversation has a deterministic, token-free outcome.
+# Its handler response proves submission; an empty composer alone cannot.
+verdict=$(fm_backend_herdr_send_text_submit "$TARGET" /compact 3 0.4 1.2)
+[ "$verdict" != send-failed ] || fail "Claude Code ($VERSION) on $HERDR_VER refused /compact"
+compact=0
+for ((i = 0; i < 30; i++)); do
+  screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
+  case "$screen" in *'Not enough messages to compact.'*) compact=1; break ;; esac
+  sleep 0.2
+done
+[ "$compact" = 1 ] || fail "Claude Code ($VERSION) on $HERDR_VER never handled the fresh-session /compact"
+pass "live Herdr submit confirm: Claude Code ($VERSION) on $HERDR_VER executes a colored /compact in a named session"
 
 TOKEN="FMHERDRPONG$$_$RANDOM"
 verdict=$(fm_backend_herdr_send_text_submit "$TARGET" "Reply with exactly $TOKEN and nothing else." 3 0.4 0.4) \
@@ -178,12 +209,8 @@ done
   || fail "Claude Code ($VERSION) on $HERDR_VER: operational submit reported '$verdict' but the expected reply never rendered"
 pass "live Herdr submit confirm: Claude Code ($VERSION) on $HERDR_VER submits a U+2063 away-supervisor payload whose read-back drops the mark"
 
-# The fm-control exit regression: a typed slash command (/exit) makes Claude
-# Code 2.1.283 render its command popup between the composer and the pane
-# bottom, which pushed the composer above the old bounded proof read - the
-# typed command was judged unsent, cleared, and never submitted. The viewport
-# capture must prove the typed /exit and submit it; Claude must actually
-# exit. This scenario runs last because it ends the lab's Claude process.
+# Exit must go through the lifecycle command, including its pre-send guard
+# and authoritative agent-state postcondition, not just the submit helper.
 i=0
 while [ "$i" -lt 45 ]; do
   st=$(lab agent get "$PANE" 2>/dev/null | jq -r '.result.agent.agent_status // empty')
@@ -191,19 +218,13 @@ while [ "$i" -lt 45 ]; do
   i=$((i + 1))
   sleep 1
 done
-verdict=$(fm_backend_herdr_send_text_submit "$TARGET" '/exit' 3 0.4 1.2) \
-  || fail "send_text_submit failed to run the /exit submission against Claude Code ($VERSION) on $HERDR_VER"
-[ "$verdict" != send-failed ] \
-  || fail "Claude Code ($VERSION) on $HERDR_VER: a typed /exit behind its command popup was judged unsent and cleared instead of submitted"
-exited=0
-i=0
-while [ "$i" -lt 30 ]; do
-  if ! lab agent get "$PANE" >/dev/null 2>&1; then exited=1; break; fi
-  i=$((i + 1))
-  sleep 1
-done
-[ "$exited" = 1 ] \
-  || fail "Claude Code ($VERSION) on $HERDR_VER: the /exit submission reported '$verdict' but the agent never exited"
-pass "live Herdr submit confirm: Claude Code ($VERSION) on $HERDR_VER proves and submits a typed /exit behind its command popup"
+out=$(FM_HOME="$CONTROL_HOME" FM_CONTROL_POLL=0.2 FM_CONTROL_EXIT_WAIT=30 \
+  "$ROOT/bin/fm-control.sh" submitlive exit 2>&1) \
+  || fail "Claude Code ($VERSION) on $HERDR_VER: fm-control exit refused: $out"
+case "$out" in stopped\ submitlive*) ;; *) fail "exit did not report a verified stop: $out" ;; esac
+state=$(fm_backend_herdr_agent_state "$TARGET")
+[ "$state" = dead ] || fail "Claude Code ($VERSION) on $HERDR_VER: exit returned but agent state is '$state'"
+lab pane get "$PANE" >/dev/null || fail "exit removed the endpoint it must preserve"
+pass "live Herdr submit confirm: Claude Code ($VERSION) on $HERDR_VER fm-control exits a named truecolor session and preserves its endpoint"
 
 [ "$CHECKED" -gt 0 ] || fail "FM_HERDR_SUBMIT_CONFIRM_LIVE=1 checked no harness"
