@@ -1047,13 +1047,17 @@ The existing profile-array quota decision remains responsible for choosing among
 An unknown role, absent harness mapping, missing requested stand-in, malformed index, or retired id refuses resolution.
 Literal profiles and homes without an index retain their existing behavior, except that a configured retired list also applies to literals.
 A retired id also matches an id carrying a trailing context suffix, so retiring `claude-sonnet-5-5` refuses `claude-sonnet-5-5[1m]`.
+Claude's catalog lists no suffixed aliases, so a Claude id such as `opus[1m]` is available when its base `opus` is listed.
 
-Run `bin/fm-model-index.sh check` after every index edit, before propagating the index with `bin/fm-config-push.sh`; it checks every active id, including stand-ins, against its own harness catalog.
+Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
+`bin/fm-config-push.sh` runs the same check before it pushes an index and withholds `model-index.json` from every home, exiting non-zero, when an id is absent from a readable catalog; an unavailable catalog is only a notice.
+Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
-Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id.
+Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id, under that harness's `config/claude-account` or `config/pi-account` pin when one is set.
 For a manually selected profile, pass `--model role:<role>` or `--model stand-in:<role>` to `fm-spawn.sh`, or use the concrete id returned by `fm-model-index.sh model <harness> role:<role>`.
 Spawn resolves role references, including a model token in `config/secondmate-harness`, before its existing model validation and records and launches only the resulting concrete id.
+`fm-control.sh relaunch` and the remote secondmate spawn and restart paths resolve the same way before anything stops, so a role pin launches and a since-retired id refuses on the pre-stop side.
 Spawn checks only the selected index entry, after worker-account selection, against the catalog of the account the worker launches under (a `config/claude-account` or `config/pi-account` pin, else the ambient account).
 Resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and the selected-entry checks at intake and spawn do.
 The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.

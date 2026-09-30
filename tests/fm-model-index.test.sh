@@ -76,8 +76,14 @@ refuses check claude opus
 printf '%s\n' '{"models":[{"id":"opus","resolved_id":"claude-current"}]}' > "$CATALOGS/claude.json"
 jq '.roles.strong.codex.model = "old"' "$BASE" > "$INDEX"
 refuses check
+jq '.roles.long = {claude:{model:"opus[1m]"},codex:{model:"current[1m]"}}' "$BASE" > "$INDEX"
+"$TOOL" check claude 'opus[1m]' >/dev/null 2> "$TMP_ROOT/suffix-notice" || fail 'a context-suffixed Claude id was refused although its base is listed'
+[ ! -s "$TMP_ROOT/suffix-notice" ] || fail "a listed Claude base must validate its suffixed id: $(cat "$TMP_ROOT/suffix-notice")"
+refuses check codex 'current[1m]'
+jq '.roles.long = {claude:{model:"opus[1m]"}} | .retired += ["claude-current"]' "$BASE" > "$INDEX"
+refuses check claude 'opus[1m]'
 cp "$BASE" "$INDEX"
-pass 'retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused'
+pass 'retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude suffixes match their listed base'
 
 jq '.roles.strong.codex.model = "absent"' "$BASE" > "$INDEX"
 refuses check
@@ -157,7 +163,7 @@ shift
 exec "$@"
 SH
 chmod +x "$FAKEBIN/claude" "$FAKEBIN/omp" "$FAKEBIN/cursor-agent" "$FAKEBIN/timeout"
-jq '.roles.strong.cursor = {model:"cursor-current"}' "$BASE" > "$INDEX"
+jq '.roles.strong.cursor = {model:"cursor-current"} | .roles.long = {claude:{model:"opus[1m]"}}' "$BASE" > "$INDEX"
 PATH="$FAKEBIN:$PATH" CODEX_HOME="$TMP_ROOT/codex" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_MODEL_CATALOG_DIR='' MODEL_INIT_LOG="$TMP_ROOT/init.json" "$TOOL" check 2> "$TMP_ROOT/native-notices"
 [ ! -s "$TMP_ROOT/native-notices" ] || fail "a native catalog was not read: $(cat "$TMP_ROOT/native-notices")"
 jq -e '.type == "control_request" and .request.subtype == "initialize"' "$TMP_ROOT/init.json" >/dev/null || fail 'Claude catalog query sent something other than token-free initialization'
@@ -166,7 +172,7 @@ refuses_native=0
 PATH="$FAKEBIN:$PATH" CODEX_HOME="$TMP_ROOT/codex" FM_MODEL_CATALOG_DIR='' MODEL_INIT_LOG="$TMP_ROOT/init.json" "$TOOL" check >/dev/null 2>&1 || refuses_native=$?
 [ "$refuses_native" -ne 0 ] || fail 'native Codex cache omission accepted'
 cp "$BASE" "$INDEX"
-pass 'native Codex, Claude initialization, omp selector, and padded, colored Cursor catalogs are checked'
+pass 'native Codex, Claude initialization with a context-suffixed alias, omp selector, and padded, colored Cursor catalogs are checked'
 
 # The inherited file is consumed in the destination home, proving policy
 # convergence rather than just allowlist membership or copied text.
@@ -182,4 +188,43 @@ jq '.roles.strong.codex.model = "next"' "$BASE" > "$INDEX"
 propagate_inheritable_config "$HOME_DIR/config" "$SECOND/config"
 [ "$(FM_HOME="$SECOND" "$TOOL" model codex role:strong)" = next ] || fail 'second home did not consume the index update'
 pass 'secondmate inheritance changes the model selected by the destination home'
+
+# fm-config-push runs the full index check before the index reaches any home.
+fm_git_identity fmtest fmtest@example.invalid
+PUSH="$TMP_ROOT/push"
+mkdir -p "$PUSH/home/state" "$PUSH/home/data" "$PUSH/home/config" "$PUSH/jqbin"
+ln -s "$(command -v jq)" "$PUSH/jqbin/jq"
+git init -q -b main "$PUSH/root"
+printf '%s\n' .fm-secondmate-home data/ state/ config/ projects/ > "$PUSH/root/.gitignore"
+printf 'instructions\n' > "$PUSH/root/AGENTS.md"
+mkdir -p "$PUSH/root/bin"
+printf 'echo spawn\n' > "$PUSH/root/bin/fm-spawn.sh"
+touch "$PUSH/home/state/.last-watcher-beat"
+git -C "$PUSH/root" add -A
+git -C "$PUSH/root" commit -qm initial
+git -C "$PUSH/root" worktree add -q --detach "$PUSH/sm" HEAD
+printf 'sm\n' > "$PUSH/sm/.fm-secondmate-home"
+mkdir -p "$PUSH/sm/data" "$PUSH/sm/state" "$PUSH/sm/config"
+printf 'window=firstmate:fm-sm\nkind=secondmate\nhome=%s\n' "$PUSH/sm" > "$PUSH/home/state/sm.meta"
+printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"prior"}}},"retired":[]}' > "$PUSH/sm/config/model-index.json"
+cp "$PUSH/sm/config/model-index.json" "$PUSH/prior-index.json"
+config_push() { # <catalog-dir>; output in $TMP_ROOT/push.out
+  PATH="$PUSH/jqbin:${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" \
+    FM_MODEL_CATALOG_DIR="$1" "$ROOT/bin/fm-config-push.sh" > "$TMP_ROOT/push.out" 2>&1 || true
+}
+jq '.roles.strong.codex.model = "absent"' "$BASE" > "$PUSH/home/config/model-index.json"
+printf 'codex\n' > "$PUSH/home/config/crew-harness"
+config_push "$CATALOGS"
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json not pushed' 'an index with an absent id must be withheld'
+cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail 'a refused index reached the secondmate home'
+cmp -s "$PUSH/home/config/crew-harness" "$PUSH/sm/config/crew-harness" || fail "a refused index must not withhold other inherited config: $(cat "$TMP_ROOT/push.out")"
+mkdir -p "$TMP_ROOT/no-push-catalogs"
+config_push "$TMP_ROOT/no-push-catalogs"
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'codex catalog unavailable' 'an unreadable catalog must be reported'
+cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'an unreadable catalog blocked the index push'
+cp "$BASE" "$PUSH/home/config/model-index.json"
+config_push "$CATALOGS"
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid index must not be withheld'
+cmp -s "$BASE" "$PUSH/sm/config/model-index.json" || fail 'a valid index was not pushed'
+pass 'fm-config-push withholds an index with an absent id, pushes with a notice when catalogs are unreadable, and pushes a valid index'
 printf '# all fm-model-index tests passed\n'

@@ -268,6 +268,30 @@ fm_worker_account_select() {
   printf '%s\t%s\t%s\n' "$declared" "$root" "$provider"
 }
 
+# fm_worker_account_run <harness> <root> <command...>
+# Runs a read-only command under the account a pinned launch of <harness>
+# selects: a Claude root (unset for ordinary) with the outranking credentials
+# shed, or a Pi root. Credentials and pins are never changed.
+fm_worker_account_run() {
+  local harness=$1 root=$2 var
+  local -a prefix=(env)
+  shift 2
+  case "$harness" in
+  claude)
+    for var in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+      prefix+=(-u "$var")
+    done
+    if [ -n "$root" ]; then
+      prefix+=("CLAUDE_CONFIG_DIR=$root")
+    else
+      prefix+=(-u CLAUDE_CONFIG_DIR)
+    fi
+    ;;
+  pi | pi-signed) prefix+=("PI_CODING_AGENT_DIR=$root") ;;
+  esac
+  "${prefix[@]}" "$@"
+}
+
 # fm_worker_account_claude_shed
 # Prints the `env` launch prefix that unsets the environment credentials Claude
 # ranks above a pinned root's stored login. The caller appends the root

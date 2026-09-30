@@ -90,6 +90,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-brief-heading-lib.sh
 . "$SCRIPT_DIR/fm-brief-heading-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
@@ -508,8 +510,16 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
 CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
 if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
   IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
-  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model" \
-    || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
+  chosen_account=$(fm_worker_account_resolve "$chosen_harness" "$CONFIG") \
+    || emit_error "worker account pin for $chosen_harness does not resolve"
+  chosen_root=${chosen_account#*$'\t'}
+  chosen_root=${chosen_root%%$'\t'*}
+  if [ -n "$chosen_account" ]; then
+    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_run "$chosen_harness" "$chosen_root" \
+      "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
+  else
+    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
+  fi || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
 fi
 
 TEXT=$(jq -r '

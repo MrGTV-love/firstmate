@@ -1055,4 +1055,32 @@ assert_absent "$LOG/argv" "duplicate candidates must refuse before the rule requ
 rm "$HOME_DIR/config/model-index.json"
 pass "typed intake resolves roles before quota ranking and detects concrete duplicates"
 
+# The chosen id is checked against the catalog of the account a pinned worker
+# would launch under, not the intake's ambient account.
+mkdir -p "$TMP_ROOT/pinned-claude" "$TMP_ROOT/ambient-claude"
+printf 'pinned-only\n' > "$TMP_ROOT/pinned-claude/catalog"
+printf 'ambient-only\n' > "$TMP_ROOT/ambient-claude/catalog"
+cat > "$FAKEBIN/claude" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\${CLAUDE_CONFIG_DIR-unset}" >> '$TMP_ROOT/claude-catalog-roots'
+jq -Rsc '{type:"control_response",response:{subtype:"success",request_id:"model-index",
+  response:{models:[split("\\n")[] | select(length > 0) | {value:., resolvedModel:.}]}}}' "\${CLAUDE_CONFIG_DIR}/catalog"
+SH
+chmod +x "$FAKEBIN/claude"
+printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"pinned-only"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+printf '%s\n' "$TMP_ROOT/pinned-claude" > "$HOME_DIR/config/claude-account"
+printf '%s\n' '{"rules":[{"when":"Claude work.","use":{"harness":"claude","role":"routine"}}]}' > "$RULES"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"rule_1","confidence":0.99,"probabilities":{"rule_1":0.99,"default":0.01}}},"usage":{"input_tokens":100,"output_tokens":60}}
+JSON
+reset_log
+CLAUDE_CONFIG_DIR="$TMP_ROOT/ambient-claude" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "pinned-account intake exits 0"
+assert_contains "$out" "  profile: --harness 'claude' --model 'pinned-only'" "the pinned account's catalog must decide the chosen id: $err"
+[ "$(cat "$TMP_ROOT/claude-catalog-roots")" = "$TMP_ROOT/pinned-claude" ] \
+  || fail "the chosen-id catalog must be read from the pinned root only: $(cat "$TMP_ROOT/claude-catalog-roots")"
+rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/claude-account" "$FAKEBIN/claude"
+cp "$BASE_RULES" "$RULES"
+pass "typed intake checks the chosen id against the pinned worker account's catalog"
+
 printf '# all fm-dispatch-resolve tests passed\n'

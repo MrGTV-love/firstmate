@@ -995,6 +995,11 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
+  if [ "$model" != - ] && ! model=$("$SCRIPT_DIR/fm-model-index.sh" model "$harness" "$model"); then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  fi
   if [ "$effort" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$harness" "$model" "$effort"; then
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
@@ -2434,14 +2439,11 @@ fi
 # worker launches under: a pinned Claude root with its outranking credentials
 # shed, or a pinned Pi root. Unpinned workers inherit this environment.
 if [ "$MODEL_INDEXED" = 1 ]; then
-  catalog_env=(env)
   if [ -n "$WORKER_ACCOUNT" ]; then
-    case "$HARNESS" in
-    claude) read -ra catalog_env <<< "$(fm_worker_account_claude_shed)" ;;
-    pi | pi-signed) catalog_env=(env "PI_CODING_AGENT_DIR=$WORKER_ACCOUNT_ROOT") ;;
-    esac
+    fm_worker_account_run "$HARNESS" "$WORKER_ACCOUNT_ROOT" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
+  else
+    "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
   fi
-  "${catalog_env[@]}" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
