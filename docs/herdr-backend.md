@@ -594,7 +594,7 @@ Dim or faint suggestions are still removed, and other harnesses retain their exi
 `fm_backend_herdr_composer_ghost_luma` owns that policy; a state read consults identity for it only when the two policies strip the selected composer rows differently.
 A submission reuses the identity it already probed for its post-Enter confirmation and clear reads, so a failed later probe cannot turn a swallowed colored command into a reported delivery; a Pi status is still read live, because only a live idle or done status proves its composer.
 Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
-Dated measurement: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup".
+Dated measurements: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup" and "Colored Claude slash commands".
 
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
@@ -687,6 +687,7 @@ Identity stays a lazy read, consulted only when a separator pair or a composer r
 
 ANSI capture preserves de-emphasized placeholder style.
 `bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
+A pane whose native identity is Claude keeps dark truecolor text, as "Claude composer proof" describes.
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.
