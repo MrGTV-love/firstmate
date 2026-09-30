@@ -24,6 +24,8 @@ skip_or_fail() {  # <reason>
   exit 0
 }
 TC_BIN=$(type -P teamclaude 2>/dev/null || true)
+TC_PATH_DIR=
+[ -z "$TC_BIN" ] || TC_PATH_DIR=$(dirname "$TC_BIN")
 if [ -z "$TC_BIN" ]; then
   set -- "$HOME"/.nvm/versions/node/*/bin/teamclaude
   [ "$#" -eq 1 ] && [ -x "$1" ] && TC_BIN=$1
@@ -41,10 +43,14 @@ env > "$FM_GUARD_CLAUDE_ENV"
 SH
 chmod +x "$LAB/fakebin/claude"
 
-# A clean environment: nothing but the home and a PATH whose claude records.
-out=$(env -i HOME="$HOME" PATH="$LAB/fakebin:$(dirname "$(command -v bash)"):/usr/bin:/bin" \
-  FM_GUARD_CLAUDE_ENV="$LAB/claude-env" \
-  "$ROOT/bin/fm-teamclaude-launch.sh" --version 2>&1) \
+# A clean environment: the home, a PATH whose claude records ahead of the
+# directory the teamclaude found above came from, and the TeamClaude
+# configuration that status check read, under the names fm-spawn hands it.
+launch_env=(HOME="$HOME" FM_GUARD_CLAUDE_ENV="$LAB/claude-env"
+  PATH="$LAB/fakebin${TC_PATH_DIR:+:$TC_PATH_DIR}:$(dirname "$(command -v bash)"):/usr/bin:/bin")
+[ -z "${XDG_CONFIG_HOME:-}" ] || launch_env+=(FM_TC_XDG_CONFIG_HOME="$XDG_CONFIG_HOME")
+[ -z "${TEAMCLAUDE_CONFIG:-}" ] || launch_env+=(FM_TC_TEAMCLAUDE_CONFIG="$TEAMCLAUDE_CONFIG")
+out=$(env -i "${launch_env[@]}" "$ROOT/bin/fm-teamclaude-launch.sh" --version 2>&1) \
   || fail "teamclaude $TC_VERSION: the launcher refused against a running proxy: $out"
 [ -s "$LAB/claude-env" ] || fail "teamclaude $TC_VERSION: the launcher never started claude"
 
