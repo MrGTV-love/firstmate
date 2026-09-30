@@ -1,0 +1,213 @@
+### K: report case: codex 6% remaining, established exhaustion in 1800s  (2026-09-30T20:41:59Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.effectivePercentRemaining=6 | .runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=1800)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.78
+  probabilities: rule_5=0.0 rule_2=0.0 rule_3=0.0 rule_1=0.0 rule_4=0.0 default=0.02 rule_7=0.81 rule_6=0.16
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=6%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=established)]
+exit=0
+# check: PASS (exit=0 status=escalate must='shorter than the 240-minute task horizon' must_not='profile:')
+
+### A: established 3600s < 240-min horizon  (2026-09-30T20:42:06Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: rule_2=0.0 rule_6=0.19 rule_3=0.0 default=0.02 rule_7=0.79 rule_4=0.0 rule_5=0.0 rule_1=0.0
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+# check: PASS (exit=0 status=escalate must='shorter than the 240-minute task horizon' must_not='profile:')
+
+### B: early 3600s projection is warning only  (2026-09-30T20:42:13Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="early" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.78
+  probabilities: rule_2=0.0 rule_6=0.17 rule_7=0.8 rule_1=0.0 rule_3=0.0 rule_4=0.0 default=0.02 rule_5=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+# check: PASS (exit=0 status=clear must='projectionConfidence=early)]' must_not='')
+
+### C: absent confidence and seconds is warning only  (2026-09-30T20:42:17Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | del(.runway.projectionConfidence) | del(.runway.usableRunwaySeconds))
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: rule_5=0.0 rule_2=0.0 rule_4=0.0 rule_1=0.0 rule_3=0.0 default=0.02 rule_7=0.79 rule_6=0.19
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=unknown)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+# check: PASS (exit=0 status=clear must='projectionConfidence=unknown)]' must_not='')
+
+### D: established exactly 14400s clears without warning  (2026-09-30T20:42:21Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=14400)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.77
+  probabilities: rule_7=0.8 rule_6=0.18 rule_4=0.0 rule_3=0.0 rule_5=0.0 default=0.02 rule_1=0.0 rule_2=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+# check: PASS (exit=0 status=clear must='profile: --harness 'omp'' must_not='[warning:')
+
+### E1: task_horizon_minutes=30 lets established 3600s clear  (2026-09-30T20:42:29Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: . + {task_horizon_minutes: 30}
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.76
+  probabilities: rule_5=0.0 default=0.02 rule_2=0.0 rule_3=0.0 rule_6=0.18 rule_7=0.8 rule_4=0.0 rule_1=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+# check: PASS (exit=0 status=clear must='profile: --harness 'omp'' must_not='[warning:')
+
+### E2: task_horizon_minutes=120 escalates established 3600s  (2026-09-30T20:42:35Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: . + {task_horizon_minutes: 120}
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 2000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.72
+  probabilities: rule_1=0.0 rule_2=0.0 rule_4=0.0 rule_5=0.0 rule_6=0.21 rule_7=0.77 rule_3=0.0 default=0.02
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 120-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+# check: PASS (exit=0 status=escalate must='shorter than the 120-minute task horizon' must_not='profile:')
+
+### E3: task_horizon_minutes=0 is a config error  (2026-09-30T20:42:40Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: . + {task_horizon_minutes: 0}
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+error: malformed rules file: /tmp/fm-resolve-ctl.qeAejy/home/config/crew-dispatch.json - task_horizon_minutes must be a positive number when present
+exit=2
+# check: PASS (exit=2 status= must='task_horizon_minutes must be a positive number' must_not='profile:')
+
+### F: exhausted_now on pool visible account: eligible unranked with warning, not vetoed  (2026-09-30T20:42:43Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="exhausted_now" | .effectivePercentRemaining=0 | .runway.usableRunwaySeconds=0)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: rule_1=0.0 rule_2=0.0 rule_4=0.0 rule_5=0.0 rule_7=0.79 rule_3=0.0 rule_6=0.19 default=0.02
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+exit=0
+# check: PASS (exit=0 status=escalate must='eligible, unranked: omp Codex account pool' must_not='not eligible')
+
+### F-nonpool: exhausted_now on single codex harness (outside pool) remains a veto  (2026-09-30T20:42:46Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .rules[6].use = {harness: "codex", model: "gpt-6.1-sol", effort: "high"}
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="exhausted_now" | .effectivePercentRemaining=0 | .runway.usableRunwaySeconds=0)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.82
+  probabilities: rule_5=0.0 rule_7=0.85 default=0.01 rule_2=0.0 rule_4=0.0 rule_3=0.0 rule_1=0.0 rule_6=0.14
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: codex:gpt-6.1-sol  provider=codex  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models
+exit=0
+# check: PASS (exit=0 status=escalate must='not eligible' must_not='profile:')
+
+### H: short pool winner escalates; lower-ranked cursor not used  (2026-09-30T20:42:56Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .rules[6].use = [.rules[6].use, {harness: "cursor", model: "cursor-grok-4.6-medium"}]
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="cursor") | .quotaSemantics) = {status: "known", effectiveAvailability: [{scope: "all_models", status: "known", effectivePercentRemaining: 95, runway: {status: "through_reset"}, selection: {spendPriority: -9.5}}]} | (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 2000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.72
+  probabilities: rule_4=0.0 rule_7=0.76 rule_6=0.21 rule_2=0.0 rule_3=0.01 default=0.02 rule_1=0.0 rule_5=0.0
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=95%  spendPriority=-9.5  runway=through_reset  -> eligible
+exit=0
+# check: PASS (exit=0 status=escalate must='shorter than the 240-minute task horizon' must_not='profile:')
+
+### H-control: healthy pool + cursor clears on the pool  (2026-09-30T20:43:11Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .rules[6].use = [.rules[6].use, {harness: "cursor", model: "cursor-grok-4.6-medium"}]
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): (.providers[] | select(.provider=="cursor") | .quotaSemantics) = {status: "known", effectiveAvailability: [{scope: "all_models", status: "known", effectivePercentRemaining: 95, runway: {status: "through_reset"}, selection: {spendPriority: -9.5}}]} | (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=79737)
+# quota-axi --version -> 0.1.55
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: default=0.02 rule_1=0.0 rule_4=0.0 rule_3=0.0 rule_7=0.78 rule_5=0.0 rule_2=0.0 rule_6=0.2
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=55%  spendPriority=-3.5552  runway=projected_exhaustion  -> eligible
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=95%  spendPriority=-9.5  runway=through_reset  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+# check: PASS (exit=0 status=clear must='profile: --harness 'omp'' must_not='--harness 'cursor'')
+
+### J: quota-axi 0.1.50 is below minimum  (2026-09-30T20:43:14Z)
+# evidence class: CONTROLLED CLI (fixture quota via stand-in quota-axi; lab FM_HOME rules copy; real Jev API call). Not a live provider reading.
+# rules transform: .
+# quota fixture transform (on live snapshot generatedAt 2026-09-30T20:40:33.157Z): .
+# quota-axi --version -> 0.1.50
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve: error (quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable)
+dispatch-resolve:
+  status: error
+  reason: quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable
+exit=0
+# check: PASS (exit=0 status=error must='quota-axi requires >= 0.1.51' must_not='profile:')
+
+pass=13 fail=0

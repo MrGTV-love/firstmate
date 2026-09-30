@@ -1,0 +1,189 @@
+### A: pool winner, established runway 3600s < 240-min horizon  (2026-09-30T19:52:22Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.74
+  probabilities: rule_4=0.0 rule_6=0.2 rule_2=0.0 default=0.02 rule_5=0.0 rule_3=0.0 rule_7=0.78 rule_1=0.0
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5314  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+
+### K: report case replay - codex 6% remaining, established exhaustion in 1800s  (2026-09-30T19:54:08Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.effectivePercentRemaining=6 | .runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=1800)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.79
+  probabilities: rule_4=0.0 rule_5=0.0 rule_3=0.0 rule_1=0.0 default=0.02 rule_2=0.0 rule_7=0.81 rule_6=0.16
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=6%  spendPriority=-3.526  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=established)]
+exit=0
+
+### B: early projection 3600s is a warning, not a veto  (2026-09-30T19:54:45Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="early" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: rule_2=0.0 rule_3=0.0 rule_4=0.0 rule_5=0.0 rule_1=0.0 default=0.02 rule_6=0.19 rule_7=0.79
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5234  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### C: projection with absent confidence and runway seconds is a warning, not a veto  (2026-09-30T19:55:24Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | del(.runway.projectionConfidence) | del(.runway.usableRunwaySeconds))
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.73
+  probabilities: rule_4=0.0 rule_1=0.0 default=0.02 rule_5=0.0 rule_7=0.78 rule_2=0.0 rule_3=0.0 rule_6=0.2
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5203  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=unknown)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### D: established projection exactly at 240-min horizon passes  (2026-09-30T19:56:10Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=14400)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 2000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.77
+  probabilities: rule_4=0.0 rule_5=0.0 rule_1=0.0 rule_2=0.0 rule_6=0.17 default=0.02 rule_3=0.0 rule_7=0.8
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5174  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### E1: declared task_horizon_minutes=30 lets established 3600s clear  (2026-09-30T19:57:47Z)
+# rules transform: . + {task_horizon_minutes: 30}
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.76
+  probabilities: default=0.02 rule_3=0.0 rule_7=0.8 rule_5=0.0 rule_6=0.18 rule_2=0.0 rule_1=0.0 rule_4=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5103  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### E2: declared task_horizon_minutes=120 escalates established 3600s  (2026-09-30T19:58:39Z)
+# rules transform: . + {task_horizon_minutes: 120}
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 2000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.78
+  probabilities: rule_1=0.0 rule_2=0.0 rule_3=0.0 rule_4=0.0 rule_5=0.0 rule_6=0.17 rule_7=0.81 default=0.01
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 120-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5071  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+
+### E3: malformed task_horizon_minutes=0 is a config error (exit 2)  (2026-09-30T19:59:31Z)
+# rules transform: . + {task_horizon_minutes: 0}
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+error: malformed rules file: /Users/charlesabrooker/tmp/fm-resolve-lab.JcISFv/home/config/crew-dispatch.json - task_horizon_minutes must be a positive number when present
+exit=2
+
+### F: exhausted_now on pool visible account -> eligible unranked, not vetoed; lone candidate so escalate  (2026-09-30T19:59:37Z)
+# rules transform: .
+# quota transform: (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="exhausted_now" | .effectivePercentRemaining=0 | .runway.usableRunwaySeconds=0)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 3000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.75
+  probabilities: rule_3=0.0 rule_4=0.0 rule_1=0.0 rule_7=0.79 rule_6=0.19 rule_2=0.0 default=0.02 rule_5=0.0
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+exit=0
+
+### G: explicit profile floor 90% on the pool vetoes it (visible account ~57%)  (2026-09-30T20:00:51Z)
+# rules transform: .rules[6].use.floor = {scope: "all_models", min_percent: 90}
+# quota transform: . (real live snapshot)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 3000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.74
+  probabilities: rule_7=0.78 rule_6=0.2 rule_4=0.0 default=0.02 rule_5=0.0 rule_3=0.0 rule_1=0.0 rule_2=0.0
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=56%  spendPriority=-  runway=projected_exhaustion  -> not eligible: profile floor all_models below 90%
+exit=0
+
+### H: short pool winner escalates; lower-ranked cursor in same rule is NOT used  (2026-09-30T20:01:46Z)
+# rules transform: .rules[6].use = [.rules[6].use, {harness: "cursor", model: "cursor-grok-4.6-medium"}]
+# quota transform: (.providers[] | select(.provider=="cursor") | .quotaSemantics) = {status: "known", effectiveAvailability: [{scope: "all_models", status: "known", effectivePercentRemaining: 95, runway: {status: "through_reset"}, selection: {spendPriority: -9.5}}]} | (.providers[] | select(.provider=="codex") | .quotaSemantics.effectiveAvailability[]) |= (.runway.status="projected_exhaustion" | .runway.projectionConfidence="established" | .runway.usableRunwaySeconds=3600)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 2000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.73
+  probabilities: rule_2=0.0 rule_3=0.0 rule_5=0.0 rule_7=0.77 rule_6=0.21 rule_4=0.0 rule_1=0.0 default=0.02
+  reason: highest-ranked candidate omp:openai-codex/gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=56%  spendPriority=-3.6  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=95%  spendPriority=-9.5  runway=through_reset  -> eligible
+exit=0
+
+### H-control: same two-candidate rule with healthy pool clears on the pool (higher spendPriority)  (2026-09-30T20:03:05Z)
+# rules transform: .rules[6].use = [.rules[6].use, {harness: "cursor", model: "cursor-grok-4.6-medium"}]
+# quota transform: (.providers[] | select(.provider=="cursor") | .quotaSemantics) = {status: "known", effectiveAvailability: [{scope: "all_models", status: "known", effectivePercentRemaining: 95, runway: {status: "through_reset"}, selection: {spendPriority: -9.5}}]}
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.74
+  probabilities: rule_2=0.0 rule_4=0.0 default=0.02 rule_3=0.0 rule_5=0.0 rule_1=0.0 rule_7=0.78 rule_6=0.2
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=56%  spendPriority=-3.5957  runway=projected_exhaustion  -> eligible
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=95%  spendPriority=-9.5  runway=through_reset  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### I: omp OpenRouter candidate (no usable quota row) stays eligible, unranked; pool still clears with unranked note  (2026-09-30T20:04:04Z)
+# rules transform: .rules[6].use = [.rules[6].use, {harness: "omp", model: "openrouter/anthropic/claude-sonnet-5.5", effort: "high", provider: "openrouter"}]
+# quota transform: . (real live snapshot)
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.74
+  probabilities: rule_2=0.0 rule_1=0.0 rule_7=0.78 rule_6=0.2 rule_3=0.0 rule_4=0.0 default=0.02 rule_5=0.0
+  note: rule matched
+  note: 1 eligible candidate(s) unranked (openrouter)
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=56%  spendPriority=-3.5916  runway=projected_exhaustion  -> eligible
+  candidate: omp:openrouter/anthropic/claude-sonnet-5.5  provider=openrouter  -> eligible, unranked: provider openrouter unmeasured (unknown): disclosed uncertainty
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### J: quota-axi older than minimum -> error naming minimum, no ranking  (2026-09-30T20:05:06Z)
+# rules transform: .
+# quota transform: . (real live snapshot)   quota-axi --version -> quota-axi 0.1.50
+$ bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve: error (quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable)
+dispatch-resolve:
+  status: error
+  reason: quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable
+exit=0
+

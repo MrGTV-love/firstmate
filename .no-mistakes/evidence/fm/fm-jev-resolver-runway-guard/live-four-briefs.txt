@@ -1,0 +1,48 @@
+### fm-jev-resolver-runway-guard  (2026-09-30T19:47:07Z)
+$ FM_HOME=/Users/charlesabrooker/firstmate bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-runway-guard/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1518/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.77
+  probabilities: rule_2=0.0 rule_3=0.0 rule_7=0.8 rule_5=0.0 rule_6=0.17 default=0.02 rule_4=0.0 rule_1=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5551  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### fm-jev-mem-guard-macos  (2026-09-30T19:47:37Z)
+$ FM_HOME=/Users/charlesabrooker/firstmate bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-mem-guard-macos/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1321/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.93
+  probabilities: rule_1=0.0 rule_5=0.0 rule_3=0.0 rule_2=0.0 rule_4=0.0 rule_7=0.94 rule_6=0.04 default=0.02
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5541  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### fm-jev-never-send-sections  (2026-09-30T19:47:53Z)
+$ FM_HOME=/Users/charlesabrooker/firstmate bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-never-send-sections/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 1000   tokens: 1341/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.77
+  probabilities: rule_4=0.0 rule_7=0.81 rule_6=0.18 rule_2=0.0 rule_3=0.0 default=0.01 rule_1=0.0 rule_5=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5521  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
+### fm-jev-resolver-observability  (2026-09-30T19:48:25Z)
+$ FM_HOME=/Users/charlesabrooker/firstmate bin/fm-dispatch-resolve.sh /Users/charlesabrooker/firstmate/data/fm-jev-resolver-observability/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 0   tokens: 1436/89
+  rule: rule_7 (Non-Vernant ship task (any project other than vernant, such )   confidence: 0.89
+  probabilities: rule_4=0.0 rule_7=0.92 rule_6=0.06 rule_5=0.0 rule_3=0.0 rule_1=0.0 rule_2=0.0 default=0.02
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  scope=all_models  remaining=57%  spendPriority=-3.5484  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+exit=0
+
