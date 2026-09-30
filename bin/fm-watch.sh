@@ -2157,7 +2157,7 @@ watcher_stop_signals() {
 # Capture a check without blocking bash inside a command substitution, so the
 # poll shell keeps publishing progress while it waits on the bounded check.
 run_check_capture() {
-  local pgid check_started=$SECONDS interval=0.1
+  local pgid check_started=$SECONDS
   fm_check_output_cleanup
   FM_CHECK_RESULT=
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
@@ -2181,15 +2181,14 @@ run_check_capture() {
     return 1
   fi
   # Also enforce the deadline here in case the check's timeout controller stops
-  # responding. A quick check returns after one short sleep.
+  # responding. Poll briefly; watcher_beat throttles its own writes.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat || return 1
     if [ "$((SECONDS - check_started))" -ge "$((CHECK_TIMEOUT + 1))" ]; then
       fm_active_check_stop || return 1
       break
     fi
-    sleep "$interval"
-    interval=1
+    sleep 0.1
   done
   [ -z "$FM_ACTIVE_CHECK_PID" ] || wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || true
   FM_ACTIVE_CHECK_PID=

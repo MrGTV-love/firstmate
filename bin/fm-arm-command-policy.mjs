@@ -755,6 +755,7 @@ function exactHomePidKill(program, context) {
     if (original.some((token) => token.type === "group" || token.type === "word" && token.subs.length)) return false;
     let tokens = original;
     while (["if", "then", "else", "elif", "while", "until", "do", "!"].includes(tokens[0]?.value)) tokens = tokens.slice(1);
+    if (!tokens.length) continue;
     const first = tokens[0]?.value;
     if (["fi", "done"].includes(first) && tokens.length === 1) continue;
     if (["if", "then", "else", "elif", "fi", "for", "select", "in", "while", "until", "case", "esac", "do", "done", "function", "coproc", "time", "{", "}", "[[", "]]", "!"].includes(first)) return false;
