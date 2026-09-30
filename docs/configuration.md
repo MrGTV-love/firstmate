@@ -1174,10 +1174,16 @@ After the answer, code applies all remaining checks and ranking:
 - Every applicable account-wide and model/product row from one `quota-axi --json` snapshot.
 - The numeric `spendPriority` argmax over candidates, using each candidate's limiting row.
 
-The [shared quota library](../bin/fm-quota-axi-lib.sh) accepts schema 5 and schema 6 and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version, currently 0.1.51, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+The resolver checks `quota-axi --version` before taking its one JSON snapshot; an older, unreadable, or unparseable version produces a named `error` requiring that minimum, never a ranking based on incompatible output.
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
+- omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
+  An `omp` profile declaring `provider: "codex"` is therefore eligible but unranked, with no single-account remaining percentage or exhaustion veto presented as pool evidence.
+  Neither a schema-5 provider row nor several schema-6 account rows prove pool coverage; the resolver never sums them, discovers credentials, or reads another runtime's credential store to fill that gap.
+- quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
+  An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
 **Confidence and fallback rules**
 
@@ -1193,8 +1199,14 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 **Candidate eligibility and evidence**
 
-- Any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
+- For candidates bound to individual-account evidence, any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
+- A numeric winner with `projected_exhaustion` or `unknown` runway on any applicable bound produces `escalate`, names the affected scopes on its candidate line, and emits no `profile:`.
+  The resolver has no likely-completion horizon, so a finite projection cannot prove that the task will finish before exhaustion, even when the percentage or ranking looks favorable.
+  It preserves the highest `spendPriority` choice for firstmate's completion-aware decision instead of silently substituting a lower-ranked model.
+  `through_reset` on every applicable bound permits a clear winner without inventing a generic percentage floor.
+- A `quota_summary:` line names every unranked, ineligible, or uncertain-runway candidate, including on ambiguous and approval-gated outcomes.
+  Unranked alternatives do not prevent an otherwise measured, through-reset winner from clearing, but they remain visibly uncertain and cannot themselves be selected.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
@@ -1203,7 +1215,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, or a genuine tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or a winner whose completion runway is unproven. |
 | `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
 
 Every result above exits 0.
@@ -1215,7 +1227,7 @@ Every result above exits 0.
 **Firstmate retains the dispatch decision**
 
 The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captain-approval gate, or `fm-spawn.sh` validation; `AGENTS.md` section 4 owns what firstmate does with each outcome.
-By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
+A `clear` result still leaves catalog/authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
 
 Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
 
