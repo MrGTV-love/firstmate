@@ -1190,7 +1190,8 @@ The pre-send guard read a human's colored draft under the same ceiling as an emp
 `fm_backend_herdr_composer_ghost_luma` now keeps every normal-intensity truecolor run for every Herdr composer read of a pane whose native identity is Claude.
 SGR-2 suggestions remain ghost text, and other harnesses keep their placeholder behavior.
 At a load average near 90 the same Claude rendered a typed `/compact` 2.7 to 21 seconds after the literal send, while the payload proof read the composer once about 1.2 seconds after it; that single read refused and cleared the command, so `/compact` reported `send-failed` in the live guard.
-The proof now keeps reading for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds without retyping, and `tests/fm-backend-herdr.test.sh` pins a payload that renders after the settle.
+The proof now keeps reading, without retyping, for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds while the composer is empty or shows a prefix of the payload, and refuses a truncated suffix or foreign text on the read that shows it.
+`tests/fm-backend-herdr.test.sh` pins a payload that renders after the settle, a growing prefix, a truncated suffix refused and cleared at once, and foreign text refused at once and left in place.
 In the live guard run below, the public relaunch replaced the production-shape worker in the same endpoint through `fm-spawn`'s own launch, and the replacement rendered a token that existed only in its instructions.
 
 Refresh the repeatable pending-draft refusal, `/compact`, relaunch, prompt, and verified-exit evidence for both shapes with:
@@ -1207,7 +1208,7 @@ ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9
 ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the production shape and preserves its endpoint
 ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the forced-truecolor shape (draft drawn below the default ghost ceiling)
 ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes /compact in the forced-truecolor shape
-ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 reports empty and renders the requested reply in isolated session fm-lab-herdr-submit-con-85039-2206
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 reports empty and renders the requested reply in isolated session fm-lab-herdr-submit-con-67549-4960
 ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 submits a U+2063 away-supervisor payload whose read-back drops the mark
 ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the forced-truecolor shape and preserves its endpoint
 ```
