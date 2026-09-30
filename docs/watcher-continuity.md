@@ -463,8 +463,6 @@ It checks that a newly appended keyed decision is classified without rereading e
 
 ### Claude auto-arm and turn-end guard
 
-`tests/fm-subagent-pretool-check.test.sh` proves Claude retains only the non-status Bash seatbelts.
-
 `tests/fm-claude-stop-autoarm.test.sh` covers:
 
 - The auto-arm's scope.

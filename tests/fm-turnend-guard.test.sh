@@ -880,18 +880,15 @@ test_grok_adapter_missing_jq_and_no_supervision_allow() {
 # GROK_AGENT alone, which a grok 1.0.0 HOOK process does not carry, so the
 # Claude-only Stop auto-arm ran synchronously under Grok, foregrounded the
 # watcher, and wedged the Grok turn for its declared 28800-second timeout.
-#
-# bin/fm-subagent-pretool-check.sh is the deliberate exception: Grok has no
-# counterpart registration, so guarding it would REMOVE the guard from Grok
-# rather than deduplicate it (docs/subagent-guard.md "Known residual gap").
-# It is asserted to stay unguarded so the exception cannot be closed silently.
+# Every tracked Claude entry has a native Grok counterpart and must be inert
+# under Grok's Claude-compatible settings loading.
 test_tracked_claude_entries_inert_under_grok() {
-  local dir cmd script target guarded=0 unguarded=0
+  local dir cmd script target guarded=0
   command -v jq >/dev/null 2>&1 || fail "test host must provide jq"
   dir="$TMP_ROOT/claude-entries-grok-inert"
   mkdir -p "$dir/bin"
   for script in fm-turnend-guard.sh fm-claude-stop-autoarm.sh fm-sessionstart-run.sh \
-    fm-arm-pretool-check.sh fm-cd-pretool-check.sh fm-subagent-pretool-check.sh fm-host-mirror.sh; do
+    fm-arm-pretool-check.sh fm-cd-pretool-check.sh fm-host-mirror.sh; do
     printf '#!/usr/bin/env bash\nprintf ran >> %q\n' "$dir/invoked" > "$dir/bin/$script"
     chmod +x "$dir/bin/$script"
   done
@@ -914,13 +911,6 @@ test_tracked_claude_entries_inert_under_grok() {
       -u GROK_WORKSPACE_ROOT \
       || fail "tracked entry for $target did not run under a native Claude environment"
 
-    if [ "$target" = fm-subagent-pretool-check.sh ]; then
-      unguarded=$((unguarded + 1))
-      ran_under -u GROK_AGENT GROK_HOOK_EVENT=pre_tool_use GROK_SESSION_ID=grok-test-session \
-        || fail "the documented $target exception must stay unguarded; Grok has no counterpart to fall back to"
-      continue
-    fi
-
     guarded=$((guarded + 1))
     # grok 1.0.0 hook process: hook markers present, GROK_AGENT absent.
     ! ran_under -u GROK_AGENT GROK_HOOK_EVENT=stop \
@@ -933,8 +923,7 @@ test_tracked_claude_entries_inert_under_grok() {
   done < <(jq -r '.hooks[][].hooks[].command' "$ROOT/.claude/settings.json")
 
   [ "$guarded" -eq 7 ] || fail "expected 7 grok-guarded tracked entries, saw $guarded"
-  [ "$unguarded" -eq 1 ] || fail "expected 1 documented unguarded tracked entry, saw $unguarded"
-  pass "tracked .claude/settings.json entries: $guarded inert under grok, the documented subagent exception still armed, all live under Claude"
+  pass "tracked .claude/settings.json entries: $guarded inert under grok, all live under Claude"
 }
 
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root() {

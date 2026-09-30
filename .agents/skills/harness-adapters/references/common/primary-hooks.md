@@ -20,10 +20,8 @@ Supported primaries deny watcher-arm anti-patterns before execution, including s
 The tool reference names the integration form.
 Validate changes against the real harness in a scratch project before trusting them.
 
-A primary must also account for built-in delegation that can create work outside Firstmate's durable records.
-Claude's verified delegation guard is in `references/harness/claude.md`.
-`../../../docs/subagent-guard.md` owns its full contract, local hardening, escape hatch, and per-harness applicability review.
-Never generalize Claude tool names or permissions without live evidence.
+A primary may use built-in helpers for read-only work; project-specific work still follows `../../../AGENTS.md` sections 1 and 7.
+`../../../docs/subagent-guard.md` owns this distinction and the removal of the tool-name guard.
 
 ## Session start
 
