@@ -407,7 +407,7 @@ SH
 # The fake teamclaude's own environment lands in <env-out>.teamclaude.
 fm_test_teamclaude_launch_env() {
   local fakebin=$1 launch=$2 out=$3 bash_dir
-  bash_dir=$(dirname "$(command -v bash)")
+  bash_dir=$(fm_test_bash_only_dir "$(dirname "$out")")
   : > "$out"
   : > "$out.teamclaude"
   env -i HOME="$(dirname "$fakebin")" PATH="$fakebin:$bash_dir:/usr/bin:/bin" \

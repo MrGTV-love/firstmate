@@ -47,7 +47,7 @@ chmod +x "$LAB/fakebin/claude"
 # directory the teamclaude found above came from, and the TeamClaude
 # configuration that status check read, under the names fm-spawn hands it.
 launch_env=(HOME="$HOME" FM_GUARD_CLAUDE_ENV="$LAB/claude-env"
-  PATH="$LAB/fakebin${TC_PATH_DIR:+:$TC_PATH_DIR}:$(dirname "$(command -v bash)"):/usr/bin:/bin")
+  PATH="$LAB/fakebin${TC_PATH_DIR:+:$TC_PATH_DIR}:$(fm_test_bash_only_dir "$LAB"):/usr/bin:/bin")
 [ -z "${XDG_CONFIG_HOME:-}" ] || launch_env+=(FM_TC_XDG_CONFIG_HOME="$XDG_CONFIG_HOME")
 [ -z "${TEAMCLAUDE_CONFIG:-}" ] || launch_env+=(FM_TC_TEAMCLAUDE_CONFIG="$TEAMCLAUDE_CONFIG")
 out=$(env -i "${launch_env[@]}" "$ROOT/bin/fm-teamclaude-launch.sh" --version 2>&1) \
