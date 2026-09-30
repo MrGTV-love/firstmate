@@ -30,8 +30,9 @@
 #   an expanded provider with no matching row stays eligible but unranked, and
 #   omp's Codex pool ranks on its visible account only when that lower bound is
 #   through_reset. Ranking uses the spendPriority argmax over the matched
-#   rule's candidates with through_reset runway on every applicable bound; a
-#   candidate with weaker runway is never ranked. The model never sees quota, catalogs, approvals,
+#   rule's candidates; a winner whose established projected runway is shorter
+#   than the task horizon (top-level `task_horizon_minutes`, default 240)
+#   escalates, while early or unknown projections are disclosed warnings. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
@@ -58,7 +59,7 @@
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, no candidate rankable, a genuine tie, or
-#                no rankable candidate with through_reset runway
+#                a winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, or quota-axi failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
@@ -186,6 +187,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   elif any((.rules // [])[]; (profiles(.use) | length) == 0) then "each rule needs at least one use profile"
   elif any((.rules // [])[]; has("approval") and .approval != "captain") then "approval must be \"captain\" when present"
   elif any((.rules // [])[]; has("min_confidence") and ((.min_confidence | type) != "number" or .min_confidence < 0 or .min_confidence > 1)) then "min_confidence must be a number from 0 through 1 when present"
+  elif has("task_horizon_minutes") and ((.task_horizon_minutes | type) != "number" or .task_horizon_minutes <= 0) then "task_horizon_minutes must be a positive number when present"
   elif any((.rules // [])[]; has("select") and ((.select | type) != "string" or (.select | length) == 0)) then "select must be a non-empty string"
   elif any((.rules // [])[]; has("select") and .select != "quota-balanced") then
     "unknown select: " + ([.rules[] | select(has("select") and .select != "quota-balanced") | .select] | unique | join(", "))
@@ -381,10 +383,19 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
-  def runway_risks($p; $lane; $m):
-    [applicable($p; $lane; $m)[] |
-      select((.runway.status // "unknown") != "through_reset") |
-      "\(.runway.status // "unknown") at \(.scope)"];
+  def horizon_seconds: (($cfg.task_horizon_minutes // 240) * 60);
+  def runway_class($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "through_reset" then "ok"
+    elif $s == "projected_exhaustion" and ($row.runway.projectionConfidence // "") == "established"
+      and (($row.runway.usableRunwaySeconds | type) == "number") then
+      (if $row.runway.usableRunwaySeconds < horizon_seconds then "short" else "ok" end)
+    else "warn" end;
+  def runway_note($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "projected_exhaustion" then
+      "projected_exhaustion at \($row.scope) (usableRunwaySeconds=\($row.runway.usableRunwaySeconds // "unknown") projectionConfidence=\($row.runway.projectionConfidence // "unknown"))"
+    else "\($s) at \($row.scope)" end;
   def assess($c; $p; $lane):
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
@@ -396,18 +407,18 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       (applicable($p; $lane; ($c.model // ""))) as $rows |
       (evidence($rows)) as $bounds |
       (floor_state($c.floor; $p; $lane)) as $profile_floor_state |
-      if any($rows[]; (.runway.status // "") == "exhausted_now") then
-        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
-      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
-        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
-      elif $profile_floor_state == "below" then
+      if $profile_floor_state == "below" then
         ([rows($p; $lane)[] | select(
           .scope == $c.floor.scope and
           .effectivePercentRemaining < $c.floor.min_percent
         )] | first) as $floor_row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
+      elif any($rows[]; (.runway.status // "") == "exhausted_now") then
+        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
+      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
+        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}
@@ -431,14 +442,19 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def evaluate($c):
     (provider_of($c)) as $p | (lane_of($c)) as $lane |
     (assess($c; $p; $lane)) as $base |
-    (if $p == null then [] else runway_risks($p; $lane; ($c.model // "")) end) as $risks |
+    (if $p == null then [] else applicable($p; $lane; ($c.model // "")) end) as $rows |
     ($base.eligible and (($base.unranked // false) | not)) as $ranked |
     ($c.harness == "omp" and $p == "codex") as $pooled |
-    if $pooled and (($ranked and ($risks | length) == 0) | not) then
+    ([$rows[] | select((.runway.status // "unknown") != "through_reset") | runway_note(.)]) as $visible |
+    ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
+    if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
+    elif $pooled and (($ranked and ($visible | length) == 0) | not) then
       {profile: $c, provider: $p, eligible: true, unranked: true,
        reason: "omp Codex account pool is only lower-bounded by its visible account, which lacks through_reset evidence (\(if $ranked then "runway" else $base.reason end))"}
-    else $base end
-    | if ($ranked or $pooled) and ($risks | length) > 0 then . + {warning: ($risks | join(", "))} else . end;
+      + (if ($visible | length) > 0 then {warning: ($visible | join("; "))} else {} end)
+    elif $ranked and ($risks | length) > 0 then
+      $base + {warning: ($risks | join("; ")), short: any($rows[]; runway_class(.) == "short")}
+    else $base end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
       ($c | ltrimstr("rule_") | tonumber) as $n |
@@ -497,15 +513,14 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   else
     ($sel.use | map(evaluate(.))) as $cands |
     ([$cands[] | select(.eligible and ((.unranked // false) | not))]) as $elig |
-    ([$elig[] | select(.warning | not)]) as $safe |
     ([$cands[] | select(.unranked)]) as $unranked |
     if ($elig | length) == 0 then $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
-    elif ($safe | length) == 0 then
-      $ev + {status: "escalate", reason: "no rankable candidate in \($sel.source) has through_reset runway on every applicable bound; completion runway is not proven", note: $sel.note, candidates: $cands}
     else
-      ($safe | max_by(.spendPriority)) as $best |
-      ([$safe[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
+      ($elig | max_by(.spendPriority)) as $best |
+      ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
       if $ties > 1 then $ev + {status: "escalate", reason: "genuine spendPriority tie", note: $sel.note, candidates: $cands}
+      elif $best.short then
+        $ev + {status: "escalate", reason: "highest-ranked candidate \($best.profile.harness):\($best.profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
       else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $best}
         + (if ($unranked | length) > 0 then
              {unranked_note: "\($unranked | length) eligible candidate(s) unranked (\([$unranked[].provider] | unique | join(", ")))"}
@@ -532,7 +547,7 @@ TEXT=$(jq -r '
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
       + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
-      + (if .warning then " [warning: \(.warning | flat); completion runway unproven]" else "" end)),
+      + (if .warning then " [warning: \(.warning | flat)]" else "" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
