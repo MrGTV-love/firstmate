@@ -1,0 +1,13 @@
+== BEFORE: base a4d559e hook in a plain primary checkout (FM_HOME=lab) ==
+Agent -> exit=2 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] the firstmate primary dispatches through t
+Monitor -> exit=2 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] the firstmate primary dispatches through t
+TaskCreate -> exit=0 
+ScheduleWakeup -> exit=2 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] the firstmate primary dispatches through t
+SendMessage -> exit=2 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] the firstmate primary dispatches through t
+Workflow -> exit=2 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] the firstmate primary dispatches through t
+Bash -> exit=0 
+Read -> exit=0 
+
+== AFTER: target ee4d5fb registers no such hook ==
+ls: /Users/charlesabrooker/tmp/fm-lab.jYPRlx/clones/after/bin/fm-subagent-pretool-check.sh: No such file or directory
+{"matcher":"Bash","cmds":["fm-arm-pretool-check.sh --claude","fm-cd-pretool-check.sh --claude"]}
