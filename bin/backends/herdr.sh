@@ -3430,9 +3430,11 @@ fm_backend_herdr_composer_content() {  # <target> <identity>
 #   shown     - <text> itself, or only Claude paste placeholders.
 #   rendering - empty, or a strict prefix of <text>: still being drawn.
 #   truncated - this send's own text with its head missing: a strict suffix
-#               of <text>, or a paste placeholder followed by a literal
-#               remainder.
-#   foreign   - anything else, which this send did not type on its own.
+#               of <text>, alone or after leading paste placeholders.
+#   foreign   - anything else, which this send did not type on its own. A
+#               strict infix of <text>, or any other literal beside a
+#               placeholder, is ambiguous and stays foreign, so it is never
+#               cleared.
 # Literal comparison ignores whitespace, the same comparison zellij uses, so a
 # wrapped payload still matches. It also ignores U+2063, the invisible mark
 # that starts operational inputs and separates the from-firstmate label:
@@ -3443,7 +3445,7 @@ fm_backend_herdr_composer_content() {  # <target> <identity>
 # burst: Claude collapses that burst into the placeholder and expands it on
 # submit.
 fm_backend_herdr_composer_payload_progress() {  # <text> <after>
-  local text=$1 after=$2 literal
+  local text=$1 after=$2 literal lead
   fm_composer_normalize_spaces_var text
   fm_composer_normalize_spaces_var after
   text=${text//[$' \t\r\n\v\f']/}
@@ -3463,7 +3465,15 @@ fm_backend_herdr_composer_payload_progress() {  # <text> <after>
     literal=${literal/"${BASH_REMATCH[0]}"/}
   done
   if [ "$literal" != "$after" ]; then
-    [ -n "$literal" ] && printf 'truncated' || printf 'shown'
+    [ -n "$literal" ] || { printf 'shown'; return 0; }
+    lead=$after
+    while [[ $lead =~ ^\[Pastedtext#[0-9]+(\+[0-9]+lines?)?\] ]]; do
+      lead=${lead#"${BASH_REMATCH[0]}"}
+    done
+    if [ "$lead" = "$literal" ] && [ "$literal" != "$text" ]; then
+      case "$text" in *"$literal") printf 'truncated'; return 0 ;; esac
+    fi
+    printf 'foreign'
     return 0
   fi
   case "$text" in
@@ -3480,7 +3490,7 @@ fm_backend_herdr_composer_payload_progress() {  # <text> <after>
 # well after the submit's settle (measured 2026-09-30, load average near 90:
 # 2.7 to 21 seconds for `/compact` in Claude 2.1.285 on Herdr 0.9.1), so an
 # empty or partly drawn composer keeps being read for up to
-# FM_BACKEND_HERDR_PROOF_WAIT seconds (default 20). Truncated or foreign text
+# FM_BACKEND_HERDR_PROOF_WAIT seconds (default 30). Truncated or foreign text
 # can never become the payload, so it is refused on the read that shows it.
 fm_backend_herdr_composer_await_payload() {  # <target> <text> <identity>
   local target=$1 text=$2 identity=$3 content progress start=$SECONDS
@@ -3494,7 +3504,7 @@ fm_backend_herdr_composer_await_payload() {  # <target> <text> <identity>
       truncated) return 1 ;;
       foreign) return 2 ;;
     esac
-    [ $((SECONDS - start)) -lt "${FM_BACKEND_HERDR_PROOF_WAIT:-20}" ] || return 1
+    [ $((SECONDS - start)) -lt "${FM_BACKEND_HERDR_PROOF_WAIT:-30}" ] || return 1
     sleep 0.5
   done
 }

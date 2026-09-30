@@ -1191,7 +1191,7 @@ The pre-send guard read a human's colored draft under the same ceiling as an emp
 SGR-2 suggestions remain ghost text, and other harnesses keep their placeholder behavior.
 At a load average near 90 the same Claude rendered a typed `/compact` 2.7 to 21 seconds after the literal send, while the payload proof read the composer once about 1.2 seconds after it; that single read refused and cleared the command, so `/compact` reported `send-failed` in the live guard.
 The proof now keeps reading, without retyping, for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds while the composer is empty or shows a prefix of the payload, and refuses a truncated suffix or foreign text on the read that shows it.
-`tests/fm-backend-herdr.test.sh` pins a payload that renders after the settle, a growing prefix, a truncated suffix refused and cleared at once, and foreign text refused at once and left in place.
+`tests/fm-backend-herdr.test.sh` pins a payload that renders after the settle, a growing prefix, a truncated suffix refused and cleared at once, and foreign text, a strict infix of the payload, or a note beside a paste placeholder refused at once and left in place.
 In the live guard run below, the public relaunch replaced the production-shape worker in the same endpoint through `fm-spawn`'s own launch, and the replacement rendered a token that existed only in its instructions.
 
 Refresh the repeatable pending-draft refusal, `/compact`, relaunch, prompt, and verified-exit evidence for both shapes with:
