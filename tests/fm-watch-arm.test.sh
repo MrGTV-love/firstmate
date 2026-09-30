@@ -1130,17 +1130,36 @@ wait_for_pid_gone() {  # <pid> <polls>
 # as an orphan (upstream #4760). Allow for a slow CI runner finishing the cycle
 # already in progress before its next FM_POLL=1 tick. A busy poll may spend
 # longer than ten seconds in subprocesses on a contended CI runner.
+#
+# The deletion lands late in a pass, at its heartbeat stage, so the rest of that
+# pass, including its closing liveness beat, runs against the missing directory.
+# A deletion that only ever lands in the terminal sleep would not prove that.
 test_watcher_exits_when_its_state_directory_is_removed() {
-  local dir home state fakebin armout
+  local dir home state fakebin armout teardown real_touch
   dir=$(make_case state-dir-removed)
   home="$dir/home"
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
+  teardown="$dir/teardown"
+  real_touch=$(command -v touch)
   mkdir -p "$home/data"
+  cat > "$fakebin/touch" <<SH
+#!/usr/bin/env bash
+case "\${!#}" in
+  */.last-heartbeat)
+    if [ -e "$teardown" ]; then
+      rm -rf "$state" "$teardown"
+    fi
+    ;;
+esac
+exec "$real_touch" "\$@"
+SH
+  chmod +x "$fakebin/touch"
   start_owned_watcher "$home" "$state" "$fakebin" "$armout"
 
-  rm -rf "$state"
+  : > "$teardown"
+  rm -f "$state/.last-heartbeat"
   wait_for_pid_gone "$WATCH_PID" 400 \
     || { kill -TERM "$WATCH_PID" 2>/dev/null; fail "watcher pid $WATCH_PID outlived its deleted state directory"; }
   wait_for_exit "$ARM_PID" 100 >/dev/null 2>&1 || true

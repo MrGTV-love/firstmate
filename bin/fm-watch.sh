@@ -311,7 +311,8 @@ watcher_beat() {
   [ "$BASH_SUBSHELL" -eq 0 ] || return 0
   [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ] || return 0
   [ "${1:-}" = force ] || [ "$((SECONDS - LAST_BEAT_SECONDS))" -ge "$BEAT_INTERVAL" ] || return 0
-  touch "$STATE/.last-watcher-beat" || return 1
+  # Best effort: a torn-down state directory is reported by the loop-top exit.
+  touch "$STATE/.last-watcher-beat" || return 0
   LAST_BEAT_SECONDS=$SECONDS
 }
 HEARTBEAT=${FM_HEARTBEAT:-600}        # base seconds between heartbeat scans
@@ -965,7 +966,7 @@ secondmate_wake_stall_tick() {
   # Endpoint metadata admits this queue-loop check; secondmate-liveness owns registered mates whose endpoint is missing or dead.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
-    watcher_beat || exit 1
+    watcher_beat
     kind=$(fm_meta_get "$meta" kind)
     [ "$kind" = secondmate ] || continue
     remote_host=$(fm_meta_get "$meta" remote_host)
@@ -1079,7 +1080,7 @@ secondmate_liveness_tick() {
   local bound_marker attempts notify_key reason queued err first_reason='' failed=0
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
-    watcher_beat || exit 1
+    watcher_beat
     kind=$(fm_meta_get "$meta" kind 2>/dev/null || true)
     [ "$kind" = secondmate ] || continue
     id=${meta##*/}
@@ -2183,7 +2184,7 @@ run_check_capture() {
   # Also enforce the deadline here in case the check's timeout controller stops
   # responding. Poll briefly; watcher_beat throttles its own writes.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
-    watcher_beat || return 1
+    watcher_beat
     if [ "$((SECONDS - check_started))" -ge "$((CHECK_TIMEOUT + 1))" ]; then
       fm_active_check_stop || return 1
       break
@@ -2222,7 +2223,7 @@ signal_files_actionable() {  # <status-file> ...
   for f in "$@"; do
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
-    watcher_beat || exit 1
+    watcher_beat
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
     status_span_first_actionable_record "$f" \
@@ -2284,7 +2285,7 @@ heartbeat_scan_finds_actionable() {
   FM_HEARTBEAT_SURFACE_ENDPOINTS=''
   for f in "$STATE"/*.status; do
     [ -e "$f" ] || [ -L "$f" ] || continue
-    watcher_beat || exit 1
+    watcher_beat
     task=$(basename "$f"); task="${task%.status}"
     record=$(status_span_first_actionable_record "$f" "$(hb_surfaced_offset "$task")")
     rc=$?
@@ -2319,7 +2320,7 @@ event_wait_or_sleep() {
   local w b session first_backend="" first_session="" rec rc
   local windows=()
   while IFS= read -r w; do
-    watcher_beat || exit 1
+    watcher_beat
     b=$(window_backend "$w")
     fm_backend_has_push "$b" || continue
     # Secondmate endpoints are supervised via status writes, not pane/agent
@@ -2694,12 +2695,12 @@ while :; do
     exit 0
   fi
 
-  watcher_beat force || exit 1
+  watcher_beat force
 
   # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
   # status lines before this cycle can exit on a wake. Off costs one file test.
   [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
-  watcher_beat || exit 1
+  watcher_beat
 
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
@@ -2711,14 +2712,14 @@ while :; do
   if reconcile_requests_pending; then
     reconcile_requests_detached
   fi
-  watcher_beat || exit 1
+  watcher_beat
 
   # Parent-owned secondmate pending-reply reconciliation: resolve correlated
   # parent reports, observe backend busy/idle turn completion, send one recovery
   # repost after grace, and escalate once if the recovery turn is also missed.
   # No conversation scraping; unresolved records are never silently expired.
   fm_pending_reply_tick "$STATE" || true
-  watcher_beat || exit 1
+  watcher_beat
 
   # Endpoint liveness runs before queue observation: a positively dead or
   # missing secondmate endpoint is relaunched here on a bounded cadence, which
@@ -2729,7 +2730,7 @@ while :; do
     echo "watcher: secondmate liveness check failed" >&2
     exit 1
   }
-  watcher_beat || exit 1
+  watcher_beat
   # An in-flight ship or scout whose SessionEnd record says the worker is
   # gone is relaunched through the existing control path. The tick wakes and
   # exits the cycle like every other wake, so a restarted watcher sees the
@@ -2738,7 +2739,7 @@ while :; do
     echo "watcher: session-end relaunch check failed" >&2
     exit 1
   }
-  watcher_beat || exit 1
+  watcher_beat
 
 
   # A live secondmate endpoint does not prove that its own wake loop is alive.
@@ -2748,7 +2749,7 @@ while :; do
     echo "watcher: secondmate wake-loop observation failed" >&2
     exit 1
   }
-  watcher_beat || exit 1
+  watcher_beat
 
   # Process-to-event liveness repair. This never discovers a result by polling:
   # each registered source has its own child blocking on that source, and this
@@ -2777,7 +2778,7 @@ while :; do
   else
     triage_log "inactive-outcome reconciliation unavailable"
   fi
-  watcher_beat || exit 1
+  watcher_beat
 
   # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
   # Time-based via .last-check mtime so the cadence survives watcher restarts.
@@ -2791,7 +2792,7 @@ while :; do
     contribution_check_output=
     for c in "$STATE"/*.check.sh; do
       [ -e "$c" ] || continue
-      watcher_beat || exit 1
+      watcher_beat
       is_pr_poll=0
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
@@ -2914,7 +2915,7 @@ EOF
       wake "$contribution_check_output"
     fi
   fi
-  watcher_beat || exit 1
+  watcher_beat
 
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
@@ -2931,7 +2932,7 @@ EOF
     # home_summary_refresh_detached for why publication stays off the beacon's
     # path. Publication failure stays side-band.
     home_summary_refresh_detached
-    watcher_beat || exit 1
+    watcher_beat
     files=""
     while IFS=$(printf '\t') read -r sf sig f; do
       [ -n "$sf" ] || continue
@@ -3048,7 +3049,7 @@ EOF
   # remembers the hash already classified, or the declaration a busy pane's
   # crossed turn bound already handed to the away-mode daemon).
   while IFS= read -r w; do
-    watcher_beat || exit 1
+    watcher_beat
     kind=$(window_kind "$w")
     task=$(window_to_task "$w" "$STATE")
     # Steering-inbox loss detection runs before the secondmate stale
@@ -3264,7 +3265,7 @@ EOF
       fi
     fi
   done < <(recorded_windows)
-  watcher_beat || exit 1
+  watcher_beat
 
   # Heartbeat: the watcher runs a cheap fleet-scan at a regular cadence no matter
   # what. Time-based via .last-heartbeat mtime; interval doubles per consecutive
@@ -3307,6 +3308,6 @@ EOF
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
   # else the blind poll sleep. See event_wait_or_sleep.
-  watcher_beat force || exit 1
+  watcher_beat force
   event_wait_or_sleep
 done
