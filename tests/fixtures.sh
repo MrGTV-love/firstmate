@@ -370,11 +370,13 @@ FM_TEST_TEAMCLAUDE_CA=/fm-test/teamclaude-ca.pem
 # Stubs the TeamClaude CLI and a recording claude for config/claude-launcher
 # cases. `teamclaude status` exits FM_FAKE_TEAMCLAUDE_STATUS (default 0);
 # `teamclaude env` prints the forward-proxy export lines the real command prints.
-# claude appends its environment to FM_FAKE_CLAUDE_ENV_LOG when that is set.
+# teamclaude appends its environment to FM_FAKE_TEAMCLAUDE_ENV_LOG, and claude
+# to FM_FAKE_CLAUDE_ENV_LOG, when those are set.
 fm_test_fake_teamclaude() {
   local fakebin=$1
   cat > "$fakebin/teamclaude" <<SH
 #!/usr/bin/env bash
+[ -z "\${FM_FAKE_TEAMCLAUDE_ENV_LOG:-}" ] || env >> "\$FM_FAKE_TEAMCLAUDE_ENV_LOG"
 case "\${1:-}" in
   status) exit "\${FM_FAKE_TEAMCLAUDE_STATUS:-0}" ;;
   env)
@@ -398,12 +400,15 @@ SH
 # Runs one recorded launch command as a pane would, but in a clean
 # non-interactive /bin/sh: no inherited proxy environment and no shell aliases,
 # so any proxy setting the recording claude reports came from the launch itself.
+# The fake teamclaude's own environment lands in <env-out>.teamclaude.
 fm_test_teamclaude_launch_env() {
   local fakebin=$1 launch=$2 out=$3 bash_dir
   bash_dir=$(dirname "$(command -v bash)")
   : > "$out"
+  : > "$out.teamclaude"
   env -i HOME="$(dirname "$fakebin")" PATH="$fakebin:$bash_dir:/usr/bin:/bin" \
-    FM_FAKE_CLAUDE_ENV_LOG="$out" /bin/sh -c "$launch" </dev/null >/dev/null 2>&1
+    FM_FAKE_CLAUDE_ENV_LOG="$out" FM_FAKE_TEAMCLAUDE_ENV_LOG="$out.teamclaude" \
+    /bin/sh -c "$launch" </dev/null >/dev/null 2>&1
 }
 
 # fm_test_assert_teamclaude_launch <fakebin> <launch-command> <label>

@@ -2694,6 +2694,31 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   pass "config/claude-launcher=teamclaude: a Claude second mate respawns through TeamClaude on tmux and herdr"
 }
 
+# A stopped proxy or a malformed launcher file must refuse while the old agent
+# still runs: fm-spawn --relaunch would refuse too, but only after fm-control
+# had already stopped it.
+test_teamclaude_refusal_lands_before_the_old_agent_stops() {
+  local dir out rc id=tc-stop
+  dir=$(new_case tc-stopped "$id")
+  add_ship_task "$dir" "$id" claude
+  enable_teamclaude "$dir"
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  out=$(FM_FAKE_TEAMCLAUDE_STATUS=1 run_control "$dir" "$id" relaunch --note "proxy stopped"); rc=$?
+  expect_code 1 "$rc" "a relaunch with the TeamClaude proxy stopped must refuse"
+  assert_contains "$out" "proxy is not running" "the refusal should name the stopped proxy"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a stopped proxy must refuse before the running agent stops"
+  [ ! -s "$dir/fake/literal" ] || fail "a stopped proxy must refuse before any lifecycle input is sent"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "a refused relaunch must leave the task record untouched"
+
+  printf 'proxy\n' > "$dir/home/config/claude-launcher"
+  out=$(run_control "$dir" "$id" relaunch --note "malformed launcher"); rc=$?
+  expect_code 1 "$rc" "a relaunch with a malformed config/claude-launcher must refuse"
+  assert_contains "$out" "the only accepted value is teamclaude" "the refusal should name the accepted value"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a malformed launcher file must refuse before the running agent stops"
+  [ ! -s "$dir/fake/literal" ] || fail "a malformed launcher file must refuse before any lifecycle input is sent"
+  pass "fm-control relaunch: a stopped TeamClaude proxy or malformed launcher file refuses before the old agent stops"
+}
+
 # A fresh herdr spawn needs no relaunch, but it shares this suite's herdr
 # stub: the pane the stub's `tab create` mints reads back in the task's copy.
 test_teamclaude_reaches_fresh_herdr_spawns() {
@@ -2856,3 +2881,4 @@ test_teamclaude_reaches_tmux_relaunch_paths
 test_teamclaude_reaches_herdr_relaunch_paths
 test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
+test_teamclaude_refusal_lands_before_the_old_agent_stops

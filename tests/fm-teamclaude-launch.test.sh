@@ -32,6 +32,38 @@ run_launcher() {
     "$LAUNCHER" "$@" </dev/null 2>&1
 }
 
+# run_launcher_with_ambient_proxy <case-dir> <launcher-args...>: run_launcher,
+# plus the caller's HTTPS_PROXY already in the launcher's environment.
+run_launcher_with_ambient_proxy() {
+  local dir=$1
+  shift
+  env -i HOME="$dir/home" PATH="$dir/fakebin:$BASH_DIR:/usr/bin:/bin" \
+    HTTPS_PROXY="$HTTPS_PROXY" FM_FAKE_CLAUDE_ENV_LOG="$dir/claude-env" \
+    "$LAUNCHER" "$@" </dev/null 2>&1
+}
+
+# The spawn's TeamClaude configuration paths reach the launcher's teamclaude
+# calls under private names and never reach claude.
+test_config_paths_reach_teamclaude_but_not_claude() {
+  local dir out rc
+  dir=$(new_case config-paths)
+  fm_test_fake_teamclaude "$dir/fakebin"
+  out=$(env -i HOME="$dir/home" PATH="$dir/fakebin:$BASH_DIR:/usr/bin:/bin" \
+    FM_FAKE_CLAUDE_ENV_LOG="$dir/claude-env" FM_FAKE_TEAMCLAUDE_ENV_LOG="$dir/teamclaude-env" \
+    FM_TC_XDG_CONFIG_HOME="$dir/xdg" FM_TC_TEAMCLAUDE_CONFIG="$dir/teamclaude.json" \
+    "$LAUNCHER" --version </dev/null 2>&1); rc=$?
+  expect_code 0 "$rc" "a launch with TeamClaude configuration paths should start claude"$'\n'"$out"
+  grep -Fqx "XDG_CONFIG_HOME=$dir/xdg" "$dir/teamclaude-env" \
+    || fail "teamclaude must read the spawn's XDG_CONFIG_HOME"
+  grep -Fqx "TEAMCLAUDE_CONFIG=$dir/teamclaude.json" "$dir/teamclaude-env" \
+    || fail "teamclaude must read the spawn's TEAMCLAUDE_CONFIG"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$dir/claude-env" \
+    || fail "claude must still receive the TeamClaude proxy"
+  ! grep -Eq '^(XDG_CONFIG_HOME|TEAMCLAUDE_CONFIG|FM_TC_[A-Z_]+)=' "$dir/claude-env" \
+    || fail "claude must not receive the TeamClaude configuration paths: $(cat "$dir/claude-env")"
+  pass "TeamClaude configuration paths reach only the launcher's teamclaude calls, never claude"
+}
+
 test_claude_receives_the_teamclaude_client_environment() {
   local dir out rc
   dir=$(new_case proxied)
@@ -91,15 +123,26 @@ test_export_without_a_proxy_setting_refuses() {
     > "$dir/fakebin/teamclaude"
   out=$(run_launcher "$dir" --version); rc=$?
   expect_code 1 "$rc" "an export with no proxy setting must refuse"
-  assert_contains "$out" "neither HTTPS_PROXY nor ANTHROPIC_BASE_URL" "the refusal must name the missing routing"
+  assert_contains "$out" "did not set HTTPS_PROXY" "the refusal must name the missing proxy"
   assert_absent "$dir/claude-env" "an unrouted export must not start claude"
+
+  printf '#!/usr/bin/env bash\n[ "$1" = status ] && exit 0\nprintf "export ANTHROPIC_BASE_URL=http://127.0.0.1:13456\\n"\n' \
+    > "$dir/fakebin/teamclaude"
+  out=$(run_launcher "$dir" --version); rc=$?
+  expect_code 1 "$rc" "a base-URL export with no HTTPS_PROXY must refuse"
+  assert_contains "$out" "did not set HTTPS_PROXY" "the refusal must name the missing proxy"
+  assert_absent "$dir/claude-env" "a base-URL export must not start claude"
+
+  out=$(HTTPS_PROXY=http://127.0.0.1:9 run_launcher_with_ambient_proxy "$dir" --version); rc=$?
+  expect_code 1 "$rc" "an ambient HTTPS_PROXY must not stand in for the TeamClaude export"
+  assert_absent "$dir/claude-env" "an ambient HTTPS_PROXY must not start claude"
 
   printf '#!/usr/bin/env bash\n[ "$1" = status ] && exit 0\nexit 1\n' > "$dir/fakebin/teamclaude"
   out=$(run_launcher "$dir" --version); rc=$?
   expect_code 1 "$rc" "a failed export must refuse"
   assert_contains "$out" "teamclaude env failed" "the refusal must name the failed export"
   assert_absent "$dir/claude-env" "a failed export must not start claude"
-  pass "a TeamClaude export that fails or routes nothing refuses without starting claude"
+  pass "a TeamClaude export that fails or sets no HTTPS_PROXY refuses without starting claude"
 }
 
 # An nvm install is found without PATH, and its `#!/usr/bin/env node` script
@@ -150,5 +193,6 @@ test_missing_teamclaude_refuses_without_starting_claude
 test_export_without_a_proxy_setting_refuses
 test_nvm_install_is_found_and_runs_with_its_own_node
 test_check_validates_without_starting_claude
+test_config_paths_reach_teamclaude_but_not_claude
 
 echo "# all fm-teamclaude-launch tests passed"
