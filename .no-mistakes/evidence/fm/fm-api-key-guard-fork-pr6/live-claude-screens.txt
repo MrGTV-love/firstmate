@@ -1,0 +1,28 @@
+Live lab: real claude v2.1.285 workers on a private tmux socket. Pane shell ~/.bashrc exports fake ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN.
+
+=== window fm-lab-s2: new code 37ff3ef, no opt-in (launch prefixed with env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN)
+       █████████      *
+.......█ █   █ █..........................................
+ Claude Code can be used with your Claude subscription or billed based on API usage through your Console account.
+ Select login method:
+ ❯ 1. Claude account with subscription · Pro, Max, Team, or Enterprise
+   2. Anthropic Console account · API usage billing
+   3. 3rd-party platform · Amazon Bedrock, Microsoft Foundry, Google Vertex AI
+
+=== window fm-lab-s3: base code a4d559e, no opt-in (regression reproduction)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Detected a custom API key in your environment
+  ANTHROPIC_API_KEY: sk-ant-...-ant-pane-rcfile-key
+  Do you want to use this API key?
+    Yes
+  ❯ No (recommended)
+  Enter to confirm · Esc to cancel
+
+=== window fm-lab-s4: new code 37ff3ef, --allow-api-key opt-in
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Detected a custom API key in your environment
+  ANTHROPIC_API_KEY: sk-ant-...-ant-pane-rcfile-key
+  Do you want to use this API key?
+    Yes
+  ❯ No (recommended)
+  Enter to confirm · Esc to cancel

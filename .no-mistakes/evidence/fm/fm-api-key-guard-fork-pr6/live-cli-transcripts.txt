@@ -1,0 +1,85 @@
+##### s1-refuse-spawner-key
+$ ANTHROPIC_API_KEY=sk-ant-lab-spawner-key bin/fm-spawn.sh lab-s1 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+##### s1-refuse-spawner-token
+$ ANTHROPIC_AUTH_TOKEN=sk-ant-lab-spawner-token bin/fm-spawn.sh lab-s1 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+##### s2-refuse-tmux-global
+$ bin/fm-spawn.sh lab-s1 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_API_KEY is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+##### s2-refuse-tmux-session
+$ bin/fm-spawn.sh lab-s1 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t firstmate -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+##### s3-spawn-shed
+$ bin/fm-spawn.sh lab-s2 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+spawned lab-s2 harness=claude kind=scout window=firstmate:fm-lab-s2 worktree=/Users/charlesabrooker/tmp/fm-lab.mjvB2a/th-root/.treehouse/labproj-2a14c4/1/labproj
+[exit=0]
+
+##### s3-base-spawn
+$ /Users/charlesabrooker/tmp/fm-lab.mjvB2a/base/bin/fm-spawn.sh lab-s3 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+spawned lab-s3 harness=claude kind=scout window=firstmate:fm-lab-s3 worktree=/Users/charlesabrooker/tmp/fm-lab.mjvB2a/th-root/.treehouse/labproj-2a14c4/2/labproj
+[exit=0]
+
+##### s4-allow
+$ ANTHROPIC_API_KEY=sk-ant-lab-optin-key bin/fm-spawn.sh lab-s4 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout --allow-api-key
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+spawned lab-s4 harness=claude kind=scout window=firstmate:fm-lab-s4 worktree=/Users/charlesabrooker/tmp/fm-lab.mjvB2a/th-root/.treehouse/labproj-2a14c4/3/labproj
+[exit=0]
+
+##### r1-refuse-env
+$ ANTHROPIC_API_KEY=sk-ant-lab-relaunch-key bin/fm-control.sh lab-s2 relaunch --note lab guard probe
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: refused before stopping lab-s2: an Anthropic credential would reach the replacement worker
+error: relaunch of lab-s2 was refused before its agent was touched; nothing changed
+[exit=1]
+
+##### r1-refuse-tmux
+$ bin/fm-control.sh lab-s2 relaunch --note lab guard probe tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+error: refused before stopping lab-s2: an Anthropic credential would reach the replacement worker
+error: relaunch of lab-s2 was refused before its agent was touched; nothing changed
+[exit=1]
+
+##### r0-base-relaunch
+$ ANTHROPIC_API_KEY=sk-ant-lab-relaunch-key /Users/charlesabrooker/tmp/fm-lab.mjvB2a/base/bin/fm-control.sh lab-s3 relaunch --note lab guard probe base
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: task lab-s3's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'relaunch'
+error: relaunch of lab-s3 failed while stopping the old agent, which is still running; its original instructions were restored
+[exit=1]
+
+##### r2-relaunch-clean
+$ bin/fm-control.sh lab-s2 relaunch --note lab guard probe clean
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: task lab-s2's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'relaunch'
+error: relaunch of lab-s2 failed while stopping the old agent, which is still running; its original instructions were restored
+[exit=1]
+
+##### r3-relaunch-existing-pane
+$ bin/fm-control.sh lab-s2 relaunch --note lab guard probe clean
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+relaunched lab-s2 harness=claude from=claude model=default effort=default backend=tmux endpoint=firstmate:fm-lab-s2 worktree=/Users/charlesabrooker/tmp/fm-lab.mjvB2a/th-root/.treehouse/labproj-2a14c4/1/labproj
+[exit=0]
+
+##### s5-raw-refuse
+$ ANTHROPIC_API_KEY=sk-ant-lab-raw-key bin/fm-spawn.sh lab-s5 /Users/charlesabrooker/tmp/fm-lab.mjvB2a/proj/labproj --scout --harness FOO=1 claude --verbose
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mjvB2a
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+[exit=1]
+

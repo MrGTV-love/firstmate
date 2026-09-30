@@ -1,0 +1,10 @@
+Relaunch into EXISTING pane %1 (pane pid 98074, shell whose ~/.bashrc exported fake ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN) via: bin/fm-control.sh lab-s2 relaunch --note 'lab guard probe clean'
+replacement claude pid 81443, Anthropic credentials in its process environment:
+  (none: ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN absent)
+pane tail after relaunch:
+lab$ cd -- '/Users/charlesabrooker/tmp/fm-lab.mjvB2a/th-root/.treehouse/labproj-2a14c4/1/labproj'
+lab$ export GOTMPDIR=/tmp/fm-lab-s2/gotmp
+lab$ export COMPACT_ADVISER_DISABLE=1
+lab$ export FM_TASK_ID=lab-s2
+lab$ . '/tmp/fm-lab-s2+3a7236bc8da9af981a138d4493afcabc954cd4af081125ee37855b53e4df2642/launch.s1790738844.56027.9892.sh'
+ Choose the text style that looks best with your terminal
