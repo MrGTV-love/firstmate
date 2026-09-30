@@ -157,6 +157,9 @@
 # second route record. Ambient/configured addresses must not retarget a reply.
 # An unreadable session stops before the staged reply is consumed; an absent
 # saved session emits NOT_FOUND for the runner's existing terminal retire path.
+# Lavish rewrites that store in place, so a store that does not decode may be a
+# half-written snapshot: it is re-read under the quiet retry bound below, and is
+# refused only while still undecodable once that bound is spent.
 #
 # `answers` is this adapter's half of the generic keyed-answer contract in
 # bin/fm-procevent.sh. It reports what the captain actually chose, as
@@ -228,7 +231,7 @@ apply_session_host() {  # <artifact>
     -f $file or die "Lavish session store is not a regular file\n";
     local $/;
     my $state = eval { decode_json(<$file>) };
-    !$@ or die "invalid Lavish session store\n";
+    exit 4 if $@;
     ref($state) eq "HASH" && ref($state->{sessions}) eq "HASH"
       or die "invalid Lavish session store\n";
     my @sessions = grep {
@@ -246,8 +249,11 @@ apply_session_host() {  # <artifact>
     print "$host\n$port\n";
   ' "${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json" "$1")
   rc=$?
-  [ "$rc" -eq 3 ] && return 3
-  [ "$rc" -eq 0 ] || die "cannot resolve the board server from its Lavish session: $1"
+  case "$rc" in
+    0) ;;
+    3|4) return "$rc" ;;
+    *) die "cannot resolve the board server from its Lavish session: $1" ;;
+  esac
   LAVISH_AXI_HOST=${endpoint%$'\n'*}
   LAVISH_AXI_PORT=${endpoint##*$'\n'}
   export LAVISH_AXI_HOST LAVISH_AXI_PORT
@@ -607,7 +613,7 @@ poll_iteration_floor_wait() {
 cmd_poll() {
   local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc iteration_started
   local pipeline_status reply_file=''
-  local reply_text='' reply_pending=0
+  local reply_text='' reply_pending=0 store_attempt=0
   [ -n "$artifact" ] || usage
   if [ "$#" -eq 3 ] && [ "${2-}" = --agent-reply-file ]; then
     reply_file=$3
@@ -633,10 +639,22 @@ cmd_poll() {
     iteration_started=$(poll_iteration_started) || die "cannot start the poll rate governor"
     [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
       || die "artifact is no longer a readable file: $artifact"
-    if ! apply_session_host "$artifact"; then
-      printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n'
-      return 1
-    fi
+    apply_session_host "$artifact"
+    case "$?" in
+      0) ;;
+      3)
+        printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n'
+        return 1
+        ;;
+      *)
+        [ "$store_attempt" -lt "$POLL_RETRY_LIMIT" ] \
+          || die "cannot resolve the board server from its Lavish session: $artifact"
+        store_attempt=$((store_attempt + 1))
+        poll_iteration_floor_wait "$iteration_started" "$delay" \
+          || die "cannot enforce the poll rate governor"
+        continue
+        ;;
+    esac
     # Newer Lavish builds expose a one-shot reply command whose success is the
     # server's acceptance receipt. Consume the staged file only after that
     # confirmation; older compatible builds retain the published poll reply

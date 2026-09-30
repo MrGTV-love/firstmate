@@ -3261,7 +3261,7 @@ for shape in missing malformed no-session invalid-url; do
   : > "$HOST_SEEN"
   bad_status=0
   bad_out=$(PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
-    LAVISH_AXI_STATE_DIR="$BAD_STORE" FM_HOME="$HOST_HOME" \
+    LAVISH_AXI_STATE_DIR="$BAD_STORE" FM_LAVISH_POLL_RETRY_DELAY=1 FM_HOME="$HOST_HOME" \
     "$ROOT/bin/fm-procevent-lavish.sh" poll "$HOST_ART" \
     --agent-reply-file "$HOST_HOME/reply" 2>&1) || bad_status=$?
   [ "$bad_status" -ne 0 ] || fail "$shape session evidence was accepted"
@@ -3271,6 +3271,42 @@ for shape in missing malformed no-session invalid-url; do
   assert_not_contains "$bad_out" private_fixture_text "JSON errors must not print session content"
 done
 pass "missing or unreadable session routing preserves replies and never guesses another server"
+
+# Lavish rewrites its shared session store in place, so a poll can read an empty
+# or partial snapshot. That is a quiet retry: never a missing session, never a
+# stopped listener, and the staged reply is posted only once routing resolves.
+TORN_STORE="$TMP_ROOT/torn-lavish-state"
+mkdir -p "$TORN_STORE"
+LAVISH_AXI_STATE_DIR="$TORN_STORE" lavish_session "$HOST_ART"
+mv "$TORN_STORE/state.json" "$TORN_STORE/complete"
+for shape in empty partial; do
+  case "$shape" in
+    empty) : > "$TORN_STORE/state.json" ;;
+    partial) head -c 24 "$TORN_STORE/complete" > "$TORN_STORE/state.json" ;;
+  esac
+  printf 'reply to deliver\n' > "$HOST_HOME/reply"
+  : > "$HOST_SEEN"
+  PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
+    LAVISH_AXI_STATE_DIR="$TORN_STORE" FM_LAVISH_POLL_RETRY_DELAY=1 FM_HOME="$HOST_HOME" \
+    "$ROOT/bin/fm-procevent-lavish.sh" poll "$HOST_ART" \
+    --agent-reply-file "$HOST_HOME/reply" > "$TORN_STORE/out" 2>&1 &
+  torn_pid=$!
+  sleep 0.5
+  kill -0 "$torn_pid" 2>/dev/null || fail "a $shape session-store snapshot stopped the listener"
+  [ ! -s "$HOST_SEEN" ] || fail "a $shape session-store snapshot reached the CLI"
+  [ "$(cat "$HOST_HOME/reply")" = 'reply to deliver' ] \
+    || fail "a $shape session-store snapshot consumed the staged reply"
+  cat "$TORN_STORE/complete" > "$TORN_STORE/state.json"
+  wait "$torn_pid" || fail "poll did not recover once the $shape session store was rewritten"
+  [ "$(cat "$HOST_SEEN")" = '127.0.0.1:14387' ] \
+    || fail "poll did not route to the board session after a $shape snapshot"
+  assert_contains "$(cat "$TORN_STORE/out")" 'status: ended' \
+    "the recovered poll returns the published result"
+  assert_not_contains "$(cat "$TORN_STORE/out")" NOT_FOUND \
+    "a $shape session-store snapshot is not a missing session"
+  assert_absent "$HOST_HOME/reply" "the recovered poll posts the staged reply"
+done
+pass "a half-written session store is retried quietly instead of stopping the listener"
 
 # The adapter, not the runner, decides which results end a Lavish source. A
 # final feedback delivery still classifies as feedback for the handler while

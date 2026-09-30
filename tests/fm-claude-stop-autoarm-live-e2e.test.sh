@@ -58,7 +58,7 @@ printf 'lavish\n' > "$POST_HOME/state/procevent-inbox/lavish-midturn.1.adapter"
 printf '%s\t1\tcheck\tprocevent:lavish-midturn:1\tcheck: procevent lavish lavish-midturn 1\n' \
   "$(date +%s)" > "$POST_HOME/state/.wake-queue"
 printf '1\n' > "$POST_HOME/state/.wake-queue.seq"
-POST_PROMPT='This is a bounded hook-integration experiment, not project work. First run exactly `printf "MIDTURN_START\n"` with Bash. If a hook then tells you captured Lavish feedback is waiting, follow its instructions to find, read and acknowledge the specific capture before replying. If you received no such hook notice, run exactly `printf "NO_FEEDBACK_NOTICE\n"` instead. End with exactly POSTTOOL_DONE. Use only Bash; do not delegate, inspect the fleet, or run a Stop watcher.'
+POST_PROMPT='This is a bounded hook-integration experiment, not project work. First run exactly `printf "MIDTURN_START\n"` with Bash. If a hook then tells you a captured Lavish result is waiting, follow its instructions to find, read and acknowledge the specific capture before replying. If you received no such hook notice, run exactly `printf "NO_FEEDBACK_NOTICE\n"` instead. End with exactly POSTTOOL_DONE. Use only Bash; do not delegate, inspect the fleet, or run a Stop watcher.'
 (
   cd "$POST_PROJECT" || exit 1
   FM_HOME="$POST_HOME" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
