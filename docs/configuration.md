@@ -1172,16 +1172,18 @@ After the answer, code applies all remaining checks and ranking:
 - The confidence floor and the matched rule's `approval` and `floor`.
 - Each candidate's `provider` and `floor`.
 - Every applicable account-wide and model/product row from one `quota-axi --json` snapshot.
-- The numeric `spendPriority` argmax over candidates, using each candidate's limiting row.
+- The numeric `spendPriority` argmax over the matched rule's candidates with `through_reset` runway on every applicable bound, using each candidate's limiting row.
 
-The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version, currently 0.1.51, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version in `FM_QUOTA_AXI_MIN`, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
 The resolver checks `quota-axi --version` before taking its one JSON snapshot; an older, unreadable, or unparseable version produces a named `error` requiring that minimum, never a ranking based on incompatible output.
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
 - omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
-  An `omp` profile declaring `provider: "codex"` is therefore eligible but unranked, with no single-account remaining percentage or exhaustion veto presented as pool evidence.
-  Neither a schema-5 provider row nor several schema-6 account rows prove pool coverage; the resolver never sums them, discovers credentials, or reads another runtime's credential store to fill that gap.
+  The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
+  When that account reads `through_reset` on every applicable bound with numeric `spendPriority`, the pool is ranked on it like any other candidate.
+  Any other reading (projected, unknown, exhausted, below a profile floor, or absent) leaves the pool eligible but unranked with its runway warning, and never vetoes it, because another pooled account may still have headroom.
+  The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
@@ -1199,14 +1201,14 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 **Candidate eligibility and evidence**
 
-- For candidates bound to individual-account evidence, any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
+- Outside the omp Codex pool, any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
-- A numeric winner with `projected_exhaustion` or `unknown` runway on any applicable bound produces `escalate`, names the affected scopes on its candidate line, and emits no `profile:`.
+- A candidate with `projected_exhaustion` or `unknown` runway on any applicable bound is never ranked; its candidate line carries a `[warning: ...]` naming the affected scopes.
   The resolver has no likely-completion horizon, so a finite projection cannot prove that the task will finish before exhaustion, even when the percentage or ranking looks favorable.
-  It preserves the highest `spendPriority` choice for firstmate's completion-aware decision instead of silently substituting a lower-ranked model.
-  `through_reset` on every applicable bound permits a clear winner without inventing a generic percentage floor.
-- A `quota_summary:` line names every unranked, ineligible, or uncertain-runway candidate, including on ambiguous and approval-gated outcomes.
-  Unranked alternatives do not prevent an otherwise measured, through-reset winner from clearing, but they remain visibly uncertain and cannot themselves be selected.
+  `through_reset` on every applicable bound makes a candidate rankable without inventing a generic percentage floor.
+- Ranking stays inside the matched rule's own `use` array (or `default` when that was selected): a through-reset candidate there clears even when a higher-`spendPriority` candidate in the same array is tight.
+  When no candidate in that array is through-reset, the result is `escalate` with no `profile:`; the resolver never falls back to another rule or the default array to find runway, so the rule's reasoning class is never silently downgraded to conserve quota.
+- Unranked alternatives do not prevent a through-reset winner from clearing; the clear result's unranked note names their providers.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
@@ -1215,7 +1217,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or a winner whose completion runway is unproven. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or no candidate in the matched rule with through-reset runway. |
 | `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
 
 Every result above exits 0.
