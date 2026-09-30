@@ -32,7 +32,7 @@ HERDR_STATE="$TMP_ROOT/remote-herdr.state"
 CLAIMS="$TMP_ROOT/claims"
 mkdir -p "$PARENT/data" "$PARENT/state" "$PARENT/config" "$PARENT/projects" \
   "$REMOTE_ROOT" "$CLAIMS" "$PROBEBIN" "$TMP_ROOT/pane-home"
-trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
+trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; fm_test_cleanup' EXIT
 
 # A synthetic value the remote launch must override rather than inherit, so a
 # launch that only forwarded the ambient environment cannot pass as a floor.
@@ -56,6 +56,13 @@ SH
 chmod +x "$REMOTE_ROOT/bin/tmux"
 install_remote_herdr_fixture "$REMOTE_ROOT" "$HERDR_STATE" "$HERDR_LOG" \
   "$TMP_ROOT/herdr-send-fail" "$TMP_ROOT/herdr.sock"
+# Claude trust must use a disposable account home even though the remote
+# transport intentionally resolves the real operator HOME.
+cat > "$REMOTE_ROOT/bin/fm-claude-trust.sh" <<SH
+#!/usr/bin/env bash
+HOME='$TMP_ROOT/pane-home' CLAUDE_CONFIG_DIR='' exec bash '$ROOT/bin/fm-claude-trust.sh' "\$@"
+SH
+chmod +x "$REMOTE_ROOT/bin/fm-claude-trust.sh"
 git -C "$REMOTE_ROOT" init -q -b main
 git -C "$REMOTE_ROOT" config user.email test@example.com
 git -C "$REMOTE_ROOT" config user.name Test
@@ -138,11 +145,11 @@ FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
   || fail "remote seed did not provision the route under test"
 
 run_remote_launch() {  # <label>
-  local label=$1
+  local label=$1 out
   reset_remote_herdr_fixture "$HERDR_STATE"
   : > "$HERDR_LOG"
-  remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate >/dev/null 2>&1 \
-    || fail "$label: the remote second-mate launch failed"
+  out=$(COMPACT_ADVISER_DISABLE="${ADVISER_KILL:-0}" remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate 2>&1) \
+    || fail "$label: the remote second-mate launch failed: $out"
 }
 
 # Replay what the remote pane received, in the order it received it, under a
@@ -188,5 +195,35 @@ SEEN=$(replay_remote_launch bare) \
 assert_equals 1 "$SEEN" \
   "a remote second mate launched under the cleared allowlisted environment must still start with the compact adviser disabled"
 pass "the remote route keeps the compact-adviser switch through the cleared allowlisted environment"
+
+# Automatic mode is selected by inherited policy, not by the parent or
+# destination shell carrying an ambient enable flag.
+cat > "$PROBEBIN/claude" <<'SH'
+#!/bin/sh
+printf '%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}"
+SH
+chmod +x "$PROBEBIN/claude"
+printf 'claude\n' > "$PARENT/config/secondmate-harness"
+printf '{"claude":"auto","codex":"off"}\n' > "$PARENT/config/compact-adviser"
+for setting in absent enabled; do
+  if [ "$setting" = absent ]; then
+    rm "$PARENT/config/launch-env-allowlist"
+  else
+    : > "$PARENT/config/launch-env-allowlist"
+  fi
+  run_remote_launch "automatic Claude, allowlist $setting"
+  cmp -s "$PARENT/config/compact-adviser" "$REMOTE_HOME/config/compact-adviser" \
+    || fail "the remote home did not inherit automatic policy for subsequent workers"
+  for shape in preamble bare; do
+    SEEN=$(replay_remote_launch "$shape") || fail "automatic remote launch replay failed"
+    assert_equals '0|1' "$SEEN" "automatic remote Claude must receive both enablement assignments"
+  done
+  ADVISER_KILL=1 run_remote_launch "emergency-disabled Claude, allowlist $setting"
+  for shape in preamble bare; do
+    SEEN=$(replay_remote_launch "$shape") || fail "emergency-disabled remote launch replay failed"
+    assert_equals '1|unset' "$SEEN" "the parent's emergency switch must defeat remote automatic policy"
+  done
+done
+pass "remote Claude auto and function hooks survive both environment postures and lost pane exports"
 
 echo "ALL TESTS PASSED"

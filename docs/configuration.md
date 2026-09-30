@@ -984,13 +984,43 @@ This is not a sandbox: it cannot revoke same-user access to credential files, pr
 
 Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh).
 
-### Compact adviser setting
+### Compact adviser setting (config/compact-adviser)
 
-Every crewmate, scout, and secondmate Firstmate launches starts with `COMPACT_ADVISER_DISABLE=1` in its environment, on a fresh spawn and on a relaunch alike, so an unattended session never activates the compact adviser.
-This guarantee also covers raw launch commands, remote secondmates, and launches filtered by `config/launch-env-allowlist`; it does not depend on the destination environment already containing the variable.
+The optional local, gitignored `config/compact-adviser` is a JSON object mapping harness names to `"off"` or `"auto"`.
+An absent file or absent harness entry keeps the adviser disabled, preserving the default for homes that have not opted in.
 
-Firstmate provides no configuration or flag to change this value.
-This applies only to agents Firstmate launches; the captain's own primary Firstmate session is never given the variable.
+```json
+{"claude": "auto", "omp": "auto"}
+```
+
+Only `claude` and `omp` may select `"auto"`; other harnesses may select `"off"`, and malformed or unsupported settings refuse launch.
+Codex and Grok are hint-only upstream and cannot run automatic compaction.
+The policy is inherited by local and remote secondmates for their subsequent worker launches.
+It applies to fresh launches, relaunches, raw launch commands with an identifiable harness, and filtered launch environments, but does not change an already-running session or the primary Firstmate session.
+For an unidentifiable raw command, the adviser stays off.
+
+Auto allows the installed plugin to act; it does not install the plugin or supply a credential.
+Use the plugin's supported saved settings to select `mode: auto`, acknowledge experimental automatic mode, and save the TypeSafe key without adding `TYPESAFE_API_KEY` to launch text or the worker environment.
+For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
+Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
+Claude auto launches receive `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting.
+The installed plugin must support the host's settled-turn event and context API; loading its command alone does not prove that it judges completed turns.
+Print and other reliably detected noninteractive sessions remain inert under the plugin's own rules.
+
+A truthy `COMPACT_ADVISER_DISABLE` in the invoking process overrides automatic policy as an emergency kill switch.
+Restart or clear that variable in a primary launched under the old unconditional-disable policy before commissioning enabled workers.
+The default upstream minimum is 40,000 context tokens, with an additional 20,000-token conversation minimum; smaller sessions should not issue a judgement.
+Eligible checkpoint excerpts are sent to TypeSafe, with best-effort redaction rather than a guarantee that all sensitive material is removed.
+Keep the policy off for material that must not leave the machine.
+
+#### Comparing enabled and disabled workers
+
+Run matched tasks from identical starting revisions with the same model, effort, tools, and acceptance criteria, alternating off and auto across repeated pairs.
+Record native session compaction events, context tokens immediately before and after each compaction and at the same task checkpoints, cumulative model input/output tokens, elapsed time, and task outcome against the original acceptance criteria.
+Distinguish adviser-triggered compactions from the host's native context-limit compactions.
+When necessary, temporarily enable the plugin's request logging for a nonsensitive lab to correlate a qualifying judgement with a native compaction, then turn logging off again.
+Request logs contain checkpoint excerpts and must remain private.
+Report raw counts and outcomes, not estimated savings from a single synthetic smoke; differences in task completion or repeated work matter as much as context reduction.
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/fm-spawn-compact-adviser-disable.test.sh`](../tests/fm-spawn-compact-adviser-disable.test.sh) and [`tests/fm-spawn-compact-adviser-disable-remote.test.sh`](../tests/fm-spawn-compact-adviser-disable-remote.test.sh).
 
