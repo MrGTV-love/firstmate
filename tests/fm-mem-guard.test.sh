@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-mem-guard.test.sh - Memory/pressure parsing, verdicts, and CLI exit semantics.
+# fm-mem-guard.test.sh - Memory/pressure parsing, verdicts, wrapper, and CLI exit semantics.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 python3 - "$SCRIPT_DIR/../bin/fm-mem-guard.py" <<'PY'
@@ -74,13 +74,13 @@ print("ok - Linux fixtures, thresholds, incomplete readings, and zero swap")
 # Native macOS pressure accounts for reclaimable memory, unlike raw vm_stat free pages.
 host = "34359738368\ntotal = 4096.00M  used = 1024.00M  free = 3072.00M  (encrypted)\n"
 pressure = "The system has 34359738368 (2097152 pages with a page size of 16384).\nSystem-wide memory free percentage: 50%\n"
-ps = " 101 10240 /Applications/Worker One\n 102 40960 big-worker\n 103 10239 small-worker\nmalformed\n"
+ps = " 101 10240 Worker One\n 102 40960 big-worker\n 103 10239 small-worker\nmalformed\n"
 report = verdict(audit("darwin", host=host, pressure=pressure, ps=ps), "OK", 0)
 assert report["summary"] == {"mem_total_gb": 32.0, "mem_available_gb": 16.0,
                              "mem_used_pct": 50.0, "swap_total_gb": 4.0,
                              "swap_used_gb": 1.0, "swap_used_pct": 25.0}
 assert report["top_processes"] == [{"pid": 102, "comm": "big-worker", "rss_mb": 40.0},
-                                    {"pid": 101, "comm": "/Applications/Worker One", "rss_mb": 10.0}]
+                                    {"pid": 101, "comm": "Worker One", "rss_mb": 10.0}]
 verdict(audit("darwin", host=host, pressure=pressure.replace("50%", "10%")), "WARNING", 1)
 verdict(audit("darwin", host=host, pressure=pressure.replace("50%", "5%")), "CRITICAL", 1)
 # An expandable macOS swap pool can be nearly full while native pressure is healthy.
@@ -109,8 +109,27 @@ for failure in ("/usr/sbin/sysctl", "/usr/bin/memory_pressure"):
 report = verdict(audit("darwin", host=host, pressure=pressure, failure="/bin/ps"), "OK", 0)
 assert report["top_processes"] == []
 # Total command budget exhausted before pressure query; no fabricated verdict.
-verdict(audit("darwin", host=host, pressure=pressure, clock=[0.0, 0.0, 0.5, 0.5]), "UNKNOWN", 0)
+verdict(audit("darwin", host=host, pressure=pressure, clock=[0.0, 0.0, 0.5, 0.5, 0.5]), "UNKNOWN", 0)
+# Slow memory reads cannot starve the top-RSS listing, which has its own budget.
+report = verdict(audit("darwin", host=host, pressure=pressure, ps=ps,
+                       clock=[0.0, 0.0, 0.1, 0.45, 0.45]), "OK", 0)
+assert [p["pid"] for p in report["top_processes"]] == [102, 101], report
 report = verdict(audit("freebsd"), "UNKNOWN", 0)
 assert report["reason"] == "unsupported-platform"
 print("ok - native command failures, deadline exhaustion, and unsupported platform")
 PY
+
+# The public wrapper reaches the engine and passes --json/--check through on this host.
+pass_args=(--json --check --warn-mem-pct 101 --crit-mem-pct 101 --warn-swap-pct 101 --crit-swap-pct 101)
+wrapper_json="$("$SCRIPT_DIR/../bin/fm-mem-guard.sh" "${pass_args[@]}")"
+python3 - "$wrapper_json" <<'PY'
+import json
+import sys
+
+report = json.loads(sys.argv[1])
+assert report["name"] == "fm-mem-guard", report
+assert report["status"] in ("OK", "UNKNOWN"), report
+assert (report["reason"] is None) == (report["status"] == "OK"), report
+assert isinstance(report["top_processes"], list), report
+PY
+echo "ok - fm-mem-guard.sh wrapper --json --check exits 0 with a pass verdict"

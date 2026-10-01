@@ -4,7 +4,7 @@ fm-mem-guard.py - Local host memory-pressure and top-RSS diagnostic.
 
 No model, API, or network call is made; the guard only reports host readings.
 Linux uses /proc/meminfo and /proc/<pid>/{statm,comm}.
-macOS uses memory_pressure -Q, sysctl -n hw.memsize vm.swapusage, and ps.
+macOS uses memory_pressure -Q, sysctl -n hw.memsize vm.swapusage, and ps ucomm.
 On macOS MemAvailable is estimated from the native memory-pressure free percentage,
 not vm_stat's raw free pages: reclaimable/compressed memory must not be counted
 as exhausted RAM. SwapTotal is the currently allocated swap pool, not a fixed cap;
@@ -20,8 +20,9 @@ Invariants:
   - Missing memory readings yield UNKNOWN, a reason, null summary measurements,
     and a 0 --check exit. Missing swap never classifies the verdict.
   - A failed top-process listing degrades to an empty list.
-  - macOS subprocesses share a 400ms budget; unavailable commands/timeouts
-    withhold the affected measurement rather than blocking the caller.
+  - macOS memory reads share a 400ms budget and the ps top-RSS listing has its
+    own 400ms budget; unavailable commands/timeouts withhold the affected
+    measurement rather than blocking the caller.
   - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic
     text for the operator, never a command.
 """
@@ -99,10 +100,11 @@ def read_macos_memory(deadline: float) -> Dict[str, int]:
     return info
 
 
-def get_macos_rss_processes(deadline: float, top_n: int = 10) -> List[Dict[str, Any]]:
-    """Reads ps RSS in KiB, applying the Linux listing's cutoff and ordering."""
+def get_macos_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
+    """Reads ps RSS in KiB within its own budget, applying the Linux listing's cutoff and ordering."""
     procs: List[Dict[str, Any]] = []
-    for line in native_output(["/bin/ps", "-axo", "pid=,rss=,comm="], deadline).splitlines():
+    output = native_output(["/bin/ps", "-axo", "pid=,rss=,ucomm="], monotonic() + 0.4)
+    for line in output.splitlines():
         parts = line.split(None, 2)
         if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
             continue
@@ -168,9 +170,8 @@ def audit_memory(
     crit_swap_pct: float,
 ) -> Dict[str, Any]:
     """Audits system memory and swap usage, failing open to status UNKNOWN when unmeasurable."""
-    deadline = monotonic() + 0.4
     if sys.platform == "darwin":
-        mem = read_macos_memory(deadline)
+        mem = read_macos_memory(monotonic() + 0.4)
         unavailable_reason = "macos-memory-unavailable"
         unavailable_source = "Native macOS memory-pressure readings are unavailable or incomplete"
     elif sys.platform.startswith("linux"):
@@ -246,7 +247,7 @@ def audit_memory(
             )
 
     if sys.platform == "darwin":
-        top_procs = get_macos_rss_processes(deadline)
+        top_procs = get_macos_rss_processes()
     elif sys.platform.startswith("linux"):
         top_procs = get_top_rss_processes()
     else:
