@@ -48,8 +48,8 @@
 #            Confirm the current registration generation's listener is running.
 #            Starts one when nothing live is in the way, and returns only after
 #            that generation's live claim or its launch stamp says it started.
-#            The wait is the reconcile confirm window and ends early on evidence.
-#            No evidence within the window is a nonzero result. Exit 3 means a
+#            Polls within the reconcile confirm window, then refreshes evidence
+#            once at its boundary. No proof is a nonzero result. Exit 3 means a
 #            live listener from another registration generation still held the
 #            source when the window ended, so this generation cannot start until
 #            it is retired.
@@ -1903,7 +1903,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # Every launch shares ONE window rather than taking a window each, so a whole
 # fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state stamp mark current_identity
+  local deadline window entry id rest identity before state stamp mark current_identity final_read=0
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1950,7 +1950,14 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
     done
     pending=("${remaining[@]+"${remaining[@]}"}")
     [ "${#pending[@]}" -gt 0 ] || break
-    [ "$SECONDS" -lt "$deadline" ] || break
+    [ "$final_read" -eq 0 ] || break
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      # External evidence reads can consume the remaining window after the
+      # claim snapshot. Refresh it once before reporting an already-live
+      # launch absent; this does not extend the configured polling deadline.
+      final_read=1
+      continue
+    fi
     sleep 0.05
   done
   [ "${#pending[@]}" -eq 0 ] || printf '%s\n' "${pending[@]}"
@@ -1990,7 +1997,7 @@ generation_can_launch() {  # <source-id>
 # launch stamp advancing. Returns as soon as either appears. A fixed sleep is
 # not success.
 cmd_ensure_listening() {
-  local id=${1-} identity before mark stamp deadline window started_once=0 listening
+  local id=${1-} identity before mark stamp deadline window started_once=0 listening final_read=0
   [ "$#" -eq 1 ] || usage
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   window=$(fm_procevent_launch_confirm_seconds) \
@@ -2015,11 +2022,17 @@ cmd_ensure_listening() {
     if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
       return 0
     fi
+    [ "$final_read" -eq 0 ] || break
     if [ "$started_once" -eq 0 ] && generation_can_launch "$id"; then
       detach_runner "$id"
       started_once=1
     fi
-    [ "$SECONDS" -lt "$deadline" ] || break
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      # Also observes a launch made at the end of this iteration before
+      # deciding it failed. Never wait beyond one final evidence read.
+      final_read=1
+      continue
+    fi
     sleep 0.05
   done
   [ "$listening" -ne 3 ] || return 3
