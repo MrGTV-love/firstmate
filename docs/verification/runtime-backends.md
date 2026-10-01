@@ -1342,6 +1342,27 @@ HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
 
 Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pane childless idle shell was closed after restoration while the exact non-target focus and default fleet session remained unchanged, and a repeat run was a no-op.
 
+### Cross-home recovery custody
+
+Verified on 2026-10-01 on macOS aarch64 with Herdr 0.9.1 and Bash 3.2, using the guarded named-session helpers:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+```
+
+Observed output:
+
+```text
+# herdr 0.9.1 recovery custody lab
+ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=26022
+```
+
+The primary recovery remains blocked at generated-copy allocation until the secondmate recovery has completed, so the verdict cannot depend on the allocation finishing within the session-lock acquisition window.
+Both homes replace only their exact old husks in their original workspaces, advance distinct generations, retain their projection tokens and home bindings, publish matching journal and metadata endpoints, and preserve the exact focused workspace and tab.
+A duplicate primary invocation refuses while its original process still owns the per-task lock, and every intercepted presentation mutation observes a live session-lock owner.
+The fixture proves submitted and literal allocation interception before provisioning, refuses unmatched commands and foreign paths, and never calls the shared Treehouse allocator.
+
 ### Workspace-removal focus safety
 
 The focus-flash regression ran on 2026-08-05 against both Herdr 0.7.5 protocol 17 and Herdr 0.8.0 protocol 19 on macOS aarch64, with the 0.7.5 run using the pinned upstream release binary first on `PATH`:

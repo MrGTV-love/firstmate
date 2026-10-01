@@ -143,7 +143,9 @@
 #   metadata are unchanged.
 #   A clean projected create or exact resume makes one bounded attempt to hold
 #   the one session-scoped presentation-order lock (keyed by named session plus
-#   canonical socket, outside any home's state/) through launch handoff. Lock
+#   canonical socket, outside any home's state/) through launch handoff for a
+#   fresh projection, or through verified endpoint replacement and journal
+#   advancement for an exact resume. Abort cleanup reacquires it if needed. Lock
 #   contention warns and falls back to the ordinary flat layout before any
 #   projection mutation. The exact response-derived new workspace is inserted
 #   immediately after its owning parent (firstmate or 2ndmate-<id>) contiguous
@@ -3754,6 +3756,11 @@ else
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=""
+            # Reclaim has finished every focus-sensitive mutation and
+            # published its exact replacement binding. Task/meta locks still
+            # protect this incarnation; allocation and harness setup need no
+            # session custody. Abort cleanup reacquires it before any close.
+            spawn_herdr_presentation_order_lock_release
             ;;
           2)
             spawn_herdr_presentation_order_lock_release

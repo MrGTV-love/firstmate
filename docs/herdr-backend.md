@@ -418,6 +418,7 @@ The replacement is allowed only when all of these agree:
 
 The replacement tab and pane are created and verified before the old pane is rechecked and closed.
 Then the journal advances atomically to the replacement endpoint before metadata publication.
+Exact reclaim releases the session presentation lock after that verified journal advancement, before worktree allocation and harness setup; the task and metadata locks still protect the launch incarnation, and abort cleanup reacquires the session lock before closing any pane.
 The reclaim path never moves, closes, deletes, or renames a workspace and never touches a parent, sibling, captain, or foreign pane.
 A failed replacement rolls back only the exact response-derived new pane when focus-safe verification permits it.
 
