@@ -1,0 +1,37 @@
+# S1 (machine-fitted index): every active id incl. stand-in checked against the live claude/codex/pi catalogs
+{
+  "version": 1,
+  "roles": {
+    "opus-grade": {
+      "claude": { "model": "opus[1m]" },
+      "codex": { "model": "gpt-6.1-sol" }
+    },
+    "sonnet-grade": {
+      "claude": { "model": "claude-sonnet-5-5[1m]" },
+      "codex": { "model": "gpt-6.1-sol" },
+      "pi": { "model": "openai-codex/gpt-5.5", "stand_in": "openai-codex/gpt-5.4-mini" }
+    },
+    "easy": {
+      "claude": { "model": "haiku" },
+      "codex": { "model": "gpt-6-luna" }
+    }
+  },
+  "retired": ["gpt-6-sol"]
+}
+$ fm-model-index.sh check
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.5' (role 'sonnet-grade') not validated
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.4-mini' (role 'sonnet-grade') not validated
+model-index: active ids checked; none absent or retired
+exit=0
+
+# S1b adversarial: operator typos the new release id (gpt-6.2-sol does not exist yet)
+$ fm-model-index.sh check
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'opus[1m]' (role 'opus-grade') not validated
+model-index: id 'gpt-6.2-sol' absent or retired in codex catalog (role 'opus-grade')
+exit=2
+
+# S1c adversarial: operator re-adds the retired prior-generation id as an active entry
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.5' (role 'sonnet-grade') not validated
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.4-mini' (role 'sonnet-grade') not validated
+model-index: retired id 'gpt-6-sol' in role 'easy' (codex)
+exit=2

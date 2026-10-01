@@ -1,0 +1,14 @@
+# R2-R1 (F2): index edit puts absent id gpt-6.2-sol on opus-grade.codex; relaunch of running worker r2-codex onto role:opus-grade must refuse BEFORE the stop
+$ index opus-grade.codex = gpt-6.2-sol
+$ worker before: pane_pid=23048 cmd=node; meta model=model=gpt-6.1-sol
+$ bin/fm-control.sh r2-codex relaunch --model role:opus-grade --note lab relaunch check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+model-index: id 'gpt-6.2-sol' absent or retired in codex catalog (role 'opus-grade')
+exit=1
+$ worker after: pane_pid=23048 cmd=node; meta model=model=gpt-6.1-sol
+$ codex pane still shows the original agent:
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+› 1. Trust and continue
+  2. Quit
+  enter continue · esc quit

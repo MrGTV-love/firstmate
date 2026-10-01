@@ -1,0 +1,30 @@
+# C2: operator fixes the id (fast.codex = gpt-6.1-sol); fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.yZS74j -> live secondmate homes
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'opus[1m]' (role 'opus-grade') not validated
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5[1m]' (role 'sonnet-grade') not validated
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5[1m]' (role 'easy') not validated
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.5' (role 'sonnet-grade') not validated
+model-index: notice: pi catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'openai-codex/gpt-5.4-mini' (role 'sonnet-grade') not validated
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.0lWMPH):
+  model-index.json: pushed
+  crew-dispatch.json: pushed
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=1
+
+lane model-index.json == fleet index
+lane crew-dispatch.json == fleet dispatch
+$ lane home resolves role fast (fm-model-index.sh profiles, FM_HOME=lane):
+{"harness":"codex","effort":"high","model":"gpt-6.1-sol"}

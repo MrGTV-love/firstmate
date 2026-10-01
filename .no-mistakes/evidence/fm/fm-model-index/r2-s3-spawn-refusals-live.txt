@@ -1,0 +1,47 @@
+# R2-S3 adversarial spawns in the lab primary pane; index = {"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}}},"retired":["gpt-6-sol"]}
+
+## retired literal
+$ bin/fm-brief.sh r2-ret demo --scout
+exit=0
+$ bin/fm-spawn.sh r2-ret /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo --scout --harness codex --model gpt-6-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+model-index: warning: literal model 'gpt-6-sol' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+exit=1
+
+$ grep -E '^(harness|kind|model|effort)=' state/r2-ret.meta
+grep: /Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/r2-ret.meta: No such file or directory
+
+## role absent from index
+$ bin/fm-brief.sh r2-norole demo --scout
+exit=0
+$ bin/fm-spawn.sh r2-norole /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo --scout --harness codex --model role:fast
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+jq: error (at <stdin>:4): role or stand-in not configured: codex:fast
+exit=1
+
+$ grep -E '^(harness|kind|model|effort)=' state/r2-norole.meta
+grep: /Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/r2-norole.meta: No such file or directory
+
+## stand-in not configured for claude
+$ bin/fm-brief.sh r2-nostand demo --scout
+exit=0
+$ bin/fm-spawn.sh r2-nostand /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo --scout --harness claude --model stand-in:opus-grade
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+jq: error (at <stdin>:5): role or stand-in not configured: claude:opus-grade
+exit=1
+
+$ grep -E '^(harness|kind|model|effort)=' state/r2-nostand.meta
+grep: /Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/r2-nostand.meta: No such file or directory
+
+$ windows after (no worker windows for the refused ids)
+bash
+fm-r2-codex
+fm-r2-claude
+$ state metas
+/Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/r2-claude.meta
+/Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/r2-codex.meta
+/Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/sm.meta

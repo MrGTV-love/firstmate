@@ -1,0 +1,9 @@
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.286 (Claude Code): catalog id accepted; absent id refused
+skip - omp catalog adapter: executable absent
+ok - pi 0.80.3: catalog id accepted; absent id refused
+skip - pi-signed catalog adapter: executable absent
+skip - opencode catalog adapter: executable absent
+skip - cursor catalog adapter: executable absent
+ok - agy 1.2.14: catalog id accepted; absent id refused
+# model-index live adapters checked: 4

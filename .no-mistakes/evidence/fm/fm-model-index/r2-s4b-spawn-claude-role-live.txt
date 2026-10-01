@@ -1,0 +1,34 @@
+$ bin/fm-brief.sh r2-claude demo --scout
+exit=0
+$ bin/fm-spawn.sh r2-claude /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo --scout --harness claude --model role:sonnet-grade
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+spawned r2-claude harness=claude kind=scout window=primary:fm-r2-claude worktree=/Users/charlesabrooker/.treehouse/demo-46f839/2/demo
+exit=0
+
+$ grep -E '^(harness|kind|model|effort)=' state/r2-claude.meta
+harness=claude
+kind=scout
+model=claude-sonnet-5-5
+effort=default
+(no 'catalog unavailable' notice: the spawn's selected-entry check read the live Claude listing and accepted claude-sonnet-5-5)
+
+$ launch script model flag (/tmp/fm-r2-claude+ac7e9ff14064a4a6965b7df66d92f306ae62140649ad6107bc49e78c9b0046fc/launch.s1790813593.2778.5450.sh)
+--model 'claude-sonnet-5-5'
+
+$ tmux capture-pane -t primary:fm-r2-claude
+ ▐▛███▛█   Claude Code v2.1.286
+▝▜██████▀  Sonnet 5.5 · Claude Max
+ ▝▝   ▝▝   ~/.treehouse/demo-46f839/2/demo
+⚠ Your login expires in 2 days · run /login to renew
+▎ Your voice can help guide AI
+▎ Take 15 min to share your experiences with Anthropic Interviewer. Start now
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.XBUIX6/state/operational-inbox/1790813623-efb4f8ff404157dc.msg' and handle its contents as Firstmate operational
+  input.
+· Creating… (running UserPromptSubmit hook · 19s)
+                                                                                                     tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux.conf for wheel scroll
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 0% 0/0 demo:3b01491c
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

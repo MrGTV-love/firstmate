@@ -1,0 +1,10 @@
+# omp adapter live: listed id + absent id, 3 runs; host load average 78.26 85.78 95.81
+$ fm-model-index.sh check omp   (run 1)
+model-index: id 'google/fm-absent-guard' absent or retired in omp catalog (role 'absent')
+exit=2 secs=10
+$ fm-model-index.sh check omp   (run 2)
+model-index: id 'google/fm-absent-guard' absent or retired in omp catalog (role 'absent')
+exit=2 secs=3
+$ fm-model-index.sh check omp   (run 3)
+model-index: id 'google/fm-absent-guard' absent or retired in omp catalog (role 'absent')
+exit=2 secs=2

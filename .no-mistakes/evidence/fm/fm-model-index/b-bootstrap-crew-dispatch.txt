@@ -1,0 +1,18 @@
+# B1: session-start bootstrap (FM_BOOTSTRAP_NETWORK=skip) with crew-dispatch.json naming role fast that the index lacks
+{"default":{"harness":"codex","role":"fast","effort":"high"}}
+CREW_DISPATCH: invalid config/crew-dispatch.json - jq: error (at /Users/charlesabrooker/tmp/fm-lab.yZS74j/config/crew-dispatch.json:1): role or stand-in not configured: codex:fast
+exit=0
+
+# B2: crew-dispatch.json uses a literal id beside an index
+{"default":{"harness":"codex","model":"gpt-5.5","effort":"high"}}
+CREW_DISPATCH: warning - literal model 'gpt-5.5' for codex is not an index entry; name its role so the next model release is one index edit
+exit=0
+
+# B3: crew-dispatch.json names a retired literal
+{"default":{"harness":"codex","model":"gpt-6-sol","effort":"high"}}
+CREW_DISPATCH: invalid config/crew-dispatch.json - jq: error (at /Users/charlesabrooker/tmp/fm-lab.yZS74j/config/crew-dispatch.json:1): retired model: gpt-6-sol
+exit=0
+
+# B4: crew-dispatch.json names a role the index defines
+{"default":{"harness":"codex","role":"opus-grade","effort":"high"}}
+exit=0

@@ -1,0 +1,57 @@
+# S5 adversarial: index edited (easy.claude -> claude-sonnet-5-5, retired += haiku); worker mi-claude still recorded on haiku
+$ diff model-index v1 -> v2
+5,6c5,10
+<       "claude": { "model": "opus[1m]" },
+<       "codex": { "model": "gpt-6.1-sol" }
+---
+>       "claude": {
+>         "model": "opus[1m]"
+>       },
+>       "codex": {
+>         "model": "gpt-6.1-sol"
+>       }
+9,11c13,22
+<       "claude": { "model": "claude-sonnet-5-5[1m]" },
+<       "codex": { "model": "gpt-6.1-sol" },
+<       "pi": { "model": "openai-codex/gpt-5.5", "stand_in": "openai-codex/gpt-5.4-mini" }
+---
+>       "claude": {
+>         "model": "claude-sonnet-5-5[1m]"
+>       },
+>       "codex": {
+>         "model": "gpt-6.1-sol"
+>       },
+>       "pi": {
+>         "model": "openai-codex/gpt-5.5",
+>         "stand_in": "openai-codex/gpt-5.4-mini"
+>       }
+14,15c25,30
+<       "claude": { "model": "haiku" },
+<       "codex": { "model": "gpt-6-luna" }
+---
+>       "claude": {
+>         "model": "claude-sonnet-5-5"
+>       },
+>       "codex": {
+>         "model": "gpt-6-luna"
+>       }
+18c33,36
+<   "retired": ["gpt-6-sol"]
+---
+>   "retired": [
+>     "gpt-6-sol",
+>     "haiku"
+>   ]
+
+$ fm-control.sh mi-claude relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+model-index: warning: literal model 'haiku' for claude is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: haiku
+exit=1
+
+$ after refusal: state/mi-claude.meta model, journal, live pane
+model=haiku
+0
+ ▐▛███▛█   Claude Code v2.1.286
+▝▜██████▀  Haiku 4.5 · Claude Max
+  Haiku 4.5 █░░░░░░░░░ 16% 32k/200k demo:653fc1f9

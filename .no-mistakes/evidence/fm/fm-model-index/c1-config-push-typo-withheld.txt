@@ -1,0 +1,27 @@
+# C1 adversarial: operator adds role fast with typo id gpt-6.2-sol and switches crew-dispatch.json to role fast; runs fm-config-push.sh from the lab primary pane
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.yZS74j -> live secondmate homes
+model-index: id 'gpt-6.2-sol' absent or retired in codex catalog (role 'fast')
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.0lWMPH):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=1
+
+$ lane home pair unchanged?
+model-index.json: unchanged (prior kept)
+crew-dispatch.json: unchanged (prior kept)
+crew-harness in lane: codex
+$ lane still resolves its dispatch:
+{"harness":"codex","effort":"high","model":"gpt-6.1-sol"}

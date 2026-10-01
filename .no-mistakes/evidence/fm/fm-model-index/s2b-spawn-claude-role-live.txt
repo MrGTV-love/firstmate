@@ -1,0 +1,30 @@
+# S2b: fm-spawn.sh mi-claude <demo> --scout --harness claude --model role:easy --effort low (real lab tmux, real Claude login)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+spawned mi-claude harness=claude kind=scout window=primary:fm-mi-claude worktree=/Users/charlesabrooker/.treehouse/demo-67b433/2/demo
+exit=0
+
+$ grep state/mi-claude.meta
+harness=claude
+kind=scout
+model=haiku
+effort=low
+
+$ launch script
+--model 'haiku'
+
+$ tmux capture-pane -t primary:fm-mi-claude
+ ▐▛███▛█   Claude Code v2.1.286
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   ~/.treehouse/demo-67b433/2/demo
+⚠ Your login expires in 2 days · run /login to renew
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.yZS74j/state/operational-inbox/1790806421-8fb1fa1cfd6f0bca.msg' and handle its contents as Firstmate operational
+  input.
+✶ Burrowing… (running UserPromptSubmit hook · 4s)
+                                                                                                     tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux.conf for wheel scroll
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1 to keep future transcripts
+  Haiku 4.5 ░░░░░░░░░░ 0% 0/0 demo:653fc1f9
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

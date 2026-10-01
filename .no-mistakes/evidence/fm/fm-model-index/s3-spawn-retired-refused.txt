@@ -1,0 +1,19 @@
+# S3 adversarial: fm-spawn.sh mi-retired <demo> --scout --harness codex --model gpt-6-sol (retired literal)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model-index: warning: literal model 'gpt-6-sol' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+exit=1
+
+$ ls state/ ; tmux list-windows
+home-summary.json
+mi-scout.git-hooks
+mi-scout.meta
+primary:0: bash* (1 panes) [200x50] 
+primary:1: fm-mi-scout (1 panes) [200x50] 

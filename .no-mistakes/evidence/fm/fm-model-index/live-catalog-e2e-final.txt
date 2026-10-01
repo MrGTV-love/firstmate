@@ -1,0 +1,4 @@
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.286 (Claude Code): catalog id accepted; absent id refused
+ok - omp omp/18.4.5: catalog id accepted; absent id refused
+not ok - pi 0.80.3: its own listing named no model

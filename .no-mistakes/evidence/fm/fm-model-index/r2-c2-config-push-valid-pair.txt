@@ -1,0 +1,44 @@
+# R2-C2: valid index + role-named crew-dispatch.json pushed from lab primary to lane home sm
+$ primary config/model-index.json
+{"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5[1m]"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}}},"retired":["gpt-6-sol"]}
+$ primary config/crew-dispatch.json
+{"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","role":"opus-grade","effort":"high"},{"harness":"codex","role":"opus-grade","effort":"high"}]},{"when":"trivial edit","use":{"harness":"codex","role":"easy","effort":"low"}}],"default":{"harness":"codex","role":"sonnet-grade","effort":"medium"}}
+$ lane config before:
+
+$ FM_HOME=$LAB bin/fm-config-push.sh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  model-index.json: pushed
+  crew-dispatch.json: pushed
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=1
+
+$ lane config after:
+crew-dispatch.json
+model-index.json
+$ cmp primary vs lane
+model-index.json identical
+crew-dispatch.json identical
+
+$ lane resolves its pushed dispatch (FM_HOME=$SM fm-model-index.sh profiles config/crew-dispatch.json)
+{"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","effort":"high","model":"opus"},{"harness":"codex","effort":"high","model":"gpt-6.1-sol"}]},{"when":"trivial edit","use":{"harness":"codex","effort":"low","model":"gpt-6-luna"}}],"default":{"harness":"codex","effort":"medium","model":"gpt-6.1-sol"}}
+exit=0

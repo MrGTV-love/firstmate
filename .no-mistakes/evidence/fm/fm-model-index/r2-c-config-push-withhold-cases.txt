@@ -1,0 +1,210 @@
+# R2-C adversarial config-push cases; lane home starts with the valid pair from R2-C2. Each case also changes config/crew-harness to prove unrelated material still pushes.
+
+## C1: index adds role fast with typo id gpt-6.2-sol; dispatch switches to role fast
+$ primary model-index.json: {"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5[1m]"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}},"fast":{"codex":{"model":"gpt-6.2-sol"}}},"retired":["gpt-6-sol"]}
+$ primary crew-dispatch.json: {"default":{"harness":"codex","role":"fast","effort":"high"}}
+$ primary crew-harness: codex-1
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'opus' (role 'opus-grade') not validated
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5[1m]' (role 'sonnet-grade') not validated
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'haiku' (role 'easy') not validated
+model-index: id 'gpt-6.2-sol' absent or retired in codex catalog (role 'fast')
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-1
+
+## C3: index removes role easy; dispatch still names role easy (R6-1)
+$ primary model-index.json: {"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5[1m]"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}}},"retired":["gpt-6-sol"]}
+$ primary crew-dispatch.json: {"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","role":"opus-grade","effort":"high"},{"harness":"codex","role":"opus-grade","effort":"high"}]},{"when":"trivial edit","use":{"harness":"codex","role":"easy","effort":"low"}}],"default":{"harness":"codex","role":"sonnet-grade","effort":"medium"}}
+$ primary crew-harness: codex-2
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+jq: error (at /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/crew-dispatch.json:1): role or stand-in not configured: codex:easy
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-2
+
+## C4: new index with empty roles and no retired array (R5-1)
+$ primary model-index.json: {"version":1,"roles":{}}
+$ primary crew-dispatch.json: {"default":{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}}
+$ primary crew-harness: codex-3
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+model-index: malformed index: /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/model-index.json
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-3
+
+## C5: unsupported version 2 with empty roles (R5-1)
+$ primary model-index.json: {"version":2,"roles":{},"retired":[]}
+$ primary crew-dispatch.json: {"default":{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}}
+$ primary crew-harness: codex-4
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+model-index: malformed index: /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/model-index.json
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-4
+
+## C6b: valid empty index but dispatch still names roles (R6-1)
+$ primary model-index.json: {"version":1,"roles":{},"retired":[]}
+$ primary crew-dispatch.json: {"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","role":"opus-grade","effort":"high"},{"harness":"codex","role":"opus-grade","effort":"high"}]},{"when":"trivial edit","use":{"harness":"codex","role":"easy","effort":"low"}}],"default":{"harness":"codex","role":"sonnet-grade","effort":"medium"}}
+$ primary crew-harness: codex-5
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+jq: error (at /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/crew-dispatch.json:1): role or stand-in not configured: claude:opus-grade
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-5
+
+## C7: valid index; dispatch names retired literal gpt-6-sol
+$ primary model-index.json: {"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5[1m]"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}}},"retired":["gpt-6-sol"]}
+$ primary crew-dispatch.json: {"default":{"harness":"codex","model":"gpt-6-sol","effort":"high"}}
+$ primary crew-harness: codex-6
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+jq: error (at /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/crew-dispatch.json:1): retired model: gpt-6-sol
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: unchanged (previous pair kept)
+  crew-dispatch.json: unchanged (previous pair kept)
+  crew-harness in lane: codex-6
+
+## C6: valid empty index with a dispatch that names no role (must push)
+$ primary model-index.json: {"version":1,"roles":{},"retired":[]}
+$ primary crew-dispatch.json: {"default":{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}}
+$ primary crew-harness: codex-7
+$ FM_HOME=$LAB bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/tmp/fm-lab.XBUIX6 -> live secondmate homes
+model-index: warning: literal model 'gpt-6.1-sol' for codex is not an index entry; name its role so the next model release is one index edit
+secondmate sm (/Users/charlesabrooker/tmp/fm-lab-sm.NF169K):
+  model-index.json: pushed
+  crew-dispatch.json: pushed
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate sm: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+$ lane pair after:
+  model-index.json: CHANGED
+{"version":1,"roles":{},"retired":[]}
+  crew-dispatch.json: CHANGED
+{"default":{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}}
+  crew-harness in lane: codex-7

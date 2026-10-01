@@ -1,0 +1,646 @@
++ set -euo pipefail
+++ dirname tests/fm-model-index-live-e2e.test.sh
++ . tests/lib.sh
+++ '[' -n '' ']'
+++ FM_TEST_LIB_SOURCED=1
+++ umask 022
++++ dirname tests/lib.sh
+++ . tests/git-config-helpers.sh
++++ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++++ GIT_CONFIG_GLOBAL=/dev/null
++++ GIT_CONFIG_NOSYSTEM=1
+++ export FM_GATE_REFUSE_BYPASS=1
+++ FM_GATE_REFUSE_BYPASS=1
+++ export FM_TEST_SEAM=1
+++ FM_TEST_SEAM=1
+++ unset FM_TASK_ID
+++ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
+++++ dirname tests/lib.sh
++++ cd tests/..
++++ pwd
+++ ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC
+++ FM_TEST_CLEANUP_DIRS=()
++++ mktemp /Users/charlesabrooker/tmp/.fm-test-cleanup.33448.XXXXXX
+++ FM_TEST_CLEANUP_REGISTRY=/Users/charlesabrooker/tmp/.fm-test-cleanup.33448.5niqhi
++++ fm_test_pid_identity 33448
++++ local pid=33448
++++ FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp
++++ bash -c '. "$1"; fm_pid_identity "$2"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-wake-lib.sh 33448
+++ FM_TEST_OWNER_IDENTITY='Wed Sep 30 16:35:33 2026     bash -x tests/fm-model-index-live-e2e.test.sh'
++++ mktemp /Users/charlesabrooker/tmp/.fm-test-procevent.33448.XXXXXX
+++ FM_TEST_PROCEVENT_REGISTRY=/Users/charlesabrooker/tmp/.fm-test-procevent.33448.kqg9d8
++++ mktemp /Users/charlesabrooker/tmp/.fm-test-watcher.33448.XXXXXX
+++ FM_TEST_WATCHER_REGISTRY=/Users/charlesabrooker/tmp/.fm-test-watcher.33448.UXb84P
+++ FM_TEST_STUB_MAX_BLOCK_SECONDS=120
+++ export FM_TEST_STUB_MAX_BLOCK_SECONDS
+++ trap fm_test_cleanup EXIT
+++ trap 'fm_test_cleanup; exit 130' INT
+++ trap 'fm_test_cleanup; exit 143' TERM
+++ trap 'fm_test_cleanup; exit 129' HUP
+++ trap 'fm_test_cleanup; exit 131' QUIT
+++ FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
+++ '[' 0 '!=' 1 ']'
+++ fm_test_reap_orphans
+++ local marker dir mtime now owner_pid owner_identity current_identity
++++ date +%s
+++ now=1790804133
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-captain-hold.P7sgnI/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-captain-hold.P7sgnI/.fm-test-fixture
+++ owner_pid=4683
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-captain-hold.P7sgnI/.fm-test-fixture
+++ owner_identity='Wed Sep 30 15:39:29 2026     bash tests/fm-captain-hold-lifecycle.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 4683
+++ current_identity=
+++ current_identity=
+++ '[' -n 'Wed Sep 30 15:39:29 2026     bash tests/fm-captain-hold-lifecycle.test.sh' ']'
+++ '[' '' = 'Wed Sep 30 15:39:29 2026     bash tests/fm-captain-hold-lifecycle.test.sh' ']'
++++ stat -c %Y /Users/charlesabrooker/tmp/fm-captain-hold.P7sgnI/.fm-test-fixture
++++ stat -f %m /Users/charlesabrooker/tmp/fm-captain-hold.P7sgnI/.fm-test-fixture
+++ mtime=1790800769
+++ '[' 3364 -ge 3600 ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-backend-purity.7HA82b/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-backend-purity.7HA82b/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-backend-purity.7HA82b/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-bad.ypxRtp/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-bad.ypxRtp/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-bad.ypxRtp/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-cache.by4jYu/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-cache.by4jYu/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-cache.by4jYu/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-ci-follow.PGfzuK/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-ci-follow.PGfzuK/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-ci-follow.PGfzuK/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-ci-reject-fast.wdYQZw/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-ci-reject-fast.wdYQZw/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-ci-reject-fast.wdYQZw/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-explicit-backend-purity.Z057hq/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-explicit-backend-purity.Z057hq/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-explicit-backend-purity.Z057hq/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-explicit-override.Va3EXL/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-explicit-override.Va3EXL/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-explicit-override.Va3EXL/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-fast-bad.7RNa7R/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-fast-bad.7RNa7R/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-fast-bad.7RNa7R/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-good.NJGiKj/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-good.NJGiKj/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-good.NJGiKj/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-jobs.sa7CLm/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-jobs.sa7CLm/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-jobs.sa7CLm/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-joint-call.Pw6XU8/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-joint-call.Pw6XU8/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-joint-call.Pw6XU8/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-main-follow.r39CCd/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-main-follow.r39CCd/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-main-follow.r39CCd/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-main-full.Ej0cYS/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-main-full.Ej0cYS/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-main-full.Ej0cYS/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-memory-evidence.KTHmO8/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-memory-evidence.KTHmO8/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-memory-evidence.KTHmO8/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-mode-cache.ChzIwK/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-mode-cache.ChzIwK/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-mode-cache.ChzIwK/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-nomergebase-follow.QoduZT/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-nomergebase-follow.QoduZT/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-nomergebase-follow.QoduZT/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-noshellcheck.Xtpiyt/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-noshellcheck.Xtpiyt/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-noshellcheck.Xtpiyt/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-oom-text-excerpt.KKmuBP/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-oom-text-excerpt.KKmuBP/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-oom-text-excerpt.KKmuBP/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-opts.oUMlFm/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-opts.oUMlFm/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-opts.oUMlFm/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-partitions.6CJTum/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-partitions.6CJTum/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-partitions.6CJTum/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-require-bounds.bN4BXF/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-require-bounds.bN4BXF/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-require-bounds.bN4BXF/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-roots-log.fas9yN/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-roots-log.fas9yN/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-roots-log.fas9yN/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-sidecar-result.arj5MQ/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-sidecar-result.arj5MQ/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-sidecar-result.arj5MQ/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-signal.tgASXf/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-signal.tgASXf/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-signal.tgASXf/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-source-changes.gTYs1k/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-source-changes.gTYs1k/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-source-changes.gTYs1k/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-source-spelling.rlxmyP/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-source-spelling.rlxmyP/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-source-spelling.rlxmyP/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-ver.vHBVcJ/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-ver.vHBVcJ/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-ver.vHBVcJ/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-lint-zero-changed.0GSECR/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-lint-zero-changed.0GSECR/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-lint-zero-changed.0GSECR/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-procevent-tests.nF85Av/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-procevent-tests.nF85Av/.fm-test-fixture
+++ owner_pid=63971
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-procevent-tests.nF85Av/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:28:49 2026     bash tests/fm-procevent.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 63971
+++ current_identity='Wed Sep 30 16:28:49 2026     bash tests/fm-procevent.test.sh'
+++ '[' -n 'Wed Sep 30 16:28:49 2026     bash tests/fm-procevent.test.sh' ']'
+++ '[' 'Wed Sep 30 16:28:49 2026     bash tests/fm-procevent.test.sh' = 'Wed Sep 30 16:28:49 2026     bash tests/fm-procevent.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-badsum.hYjQ9U/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-badsum.hYjQ9U/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-badsum.hYjQ9U/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-download.4orfFv/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-download.4orfFv/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-download.4orfFv/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-platform.5saPBH/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-platform.5saPBH/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-platform.5saPBH/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-sha256sum-pref.cjt0tq/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-sha256sum-pref.cjt0tq/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-sha256sum-pref.cjt0tq/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-shasum.gVWkTA/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-shasum.gVWkTA/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-shasum.gVWkTA/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-shellcheck-unsupported.O5tsto/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-shellcheck-unsupported.O5tsto/.fm-test-fixture
+++ owner_pid=77795
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-shellcheck-unsupported.O5tsto/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 77795
+++ current_identity='Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh'
+++ '[' -n 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ '[' 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' = 'Wed Sep 30 16:30:09 2026     /bin/bash tests/fm-lint.test.sh' ']'
+++ continue
+++ for marker in '"${TMPDIR:-/tmp}"/fm-*/.fm-test-fixture'
+++ '[' -e /Users/charlesabrooker/tmp/fm-spawn-compact-adviser.qnGbB7/.fm-test-fixture ']'
++++ sed -n 1p /Users/charlesabrooker/tmp/fm-spawn-compact-adviser.qnGbB7/.fm-test-fixture
+++ owner_pid=15477
++++ sed -n '2,$p' /Users/charlesabrooker/tmp/fm-spawn-compact-adviser.qnGbB7/.fm-test-fixture
+++ owner_identity='Wed Sep 30 16:19:36 2026     bash tests/fm-spawn-compact-adviser-disable.test.sh'
+++ case "$owner_pid" in
++++ fm_test_pid_identity 15477
+++ current_identity='Wed Sep 30 16:19:36 2026     bash tests/fm-spawn-compact-adviser-disable.test.sh'
+++ '[' -n 'Wed Sep 30 16:19:36 2026     bash tests/fm-spawn-compact-adviser-disable.test.sh' ']'
+++ '[' 'Wed Sep 30 16:19:36 2026     bash tests/fm-spawn-compact-adviser-disable.test.sh' = 'Wed Sep 30 16:19:36 2026     bash tests/fm-spawn-compact-adviser-disable.test.sh' ']'
+++ continue
++ fm_live_gate default-on FM_MODEL_INDEX_LIVE_E2E jq
++ local policy=default-on vars=FM_MODEL_INDEX_LIVE_E2E
++ shift 2
++ local var value rest primary requested=0 disabled_by= tool
++ var_list=()
++ local -a var_list
++ case "$policy" in
++ rest=FM_MODEL_INDEX_LIVE_E2E
++ '[' -n FM_MODEL_INDEX_LIVE_E2E ']'
++ var=FM_MODEL_INDEX_LIVE_E2E
++ '[' FM_MODEL_INDEX_LIVE_E2E = FM_MODEL_INDEX_LIVE_E2E ']'
++ rest=
++ '[' -n FM_MODEL_INDEX_LIVE_E2E ']'
++ var_list+=("$var")
++ '[' -n '' ']'
++ '[' 1 -gt 0 ']'
++ primary=FM_MODEL_INDEX_LIVE_E2E
++ for var in '"${var_list[@]}"'
++ value=1
++ case "$value" in
++ requested=1
++ '[' 1 -eq 0 ']'
++ for tool in '"$@"'
++ command -v jq
++ continue
++ export DISABLE_AUTOUPDATER=1
++ DISABLE_AUTOUPDATER=1
++ return 0
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-timeout-lib.sh
+++ set -u
++ . /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-cursor-lib.sh
+++ FM_CURSOR_PROBE_TIMEOUT=10
++ forced=1
+++ fm_test_tmproot fm-model-index-live
+++ local prefix=fm-model-index-live root tmp_base
+++ tmp_base=/Users/charlesabrooker/tmp
+++ tmp_base=/Users/charlesabrooker/tmp
++++ mktemp -d /Users/charlesabrooker/tmp/fm-model-index-live.XXXXXX
+++ root=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++++ cd -P -- /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++++ pwd -P
+++ root=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
+++ printf '%s\n%s\n' 33448 'Wed Sep 30 16:35:33 2026     bash -x tests/fm-model-index-live-e2e.test.sh'
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
+++ printf '%s\n' /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++ TMP_ROOT=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++ mkdir -p /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/home/config
++ export FM_HOME=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/home
++ FM_HOME=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/home
++ unset FM_CONFIG_OVERRIDE FM_ROOT_OVERRIDE FM_MODEL_CATALOG_DIR
++ TOOL=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-model-index.sh
++ ABSENT=fm-intentionally-absent-model-index-guard
++ checked=0
++ for harness in codex claude omp pi pi-signed opencode cursor agy
++ binary=codex
++ '[' codex = cursor ']'
++ '[' -z codex ']'
++ command -v codex
+++ codex --version
++ version='codex-cli 0.159.0'
+++ listed_id codex codex
++ model=gpt-6.1-sol
++ '[' -z gpt-6.1-sol ']'
++ jq -n --arg h codex --arg m gpt-6.1-sol --arg a fm-intentionally-absent-model-index-guard '{version:1,roles:{live:{($h):{model:$m}},absent:{($h):{model:$a}}},retired:[]}'
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-model-index.sh check
+++ cat /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/verdict
++ verdict='model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in codex catalog (role '\''absent'\'')'
++ assert_not_contains 'model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in codex catalog (role '\''absent'\'')' 'catalog unavailable' 'codex codex-cli 0.159.0: the adapter could not read the catalog its CLI lists'
++ case "$1" in
++ :
++ assert_contains 'model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in codex catalog (role '\''absent'\'')' 'id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired' 'codex codex-cli 0.159.0: absence did not receive a catalog verdict'
++ case "$1" in
++ :
++ printf 'ok - %s %s: catalog id accepted; absent id refused\n' codex 'codex-cli 0.159.0'
++ checked=1
++ for harness in codex claude omp pi pi-signed opencode cursor agy
++ binary=claude
++ '[' claude = cursor ']'
++ '[' -z claude ']'
++ command -v claude
+++ claude --version
++ version='2.1.286 (Claude Code)'
+++ listed_id claude claude
++ model=default
++ '[' -z default ']'
++ jq -n --arg h claude --arg m default --arg a fm-intentionally-absent-model-index-guard '{version:1,roles:{live:{($h):{model:$m}},absent:{($h):{model:$a}}},retired:[]}'
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-model-index.sh check
+++ cat /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/verdict
++ verdict='model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in claude catalog (role '\''absent'\'')'
++ assert_not_contains 'model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in claude catalog (role '\''absent'\'')' 'catalog unavailable' 'claude 2.1.286 (Claude Code): the adapter could not read the catalog its CLI lists'
++ case "$1" in
++ :
++ assert_contains 'model-index: id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired in claude catalog (role '\''absent'\'')' 'id '\''fm-intentionally-absent-model-index-guard'\'' absent or retired' 'claude 2.1.286 (Claude Code): absence did not receive a catalog verdict'
++ case "$1" in
++ :
++ printf 'ok - %s %s: catalog id accepted; absent id refused\n' claude '2.1.286 (Claude Code)'
++ checked=2
++ for harness in codex claude omp pi pi-signed opencode cursor agy
++ binary=omp
++ '[' omp = cursor ']'
++ '[' -z omp ']'
++ command -v omp
+++ omp --version
++ version=omp/18.4.5
+++ listed_id omp omp
++ model=google/antigravity-preview-05-2026
++ '[' -z google/antigravity-preview-05-2026 ']'
++ jq -n --arg h omp --arg m google/antigravity-preview-05-2026 --arg a fm-intentionally-absent-model-index-guard '{version:1,roles:{live:{($h):{model:$m}},absent:{($h):{model:$a}}},retired:[]}'
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SKATX86XS7MY7H9K4ACKKC/bin/fm-model-index.sh check
+++ cat /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I/verdict
++ fail 'omp omp/18.4.5: absent id was accepted (model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '\''google/antigravity-preview-05-2026'\'' (role '\''live'\'') not validated
+model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '\''fm-intentionally-absent-model-index-guard'\'' (role '\''absent'\'') not validated
+model-index: active ids checked; none absent or retired)'
++ printf 'not ok - %s\n' 'omp omp/18.4.5: absent id was accepted (model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '\''google/antigravity-preview-05-2026'\'' (role '\''live'\'') not validated
+model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); '\''fm-intentionally-absent-model-index-guard'\'' (role '\''absent'\'') not validated
+model-index: active ids checked; none absent or retired)'
+not ok - omp omp/18.4.5: absent id was accepted (model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'google/antigravity-preview-05-2026' (role 'live') not validated
+model-index: notice: omp catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'fm-intentionally-absent-model-index-guard' (role 'absent') not validated
+model-index: active ids checked; none absent or retired)
++ exit 1
++ fm_test_cleanup
++ local d
++ fm_test_reap_watchers
++ local state lock_home 'seen=
+'
++ '[' -f /Users/charlesabrooker/tmp/.fm-test-watcher.33448.UXb84P ']'
++ IFS=
++ read -r state
++ rm -f /Users/charlesabrooker/tmp/.fm-test-watcher.33448.UXb84P
++ fm_test_reap_procevent_homes
++ local home claim_root 'seen=
+'
++ '[' -f /Users/charlesabrooker/tmp/.fm-test-procevent.33448.kqg9d8 ']'
++ IFS='	'
++ read -r home claim_root
++ rm -f /Users/charlesabrooker/tmp/.fm-test-procevent.33448.kqg9d8
++ for d in '"${FM_TEST_CLEANUP_DIRS[@]:-}"'
++ '[' -n '' ']'
++ '[' -f /Users/charlesabrooker/tmp/.fm-test-cleanup.33448.5niqhi ']'
++ IFS=
++ read -r d
++ '[' -n /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I ']'
++ fm_test_remove_tree /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++ local dir=/Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++ '[' -d /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I ']'
++ '[' '!' -L /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I ']'
++ find /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I -type d -exec chmod u+rwx '{}' +
++ rm -rf /Users/charlesabrooker/tmp/fm-model-index-live.WOKK4I
++ IFS=
++ read -r d
++ rm -f /Users/charlesabrooker/tmp/.fm-test-cleanup.33448.5niqhi

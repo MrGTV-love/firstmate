@@ -1,0 +1,27 @@
+$ bin/fm-brief.sh r2-codex demo --scout
+exit=0
+$ bin/fm-spawn.sh r2-codex /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo --scout --harness codex --model role:opus-grade
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XBUIX6
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+spawned r2-codex harness=codex kind=scout window=primary:fm-r2-codex worktree=/Users/charlesabrooker/.treehouse/demo-46f839/1/demo
+exit=0
+
+$ grep -E '^(harness|kind|model|effort)=' state/r2-codex.meta
+harness=codex
+kind=scout
+model=gpt-6.1-sol
+effort=default
+
+$ launch script codex flag (/tmp/fm-r2-codex+ac7e9ff14064a4a6965b7df66d92f306ae62140649ad6107bc49e78c9b0046fc/launch.s1790813450.15395.22259.sh)
+codex --model 'gpt-6.1-sol'
+
+$ tmux capture-pane -t primary:fm-r2-codex (real codex CLI started; folder-trust prompt left unanswered to avoid editing ~/.codex config)
+  Folder access
+  /Users/charlesabrooker/.treehouse/demo-46f839/1/demo
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/tmp/fm-lab.XBUIX6/projects/demo
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+› 1. Trust and continue
+  2. Quit
+  enter continue · esc quit

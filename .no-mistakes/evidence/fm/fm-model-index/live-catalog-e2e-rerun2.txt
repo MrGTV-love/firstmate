@@ -1,0 +1,2 @@
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.286 (Claude Code): catalog id accepted; absent id refused

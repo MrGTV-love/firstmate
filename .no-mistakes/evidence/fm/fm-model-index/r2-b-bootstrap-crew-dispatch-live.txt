@@ -1,0 +1,23 @@
+# R2-B: session-start bootstrap in the lab home; index = {"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-opus-5-5"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}}},"retired":["gpt-6-sol","claude-sonnet-5-5"]}
+
+## B1: role-named dispatch resolves to concrete ids
+$ crew-dispatch.json: {"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","role":"opus-grade","effort":"high"},{"harness":"codex","role":"opus-grade","effort":"high"}]},{"when":"trivial edit","use":{"harness":"codex","role":"easy","effort":"low"}}],"default":{"harness":"codex","role":"sonnet-grade","effort":"medium"}}
+$ FM_BOOTSTRAP_NETWORK=skip bin/fm-bootstrap.sh | grep -i 'crew.dispatch'
+
+## B2: dispatch names role fast the index lacks
+$ crew-dispatch.json: {"default":{"harness":"codex","role":"fast","effort":"high"}}
+$ FM_BOOTSTRAP_NETWORK=skip bin/fm-bootstrap.sh | grep -i 'crew.dispatch'
+CREW_DISPATCH: invalid config/crew-dispatch.json - jq: error (at /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/crew-dispatch.json:1): role or stand-in not configured: codex:fast
+
+## B3: dispatch names now-retired literal claude-sonnet-5-5
+$ crew-dispatch.json: {"default":{"harness":"claude","model":"claude-sonnet-5-5","effort":"high"}}
+$ FM_BOOTSTRAP_NETWORK=skip bin/fm-bootstrap.sh | grep -i 'crew.dispatch'
+CREW_DISPATCH: invalid config/crew-dispatch.json - jq: error (at /Users/charlesabrooker/tmp/fm-lab.XBUIX6/config/crew-dispatch.json:1): retired model: claude-sonnet-5-5
+
+## B1 (verbose facts): role-named dispatch reported with concrete ids, no CREW_DISPATCH error
+$ crew-dispatch.json: {"rules":[{"when":"big ambiguous work","use":[{"harness":"claude","role":"opus-grade","effort":"high"},{"harness":"codex","role":"opus-grade","effort":"high"}]},{"when":"trivial edit","use":{"harness":"codex","role":"easy","effort":"low"}}],"default":{"harness":"codex","role":"sonnet-grade","effort":"medium"}}
+$ FM_BOOTSTRAP_VERBOSE_FACTS=1 FM_BOOTSTRAP_NETWORK=skip bin/fm-bootstrap.sh | grep -i 'crew.dispatch'
+BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json
+BOOTSTRAP_INFO: crew dispatch rule: big ambiguous work -> quota-balanced[claude/opus/high, codex/gpt-6.1-sol/high]
+BOOTSTRAP_INFO: crew dispatch rule: trivial edit -> codex/gpt-6-luna/low
+BOOTSTRAP_INFO: crew dispatch default: codex/gpt-6.1-sol/medium

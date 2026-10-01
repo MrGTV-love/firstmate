@@ -1,0 +1,26 @@
+# S2: fm-spawn.sh mi-scout <demo> --scout --harness codex --model role:opus-grade (real lab tmux, real codex)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+spawned mi-scout harness=codex kind=scout window=primary:fm-mi-scout worktree=/Users/charlesabrooker/.treehouse/demo-67b433/1/demo
+exit=0
+
+$ grep model/harness state/mi-scout.meta
+harness=codex
+kind=scout
+model=gpt-6.1-sol
+effort=default
+
+$ tmux capture-pane -t primary:fm-mi-scout (live codex worker)
+treehouse get
+charlesabrooker@GTT-CB demo % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.0
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-67b433/1/demo. Type 'exit' to return.
+cd -- '/Users/charlesabrooker/.treehouse/demo-67b433/1/demo'
+charlesabrooker@GTT-CB demo % cd -- '/Users/charlesabrooker/.treehouse/demo-67b433/1/demo'
+charlesabrooker@GTT-CB demo % export GOTMPDIR=/tmp/fm-mi-scout/gotmp
+charlesabrooker@GTT-CB demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB demo % export FM_TASK_ID=mi-scout
+charlesabrooker@GTT-CB demo % . '/tmp/fm-mi-scout+5eeac6cc9e67bf636a8c0867213df18ae321381627678eca895b2eafda353c87/launch.s1790805967.71216.6752.sh'
+Error: account/read failed during TUI bootstrap: account/read failed: workspace routing discovery timed out (code -32603)
+charlesabrooker@GTT-CB demo %

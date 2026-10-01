@@ -1,0 +1,37 @@
+# FINDING: live Claude catalog check falsely refuses the canonical id claude-sonnet-5-5
+
+$ fm-relaunch transcript (index easy.claude=claude-sonnet-5-5):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+model-index: id 'claude-sonnet-5-5' absent or retired in claude catalog (role 'easy')
+exit=1
+
+$ live Claude picker (SDK initialize) value -> resolvedModel:
+default -> claude-opus-5-5
+opus -> claude-opus-5-5
+claude-fable-5-1 -> claude-fable-5-1
+sonnet -> claude-sonnet-5-5[1m]
+haiku -> claude-haiku-4-5-20251001
+claude-sonnet-5 -> claude-sonnet-5
+claude-opus-5 -> claude-opus-5
+claude-fable-5 -> claude-fable-5
+claude-opus-4-8 -> claude-opus-4-8
+claude-opus-4-7 -> claude-opus-4-7
+claude-opus-4-6 -> claude-opus-4-6
+claude-sonnet-4-6 -> claude-sonnet-4-6
+
+$ claude -p --model claude-sonnet-5-5 "Reply with the single word ok."
+{"is_error":false,"result":"ok","models":["claude-sonnet-5-5"]}   (run at 2026-09-30 in this session)
+
+$ index {sonnet-grade: {claude: claude-sonnet-5-5}}; fm-model-index.sh check
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5' (role 'sonnet-grade') not validated
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ same check with FM_MODEL_CATALOG_DIR holding the live Claude listing normalized exactly as the adapter does (host load makes the 30s live read time out intermittently):
+["claude-fable-5","claude-fable-5-1","claude-haiku-4-5-20251001","claude-opus-4-6","claude-opus-4-7","claude-opus-4-8","claude-opus-5","claude-opus-5-5","claude-sonnet-4-6","claude-sonnet-5","claude-sonnet-5-5[1m]","default","haiku","opus","sonnet"]
+model-index: id 'claude-sonnet-5-5' absent or retired in claude catalog (role 'sonnet-grade')
+exit=2
+
+$ contrast: claude-sonnet-5-5[1m] in the index passes
+model-index: active ids checked; none absent or retired
+exit=0

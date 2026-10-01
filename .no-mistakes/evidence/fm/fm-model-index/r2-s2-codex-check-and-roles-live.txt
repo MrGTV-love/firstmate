@@ -1,0 +1,46 @@
+# R2-S2: live Codex catalog (~/.codex/models_cache.json) + role resolution, FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XBUIX6
+$ live codex slugs:
+["gpt-6.1-sol","gpt-6-astra","gpt-6-sol","gpt-6-luna","gpt-reserve","gpt-5.6-sol","gpt-5.6-terra","gpt-5.6-luna","gpt-5.5","codex-auto-review"]
+
+$ cat config/model-index.json
+{"version":1,"roles":{"opus-grade":{"claude":{"model":"opus"},"codex":{"model":"gpt-6.1-sol"}},"sonnet-grade":{"claude":{"model":"claude-sonnet-5-5[1m]"},"codex":{"model":"gpt-6.1-sol","stand_in":"gpt-5.6-terra"}},"easy":{"claude":{"model":"haiku"},"codex":{"model":"gpt-6-luna"}}},"retired":["gpt-6-sol"]}
+
+$ fm-model-index.sh check codex
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ fm-model-index.sh model codex role:opus-grade
+gpt-6.1-sol
+exit=0
+$ fm-model-index.sh model codex stand-in:sonnet-grade
+gpt-5.6-terra
+exit=0
+$ fm-model-index.sh model claude role:sonnet-grade
+claude-sonnet-5-5[1m]
+exit=0
+$ fm-model-index.sh model codex role:fast   (unknown role)
+jq: error (at <stdin>:4): role or stand-in not configured: codex:fast
+exit=5
+$ fm-model-index.sh model codex gpt-6-sol   (retired literal)
+model-index: warning: literal model 'gpt-6-sol' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+exit=5
+$ fm-model-index.sh model codex gpt-5.5   (literal, not index entry)
+model-index: warning: literal model 'gpt-5.5' for codex is not an index entry; name its role so the next model release is one index edit
+gpt-5.5
+exit=0
+
+# adversarial: typo id gpt-6.2-sol in an index edit
+$ fm-model-index.sh check codex
+model-index: id 'gpt-6.2-sol' absent or retired in codex catalog (role 'opus-grade')
+exit=2
+
+# adversarial: retired id gpt-6-sol put back into a role
+$ fm-model-index.sh check codex
+model-index: retired id 'gpt-6-sol' in role 'easy' (codex)
+exit=2
+
+# adversarial: retired base with [1m] suffix
+$ fm-model-index.sh check codex
+model-index: retired id 'gpt-6-sol[1m]' in role 'easy' (codex)
+exit=2

@@ -1,0 +1,4 @@
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.286 (Claude Code): catalog id accepted; absent id refused
+not ok - omp omp/18.4.5: its own listing named no model
+FM_MODEL_INDEX_LIVE_E2E=1 bash tests/fm-model-index-live-e2e.test.sh  2.22s user 1.19s system 5% cpu 1:02.34 total

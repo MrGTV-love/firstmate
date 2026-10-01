@@ -1,0 +1,34 @@
+# R: role / stand-in resolution and retired-list guard through the public CLI (lab index v2, retired: gpt-6-sol, haiku)
+$ fm-model-index.sh model codex role:opus-grade
+gpt-6.1-sol
+exit=0
+$ fm-model-index.sh model claude role:opus-grade
+opus[1m]
+exit=0
+$ fm-model-index.sh model pi role:sonnet-grade
+openai-codex/gpt-5.5
+exit=0
+$ fm-model-index.sh model pi stand-in:sonnet-grade
+openai-codex/gpt-5.4-mini
+exit=0
+$ fm-model-index.sh model codex stand-in:opus-grade
+jq: error (at <stdin>:5): role or stand-in not configured: codex:opus-grade
+exit=5
+$ fm-model-index.sh model codex role:no-such-role
+jq: error (at <stdin>:4): role or stand-in not configured: codex:no-such-role
+exit=5
+$ fm-model-index.sh model codex gpt-6-sol
+model-index: warning: literal model 'gpt-6-sol' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+exit=5
+$ fm-model-index.sh check codex gpt-6-sol
+model-index: retired id 'gpt-6-sol' selected (codex)
+exit=2
+$ fm-model-index.sh check pi openai-codex/gpt-6-sol
+model-index: retired id 'openai-codex/gpt-6-sol' selected (pi)
+exit=2
+$ fm-model-index.sh check claude haiku[1m]
+model-index: retired id 'haiku[1m]' selected (claude)
+exit=2
+$ fm-model-index.sh check codex gpt-6.1-sol
+exit=0

@@ -1,0 +1,53 @@
+# R2-S1: live Claude catalog check (SDK initialize) at commit 7190adb, lab home FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XBUIX6
+$ live Claude picker value -> resolvedModel
+default -> claude-opus-5-5
+opus -> claude-opus-5-5
+claude-fable-5-1[1m] -> claude-fable-5-1
+sonnet -> claude-sonnet-5-5[1m]
+haiku -> claude-haiku-4-5-20251001
+
+$ index claude entry: claude-sonnet-5-5
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5' (role 'sonnet-grade') not validated
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: claude-sonnet-5-5[1m]
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: opus
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'opus' (role 'sonnet-grade') not validated
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: claude-sonnet-5-9
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-9' (role 'sonnet-grade') not validated
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: claude-sonnet-5-9[1m]
+model-index: id 'claude-sonnet-5-9[1m]' absent or retired in claude catalog (role 'sonnet-grade')
+exit=2
+
+$ index claude entry: claude-sonnet-5-5
+  retired=["claude-sonnet-5-5"]
+model-index: retired id 'claude-sonnet-5-5' in role 'sonnet-grade' (claude)
+exit=2
+
+# retries where the live listing was read (earlier attempts hit the 30s bound under host load and passed with a notice by design)
+$ index claude entry: claude-sonnet-5-5   (catalog read on attempt 1)
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: opus   (catalog read on attempt 1)
+model-index: active ids checked; none absent or retired
+exit=0
+
+$ index claude entry: claude-sonnet-5-9   (catalog read on attempt 1)
+model-index: id 'claude-sonnet-5-9' absent or retired in claude catalog (role 'sonnet-grade')
+exit=2
+
+$ index claude entry: haiku   (catalog read on attempt 1)
+model-index: active ids checked; none absent or retired
+exit=0
+

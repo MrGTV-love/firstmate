@@ -1,0 +1,41 @@
+# S6: next model release = one index edit. Only change: config/model-index.json easy.claude haiku -> claude-sonnet-5-5[1m] (+ retired haiku). crew-dispatch.json and the call stay role-named.
+$ diff model-index v1 -> v2 (semantic)
+3c3,4
+<     "gpt-6-sol"
+---
+>     "gpt-6-sol",
+>     "haiku"
+8c9
+<         "model": "haiku"
+---
+>         "model": "claude-sonnet-5-5[1m]"
+
+$ fm-control.sh mi-claude relaunch --model role:easy --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5[1m]' (role 'sonnet-grade') not validated
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yZS74j
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-sonnet-5-5[1m]' (role 'sonnet-grade') not validated
+relaunched mi-claude harness=claude from=claude model=claude-sonnet-5-5[1m] effort=low backend=tmux endpoint=primary:fm-mi-claude worktree=/Users/charlesabrooker/.treehouse/demo-67b433/2/demo
+exit=0
+
+$ state/mi-claude.meta
+harness=claude
+model=claude-sonnet-5-5[1m]
+effort=low
+
+$ tmux capture-pane -t primary:fm-mi-claude (replacement worker)
+ ▐▛███▛█   Claude Code v2.1.286
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Max
+ ▝▝   ▝▝   ~/.treehouse/demo-67b433/2/demo
+⚠ Your login expires in 2 days · run /login to renew
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-lab.yZS74j/state/operational-inbox/1790807353-c679f1a3c4f5cf6c.msg' and handle its contents as Firstmate operational
+  input.
+✶ Cascading… (running UserPromptSubmit hook · 20s)
+                                                                                                  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1 to keep future transcripts
+  Sonnet 5.5 ░░░░░░░░░░ 0% 0/0 demo:1e52e46d
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

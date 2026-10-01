@@ -1,0 +1,12 @@
+ok - roles select the correct harness id and only explicitly configured stand-ins
+ok - one index edit changes the next selection; literal ids work but warn while an index exists
+ok - retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude suffixes match their listed base
+ok - the index-edit check refuses any absent id; a selected-entry check reads only its own entry
+ok - unavailable, empty, undiscoverable, and extension-provider catalogs are notices; a listed provider with an absent id refuses
+ok - conflicting profile axes and misspelled index fields are actionable errors
+ok - homes without an index keep literal compatibility but cannot resolve roles
+model-index: active ids checked; none absent or retired
+ok - native Codex, Claude initialization with a context-suffixed alias, omp selector, and padded, colored Cursor catalogs are checked
+ok - secondmate inheritance changes the model selected by the destination home
+ok - fm-config-push withholds an index with an absent id together with its dispatch profiles, pushes with a notice when catalogs are unreadable, pushes a valid pair, and reads each catalog under only its own worker account pin
+# all fm-model-index tests passed
