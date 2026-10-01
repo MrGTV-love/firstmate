@@ -108,17 +108,20 @@ JSON
 cat > "$FAKEBIN/curl" <<'SH'
 #!/usr/bin/env bash
 # Fake curl: records argv (minus the -o target), the stdin body, and the header
-# read from fd 3, then answers with FAKE_CURL_RESPONSE and FAKE_CURL_HTTP.
+# read from fd 3, then answers with FAKE_CURL_RESPONSE and FAKE_CURL_HTTP. Like
+# real curl, it renders the -w template even when the transfer fails, reporting
+# FAKE_CURL_DELAY as its own transfer time.
 set -u
 if [ -n "${TYPESAFE_API_KEY+x}" ] || [ -n "${TYPESAFE_API_KEY_PRIVATE+x}" ]; then
   printf 'curl:secret-present\n' >> "${CHILD_ENV_LOG:?}"
 else
   printf 'curl:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
-out=''
+out='' write=''
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift 2 ;;
+    -w) write=$2; printf '%s\n%s\n' "$1" "$2" >> "${FAKE_CURL_LOG:?}/argv"; shift 2 ;;
     *) printf '%s\n' "$1" >> "${FAKE_CURL_LOG:?}/argv"; shift ;;
   esac
 done
@@ -128,11 +131,14 @@ cat /dev/fd/3 > "$FAKE_CURL_LOG/header" 2>/dev/null || printf 'fd3 unreadable\n'
 if [ -n "${FAKE_CURL_MUTATE_SOURCE:-}" ]; then
   cp "$FAKE_CURL_MUTATE_SOURCE" "${FAKE_CURL_MUTATE_TARGET:?}"
 fi
+status=${FAKE_CURL_HTTP:-200}
+[ "${FAKE_CURL_FAIL:-0}" = 1 ] && status=000
+write=${write//'%{http_code}'/$status}
+printf '%s' "${write//'%{time_total}'/${FAKE_CURL_TIME_TOTAL:-${FAKE_CURL_DELAY:-0}}}"
 if [ "${FAKE_CURL_FAIL:-0}" = 1 ]; then
   exit 7
 fi
 cp "${FAKE_CURL_RESPONSE:?}" "$out"
-printf '%s' "${FAKE_CURL_HTTP:-200}"
 SH
 chmod +x "$FAKEBIN/curl"
 
@@ -271,6 +277,7 @@ esac
 [ "$api_ms" -ge 120 ] || fail "API delay lost millisecond precision: $api_ms"
 [ "$quota_ms" -ge 240 ] || fail "quota delay lost millisecond precision: $quota_ms"
 assert_equals "$total_ms" "$(( api_ms + quota_ms + local_ms ))" "stages account for total time exactly"
+assert_equals 120 "$api_ms" "API time is curl's own transfer time, without helper startup"
 assert_contains "$out" "latency_ms: $api_ms" "legacy latency still measures only the API"
 assert_contains "$out" 'model: jev-1.13.0' "returned model id remains observable"
 assert_equals 812 "$(telemetry_field "$out" input_tokens)" "usage reports input tokens"
@@ -284,22 +291,56 @@ assert_not_contains "$out$err" 'off-by-one in the pager' "timing and cost output
 assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "timing does not add quota snapshots"
 pass "stock Bash resolver separates API, quota, local and total timing, with input-only Jev cost"
 
-# A backwards wall clock must not affect monotonic stamps. Comparing against
-# the independent host clock also rejects the old seconds-since-epoch fallback.
+# Without EPOCHREALTIME, as on stock macOS Bash 3.2, stamps still come from the
+# epoch clock at millisecond precision. A fake whole-second `date` proves the
+# coarse fallback is not what answered.
 cat > "$FAKEBIN/date" <<'SH'
 #!/usr/bin/env bash
 printf '1\n'
 SH
 chmod +x "$FAKEBIN/date"
 clock_ms=$(PATH="$FAKEBIN:$BASE_PATH" /bin/bash -c \
-  '. "$1"; EPOCHREALTIME=1.000; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
-perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e '
+  '. "$1"; unset EPOCHREALTIME; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
+perl -MTime::HiRes=time -e '
   my $stamp = shift;
-  my $now = int(clock_gettime(CLOCK_MONOTONIC) * 1000);
-  exit !($stamp <= $now && $now - $stamp < 10000);
-' "$clock_ms" || fail "Bash timer did not use the monotonic clock: $clock_ms"
+  my $now = int(time * 1000);
+  exit !($stamp =~ /\A[0-9]+\z/ && $stamp <= $now && $now - $stamp < 10000);
+' "$clock_ms" || fail "Bash timer without EPOCHREALTIME did not use the epoch ms clock: $clock_ms"
 rm -f "$FAKEBIN/date"
-pass "stock Bash timing uses the monotonic host clock rather than wall time"
+pass "stock Bash timing uses the host epoch clock at millisecond precision"
+
+# Where the shell has EPOCHREALTIME, the timer reads it without starting Perl.
+cat > "$FAKEBIN/perl" <<'SH'
+#!/usr/bin/env bash
+printf 'perl\n' >> "${FAKE_CURL_LOG:?}/perl.calls"
+exit 1
+SH
+chmod +x "$FAKEBIN/perl"
+reset_log
+if PATH="$FAKEBIN:$BASE_PATH" bash -c '[ -n "${EPOCHREALTIME:-}" ]'; then
+  clock_ms=$(PATH="$FAKEBIN:$BASE_PATH" bash -c \
+    '. "$1"; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
+  rm -f "$FAKEBIN/perl"
+  perl -MTime::HiRes=time -e '
+    my $stamp = shift;
+    my $now = int(time * 1000);
+    exit !($stamp =~ /\A[0-9]+\z/ && $stamp <= $now && $now - $stamp < 10000);
+  ' "$clock_ms" || fail "EPOCHREALTIME timer did not read the epoch ms clock: $clock_ms"
+  assert_absent "$LOG/perl.calls" "EPOCHREALTIME timing starts no Perl process"
+  pass "EPOCHREALTIME timing stays on the builtin fast path"
+else
+  rm -f "$FAKEBIN/perl"
+  printf 'skip: bash on PATH has no EPOCHREALTIME\n'
+fi
+
+# A curl that reports no transfer time leaves API time unknown, never invented.
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_TIME_TOTAL=unknown run code out err "$BRIEF"
+expect_code 0 "$code" "unparseable curl time exits 0"
+assert_contains "$out" '  status: clear' "unparseable curl time does not change resolution"
+assert_equals null "$(telemetry_field "$out" api_ms)" "unparseable curl time is unknown API time"
+assert_contains "$out" 'latency_ms: -' "legacy latency is unknown with API time"
+pass "missing curl transfer time is reported as unknown"
 
 # Missing usage is not fabricated as zero, and a quota failure still reports
 # the paid API call while marking only the snapshot as failed.
@@ -993,7 +1034,7 @@ assert_contains "$err" 'dispatch-resolve: error (http 429' "error also goes to s
 reset_log
 TYPESAFE_API_KEY=$KEY FAKE_CURL_FAIL=1 run code out err "$BRIEF"
 expect_code 0 "$code" "curl failure exits 0"
-assert_contains "$out" '  reason: http 000 after' "transport failure reads as http 000"
+assert_contains "$out" '  reason: http 000 after 0 ms' "transport failure reads as http 000 with curl's elapsed time"
 reset_log
 printf '%s\n' '{"model":"jev","answers":{}}' > "$RESPONSE"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
