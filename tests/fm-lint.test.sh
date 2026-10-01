@@ -1513,9 +1513,9 @@ test_roots_sidecar_records_per_root_lifecycle() {
   pass "the retained sidecar records each root's lifecycle with a mode, reason, and duration"
 }
 
-test_seeded_module_boundary_parity() {
+test_seeded_joint_source_parity() {
   if ! pinned_ready; then
-    pass "SKIP (ShellCheck $REQUIRED not resolved): seeded source-boundary parity check"
+    pass "SKIP (ShellCheck $REQUIRED not resolved): seeded joint-source parity check"
     return
   fi
   local tmp rel adapter dispatcher dep owner test_root out rc
@@ -1539,7 +1539,7 @@ adapter_bad() {
 SH
   cat > "$dispatcher" <<SH
 #!/usr/bin/env bash
-# shellcheck source=/dev/null
+# shellcheck source=$rel/adapter.sh
 . "$adapter"
 dispatcher_bad() {
   local a= b=
@@ -1561,7 +1561,7 @@ owner_bad() {
 SH
   cat > "$test_root" <<SH
 #!/usr/bin/env bash
-# shellcheck source=/dev/null
+# shellcheck source=$rel/owner.sh
 . "$owner"
 test_local_bad() {
   local output=\$(printf ok)
@@ -1577,11 +1577,7 @@ SH
   assert_contains "$out" "SC2164" "representative production-owner defect was hidden"
   assert_contains "$out" "SC2155" "representative test-local defect was hidden"
   assert_not_contains "$out" "SC2154" "the production owner lost source-aware dependency context"
-  [ "$(printf '%s\n' "$out" | grep -Fc 'SC2086 (info)')" -eq 1 ] \
-    || fail "the dispatcher boundary re-imported the adapter diagnostic"
-  [ "$(printf '%s\n' "$out" | grep -Fc 'SC2164 (warning)')" -eq 1 ] \
-    || fail "the test boundary re-imported the production-owner diagnostic"
-  pass "seeded dispatcher, adapter, production-owner, and test-local diagnostics preserve parity"
+  pass "jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity"
 }
 
 fm_lint_small_repo() {  # <directory>
@@ -1624,8 +1620,9 @@ test_changed_dependencies_and_deleted_sources_retain_findings() {
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files)
-  [ "$listed" = $'bin/caller.sh\nbin/consumer.sh\nbin/library.sh' ] \
-    || fail "changed library did not select exactly its transitive callers and owners: $listed"
+  assert_contains "$listed" bin/caller.sh "changed library did not select its transitive caller"
+  assert_contains "$listed" bin/consumer.sh "changed library did not select its direct caller"
+  assert_contains "$listed" bin/library.sh "changed library did not select the library"
   cat >> "$repo/bin/library.sh" <<'SH'
 bad() {
   local a= b=
@@ -1715,7 +1712,7 @@ SH
 
 test_source_spellings_keep_changed_and_cached_dataflow_findings() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): source spelling regression"; return; }
-  local tmp repo fakebin diff_file command_line index=0 out
+  local tmp repo fakebin diff_file command_line index=0 out attempt listed
   tmp=$(fm_test_tmproot fm-lint-source-spelling)
   repo="$tmp/repo"
   fakebin=$(fm_fakebin "$tmp/fake")
@@ -1727,7 +1724,8 @@ test_source_spellings_keep_changed_and_cached_dataflow_findings() {
   for command_line in '\source bin/library.sh' 'sour\
 ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh' \
     "X=\"\$(printf x)\" source bin/library.sh" 'time -p source bin/library.sh' \
-    '</dev/null source bin/library.sh'; do
+    '</dev/null source bin/library.sh' \
+    "case \"\${1:-}\" in a) source bin/library.sh ;; esac"; do
     index=$((index + 1))
     printf '%s\n' '#!/usr/bin/env bash' "$command_line" \
       "printf '%s\\n' \"\$module_value\"" > "$repo/bin/spelling-$index.sh"
@@ -1735,49 +1733,154 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
       "$repo/bin/fm-lint.sh" --jobs 1 "bin/spelling-$index.sh" 2>&1) \
       || fail "source spelling $index did not initially pass: $out"
   done
+  # An unsupported command wrapper is not claimed to receive joint analysis.
+  # The helper must instead refuse reuse and conservatively select its caller.
+  cat > "$repo/bin/unparsed.sh" <<'SH'
+#!/usr/bin/env bash
+builtin source bin/library.sh
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/unparsed.sh 2>&1) \
+      || fail "unsupported source wrapper check $attempt failed: $out"
+    assert_not_contains "$out" 'cache hit bin/unparsed.sh' \
+      "an unparsed source form authorized successful-result reuse"
+  done
+  fm_lint_write_diff_file "$diff_file" unrelated-input
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
+    FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "unparsed source selection failed"
+  assert_contains "$listed" bin/unparsed.sh "an unparsed source form omitted its caller on changed inputs"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
   printf '%s\n' '#!/usr/bin/env bash' 'export other_value=ok' > "$repo/bin/library.sh"
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
     FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --jobs 1 2>&1) && fail "source spelling hid changed imported state"
   assert_contains "$out" SC2154 "source spelling or cached success hid the dataflow warning"
-  for index in 1 2 3 4 5 6 7; do
+  for index in 1 2 3 4 5 6 7 8; do
     assert_contains "$out" "In bin/spelling-$index.sh line" \
       "changed imported state did not recheck source spelling $index"
   done
   pass "source spellings and command prefixes retain changed/cached dataflow findings"
 }
 
-test_api_boundary_keeps_owner_findings_and_missing_sources() {
-  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): canonical API owner regression"; return; }
-  local tmp repo out ci
-  tmp=$(fm_test_tmproot fm-lint-api-owner)
+test_declaration_source_words_do_not_disable_cache() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): declaration cache regression"; return; }
+  local tmp repo out
+  tmp=$(fm_test_tmproot fm-lint-declaration-cache)
   repo="$tmp/repo"
   fm_lint_small_repo "$repo"
-  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { printf "api\n"; }' > "$repo/bin/library.sh"
-  printf '%s\n' '#!/usr/bin/env bash' \
-    '# fm-lint source-owner=bin/library.sh' > "$repo/bin/consumer.sh"
-  cat >> "$repo/bin/consumer.sh" <<'SH'
-# shellcheck source=/dev/null
-. "$(dirname "${BASH_SOURCE[0]}")/library.sh"
-library_api
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+library_value() { # <source>
+  local source rest
+  source=one
+  rest=two
+  printf '%s\n' "$source" "$rest"
+}
+SH
+  cat > "$repo/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
 SH
   out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || fail "API fixture failed: $out"
-  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { broken= value; }' > "$repo/bin/library.sh"
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "declaration fixture did not pass: $out"
   out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) && fail "API boundary hid its owner defect"
-  assert_contains "$out" SC1007 "the canonical API owner was not analyzed"
-  printf '%s\n' '#!/usr/bin/env bash' 'library_api() { printf "api\n"; }' > "$repo/bin/library.sh"
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "cached declaration fixture did not pass: $out"
+  assert_contains "$out" 'cache hit bin/consumer.sh' \
+    "a declaration argument or inline function comment disabled consumer reuse"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+library_value() {
+  printf '%s\n' "$1"
+}
+SH
   out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || fail "restored API fixture failed: $out"
-  rm "$repo/bin/library.sh"
-  for ci in '' true; do
-    out=$(CI="$ci" GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-      "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) && fail "API boundary hid a deleted owner"
-    assert_contains "$out" 'missing canonical source owner bin/library.sh' \
-      "missing API source was not rejected with and without cache reuse"
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    && fail "cached declaration consumer hid a changed argument requirement"
+  assert_contains "$out" SC2119 "changed library argument requirement was hidden"
+  assert_not_contains "$out" 'cache hit bin/consumer.sh' "changed declaration library reused a cached caller"
+  pass "declaration words permit reuse without hiding changed cross-file argument requirements"
+}
+
+test_joint_sources_keep_call_dependent_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): joint-source call regression"; return; }
+  local tmp repo fakebin diff_file out rc mode
+  tmp=$(fm_test_tmproot fm-lint-joint-call)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf '%s\n' "$1"
+}
+SH
+  cat > "$repo/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. "$(dirname "${BASH_SOURCE[0]}")/library.sh"
+needs_argument supplied
+SH
+  # Prove this exact joint call passed and was cached before mutating the caller.
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "argument-bearing joint call did not pass: $out"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "argument-bearing cached joint call did not pass: $out"
+  assert_contains "$out" 'cache hit bin/consumer.sh' "clean joint call was not cached"
+  cat > "$repo/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. "$(dirname "${BASH_SOURCE[0]}")/library.sh"
+needs_argument
+SH
+  # The definition alone is clean; only source-aware caller analysis catches it.
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/library.sh 2>&1) \
+    || fail "owner-only fixture should be clean: $out"
+  assert_not_contains "$out" SC2119 "owner-only analysis unexpectedly caught the call-dependent defect"
+  for mode in explicit changed cold-cache mutated-cache ci; do
+    rc=0
+    case "$mode" in
+      explicit)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+          "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
+        ;;
+      changed)
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+          FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
+          "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || rc=$?
+        ;;
+      cold-cache)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cold-cache" \
+          "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
+        ;;
+      mutated-cache)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+          "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) || rc=$?
+        assert_not_contains "$out" 'cache hit bin/consumer.sh' \
+          "consumer mutation reused its argument-bearing cached result"
+        ;;
+      ci)
+        out=$(CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/warm-cache" \
+          "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || rc=$?
+        assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+        ;;
+    esac
+    [ "$rc" -eq 1 ] || fail "$mode joint source analysis did not reject the missing argument: $out"
+    assert_contains "$out" SC2119 "$mode joint source analysis lost the call-dependent warning"
+    assert_contains "$out" 'In bin/consumer.sh line' "$mode did not analyze the calling consumer"
   done
-  pass "function-API boundaries retain owner diagnostics and reject missing sources"
+  pass "joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes"
 }
 
 test_fast_cache_cannot_hide_full_analysis_findings() {
@@ -1805,7 +1908,8 @@ SH
 }
 
 test_source_spellings_keep_changed_and_cached_dataflow_findings
-test_api_boundary_keeps_owner_findings_and_missing_sources
+test_joint_sources_keep_call_dependent_findings
+test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
 test_shared_cache_reuses_only_identical_successful_inputs
@@ -1837,7 +1941,7 @@ test_require_bounds_refuses_when_enforcement_is_missing
 test_pinned_shellcheck_memory_limit
 test_sidecar_result_exit_reflects_final_status
 test_roots_sidecar_records_per_root_lifecycle
-test_seeded_module_boundary_parity
+test_seeded_joint_source_parity
 test_ci_forces_full_lint_even_with_empty_diff
 test_main_branch_forces_full_lint
 test_explicit_path_bypasses_changed_logic

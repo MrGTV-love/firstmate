@@ -112,17 +112,17 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, reduced checks, or paid runner provisioning is part of this layout.
 
-Local branch selection includes changed shell files, their transitive sourcing callers, and imported canonical owners. Successful analyses are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies. CI never reuses that cache. The lint script's header owns the exact selection and cache controls.
+Local branch selection includes changed shell files, their transitive sourcing callers, and imported canonical libraries.
+Successful analyses are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
+CI never reuses that cache.
+The lint script's header owns the exact selection and cache controls.
 
-Function-only imports use explicit canonical source-owner boundaries rather than repeatedly expanding the same implementation into every caller. The owner is still checked with source-aware extended analysis, including for an explicit caller check, and a missing declared owner fails lint even when a prior success was cached. State-bearing imports stay source-followed. Regression fixtures exercise actual owner/caller findings, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+Dependency selection and cache reuse retain the roots' source directives rather than replacing joint source analysis with separate library checks.
+Checking a library separately cannot preserve diagnostics that depend on both a function definition and its caller.
+Regression fixtures exercise cross-file missing-argument findings, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
 
-A serial macOS arm64 before-profile with ShellCheck 0.11.0 covered all 449 canonical roots without findings: 3,219.630 seconds of summed per-root wall time and a maximum per-root RSS of 5,942.8 MiB. The largest roots were `tests/fm-stat-shadowing.test.sh` (5,942.8 MiB), `bin/fm-spawn.sh` (5,321.7 MiB), and `bin/fm-teardown.sh` (5,061.5 MiB). Repeated external-source expansion, rather than simultaneous root scheduling, was therefore sufficient to create multi-GiB lint processes.
-
-The matching after-profile checked the same 449 roots without findings: 3,000.704 seconds of summed per-root wall time and a maximum per-root RSS of 4,143.2 MiB, a 30.3% reduction in the largest process. `bin/fm-teardown.sh` fell from 5,061.5 to 4,143.2 MiB, `bin/fm-watch.sh` from 4,258.4 to 2,647.4 MiB, and `tests/fm-pending-reply.test.sh` from 4,717.3 to 2,623.8 MiB. This is a reduction, not a guarantee that cold roots fit a small-memory runner.
-
-The final real CLI smoke checked all 449 roots and all three workflows successfully both cold and warm. Its measured lint-stage wall time was 3,586 seconds cold and 968 seconds warm; peak per-root RSS was 3,834.0 and 1,101.9 MiB respectively. The warm run reused successful results while conservative unresolved-source cases still received analysis. Host load averages exceeded 90 during these runs, so their elapsed times are evidence of that execution, not a CI speed claim or a controlled comparison with the serial profile.
-
-These per-root macOS measurements are not Linux CI duration, aggregate concurrent RSS, or P95 evidence. macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
+Cold source-aware analysis can still require multi-GiB processes; cache reuse is a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
+macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
 
 The performance objective is a complete green run under fifteen minutes including start delay: roughly twelve minutes of longest-path execution, at most two minutes of runner delay, and less than one minute of other overhead.
 The candidate uses fourteen long-lived Linux jobs (nine serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.

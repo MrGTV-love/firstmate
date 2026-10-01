@@ -250,9 +250,7 @@ pass "later generations cannot invalidate an unacknowledged ingested result"
 # line reaches the parent stream, the new decision reaches the parent's
 # open-decision fold, the correlated line still settles its pending-reply record,
 # and the cursor advances so the channel cannot wedge on a line it once refused.
-# Function-only API; fm-lint.sh also checks bin/fm-pending-reply-lib.sh.
-# fm-lint source-owner=bin/fm-pending-reply-lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-pending-reply-lib.sh
 . "$ROOT/bin/fm-pending-reply-lib.sh"
 PENDING_CORR=$(fm_pending_reply_create "$PARENT" "$PARENT/state" ios 'audit the release chain')
 [ -n "$PENDING_CORR" ] || fail "could not create the parent pending-reply record"
