@@ -13,8 +13,7 @@
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.
 #
-# With no explicit paths, the file set and source-following posture depend
-# on context:
+# With no explicit paths, the file set depends on context:
 #   - In CI (GITHUB_ACTIONS=true or CI=true), on the main branch, or when no
 #     merge-base against origin/main (or local main) can be found, it lints
 #     the full canonical set: bin/*.sh bin/backends/*.sh tests/*.sh, with
@@ -26,10 +25,10 @@
 #     a separate root; its callers analyze it through their sources. A source
 #     expression that cannot be resolved adds no selection edge and disables
 #     cache reuse; CI's full set still analyzes that root.
-#     Changes to the lint owner select all. An empty set skips ShellCheck but
-#     still checks backend purity and workflows. A changed widely sourced
-#     library still costs a cold source-aware analysis of every caller; the
-#     cache only reuses identical inputs.
+#     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
+#     set skips ShellCheck but still checks backend purity and workflows. A
+#     changed widely sourced library still costs a cold source-aware analysis
+#     of every caller; the cache only reuses identical inputs.
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
@@ -42,6 +41,7 @@
 # Only successful, input-stable results are retained; findings always run again.
 # FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
 # "off" disables reuse. CI always disables reuse so every canonical root is checked.
+# Nothing prunes that directory; each key leaves small files until removed by hand.
 # A missing, unwritable or unresolvable cache falls back to real analysis.
 # --full selects the complete inventory locally without requiring CI=true.
 #
