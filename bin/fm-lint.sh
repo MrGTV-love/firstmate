@@ -7,10 +7,8 @@
 # their transitive sourcing callers, and their imported canonical libraries.
 # Every mode keeps --norc --external-sources and the same diagnostic rules.
 # --fast remains an explicit local-only opt-out from extended dataflow.
-# Function-only imports declare a `# fm-lint source-owner=path` boundary instead
-# of expanding the same graph into every caller. Selection includes that owner
-# as a separate source-aware root even for explicit paths; a missing owner fails.
-# Imports needed for exported-variable context remain source-followed.
+# Selection and cache reuse retain the roots' source directives and call-site
+# context; checking a library separately cannot replace joint source analysis.
 # The default (no explicit-path) path also runs bin/fm-lint-workflows.sh so a
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.

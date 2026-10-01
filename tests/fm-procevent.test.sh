@@ -13,8 +13,7 @@
 # runner is stored before it is announced.
 set -u
 
-# fm-lint source-owner=tests/lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

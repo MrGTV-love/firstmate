@@ -35,10 +35,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
 . "$ROOT/bin/fm-marker-lib.sh"
-# Function-only production API; fm-lint.sh also checks its canonical source-aware
-# owner. Keep the small marker library above for its exported-variable context.
-# fm-lint source-owner=bin/fm-pending-reply-lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-pending-reply-lib.sh
 . "$ROOT/bin/fm-pending-reply-lib.sh"
 
 SEND="$ROOT/bin/fm-send.sh"
@@ -793,8 +790,6 @@ test_restart_preserves_expectation_and_parent_destination() {
   parent_status=$(fm_pending_reply_get "$rec" parent_status)
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
   # A real fresh process must recover these fields without inherited functions.
-  # Re-sourcing in this process expanded the entire dependency graph twice in
-  # ShellCheck without actually testing recovery from a process restart.
   bash -c '
     . "$1/bin/fm-pending-reply-lib.sh"
     [ -f "$2" ] &&

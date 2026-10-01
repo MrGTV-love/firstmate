@@ -615,15 +615,11 @@ fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
-# Only the function API is consumed here, not the library's nudge-message constants.
-# fm-lint source-owner=bin/fm-secondmate-nudge-lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
-# Function-only control API; the backend's imported state remains analyzed above.
-# fm-lint source-owner=bin/fm-control-lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
@@ -633,9 +629,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
-# Function-only brief API; PR and classification state remain analyzed above.
-# fm-lint source-owner=bin/fm-dod-lib.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 # shellcheck source=bin/fm-trace-context-lib.sh
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"

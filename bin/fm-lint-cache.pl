@@ -6,8 +6,6 @@
 # ShellCheck retains source-aware extended analysis; only identical successful checks
 # are reused. flock serializes identical misses across worktrees, not unrelated roots.
 # Unknown source forms disable reuse and conservatively select the root on changes.
-# `# fm-lint source-owner=path` declares a separately checked function-API owner.
-# Its content remains a selection/cache input; a missing owner still fails lint.
 #
 use Cwd qw(abs_path);
 use strict;
@@ -25,7 +23,7 @@ if (defined $mode && $mode eq 'check') {
 die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'expand' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
-my (%text, %edges, %unknown, %owners);
+my (%text, %edges, %unknown);
 # ShellCheck recognizes escaped keywords and backslash-newline continuations.
 my $source_command = qr/(?:\\\n)*(?:\\?s(?:\\\n)*\\?o(?:\\\n)*\\?u(?:\\\n)*\\?r(?:\\\n)*\\?c(?:\\\n)*\\?e|\\?\.)(?:\\\n)*/;
 my $prefix_word = qr/(?:"(?:\\.|[^"\\])*"|'[^']*'|\$\([^)]*\)|\\(?:.|\n)|[^\s;()<>"'\\])+/;
@@ -52,10 +50,6 @@ sub dependencies {
     if (defined $body) {
         # Include every override, even one in a nested function or comment. This
         # deliberately over-selects rather than relying on shell execution order.
-        while ($body =~ /^\s*#\s*fm-lint\s+source-owner=([^\s]+)/mg) {
-            $deps{$1} = 1;
-            $owners{$path}{$1} = 1;
-        }
         while ($body =~ /^\s*#\s*shellcheck\s+[^\n]*?\bsource=(?:"([^"]+)"|'([^']+)'|([^\s]+))/mg) {
             my $source = defined $1 ? $1 : defined $2 ? $2 : $3;
             $deps{$source} = 1 unless $source eq '/dev/null';
@@ -63,9 +57,11 @@ sub dependencies {
         # ShellCheck can resolve a literal source or strip one dynamic directory
         # prefix ($dir/file -> ./file). Track both that path and repository-local
         # basename candidates for runtime reverse-dependency selection.
-        while ($body =~ /(?:^\s*|[;({]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
+        my %recognized_sources;
+        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
             my $source = defined $2 ? $2 : defined $3 ? $3 : $4;
             my $offset = $-[1];
+            $recognized_sources{$offset} = 1;
             my $word_end = $+[0];
             my $prefix = substr($body, 0, $offset);
             my $has_override = $prefix =~ /(?:^|\n)\s*#\s*shellcheck[^\n]*\bsource=[^\n]+(?:\n|\z)(?:\s*#[^\n]*\n)*\s*\z/;
@@ -93,6 +89,24 @@ sub dependencies {
                 # inputs we cannot prove; select conservatively and do not cache.
                 $unknown{$path} = 1;
             }
+        }
+        # A keyword-shaped source command outside the supported grammar may
+        # still import analysis inputs. Never let an unparsed command authorize
+        # reuse or hide its caller when repository inputs change. The required
+        # token boundaries exclude case dot patterns such as ''|.|.. .
+        while ($body =~ /(?:^|[\s;({)&|<>])($source_command)(?=\s|[<>]|&>)/mg) {
+            next if $recognized_sources{$-[1]};
+            my $line_prefix = substr($body, 0, $-[1]);
+            $line_prefix =~ s/.*\n//s;
+            next if $line_prefix =~ /^\s*#/;
+            # Declaration arguments and comments after a function opener are
+            # not commands. In particular, a local variable named "source"
+            # must not disable reuse for every root importing that library.
+            # Reject substitution/operator syntax here rather than mistaking
+            # a source command inside an assignment for a declaration argument.
+            next if $line_prefix =~ /^\s*(?:local|declare|typeset|readonly|export)(?:\s+(?:-[A-Za-z]+|[A-Za-z_]\w*(?:=[^\s;()<>|&`"']*)?))*\s+\z/;
+            next if $line_prefix =~ /^\s*[A-Za-z_]\w*\(\)\s*\{\s*#/;
+            $unknown{$path} = 1;
         }
         $unknown{$path} = 1 if $body =~ /^\s*#\s*shellcheck\s+[^\n]*\bsource-path=/m;
     }
@@ -131,23 +145,12 @@ my $tool = shift @args;
 my $path = $args[-1];
 die "fm-lint-cache: missing analysis command\n" unless defined $path && defined $tool;
 $path = identity_path($path);
-my %inputs;
-closure($path, \%inputs);
-my %missing_owners;
-for my $input (keys %inputs) {
-    $missing_owners{$_} = 1 for grep { !-f $_ } keys %{$owners{$input} || {}};
-}
-if (%missing_owners) {
-    print STDERR "fm-lint: missing canonical source owner $_ (required by $path)\n" for sort keys %missing_owners;
-    exit 1;
-}
 sub fingerprint {
-    %text = (); %edges = (); %unknown = (); %owners = ();
+    %text = (); %edges = (); %unknown = ();
     return undef unless defined contents($tool);
     my %seen;
     closure($path, \%seen);
     return undef if grep { $unknown{$_} } keys %seen;
-    return undef if grep { !-f $_ } map { keys %{$owners{$_} || {}} } keys %seen;
     my @key_args = map { my $arg = $_; $arg =~ s{^\Q$root\E/}{}; $arg } @args;
     my @parts = ('fm-lint-cache-v1', $^O, @key_args);
     $seen{$_} = 1 for ($tool, 'bin/fm-lint.sh', 'bin/fm-lint-cache.pl');

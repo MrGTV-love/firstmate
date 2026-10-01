@@ -186,8 +186,7 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 . "$FM_DAEMON_DIR/fm-classify-lib.sh"
 # The away-posture record owner: while state/.afk-contract exists an item held
 # for the captain is never rechecked (the watcher applies the same rule).
-# fm-lint source-owner=bin/fm-afk-contract.sh
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-afk-contract.sh
 . "$FM_DAEMON_DIR/fm-afk-contract.sh"
 
 # Supervisor-pane discovery (FM_SUPERVISOR_TARGET_DEFAULT,
