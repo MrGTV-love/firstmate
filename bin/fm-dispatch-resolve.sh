@@ -53,8 +53,9 @@
 #   rendering, before printing diagnostics.
 #   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
 #   $0.042 per million input tokens, output free; unavailable usage prints null.
-#   returned_model accepts only numeric Jev version ids, else null; it survives
-#   quota failures alongside paid-call usage, without echoing arbitrary API text.
+#   model and returned_model accept only numeric Jev version ids, else unknown;
+#   returned_model survives quota failures alongside paid-call usage, without
+#   echoing arbitrary API text.
 #   Only numeric usage and the returned model id are observed, never request text
 #   or raw API error bodies, which may echo sensitive input.
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
@@ -242,6 +243,12 @@ done < <(jq -r '
 
 RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
 
+# Response model text is untrusted: only numeric Jev version ids are reported.
+JEV_MODEL_ID_JQ='
+  def jev_model_id:
+    if type == "string" and length <= 80 and test("\\Ajev-[0-9]+(\\.[0-9]+)*\\z")
+    then . else null end;'
+
 # Append diagnostics to both success and error results without changing routing.
 # Read only validated metadata; API errors can echo the key or private brief.
 emit_telemetry() {
@@ -254,14 +261,11 @@ emit_telemetry() {
   printf '  timings: api_ms=%s quota_ms=%s local_ms=%s total_ms=%s\n' \
     "$LAT_MS" "$QUOTA_MS" "$local_ms" "$total"
   if [ "$RESPONSE_VALID" -eq 1 ]; then
-    jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" '
+    jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" "$JEV_MODEL_ID_JQ"'
       def count: if type == "number" and . >= 0 and . == floor then . else null end;
-      def model_id:
-        if type == "string" and length <= 80 and test("\\Ajev-[0-9]+(\\.[0-9]+)*\\z")
-        then . else null end;
       (.usage.input_tokens | count) as $input |
       (.usage.output_tokens | count) as $output |
-      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price) returned_model=\(.model | model_id)"
+      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price) returned_model=\(.model | jev_model_id)"
     ' "$RESP_FILE" 2>/dev/null || true
   else
     printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s returned_model=null\n' "$TS_INPUT_USD_PER_MILLION"
@@ -402,7 +406,7 @@ fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an inval
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
-  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ"'
+  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   def prov($p; $lane): quota_row($q; $p; $lane);
@@ -541,7 +545,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
    else {source: $choice, use: profiles($rule.use), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
-    model: $r.model, latency_ms: $lat, tokens: ($r.usage // null),
+    model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
     rule: $picked,
     rule_when: when_of($picked),
     confidence: $a.confidence, probabilities: $a.probabilities
