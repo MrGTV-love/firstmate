@@ -4176,9 +4176,8 @@ keep_setup_owner "$HORPHAN" "$ORPHAN_OWNER_PRESENT" & ORPHAN_SETUP_OWNER=$!
 keep_setup_owner "$HKEEP" "$KEEP_OWNER_PRESENT" & KEEP_SETUP_OWNER=$!
 orphan_pe "$HORPHAN" register lavish orphan-src -- "$ORPHAN_STUB" "$TMP_ROOT/orphan-dead" >/dev/null
 orphan_pe "$HKEEP" register lavish keep-src -- "$QUIET_STUB" "$TMP_ROOT/orphan-live" >/dev/null
-# Startup confirmation is not the two-second owner-loss bound under test.
-FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 orphan_pe "$HORPHAN" reconcile >/dev/null
-FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 orphan_pe "$HKEEP" reconcile >/dev/null
+orphan_pe "$HORPHAN" reconcile >/dev/null
+orphan_pe "$HKEEP" reconcile >/dev/null
 
 wait_for "$HORPHAN/state/procevent/orphan-src.runner" \
   || fail "the dead-owner listener never recorded its runner"
@@ -5478,7 +5477,7 @@ printf '<h1>continuous review</h1>\n' > "$cont_art"
 lavish_session "$cont_art"
 cont_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$cont_art")
 fm_test_track_procevent_home "$CONT/home"
-PATH="$CONT/bin:$PATH" FM_HOME="$CONT/home" FM_LAVISH_POLL_RETRY_DELAY=1 FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=10 \
+PATH="$CONT/bin:$PATH" FM_HOME="$CONT/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$cont_art" >/dev/null
 wait_for_lines "$CONT/started" 1 || fail "continuous listener never started"
 cont_claim=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$cont_id.claim")
