@@ -1,0 +1,39 @@
+### Two separate copies of target 49eeb88 (copyA, copyB) share one cache dir. Root: bin/fm-marker-lib.sh (sources bin/fm-operational-input.sh).
+4:# bin/fm-operational-input.sh owns current operational-input construction,
+10:# shellcheck source=bin/fm-operational-input.sh
+11:. "$_FM_MARKER_LIB_DIR/fm-operational-input.sh"
+--- copyA cold run
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit=0
+--- copyB identical content (expect 'cache hit')
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-marker-lib.sh
+exit=0
+--- copyB: comment-only edit to SOURCED bin/fm-operational-input.sh (expect no cache hit; real check)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit=0
+--- copyB: seed a defect into the ROOT bin/fm-marker-lib.sh, run twice (expect findings and exit 1 both times, never a cache hit)
+          ^-- SC1007 (warning): Remove space after = if trying to assign a value (for empty string, use var='' ... ).
+  https://www.shellcheck.net/wiki/SC1007 -- Remove space after = if trying to...
+exit=1
+          ^-- SC1007 (warning): Remove space after = if trying to assign a value (for empty string, use var='' ... ).
+  https://www.shellcheck.net/wiki/SC1007 -- Remove space after = if trying to...
+exit=1
+--- copyB restored root, CI=true explicit path (expect NO cache hit: CI disables reuse)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit=0
+--- copyB restored root, local again (expect cache hit)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-marker-lib.sh
+exit=0
+--- shared cache dir contents
+<hash>8b7116ab1a0ff4510359bcb2011175de614b81ef0200.lock
+<hash>8b7116ab1a0ff4510359bcb2011175de614b81ef0200.passed
+<hash>7743cd3be905b5645ab1773efc16c0513163e795a5a2.lock
+<hash>7ff51c73e7f8913903c50be086a5fd2005682a70a232.lock
+<hash>7ff51c73e7f8913903c50be086a5fd2005682a70a232.passed

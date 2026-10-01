@@ -1,0 +1,34 @@
+### Why so many roots? Compare the shipped selector with a scratch copy whose ONLY difference is that the 'unknown source form => select on any change' rule is disabled (pure closure-contains-changed-path selection).
+change=README.md  shipped_selector=169  closure_contains_change=0
+change=tests/fm-pending-reply.test.sh  shipped_selector=170  closure_contains_change=1
+change=bin/fm-marker-lib.sh  shipped_selector=179  closure_contains_change=23
+change=bin/fm-pending-reply-lib.sh  shipped_selector=174  closure_contains_change=17
+
+--- closure_contains_change roots for tests/fm-pending-reply.test.sh:
+tests/fm-pending-reply.test.sh
+--- first 25 roots the shipped selector picks for a README.md-only change (none source README.md):
+bin/backends/herdr.sh
+bin/fm-afk-return.sh
+bin/fm-backlog-handoff.sh
+bin/fm-bearings-board.sh
+bin/fm-bearings-snapshot.sh
+bin/fm-bootstrap.sh
+bin/fm-branch-outcome.sh
+bin/fm-brief.sh
+bin/fm-captain-hold.sh
+bin/fm-check-register.sh
+bin/fm-check-unregister.sh
+bin/fm-claude-stop-autoarm.sh
+bin/fm-config-inherit-lib.sh
+bin/fm-config-push.sh
+bin/fm-contributions.sh
+bin/fm-control.sh
+bin/fm-crew-state.sh
+bin/fm-devin-config.sh
+bin/fm-dispatch-resolve.sh
+bin/fm-doc-audience-check.sh
+bin/fm-dod-lib.sh
+bin/fm-ff-lib.sh
+bin/fm-fleet-ledger.sh
+bin/fm-fleet-snapshot.sh
+bin/fm-guard.sh

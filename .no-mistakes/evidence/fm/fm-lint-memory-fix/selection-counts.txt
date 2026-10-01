@@ -1,0 +1,9 @@
+### Scratch clone: main=ec9c651 (this change), feature branch = main + one uncommitted edit
+edit only tests/fm-pending-reply.test.sh -> new fm-lint.sh --list-files selects 170 roots (inventory 449)
+edit only bin/fm-marker-lib.sh -> new fm-lint.sh --list-files selects 179 roots (inventory 449)
+edit only README.md -> new fm-lint.sh --list-files selects 169 roots (inventory 449)
+
+### Same edits with the OLD fm-lint.sh (base a4d559e), same tree
+edit only tests/fm-pending-reply.test.sh -> old fm-lint.sh --list-files selects 1 roots: tests/fm-pending-reply.test.sh
+edit only bin/fm-marker-lib.sh -> old fm-lint.sh --list-files selects 1 roots: bin/fm-marker-lib.sh
+edit only README.md -> old fm-lint.sh --list-files selects 0 roots: 

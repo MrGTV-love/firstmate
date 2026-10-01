@@ -1,0 +1,33 @@
+### Changed-mode selection (bin/fm-lint.sh --list-files) in scratch clones. new = target 8e4050a, old = base a4d559e. local main = each commit. Inventory:      449 roots.
+edit=none  new_selects=0  old_selects=0
+edit=README.md  new_selects=0  old_selects=0
+   new list:
+edit=tests/fm-pending-reply.test.sh  new_selects=1  old_selects=1
+   new list:
+     tests/fm-pending-reply.test.sh
+edit=bin/fm-marker-lib.sh  new_selects=23  old_selects=1
+edit=bin/fm-pending-reply-lib.sh  new_selects=17  old_selects=1
+   new list:
+     bin/fm-backlog-handoff.sh
+     bin/fm-pending-reply-lib.sh
+     bin/fm-procevent-remote-reply.sh
+     bin/fm-remote-secondmate-control.sh
+     bin/fm-secondmate-report.sh
+     bin/fm-secondmate-restart.sh
+     bin/fm-send.sh
+     bin/fm-teardown.sh
+     bin/fm-watch.sh
+     tests/fm-kimi-harness.test.sh
+     tests/fm-launch-prompt-signals-live-e2e.test.sh
+     tests/fm-pending-reply.test.sh
+     tests/fm-remote-reply.test.sh
+     tests/fm-send-remote-delivery.test.sh
+     tests/fm-send-secondmate-marker.test.sh
+     tests/fm-stat-shadowing.test.sh
+     tests/fm-supervision-events.test.sh
+edit=bin/fm-spawn.sh  new_selects=1  old_selects=1
+   new list:
+     bin/fm-spawn.sh
+edit=docs/herdr-backend.md  new_selects=0  old_selects=0
+   new list:
+edit=bin/fm-lint.sh  new_selects=449  old_selects=1

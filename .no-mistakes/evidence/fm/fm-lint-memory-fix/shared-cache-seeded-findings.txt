@@ -1,0 +1,20 @@
+### Note: ShellCheck reports findings only for the root file. A defect seeded in a sourced file is not a root finding, so the earlier pass + cache hit for that case was correct.
+--- copy three: seed a real defect into the ROOT bin/fm-marker-lib.sh, run twice (expect findings both times, never a cache hit)
+fm_live_seed() {
+  local a= b=
+  printf "%s\n" "$a$b"
+}
+fm_live_seed
+          ^-- SC1007 (warning): Remove space after = if trying to assign a value (for empty string, use var='' ... ).
+  https://www.shellcheck.net/wiki/SC1007 -- Remove space after = if trying to...
+run 1 exit=1
+          ^-- SC1007 (warning): Remove space after = if trying to assign a value (for empty string, use var='' ... ).
+  https://www.shellcheck.net/wiki/SC1007 -- Remove space after = if trying to...
+run 2 exit=1
+--- copy three: cross-file finding: sourced lib function uses $1, root calls it with no args
+  https://www.shellcheck.net/wiki/SC2119 -- Use fm_live_needs_arg "$@" if fun...
+^---------------^ SC2119 (info): Use fm_live_needs_arg "$@" if function's $1 should mean script's $1.
+run 1 exit=1
+  https://www.shellcheck.net/wiki/SC2119 -- Use fm_live_needs_arg "$@" if fun...
+^---------------^ SC2119 (info): Use fm_live_needs_arg "$@" if function's $1 should mean script's $1.
+run 2 exit=1

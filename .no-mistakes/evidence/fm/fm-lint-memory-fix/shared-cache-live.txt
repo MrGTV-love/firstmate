@@ -1,0 +1,49 @@
+### Two separate copies of ec9c651 share one cache dir (/Users/charlesabrooker/tmp/fmlint-live.stktym/shared-cache)
+--- copy 'two': first run of bin/fm-marker-lib.sh (cold)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+real 2.82
+user 0.94
+sys 0.21
+exit=0
+--- copy 'three': same root, identical content (expect cache hit)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-marker-lib.sh
+real 1.22
+user 0.44
+sys 0.13
+exit=0
+--- copy 'three': edit the SOURCED file bin/fm-operational-input.sh (comment only), rerun (expect miss, real check)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+real 2.61
+user 0.97
+sys 0.18
+exit=0
+--- copy 'three': seed a real defect into the sourced file, run twice (expect findings both times, never a cache hit)
+run 1 exit=
+fm-lint: cache hit bin/fm-marker-lib.sh
+run 2 exit=
+--- copy 'three': restored content, CI=true (expect NO cache hit; CI disables reuse)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+real 1.23
+user 0.40
+sys 0.15
+exit=0
+--- copy 'three': same restored content, local (expect cache hit again)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-marker-lib.sh
+exit=0
+--- cache dir contents
+total 24
+drwx------@  8 charlesabrooker  staff  256 Oct  1 14:32 .
+drwx------@ 16 charlesabrooker  staff  512 Oct  1 14:31 ..
+-rw-r--r--@  1 charlesabrooker  staff    0 Oct  1 14:31 30b2567a05b6b259083a4f31e7035c0f5f2fc2414d81e565137db250df1dc034.lock
+-rw-r--r--@  1 charlesabrooker  staff   65 Oct  1 14:32 30b2567a05b6b259083a4f31e7035c0f5f2fc2414d81e565137db250df1dc034.passed
+-rw-r--r--@  1 charlesabrooker  staff    0 Oct  1 14:31 ab1d93aa5a1b25667a0bda29b0bee9adc359db2fc65122eaefdfe2145c0c59e4.lock
+-rw-r--r--@  1 charlesabrooker  staff   65 Oct  1 14:31 ab1d93aa5a1b25667a0bda29b0bee9adc359db2fc65122eaefdfe2145c0c59e4.passed
+-rw-r--r--@  1 charlesabrooker  staff    0 Oct  1 14:31 fefe0222a810d53b96f77ff51c73e7f8913903c50be086a5fd2005682a70a232.lock
+-rw-r--r--@  1 charlesabrooker  staff   65 Oct  1 14:31 fefe0222a810d53b96f77ff51c73e7f8913903c50be086a5fd2005682a70a232.passed

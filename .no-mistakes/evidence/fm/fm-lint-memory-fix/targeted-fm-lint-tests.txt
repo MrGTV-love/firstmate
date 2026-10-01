@@ -1,0 +1,12 @@
+ok - ShellCheck installer prefers sha256sum when both hashers are present
+ok - selection analyzes unchanged imports only through changed or explicit callers
+ok - changed and deleted libraries recheck transitive callers with the full diagnostic rules
+ok - shared cache single-flights identical misses and invalidates sources, binaries and failures
+ok - jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity
+ok - joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes
+ok - a fast-mode success cannot satisfy source-aware extended analysis
+ok - source spellings and command prefixes retain changed/cached dataflow findings
+ok - declaration words permit reuse without hiding changed cross-file argument requirements
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh explicit paths bypass changed-file mode selection
+ok - fm-lint.sh CI keeps source following without the local exclusion list

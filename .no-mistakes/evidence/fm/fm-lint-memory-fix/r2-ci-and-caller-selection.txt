@@ -1,0 +1,29 @@
+### CI full set: CI=true bin/fm-lint.sh --list-files (target 49eeb88)
+roots listed: 449  inventory: 449
+
+### Changed library bin/fm-marker-lib.sh: every root whose source closure contains it must be selected
+callers needing recheck: 23; shipped selector picks: 179; missing from shipped selection: 0
+--- the callers:
+bin/fm-backlog-handoff.sh
+bin/fm-brief.sh
+bin/fm-marker-lib.sh
+bin/fm-pending-reply-lib.sh
+bin/fm-procevent-remote-reply.sh
+bin/fm-remote-secondmate-control.sh
+bin/fm-secondmate-report.sh
+bin/fm-secondmate-restart.sh
+bin/fm-send.sh
+bin/fm-teardown.sh
+bin/fm-watch.sh
+tests/fm-control.test.sh
+tests/fm-kimi-harness.test.sh
+tests/fm-launch-prompt-signals-live-e2e.test.sh
+tests/fm-pending-reply.test.sh
+tests/fm-remote-reply.test.sh
+tests/fm-send-inbox.test.sh
+tests/fm-send-remote-delivery.test.sh
+tests/fm-send-resolve-key.test.sh
+tests/fm-send-secondmate-marker-herdr-e2e.test.sh
+tests/fm-send-secondmate-marker.test.sh
+tests/fm-stat-shadowing.test.sh
+tests/fm-supervision-events.test.sh

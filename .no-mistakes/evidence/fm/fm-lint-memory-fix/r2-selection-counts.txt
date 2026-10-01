@@ -1,0 +1,6 @@
+### Changed-mode selection, scratch clones. 'new' = target 49eeb88 (main=target). 'old' = base a4d559e (main=base). Inventory: 449 roots.
+edit=none  new_selects=0  old_selects=0
+edit=README.md  new_selects=169  old_selects=0
+edit=tests/fm-pending-reply.test.sh  new_selects=170  old_selects=1
+edit=bin/fm-marker-lib.sh  new_selects=179  old_selects=1
+edit=bin/fm-pending-reply-lib.sh  new_selects=174  old_selects=1

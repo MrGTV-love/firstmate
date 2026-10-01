@@ -1,0 +1,31 @@
+### Seeded defect in a changed library must reach its callers, even with a warm cache (target 8e4050a, scratch clone, isolated cache /Users/charlesabrooker/tmp/fm-r3.QP08Qj/cache-landed)
+--- 1. warm the cache: explicit lint of the library and both callers on clean content
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit=0 wall=62s
+--- 2. same again (expect three cache hits)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-landed-lib.sh
+exit=0
+--- 3. seed a defect into bin/fm-landed-lib.sh only (callers unchanged); changed-mode selection:
+ bin/fm-landed-lib.sh | 1 +
+ 1 file changed, 1 insertion(+)
+bin/fm-bearings-snapshot.sh
+bin/fm-fleet-snapshot.sh
+bin/fm-landed-lib.sh
+--- 4. changed-mode bin/fm-lint.sh with the warm cache (expect no cache hit, findings, exit 1)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+In bin/fm-landed-lib.sh line 80:
+                                                   ^----^ SC2086 (info): Double quote to prevent globbing and word splitting.
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+fm-lint-workflows.sh: 3 workflow files valid
+exit=1 wall=61s
+--- 5. defect removed: changed mode is back to zero roots and the warm cache still hits on explicit lint
+0
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-landed-lib.sh
+exit=0

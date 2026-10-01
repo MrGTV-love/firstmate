@@ -1,0 +1,20 @@
+### Explicit root on target 8e4050a, isolated empty cache dir /Users/charlesabrooker/tmp/fm-r3.QP08Qj/cache-pr. Command: bin/fm-lint.sh tests/fm-pending-reply.test.sh
+--- cold run (/usr/bin/time -l)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+      313.66 real        57.23 user        24.06 sys
+          2527199232  maximum resident set size
+             1851728  peak memory footprint
+exit= wall=314s
+--- warm run, same content
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit tests/fm-pending-reply.test.sh
+        2.18 real         0.94 user         0.14 sys
+            73662464  maximum resident set size
+exit= wall=2s
+warm rerun under bash: fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+warm rerun under bash: fm-lint.sh: full ShellCheck extended analysis enabled
+warm rerun under bash: fm-lint: cache hit tests/fm-pending-reply.test.sh
+warm rerun under bash: exit=0
+note: the zsh capture above printed an empty exit= field (PIPESTATUS is bash-only). A .passed cache record is written only when ShellCheck exits 0, and the warm cache hit proves the cold run passed.

@@ -1,0 +1,28 @@
+### Target 49eeb88: bin/fm-lint.sh tests/fm-pending-reply.test.sh, cold private cache, FM_LINT_JOBS=1
+HEAD 49eeb88d9b3065b82a4224f2efb618271a61dc35 no-mistakes(test): Restore marker re-source to fix pending-reply SC2031
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+real 365.45
+user 57.39
+sys 10.92
+exit=0
+--- roots log (one row per ShellCheck root):
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-pending-reply.test.sh	0	full	1790885648000
+end	1	tests/fm-pending-reply.test.sh	0	full	1790885648000	1790886007000	359000	0	ok	4935312
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	0

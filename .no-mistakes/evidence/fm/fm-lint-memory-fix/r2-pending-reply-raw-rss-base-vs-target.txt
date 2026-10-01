@@ -1,0 +1,16 @@
+### Raw cold ShellCheck cost of the pending-reply root (same command the lint worker runs): shellcheck --norc --external-sources -- tests/fm-pending-reply.test.sh, measured with /usr/bin/time -l, run one at a time
+== base (a4d559e)
+      231.01 real        82.49 user        23.04 sys
+          4807557120  maximum resident set size
+rc=0
+findings lines:        0
+== target (49eeb88)
+      194.29 real        54.74 user         8.48 sys
+          4516626432  maximum resident set size
+rc=0
+findings lines:        0
+== noresource (ec9c651: re-source removed; lint FAILS with SC2031)
+      121.11 real        51.15 user        10.13 sys
+          4601413632  maximum resident set size
+rc=1
+SC2031 hits: 3

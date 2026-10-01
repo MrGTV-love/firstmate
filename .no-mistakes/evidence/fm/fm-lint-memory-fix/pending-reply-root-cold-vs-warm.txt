@@ -1,0 +1,79 @@
+### NEW fm-lint.sh (ec9c651), explicit root, cold shared cache
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+In tests/fm-pending-reply.test.sh line 869:
+    "$FM_FROMFIRST_MARK"corr=*) : ;;
+     ^----------------^ SC2031 (info): FM_FROMFIRST_MARK was modified in a subshell. That change might be lost.
+
+
+In tests/fm-pending-reply.test.sh line 1118:
+  run_send "$fb" "$home" "$log" domain "${FM_FROMFIRST_MARK}corr=${corr1} follow-up" \
+                                        ^------------------^ SC2031 (info): FM_FROMFIRST_MARK was modified in a subshell. That change might be lost.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2031 -- FM_FROMFIRST_MARK was modified in...
+real 150.56
+user 53.12
+sys 26.41
+exit=1
+roots sidecar:
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-pending-reply.test.sh	0	full	1790882229000
+end	1	tests/fm-pending-reply.test.sh	0	full	1790882229000	1790882379000	150000	1	findings	2818336
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	1
+
+### NEW fm-lint.sh, same root again, warm cache (same content)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+In tests/fm-pending-reply.test.sh line 869:
+    "$FM_FROMFIRST_MARK"corr=*) : ;;
+     ^----------------^ SC2031 (info): FM_FROMFIRST_MARK was modified in a subshell. That change might be lost.
+
+
+In tests/fm-pending-reply.test.sh line 1118:
+  run_send "$fb" "$home" "$log" domain "${FM_FROMFIRST_MARK}corr=${corr1} follow-up" \
+                                        ^------------------^ SC2031 (info): FM_FROMFIRST_MARK was modified in a subshell. That change might be lost.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2031 -- FM_FROMFIRST_MARK was modified in...
+real 146.76
+user 51.94
+sys 22.51
+exit=1
+roots sidecar:
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-pending-reply.test.sh	0	full	1790882380000
+end	1	tests/fm-pending-reply.test.sh	0	full	1790882380000	1790882526000	146000	1	findings	3183664
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	1

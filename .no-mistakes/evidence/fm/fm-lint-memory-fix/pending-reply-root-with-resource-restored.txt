@@ -1,0 +1,21 @@
+### NEW fm-lint.sh on ec9c651 tree with ONLY the 3-line marker re-source restored in tests/fm-pending-reply.test.sh
+diff --git a/tests/fm-pending-reply.test.sh b/tests/fm-pending-reply.test.sh
+index 7ed47cc..a6cb8cb 100755
+--- a/tests/fm-pending-reply.test.sh
++++ b/tests/fm-pending-reply.test.sh
+@@ -793,6 +793,9 @@ test_restart_preserves_expectation_and_parent_destination() {
+       [ "$(fm_pending_reply_get "$2" phase)" = awaiting_report ]
+   ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
+     || fail "fresh process must retain expectation and exact parent destination"
++  # Preserve the marker reinitialization performed by the old in-process reload.
++  # shellcheck source=bin/fm-marker-lib.sh
++  . "$ROOT/bin/fm-marker-lib.sh"
+   # Compaction-safe: destination is absolute path fields, not chat memory.
+   case "$parent_status" in
+     /*.status) : ;;
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+real 258.99
+user 58.65
+sys 17.17
+exit=0
