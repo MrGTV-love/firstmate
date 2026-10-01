@@ -1,0 +1,8 @@
+37:Never-send: docs/configuration.md owns the opt-in list and section markers
+38-  in $FM_HOME/config/dispatch-never-send. Enabled marked regions are removed
+39-  from the brief before task extraction; markers without that opt-in stop the
+40-  whole request. Then every request string is checked for literals.
+41-  A match, unreadable list, or invalid privacy directive/marker prints one
+42-  "dispatch-resolve: off (...; nothing sent)" line on stderr without private
+43-  text, prints nothing on stdout, and exits 0 with no network or quota call.
+44-
