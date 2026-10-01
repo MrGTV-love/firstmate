@@ -14,11 +14,12 @@
 # through their SSH route. Unchanged config and data/captain-shared.md-only
 # updates send no reread unless a previous send failure is pending for that home.
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
-# config/model-index.json is pushed only after bin/fm-model-index.sh check
-# passes; an index with an id absent from a readable catalog is withheld from
-# every home together with config/crew-dispatch.json, whose roles it resolves,
-# as is a pair whose dispatch roles do not resolve against the index, while the
-# other material still pushes, and the run exits non-zero.
+# config/model-index.json is pushed only after its schema, the dispatch roles
+# it resolves, and bin/fm-model-index.sh check pass; a malformed index, an id
+# absent from a readable catalog, an unresolvable worker account pin, or
+# config/crew-dispatch.json roles that do not resolve against the index
+# withholds both files from every home, while the other material still pushes,
+# and the run exits non-zero.
 set -u
 
 usage() {
@@ -37,8 +38,9 @@ This is local-material-only:
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
   - withholds config/model-index.json and config/crew-dispatch.json from
-    every home when bin/fm-model-index.sh check finds an id absent from a
-    readable catalog
+    every home when the index is malformed, bin/fm-model-index.sh check finds
+    an id absent from a readable catalog, a worker account pin does not
+    resolve, or the dispatch roles do not resolve against the index
 
 Live homes come from state/*.meta records with kind=secondmate.
 data/secondmates.md is only a fallback for missing home= fields in older or

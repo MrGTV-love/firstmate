@@ -1174,11 +1174,11 @@ The existing profile-array quota decision remains responsible for choosing among
 An unknown role, absent harness mapping, missing requested stand-in, malformed index, or retired id refuses resolution.
 Literal profiles and homes without an index retain their existing behavior, except that a configured retired list also applies to literals.
 A retired id also matches an id carrying a trailing context suffix, so retiring `claude-sonnet-5-5` refuses `claude-sonnet-5-5[1m]`.
-Claude's catalog lists no suffixed aliases, so a Claude id such as `opus[1m]` is available when its base `opus` is listed.
+Claude's catalog lists some ids only with or only without that suffix, so a Claude id is available when the catalog lists an id with the same base: `opus[1m]` when `opus` is listed, and `claude-sonnet-5-5` when only `claude-sonnet-5-5[1m]` is listed.
 
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
 `bin/fm-config-push.sh` runs the same check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
-When an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
+When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
