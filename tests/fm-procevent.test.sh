@@ -3939,28 +3939,27 @@ pass "an orphaned source command obeys the launch floor during its grace window"
 HPACE="$TMP_ROOT/registration-pacing"; new_home "$HPACE"
 fm_test_track_procevent_home "$HPACE"
 PACE_LOG="$TMP_ROOT/registration-pacing.log"
+# A runner sleeps out a launch floor only from the pacing stamp a prior launch
+# left on disk, so observe that persisted input instead of timing the attached
+# replacement start, which alone can outrun any fixed bound on a loaded host.
+# The first launch must leave its floor behind, or the absence below proves
+# nothing.
+pace_stamp_count() {
+  find "$HPACE/state/procevent" -maxdepth 1 -type f -name 'pace-src.*last-launch' \
+    | wc -l | tr -d ' '
+}
 pe_register "$HPACE" lavish pace-src -- "$FAST_SOURCE" "$PACE_LOG" >/dev/null
 FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src >/dev/null
+[ "$(pace_stamp_count)" = 1 ] || fail "the first launch left no launch floor behind"
 pe "$HPACE" retire pace-src >/dev/null
 pe_register "$HPACE" lavish pace-src -- "$FAST_SOURCE" "$PACE_LOG" >/dev/null
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src > "$TMP_ROOT/replacement-pacing.out" 2>&1 &
-PACE_START_PID=$!
-pace_deadline=$((SECONDS + 4))
-while kill -0 "$PACE_START_PID" 2>/dev/null; do
-  if [ "$SECONDS" -ge "$pace_deadline" ]; then
-    pe "$HPACE" retire pace-src >/dev/null 2>&1 || true
-    wait "$PACE_START_PID" 2>/dev/null || true
-    cat "$TMP_ROOT/replacement-pacing.out" >&2
-    fail "a replacement registration inherited the prior launch floor"
-  fi
-  sleep 0.1
-done
-wait "$PACE_START_PID" || fail "the replacement registration failed"
+[ "$(pace_stamp_count)" = 0 ] \
+  || fail "a replacement registration inherited the prior launch floor"
+FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src >/dev/null \
+  || fail "the replacement registration failed"
 [ "$(wc -l < "$PACE_LOG" | tr -d ' ')" = 2 ] \
   || fail "a replacement registration did not launch immediately"
-PACE_STAMPS=$(find "$HPACE/state/procevent" -maxdepth 1 -type f \
-  -name 'pace-src.*.last-launch' | wc -l | tr -d ' ')
-[ "$PACE_STAMPS" = 1 ] || fail "replacement registrations accumulated stale pacing state"
+[ "$(pace_stamp_count)" = 1 ] || fail "replacement registrations accumulated stale pacing state"
 pass "a replacement registration starts with one fresh launch floor"
 
 HPACE_RACE="$TMP_ROOT/registration-pacing-race"; new_home "$HPACE_RACE"
