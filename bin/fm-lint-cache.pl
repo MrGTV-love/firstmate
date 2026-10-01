@@ -4,7 +4,7 @@
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 # ShellCheck retains source-aware extended analysis; only identical successful checks
 # are reused. flock serializes identical misses across worktrees, not unrelated roots.
-# Unknown source forms disable reuse and conservatively select the root on changes.
+# Unknown source forms disable reuse; selection follows only resolved source closures.
 #
 use Cwd qw(abs_path);
 use strict;
@@ -57,8 +57,9 @@ sub dependencies {
         # prefix ($dir/file -> ./file). Track both that path and repository-local
         # basename candidates for runtime reverse-dependency selection.
         my %recognized_sources;
-        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
+        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)(?:\s*\d*(?:>>?|<<?|<&|>&|&>)\s*$prefix_word)*\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
             my $source = defined $2 ? $2 : defined $3 ? $3 : $4;
+            my $bare_word = defined $4;
             my $offset = $-[1];
             $recognized_sources{$offset} = 1;
             my $word_end = $+[0];
@@ -72,6 +73,8 @@ sub dependencies {
             $line_prefix =~ s/.*\n//s;
             next if $line_prefix =~ /^\s*#/;
             next if $source eq '/dev/null';
+            # Joined quoted fragments without expansions name a literal path.
+            $source =~ s/"([^"\$`\\]*)"|'([^'\$]*)'/defined $1 ? $1 : $2/ge if $bare_word;
             if ($source =~ /^\$/ && $source =~ m#^\$(?:[A-Za-z_]\w*|[0-9]|\{[^}]+\}|\([^)]*\))(/[^\$`*?\[\\<>&|'"]+)\z#) {
                 $deps{".$1"} = 1;
                 my ($base) = $source =~ m{([^/]+)$};
@@ -85,14 +88,14 @@ sub dependencies {
                 # follow. It therefore contributes no external analysis input.
                 next if $source =~ /^\$(?:[A-Za-z_]\w*|[0-9]|\{[^}]+\})\z/;
                 # Other unresolved word shapes and custom search paths may add
-                # inputs we cannot prove; select conservatively and do not cache.
+                # inputs we cannot prove; never reuse a cached result for them.
                 $unknown{$path} = 1;
             }
         }
         # A keyword-shaped source command outside the supported grammar may
         # still import analysis inputs. Never let an unparsed command authorize
-        # reuse or hide its caller when repository inputs change. The required
-        # token boundaries exclude case dot patterns such as ''|.|.. .
+        # reuse. The required token boundaries exclude case dot patterns such
+        # as ''|.|.. .
         while ($body =~ /(?:^|[\s;({)&|<>])($source_command)(?=\s|[<>]|&>)/mg) {
             next if $recognized_sources{$-[1]};
             my $line_prefix = substr($body, 0, $-[1]);
@@ -121,13 +124,12 @@ if ($mode eq 'select') {
     my %changed;
     while (<STDIN>) { chomp; s{^\./}{}; $changed{$_} = 1; }
     my $policy_changed = grep { $changed{$_} } qw(bin/fm-lint.sh bin/fm-lint-cache.pl);
-    my $inputs_changed = scalar keys %changed;
     my %selected;
     for my $path (@inventory) {
         my %seen;
         closure($path, \%seen);
         $selected{$path} = 1 if $policy_changed || $changed{$path}
-            || grep { $changed{$_} || ($unknown{$_} && $inputs_changed) } keys %seen;
+            || grep { $changed{$_} } keys %seen;
     }
     print "$_\0" for grep { $selected{$_} } @inventory;
     exit 0;
