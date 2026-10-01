@@ -2432,29 +2432,6 @@ Worker-owned rounds, away homes, inherited source-runner contexts, Cursor compat
 A reply arriving while Claude is reasoning or executing one long tool is delivered at the next tool completion, not asynchronously inside that operation.
 Other primary integrations retain their native supervision delivery paths.
 
-**Keep open Lavish reviews listening**
-
-An ordinary firstmate-owned Lavish review keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
-It does not wait for watcher reconciliation or for firstmate to handle an earlier answer before collecting the next one.
-Disconnected and empty rounds wait the adapter's retry delay before listening again, so an immediately returning source cannot spin.
-Only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
-Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
-The runner's existing owner lease and source launch pacing remain in force.
-`bin/fm-procevent.sh list --age` reports registration age alongside ownership and pending-result counts so an operator can deliberately retire old open reviews through the adapter's existing `retire` command.
-
-**Deliver captured feedback during a Claude turn**
-
-The tracked Claude `PostToolUse` hook calls `bin/fm-procevent-posttool-check.sh` after each tool completion.
-Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled.
-It names the capture's source and sequence and directs the primary to drain and handle it immediately, before continuing its previous work.
-If capture succeeded but wake publication did not, the notice supplies the exact durable result path for direct reading after the empty drain and the matching acknowledgement command.
-The hook reads no result payload, performs no network call, starts no listener or watcher, and never acknowledges feedback itself.
-It inspects local directory entries and reads each candidate adapter sidecar at most 16 bytes; an empty or fully handled inbox is silent.
-Active primary tool completions also refresh the existing owner lease between Claude's Stop-owned watcher cycles.
-Worker-owned rounds, away homes, inherited source-runner contexts, Cursor compatibility payloads, and Pi compatibility payloads remain inert.
-A reply arriving while Claude is reasoning or executing one long tool is delivered at the next tool completion, not asynchronously inside that operation.
-Other primary integrations retain their native supervision delivery paths.
-
 ### Crew-hosted Lavish review boards
 
 **Arm and confirm a listener**
