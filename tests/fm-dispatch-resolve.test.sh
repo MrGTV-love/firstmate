@@ -123,6 +123,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 cat > "$FAKE_CURL_LOG/body"
+sleep "${FAKE_CURL_DELAY:-0}"
 cat /dev/fd/3 > "$FAKE_CURL_LOG/header" 2>/dev/null || printf 'fd3 unreadable\n' > "$FAKE_CURL_LOG/header"
 if [ -n "${FAKE_CURL_MUTATE_SOURCE:-}" ]; then
   cp "$FAKE_CURL_MUTATE_SOURCE" "${FAKE_CURL_MUTATE_TARGET:?}"
@@ -150,6 +151,7 @@ else
   printf 'quota-axi:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
 printf '%s\n' "$*" >> "${QUOTA_AXI_CALLS:?}"
+sleep "${FAKE_QUOTA_DELAY:-0}"
 [ "${FAKE_QUOTA_FAIL:-0}" = 1 ] && exit 1
 [ "${1:-}" = --json ] || exit 2
 cat "${QUOTA_AXI_FIXTURE:?}"
@@ -169,7 +171,7 @@ reset_log() {
 run() {
   local __exit=$1 __out=$2 __err=$3 _out _code
   shift 3
-  _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
+  _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "${RESOLVER_BASH:-bash}" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
   _code=$?
   printf -v "$__exit" '%s' "$_code"
   printf -v "$__out" '%s' "$_out"
@@ -251,6 +253,90 @@ assert_not_contains "$body" 'SECRET-WHY-TEXT' "why text never leaves the machine
 assert_not_contains "$body" 'spendPriority' "quota never leaves the machine"
 assert_not_contains "$body" 'cursor-grok' "use profiles never leave the machine"
 pass "clear: one rule Choice request, key on the fd header only, spendPriority argmax over every candidate"
+
+# --- API, quota, and local time are separate on stock macOS Bash too ----------
+telemetry_field() {  # <output> <field>
+  awk -v key="$2" '{
+    for (i = 1; i <= NF; i++) {
+      split($i, pair, "=")
+      if (pair[1] == key) { print pair[2]; exit }
+    }
+  }' <<<"$1"
+}
+reset_log
+TYPESAFE_API_KEY=$KEY RESOLVER_BASH=/bin/bash FAKE_CURL_DELAY=0.12 FAKE_QUOTA_DELAY=0.24 \
+  run code out err "$BRIEF" --project pager
+expect_code 0 "$code" "timed resolver exits 0 under /bin/bash"
+api_ms=$(telemetry_field "$out" api_ms)
+quota_ms=$(telemetry_field "$out" quota_ms)
+local_ms=$(telemetry_field "$out" local_ms)
+total_ms=$(telemetry_field "$out" total_ms)
+case "$api_ms:$quota_ms:$local_ms:$total_ms" in
+  *[!0-9:]*|:*|*::*|*:) fail "timings must be integer milliseconds: $out" ;;
+esac
+[ "$api_ms" -ge 120 ] || fail "API delay lost millisecond precision: $api_ms"
+[ "$quota_ms" -ge 240 ] || fail "quota delay lost millisecond precision: $quota_ms"
+assert_equals "$total_ms" "$(( api_ms + quota_ms + local_ms ))" "stages account for total time exactly"
+assert_contains "$out" "latency_ms: $api_ms" "legacy latency still measures only the API"
+assert_contains "$out" 'model: jev-1.13.0' "returned model id remains observable"
+assert_equals 812 "$(telemetry_field "$out" input_tokens)" "usage reports input tokens"
+assert_equals 60 "$(telemetry_field "$out" output_tokens)" "usage reports output tokens"
+cost=$(telemetry_field "$out" jev_cost_usd)
+jq -ne --argjson cost "$cost" '$cost == (812 * 0.042 / 1000000)' >/dev/null \
+  || fail "cost must charge input tokens only: $cost"
+assert_equals 0.042 "$(telemetry_field "$out" jev_input_usd_per_million)" "estimate exposes its catalog rate"
+assert_not_contains "$out$err" "$KEY" "timing and cost output never expose the key"
+assert_not_contains "$out$err" 'off-by-one in the pager' "timing and cost output never expose brief text"
+assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "timing does not add quota snapshots"
+pass "stock Bash resolver separates API, quota, local and total timing, with input-only Jev cost"
+
+# A backwards wall clock must not affect monotonic stamps. Comparing against
+# the independent host clock also rejects the old seconds-since-epoch fallback.
+cat > "$FAKEBIN/date" <<'SH'
+#!/usr/bin/env bash
+printf '1\n'
+SH
+chmod +x "$FAKEBIN/date"
+clock_ms=$(PATH="$FAKEBIN:$BASE_PATH" /bin/bash -c \
+  '. "$1"; EPOCHREALTIME=1.000; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
+perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e '
+  my $stamp = shift;
+  my $now = int(clock_gettime(CLOCK_MONOTONIC) * 1000);
+  exit !($stamp <= $now && $now - $stamp < 10000);
+' "$clock_ms" || fail "Bash timer did not use the monotonic clock: $clock_ms"
+rm -f "$FAKEBIN/date"
+pass "stock Bash timing uses the monotonic host clock rather than wall time"
+
+# Missing usage is not fabricated as zero, and a quota failure still reports
+# the paid API call while marking only the snapshot as failed.
+jq 'del(.usage)' "$RESPONSE" > "$TMP_ROOT/no-usage.json"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/no-usage.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "missing optional usage does not change resolution"
+assert_equals null "$(telemetry_field "$out" jev_cost_usd)" "missing usage has unknown cost"
+assert_equals null "$(telemetry_field "$out" input_tokens)" "missing usage has unknown input count"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_QUOTA_FAIL=1 FAKE_QUOTA_DELAY=0.12 run code out err "$BRIEF"
+expect_code 0 "$code" "quota failure with telemetry exits 0"
+assert_contains "$out" '  reason: quota-axi --json failed' "quota failure preserves its reason"
+assert_equals "$cost" "$(telemetry_field "$out" jev_cost_usd)" "quota failure retains API cost"
+[ "$(telemetry_field "$out" quota_ms)" -ge 120 ] || fail "failed quota duration was lost"
+pass "unavailable usage is unknown and a failed quota snapshot retains API cost"
+
+# API error bodies may echo an authorization header or private request state.
+# They are never diagnostics, even when the resolver keeps intake moving.
+printf '%s\n' "$KEY private-brief-marker-4417" > "$TMP_ROOT/sensitive-error"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=429 FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-error" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "sensitive API error exits 0"
+assert_contains "$out" '  reason: http 429 after' "HTTP failure remains actionable"
+assert_not_contains "$out$err" "$KEY" "raw HTTP error cannot expose the API key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "raw HTTP error cannot expose private request text"
+assert_equals null "$(telemetry_field "$out" quota_ms)" "unattempted quota is unknown, not zero"
+assert_equals null "$(telemetry_field "$out" jev_cost_usd)" "unvalidated API response has no invented cost"
+assert_absent "$LOG/quota-axi.calls" "HTTP error does not call quota"
+pass "error diagnostics omit sensitive API bodies without blocking intake"
 
 # --- never-send list: a match or a bad list withholds the request -------------
 NEVER_SEND="$HOME_DIR/config/dispatch-never-send"

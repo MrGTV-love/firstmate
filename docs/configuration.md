@@ -1238,6 +1238,10 @@ Every result above exits 0.
 - Response probabilities must contain exactly every offered choice, use numeric values from 0 through 1, and sum to approximately 1 within 0.01.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, or missing `jq`, each reported and never selected around.
 - Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
+- Resolver diagnostics separate the API call, quota snapshot, local processing, and opted-in total time; the script header owns the fields and measurement boundaries.
+- Jev cost is estimated from reported input tokens at the [published catalog price](https://docs.typesafe.ai/models); output tokens are free, and missing usage remains unknown rather than zero.
+- Millisecond measurements use the host's monotonic Perl clock on stock macOS Bash 3.2 and newer shells, with best-effort wall-clock fallback when that helper is unavailable.
+- HTTP failures report status and elapsed time but never echo a raw API response body, because it can contain private request text or credentials.
 
 **Firstmate retains the dispatch decision**
 
