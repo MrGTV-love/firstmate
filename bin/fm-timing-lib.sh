@@ -50,31 +50,32 @@ fm_timing_enabled() {
   [ -n "${FM_TIMING_LOG:-}" ]
 }
 
-# Milliseconds on the host's monotonic clock, shared across processes and immune
-# to wall-clock adjustments. Time::HiRes ships with stock macOS Perl and works
-# under Bash 3.2 as well as newer shells; the same helper is used by process-event
-# leases. These stamps are only for differences, not Unix timestamps.
-# Hosts without that helper retain the previous best-effort wall-clock fallback
-# so unavailable diagnostics never change a caller's exit behavior.
-fm_timing_now_ms() {
-  local raw sec frac
-  if perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
-    'printf "%d\n", clock_gettime(CLOCK_MONOTONIC) * 1000' 2>/dev/null; then
-    return 0
-  fi
-  raw=${EPOCHREALTIME:-}
+# Whole milliseconds from a decimal seconds value such as EPOCHREALTIME or curl's
+# %{time_total}. Either decimal separator is accepted because EPOCHREALTIME
+# follows the locale. Prints nothing and fails for anything else.
+fm_timing_seconds_ms() {  # <seconds>
+  local raw=${1:-} sec frac
   case "$raw" in
-    *[0-9][.,][0-9]*)
-      sec=${raw%%[.,]*}
-      frac=${raw#*[.,]}
-      frac="${frac}000"
-      frac=${frac:0:3}
-      case "$sec$frac" in
-        ''|*[!0-9]*) ;;
-        *) printf '%s\n' "$(( sec * 1000 + 10#$frac ))"; return 0 ;;
-      esac
-      ;;
+    *[.,]*) sec=${raw%%[.,]*}; frac=${raw#*[.,]} ;;
+    *) sec=$raw; frac= ;;
   esac
+  frac="${frac}000"
+  frac=${frac:0:3}
+  case "$sec" in ''|*[!0-9]*) return 1 ;; esac
+  case "$frac" in *[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$(( 10#$sec * 1000 + 10#$frac ))"
+}
+
+# Milliseconds since the epoch, so stamps written by several processes share one
+# origin. EPOCHREALTIME is a bash builtin (no fork). macOS's system bash 3.2,
+# which `env bash` still resolves to on a host with no newer bash on PATH, lacks
+# it and asks stock Perl's Time::HiRes for the same epoch clock instead. Only a
+# host without that helper degrades to whole seconds, so unavailable diagnostics
+# never change a caller's exit behavior.
+fm_timing_now_ms() {
+  local sec
+  fm_timing_seconds_ms "${EPOCHREALTIME:-}" && return 0
+  perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000' 2>/dev/null && return 0
   sec=$(date +%s 2>/dev/null || printf '0')
   case "$sec" in ''|*[!0-9]*) sec=0 ;; esac
   printf '%s\n' "$(( sec * 1000 ))"

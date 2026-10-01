@@ -47,8 +47,10 @@
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
 #     timings: api_ms/quota_ms/local_ms/total_ms (local is total minus both calls)
 #     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
-#   latency_ms remains API-only. Times include local helper overhead; total is
-#   measured from opted-in setup through rendering, before printing diagnostics.
+#   api_ms and its latency_ms alias are curl's own time_total, so they carry no
+#   local helper overhead; null when curl reports none. quota, local and total
+#   include helper overhead; total is measured from opted-in setup through
+#   rendering, before printing diagnostics.
 #   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
 #   $0.042 per million input tokens, output free; unavailable usage prints null.
 #   returned_model accepts only numeric Jev version ids, else null; it survives
@@ -358,14 +360,17 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
-  T0=$(fm_timing_now_ms)
-  HTTP=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code}' \
+  curl_rc=0
+  CURL_WRITE=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code} %{time_total}' \
     -X POST "$TS_BASE/v1/systemone" -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
-    --data-binary @- 2>/dev/null) || HTTP=000
-  T1=$(fm_timing_now_ms)
-  LAT_MS=$(( T1 - T0 ))
-  [ "$LAT_MS" -ge 0 ] || LAT_MS=0
+    --data-binary @- 2>/dev/null) || curl_rc=$?
+  HTTP=${CURL_WRITE%% *}
+  [ "$curl_rc" -eq 0 ] || HTTP=000
+  LAT_MS=null
+  case "$CURL_WRITE" in
+    *' '*) LAT_MS=$(fm_timing_seconds_ms "${CURL_WRITE#* }") || LAT_MS=null ;;
+  esac
   [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
