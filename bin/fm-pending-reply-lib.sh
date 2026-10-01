@@ -1450,25 +1450,39 @@ fm_pending_reply_tick_one() {  # <state-dir> <corr_id> <busy_state> [secondmate-
 # state, and optional secondmate-home wrong-home path checks.
 fm_pending_reply_tick() {  # <state-dir>
   local state=$1 dir rec corr task_id phase delivered meta backend target label busy sm_home harness remote_host
+  local record_line escalated closed
   local observation observation_task found i
   local -a observation_tasks=() observation_values=()
   dir=$(fm_pending_reply_dir "$state")
   [ -d "$dir" ] || return 0
   for rec in "$dir"/*; do
     [ -f "$rec" ] || continue
-    case "$(basename "$rec")" in
+    case "${rec##*/}" in
       .*) continue ;;
     esac
-    corr=$(fm_pending_reply_get "$rec" corr_id)
-    [ -n "$corr" ] || corr=$(basename "$rec")
-    task_id=$(fm_pending_reply_get "$rec" task_id)
-    phase=$(fm_pending_reply_get "$rec" phase)
+    # Records are replaced atomically. Read one snapshot with builtins instead
+    # of spawning a field-reader pipeline for every retained completed reply.
+    corr='' task_id='' phase='' escalated='' closed=''
+    while IFS= read -r record_line || [ -n "$record_line" ]; do
+      case "$record_line" in
+        corr_id=*) corr=${record_line#*=} ;;
+        task_id=*) task_id=${record_line#*=} ;;
+        phase=*) phase=${record_line#*=} ;;
+        escalated_epoch=*) escalated=${record_line#*=} ;;
+        escalation_closed_epoch=*) closed=${record_line#*=} ;;
+      esac
+    done < "$rec" || continue
     if [ "$phase" = resolved ]; then
-      # Cheap no-op unless an escalation for this record is still open; this is
-      # the retry that makes the close converge after a transient write failure.
-      fm_pending_reply_close_escalation "$state" "$corr" || true
+      # Completed no-ops need no lock. An owed close still re-reads the current
+      # record under the existing correlation lock, including after a failed
+      # publication; this snapshot never authorizes a status append.
+      if [ -n "$escalated" ] && [ -z "$closed" ]; then
+        [ -n "$corr" ] || corr=${rec##*/}
+        fm_pending_reply_close_escalation "$state" "$corr" || true
+      fi
       continue
     fi
+    [ -n "$corr" ] || corr=${rec##*/}
     fm_pending_reply_reconcile_delivery "$state" "$corr" || true
     phase=$(fm_pending_reply_get "$rec" phase)
     delivered=$(fm_pending_reply_get "$rec" delivered_epoch)

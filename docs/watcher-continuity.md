@@ -393,6 +393,7 @@ Those intermediate touches are throttled to at most once per `min(15, grace / 3)
 The main shell enforces the check deadline even if the check's timeout controller stops responding.
 Home-summary publication is single-flight, and process-event source reconciliation is single-flight within one watcher process; both run separately so their inventory-sized work does not delay the main poll.
 Captured process-event results remain durable and are observed each poll, including while reconciliation is still running.
+Completed reply archives remain retained without repeated no-op reconciliation locking; the [pending-reply library](../bin/fm-pending-reply-lib.sh) owns that scan and retries escalation closes that are still owed.
 There is no independent heartbeat timer: a main shell blocked on an unbounded operation, stopped, or dead stops publishing progress and becomes stale.
 Subprocesses doing scan or capture work cannot beat for a stopped main shell.
 This distinguishes a progressing slow pass from a stuck loop without raising grace; it cannot guarantee freshness when the host does not schedule the main shell for an entire grace window.
