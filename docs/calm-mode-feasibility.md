@@ -902,3 +902,24 @@ ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.1
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=4835
 ```
 
+## 2026-09-30 Claude Code 2.1.286 compact-adviser marker
+
+The mod now also reads `FM_COMPACT_ADVISER_HOOKS`, the marker Firstmate sets when it supplies the function-hooks flag only for the compact adviser; [`calm.md`](calm.md#enabling-function-hooks) owns the resulting activation contract.
+Strict validation on the installed Claude Code 2.1.286, run from this branch's worktree with the inherited `CLAUDECODE` and `FM_COMPACT_ADVISER_HOOKS` unset, scans that read and still writes nothing:
+
+```text
+$ claude --version
+2.1.286 (Claude Code)
+
+$ CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate --strict .claude/mods/firstmate-calm
+Validating plugin manifest: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SZRWF9E6EEGV5M1Z197QE0/.claude/mods/firstmate-calm/.claude-plugin/plugin.json
+
+Validating hooks: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3SZRWF9E6EEGV5M1Z197QE0/.claude/mods/firstmate-calm/hooks/hooks.json
+
+  ❯ ./register.ts hooks: session.start, command.run{command=calm}, config.set{key=theme}, turn.step, ui.render{component=Spinner}, ui.render{component=ToolUse}, ui.render{component=ToolResult}, ui.render{component=ToolGroup}, ui.render{component=UserMessage}, ui.render{component=AssistantMessage}
+  ❯ ./register.ts calls: $.clock.every (via load, startNotes), $.clock.now (via readIfChanged), $.command.register, $.config.list (via readTheme), $.env.get (via isActivated, load, startNotes), $.fs.exists (via readIfChanged, readText), $.fs.read (via readText), $.fs.stat (via readIfChanged), $.fs.write, $.session.id (via startNotes), $.session.messages (via load), $.store.get (via readStored), $.store.set (via rememberShown), $.ui.blit (via repaintShip), $.ui.invalidate (via invalidateDrawings), $.ui.log (via followTail, pollNotes), $.ui.resolve, $.ui.toast
+  ❯ ./register.ts env writes: nothing
+  ❯ ./register.ts env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, FM_COMPACT_ADVISER_HOOKS, FM_CONFIG_OVERRIDE, FM_HOME, FM_ROOT_OVERRIDE, FM_STATE_OVERRIDE
+
+✔ Validation passed
+```
