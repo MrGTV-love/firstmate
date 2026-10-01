@@ -1,0 +1,18 @@
+=== [target-unlanded] teardown under test: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M3V0RXGZR39620ZPQ5GHY45E/bin/fm-teardown.sh
+=== [target-unlanded] lab home: /Users/charlesabrooker/tmp/fm-lab.cV1wpP (marker: /Users/charlesabrooker/tmp/fm-lab.cV1wpP/.fm-lab-home)
+=== [target-unlanded] unrelated orphan worker pid=45132 ppid=1: /bin/bash /Users/charlesabrooker/tmp/fm-orphan-root.WyGftx/pruned-root/bin/fm-remote-job-worker.sh --serve
+=== [target-unlanded] standalone reaper --dry-run sees:
+    would reap abandoned remote job worker 45132 (pruned code root /Users/charlesabrooker/tmp/fm-orphan-root.WyGftx/pruned-root)
+=== [target-unlanded] lab tmux windows before: fm-task-x1 driver 
+=== [target-unlanded] teardown exit code: 1
+=== [target-unlanded] teardown stderr:
+    REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.cV1wpP/wt has work not on any remote and not landed.
+    unpushed commits:
+    ee56ee0 unlanded work
+    Push the branch, land its PR, or get the captain's explicit OK to discard, then --force.
+=== [target-unlanded] teardown stdout:
+=== [target-unlanded] lab tmux windows after: fm-task-x1 driver 
+RESULT [target-unlanded] task-scoped leaked process: SURVIVED
+RESULT [target-unlanded] unrelated account orphan worker: UNTOUCHED (alive)
+RESULT [target-unlanded] backlog row state: in_flight
+RESULT [target-unlanded] task meta: retained

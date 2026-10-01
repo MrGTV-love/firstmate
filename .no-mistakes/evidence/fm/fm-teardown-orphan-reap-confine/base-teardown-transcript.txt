@@ -1,0 +1,19 @@
+=== [base] teardown under test: /Users/charlesabrooker/tmp/fm-base.0oaziY/bin/fm-teardown.sh
+=== [base] lab home: /Users/charlesabrooker/tmp/fm-lab.C5qnf1 (marker: /Users/charlesabrooker/tmp/fm-lab.C5qnf1/.fm-lab-home)
+=== [base] unrelated orphan worker pid=59520 ppid=1: /bin/bash /Users/charlesabrooker/tmp/fm-orphan-root.dqSCFt/pruned-root/bin/fm-remote-job-worker.sh --serve
+=== [base] standalone reaper --dry-run sees:
+    would reap abandoned remote job worker 59520 (pruned code root /Users/charlesabrooker/tmp/fm-orphan-root.dqSCFt/pruned-root)
+=== [base] lab tmux windows before: fm-task-x1 driver 
+=== [base] teardown exit code: 0
+=== [base] teardown stderr:
+    teardown: reaping leaked worktree process(es) for task-x1: 89089
+    reaped abandoned remote job worker 59520 (pruned code root /Users/charlesabrooker/tmp/fm-orphan-root.dqSCFt/pruned-root)
+=== [base] teardown stdout:
+    demo: already current
+    teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/tmp/fm-lab.C5qnf1/wt)
+    Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.C5qnf1/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+=== [base] lab tmux windows after: driver 
+RESULT [base] task-scoped leaked process: REAPED
+RESULT [base] unrelated account orphan worker: KILLED by task teardown
+RESULT [base] backlog row state: done
+RESULT [base] task meta: retired
