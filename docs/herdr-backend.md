@@ -294,6 +294,9 @@ Creation proceeds in this order:
 2. After the new workspace converges to one exact task endpoint beneath one exact parent workspace id, the journal advances to a version 2 binding.
    That binding records the physical home, named session, endpoint, parent, and immutable expected labels.
 
+Creation releases the session presentation lock after create, prune, order, and binding publication, before worktree allocation and harness setup.
+The task and metadata locks still protect the launch incarnation, and abort cleanup reacquires the session lock before closing any pane.
+
 Another parent with the same presentation label does not prevent publication or participate in restart reclaim.
 
 The token is visible in the workspace title, because Herdr exposes no verified hidden persistent field.

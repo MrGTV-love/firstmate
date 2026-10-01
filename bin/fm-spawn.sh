@@ -143,14 +143,17 @@
 #   metadata are unchanged.
 #   A clean projected create or exact resume makes one bounded attempt to hold
 #   the one session-scoped presentation-order lock (keyed by named session plus
-#   canonical socket, outside any home's state/) through launch handoff for a
-#   fresh projection, or through verified endpoint replacement and journal
-#   advancement for an exact resume. Abort cleanup reacquires it if needed. Lock
-#   contention warns and falls back to the ordinary flat layout before any
-#   projection mutation. The exact response-derived new workspace is inserted
-#   immediately after its owning parent (firstmate or 2ndmate-<id>) contiguous
-#   child block. Ordering never authorizes lifecycle cleanup, and any
-#   unavailable, ambiguous, or failed move warns while the spawn continues.
+#   canonical socket, outside any home's state/) through its last presentation
+#   mutation and journal publication: create, prune, order, and binding for a
+#   fresh projection, or verified endpoint replacement and journal advancement
+#   for an exact resume. Worktree allocation and harness setup run outside it,
+#   under the task and metadata locks. Abort cleanup reacquires it before any
+#   exact-pane close. Lock contention warns and falls back to the ordinary flat
+#   layout before any projection mutation. The exact response-derived new
+#   workspace is inserted immediately after its owning parent (firstmate or
+#   2ndmate-<id>) contiguous child block. Ordering never authorizes lifecycle
+#   cleanup, and any unavailable, ambiguous, or failed move warns while the
+#   spawn continues.
 #   Every projected create, prune, and move captures and verifies the named
 #   session's exact active workspace and tab. A detected focus change restores
 #   only that exact tab id; an ambiguous pre-operation snapshot refuses the
@@ -3839,6 +3842,7 @@ else
             else
               echo "warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart" >&2
             fi
+            spawn_herdr_presentation_order_lock_release
           fi
         else
           echo "warning: herdr presentation focus lock unavailable; using the ordinary flat layout without projection" >&2
@@ -5450,7 +5454,6 @@ spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   HERDR_PROJECTION_ABORT_CLEANUP=0
-  spawn_herdr_presentation_order_lock_release
 fi
 spawn_send_key "$T" Enter
 if [ "$HARNESS" = kimi ]; then
