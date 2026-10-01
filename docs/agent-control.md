@@ -72,6 +72,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A harness change resets model and effort unless they are named too, because a model chosen for one adapter does not transfer to another.
    `--claude-debug` is off by default, refused unless the resolved replacement harness is claude, and passed through to the launch; the [`bin/fm-spawn.sh`](../bin/fm-spawn.sh) header owns what it turns on, including the diagnostics file that names the signal of the next stop.
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
+   The model, including a role reference, resolves through the [fleet model index](configuration.md#fleet-model-index-configmodel-indexjson) and passes its selected-entry catalog check under that account, so a retired or catalog-absent id also refuses before the old agent stops.
 2. **Safe checkpoint.**
    The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
    For a `kind=secondmate` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
