@@ -320,8 +320,19 @@ TYPESAFE_API_KEY=$KEY FAKE_QUOTA_FAIL=1 FAKE_QUOTA_DELAY=0.12 run code out err "
 expect_code 0 "$code" "quota failure with telemetry exits 0"
 assert_contains "$out" '  reason: quota-axi --json failed' "quota failure preserves its reason"
 assert_equals "$cost" "$(telemetry_field "$out" jev_cost_usd)" "quota failure retains API cost"
+assert_equals jev-1.13.0 "$(telemetry_field "$out" returned_model)" "quota failure attributes paid usage to the returned Jev version"
 [ "$(telemetry_field "$out" quota_ms)" -ge 120 ] || fail "failed quota duration was lost"
 pass "unavailable usage is unknown and a failed quota snapshot retains API cost"
+
+jq --arg key "$KEY" '.model = ("jev-1.13.0\n" + $key + " private-brief-marker-4417")' "$RESPONSE" > "$TMP_ROOT/sensitive-model.json"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-model.json" FAKE_QUOTA_FAIL=1 \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "unsafe response model does not block quota-error intake"
+assert_equals null "$(telemetry_field "$out" returned_model)" "arbitrary response model text is not telemetry"
+assert_not_contains "$out$err" "$KEY" "error model evidence cannot echo a key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "error model evidence cannot echo private brief text"
+pass "quota-error model evidence accepts only safe Jev version ids"
 
 # API error bodies may echo an authorization header or private request state.
 # They are never diagnostics, even when the resolver keeps intake moving.
