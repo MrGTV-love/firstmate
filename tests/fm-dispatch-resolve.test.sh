@@ -369,6 +369,18 @@ assert_not_contains "$out$err" "$KEY" "error model evidence cannot echo a key"
 assert_not_contains "$out$err" 'private-brief-marker-4417' "error model evidence cannot echo private brief text"
 pass "quota-error model evidence accepts only safe Jev version ids"
 
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-model.json" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "unsafe response model does not block resolution"
+assert_contains "$out" '  status: clear' "unsafe response model does not change routing"
+assert_contains "$out" '  model: -   latency_ms:' "legacy model line shows an unsafe model id as unknown"
+assert_equals null "$(telemetry_field "$out" returned_model)" "unsafe model id is not success telemetry"
+assert_equals 812 "$(telemetry_field "$out" input_tokens)" "unsafe model id keeps usage"
+assert_not_contains "$out$err" "$KEY" "success model evidence cannot echo a key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "success model evidence cannot echo private brief text"
+pass "successful resolution model evidence accepts only safe Jev version ids"
+
 # API error bodies may echo an authorization header or private request state.
 # They are never diagnostics, even when the resolver keeps intake moving.
 printf '%s\n' "$KEY private-brief-marker-4417" > "$TMP_ROOT/sensitive-error"
