@@ -318,7 +318,10 @@
 #   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION, plus the task
 #   marker FM_TASK_ID that ship and scout panes receive above, plus the
 #   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor pins
-#   to the resolved per-home policy even when no pane export arrived.
+#   to the resolved per-home policy even when no pane export arrived, plus
+#   FM_COMPACT_ADVISER_HOOKS, which travels with a retained function-hooks flag
+#   so an adviser-only flag cannot pass as the captain's own opt-in, plus the
+#   Lavish server address LAVISH_AXI_HOST.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
