@@ -2757,7 +2757,9 @@ pass "a zero-padded launch confirm window is honored as base 10"
 # value by name before anything runs, and so does this one.
 HIW="$TMP_ROOT/hiw"; new_home "$HIW"
 IW_TRIGGER="$TMP_ROOT/invalid-window-trigger"
-pe_register "$HIW" lavish invalid-window-src -- "$BLOCKER" "$IW_TRIGGER" "window" >/dev/null
+IW_STARTED="$TMP_ROOT/invalid-window-started"
+pe_register "$HIW" lavish invalid-window-src -- \
+  "$STARTED_BLOCKER" "$IW_STARTED" "$BLOCKER" "$IW_TRIGGER" "window" >/dev/null
 for iw_value in 5s 0 700; do
   iw_rc=0
   iw_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$iw_value" pe "$HIW" reconcile 2>&1) || iw_rc=$?
@@ -2771,13 +2773,44 @@ for iw_value in 5s 0 700; do
   [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/invalid-window-src.claim" ] \
     || fail "reconcile launched a runner before refusing the confirm window '$iw_value'"
 done
-# The refusal costs the source nothing: it still arms on the next run with a
-# usable value.
-iw_ok=$(pe "$HIW" reconcile)
+# The successful clause tests refusal recovery, not a scheduler latency bound.
+# Arrange real producer startup during its first confirmation stamp read, using
+# the same external-read seam as the final-boundary cases below.
+IW_BIN="$TMP_ROOT/invalid-window-bin"; mkdir -p "$IW_BIN"
+IW_REAL_CAT=$(command -v cat); IW_READS="$TMP_ROOT/invalid-window-reads"
+export IW_STARTED IW_REAL_CAT IW_READS
+cat > "$IW_BIN/cat" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *invalid-window-src.*.last-launch)
+    if [ "${FM_PROCEVENT_IN_RUNNER:-0}" != 1 ]; then
+      n=0; [ ! -e "$IW_READS" ] || read -r n < "$IW_READS"
+      n=$((n + 1)); printf '%s\n' "$n" > "$IW_READS"
+      if [ "$n" -eq 2 ]; then
+        for _ in $(seq 1 100); do
+          [ ! -s "$IW_STARTED" ] || break
+          sleep 0.1
+        done
+        [ -s "$IW_STARTED" ] || exit 76
+      fi
+    fi
+    ;;
+esac
+exec "$IW_REAL_CAT" "$@"
+SH
+chmod +x "$IW_BIN/cat"
+iw_rc=0
+iw_ok=$(PATH="$IW_BIN:$PATH" pe "$HIW" reconcile) || iw_rc=$?
 assert_contains "$iw_ok" "started=1" \
   "the source did not arm once its confirm window was usable: $iw_ok"
 assert_contains "$iw_ok" "failed=0" \
   "the source was reported as failed once its confirm window was usable: $iw_ok"
+[ "$iw_rc" -eq 0 ] || fail "default valid confirmation exited non-zero: $iw_ok"
+wait_for "$IW_STARTED" || fail "the valid source never actually started"
+iw_owner=$(pe "$HIW" list | awk '$1 == "invalid-window-src" { print $3 }')
+[ "$iw_owner" = live ] || fail "the valid default source has no live owner: $iw_owner"
+assert_contains "$(pe "$HIW" start invalid-window-src)" "already owned" \
+  "the valid default source does not retain exclusive ownership"
 : > "$IW_TRIGGER"
 pe "$HIW" retire invalid-window-src >/dev/null 2>&1 || true
 pass "an unusable launch confirm window is refused by name instead of blamed on the sources"
@@ -4824,11 +4857,11 @@ kill -0 -"$CRASH_PID" 2>/dev/null \
 pass "a group whose leader died to something else is still refused, not signalled"
 kill -KILL -"$CRASH_PID" 2>/dev/null || true
 
-# A slow final stamp read must not erase verified live ownership that appeared
-# during that read. Gate the real runner before claiming, take an empty stamp
-# snapshot, then let it claim before returning that snapshot past the deadline.
-# Reconcile and arm must refresh evidence once, not inflate the polling window
-# or declare a merely live-but-unclaimed launch ready.
+# The deadline-crossing stamp read must leave the runner unclaimed. During the
+# final read, take another absent snapshot, release the real runner, and prove
+# its ownership before returning that snapshot. A final ownership proof taken
+# before this external work would still report a live source absent.
+# Reconcile and arm must preserve their polling window and one-owner checks.
 confirm_live_at_boundary() {
   local operation=$1 BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ rc=0 output
   local -a command=()
@@ -4855,6 +4888,12 @@ case "$*" in
       n=0; [ ! -e "$BOUNDARY/reads" ] || read -r n < "$BOUNDARY/reads"
       n=$((n + 1)); printf '%s\n' "$n" > "$BOUNDARY/reads"
       if [ "$n" -eq "$BOUNDARY_READ" ]; then
+        rc=0; snapshot=$("$REAL_CAT" "$@" 2>/dev/null) || rc=$?
+        sleep 2
+        printf '%s' "$snapshot"
+        exit "$rc"
+      fi
+      if [ "$n" -eq "$((BOUNDARY_READ + 1))" ]; then
         rc=0; snapshot=$("$REAL_CAT" "$@" 2>/dev/null) || rc=$?
         : > "$BOUNDARY/release"
         for _ in $(seq 1 600); do
@@ -4893,13 +4932,17 @@ SH
     printf '<h1>boundary</h1>\n' > "$BOUNDARY/board.html"
     lavish_session "$BOUNDARY/board.html"
     BOUNDARY_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOUNDARY/board.html")
-    BOUNDARY_READ=3
+    # Delay the first loop read, before launch setup can consume the window.
+    BOUNDARY_READ=2
     fm_test_track_procevent_home "$BOUNDARY/home"
     command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$BOUNDARY/board.html")
   fi
   PATH="$BOUNDARY/bin:$PATH" FM_HOME="$BOUNDARY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
     "${command[@]}" > "$BOUNDARY/out" 2> "$BOUNDARY/err" || rc=$?
-  [ -s "$BOUNDARY/verified" ] || fail "boundary fixture never verified live ownership"
+  if [ ! -s "$BOUNDARY/verified" ]; then
+    cat "$BOUNDARY/out" "$BOUNDARY/err" "$BOUNDARY/reads" >&2
+    fail "boundary fixture never verified live ownership"
+  fi
   [ "$rc" -eq 0 ] || fail "$operation rejected already verified live ownership: $(cat "$BOUNDARY/err")"
   output=$(cat "$BOUNDARY/out")
   if [ "$operation" = reconcile ]; then
@@ -4914,7 +4957,7 @@ SH
     "a boundary confirmation lost the one-owner claim"
   : > "$BOUNDARY/poll-release"
   pe "$BOUNDARY/home" retire "$BOUNDARY_ID" >/dev/null 2>&1 || true
-  pass "$operation refreshes verified live ownership at the unchanged confirmation boundary"
+  pass "$operation proves ownership after the final stamp read at the unchanged confirmation boundary"
 }
 confirm_live_at_boundary reconcile
 confirm_live_at_boundary arm
