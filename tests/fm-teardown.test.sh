@@ -3768,14 +3768,20 @@ test_process_identity_is_recorded_before_term_and_kill() {
   pass "a real leaked process observes its durable identity audit before TERM, and KILL is audited too"
 }
 
-test_nested_registered_worktree_process_is_not_reaped() {
-  local case_dir rc pid other_pid nested before
-  case_dir=$(make_case nested-worktree-custody)
+assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|sibling>
+  local name=$1 registrar=$2 case_dir rc pid other_pid nested lane before identity registry
+  case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
+  registry="$case_dir/project"
+  if [ "$registrar" = sibling ]; then
+    registry="$case_dir/sibling-clone"
+    git clone -q "$case_dir/origin.git" "$registry"
+  fi
   nested="$case_dir/wt/other-lane"
-  git -C "$case_dir/project" worktree add -q --detach "$nested" main
-  git -C "$case_dir/project" worktree lock "$nested"
+  git -C "$registry" worktree add -q --detach "$nested" main
+  git -C "$registry" worktree lock "$nested"
+  lane=$(cd "$nested" && pwd -P)
   fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
   before=$(cat "$case_dir/state/unrelated.meta")
   mkdir -p "$case_dir/unrelated"
@@ -3786,23 +3792,40 @@ test_nested_registered_worktree_process_is_not_reaped() {
   other_pid=$!
   disown
   sleep 0.3
+  if [ -r "/proc/$pid/stat" ]; then
+    identity="starttime=$(sed 's/.*) //' "/proc/$pid/stat" | awk '{print $20}')"
+  else
+    identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
+  fi
   rc=0
   run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   local survived=0 other_survived=0
   kill -0 "$pid" 2>/dev/null && survived=1
   kill -0 "$other_pid" 2>/dev/null && other_survived=1
   kill -KILL "$pid" "$other_pid" 2>/dev/null || true
-  expect_code 1 "$rc" "nested-worktree-custody: teardown must refuse even with force"
-  [ "$survived" -eq 1 ] || fail "nested-worktree-custody: other lane process was killed"
-  [ "$other_survived" -eq 1 ] || fail "nested-worktree-custody: unrelated process was killed"
+  expect_code 1 "$rc" "$name: teardown must refuse even with force"
+  [ "$survived" -eq 1 ] || fail "$name: other lane process was killed"
+  [ "$other_survived" -eq 1 ] || fail "$name: unrelated process was killed"
   [ "$(cat "$case_dir/state/unrelated.meta")" = "$before" ] \
-    || fail "nested-worktree-custody: unrelated task record changed"
-  assert_present "$case_dir/state/task-x1.meta" "nested-worktree-custody: task record removed"
-  assert_grep "REFUSED: process $pid matches only another registered nested worktree" "$case_dir/stderr" \
-    "nested-worktree-custody: other lane custody not reported"
+    || fail "$name: unrelated task record changed"
+  assert_present "$case_dir/state/task-x1.meta" "$name: task record removed"
+  assert_present "$nested" "$name: nested lane removed"
+  assert_grep "REFUSED: process $pid ($identity) " "$case_dir/stderr" \
+    "$name: refusal does not name the pid and its start identity"
+  assert_grep "matched path $lane inside registered nested worktree lane $lane," "$case_dir/stderr" \
+    "$name: refusal does not name the matched path and lane"
   assert_absent "$case_dir/state/task-x1.teardown-processes" \
-    "nested-worktree-custody: other lane recorded as a signal target"
+    "$name: other lane recorded as a signal target"
+}
+
+test_nested_registered_worktree_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped nested-worktree-custody project
   pass "registered nested-lane and unrelated processes and records remain untouched on forced teardown"
+}
+
+test_sibling_clone_nested_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-nested-worktree-custody sibling
+  pass "a nested lane registered by a sibling clone of the project is never signalled on forced teardown"
 }
 
 test_process_audit_failure_refuses_before_signal() {
@@ -3854,20 +3877,20 @@ test_leaked_tasktmp_process_is_reaped() {
   pass "a leaked descendant process rooted under the task's per-task tasktmp is reaped by teardown too"
 }
 
-test_lsof_absent_reaps_tmux_process_group() {
-  local case_dir rc pid path_without_lsof
-  case_dir=$(make_case lsof-absent-process-group-reap)
+test_lsof_absent_refuses_without_signalling() {
+  local case_dir rc pid path_without_lsof survived=0
+  case_dir=$(make_case lsof-absent-refusal)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   path_without_lsof=$(make_path_without_lsof "$case_dir")
   PATH="$path_without_lsof" command -v lsof >/dev/null 2>&1 \
-    && fail "lsof-absent-process-group-reap: fixture path unexpectedly exposes lsof"
+    && fail "lsof-absent-refusal: fixture path unexpectedly exposes lsof"
 
   perl -e 'setpgrp(0, 0); chdir shift or die; exec "sleep", "300"' "$case_dir/wt" &
   pid=$!
   disown
   sleep 0.3
-  kill -0 "$pid" 2>/dev/null || fail "lsof-absent-process-group-reap: setup sleeper did not start"
+  kill -0 "$pid" 2>/dev/null || fail "lsof-absent-refusal: setup sleeper did not start"
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
 if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
@@ -3879,16 +3902,19 @@ EOF
 
   rc=0
   FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  kill -KILL "$pid" 2>/dev/null || true
 
-  expect_code 0 "$rc" "lsof-absent-process-group-reap: teardown should succeed"
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
-    fail "lsof-absent-process-group-reap: tmux process group survived teardown"
-  fi
-  assert_grep "reaping leaked worktree process group" "$case_dir/stderr" \
-    "lsof-absent-process-group-reap: teardown did not use the process-group fallback"
-  pass "missing lsof falls back to reaping the tmux pane process group"
+  expect_code 1 "$rc" "lsof-absent-refusal: teardown should refuse even with force"
+  [ "$survived" -eq 1 ] || fail "lsof-absent-refusal: an unaudited signal reached the pane process group"
+  assert_grep "(lsof is unavailable, so no signal target can be audited)" "$case_dir/stderr" \
+    "lsof-absent-refusal: teardown did not explain the missing-lsof refusal"
+  assert_present "$case_dir/wt" "lsof-absent-refusal: teardown removed the worktree"
+  assert_present "$case_dir/state/task-x1.meta" "lsof-absent-refusal: teardown removed task metadata"
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "lsof-absent-refusal: an unscanned process was recorded as a signal target"
+  pass "missing lsof refuses teardown instead of sending unaudited process-group signals"
 }
 
 test_lsof_error_refuses_before_removal() {
@@ -4457,8 +4483,9 @@ test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_nested_registered_worktree_process_is_not_reaped
+test_sibling_clone_nested_lane_process_is_not_reaped
 test_process_audit_failure_refuses_before_signal
-test_lsof_absent_reaps_tmux_process_group
+test_lsof_absent_refuses_without_signalling
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
 test_exec_changed_process_is_still_reaped
