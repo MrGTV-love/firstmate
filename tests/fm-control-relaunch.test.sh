@@ -763,7 +763,7 @@ test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop() {
 }
 
 test_model_index_resolves_and_refuses_before_stop() {
-  local dir out rc id=rl-index catalogs
+  local dir out rc id=rl-index
   dir=$(new_case model-index "$id")
   add_ship_task "$dir" "$id" pi
   printf pi > "$dir/fake/command"
