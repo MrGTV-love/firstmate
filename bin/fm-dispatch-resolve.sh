@@ -35,10 +35,10 @@
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
-# Never-send: docs/configuration.md owns the opt-in list, project directives,
-#   and section markers in $FM_HOME/config/dispatch-never-send. Project rules
-#   stop the whole request; enabled marked regions are removed from the brief
-#   before task extraction, then every request string is checked for literals.
+# Never-send: docs/configuration.md owns the opt-in list and section markers
+#   in $FM_HOME/config/dispatch-never-send. Enabled marked regions are removed
+#   from the brief before task extraction; markers without that opt-in stop the
+#   whole request. Then every request string is checked for literals.
 #   A match, unreadable list, or invalid privacy directive/marker prints one
 #   "dispatch-resolve: off (...; nothing sent)" line on stderr without private
 #   text, prints nothing on stdout, and exits 0 with no network or quota call.
@@ -251,29 +251,24 @@ never_send_off() {
 # Snapshot and validate privacy policy before reading any outgoing brief text.
 NEVER_SEND_LIST='' MARKED_SECTIONS=0
 never_send_load() {
-  local value n=0 project normalized_project
+  local value n=0
   [ -e "$NEVER_SEND_PATH" ] || [ -L "$NEVER_SEND_PATH" ] || return 0
   { [ -f "$NEVER_SEND_PATH" ] && [ -r "$NEVER_SEND_PATH" ]; } \
     || never_send_off "$NEVER_SEND_PATH is not a readable regular file"
   NEVER_SEND_LIST=$(jq -Rr 'gsub("\\s+"; " ")' "$NEVER_SEND_PATH" 2>/dev/null) \
     || never_send_off "could not read $NEVER_SEND_PATH"
-  normalized_project=$(jq -nr --arg project "$PROJECT" '$project | gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "") | ascii_downcase')
   while IFS= read -r value; do
     n=$((n + 1))
     value=${value# }
     value=${value% }
     case "$value" in
       '# dispatch-never-send marked-sections') MARKED_SECTIONS=1 ;;
-      '# dispatch-never-send project: '*)
-        project=${value#'# dispatch-never-send project: '}
-        project=$(jq -nr --arg project "$project" '$project | ascii_downcase')
-        [ -n "$normalized_project" ] \
-          || never_send_off "project name required by $NEVER_SEND_PATH line $n"
-        [ "$project" != "$normalized_project" ] \
-          || never_send_off "project withheld by $NEVER_SEND_PATH line $n"
+      '#'*)
+        case "$(printf '%s' "${value#'#'}" | tr '[:upper:]' '[:lower:]')" in
+          dispatch-never-send*|' dispatch-never-send'*)
+            never_send_off "invalid privacy directive in $NEVER_SEND_PATH line $n" ;;
+        esac
         ;;
-      '# dispatch-never-send'*)
-        never_send_off "invalid privacy directive in $NEVER_SEND_PATH line $n" ;;
     esac
   done <<<"$NEVER_SEND_LIST"
 }
@@ -281,10 +276,15 @@ never_send_load() {
 # Markers are interpreted on the original brief, even inside Markdown fences,
 # so protected headings cannot change extraction or cause a whole-brief fallback.
 never_send_brief() {
-  if [ "$MARKED_SECTIONS" -eq 0 ]; then
-    cp "$BRIEF" "$SEND_TEXT" || never_send_off "could not read the brief"
-    return
-  fi
+  local rc=0
+  grep -qiE -e '<!--[[:space:]]*dispatch-never-send' "$BRIEF" 2>/dev/null || rc=$?
+  case "$rc" in
+    0) [ "$MARKED_SECTIONS" -eq 1 ] \
+         || never_send_off "never-send markers need the marked-sections directive" ;;
+    1) cp "$BRIEF" "$SEND_TEXT" || never_send_off "could not read the brief"
+       return ;;
+    *) never_send_off "could not read the brief" ;;
+  esac
   awk '
     {
       marker = $0
@@ -300,7 +300,7 @@ never_send_brief() {
         hidden = 0
         next
       }
-      if (index($0, "<!-- dispatch-never-send") > 0) exit 1
+      if (tolower($0) ~ /<!--[[:space:]]*dispatch-never-send/) exit 1
       if (!hidden) print
     }
     END { if (hidden) exit 1 }
