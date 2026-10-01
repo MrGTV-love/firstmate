@@ -1,0 +1,18 @@
+## S9 old Jev-labelled entry points are gone; new name is the only one
+$ ls bin tests docs | grep -i -E "mem-guard|guards"
+fm-mem-guard.py
+fm-mem-guard.sh
+host-guards.md
+fm-mem-guard.test.sh
+$ bin/fm-jev-mem-guard.sh --json
+(eval):5: no such file or directory: bin/fm-jev-mem-guard.sh
+exit=127
+$ git grep -n -i "jev" -- bin/fm-mem-guard.sh bin/fm-mem-guard.py tests/fm-mem-guard.test.sh
+matches_exit=1 (1 = none)
+$ git grep -n -E "fm-jev-mem-guard|jev-guards" (whole repo)
+docs/host-guards.md:15:It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name has been removed rather than kept as an alias.
+$ git grep -n -E "fm-mem-guard|host-guards" (callers of the new name)
+bin/fm-mem-guard.sh:2:# fm-mem-guard.sh - Local Linux/macOS memory-pressure diagnostic; see engine --help.
+bin/fm-mem-guard.sh:7:exec python3 "$SCRIPT_DIR/fm-mem-guard.py" "$@"
+docs/documentation-audiences.json:388:      "path": "docs/host-guards.md",
+docs/host-guards.md:14:The memory family is `fm-mem-guard`; its engine header owns Linux/macOS sources, metric interpretation, and command budget.

@@ -1,0 +1,46 @@
+$ bin/fm-mem-guard.sh
+fm-mem-guard — 2026-10-01T21:15:56Z
+  • RAM: 57.0% used (13.76 GB available / 32.0 GB total)
+  • Swap: 95.8% used (31.62 GB used / 33.0 GB total)
+  • Status: OK
+  • Recommendation: Native memory pressure is within thresholds; swap is telemetry only; the caller should continue unchanged.
+
+  Top 10 RSS Processes:
+    - PID 95910 (shellcheck): 1366.6 MB
+    - PID 398 (fseventsd): 895.5 MB
+    - PID 4026 (omp): 524.8 MB
+    - PID 27323 (com.apple.Virtua): 464.5 MB
+    - PID 23630 (omp): 315.3 MB
+    - PID 57046 (omp): 315.1 MB
+    - PID 12096 (2.1.284): 279.7 MB
+    - PID 13569 (2.1.285): 264.8 MB
+    - PID 82037 (2.1.287): 224.2 MB
+    - PID 19578 (omp): 223.8 MB
+exit=0
+$ bin/fm-mem-guard.sh --help
+usage: fm-mem-guard.py [-h] [--warn-mem-pct WARN_MEM_PCT]
+                       [--crit-mem-pct CRIT_MEM_PCT]
+                       [--warn-swap-pct WARN_SWAP_PCT]
+                       [--crit-swap-pct CRIT_SWAP_PCT] [--json] [--check]
+
+Local host memory-pressure and top-RSS diagnostic (Linux and macOS; no API
+calls)
+
+options:
+  -h, --help            show this help message and exit
+  --warn-mem-pct WARN_MEM_PCT
+                        Warning threshold for memory utilization % (default:
+                        90.0)
+  --crit-mem-pct CRIT_MEM_PCT
+                        Critical threshold for memory utilization % (default:
+                        95.0)
+  --warn-swap-pct WARN_SWAP_PCT
+                        Linux-only warning threshold for swap utilization %
+                        (default: 85.0)
+  --crit-swap-pct CRIT_SWAP_PCT
+                        Linux-only critical threshold for swap utilization %
+                        (default: 95.0)
+  --json                Emit structured JSON telemetry to stdout
+  --check               Exit 0 for OK or unknown (fail-open), exit 1 for
+                        WARNING or CRITICAL
+exit=0

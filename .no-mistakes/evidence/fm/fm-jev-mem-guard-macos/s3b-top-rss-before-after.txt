@@ -1,0 +1,4 @@
+load average: (52.39013671875, 68.43359375, 72.85888671875)
+30 interleaved runs per version on this macOS host
+pre-fix 3d73168 (shared 400ms budget, comm=): empty top_processes 7/30; runs with trailing-padded comm 0/30
+HEAD 18e37cc (own 400ms budget, ucomm=, rstrip): empty top_processes 0/30; runs with trailing-padded comm 0/30

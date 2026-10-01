@@ -1,0 +1,49 @@
+## S8 Linux (docker python:3.12-slim, --network none, worktree mounted read-only)
+Linux 7.0.14-linuxkit
+$ bin/fm-mem-guard.sh --json
+exit=0
+{
+  "name": "fm-mem-guard",
+  "checked_at": "2026-10-01T21:17:30Z",
+  "status": "OK",
+  "recommendation": "Memory and swap utilization are within thresholds; the caller should continue unchanged.",
+  "reason": null,
+  "summary": {
+    "mem_total_gb": 7.75,
+    "mem_available_gb": 6.77,
+    "mem_used_pct": 12.6,
+    "swap_total_gb": 1.0,
+    "swap_used_gb": 0.0,
+    "swap_used_pct": 0.0
+  },
+  "top_processes": [
+    {
+      "pid": 8,
+      "comm": "python3",
+      "rss_mb": 18.5
+    }
+  ]
+}
+$ bin/fm-mem-guard.sh
+fm-mem-guard — 2026-10-01T21:17:30Z
+  • RAM: 12.6% used (6.77 GB available / 7.75 GB total)
+  • Swap: 0.0% used (0.0 GB used / 1.0 GB total)
+  • Status: OK
+  • Recommendation: Memory and swap utilization are within thresholds; the caller should continue unchanged.
+
+  Top 1 RSS Processes:
+    - PID 12 (python3): 12.6 MB
+exit=0
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 1
+exit=1 (expected 1)
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 101 --crit-mem-pct 101 --warn-swap-pct 0 --crit-swap-pct 0  (Linux swap still classifies)
+CRITICAL {'mem_total_gb': 7.75, 'mem_available_gb': 6.77, 'mem_used_pct': 12.6, 'swap_total_gb': 1.0, 'swap_used_gb': 0.0, 'swap_used_pct': 0.0}
+exit=1
+
+## Linux parity vs base engine (same moment, fields other than name/checked_at/top_processes ordering)
+old name: fm-jev-mem-guard | new name: fm-mem-guard
+old status/reason: OK None | new: OK None
+recommendation identical: True
+summary keys identical: True
+mem_total_gb identical: True
+top_processes shape identical: True

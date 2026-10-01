@@ -1,0 +1,97 @@
+$ uname -sr
+Darwin 25.5.0
+$ bin/fm-mem-guard.sh --json
+{
+  "name": "fm-mem-guard",
+  "checked_at": "2026-10-01T21:15:48Z",
+  "status": "OK",
+  "recommendation": "Native memory pressure is within thresholds; swap is telemetry only; the caller should continue unchanged.",
+  "reason": null,
+  "summary": {
+    "mem_total_gb": 32.0,
+    "mem_available_gb": 14.08,
+    "mem_used_pct": 56.0,
+    "swap_total_gb": 33.0,
+    "swap_used_gb": 31.62,
+    "swap_used_pct": 95.8
+  },
+  "top_processes": [
+    {
+      "pid": 398,
+      "comm": "fseventsd",
+      "rss_mb": 840.5
+    },
+    {
+      "pid": 91534,
+      "comm": "shellcheck",
+      "rss_mb": 703.0
+    },
+    {
+      "pid": 27323,
+      "comm": "com.apple.Virtua",
+      "rss_mb": 618.6
+    },
+    {
+      "pid": 95910,
+      "comm": "shellcheck",
+      "rss_mb": 441.2
+    },
+    {
+      "pid": 7957,
+      "comm": "omp",
+      "rss_mb": 322.3
+    },
+    {
+      "pid": 4026,
+      "comm": "omp",
+      "rss_mb": 316.4
+    },
+    {
+      "pid": 23630,
+      "comm": "omp",
+      "rss_mb": 315.2
+    },
+    {
+      "pid": 63181,
+      "comm": "omp",
+      "rss_mb": 312.4
+    },
+    {
+      "pid": 99270,
+      "comm": "2.1.284",
+      "rss_mb": 283.1
+    },
+    {
+      "pid": 57970,
+      "comm": "2.1.284",
+      "rss_mb": 268.4
+    }
+  ]
+}
+exit=0
+$ /usr/bin/memory_pressure -Q   (native reference)
+The system has 34359738368 (2097152 pages with a page size of 16384).
+System-wide memory free percentage: 44%
+$ sysctl -n hw.memsize vm.swapusage   (native reference)
+34359738368
+total = 33792.00M  used = 32375.00M  free = 1417.00M  (encrypted)
+
+--- BEFORE (base a4d559e) bin/fm-jev-mem-guard.sh --json ---
+$ python3 <base>/bin/fm-jev-mem-guard.py --json
+{
+  "name": "fm-jev-mem-guard",
+  "checked_at": "2026-10-01T21:15:48Z",
+  "status": "UNKNOWN",
+  "recommendation": "/proc/meminfo is unreadable or incomplete on this host; the verdict is withheld rather than fabricated.",
+  "reason": "meminfo-unavailable",
+  "summary": {
+    "mem_total_gb": null,
+    "mem_available_gb": null,
+    "mem_used_pct": null,
+    "swap_total_gb": null,
+    "swap_used_gb": null,
+    "swap_used_pct": null
+  },
+  "top_processes": []
+}
+exit=0

@@ -1,0 +1,6 @@
+$ bash tests/fm-mem-guard.test.sh
+ok - Linux fixtures, thresholds, incomplete readings, and zero swap
+ok - macOS native pressure, swap units, RSS ordering/cutoff, and verdicts
+ok - native command failures, deadline exhaustion, and unsupported platform
+ok - fm-mem-guard.sh wrapper --json --check exits 0 with a pass verdict
+exit=0

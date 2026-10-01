@@ -1,0 +1,26 @@
+run  1: status=OK top_processes=0 padded_names=[] wall=1.262s
+run  2: status=OK top_processes=10 padded_names=[] wall=0.617s
+run  3: status=OK top_processes=10 padded_names=[] wall=0.697s
+run  4: status=OK top_processes=10 padded_names=[] wall=0.413s
+run  5: status=OK top_processes=10 padded_names=[] wall=0.373s
+run  6: status=OK top_processes=10 padded_names=[] wall=0.316s
+run  7: status=OK top_processes=10 padded_names=[] wall=0.200s
+run  8: status=OK top_processes=10 padded_names=[] wall=0.334s
+run  9: status=OK top_processes=10 padded_names=[] wall=0.168s
+run 10: status=OK top_processes=10 padded_names=[] wall=0.518s
+run 11: status=OK top_processes=10 padded_names=[] wall=0.298s
+run 12: status=OK top_processes=10 padded_names=[] wall=0.165s
+run 13: status=OK top_processes=10 padded_names=[] wall=0.306s
+run 14: status=OK top_processes=10 padded_names=[] wall=0.315s
+run 15: status=OK top_processes=10 padded_names=[] wall=0.539s
+run 16: status=OK top_processes=10 padded_names=[] wall=0.503s
+run 17: status=OK top_processes=10 padded_names=[] wall=0.272s
+run 18: status=OK top_processes=10 padded_names=[] wall=0.502s
+run 19: status=OK top_processes=10 padded_names=[] wall=0.690s
+run 20: status=OK top_processes=10 padded_names=[] wall=0.730s
+run 21: status=OK top_processes=10 padded_names=[] wall=0.386s
+run 22: status=OK top_processes=10 padded_names=[] wall=0.830s
+run 23: status=OK top_processes=10 padded_names=[] wall=0.330s
+run 24: status=OK top_processes=10 padded_names=[] wall=0.313s
+run 25: status=OK top_processes=10 padded_names=[] wall=0.153s
+SUMMARY: 25 runs, empty top_processes=1, runs with padded comm=0, max wall=1.262s, mean wall=0.449s

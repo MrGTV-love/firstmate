@@ -1,0 +1,34 @@
+## S6 no network: all network denied by the macOS sandbox kernel policy
+$ sandbox-exec -p '(version 1)(allow default)(deny network*)' bin/fm-mem-guard.sh --json --check
+status=OK reason=None mem_used_pct=62.0 swap_used_pct=95.8 top=0
+exit=0 stderr_bytes=0
+
+## S7 fail-open: memory_pressure exec denied
+$ sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/memory_pressure"))' bin/fm-mem-guard.sh --json --check --warn-mem-pct 1 --crit-mem-pct 1
+status=UNKNOWN reason=macos-memory-unavailable mem_used_pct=None swap_used_pct=None top=0
+exit=0 stderr_bytes=0
+
+## S7 fail-open: sysctl exec denied
+$ sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/sbin/sysctl"))' bin/fm-mem-guard.sh --json --check --warn-mem-pct 1 --crit-mem-pct 1
+status=UNKNOWN reason=macos-memory-unavailable mem_used_pct=None swap_used_pct=None top=0
+exit=0 stderr_bytes=0
+
+## S7 fail-open: ps exec denied -> verdict kept, listing degrades to []
+$ sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/bin/ps"))' bin/fm-mem-guard.sh --json --check
+status=OK reason=None mem_used_pct=64.0 swap_used_pct=95.8 top=0
+exit=0 stderr_bytes=0
+
+## S7 fail-open: all three native tools denied, human output
+$ sandbox-exec ... bin/fm-mem-guard.sh --check
+fm-mem-guard — 2026-10-01T21:16:56Z
+  • RAM: unavailable
+  • Swap: unknown (not measurable)
+  • Status: UNKNOWN
+  • Recommendation: Native macOS memory-pressure readings are unavailable or incomplete on this host; the verdict is withheld rather than fabricated.
+exit=0
+
+## Note on top=0 under sandbox-exec
+/bin/ps is setuid root (-rwsr-xr-x). sandbox-exec refuses to exec setuid binaries:
+  sandbox-exec: execvp() of '/bin/ps' failed: Operation not permitted
+So top=0 in every sandboxed run above is a sandbox artifact. It shows the guard degrades a failed listing to [] without error.
+The unsandboxed runs (s1, s3) show the real listing.

@@ -1,0 +1,19 @@
+## S4 --check exit semantics (live host)
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 101 --crit-mem-pct 101
+status=OK reason=None mem_used_pct=54.0 swap_used_pct=95.8 top=10
+exit=0
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 1 --crit-mem-pct 101
+status=WARNING reason=None mem_used_pct=54.0 swap_used_pct=95.8 top=10
+exit=1
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 1 --crit-mem-pct 1
+status=CRITICAL reason=None mem_used_pct=55.0 swap_used_pct=95.8 top=10
+exit=1
+
+## S5 adversarial: macOS swap ~96% full, swap thresholds forced to 0, memory thresholds unreachable
+$ bin/fm-mem-guard.sh --json --check --warn-mem-pct 101 --crit-mem-pct 101 --warn-swap-pct 0 --crit-swap-pct 0
+status=OK reason=None mem_used_pct=56.0 swap_used_pct=95.8 top=10
+exit=0
+$ bin/fm-mem-guard.sh --check --warn-swap-pct 0 --crit-swap-pct 0   (defaults for memory)
+  • Swap: 95.8% used (31.61 GB used / 33.0 GB total)
+  • Status: OK
+exit=0 (guard exit, captured directly)

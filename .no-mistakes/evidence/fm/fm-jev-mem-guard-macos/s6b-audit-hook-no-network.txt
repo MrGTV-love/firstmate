@@ -1,0 +1,73 @@
+{
+  "name": "fm-mem-guard",
+  "checked_at": "2026-10-01T21:17:16Z",
+  "status": "OK",
+  "recommendation": "Native memory pressure is within thresholds; swap is telemetry only; the caller should continue unchanged.",
+  "reason": null,
+  "summary": {
+    "mem_total_gb": 32.0,
+    "mem_available_gb": 11.2,
+    "mem_used_pct": 65.0,
+    "swap_total_gb": 33.0,
+    "swap_used_gb": 31.57,
+    "swap_used_pct": 95.7
+  },
+  "top_processes": [
+    {
+      "pid": 67478,
+      "comm": "shellcheck",
+      "rss_mb": 1758.9
+    },
+    {
+      "pid": 398,
+      "comm": "fseventsd",
+      "rss_mb": 835.4
+    },
+    {
+      "pid": 54411,
+      "comm": "shellcheck",
+      "rss_mb": 802.9
+    },
+    {
+      "pid": 27323,
+      "comm": "com.apple.Virtua",
+      "rss_mb": 328.2
+    },
+    {
+      "pid": 80831,
+      "comm": "Comet Helper (Re",
+      "rss_mb": 263.4
+    },
+    {
+      "pid": 84839,
+      "comm": "2.1.284",
+      "rss_mb": 240.1
+    },
+    {
+      "pid": 4026,
+      "comm": "omp",
+      "rss_mb": 200.0
+    },
+    {
+      "pid": 99270,
+      "comm": "2.1.284",
+      "rss_mb": 195.0
+    },
+    {
+      "pid": 42630,
+      "comm": "2.1.287",
+      "rss_mb": 186.1
+    },
+    {
+      "pid": 12096,
+      "comm": "2.1.284",
+      "rss_mb": 181.7
+    }
+  ]
+}
+
+## Python audit-hook record of process spawns and network events during one live run
+subprocess.Popen ['/usr/sbin/sysctl', '-n', 'hw.memsize', 'vm.swapusage']
+subprocess.Popen ['/usr/bin/memory_pressure', '-Q']
+subprocess.Popen ['/bin/ps', '-axo', 'pid=,rss=,ucomm=']
+socket/network events: 0
