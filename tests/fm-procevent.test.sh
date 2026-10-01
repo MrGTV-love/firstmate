@@ -1790,6 +1790,16 @@ case "${plan[$i]}" in
     exit 1 ;;
   interrupt-other-help)
     printf 'error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\nhelp[1]: Restore the session store from backup\n'; exit 1 ;;
+  start-race)
+    # The exact bytes lavish-axi 0.1.79 prints when another poll won the race to
+    # auto-start the restarted server on this poll's port.
+    printf 'error: Lavish Editor server did not start\ncode: SERVER_ERROR\n'
+    printf 'help[1]: Run `lavish-axi server --port %s` to inspect server startup\n' "$LAVISH_AXI_PORT"
+    exit 1 ;;
+  start-other-port)
+    printf 'error: Lavish Editor server did not start\ncode: SERVER_ERROR\n'
+    printf 'help[1]: Run `lavish-axi server --port %s` to inspect server startup\n' "1$LAVISH_AXI_PORT"
+    exit 1 ;;
   killed)
     kill -TERM $$ ;;
   other-server-error)
@@ -1905,6 +1915,51 @@ assert_contains "$(wake_payloads "$HOTHERHELP")" "procevent lavish $otherhelp_id
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERHELP" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$OTHERHELP_ART" >/dev/null
 pass "only the exact generated help footer joins the quiet retry; other help text still surfaces"
+
+# --- end-user-aligned regression: a restart's auto-start race keeps listeners ---
+# Seen live on lavish-axi 0.1.79: after a server restart, the listeners' retried
+# polls raced to auto-start that server, and each loser printed "server did not
+# start" for the board's own port. That was captured as `unknown`, relisten
+# refused it, and those boards sat unowned until reconcile. The same runner must
+# retry it quietly and still capture the answer, with no reconcile. The same
+# response for any other port is not this board's restart and still surfaces.
+HSTARTRACE="$TMP_ROOT/hstartrace"; new_home "$HSTARTRACE"
+STARTRACE_ART="$TMP_ROOT/start-race-board.html"
+printf '<h1>start race</h1>\n' > "$STARTRACE_ART"
+lavish_session "$STARTRACE_ART"
+startrace_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$STARTRACE_ART")
+fm_test_track_procevent_home "$HSTARTRACE"
+LAVISH_COUNT="$TMP_ROOT/start-race-count"; LAVISH_SCRIPT="interrupt-help start-race feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSTARTRACE" \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$STARTRACE_ART" >/dev/null
+wait_capture "$HSTARTRACE" "$startrace_id" 200 \
+  || fail "the listener stopped on a lost auto-start race instead of retrying it"
+[ "$(cat "$LAVISH_COUNT")" = 3 ] \
+  || fail "the lost auto-start race was polled $(cat "$LAVISH_COUNT") times, not two quiet retries plus the delivering poll"
+[ "$(count_results "$HSTARTRACE" "$startrace_id")" = 1 ] \
+  || fail "a lost auto-start race produced $(count_results "$HSTARTRACE" "$startrace_id") captured results instead of one"
+assert_grep 'ship it' "$(first_result "$HSTARTRACE" "$startrace_id")" \
+  "the captured result after a lost auto-start race is the captain's answer"
+pass "a lavish-axi 0.1.79 lost auto-start race after a restart is retried quietly by the same listener"
+
+HOTHERPORT="$TMP_ROOT/hotherport"; new_home "$HOTHERPORT"
+OTHERPORT_ART="$TMP_ROOT/other-port-board.html"
+printf '<h1>other port</h1>\n' > "$OTHERPORT_ART"
+lavish_session "$OTHERPORT_ART"
+otherport_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$OTHERPORT_ART")
+fm_test_track_procevent_home "$HOTHERPORT"
+LAVISH_COUNT="$TMP_ROOT/other-port-count"; LAVISH_SCRIPT="start-other-port feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERPORT" \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$OTHERPORT_ART" >/dev/null
+wait_capture "$HOTHERPORT" "$otherport_id" 200 \
+  || fail "a server start failure for another port was not captured"
+[ "$(cat "$LAVISH_COUNT")" = 1 ] \
+  || fail "a server start failure for another port was retried instead of surfacing on its first poll"
+assert_grep 'server did not start' "$(first_result "$HOTHERPORT" "$otherport_id")" \
+  "a server start failure for another port is captured verbatim"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERPORT" \
+  "$ROOT/bin/fm-procevent-lavish.sh" retire "$OTHERPORT_ART" >/dev/null
+pass "only a start failure naming this poll's own port joins the quiet retry"
 
 # --- end-user-aligned regression: a killed blocking poll keeps its listener ---
 # Seen live: a signal to the blocking `lavish-axi poll` child, with nothing
@@ -2344,23 +2399,29 @@ for race_index in $(seq 1 24); do
 done
 # Wait for the blocked winner and every loser to observe its claim before
 # releasing it; a settle sleep lets slow contenders arrive only after the
-# winner exits and no longer tests contention.
+# winner exits and no longer tests contention. The winner blocks until the
+# trigger, so every other contender finishing is the loser's own completion,
+# not a clock; a second runner also blocks, and stops this wait on its start.
 if ! wait_for "$RACE_LOG" 300; then
   cat "$TMP_ROOT"/race-contender-*.out >&2
   fail "no contender acquired the stale claim"
 fi
 race_expected_losers=$((${#race_pids[@]} - 1))
-race_loser_deadline=$((SECONDS + 30))
 while :; do
-  race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
-    "$TMP_ROOT"/race-contender-*.out)
-  [ "$race_losers" -eq "$race_expected_losers" ] && break
-  if [ "$SECONDS" -ge "$race_loser_deadline" ]; then
-    cat "$TMP_ROOT"/race-contender-*.out >&2
-    fail "not every stale-claim contender observed the winning owner"
-  fi
+  race_running=0
+  for race_pid in "${race_pids[@]}"; do
+    kill -0 "$race_pid" 2>/dev/null && race_running=$((race_running + 1))
+  done
+  [ "$race_running" -le 1 ] && break
+  [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
   sleep 0.1
 done
+race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
+  "$TMP_ROOT"/race-contender-*.out)
+if [ "$race_losers" -ne "$race_expected_losers" ]; then
+  cat "$TMP_ROOT"/race-contender-*.out >&2
+  fail "not every stale-claim contender observed the winning owner"
+fi
 [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || fail "stale-claim race started more than one runner"
 : > "$RACE_TRIGGER"
 for race_pid in "${race_pids[@]}"; do wait "$race_pid" 2>/dev/null || true; done
@@ -5045,6 +5106,76 @@ SH
 }
 confirm_live_at_boundary reconcile
 confirm_live_at_boundary arm
+
+# A runner holds the source lock for its whole claim. On a loaded host that
+# claim outlasted the default confirm window, and the final read skipped the
+# held lock, so arm and reconcile reported a listener absent the moment before
+# it was owned. The shim holds the real runner inside its claim, at its first
+# argv read, past the default 3 s window and the whole-second clock's 1 s.
+confirm_held_claim() {
+  local operation=$1 HELD HELD_ID REAL_SED rc=0 output
+  local -a command=()
+  HELD="$TMP_ROOT/held-claim-$operation"
+  mkdir -p "$HELD/bin" "$HELD/home/state"
+  REAL_SED=$(command -v sed)
+  if [ "$operation" = reconcile ]; then
+    HELD_ID=held-claim-src
+    pe_register "$HELD/home" lavish "$HELD_ID" -- \
+      "$STARTED_BLOCKER" "$HELD/started" "$BLOCKER" "$HELD/poll-release" "done" >/dev/null
+    command=("$ROOT/bin/fm-procevent.sh" reconcile)
+  else
+    cat > "$HELD/bin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'started\n' > "$HELD/started"
+while [ ! -e "$HELD/poll-release" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: ended\n'
+SH
+    chmod +x "$HELD/bin/lavish-axi"
+    printf '<h1>held claim</h1>\n' > "$HELD/board.html"
+    lavish_session "$HELD/board.html"
+    HELD_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$HELD/board.html")
+    fm_test_track_procevent_home "$HELD/home"
+    command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$HELD/board.html")
+  fi
+  export HELD HELD_ID REAL_SED
+  cat > "$HELD/bin/sed" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "-n s/^argc=//p "*"/$HELD_ID.source")
+    if mkdir "$HELD/held" 2>/dev/null; then
+      sleep 5
+    fi
+    ;;
+esac
+exec "$REAL_SED" "$@"
+SH
+  chmod +x "$HELD/bin/sed"
+  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" \
+    "${command[@]}" > "$HELD/out" 2> "$HELD/err" || rc=$?
+  [ -d "$HELD/held" ] || fail "held-claim fixture never held the $operation runner's claim"
+  output=$(cat "$HELD/out")
+  [ "$rc" -eq 0 ] || fail "$operation reported a runner holding its claim absent ($rc): $output $(cat "$HELD/err")"
+  assert_not_contains "$(cat "$HELD/err")" "error:" "$operation printed an error for a runner that claimed"
+  if [ "$operation" = reconcile ]; then
+    assert_contains "$output" "started=1" "reconcile lost a launch whose claim outlasted the window"
+    assert_contains "$output" "failed=0" "reconcile reported a launch whose claim outlasted the window failed"
+    [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 0 ] \
+      || fail "reconcile published a false launch-failure event for a slow claim"
+  else
+    assert_contains "$output" "armed: $HELD_ID" "arm lost a listener whose claim outlasted the window"
+  fi
+  wait_for "$HELD/started" || fail "the $operation listener never ran after its slow claim"
+  assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
+    "a slow claim did not leave exactly one owner"
+  : > "$HELD/poll-release"
+  pe "$HELD/home" retire "$HELD_ID" >/dev/null 2>&1 || true
+  pass "$operation waits out a runner's claim that outlasts the default confirm window"
+}
+confirm_held_claim reconcile
+confirm_held_claim arm
 
 # --- arm reports ready only once this registration's listener is running ----
 # The public arm path used to print armed as soon as registration was stored.
