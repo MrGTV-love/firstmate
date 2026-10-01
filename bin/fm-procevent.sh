@@ -1890,6 +1890,14 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       rest=${entry#*$'\t'}
       identity=${rest%%$'\t'*}
       before=${rest#*$'\t'}
+      mark=
+      if [ -n "$identity" ] \
+        && stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$identity"); then
+        mark=$(cat -- "$stamp" 2>/dev/null || true)
+      fi
+      if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
+        continue
+      fi
       state=1
       if fm_procevent_source_lock_try_acquire "$id"; then
         fm_procevent_claim_state_locked "$id"
@@ -1906,23 +1914,15 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if [ "$state" -eq 0 ]; then
         continue
       fi
-      mark=
-      if [ -n "$identity" ] \
-        && stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$identity"); then
-        mark=$(cat -- "$stamp" 2>/dev/null || true)
-      fi
-      if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
-        continue
-      fi
       remaining+=("$entry")
     done
     pending=("${remaining[@]+"${remaining[@]}"}")
     [ "${#pending[@]}" -gt 0 ] || break
     [ "$final_read" -eq 0 ] || break
     if [ "$SECONDS" -ge "$deadline" ]; then
-      # External evidence reads can consume the remaining window after the
-      # claim snapshot. Refresh it once before reporting an already-live
-      # launch absent; this does not extend the configured polling deadline.
+      # External stamp reads can consume the remaining window. Refresh once
+      # before reporting a launch absent, with ownership checked after stamp
+      # work even on that final pass; the polling deadline stays unchanged.
       final_read=1
       continue
     fi
@@ -1980,9 +1980,6 @@ cmd_ensure_listening() {
   fi
   deadline=$((SECONDS + 10#$window + 1))
   while :; do
-    listening=0
-    generation_is_listening "$id" "$identity" || listening=$?
-    [ "$listening" -ne 0 ] || return 0
     mark=
     if stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$identity"); then
       mark=$(cat -- "$stamp" 2>/dev/null || true)
@@ -1990,6 +1987,9 @@ cmd_ensure_listening() {
     if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
       return 0
     fi
+    listening=0
+    generation_is_listening "$id" "$identity" || listening=$?
+    [ "$listening" -ne 0 ] || return 0
     [ "$final_read" -eq 0 ] || break
     if [ "$started_once" -eq 0 ] && generation_can_launch "$id"; then
       detach_runner "$id"
@@ -1997,7 +1997,7 @@ cmd_ensure_listening() {
     fi
     if [ "$SECONDS" -ge "$deadline" ]; then
       # Also observes a launch made at the end of this iteration before
-      # deciding it failed. Never wait beyond one final evidence read.
+      # deciding it failed. Never wait beyond one final evidence pass.
       final_read=1
       continue
     fi
