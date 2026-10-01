@@ -10,8 +10,10 @@
 # manual tracing. These helpers record per-step elapsed times as the run happens,
 # so the next slow run is answerable from the durable record alone.
 #
-# OFF BY DEFAULT, AND INERT. Every helper is a no-op unless FM_TIMING_LOG names a
-# file. Nothing here talks to the network, waits, locks, or changes control flow:
+# OFF BY DEFAULT, AND INERT. Every recording helper is a no-op unless
+# FM_TIMING_LOG names a file; the clock helpers (fm_timing_now_ms,
+# fm_timing_seconds_ms) only read or convert time, which is why
+# bin/fm-dispatch-resolve.sh reuses them for its own diagnostics. Nothing here talks to the network, waits, locks, or changes control flow:
 # a failed append is discarded rather than propagated, because losing a diagnostic
 # line must never change what a sweep does or how it exits.
 #
@@ -50,27 +52,32 @@ fm_timing_enabled() {
   [ -n "${FM_TIMING_LOG:-}" ]
 }
 
-# Milliseconds since the epoch. EPOCHREALTIME is a bash builtin (no fork) whose
-# decimal separator follows the locale, so both forms are accepted. A shell
-# without it - macOS's system bash 3.2, which `env bash` still resolves to on a
-# host with no newer bash on PATH - degrades to whole-second granularity rather
-# than losing the timing entirely. That is a coarser answer to "which host was
-# slow", not a missing one, because the steps being measured are seconds-scale.
-fm_timing_now_ms() {
-  local raw sec frac
-  raw=${EPOCHREALTIME:-}
+# Whole milliseconds from a decimal seconds value such as EPOCHREALTIME or curl's
+# %{time_total}. Either decimal separator is accepted because EPOCHREALTIME
+# follows the locale. Prints nothing and fails for anything else.
+fm_timing_seconds_ms() {  # <seconds>
+  local raw=${1:-} sec frac
   case "$raw" in
-    *[0-9][.,][0-9]*)
-      sec=${raw%%[.,]*}
-      frac=${raw#*[.,]}
-      frac="${frac}000"
-      frac=${frac:0:3}
-      case "$sec$frac" in
-        ''|*[!0-9]*) ;;
-        *) printf '%s\n' "$(( sec * 1000 + 10#$frac ))"; return 0 ;;
-      esac
-      ;;
+    *[.,]*) sec=${raw%%[.,]*}; frac=${raw#*[.,]} ;;
+    *) sec=$raw; frac= ;;
   esac
+  frac="${frac}000"
+  frac=${frac:0:3}
+  case "$sec" in ''|*[!0-9]*) return 1 ;; esac
+  case "$frac" in *[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$(( 10#$sec * 1000 + 10#$frac ))"
+}
+
+# Milliseconds since the epoch, so stamps written by several processes share one
+# origin. EPOCHREALTIME is a bash builtin (no fork). macOS's system bash 3.2,
+# which `env bash` still resolves to on a host with no newer bash on PATH, lacks
+# it and asks stock Perl's Time::HiRes for the same epoch clock instead. Only a
+# host without that helper degrades to whole seconds, so unavailable diagnostics
+# never change a caller's exit behavior.
+fm_timing_now_ms() {
+  local sec
+  fm_timing_seconds_ms "${EPOCHREALTIME:-}" && return 0
+  perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000' 2>/dev/null && return 0
   sec=$(date +%s 2>/dev/null || printf '0')
   case "$sec" in ''|*[!0-9]*) sec=0 ;; esac
   printf '%s\n' "$(( sec * 1000 ))"

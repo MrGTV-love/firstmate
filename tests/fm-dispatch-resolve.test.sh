@@ -108,30 +108,37 @@ JSON
 cat > "$FAKEBIN/curl" <<'SH'
 #!/usr/bin/env bash
 # Fake curl: records argv (minus the -o target), the stdin body, and the header
-# read from fd 3, then answers with FAKE_CURL_RESPONSE and FAKE_CURL_HTTP.
+# read from fd 3, then answers with FAKE_CURL_RESPONSE and FAKE_CURL_HTTP. Like
+# real curl, it renders the -w template even when the transfer fails, reporting
+# FAKE_CURL_DELAY as its own transfer time.
 set -u
 if [ -n "${TYPESAFE_API_KEY+x}" ] || [ -n "${TYPESAFE_API_KEY_PRIVATE+x}" ]; then
   printf 'curl:secret-present\n' >> "${CHILD_ENV_LOG:?}"
 else
   printf 'curl:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
-out=''
+out='' write=''
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift 2 ;;
+    -w) write=$2; printf '%s\n%s\n' "$1" "$2" >> "${FAKE_CURL_LOG:?}/argv"; shift 2 ;;
     *) printf '%s\n' "$1" >> "${FAKE_CURL_LOG:?}/argv"; shift ;;
   esac
 done
 cat > "$FAKE_CURL_LOG/body"
+sleep "${FAKE_CURL_DELAY:-0}"
 cat /dev/fd/3 > "$FAKE_CURL_LOG/header" 2>/dev/null || printf 'fd3 unreadable\n' > "$FAKE_CURL_LOG/header"
 if [ -n "${FAKE_CURL_MUTATE_SOURCE:-}" ]; then
   cp "$FAKE_CURL_MUTATE_SOURCE" "${FAKE_CURL_MUTATE_TARGET:?}"
 fi
+status=${FAKE_CURL_HTTP:-200}
+[ "${FAKE_CURL_FAIL:-0}" = 1 ] && status=000
+write=${write//'%{http_code}'/$status}
+printf '%s' "${write//'%{time_total}'/${FAKE_CURL_TIME_TOTAL:-${FAKE_CURL_DELAY:-0}}}"
 if [ "${FAKE_CURL_FAIL:-0}" = 1 ]; then
   exit 7
 fi
 cp "${FAKE_CURL_RESPONSE:?}" "$out"
-printf '%s' "${FAKE_CURL_HTTP:-200}"
 SH
 chmod +x "$FAKEBIN/curl"
 
@@ -144,6 +151,7 @@ else
   printf 'quota-axi:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
 printf '%s\n' "$*" >> "${QUOTA_AXI_CALLS:?}"
+sleep "${FAKE_QUOTA_DELAY:-0}"
 [ "${FAKE_QUOTA_FAIL:-0}" = 1 ] && exit 1
 [ "${1:-}" = --json ] || exit 2
 cat "${QUOTA_AXI_FIXTURE:?}"
@@ -163,7 +171,7 @@ reset_log() {
 run() {
   local __exit=$1 __out=$2 __err=$3 _out _code
   shift 3
-  _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
+  _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "${RESOLVER_BASH:-bash}" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
   _code=$?
   printf -v "$__exit" '%s' "$_code"
   printf -v "$__out" '%s' "$_out"
@@ -245,6 +253,148 @@ assert_not_contains "$body" 'SECRET-WHY-TEXT' "why text never leaves the machine
 assert_not_contains "$body" 'spendPriority' "quota never leaves the machine"
 assert_not_contains "$body" 'cursor-grok' "use profiles never leave the machine"
 pass "clear: one rule Choice request, key on the fd header only, spendPriority argmax over every candidate"
+
+# --- API, quota, and local time are separate on stock macOS Bash too ----------
+telemetry_field() {  # <output> <field>
+  awk -v key="$2" '{
+    for (i = 1; i <= NF; i++) {
+      split($i, pair, "=")
+      if (pair[1] == key) { print pair[2]; exit }
+    }
+  }' <<<"$1"
+}
+reset_log
+TYPESAFE_API_KEY=$KEY RESOLVER_BASH=/bin/bash FAKE_CURL_DELAY=0.12 FAKE_QUOTA_DELAY=0.24 \
+  run code out err "$BRIEF" --project pager
+expect_code 0 "$code" "timed resolver exits 0 under /bin/bash"
+api_ms=$(telemetry_field "$out" api_ms)
+quota_ms=$(telemetry_field "$out" quota_ms)
+local_ms=$(telemetry_field "$out" local_ms)
+total_ms=$(telemetry_field "$out" total_ms)
+case "$api_ms:$quota_ms:$local_ms:$total_ms" in
+  *[!0-9:]*|:*|*::*|*:) fail "timings must be integer milliseconds: $out" ;;
+esac
+[ "$api_ms" -ge 120 ] || fail "API delay lost millisecond precision: $api_ms"
+[ "$quota_ms" -ge 240 ] || fail "quota delay lost millisecond precision: $quota_ms"
+assert_equals "$total_ms" "$(( api_ms + quota_ms + local_ms ))" "stages account for total time exactly"
+assert_equals 120 "$api_ms" "API time is curl's own transfer time, without helper startup"
+assert_contains "$out" "latency_ms: $api_ms" "legacy latency still measures only the API"
+assert_contains "$out" 'model: jev-1.13.0' "returned model id remains observable"
+assert_equals 812 "$(telemetry_field "$out" input_tokens)" "usage reports input tokens"
+assert_equals 60 "$(telemetry_field "$out" output_tokens)" "usage reports output tokens"
+cost=$(telemetry_field "$out" jev_cost_usd)
+jq -ne --argjson cost "$cost" '$cost == (812 * 0.042 / 1000000)' >/dev/null \
+  || fail "cost must charge input tokens only: $cost"
+assert_equals 0.042 "$(telemetry_field "$out" jev_input_usd_per_million)" "estimate exposes its catalog rate"
+assert_not_contains "$out$err" "$KEY" "timing and cost output never expose the key"
+assert_not_contains "$out$err" 'off-by-one in the pager' "timing and cost output never expose brief text"
+assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "timing does not add quota snapshots"
+pass "stock Bash resolver separates API, quota, local and total timing, with input-only Jev cost"
+
+# Without EPOCHREALTIME, as on stock macOS Bash 3.2, stamps still come from the
+# epoch clock at millisecond precision. A fake whole-second `date` proves the
+# coarse fallback is not what answered.
+cat > "$FAKEBIN/date" <<'SH'
+#!/usr/bin/env bash
+printf '1\n'
+SH
+chmod +x "$FAKEBIN/date"
+clock_ms=$(PATH="$FAKEBIN:$BASE_PATH" /bin/bash -c \
+  '. "$1"; unset EPOCHREALTIME; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
+perl -MTime::HiRes=time -e '
+  my $stamp = shift;
+  my $now = int(time * 1000);
+  exit !($stamp =~ /\A[0-9]+\z/ && $stamp <= $now && $now - $stamp < 10000);
+' "$clock_ms" || fail "Bash timer without EPOCHREALTIME did not use the epoch ms clock: $clock_ms"
+rm -f "$FAKEBIN/date"
+pass "stock Bash timing uses the host epoch clock at millisecond precision"
+
+# Where the shell has EPOCHREALTIME, the timer reads it without starting Perl.
+cat > "$FAKEBIN/perl" <<'SH'
+#!/usr/bin/env bash
+printf 'perl\n' >> "${FAKE_CURL_LOG:?}/perl.calls"
+exit 1
+SH
+chmod +x "$FAKEBIN/perl"
+reset_log
+if PATH="$FAKEBIN:$BASE_PATH" bash -c '[ -n "${EPOCHREALTIME:-}" ]'; then
+  clock_ms=$(PATH="$FAKEBIN:$BASE_PATH" bash -c \
+    '. "$1"; fm_timing_now_ms' _ "$ROOT/bin/fm-timing-lib.sh")
+  rm -f "$FAKEBIN/perl"
+  perl -MTime::HiRes=time -e '
+    my $stamp = shift;
+    my $now = int(time * 1000);
+    exit !($stamp =~ /\A[0-9]+\z/ && $stamp <= $now && $now - $stamp < 10000);
+  ' "$clock_ms" || fail "EPOCHREALTIME timer did not read the epoch ms clock: $clock_ms"
+  assert_absent "$LOG/perl.calls" "EPOCHREALTIME timing starts no Perl process"
+  pass "EPOCHREALTIME timing stays on the builtin fast path"
+else
+  rm -f "$FAKEBIN/perl"
+  printf 'skip: bash on PATH has no EPOCHREALTIME\n'
+fi
+
+# A curl that reports no transfer time leaves API time unknown, never invented.
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_TIME_TOTAL=unknown run code out err "$BRIEF"
+expect_code 0 "$code" "unparseable curl time exits 0"
+assert_contains "$out" '  status: clear' "unparseable curl time does not change resolution"
+assert_equals null "$(telemetry_field "$out" api_ms)" "unparseable curl time is unknown API time"
+assert_contains "$out" 'latency_ms: -' "legacy latency is unknown with API time"
+pass "missing curl transfer time is reported as unknown"
+
+# Missing usage is not fabricated as zero, and a quota failure still reports
+# the paid API call while marking only the snapshot as failed.
+jq 'del(.usage)' "$RESPONSE" > "$TMP_ROOT/no-usage.json"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/no-usage.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "missing optional usage does not change resolution"
+assert_equals null "$(telemetry_field "$out" jev_cost_usd)" "missing usage has unknown cost"
+assert_equals null "$(telemetry_field "$out" input_tokens)" "missing usage has unknown input count"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_QUOTA_FAIL=1 FAKE_QUOTA_DELAY=0.12 run code out err "$BRIEF"
+expect_code 0 "$code" "quota failure with telemetry exits 0"
+assert_contains "$out" '  reason: quota-axi --json failed' "quota failure preserves its reason"
+assert_equals "$cost" "$(telemetry_field "$out" jev_cost_usd)" "quota failure retains API cost"
+assert_equals jev-1.13.0 "$(telemetry_field "$out" returned_model)" "quota failure attributes paid usage to the returned Jev version"
+[ "$(telemetry_field "$out" quota_ms)" -ge 120 ] || fail "failed quota duration was lost"
+pass "unavailable usage is unknown and a failed quota snapshot retains API cost"
+
+jq --arg key "$KEY" '.model = ("jev-1.13.0\n" + $key + " private-brief-marker-4417")' "$RESPONSE" > "$TMP_ROOT/sensitive-model.json"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-model.json" FAKE_QUOTA_FAIL=1 \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "unsafe response model does not block quota-error intake"
+assert_equals null "$(telemetry_field "$out" returned_model)" "arbitrary response model text is not telemetry"
+assert_not_contains "$out$err" "$KEY" "error model evidence cannot echo a key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "error model evidence cannot echo private brief text"
+pass "quota-error model evidence accepts only safe Jev version ids"
+
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-model.json" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "unsafe response model does not block resolution"
+assert_contains "$out" '  status: clear' "unsafe response model does not change routing"
+assert_contains "$out" '  model: -   latency_ms:' "legacy model line shows an unsafe model id as unknown"
+assert_equals null "$(telemetry_field "$out" returned_model)" "unsafe model id is not success telemetry"
+assert_equals 812 "$(telemetry_field "$out" input_tokens)" "unsafe model id keeps usage"
+assert_not_contains "$out$err" "$KEY" "success model evidence cannot echo a key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "success model evidence cannot echo private brief text"
+pass "successful resolution model evidence accepts only safe Jev version ids"
+
+# API error bodies may echo an authorization header or private request state.
+# They are never diagnostics, even when the resolver keeps intake moving.
+printf '%s\n' "$KEY private-brief-marker-4417" > "$TMP_ROOT/sensitive-error"
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=429 FAKE_CURL_RESPONSE="$TMP_ROOT/sensitive-error" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "sensitive API error exits 0"
+assert_contains "$out" '  reason: http 429 after' "HTTP failure remains actionable"
+assert_not_contains "$out$err" "$KEY" "raw HTTP error cannot expose the API key"
+assert_not_contains "$out$err" 'private-brief-marker-4417' "raw HTTP error cannot expose private request text"
+assert_equals null "$(telemetry_field "$out" quota_ms)" "unattempted quota is unknown, not zero"
+assert_equals null "$(telemetry_field "$out" jev_cost_usd)" "unvalidated API response has no invented cost"
+assert_absent "$LOG/quota-axi.calls" "HTTP error does not call quota"
+pass "error diagnostics omit sensitive API bodies without blocking intake"
 
 # --- never-send list: a match or a bad list withholds the request -------------
 NEVER_SEND="$HOME_DIR/config/dispatch-never-send"
@@ -896,7 +1046,7 @@ assert_contains "$err" 'dispatch-resolve: error (http 429' "error also goes to s
 reset_log
 TYPESAFE_API_KEY=$KEY FAKE_CURL_FAIL=1 run code out err "$BRIEF"
 expect_code 0 "$code" "curl failure exits 0"
-assert_contains "$out" '  reason: http 000 after' "transport failure reads as http 000"
+assert_contains "$out" '  reason: http 000 after 0 ms' "transport failure reads as http 000 with curl's elapsed time"
 reset_log
 printf '%s\n' '{"model":"jev","answers":{}}' > "$RESPONSE"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
