@@ -1356,7 +1356,8 @@ Observed output:
 # herdr 0.9.1 recovery custody lab
 ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
 ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=168323
+ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=268195
 ```
 
 The primary recovery remains blocked at generated-copy allocation until the secondmate recovery has completed, so the verdict cannot depend on the allocation finishing within the session-lock acquisition window.
@@ -1366,7 +1367,11 @@ A fresh projected spawn is then held at its own generated-copy allocation while 
 The failed recovery closes its exact replacement pane without the session-lock refusal warning, leaves its metadata unpublished and its journal on that replacement, and leaves the fresh projection's pane untouched.
 The later recovery reclaims its exact husk, and the fresh spawn then publishes metadata matching its exact journal binding and parent, with focus unchanged.
 With the pinned pre-fix `bin/fm-spawn.sh`, the abort cleanup reports the session-lock refusal warning and the later recovery fails while the fresh allocation is held.
-The fixture proves submitted and literal allocation interception before provisioning, refuses unmatched commands and foreign paths, and never calls the shared Treehouse allocator.
+A fresh projected spawn is then held at its generated-copy allocation while a teardown from the other home is held inside its intercepted generated-copy return, after its own pane close.
+The fresh setup then fails, and its abort cleanup closes the exact bound pane without the session-lock refusal warning while the teardown is still held, leaving no metadata and its journal on that pane.
+The teardown then completes, returns exactly its own generated copy, removes its record, and leaves both homes' other live projections and focus unchanged.
+With the pre-fix `bin/fm-teardown.sh`, which held the session lock through its worktree return, the abort cleanup reports the session-lock refusal warning.
+The fixture proves submitted and literal allocation interception and exact generated-copy return interception before provisioning, refuses unmatched commands and foreign paths, and never calls the shared Treehouse allocator.
 
 ### Workspace-removal focus safety
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Two real-Herdr homes recover while one is held at worktree allocation, then
-# recover and abort beside a fresh projection held at worktree allocation.
-# Generated isolated clones replace Treehouse allocation; no pool is touched.
-# The public spawn path must retain task custody but release presentation
-# custody after exact reclaim or fresh binding.
+# recover and abort beside a fresh projection held at worktree allocation, then
+# abort a fresh projection beside a teardown held in its worktree return.
+# Generated isolated clones replace Treehouse allocation and return; no pool is
+# touched. The public spawn path must retain task custody but release
+# presentation custody after exact reclaim or fresh binding, and teardown must
+# release it after its pane close.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 for tool in herdr jq python3; do
@@ -20,12 +22,12 @@ HERDR_ORIGINAL_PATH=$PATH
 HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name recovery-lock)
 export HERDR_LAB_HELPER HERDR_LAB_SESSION HERDR_ORIGINAL_PATH TEST_DIR
 export HERDR_SESSION=$HERDR_LAB_SESSION
-LANES='primary bravo fresh abort late'
-PRIMARY_PID='' BRAVO_PID='' FRESH_PID='' ABORT_PID='' LAB_READY=0
+LANES='primary bravo fresh abort late doomed'
+PRIMARY_PID='' BRAVO_PID='' FRESH_PID='' ABORT_PID='' DOOMED_PID='' TEARDOWN_PID='' LAB_READY=0
 cleanup() {
   local rc=$? lane pid
-  for lane in $LANES; do touch "$TEST_DIR/release-$lane"; done
-  for pid in "$PRIMARY_PID" "$BRAVO_PID" "$FRESH_PID" "$ABORT_PID"; do
+  for lane in $LANES; do touch "$TEST_DIR/release-$lane" "$TEST_DIR/release-return-$lane"; done
+  for pid in "$PRIMARY_PID" "$BRAVO_PID" "$FRESH_PID" "$ABORT_PID" "$DOOMED_PID" "$TEARDOWN_PID"; do
     [ -z "$pid" ] || wait "$pid" 2>/dev/null || true
   done
   if [ "$LAB_READY" = 1 ]; then
@@ -101,6 +103,32 @@ esac
 exec env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
 WRAPPER
 chmod +x "$TEST_DIR/fakebin/herdr"
+cat > "$TEST_DIR/fakebin/treehouse" <<'WRAPPER'
+#!/usr/bin/env bash
+set -euo pipefail
+# Accept only an exact generated-copy return from its generated project. Any
+# other form refuses; nothing here reaches the shared allocator.
+[ "$#" = 3 ] && [ "$1" = return ] && [ "$2" = --force ] || exit 1
+case "$3" in
+  "$TEST_DIR"/copy-*) lane=${3#"$TEST_DIR"/copy-} ;;
+  *) exit 1 ;;
+esac
+case " $LANES " in *" $lane "*) ;; *) exit 1 ;; esac
+[ "$(pwd -P)" = "$TEST_DIR/project-$lane" ] || exit 1
+touch "$TEST_DIR/$lane-at-return"
+if [ -e "$TEST_DIR/hold-return-$lane" ]; then
+  for ((i=0; i<600; i++)); do
+    [ ! -e "$TEST_DIR/release-return-$lane" ] || break
+    sleep 0.1
+  done
+  [ -e "$TEST_DIR/release-return-$lane" ] || exit 1
+fi
+printf '%s\n' "$lane" >> "$TEST_DIR/returns"
+WRAPPER
+chmod +x "$TEST_DIR/fakebin/treehouse"
+mkdir "$TEST_DIR/teardownbin"
+printf '#!/bin/sh\nexit 1\n' > "$TEST_DIR/teardownbin/no-mistakes"
+chmod +x "$TEST_DIR/teardownbin/no-mistakes"
 export PATH="$TEST_DIR/fakebin:$PATH" LANES
 # Prove allocation interception against the actual adapter forms before a
 # real session exists. The probe helper has no Herdr or Treehouse invocation.
@@ -129,7 +157,15 @@ if HERDR_LAB_HELPER="$TEST_DIR/probe" herdr pane run foreign 'treehouse get' --s
 grep -F "pane run primary cd -- $TEST_DIR/copy-primary" "$TEST_DIR/probe-calls" >/dev/null || fail "submitted allocation was not intercepted"
 grep -F "pane send-text bravo cd -- $TEST_DIR/copy-bravo" "$TEST_DIR/probe-calls" >/dev/null || fail "literal allocation was not intercepted"
 if grep -E '(^|[[:space:];/])treehouse([[:space:];]|$)' "$TEST_DIR/probe-calls" >/dev/null; then fail "unmatched Treehouse command reached probe"; fi
-rm "$TEST_DIR/primary-at-allocation" "$TEST_DIR/bravo-at-allocation"
+[ "$(command -v treehouse)" = "$TEST_DIR/fakebin/treehouse" ] || fail "generated return interception is not first on PATH"
+[ "$(PATH="$TEST_DIR/teardownbin:$PATH" command -v no-mistakes)" = "$TEST_DIR/teardownbin/no-mistakes" ] || fail "teardown run-query stub is not first on PATH"
+(cd "$TEST_DIR/project-primary" && treehouse return --force "$TEST_DIR/copy-primary") || fail "exact generated-copy return was refused"
+if (cd "$TEST_DIR/project-primary" && treehouse get); then fail "unmatched Treehouse allocation was accepted"; fi
+if (cd "$TEST_DIR/project-primary" && treehouse return "$TEST_DIR/copy-primary"); then fail "unforced return was accepted"; fi
+if (cd "$TEST_DIR/project-bravo" && treehouse return --force "$TEST_DIR/copy-primary"); then fail "foreign-project return was accepted"; fi
+if (cd "$TEST_DIR/project-primary" && treehouse return --force "$TEST_DIR/project-primary"); then fail "non-copy return was accepted"; fi
+[ "$(cat "$TEST_DIR/returns")" = primary ] || fail "return interception recorded an unexpected call"
+rm "$TEST_DIR/primary-at-allocation" "$TEST_DIR/bravo-at-allocation" "$TEST_DIR/primary-at-return" "$TEST_DIR/returns"
 LAB_READY=1
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
 echo "# herdr $(lab status --json | jq -r '.server.version') recovery custody lab"
@@ -193,6 +229,7 @@ EOF
   done
 done
 write_brief "$TEST_DIR/home-primary" fresh-primary
+write_brief "$TEST_DIR/home-bravo" fresh-bravo
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
 FOCUS=$(fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")
@@ -201,14 +238,20 @@ spawn() { # <home> <task-id> <lane>
   exec env FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 \
     bash "$ROOT/bin/fm-spawn.sh" "$2" "$TEST_DIR/project-$3" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
 }
-await_allocation() { # <lane> <pid>
+teardown() { # <home> <task-id>
+  exec env PATH="$TEST_DIR/teardownbin:$PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$TEST_DIR/home-$1" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$TEST_DIR/home-$1/state" FM_DATA_OVERRIDE="$TEST_DIR/home-$1/data" FM_CONFIG_OVERRIDE="$TEST_DIR/home-$1/config" \
+    bash "$ROOT/bin/fm-teardown.sh" "$2" --force
+}
+await_marker() { # <marker> <pid> <name>
   for ((i=0; i<600; i++)); do
-    [ ! -e "$TEST_DIR/$1-at-allocation" ] || return 0
+    [ ! -e "$TEST_DIR/$1" ] || return 0
     kill -0 "$2" 2>/dev/null || break
     sleep 0.1
   done
-  fail "$1 did not reach allocation: $(cat "$TEST_DIR/$1.err")"
+  fail "$3 did not reach $1: $(cat "$TEST_DIR/$3.err")"
 }
+await_allocation() { await_marker "$1-at-allocation" "$2" "$1"; }
 touch "$TEST_DIR/hold-primary"
 spawn primary recovery-primary primary >"$TEST_DIR/primary.out" 2>"$TEST_DIR/primary.err" &
 PRIMARY_PID=$!
@@ -291,3 +334,40 @@ FRESH_META="$TEST_DIR/home-primary/state/fresh-primary.meta"
 [ "$(fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")" = "$FOCUS" ] || fail "fresh launch handoff moved focus"
 [ "$(cut -f1 "$TEST_DIR/mutation-owners" | sort -u | wc -l | tr -d '[:space:]')" = 3 ] || fail "presentation mutations did not have the abort, fresh and late process owners"
 echo 'ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus'
+
+# A fresh projection waits at allocation. A teardown from the other home then
+# holds its own worktree return until the fresh setup has failed and its abort
+# cleanup has finished, so cleanup cannot come from the return finishing within
+# any acquisition window.
+touch "$TEST_DIR/hold-doomed" "$TEST_DIR/fail-doomed" "$TEST_DIR/hold-return-primary"
+spawn bravo fresh-bravo doomed >"$TEST_DIR/doomed.out" 2>"$TEST_DIR/doomed.err" &
+DOOMED_PID=$!
+await_allocation doomed "$DOOMED_PID"
+DOOMED_JOURNAL="$TEST_DIR/home-bravo/state/fresh-bravo.herdr-presentation"
+DOOMED_PANE=$(field "$DOOMED_JOURNAL" pane_id)
+[ -n "$DOOMED_PANE" ] || fail "doomed fresh projection did not publish its exact binding before allocation"
+lab pane get "$DOOMED_PANE" >/dev/null || fail "doomed fresh pane was not live before setup failed"
+TORN_META="$TEST_DIR/home-primary/state/recovery-primary.meta"
+TORN_PANE=$(field "$TORN_META" herdr_pane_id)
+teardown primary recovery-primary >"$TEST_DIR/teardown.out" 2>"$TEST_DIR/teardown.err" &
+TEARDOWN_PID=$!
+await_marker primary-at-return "$TEARDOWN_PID" teardown
+touch "$TEST_DIR/release-doomed"
+if wait "$DOOMED_PID"; then fail "doomed fresh spawn launched after its setup failed"; fi
+DOOMED_PID=
+kill -0 "$TEARDOWN_PID" || fail "teardown return was not still held while the failed spawn cleaned up"
+if grep -F 'focus lock unavailable' "$TEST_DIR/doomed.err" >/dev/null; then fail "fresh abort cleanup could not reacquire session custody beside a held teardown return: $(cat "$TEST_DIR/doomed.err")"; fi
+if lab pane get "$DOOMED_PANE" >/dev/null 2>&1; then fail "aborted fresh projection left its exact pane live"; fi
+[ ! -e "$TEST_DIR/home-bravo/state/fresh-bravo.meta" ] || fail "aborted fresh projection published metadata"
+[ "$(field "$DOOMED_JOURNAL" pane_id)" = "$DOOMED_PANE" ] || fail "aborted fresh projection rewrote its journal"
+if lab pane get "$TORN_PANE" >/dev/null 2>&1; then fail "teardown had not closed its own pane before its held return"; fi
+[ -e "$TORN_META" ] || fail "teardown removed its record before its return completed"
+touch "$TEST_DIR/release-return-primary"
+wait "$TEARDOWN_PID" || fail "teardown failed after its held return: $(cat "$TEST_DIR/teardown.err")"
+TEARDOWN_PID=
+[ "$(cat "$TEST_DIR/returns")" = primary ] || fail "teardown did not return exactly its own generated copy"
+[ ! -e "$TORN_META" ] || fail "teardown kept its task record"
+lab pane get "$FRESH_PANE" >/dev/null || fail "teardown touched its home's sibling projection"
+lab pane get "$(field "$TEST_DIR/home-bravo/state/recovery-late.meta" herdr_pane_id)" >/dev/null || fail "abort or teardown touched the other home's live projection"
+[ "$(fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")" = "$FOCUS" ] || fail "abort cleanup beside a held teardown moved focus"
+echo 'ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus'
