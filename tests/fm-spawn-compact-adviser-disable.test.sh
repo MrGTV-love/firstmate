@@ -390,6 +390,70 @@ SH
   pass "automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm"
 }
 
+# The same pane shell sources an automatic launch, then an off and an
+# emergency-off replacement. Only the automatic one may run with the flag
+# Firstmate marked as adviser-only; a captain's unmarked opt-in stays whole. The
+# backend never sees the operator's per-invocation override or that marker.
+test_reused_endpoint_drops_adviser_hooks() {
+  local setting rec id seen expected script kind pre launch out
+  for setting in absent enabled; do
+    rec=$(make_case "reuse-$setting" claude "reuse-$setting-auto" "reuse-$setting-off" "reuse-$setting-kill")
+    read_case "$rec"
+    [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+    mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux-backend"
+    cat > "$FAKEBIN_DIR/tmux" <<'SH'
+#!/usr/bin/env bash
+printf '%s|%s|%s\n' "${FM_COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}" >> "$(dirname "$0")/backend-env"
+exec "$(dirname "$0")/tmux-backend" "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/tmux"
+    script=
+    for kind in auto off kill; do
+      id="reuse-$setting-$kind"
+      if [ "$kind" = off ]; then
+        printf '{"claude":"off"}\n' > "$HOME_DIR/config/compact-adviser"
+      else
+        printf '{"claude":"auto"}\n' > "$HOME_DIR/config/compact-adviser"
+      fi
+      if [ "$kind" = kill ]; then
+        : > "$FAKEBIN_DIR/backend-env"
+        out=$(FM_COMPACT_ADVISER_DISABLE=1 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1 \
+          run_case_spawn "$id" "$PROJ_DIR" claude --mode no-mistakes --yolo off) \
+          || fail "$id: spawn failed: $out"
+        [ -s "$FAKEBIN_DIR/backend-env" ] || fail "$id: the backend was never invoked"
+        [ "$(sort -u "$FAKEBIN_DIR/backend-env")" = 'unset|unset|unset' ] \
+          || fail "$id: the backend inherited per-invocation adviser state: $(sort -u "$FAKEBIN_DIR/backend-env" | tr '\n' ' ')"
+      else
+        out=$(run_case_spawn "$id" "$PROJ_DIR" claude --mode no-mistakes --yolo off) \
+          || fail "$id: spawn failed: $out"
+      fi
+      pre=$(grep '^export ' "$PANE_LOG")
+      launch=$(cat "$LAUNCH_LOG")
+      script="$script$pre
+$launch
+"
+    done
+    cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/bin/sh
+printf '%s|%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}"
+SH
+    chmod +x "$FAKEBIN_DIR/claude"
+    seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm TMUX=synthetic-pane \
+      /bin/sh -c "$script" | tr '\n' ' ') || fail "reuse, allowlist $setting: replay failed"
+    assert_equals '0|1|1 1|unset|unset 1|unset|unset ' "$seen" \
+      "reuse, allowlist $setting: an off or emergency-off relaunch kept the adviser-only hooks flag"
+    expected='0|1|unset 1|1|unset 1|1|unset '
+    [ "$setting" = absent ] || expected='0|1|1 1|unset|unset 1|unset|unset '
+    seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm TMUX=synthetic-pane \
+      CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 /bin/sh -c "$script" | tr '\n' ' ') \
+      || fail "reuse, allowlist $setting: opted-in replay failed"
+    assert_equals "$expected" "$seen" "reuse, allowlist $setting: a captain's own function-hooks opt-in was not preserved"
+  done
+  pass "a reused endpoint drops adviser-only hooks on off and emergency-off relaunches, and the backend never inherits the override"
+}
+
 test_invalid_policy_refuses_before_launch() {
   local policy rec out status
   rec=$(make_case invalid-policy codex invalid-policy-a1)
@@ -424,6 +488,7 @@ test_auto_emergency_override() {
 }
 
 test_auto_launch_policy
+test_reused_endpoint_drops_adviser_hooks
 test_invalid_policy_refuses_before_launch
 test_auto_emergency_override
 test_ship_allowlist_absent

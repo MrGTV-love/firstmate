@@ -601,6 +601,10 @@ fi
 # shellcheck source=bin/fm-compact-adviser-lib.sh
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
 COMPACT_ADVISER_FORCE_OFF=$(fm_compact_adviser_force_off)
+# The override and an adviser-only hooks flag belong to this one invocation, so
+# no backend server or pane started below may inherit them.
+[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
+unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
 # config/claude-permission-mode (header above): resolved once per spawn or
 # relaunch, before any mutation, so a malformed file refuses instead of
 # launching a worker on a permission posture the captain did not choose.
@@ -2364,12 +2368,15 @@ case "$ARG3" in
 esac
 COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
 COMPACT_ADVISER_SWITCH=1
-COMPACT_ADVISER_HOOKS=
+# A reused pane shell may still hold the flag an earlier automatic launch
+# marked as adviser-only; drop it before this launch resolves its own policy.
+# shellcheck disable=SC2016
+COMPACT_ADVISER_HOOKS='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
 if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
   COMPACT_ADVISER_SWITCH=0
   if [ "$HARNESS" = claude ]; then
     # shellcheck disable=SC2016
-    COMPACT_ADVISER_HOOKS='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
+    COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
   fi
 fi
 
