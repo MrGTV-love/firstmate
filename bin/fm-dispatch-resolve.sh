@@ -50,11 +50,13 @@
 #     status: clear | ambiguous | escalate | error
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
 #     timings: api_ms/quota_ms/local_ms/total_ms (local is total minus both calls)
-#     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million
+#     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
 #   latency_ms remains API-only. Times include local helper overhead; total is
 #   measured from opted-in setup through rendering, before printing diagnostics.
 #   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
 #   $0.042 per million input tokens, output free; unavailable usage prints null.
+#   returned_model accepts only numeric Jev version ids, else null; it survives
+#   quota failures alongside paid-call usage, without echoing arbitrary API text.
 #   Only numeric usage and the returned model id are observed, never request text
 #   or raw API error bodies, which may echo sensitive input.
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
@@ -254,12 +256,15 @@ emit_telemetry() {
   if [ "$RESPONSE_VALID" -eq 1 ]; then
     jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" '
       def count: if type == "number" and . >= 0 and . == floor then . else null end;
+      def model_id:
+        if type == "string" and length <= 80 and test("\\Ajev-[0-9]+(\\.[0-9]+)*\\z")
+        then . else null end;
       (.usage.input_tokens | count) as $input |
       (.usage.output_tokens | count) as $output |
-      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price)"
+      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price) returned_model=\(.model | model_id)"
     ' "$RESP_FILE" 2>/dev/null || true
   else
-    printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s\n' "$TS_INPUT_USD_PER_MILLION"
+    printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s returned_model=null\n' "$TS_INPUT_USD_PER_MILLION"
   fi
 }
 
