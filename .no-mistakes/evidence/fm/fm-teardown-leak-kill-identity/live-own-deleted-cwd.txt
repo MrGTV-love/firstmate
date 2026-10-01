@@ -1,0 +1,15 @@
+=== scenario: own-deleted-cwd   task id: labx-own-deleted-cwd-29932
+lab home: /Users/charlesabrooker/tmp/fm-lab.szCZvx (marked: yes)
+target pid: 30808  start: Thu Oct  1 10:47:56 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.szCZvx/projects/wt/dist
+unrelated pid: 30805
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-own-deleted-cwd-29932 
+--- exit code: 0
+--- stderr (process-custody lines):
+  teardown: reaping leaked worktree process(es) for labx-own-deleted-cwd-29932: 30808
+--- target pid 30808 after teardown: dead
+--- unrelated pid 30805 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: no
+--- durable audit labx-own-deleted-cwd-29932.teardown-processes:
+  1790869680	TERM	30808	lstart=Thu\ Oct\ \ 1\ 10:47:56\ 2026	sleep\ 300	Thu\ Oct\ \ 1\ 10:47:56\ 2026\ \ \ \ 	/Users/charlesabrooker/tmp/fm-lab.szCZvx/projects/wt/dist	/Users/charlesabrooker/tmp/fm-lab.szCZvx/projects/wt/dist
+--- lab removed: yes

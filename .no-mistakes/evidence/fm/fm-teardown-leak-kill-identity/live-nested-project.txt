@@ -1,0 +1,30 @@
+=== scenario: nested-project   task id: labx-nested-project-80501
+lab home: /Users/charlesabrooker/tmp/fm-lab.LB1CiV (marked: yes)
+nested lane: /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/project
+  registry(project): HEAD fa11e40535ba90cda81f4bf1c5391159f56a9348
+  registry(project): branch refs/heads/main
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt
+  registry(project): HEAD b06acfd6e9659638ba69a1236846b6f5559f0d09
+  registry(project): branch refs/heads/fm/labx-nested-project-80501
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane
+  registry(project): HEAD fa11e40535ba90cda81f4bf1c5391159f56a9348
+  registry(project): detached
+  registry(project): locked other task lane
+  registry(project): 
+target pid: 81255  start: Thu Oct  1 10:47:27 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane
+unrelated pid: 81203
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-nested-project-80501 --force
+--- exit code: 1
+--- stderr (process-custody lines):
+  REFUSED: process 81255 (lstart=Thu Oct  1 10:47:27 2026) matched path /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane, whose ownership by labx-nested-project-80501 is not proven; preserving it and task labx-nested-project-80501 without signalling.
+  REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.LB1CiV/projects/wt/other-lane for labx-nested-project-80501 (registered nested worktree lane holds process 81255); preserving the worktree/tasktmp for manual inspection or retry.
+--- target pid 81255 after teardown: alive
+--- unrelated pid 81203 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-nested-project-80501.teardown-processes:
+  (absent)
+--- lab removed: yes

@@ -1,0 +1,16 @@
+=== scenario: tasktmp-only   task id: labx-tasktmp-only-62130
+lab home: /Users/charlesabrooker/tmp/fm-lab.B7FPpK (marked: yes)
+target pid: 64848  start: Thu Oct  1 10:49:30 2026  cwd: /private/tmp/fm-labx-tasktmp-only-62130
+unrelated pid: 64729
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-tasktmp-only-62130 --force
+--- exit code: 0
+--- stderr (process-custody lines):
+  teardown: reaping leaked tasktmp process(es) for labx-tasktmp-only-62130: 64848
+--- target pid 64848 after teardown: dead
+--- unrelated pid 64729 after teardown: alive
+--- other task's worker in the reassigned slot pid 64850 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: no
+--- durable audit labx-tasktmp-only-62130.teardown-processes:
+  1790869775	TERM	64848	lstart=Thu\ Oct\ \ 1\ 10:49:30\ 2026	sleep\ 300	Thu\ Oct\ \ 1\ 10:49:30\ 2026\ \ \ \ 	/private/tmp/fm-labx-tasktmp-only-62130	/private/tmp/fm-labx-tasktmp-only-62130
+--- lab removed: yes

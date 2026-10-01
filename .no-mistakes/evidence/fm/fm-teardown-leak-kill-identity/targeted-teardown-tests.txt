@@ -1,0 +1,18 @@
+ok - a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving
+ok - a leaked descendant process rooted under the task's per-task tasktmp is reaped by teardown too
+ok - a real leaked process observes its durable identity audit before TERM, and KILL is audited too
+ok - registered nested-lane and unrelated processes and records remain untouched on forced teardown
+ok - a nested lane registered by a sibling clone of the project is never signalled on forced teardown
+ok - a still-registered nested lane whose .git is missing is never signalled through outer-worktree discovery
+ok - a process inside a deleted but still-registered nested lane is never signalled
+ok - a leaked process whose own-tree cwd was deleted is audited and reaped
+ok - an unwritable process audit refuses before signalling a real leaked process
+ok - missing lsof refuses teardown instead of sending unaudited process-group signals
+ok - an erroring lsof scan refuses teardown and preserves the task
+ok - a reused pid with a different start time is never force-killed
+ok - an exec change preserves birth identity and the process is reaped
+ok - a process spawned during grace is reaped on a later pass
+ok - persistent leaked processes refuse teardown after bounded retries
+ok - a process exiting during identity lookup does not block teardown
+ok - the run abort and the leaked-process reap both complete before the destructive worktree return
+TARGETED-DONE

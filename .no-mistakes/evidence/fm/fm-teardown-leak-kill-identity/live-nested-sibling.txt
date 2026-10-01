@@ -1,0 +1,25 @@
+=== scenario: nested-sibling   task id: labx-nested-sibling-87242
+lab home: /Users/charlesabrooker/tmp/fm-lab.11gqYF (marked: yes)
+nested lane: /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt/other-lane
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/project
+  registry(project): HEAD eab73dbb0fa10d464b3c9340790760bf78d31e94
+  registry(project): branch refs/heads/main
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt
+  registry(project): HEAD 92c1c0c10355418e036aea0c1cfd2f807f444667
+  registry(project): branch refs/heads/fm/labx-nested-sibling-87242
+  registry(project): 
+target pid: 88546  start: Thu Oct  1 10:47:32 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt/other-lane
+unrelated pid: 88283
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-nested-sibling-87242 --force
+--- exit code: 1
+--- stderr (process-custody lines):
+  REFUSED: process 88546 (lstart=Thu Oct  1 10:47:32 2026) matched path /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt/other-lane, whose ownership by labx-nested-sibling-87242 is not proven; preserving it and task labx-nested-sibling-87242 without signalling.
+  REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.11gqYF/projects/wt/other-lane for labx-nested-sibling-87242 (registered nested worktree lane holds process 88546); preserving the worktree/tasktmp for manual inspection or retry.
+--- target pid 88546 after teardown: alive
+--- unrelated pid 88283 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-nested-sibling-87242.teardown-processes:
+  (absent)
+--- lab removed: yes

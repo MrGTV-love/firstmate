@@ -1,0 +1,19 @@
+=== scenario: own-audit   task id: labx-own-audit-48869
+lab home: /Users/charlesabrooker/tmp/fm-lab.PVIAdN (marked: yes)
+target pid: 50672  start: Thu Oct  1 10:47:08 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt
+unrelated pid: 50671
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-own-audit-48869 
+--- exit code: 0
+--- stderr (process-custody lines):
+  teardown: reaping leaked worktree process(es) for labx-own-audit-48869: 50672
+  teardown: force-killing leaked worktree process(es) for labx-own-audit-48869: 50672
+--- target pid 50672 after teardown: dead
+--- unrelated pid 50671 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: no
+--- durable audit labx-own-audit-48869.teardown-processes:
+  1790869632	TERM	50672	lstart=Thu\ Oct\ \ 1\ 10:47:08\ 2026	perl\ -e\ \\012\ \ \ \ \ \ my\ \(\$a\,\$o\,\$r\)=@ARGV\;\\012\ \ \ \ \ \ \$SIG\{TERM\}=sub\{\ my\ \$t\ =\ \"NO\ AUDIT\ FILE\ AT\ TERM\\n\"\;\ if\ \(open\(my\ \$i\,\"\<\"\,\$a\)\)\ \{\ local\ \$/\;\ \$t\ =\ \<\$i\>\;\ \}\\012\ \ \ \ \ \ \ \ open\ my\ \$w\,\"\>\"\,\$o\;\ print\ \{\$w\}\ \$t\;\ close\ \$w\;\ \}\;\\012\ \ \ \ \ \ open\ my\ \$f\,\"\>\"\,\$r\;\ close\ \$f\;\ while\(1\)\{sleep\ 300\}\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/state/labx-own-audit-48869.teardown-processes\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/term-observed\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/ready	Thu\ Oct\ \ 1\ 10:47:08\ 2026\ \ \ \ 	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt
+  1790869635	KILL	50672	lstart=Thu\ Oct\ \ 1\ 10:47:08\ 2026	perl\ -e\ \\012\ \ \ \ \ \ my\ \(\$a\,\$o\,\$r\)=@ARGV\;\\012\ \ \ \ \ \ \$SIG\{TERM\}=sub\{\ my\ \$t\ =\ \"NO\ AUDIT\ FILE\ AT\ TERM\\n\"\;\ if\ \(open\(my\ \$i\,\"\<\"\,\$a\)\)\ \{\ local\ \$/\;\ \$t\ =\ \<\$i\>\;\ \}\\012\ \ \ \ \ \ \ \ open\ my\ \$w\,\"\>\"\,\$o\;\ print\ \{\$w\}\ \$t\;\ close\ \$w\;\ \}\;\\012\ \ \ \ \ \ open\ my\ \$f\,\"\>\"\,\$r\;\ close\ \$f\;\ while\(1\)\{sleep\ 300\}\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/state/labx-own-audit-48869.teardown-processes\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/term-observed\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/ready	Thu\ Oct\ \ 1\ 10:47:08\ 2026\ \ \ \ 	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt
+--- audit content the process itself read at the instant TERM arrived:
+  1790869632	TERM	50672	lstart=Thu\ Oct\ \ 1\ 10:47:08\ 2026	perl\ -e\ \\012\ \ \ \ \ \ my\ \(\$a\,\$o\,\$r\)=@ARGV\;\\012\ \ \ \ \ \ \$SIG\{TERM\}=sub\{\ my\ \$t\ =\ \"NO\ AUDIT\ FILE\ AT\ TERM\\n\"\;\ if\ \(open\(my\ \$i\,\"\<\"\,\$a\)\)\ \{\ local\ \$/\;\ \$t\ =\ \<\$i\>\;\ \}\\012\ \ \ \ \ \ \ \ open\ my\ \$w\,\"\>\"\,\$o\;\ print\ \{\$w\}\ \$t\;\ close\ \$w\;\ \}\;\\012\ \ \ \ \ \ open\ my\ \$f\,\"\>\"\,\$r\;\ close\ \$f\;\ while\(1\)\{sleep\ 300\}\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/state/labx-own-audit-48869.teardown-processes\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/term-observed\ /Users/charlesabrooker/tmp/fm-lab.PVIAdN/ready	Thu\ Oct\ \ 1\ 10:47:08\ 2026\ \ \ \ 	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt	/Users/charlesabrooker/tmp/fm-lab.PVIAdN/projects/wt
+--- lab removed: yes

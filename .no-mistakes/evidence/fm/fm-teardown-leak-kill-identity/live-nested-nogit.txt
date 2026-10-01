@@ -1,0 +1,30 @@
+=== scenario: nested-nogit   task id: labx-nested-nogit-3105
+lab home: /Users/charlesabrooker/tmp/fm-lab.IWZKv0 (marked: yes)
+nested lane: /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/project
+  registry(project): HEAD 9bd7af5fd3895ef8fac649b6a05e72b12305b4a3
+  registry(project): branch refs/heads/main
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt
+  registry(project): HEAD 42a30cffa6f4adcfba0422ac5a8493d8c2f8e495
+  registry(project): branch refs/heads/fm/labx-nested-nogit-3105
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane
+  registry(project): HEAD 9bd7af5fd3895ef8fac649b6a05e72b12305b4a3
+  registry(project): detached
+  registry(project): locked other task lane
+  registry(project): 
+target pid: 10045  start: Thu Oct  1 10:47:42 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane
+unrelated pid: 9555
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-nested-nogit-3105 --force
+--- exit code: 1
+--- stderr (process-custody lines):
+  REFUSED: process 10045 (lstart=Thu Oct  1 10:47:42 2026) matched path /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane, whose ownership by labx-nested-nogit-3105 is not proven; preserving it and task labx-nested-nogit-3105 without signalling.
+  REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.IWZKv0/projects/wt/other-lane for labx-nested-nogit-3105 (registered nested worktree lane holds process 10045); preserving the worktree/tasktmp for manual inspection or retry.
+--- target pid 10045 after teardown: alive
+--- unrelated pid 9555 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-nested-nogit-3105.teardown-processes:
+  (absent)
+--- lab removed: yes

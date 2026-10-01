@@ -1,0 +1,15 @@
+=== scenario: no-lsof   task id: labx-no-lsof-49312
+lab home: /Users/charlesabrooker/tmp/fm-lab.ykvxrG (marked: yes)
+target pid: 57072  start: Thu Oct  1 10:48:14 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.ykvxrG/projects/wt
+unrelated pid: 55673
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-no-lsof-49312 --force
+--- exit code: 1
+--- stderr (process-custody lines):
+  REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.ykvxrG/projects/wt for labx-no-lsof-49312 (lsof is unavailable, so no signal target can be audited); preserving the worktree/tasktmp for manual inspection or retry.
+--- target pid 57072 after teardown: alive
+--- unrelated pid 55673 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-no-lsof-49312.teardown-processes:
+  (absent)
+--- lab removed: yes

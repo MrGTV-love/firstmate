@@ -1,0 +1,16 @@
+=== scenario: audit-unwritable   task id: labx-audit-unwritable-61768
+lab home: /Users/charlesabrooker/tmp/fm-lab.wqHWu3 (marked: yes)
+target pid: 63188  start: Thu Oct  1 10:48:19 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.wqHWu3/projects/wt
+unrelated pid: 63184
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-audit-unwritable-61768 
+--- exit code: 1
+--- stderr (process-custody lines):
+  teardown: reaping leaked worktree process(es) for labx-audit-unwritable-61768: 63188
+  REFUSED: cannot durably record leaked process 63188 identity for labx-audit-unwritable-61768; preserving the worktree/tasktmp without signalling it.
+--- target pid 63188 after teardown: alive
+--- unrelated pid 63184 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-audit-unwritable-61768.teardown-processes:
+  (absent: path is a directory)
+--- lab removed: yes

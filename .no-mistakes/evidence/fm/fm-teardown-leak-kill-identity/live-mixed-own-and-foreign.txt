@@ -1,0 +1,31 @@
+=== scenario: mixed-own-and-foreign   task id: labx-mixed-own-and-foreign-53915
+lab home: /Users/charlesabrooker/tmp/fm-lab.qVDWYp (marked: yes)
+nested lane: /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/project
+  registry(project): HEAD 5488f3dcd66e04335e1bf7525e7d654c757eee9f
+  registry(project): branch refs/heads/main
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt
+  registry(project): HEAD 06eb8aad4d36160109c7ecf0e03dbd1b66a5d65c
+  registry(project): branch refs/heads/fm/labx-mixed-own-and-foreign-53915
+  registry(project): 
+  registry(project): worktree /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane
+  registry(project): HEAD 5488f3dcd66e04335e1bf7525e7d654c757eee9f
+  registry(project): detached
+  registry(project): locked other task lane
+  registry(project): 
+target pid: 55432  start: Thu Oct  1 10:49:24 2026  cwd: /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane
+unrelated pid: 55349
+--- running: FM_HOME=$LAB bin/fm-teardown.sh labx-mixed-own-and-foreign-53915 --force
+--- exit code: 1
+--- stderr (process-custody lines):
+  REFUSED: process 55432 (lstart=Thu Oct  1 10:49:24 2026) matched path /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane, whose ownership by labx-mixed-own-and-foreign-53915 is not proven; preserving it and task labx-mixed-own-and-foreign-53915 without signalling.
+  REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.qVDWYp/projects/wt/other-lane for labx-mixed-own-and-foreign-53915 (registered nested worktree lane holds process 55432); preserving the worktree/tasktmp for manual inspection or retry.
+--- target pid 55432 after teardown: alive
+--- unrelated pid 55349 after teardown: alive
+--- own leak in task tree pid 55433 after teardown: alive
+--- unrelated record unchanged: yes
+--- task record present: yes
+--- durable audit labx-mixed-own-and-foreign-53915.teardown-processes:
+  (absent)
+--- lab removed: yes
