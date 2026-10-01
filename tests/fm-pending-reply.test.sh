@@ -793,9 +793,6 @@ test_restart_preserves_expectation_and_parent_destination() {
       [ "$(fm_pending_reply_get "$2" phase)" = awaiting_report ]
   ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
     || fail "fresh process must retain expectation and exact parent destination"
-  # Preserve the marker reinitialization performed by the old in-process reload.
-  # shellcheck source=bin/fm-marker-lib.sh
-  . "$ROOT/bin/fm-marker-lib.sh"
   # Compaction-safe: destination is absolute path fields, not chat memory.
   case "$parent_status" in
     /*.status) : ;;

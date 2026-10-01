@@ -1,7 +1,6 @@
 #!/usr/bin/env perl
 # fm-lint-cache.pl - private dependency selection and successful-result cache for fm-lint.sh.
 # Usage: perl fm-lint-cache.pl select <root> <NUL-separated changes on stdin>
-#        perl fm-lint-cache.pl expand <root> <explicit roots>...
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 # ShellCheck retains source-aware extended analysis; only identical successful checks
 # are reused. flock serializes identical misses across worktrees, not unrelated roots.
@@ -20,7 +19,7 @@ if (defined $mode && $mode eq 'check') {
     $cache = $root;
     $root = shift @args;
 }
-die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'expand' || $mode eq 'check');
+die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
 my (%text, %edges, %unknown);
@@ -117,14 +116,6 @@ sub closure {
     return if $seen->{$path}++;
     closure($_, $seen) for dependencies($path);
 }
-if ($mode eq 'expand') {
-    my (%seen, %roots);
-    $roots{$_} = 1 for @args;
-    closure(identity_path($_), \%seen) for @args;
-    print "$_\0" for sort keys %roots;
-    print "$_\0" for grep { $seen{$_} && !$roots{$_} } @inventory;
-    exit 0;
-}
 if ($mode eq 'select') {
     local $/ = "\0";
     my %changed;
@@ -135,7 +126,7 @@ if ($mode eq 'select') {
     for my $path (@inventory) {
         my %seen;
         closure($path, \%seen);
-        closure($path, \%selected) if $policy_changed || $changed{$path}
+        $selected{$path} = 1 if $policy_changed || $changed{$path}
             || grep { $changed{$_} || ($unknown{$_} && $inputs_changed) } keys %seen;
     }
     print "$_\0" for grep { $selected{$_} } @inventory;

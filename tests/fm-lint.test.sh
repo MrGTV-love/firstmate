@@ -1648,6 +1648,29 @@ SH
   pass "changed and deleted libraries recheck transitive callers with the full diagnostic rules"
 }
 
+test_selection_adds_no_unchanged_imported_roots() {
+  local tmp repo fakebin diff_file log listed out
+  tmp=$(fm_test_tmproot fm-lint-no-imported-roots)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  log="$tmp/shellcheck.log"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/consumer.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "changed consumer selection failed"
+  assert_contains "$listed" bin/consumer.sh "changed consumer was not selected"
+  assert_contains "$listed" bin/caller.sh "changed consumer did not select its caller"
+  assert_not_contains "$listed" bin/library.sh "changed consumer selected its unchanged imported library"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_JOBS=1 FM_LINT_CACHE_DIR=off \
+    "$repo/bin/fm-lint.sh" bin/caller.sh 2>&1) || fail "explicit caller lint failed: $out"
+  [ "$(cat "$log")" = bin/caller.sh ] \
+    || fail "explicit path added imported roots"$'\n'"logged: $(cat "$log")"
+  pass "selection analyzes unchanged imports only through changed or explicit callers"
+}
+
 test_shared_cache_reuses_only_identical_successful_inputs() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): shared cache regression"; return; }
   local tmp one two fakebin real log out rc before after first second
@@ -1669,10 +1692,10 @@ exec "$real" "\$@"
 SH
   chmod +x "$fakebin/shellcheck"
   PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$one/bin/fm-lint.sh" bin/consumer.sh > "$tmp/one.out" 2>&1 &
+    "$one/bin/fm-lint.sh" bin/consumer.sh bin/library.sh > "$tmp/one.out" 2>&1 &
   first=$!
   PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh > "$tmp/two.out" 2>&1 &
+    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh > "$tmp/two.out" 2>&1 &
   second=$!
   wait "$first" || fail "first simultaneous cache miss failed: $(cat "$tmp/one.out")"
   wait "$second" || fail "second simultaneous cache miss failed: $(cat "$tmp/two.out")"
@@ -1680,13 +1703,13 @@ SH
     || fail "identical simultaneous roots were checked more than once: $(cat "$log")"
   printf '#!/usr/bin/env bash\nexport SHARED_VALUE=changed\n' > "$two/bin/library.sh"
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "changed source check failed: $out"
+    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "changed source check failed: $out"
   [ "$(wc -l < "$log" | tr -d ' ')" = 4 ] \
     || fail "source content mutation reused an obsolete successful result"
   before=$(wc -l < "$log" | tr -d ' ')
   printf '\n' >> "$fakebin/shellcheck"
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "changed binary check failed: $out"
+    "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) || fail "changed binary check failed: $out"
   after=$(wc -l < "$log" | tr -d ' ')
   [ "$after" -eq "$((before + 2))" ] || fail "changed ShellCheck binary reused obsolete results"
   cat >> "$two/bin/library.sh" <<'SH'
@@ -1698,7 +1721,7 @@ bad
 SH
   for rc in 1 2; do
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-      "$two/bin/fm-lint.sh" bin/consumer.sh 2>&1) && fail "cached library defect unexpectedly passed"
+      "$two/bin/fm-lint.sh" bin/consumer.sh bin/library.sh 2>&1) && fail "cached library defect unexpectedly passed"
     assert_contains "$out" SC1007 "a cached result hid the seeded source defect"
   done
   [ "$(grep -c '^bin/library.sh$' "$log")" = 5 ] \
@@ -1912,6 +1935,7 @@ test_joint_sources_keep_call_dependent_findings
 test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
+test_selection_adds_no_unchanged_imported_roots
 test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint

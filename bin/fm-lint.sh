@@ -3,8 +3,8 @@
 #
 # Runs ShellCheck's default severity and extended, source-aware analysis with
 # ambient configuration disabled and one exact ShellCheck version.
-# CI selects the complete canonical set; local branches select changed files,
-# their transitive sourcing callers, and their imported canonical libraries.
+# CI selects the complete canonical set; local branches select changed files
+# and their transitive sourcing callers.
 # Every mode keeps --norc --external-sources and the same diagnostic rules.
 # --fast remains an explicit local-only opt-out from extended dataflow.
 # Selection and cache reuse retain the roots' source directives and call-site
@@ -20,13 +20,17 @@
 #     the full canonical set: bin/*.sh bin/backends/*.sh tests/*.sh, with
 #     --external-sources and full dataflow. This is what CI always runs, so
 #     CI coverage never depends on a local diff.
-#   - Otherwise it selects changed files since the merge-base, including staged,
-#     unstaged, untracked, deleted and renamed paths, plus transitive callers and
-#     imported canonical roots. Dependency selection is conservative when a
-#     source expression cannot be resolved. Changes to the lint owner select all.
-#     An empty set skips ShellCheck but still checks backend purity and workflows.
-# Explicit paths bypass changed-file selection and include their canonical source
-# dependencies, without the workflow YAML check.
+#   - Otherwise it selects canonical roots whose transitive source closure
+#     contains a path changed since the merge-base, including staged, unstaged,
+#     untracked, deleted and renamed paths. An unchanged imported library is not
+#     a separate root; its callers analyze it through their sources. Dependency
+#     selection is conservative when a source expression cannot be resolved.
+#     Changes to the lint owner select all. An empty set skips ShellCheck but
+#     still checks backend purity and workflows. A changed widely sourced
+#     library still costs a cold source-aware analysis of every caller; the
+#     cache only reuses identical inputs.
+# Explicit paths bypass changed-file selection and are linted as given, without
+# the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
 # backend-purity check. The backend-purity check rejects direct Beads CLI
 # invocations in the core bin/ and bin/backends/ scripts so every configured
@@ -754,16 +758,7 @@ fi
 if [ "$#" -gt 0 ]; then
   EXPLICIT_PATHS=1
   [ "$FULL_REQUESTED" -eq 0 ] || { printf 'fm-lint.sh: --full does not accept explicit paths.\n' >&2; exit 2; }
-  selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || exit 1
-  if ! "$PERL_BIN" "$SELF_DIR/fm-lint-cache.pl" expand "$ROOT" "$@" > "$selected_list"; then
-    rm -f "$selected_list"
-    exit 2
-  fi
-  ROOTS=()
-  while IFS= read -r -d '' path; do
-    ROOTS+=("$path")
-  done < "$selected_list"
-  rm -f "$selected_list"
+  ROOTS=("$@")
 else
   full_lint=1
   if [ "$FULL_REQUESTED" -eq 0 ] && [ -z "$PARTITION" ] && [ "${GITHUB_ACTIONS:-}" != true ] && [ "${CI:-}" != true ] \
