@@ -5730,8 +5730,12 @@ printf '<h1>continuous review</h1>\n' > "$cont_art"
 lavish_session "$cont_art"
 cont_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$cont_art")
 fm_test_track_procevent_home "$CONT/home"
+cont_rc=0
 PATH="$CONT/bin:$PATH" FM_HOME="$CONT/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
-  "$ROOT/bin/fm-procevent-lavish.sh" arm "$cont_art" >/dev/null
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$cont_art" > "$CONT/arm.out" 2> "$CONT/arm.err" || cont_rc=$?
+[ "$cont_rc" -eq 0 ] \
+  || fail "the continuous listener arm failed ($cont_rc): $(cat "$CONT/arm.err")"
+assert_contains "$(cat "$CONT/arm.out")" "armed: $cont_id" "the continuous listener was not reported ready"
 wait_for_lines "$CONT/started" 1 || fail "continuous listener never started"
 cont_claim=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$cont_id.claim")
 printf 'session:\n  status: browser_disconnected\n' > "$CONT/round1"
