@@ -167,8 +167,9 @@ fm_lint_root_rss() {  # <rss-file>
 # Map a root's exit status onto the reported reason vocabulary without
 # pretending every signal or nonzero exit is a memory kill: only process-level
 # memory-failure evidence earns the memory reason - GHC's heap-exhaustion
-# status 251, or a complete runtime memory-error line on the root's stderr -
-# and that evidence is checked before a generic findings or signal reason.
+# status 251, or a complete runtime memory-error line on the root's stderr,
+# including the cache wrapper's Perl "Out of memory!" exit 1 - and that
+# evidence is checked before a generic findings or signal reason.
 # Diagnostics and their echoed source excerpts are on stdout and never count,
 # and each stderr form is matched whole to its line end, so a root path that
 # merely contains OOM words inside a file error never counts either.
@@ -182,7 +183,7 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
     printf 'timeout\n'; return 0
   fi
-  if grep -qE '^[^[:space:]:]+: (out of memory \(requested [0-9]+ bytes\)|Heap exhausted;)$|: resource exhausted \((Cannot allocate memory|out of memory)\)$' "$err" 2>/dev/null; then
+  if grep -qE '^[^[:space:]:]+: (out of memory \(requested [0-9]+ bytes\)|Heap exhausted;)$|: resource exhausted \((Cannot allocate memory|out of memory)\)$|^Out of memory!$' "$err" 2>/dev/null; then
     printf 'memory\n'; return 0
   fi
   if [ "$rc" = 1 ]; then

@@ -380,6 +380,10 @@ case "$target" in
     printf 'shellcheck: malloc: resource exhausted (out of memory)\n' >&2
     exit 1
     ;;
+  *oom-perl*)
+    printf 'Out of memory!\n' >&2
+    exit 1
+    ;;
   *oom-heap*)
     printf 'shellcheck: Heap exhausted;\n' >&2
     exit 251
@@ -1255,7 +1259,7 @@ test_memory_evidence_outranks_findings_and_signal_reasons() {
   fakebin=$(fm_fakebin "$tmp")
   fm_lint_stub_reactive_shellcheck "$fakebin"
   roots=()
-  for name in oom-exit1 oom-heap oom-kill oom-text-findings; do
+  for name in oom-exit1 oom-perl oom-heap oom-kill oom-text-findings; do
     printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/$name.sh"
     roots+=("$tmp/$name.sh")
   done
@@ -1265,9 +1269,9 @@ test_memory_evidence_outranks_findings_and_signal_reasons() {
   fi
 
   # A memory death reports memory whether the runtime exits 1 with a
-  # program-prefixed OOM error, exits with GHC's heap-exhaustion status, or is
-  # SIGKILLed after printing OOM text; a findings root whose echoed source line
-  # merely quotes "out of memory" stays findings.
+  # program-prefixed OOM error or Perl's bare one, exits with GHC's
+  # heap-exhaustion status, or is SIGKILLed after printing OOM text; a findings
+  # root whose echoed source line merely quotes "out of memory" stays findings.
   for bounded in "${modes[@]}"; do
     roots_log="$tmp/lint.$bounded.roots.tsv"
     rc=0
@@ -1279,7 +1283,7 @@ test_memory_evidence_outranks_findings_and_signal_reasons() {
         "$LINT" --telemetry "$tmp/lint.$bounded.tsv" "${roots[@]}" 2>&1) || rc=$?
     fi
     [ "$rc" -ne 0 ] || fail "memory deaths unexpectedly passed (bounded=$bounded)"
-    for name in oom-exit1 oom-heap oom-kill oom-text-findings; do
+    for name in oom-exit1 oom-perl oom-heap oom-kill oom-text-findings; do
       reason=$(awk -F '\t' -v root="/$name.sh" \
         '$1 == "end" && substr($3, length($3) - length(root) + 1) == root { print $10 }' \
         "$roots_log")
