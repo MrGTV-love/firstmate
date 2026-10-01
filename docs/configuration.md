@@ -1144,22 +1144,49 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from ever leaving the machine in a resolver request.
-It has no default entries, and an absent file changes nothing.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver withholds the same values.
+The optional local, gitignored `config/dispatch-never-send` keeps named values, whole projects, or marked brief regions out of Jev resolver requests.
+It has no default entries, and an absent file changes nothing, including leaving section markers inert.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver applies the same privacy policy.
 
-Each non-blank line not beginning with `#` is one literal value, matched case-insensitively.
+Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
+Ordinary `#` comments remain ignored; the reserved `# dispatch-never-send` prefix opts into the following directives.
 
 ```text
-# Client names
+# Literal values still stop the whole request
 Example Client Ltd
+# Withhold every resolver request for this project
+# dispatch-never-send project: example-private
+# Remove explicitly marked regions from other projects' briefs
+# dispatch-never-send marked-sections
 ```
 
-Before the request is sent, every string in it is checked: the project name, the task text, each rule's `when`, and the fixed question text.
-A match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
-A list that is present but not a readable regular file also stops the request the same way rather than sending unchecked text.
-That one diagnostic names the list line number at most and never prints the listed value or the matching text.
+`# dispatch-never-send project: <name>` withholds the entire request when `--project` matches that name exactly, ignoring ASCII case and normalizing whitespace as for literals.
+It is not a substring or pattern rule: `example-private-tools` does not match `example-private`.
+When any project directive exists, omitting or supplying an empty `--project` stops the request rather than bypassing project exclusions.
+Project names come only from `--project`; the resolver does not infer them from brief text.
+
+`# dispatch-never-send marked-sections` enables removal of regions delimited by the following standalone lines in the original brief, before task-section extraction or whole-brief fallback.
+Place the opening marker before the heading when the heading itself is sensitive.
+
+```markdown
+<!-- dispatch-never-send:start -->
+### Private context
+Synthetic private details kept only in the local brief.
+<!-- dispatch-never-send:end -->
+```
+
+Surrounding whitespace on marker lines is allowed, and markers apply even inside Markdown code fences.
+Multiple disjoint regions are supported; nested, unmatched, misspelled, or inline markers using the `<!-- dispatch-never-send` prefix stop the entire request when marked sections are enabled.
+Both marker lines and everything between them are omitted, while the local brief and other brief consumers remain unchanged.
+This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use project exclusions or literals when those must also be withheld.
+Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
+
+Before the request is sent, every remaining string in it is checked for literal matches: the project name, the sanitized task text, each rule's `when`, and the fixed question text.
+A literal match or project exclusion stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
+A list that is present but not a readable regular file, an invalid reserved directive, or invalid enabled markers also stops the request rather than sending unchecked text.
+That one diagnostic names the list line number at most and never prints the listed value, project name, or matching text.
+The offline behavior coverage in `tests/fm-dispatch-resolve.test.sh` captures outgoing request bodies using only synthetic data.
 
 **Missing or invalid rules**
 
