@@ -1757,7 +1757,8 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
       || fail "source spelling $index did not initially pass: $out"
   done
   # An unsupported command wrapper is not claimed to receive joint analysis.
-  # The helper must instead refuse reuse and conservatively select its caller.
+  # The helper must instead refuse reuse. An unrelated change must not select it:
+  # changed mode follows only resolved source closures, and CI lints every root.
   cat > "$repo/bin/unparsed.sh" <<'SH'
 #!/usr/bin/env bash
 builtin source bin/library.sh
@@ -1773,7 +1774,7 @@ SH
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "unparsed source selection failed"
-  assert_contains "$listed" bin/unparsed.sh "an unparsed source form omitted its caller on changed inputs"
+  assert_not_contains "$listed" bin/unparsed.sh "an unrelated change selected a root with an unparsed source form"
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   printf '%s\n' '#!/usr/bin/env bash' 'export other_value=ok' > "$repo/bin/library.sh"
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
