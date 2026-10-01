@@ -1835,7 +1835,7 @@ test_model_index_resolves_launch_and_refuses_retired_literals() {
 
 test_secondmate_model_pin_resolves_through_the_model_index() {
   local rec id sm out status catalogs
-  id=model-role-secondmate-z26
+  id="model-role-secondmate-z26"
   rec=$(make_spawn_case model-role-secondmate codex "$id")
   read_case_record "$rec"
   catalogs="$CASE_DIR/catalogs"
