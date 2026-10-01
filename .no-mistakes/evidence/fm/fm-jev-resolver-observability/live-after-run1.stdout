@@ -1,0 +1,10 @@
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 147   tokens: 1006/89
+  rule: rule_5 (Trivial mechanical edit or easy task such as rote rename, fo)   confidence: 0.99
+  probabilities: rule_3=0.0 rule_6=0.0 rule_2=0.0 rule_7=0.0 default=0.01 rule_5=0.99 rule_4=0.0 rule_1=0.0
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=25%  spendPriority=-2.6805  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna' --effort 'high'
+  timings: api_ms=147 quota_ms=2788 local_ms=496 total_ms=3431
+  usage: input_tokens=1006 output_tokens=89 jev_cost_usd=4.2252e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0

@@ -1,0 +1,39 @@
+# /bin/bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+## before(a4d559e)
+EPOCHREALTIME set? no
+stamp_a=1790886155000 stamp_b=1790886155000 delta_ms_for_sleep_0.123=0
+TIMINGS - where the deferred network checks spent their time (ms):
+  lab         step-parent parent-proc                    start=+0       elapsed=1000
+  lab         step-child child-proc                      start=+1000    elapsed=0
+  slowest: lab step-parent parent-proc 1000ms, lab step-child child-proc 0ms
+raw records:
+v1	lab	step-parent	0	1000	parent-proc
+v1	lab	step-child	1000	0	child-proc
+## after(91931e2)
+EPOCHREALTIME set? no
+stamp_a=1790886156784 stamp_b=1790886157086 delta_ms_for_sleep_0.123=302
+TIMINGS - where the deferred network checks spent their time (ms):
+  lab         step-parent parent-proc                    start=+22      elapsed=432
+  lab         step-child child-proc                      start=+510     elapsed=577
+  slowest: lab step-child child-proc 577ms, lab step-parent parent-proc 432ms
+raw records:
+v1	lab	step-parent	22	432	parent-proc
+v1	lab	step-child	510	577	child-proc
+## fm_timing_seconds_ms parser (after)
+  '0.211'  -> 211
+  '0,211'  -> 211
+  '0.2'    -> 200
+  '3'      -> 3000
+  '12.3456' -> 12345
+  ''       -> (rc=1, rejected)
+  'abc'    -> (rc=1, rejected)
+  '1.2.3'  -> (rc=1, rejected)
+  '-1'     -> (rc=1, rejected)
+  '0.1 '   -> (rc=1, rejected)
+## no perl on PATH, no EPOCHREALTIME (whole-second fallback, never fails)
+rc=0 value=0
+## no perl on PATH (PATH=/bin, date present), no EPOCHREALTIME: whole-second fallback, rc 0
+rc=0 value=1790886166000
+perl not on PATH
+## per-stamp helper cost on this host (10 back-to-back stamps, /bin/bash)
+10 stamps took 133 ms
