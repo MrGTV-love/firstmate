@@ -111,7 +111,7 @@ def get_macos_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
         rss_kb = int(parts[1])
         if rss_kb >= 10240:
             procs.append({
-                "pid": int(parts[0]), "comm": parts[2],
+                "pid": int(parts[0]), "comm": parts[2].rstrip(),
                 "rss_mb": round(rss_kb / 1024.0, 1),
             })
     procs.sort(key=lambda p: p["rss_mb"], reverse=True)

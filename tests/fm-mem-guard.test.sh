@@ -74,7 +74,7 @@ print("ok - Linux fixtures, thresholds, incomplete readings, and zero swap")
 # Native macOS pressure accounts for reclaimable memory, unlike raw vm_stat free pages.
 host = "34359738368\ntotal = 4096.00M  used = 1024.00M  free = 3072.00M  (encrypted)\n"
 pressure = "The system has 34359738368 (2097152 pages with a page size of 16384).\nSystem-wide memory free percentage: 50%\n"
-ps = " 101 10240 Worker One\n 102 40960 big-worker\n 103 10239 small-worker\nmalformed\n"
+ps = " 101 10240 Worker One      \n 102 40960 big-worker      \n 103 10239 small-worker\nmalformed\n"
 report = verdict(audit("darwin", host=host, pressure=pressure, ps=ps), "OK", 0)
 assert report["summary"] == {"mem_total_gb": 32.0, "mem_available_gb": 16.0,
                              "mem_used_pct": 50.0, "swap_total_gb": 4.0,
