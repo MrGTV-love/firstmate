@@ -2158,10 +2158,12 @@ Lavish rewrites its session store in place, so a store that does not decode is r
 
 **Retry interrupted Lavish polls**
 
-That adapter, and only that adapter, retries the one exact transient response a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
+That adapter, and only that adapter, retries the one exact transient response a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`, bare or followed by the one `help[2]:` footer lavish-axi 0.1.79 generates for it when its server restarts), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
 This start-to-start governor is a no-op after a normally blocking poll but caps an immediately returning poll under the shipped defaults independently of the owner lease and registration launch pacing.
 
-Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
+A poll whose `lavish-axi` process is killed by a signal before it prints anything exits 75, the runner's existing poll-again status, so the same runner relistens at once instead of waiting for reconciliation.
+
+Real feedback, ended and missing sessions, any other `SERVER_ERROR` or help text, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
 
 **Keep open Lavish reviews listening**

@@ -1778,6 +1778,17 @@ case "${plan[$i]}" in
     printf 'error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n'; exit 1 ;;
   near-interrupt)
     printf 'error: Lavish Editor poll response was interrupted \ncode: SERVER_ERROR\n'; exit 1 ;;
+  interrupt-help)
+    # The exact bytes lavish-axi 0.1.79 prints when its server restarts under a poll.
+    printf 'error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n'
+    printf '%s%s%s\n' 'help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`' \
+      ' (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,' \
+      'Re-run the last `lavish-axi poll <html-file>` command after the server is healthy'
+    exit 1 ;;
+  interrupt-other-help)
+    printf 'error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\nhelp[1]: Restore the session store from backup\n'; exit 1 ;;
+  killed)
+    kill -TERM $$ ;;
   other-server-error)
     printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n'; exit 1 ;;
   feedback)
@@ -1838,6 +1849,83 @@ assert_contains "$(wake_payloads "$HRETRY")" "procevent lavish $retry_id 1" \
 assert_grep 'ship it' "$(first_result "$HRETRY" "$retry_id")" \
   "the announced result is the captain's feedback, not the interruption"
 pass "a transient Lavish poll interruption is retried quietly and never announced"
+
+# --- end-user-aligned regression: a Lavish server restart keeps every listener ---
+# Seen live on lavish-axi 0.1.79: restarting the Lavish server made every armed
+# board's poll return the interruption followed by a generated help footer. That
+# form was captured as an `unknown` result, relisten refused it, and every board
+# sat unowned until the next turn-end reconcile. The same runner must instead
+# retry it quietly and still capture the captain's answer, with no reconcile.
+HRESTART="$TMP_ROOT/hrestart"; new_home "$HRESTART"
+RESTART_ART="$TMP_ROOT/restart-board.html"
+printf '<h1>restart</h1>\n' > "$RESTART_ART"
+lavish_session "$RESTART_ART"
+restart_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$RESTART_ART")
+fm_test_track_procevent_home "$HRESTART"
+LAVISH_COUNT="$TMP_ROOT/restart-count"; LAVISH_SCRIPT="interrupt-help interrupt-help feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HRESTART" \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$RESTART_ART" >/dev/null
+wait_capture "$HRESTART" "$restart_id" 200 \
+  || fail "the listener stopped on a server-restart interruption instead of retrying it"
+[ "$(cat "$LAVISH_COUNT")" = 3 ] \
+  || fail "the server-restart interruption was polled $(cat "$LAVISH_COUNT") times, not two quiet retries plus the delivering poll"
+[ "$(count_results "$HRESTART" "$restart_id")" = 1 ] \
+  || fail "a server-restart interruption produced $(count_results "$HRESTART" "$restart_id") captured results instead of one"
+assert_grep 'ship it' "$(first_result "$HRESTART" "$restart_id")" \
+  "the captured result after a server restart is the captain's answer"
+wait_for "$HRESTART/state/.wake-queue" || fail "the answer after a server restart produced no wake"
+assert_contains "$(wake_payloads "$HRESTART")" "procevent lavish $restart_id 1" \
+  "the answer after a server restart is announced"
+pass "a lavish-axi 0.1.79 server-restart interruption is retried quietly by the same listener"
+
+# Only that exact generated footer belongs to the interruption: any other help
+# text after the same two lines is a genuine error and surfaces on its first poll.
+HOTHERHELP="$TMP_ROOT/hotherhelp"; new_home "$HOTHERHELP"
+OTHERHELP_ART="$TMP_ROOT/other-help-board.html"
+printf '<h1>other help</h1>\n' > "$OTHERHELP_ART"
+lavish_session "$OTHERHELP_ART"
+otherhelp_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$OTHERHELP_ART")
+fm_test_track_procevent_home "$HOTHERHELP"
+LAVISH_COUNT="$TMP_ROOT/other-help-count"; LAVISH_SCRIPT="interrupt-other-help feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERHELP" \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$OTHERHELP_ART" >/dev/null
+wait_capture "$HOTHERHELP" "$otherhelp_id" 200 \
+  || fail "an interruption with unfamiliar help text was not captured"
+[ "$(cat "$LAVISH_COUNT")" = 1 ] \
+  || fail "an interruption with unfamiliar help text was retried instead of surfacing on its first poll"
+assert_grep 'Restore the session store from backup' "$(first_result "$HOTHERHELP" "$otherhelp_id")" \
+  "an interruption with unfamiliar help text is captured verbatim"
+wait_for "$HOTHERHELP/state/.wake-queue" \
+  || fail "an interruption with unfamiliar help text produced no wake"
+assert_contains "$(wake_payloads "$HOTHERHELP")" "procevent lavish $otherhelp_id 1" \
+  "an interruption with unfamiliar help text is announced"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERHELP" \
+  "$ROOT/bin/fm-procevent-lavish.sh" retire "$OTHERHELP_ART" >/dev/null
+pass "only the exact generated help footer joins the quiet retry; other help text still surfaces"
+
+# --- end-user-aligned regression: a killed blocking poll keeps its listener ---
+# Seen live: a signal to the blocking `lavish-axi poll` child, with nothing
+# printed, left the board unowned until the next turn-end reconcile. Lavish keeps
+# the feedback queued, so the same runner must poll again and capture the answer
+# with no reconcile.
+HKILLED="$TMP_ROOT/hkilled"; new_home "$HKILLED"
+KILLED_ART="$TMP_ROOT/killed-board.html"
+printf '<h1>killed</h1>\n' > "$KILLED_ART"
+lavish_session "$KILLED_ART"
+killed_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$KILLED_ART")
+fm_test_track_procevent_home "$HKILLED"
+LAVISH_COUNT="$TMP_ROOT/killed-count"; LAVISH_SCRIPT="killed feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HKILLED" \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$KILLED_ART" >/dev/null
+wait_capture "$HKILLED" "$killed_id" 200 \
+  || fail "the listener stopped after its poll child was killed instead of polling again"
+[ "$(cat "$LAVISH_COUNT")" = 2 ] \
+  || fail "the killed poll was followed by $(cat "$LAVISH_COUNT") polls, not the one killed plus the delivering poll"
+[ "$(count_results "$HKILLED" "$killed_id")" = 1 ] \
+  || fail "a killed poll produced $(count_results "$HKILLED" "$killed_id") captured results instead of one"
+assert_grep 'ship it' "$(first_result "$HKILLED" "$killed_id")" \
+  "the captured result after a killed poll is the captain's answer"
+pass "a blocking poll killed before it printed anything is followed by a new poll from the same listener"
 
 # --- end-user-aligned regression: a retried poll does not resubmit the reply ---
 # The worker hands its round reply to the adapter once. When the first poll of
@@ -1996,7 +2084,7 @@ assert_contains "$(wake_payloads "$HNEAR")" "procevent lavish $near_id 1" \
   "a whitespace variant of the interruption is captured and announced immediately"
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HNEAR" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$NEAR_ART" >/dev/null
-pass "only the literal two-line interruption enters the quiet retry policy"
+pass "only the exact interruption forms enter the quiet retry policy"
 
 # The public arm boundary refuses invalid retry intervals before it publishes a
 # source registration, rather than arming a listener that can only fail later.
