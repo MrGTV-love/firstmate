@@ -280,8 +280,14 @@
 #     a sibling clone, and including lanes this task's own worker created) is
 #     never signalled, because no record proves which task owns that lane.
 #     Teardown refuses instead, even with --force, naming the pid, its birth
-#     identity, the matched path, and the lane. A matched cwd under a git root
-#     whose worktree git cannot classify refuses the same way. A missing lsof
+#     identity, the matched path, and the lane. A lane is either a worktree
+#     the project or a git-backed root's repository still registers there,
+#     even when its directory or .git is missing or prunable, or a linked
+#     worktree git discovers from the cwd; outer-worktree discovery never
+#     overrides a registration. A deleted cwd outside every registered lane
+#     is classified from its nearest existing directory and reaped when that
+#     is the task's own tree. A matched cwd under a git root whose worktree
+#     git cannot otherwise classify refuses the same way. A missing lsof
 #     refuses too: without the scan no target can be audited, so no
 #     unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
@@ -2108,11 +2114,35 @@ task_pid_list_contains() {  # <pid-list> <pid>
   printf '%s\n' "$1" | grep -Fxq "$2"
 }
 
-# Prints the linked git worktree strictly beneath <root> that contains <path>,
-# whichever repository registered it; prints nothing when <path> belongs to
-# <root> itself. Fails when git cannot classify <path> under a git <root>.
+# Canonical form of <path> even when its tail no longer exists: the nearest
+# existing ancestor is resolved and the missing components are kept verbatim.
+task_canonical_path() {  # <path>
+  local dir=$1 rest=""
+  while [ ! -d "$dir" ]; do
+    case "$dir" in /?*) ;; *) return 1 ;; esac
+    rest=/${dir##*/}$rest
+    dir=${dir%/*}
+    [ -n "$dir" ] || dir=/
+  done
+  dir=$(CDPATH='' cd -- "$dir" && pwd -P) || return 1
+  printf '%s%s\n' "${dir%/}" "$rest"
+}
+
+# Prints the nested worktree lane beneath <root> that holds <path>, or nothing
+# when <path> belongs to <root> itself. A lane in TASK_REGISTERED_LANES wins
+# even when its directory or .git is gone; otherwise git classifies the nearest
+# existing directory, so a linked worktree registered by any repository is
+# found. Fails when git cannot classify <path> under a git <root>.
 task_nested_lane_for_path() {  # <root> <path>
-  local root=$1 dir=$2 top git_dir common_dir
+  local root=$1 path=$2 dir lane top git_dir common_dir
+  [ -e "$path" ] || path=${path% (deleted)}
+  for lane in ${TASK_REGISTERED_LANES[@]+"${TASK_REGISTERED_LANES[@]}"}; do
+    case "$path" in "$lane"|"$lane"/*) printf '%s\n' "$lane"; return 0 ;; esac
+  done
+  dir=$path
+  while [ ! -d "$dir" ]; do
+    case "$dir" in "$root"/*) dir=${dir%/*} ;; *) return 1 ;; esac
+  done
   while :; do
     if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
       git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && return 1
@@ -2130,6 +2160,41 @@ task_nested_lane_for_path() {  # <root> <path>
       return 0
     fi
     dir=${top%/*}
+  done
+}
+
+# Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
+# entries, that the project or a git-backed scan root's repository registers
+# strictly beneath a scan root. No git-backed root means no registry is read.
+task_registered_lanes_under_roots() {  # <canonical-root>...
+  local root src registry line lane
+  local -a sources
+  TASK_REGISTERED_LANES=()
+  sources=()
+  for root in "$@"; do
+    git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
+  done
+  [ "${#sources[@]}" -gt 0 ] || return 0
+  [ -z "$PROJ" ] || sources+=("$PROJ")
+  for src in "${sources[@]}"; do
+    if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
+      TASK_PIDS_FAILED_DIR=$src
+      TASK_PIDS_ERROR="worktree registration could not be read"
+      return 1
+    fi
+    while IFS= read -r line; do
+      case "$line" in worktree\ *) ;; *) continue ;; esac
+      if ! lane=$(task_canonical_path "${line#worktree }"); then
+        TASK_PIDS_FAILED_DIR=${line#worktree }
+        TASK_PIDS_ERROR="registered worktree path could not be resolved"
+        return 1
+      fi
+      for root in "$@"; do
+        case "$lane" in "$root"/*) TASK_REGISTERED_LANES+=("$lane") ;; esac
+      done
+    done <<EOF
+$registry
+EOF
   done
 }
 
@@ -2157,6 +2222,7 @@ task_pids_under_roots() {  # <dir>...
     TASK_PIDS_ERROR="lsof is unavailable, so no signal target can be audited"
     return 1
   fi
+  task_registered_lanes_under_roots "${scan_roots[@]}" || return 1
   for dir in "${scan_roots[@]}"; do
     if ! dir_matches=$(pids_with_cwd_under "$dir"); then
       TASK_PIDS_FAILED_DIR=$dir

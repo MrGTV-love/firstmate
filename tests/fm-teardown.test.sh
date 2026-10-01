@@ -3768,8 +3768,8 @@ test_process_identity_is_recorded_before_term_and_kill() {
   pass "a real leaked process observes its durable identity audit before TERM, and KILL is audited too"
 }
 
-assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|sibling>
-  local name=$1 registrar=$2 case_dir rc pid other_pid nested lane before identity registry
+assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|sibling> [<lane-damage: none|no-git|deleted>]
+  local name=$1 registrar=$2 damage=${3:-none} case_dir rc pid other_pid nested lane before identity registry
   case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
@@ -3792,6 +3792,10 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
   other_pid=$!
   disown
   sleep 0.3
+  case "$damage" in
+    no-git) rm -f "$nested/.git" ;;
+    deleted) rm -rf "$nested" ;;
+  esac
   if [ -r "/proc/$pid/stat" ]; then
     identity="starttime=$(sed 's/.*) //' "/proc/$pid/stat" | awk '{print $20}')"
   else
@@ -3809,11 +3813,13 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
   [ "$(cat "$case_dir/state/unrelated.meta")" = "$before" ] \
     || fail "$name: unrelated task record changed"
   assert_present "$case_dir/state/task-x1.meta" "$name: task record removed"
-  assert_present "$nested" "$name: nested lane removed"
+  [ "$damage" = deleted ] || assert_present "$nested" "$name: nested lane removed"
   assert_grep "REFUSED: process $pid ($identity) " "$case_dir/stderr" \
     "$name: refusal does not name the pid and its start identity"
-  assert_grep "matched path $lane inside registered nested worktree lane $lane," "$case_dir/stderr" \
-    "$name: refusal does not name the matched path and lane"
+  assert_grep "matched path $lane" "$case_dir/stderr" \
+    "$name: refusal does not name the matched path"
+  assert_grep " inside registered nested worktree lane $lane," "$case_dir/stderr" \
+    "$name: refusal does not name the lane"
   assert_absent "$case_dir/state/task-x1.teardown-processes" \
     "$name: other lane recorded as a signal target"
 }
@@ -3826,6 +3832,39 @@ test_nested_registered_worktree_process_is_not_reaped() {
 test_sibling_clone_nested_lane_process_is_not_reaped() {
   assert_nested_lane_process_is_not_reaped sibling-nested-worktree-custody sibling
   pass "a nested lane registered by a sibling clone of the project is never signalled on forced teardown"
+}
+
+test_registered_lane_missing_git_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped missing-git-lane-custody project no-git
+  pass "a still-registered nested lane whose .git is missing is never signalled through outer-worktree discovery"
+}
+
+test_deleted_registered_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped deleted-lane-custody project deleted
+  pass "a process inside a deleted but still-registered nested lane is never signalled"
+}
+
+test_own_deleted_cwd_process_is_reaped() {
+  local case_dir rc pid journal survived=0
+  case_dir=$(make_case own-deleted-cwd-reap)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  journal="$case_dir/state/task-x1.teardown-processes"
+  mkdir -p "$case_dir/wt/dist"
+  (cd "$case_dir/wt/dist" && exec sleep 300) &
+  pid=$!
+  disown
+  sleep 0.3
+  rm -rf "$case_dir/wt/dist"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  kill -KILL "$pid" 2>/dev/null || true
+  expect_code 0 "$rc" "own-deleted-cwd-reap: teardown should succeed"
+  [ "$survived" -eq 0 ] || fail "own-deleted-cwd-reap: leaked process in a deleted own directory survived"
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$journal" \
+    "own-deleted-cwd-reap: TERM has no durable identity record"
+  pass "a leaked process whose own-tree cwd was deleted is audited and reaped"
 }
 
 test_process_audit_failure_refuses_before_signal() {
@@ -3970,7 +4009,7 @@ if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_REUSED_PID:-}" ] \
   [ ! -f "$FM_FAKE_PS_COUNT" ] || count=$(cat "$FM_FAKE_PS_COUNT")
   count=$((count + 1))
   printf '%s\n' "$count" > "$FM_FAKE_PS_COUNT"
-  if [ "$count" -le 2 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
+  if [ "$count" -le 4 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
   else printf 'Tue Aug  4 10:00:01 2026\n'; fi
   exit 0
 fi
@@ -3988,6 +4027,10 @@ SH
     fail "reused-pid-identity: teardown force-killed a process whose start time changed"
   fi
   kill -KILL "$pid" 2>/dev/null || true
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "reused-pid-identity: the original identity was not sent TERM before the grace period"
+  assert_no_grep $'\tKILL\t' "$case_dir/state/task-x1.teardown-processes" \
+    "reused-pid-identity: a KILL was audited for a changed identity"
   pass "a reused pid with a different start time is never force-killed"
 }
 
@@ -4484,6 +4527,9 @@ test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_nested_registered_worktree_process_is_not_reaped
 test_sibling_clone_nested_lane_process_is_not_reaped
+test_registered_lane_missing_git_process_is_not_reaped
+test_deleted_registered_lane_process_is_not_reaped
+test_own_deleted_cwd_process_is_reaped
 test_process_audit_failure_refuses_before_signal
 test_lsof_absent_refuses_without_signalling
 test_lsof_error_refuses_before_removal
