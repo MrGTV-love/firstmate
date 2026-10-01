@@ -174,6 +174,9 @@ test_help_includes_entire_header() {
   local help
   help=$("$ROOT/bin/fm-brief.sh" --help)
   assert_contains "$help" "Refuses to overwrite an existing brief." "fm-brief.sh --help omitted its header terminator"
+  assert_contains "$help" "<!-- dispatch-never-send:start -->" "fm-brief.sh --help omitted the never-send start marker"
+  assert_contains "$help" "<!-- dispatch-never-send:end -->" "fm-brief.sh --help omitted the never-send end marker"
+  assert_contains "$help" "# dispatch-never-send marked-sections" "fm-brief.sh --help omitted the never-send opt-in"
   pass "fm-brief.sh: --help renders the complete header"
 }
 
