@@ -112,7 +112,7 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, reduced checks, or paid runner provisioning is part of this layout.
 
-Local branch selection includes changed shell files, their transitive sourcing callers, and imported canonical libraries.
+Local branch selection includes changed shell files and their transitive sourcing callers; unchanged imported libraries are analyzed only through those callers.
 Successful analyses are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
 CI never reuses that cache.
 The lint script's header owns the exact selection and cache controls.
