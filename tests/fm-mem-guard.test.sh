@@ -83,7 +83,12 @@ assert report["top_processes"] == [{"pid": 102, "comm": "big-worker", "rss_mb": 
                                     {"pid": 101, "comm": "/Applications/Worker One", "rss_mb": 10.0}]
 verdict(audit("darwin", host=host, pressure=pressure.replace("50%", "10%")), "WARNING", 1)
 verdict(audit("darwin", host=host, pressure=pressure.replace("50%", "5%")), "CRITICAL", 1)
-verdict(audit("darwin", host=host, pressure=pressure, thresholds=("--crit-swap-pct", "25")), "CRITICAL", 1)
+# An expandable macOS swap pool can be nearly full while native pressure is healthy.
+high_swap = "34359738368\ntotal = 1000.00M used = 967.00M free = 33.00M\n"
+report = verdict(audit("darwin", host=high_swap, pressure=pressure), "OK", 0)
+assert report["summary"]["swap_used_pct"] == 96.7
+verdict(audit("darwin", host=high_swap, pressure=pressure,
+              thresholds=("--warn-swap-pct", "0", "--crit-swap-pct", "0")), "OK", 0)
 for swap in ("total = 4.00G used = 1.00G free = 3.00G", "total = 4194304K used = 1048576K free = 3145728K"):
     report = verdict(audit("darwin", host="34359738368\n" + swap, pressure=pressure), "OK", 0)
     assert report["summary"]["swap_used_pct"] == 25.0

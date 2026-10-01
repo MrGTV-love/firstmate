@@ -8,11 +8,12 @@ macOS uses memory_pressure -Q, sysctl -n hw.memsize vm.swapusage, and ps.
 On macOS MemAvailable is estimated from the native memory-pressure free percentage,
 not vm_stat's raw free pages: reclaimable/compressed memory must not be counted
 as exhausted RAM. SwapTotal is the currently allocated swap pool, not a fixed cap;
-its utilization is a snapshot, not evidence of active swap thrashing.
+macOS swap occupancy is telemetry only and never classifies pressure, because
+the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
 Thresholds (run --help for defaults):
   - --warn-mem-pct / --crit-mem-pct: percent of total memory not available.
-  - --warn-swap-pct / --crit-swap-pct: percent of the reported swap pool in use.
+  - --warn-swap-pct / --crit-swap-pct: Linux-only percent of swap capacity in use.
 
 Invariants:
   - Read-only diagnostics, not OOM prevention or an automatic intervention.
@@ -216,28 +217,31 @@ def audit_memory(
                 swap_used_gb = round(swap_used_kb / (1024.0 * 1024.0), 2)
                 swap_used_pct = round((swap_used_kb / swap_total_kb) * 100.0, 1)
 
+        swap_classifies = sys.platform.startswith("linux")
         crit = mem_used_pct >= crit_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= crit_swap_pct
+            swap_classifies and swap_used_pct is not None and swap_used_pct >= crit_swap_pct
         )
         warn = mem_used_pct >= warn_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= warn_swap_pct
+            swap_classifies and swap_used_pct is not None and swap_used_pct >= warn_swap_pct
         )
+        condition = "Native memory pressure" if sys.platform == "darwin" else "Memory or swap utilization"
         if crit:
             status = "CRITICAL"
             recommendation = (
-                "Memory or swap utilization is at or above a critical threshold; "
+                f"{condition} is at or above a critical threshold; "
                 "this host condition can explain worker silence while it holds."
             )
         elif warn:
             status = "WARNING"
             recommendation = (
-                "Memory or swap utilization is above a warning threshold but below a "
+                f"{condition} is above a warning threshold but below a "
                 "critical one; degraded but explained, see the top RSS processes."
             )
         else:
             status = "OK"
             recommendation = (
-                "Memory and swap utilization are within thresholds; "
+                ("Native memory pressure is within thresholds; swap is telemetry only; "
+                 if sys.platform == "darwin" else "Memory and swap utilization are within thresholds; ") +
                 "the caller should continue unchanged."
             )
 
@@ -287,13 +291,13 @@ def main():
         "--warn-swap-pct",
         type=float,
         default=85.0,
-        help="Warning threshold for swap utilization %% (default: %(default)s)",
+        help="Linux-only warning threshold for swap utilization %% (default: %(default)s)",
     )
     parser.add_argument(
         "--crit-swap-pct",
         type=float,
         default=95.0,
-        help="Critical threshold for swap utilization %% (default: %(default)s)",
+        help="Linux-only critical threshold for swap utilization %% (default: %(default)s)",
     )
     parser.add_argument(
         "--json",
