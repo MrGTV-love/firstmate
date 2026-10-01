@@ -275,8 +275,15 @@
 #     root via `lsof -a -d cwd` (cheap: bounded by process count, not by
 #     walking the worktree's file tree) and sends TERM, then KILL after a short
 #     grace period to any survivor whose process identity still matches.
-#     Registered worktrees nested beneath either root are excluded; finding a
-#     process there refuses cleanup rather than signalling another lane.
+#     Nested-lane boundary: a matched cwd inside a linked git worktree that
+#     sits beneath either root (registered by any repository, the project or
+#     a sibling clone, and including lanes this task's own worker created) is
+#     never signalled, because no record proves which task owns that lane.
+#     Teardown refuses instead, even with --force, naming the pid, its birth
+#     identity, the matched path, and the lane. A matched cwd under a git root
+#     whose worktree git cannot classify refuses the same way. A missing lsof
+#     refuses too: without the scan no target can be audited, so no
+#     unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
@@ -2101,43 +2108,53 @@ task_pid_list_contains() {  # <pid-list> <pid>
   printf '%s\n' "$1" | grep -Fxq "$2"
 }
 
+# Prints the linked git worktree strictly beneath <root> that contains <path>,
+# whichever repository registered it; prints nothing when <path> belongs to
+# <root> itself. Fails when git cannot classify <path> under a git <root>.
+task_nested_lane_for_path() {  # <root> <path>
+  local root=$1 dir=$2 top git_dir common_dir
+  while :; do
+    if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
+      git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && return 1
+      return 0
+    fi
+    top=$(CDPATH='' cd -- "$top" && pwd -P) || return 1
+    case "$top" in "$root"/*) ;; *) return 0 ;; esac
+    git_dir=$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+    common_dir=$(git -C "$top" rev-parse --git-common-dir 2>/dev/null) || return 1
+    case "$common_dir" in /*) ;; *) common_dir=$top/$common_dir ;; esac
+    git_dir=$(CDPATH='' cd -- "$git_dir" && pwd -P) || return 1
+    common_dir=$(CDPATH='' cd -- "$common_dir" && pwd -P) || return 1
+    if [ "$git_dir" != "$common_dir" ]; then
+      printf '%s\n' "$top"
+      return 0
+    fi
+    dir=${top%/*}
+  done
+}
+
 task_pids_under_roots() {  # <dir>...
   TASK_PIDS=
   TASK_PIDS_FAILED_DIR=
   TASK_PIDS_ERROR="lsof failed"
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
-  local dir dir_matches pid path nested registry_complete=0 line excluded pids="" task_wt=""
-  local -a nested_roots scan_roots
-  nested_roots=()
+  local dir dir_matches pid path lane identity pids=""
+  local -a scan_roots
   scan_roots=()
   for dir in "$@"; do
     [ -n "$dir" ] && [ -d "$dir" ] || continue
-    dir=$(cd "$dir" && pwd -P) || return 1
-    scan_roots+=("$dir")
+    if ! path=$(CDPATH='' cd -- "$dir" && pwd -P); then
+      TASK_PIDS_FAILED_DIR=$dir
+      TASK_PIDS_ERROR="scan root could not be resolved"
+      return 1
+    fi
+    scan_roots+=("$path")
   done
   [ "${#scan_roots[@]}" -gt 0 ] || return 0
-  if teardown_owns_worktree && [ -d "$WT" ]; then
-    task_wt=$(cd "$WT" && pwd -P) || return 1
-  fi
-  # Refresh registration before each scan. NUL fields preserve literal paths;
-  # the completion marker carries git's success out of process substitution.
-  while IFS= read -r -d '' line; do
-    case "$line" in
-      worktree\ *)
-        nested=${line#worktree }
-        [ ! -d "$nested" ] || nested=$(cd "$nested" && pwd -P) || return 1
-        [ "$nested" != "$task_wt" ] || continue
-        for dir in "${scan_roots[@]}"; do
-          case "$nested" in "$dir"/*) nested_roots+=("$nested") ;; esac
-        done
-        ;;
-      fm-registry-complete) registry_complete=1 ;;
-    esac
-  done < <(git -C "$PROJ" worktree list --porcelain -z 2>/dev/null \
-    && printf '%s\0' fm-registry-complete)
-  if [ "$registry_complete" != 1 ]; then
-    TASK_PIDS_ERROR="worktree registration could not be read"
+  if ! command -v lsof >/dev/null 2>&1; then
+    TASK_PIDS_FAILED_DIR=${scan_roots[0]}
+    TASK_PIDS_ERROR="lsof is unavailable, so no signal target can be audited"
     return 1
   fi
   for dir in "${scan_roots[@]}"; do
@@ -2147,14 +2164,16 @@ task_pids_under_roots() {  # <dir>...
     fi
     while IFS=$'\t' read -r pid path; do
       [ -n "$pid" ] || continue
-      excluded=
-      for nested in ${nested_roots[@]+"${nested_roots[@]}"}; do
-        case "$path" in "$nested"|"$nested"/*) excluded=$nested; break ;; esac
-      done
-      if [ -n "$excluded" ]; then
-        echo "REFUSED: process $pid matches only another registered nested worktree $excluded (cwd $path); preserving it and task $ID without signalling." >&2
-        TASK_PIDS_FAILED_DIR=$excluded
-        TASK_PIDS_ERROR="another registered nested worktree owns the matched path"
+      if ! lane=$(task_nested_lane_for_path "$dir" "$path"); then
+        TASK_PIDS_FAILED_DIR=$path
+        TASK_PIDS_ERROR="git could not classify the worktree holding process $pid's cwd"
+        return 1
+      fi
+      if [ -n "$lane" ]; then
+        identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$lane
+        TASK_PIDS_ERROR="registered nested worktree lane holds process $pid"
         return 1
       fi
       TASK_SCAN_PIDS+=("$pid")
@@ -2188,63 +2207,15 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     "$start" "$cwd" "$cwd" >> "$record") || return 1
 }
 
-reap_task_backend_process_group() {  # <label>
-  local label=$1 leader leader_start pgid current_pgid own_pgid
-  if [ "$BACKEND" != tmux ]; then
-    echo "warning: lsof is unavailable; cannot resolve a process-group fallback for $BACKEND task $ID" >&2
-    return 0
-  fi
-  leader=$(tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null) || leader=""
-  case "$leader" in ''|*[!0-9]*)
-    echo "warning: lsof is unavailable; cannot resolve the tmux pane process group for $ID" >&2
-    return 0
-    ;;
-  esac
-  leader_start=$(task_process_identity "$leader") || {
-    echo "warning: lsof is unavailable; cannot identify the tmux pane process group for $ID" >&2
-    return 0
-  }
-  pgid=$(ps -o pgid= -p "$leader" 2>/dev/null) || pgid=""
-  pgid=$(printf '%s' "$pgid" | tr -d '[:space:]')
-  case "$pgid" in ''|*[!0-9]*|0|1)
-    echo "warning: lsof is unavailable; cannot resolve the tmux pane process group for $ID" >&2
-    return 0
-    ;;
-  esac
-  own_pgid=$(ps -o pgid= -p "$$" 2>/dev/null) || own_pgid=""
-  own_pgid=$(printf '%s' "$own_pgid" | tr -d '[:space:]')
-  if [ "$pgid" = "$own_pgid" ]; then
-    echo "warning: lsof is unavailable; refusing to signal teardown's own process group for $ID" >&2
-    return 0
-  fi
-  task_process_identity_matches "$leader" "$leader_start" || return 0
-  current_pgid=$(ps -o pgid= -p "$leader" 2>/dev/null) || current_pgid=""
-  current_pgid=$(printf '%s' "$current_pgid" | tr -d '[:space:]')
-  [ "$current_pgid" = "$pgid" ] || return 0
-  echo "teardown: reaping leaked $label process group for $ID: $pgid" >&2
-  kill -TERM -- "-$pgid" 2>/dev/null || true
-  sleep 1
-  if task_process_identity_matches "$leader" "$leader_start" \
-     && [ "$(ps -o pgid= -p "$leader" 2>/dev/null | tr -d '[:space:]')" = "$pgid" ] \
-     && kill -0 -- "-$pgid" 2>/dev/null; then
-    echo "teardown: force-killing leaked $label process group for $ID: $pgid" >&2
-    kill -KILL -- "-$pgid" 2>/dev/null || true
-  fi
-}
-
-# Reap processes rooted by cwd under this task's worktree or tasktmp, excluding
-# other registered nested worktrees. A nested-lane match refuses cleanup.
+# Reap processes rooted by cwd under this task's worktree or tasktmp. A match
+# inside a registered nested worktree lane refuses cleanup without signalling.
 # TERM first, then KILL after a short grace period; every signal requires a
-# durable identity audit and a fresh birth-identity check. A missing lsof uses
-# the backend process-group fallback; scan errors refuse destructive teardown.
+# durable identity audit and a fresh birth-identity check. A missing lsof or
+# any other scan error refuses destructive teardown.
 reap_task_worktree_processes() {  # <label> <dir>...
   local label=$1 pids pid identity current_pids i pass=1 max_passes=3
   local -a tracked_pids tracked_identities remaining_pids remaining_identities
   shift
-  if ! command -v lsof >/dev/null 2>&1; then
-    reap_task_backend_process_group "$label"
-    return 0
-  fi
   while [ "$pass" -le "$max_passes" ]; do
     if ! task_pids_under_roots "$@"; then
       echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
