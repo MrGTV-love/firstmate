@@ -656,6 +656,7 @@ cat > "$SHARED_LAUNCHER" <<'PL'
 use strict;
 use warnings;
 my ($sibling_file, @command) = @ARGV;
+my $parent = getppid();
 pipe(my $reader, my $writer) or exit 125;
 defined(my $runner = fork) or exit 125;
 if ($runner == 0) {
@@ -669,17 +670,28 @@ if ($runner == 0) {
 close $writer;
 <$reader>;
 close $reader;
+pipe(my $life_reader, my $life_writer) or exit 125;
 defined(my $sibling = fork) or exit 125;
 if ($sibling == 0) {
+  close $life_writer;
   setpgrp(0, $runner) or exit 125;
   open(my $out, '>', $sibling_file) or exit 125;
   print {$out} "$$\n";
   close $out;
-  sleep 30;
+  # Keep the unrelated sibling alive until explicit teardown or launcher
+  # death, not a wall-clock expiry that can masquerade as a group signal.
+  my $byte;
+  read($life_reader, $byte, 1);
   exit 0;
 }
-waitpid($runner, 0);
-waitpid($sibling, 0);
+close $life_reader;
+$SIG{ALRM} = sub { exit 0 if getppid() != $parent; alarm 1; };
+alarm 1;
+for my $pid ($runner, $sibling) {
+  while (waitpid($pid, 0) != $pid) {
+    exit 125 unless $!{EINTR};
+  }
+}
 exit 0;
 PL
 pe_register "$HPG" lavish shared-src -- "$BLOCKER" "$SHARED_TRIGGER" "shared result" >/dev/null
@@ -4780,6 +4792,101 @@ kill -0 -"$CRASH_PID" 2>/dev/null \
   || fail "a refused retirement signalled the leaderless group anyway"
 pass "a group whose leader died to something else is still refused, not signalled"
 kill -KILL -"$CRASH_PID" 2>/dev/null || true
+
+# A slow final stamp read must not erase verified live ownership that appeared
+# during that read. Gate the real runner before claiming, take an empty stamp
+# snapshot, then let it claim before returning that snapshot past the deadline.
+# Reconcile and arm must refresh evidence once, not inflate the polling window
+# or declare a merely live-but-unclaimed launch ready.
+confirm_live_at_boundary() {
+  local operation=$1 BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ rc=0 output
+  local -a command=()
+  BOUNDARY="$TMP_ROOT/boundary-$operation"
+  mkdir -p "$BOUNDARY/bin" "$BOUNDARY/home/state"
+  REAL_CAT=$(command -v cat); REAL_PS=$(command -v ps)
+  BOUNDARY_ROOT=$ROOT
+  export BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ
+  cat > "$BOUNDARY/bin/ps" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_PROCEVENT_RUNNER_GROUP:-}" ]; then
+  while [ ! -e "$BOUNDARY/release" ]; do
+    [ "$SECONDS" -lt 120 ] || exit 75
+    sleep 0.02
+  done
+fi
+exec "$REAL_PS" "$@"
+SH
+  cat > "$BOUNDARY/bin/cat" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *.last-launch)
+    if [ "${FM_PROCEVENT_IN_RUNNER:-0}" != 1 ]; then
+      n=0; [ ! -e "$BOUNDARY/reads" ] || read -r n < "$BOUNDARY/reads"
+      n=$((n + 1)); printf '%s\n' "$n" > "$BOUNDARY/reads"
+      if [ "$n" -eq "$BOUNDARY_READ" ]; then
+        rc=0; snapshot=$("$REAL_CAT" "$@" 2>/dev/null) || rc=$?
+        : > "$BOUNDARY/release"
+        for _ in $(seq 1 600); do
+          owner=$("$BOUNDARY_ROOT/bin/fm-procevent.sh" list 2>/dev/null \
+            | awk -v id="$BOUNDARY_ID" '$1 == id { print $3 }')
+          [ "$owner" = live ] && break
+          sleep 0.1
+        done
+        [ "$owner" = live ] || exit 76
+        printf verified-live > "$BOUNDARY/verified"
+        sleep 2
+        printf '%s' "$snapshot"
+        exit "$rc"
+      fi
+    fi
+    ;;
+esac
+exec "$REAL_CAT" "$@"
+SH
+  cat > "$BOUNDARY/bin/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'started\n' >> "$BOUNDARY/polls"
+while [ ! -e "$BOUNDARY/poll-release" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: ended\n'
+SH
+  chmod +x "$BOUNDARY/bin/ps" "$BOUNDARY/bin/cat" "$BOUNDARY/bin/lavish-axi"
+  if [ "$operation" = reconcile ]; then
+    BOUNDARY_ID=boundary-src; BOUNDARY_READ=2
+    pe_register "$BOUNDARY/home" lavish "$BOUNDARY_ID" -- \
+      "$BLOCKER" "$BOUNDARY/poll-release" "done" >/dev/null
+    command=("$ROOT/bin/fm-procevent.sh" reconcile)
+  else
+    printf '<h1>boundary</h1>\n' > "$BOUNDARY/board.html"
+    lavish_session "$BOUNDARY/board.html"
+    BOUNDARY_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOUNDARY/board.html")
+    BOUNDARY_READ=3
+    fm_test_track_procevent_home "$BOUNDARY/home"
+    command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$BOUNDARY/board.html")
+  fi
+  PATH="$BOUNDARY/bin:$PATH" FM_HOME="$BOUNDARY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+    "${command[@]}" > "$BOUNDARY/out" 2> "$BOUNDARY/err" || rc=$?
+  [ -s "$BOUNDARY/verified" ] || fail "boundary fixture never verified live ownership"
+  [ "$rc" -eq 0 ] || fail "$operation rejected already verified live ownership: $(cat "$BOUNDARY/err")"
+  output=$(cat "$BOUNDARY/out")
+  if [ "$operation" = reconcile ]; then
+    assert_contains "$output" "started=1" "reconcile lost a live boundary launch"
+    assert_contains "$output" "failed=0" "reconcile reported a live boundary launch failed"
+    [ "$(launch_failed_wake_count "$BOUNDARY/home" "$BOUNDARY_ID")" -eq 0 ] \
+      || fail "reconcile published a false launch-failure event"
+  else
+    assert_contains "$output" "armed: $BOUNDARY_ID" "arm lost a live boundary launch"
+  fi
+  assert_contains "$(pe "$BOUNDARY/home" start "$BOUNDARY_ID")" "already owned" \
+    "a boundary confirmation lost the one-owner claim"
+  : > "$BOUNDARY/poll-release"
+  pe "$BOUNDARY/home" retire "$BOUNDARY_ID" >/dev/null 2>&1 || true
+  pass "$operation refreshes verified live ownership at the unchanged confirmation boundary"
+}
+confirm_live_at_boundary reconcile
+confirm_live_at_boundary arm
 
 # --- arm reports ready only once this registration's listener is running ----
 # The public arm path used to print armed as soon as registration was stored.

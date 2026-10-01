@@ -22,6 +22,12 @@ ln -s /bin/bash "$FAKEBIN/claude"
 FAKE_CLAUDE="$FAKEBIN/claude"
 export FAKE_CLAUDE
 
+# Live identity fixtures end on explicit teardown or their suite owner's exit.
+# A fixed sleep can expire inside the hook and falsely look like a signal.
+live_fixture() {
+  exec perl -e 'sleep 1 while getppid() == $ARGV[0]' "$$"
+}
+
 # Copy the hook and its sourced dependencies into a fixture checkout.
 install_autoarm_scripts() {
   local dir=$1
@@ -320,9 +326,9 @@ test_inert_when_lock_held_by_other_harness() {
   dir=$(make_primary_dir "$TMP_ROOT/other-lock")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
-  # The trailing no-op keeps the fake harness process alive instead of allowing
-  # bash to exec the final sleep into a non-harness process.
-  "$FAKE_CLAUDE" -c 'sleep 60; :' &
+  # Keep the harness itself alive until teardown or suite exit, without execing
+  # its wait into a non-harness process.
+  "$FAKE_CLAUDE" -c 'while kill -0 "$PPID" 2>/dev/null; do sleep 1; done; :' &
   other=$!
   printf '%s\n' "$other" > "$dir/state/.lock"
   out=$(printf '%s\n' '{"session_id":"s"}' | FM_HOME="$dir" "$FAKE_CLAUDE" -c '"$FM_HOME/bin/fm-claude-stop-autoarm.sh"' 2>&1); status=$?
@@ -482,7 +488,7 @@ test_actionable_close_with_live_successor_rewakes_once() {
   dir=$(make_primary_dir "$TMP_ROOT/actionable-live-successor")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live successor for actionable close"
   record_watcher_lock "$dir" "$pid" "$identity"
@@ -672,7 +678,7 @@ test_benign_cycle_end_with_live_watcher_is_silent() {
   dir=$(make_primary_dir "$TMP_ROOT/benign-live")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" benign-live
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live watcher holder for benign close"
   record_watcher_lock "$dir" "$pid" "$identity"
@@ -701,14 +707,14 @@ test_positive_recovery_budget_contention_preserves_episode() {
   dir=$(make_primary_dir "$TMP_ROOT/recovery-budget-contention")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" benign-live
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live watcher holder for recovery contention"
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   printf 'session=sess-autoarm\ncount=3\nepoch=9\n' > "$dir/state/.turnend-claude-blocks"
   : > "$dir/state/.claude-autoarm-failure-notified"
-  sleep 60 &
+  live_fixture &
   holder=$!
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
@@ -737,7 +743,7 @@ test_owner_mutex_contention_preserves_failure_episode_reset() {
   : > "$dir/state/.claude-autoarm-failure-notified"
   : > "$dir/state/.claude-autoarm-failure-alarmed"
   write_arm_fixture "$dir" reset-boundary
-  sleep 60 &
+  live_fixture &
   watcher=$!
   watcher_id=$(watcher_identity "$dir" "$watcher") || fail "could not identify reset-contention watcher"
   record_watcher_lock "$dir" "$watcher" "$watcher_id"
@@ -751,7 +757,7 @@ test_owner_mutex_contention_preserves_failure_episode_reset() {
     sleep 0.05
     i=$((i + 1))
   done
-  sleep 60 &
+  live_fixture &
   holder=$!
   mkdir -p "$dir/state/.claude-autoarm.lock"
   printf '%s\n' "$holder" > "$dir/state/.claude-autoarm.lock/pid"
@@ -909,7 +915,7 @@ test_abandoned_owner_claim_is_reclaimed_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_epoch "$dir" 464 "$pid" rewake
@@ -936,7 +942,7 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
   dir=$(make_primary_dir "$TMP_ROOT/abandoned-claim-dead-steal")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_epoch "$dir" 464 "$pid" rewake
@@ -982,7 +988,7 @@ test_arming_claim_with_fresh_beacon_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/arming-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   # An owner foregrounds the arm for the whole watcher cycle, so an old "arming"
@@ -1008,7 +1014,7 @@ test_fresh_arming_claim_with_stale_beacon_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/fresh-arming-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1030,7 +1036,7 @@ test_claim_not_named_by_the_ledger_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/unnamed-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   # A fresh claimant holds the lock before it writes "arming", so until it does
@@ -1060,7 +1066,7 @@ test_pid_reused_arming_claim_is_reclaimed_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$$" || fail "could not record a claim pid-identity"
@@ -1087,7 +1093,7 @@ test_pid_reused_claim_with_no_ledger_is_reclaimed_and_rearms() {
   dir=$(make_primary_dir "$TMP_ROOT/reused-pid-no-ledger")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$$" || fail "could not record a claim pid-identity"
@@ -1112,7 +1118,7 @@ test_identity_matched_arming_claim_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/identity-matched-arming")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1134,7 +1140,7 @@ test_terminal_check_claim_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/terminal-check-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   # The synchronous guard takes the same lock under its own role while it decides
   # the attended fail-open. Reclaiming that would race the guard's own decision.
@@ -1158,7 +1164,7 @@ test_stuck_live_legacy_owner_is_retired_and_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/legacy-term")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1183,7 +1189,7 @@ test_stopped_legacy_owner_is_reclaimed_with_term_pending() {
   dir=$(make_primary_dir "$TMP_ROOT/legacy-term-stopped")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1231,7 +1237,7 @@ test_open_generation_claim_defers_without_any_lock() {
   dir=$(make_primary_dir "$TMP_ROOT/v2-open-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_v2_claim "$dir" 464 "$pid" arming "$pid" || fail "could not record a v2 claim"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
@@ -1256,7 +1262,7 @@ test_stuck_generation_claim_is_superseded_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_v2_claim "$dir" 464 "$pid" arming "$pid" || fail "could not record a v2 claim"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"

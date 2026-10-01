@@ -2739,11 +2739,12 @@ The generation's first launch is immediate, later launches share its monotonic p
 
 **Confirm detached launches**
 
-`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) sets how long `reconcile` allows the runners it just started to prove they are running: a fully unconfirmed window nominally lasts from the configured value through one second more, because the deadline uses a whole-second clock.
-Confirmation can end the wait early, while scheduling delays can extend elapsed wall-clock time.
+`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) bounds the polling window for `reconcile` to observe a live claim or an advanced launch stamp.
+The whole-second clock adds at most one second to that polling window, followed by one final evidence read; local command execution time is not a wall-clock startup guarantee.
 
 - Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
+- The final read refreshes ownership that can become live during a slow last stamp read, without extending the polling deadline or treating an unclaimed process as ready.
 - A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
 - All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
 - A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.
