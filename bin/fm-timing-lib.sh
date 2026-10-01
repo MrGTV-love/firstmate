@@ -50,14 +50,18 @@ fm_timing_enabled() {
   [ -n "${FM_TIMING_LOG:-}" ]
 }
 
-# Milliseconds since the epoch. EPOCHREALTIME is a bash builtin (no fork) whose
-# decimal separator follows the locale, so both forms are accepted. A shell
-# without it - macOS's system bash 3.2, which `env bash` still resolves to on a
-# host with no newer bash on PATH - degrades to whole-second granularity rather
-# than losing the timing entirely. That is a coarser answer to "which host was
-# slow", not a missing one, because the steps being measured are seconds-scale.
+# Milliseconds on the host's monotonic clock, shared across processes and immune
+# to wall-clock adjustments. Time::HiRes ships with stock macOS Perl and works
+# under Bash 3.2 as well as newer shells; the same helper is used by process-event
+# leases. These stamps are only for differences, not Unix timestamps.
+# Hosts without that helper retain the previous best-effort wall-clock fallback
+# so unavailable diagnostics never change a caller's exit behavior.
 fm_timing_now_ms() {
   local raw sec frac
+  if perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
+    'printf "%d\n", clock_gettime(CLOCK_MONOTONIC) * 1000' 2>/dev/null; then
+    return 0
+  fi
   raw=${EPOCHREALTIME:-}
   case "$raw" in
     *[0-9][.,][0-9]*)

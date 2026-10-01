@@ -49,6 +49,14 @@
 #   dispatch-resolve:
 #     status: clear | ambiguous | escalate | error
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
+#     timings: api_ms/quota_ms/local_ms/total_ms (local is total minus both calls)
+#     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million
+#   latency_ms remains API-only. Times include local helper overhead; total is
+#   measured from opted-in setup through rendering, before printing diagnostics.
+#   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
+#   $0.042 per million input tokens, output free; unavailable usage prints null.
+#   Only numeric usage and the returned model id are observed, never request text
+#   or raw API error bodies, which may echo sensitive input.
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible | eligible, unranked: <reason> | not eligible: <reason>
@@ -94,6 +102,7 @@ CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
 TS_BASE=https://api.typesafe.ai
 TS_TIMEOUT=5
+TS_INPUT_USD_PER_MILLION=0.042
 DEFAULT_WHEN="No listed rule applies to this task."
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
@@ -128,6 +137,9 @@ if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
   exit 0
 fi
+
+RUN_T0=$(fm_timing_now_ms)
+LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 
 # ---- inputs --------------------------------------------------------------------
 [ -n "$BRIEF" ] || die "brief file required (see --help)"
@@ -228,10 +240,34 @@ done < <(jq -r '
 
 RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
 
+# Append diagnostics to both success and error results without changing routing.
+# Read only validated metadata; API errors can echo the key or private brief.
+emit_telemetry() {
+  local end total local_ms
+  end=$(fm_timing_now_ms)
+  total=$(( end - RUN_T0 ))
+  [ "$total" -ge 0 ] || total=0
+  local_ms=$(( total - ${LAT_MS/null/0} - ${QUOTA_MS/null/0} ))
+  [ "$local_ms" -ge 0 ] || local_ms=0
+  printf '  timings: api_ms=%s quota_ms=%s local_ms=%s total_ms=%s\n' \
+    "$LAT_MS" "$QUOTA_MS" "$local_ms" "$total"
+  if [ "$RESPONSE_VALID" -eq 1 ]; then
+    jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" '
+      def count: if type == "number" and . >= 0 and . == floor then . else null end;
+      (.usage.input_tokens | count) as $input |
+      (.usage.output_tokens | count) as $output |
+      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price)"
+    ' "$RESP_FILE" 2>/dev/null || true
+  else
+    printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s\n' "$TS_INPUT_USD_PER_MILLION"
+  fi
+}
+
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
+  emit_telemetry
   exit 0
 }
 
@@ -302,7 +338,6 @@ if [ -n "$SECTIONS" ]; then
 else
   cp "$BRIEF" "$TASK_TEXT" || die "could not read brief: $BRIEF"
 fi
-LAT_MS=null
 command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
     --arg none_criterion "$DEFAULT_WHEN" --slurpfile rules "$RULES" '
@@ -327,7 +362,8 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
     --data-binary @- 2>/dev/null) || HTTP=000
   T1=$(fm_timing_now_ms)
   LAT_MS=$(( T1 - T0 ))
-  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms: $(head -c 200 "$RESP_FILE" 2>/dev/null | tr '\n' ' ')"
+  [ "$LAT_MS" -ge 0 ] || LAT_MS=0
+  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
     (.answers.rule.choice | type) == "string" and
@@ -342,10 +378,17 @@ jq -e --slurpfile rules "$RULES" '
        (.usage.input_tokens | type) == "number" and
        (.usage.output_tokens | type) == "number"))' \
   "$RESP_FILE" >/dev/null 2>&1 || emit_error "response is not a rule Choice answer"
+RESPONSE_VALID=1
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
 command -v quota-axi >/dev/null 2>&1 || emit_error "quota-axi not installed"
-quota-axi --json > "$QUOTA" 2>/dev/null || emit_error "quota-axi --json failed"
+Q0=$(fm_timing_now_ms)
+quota_rc=0
+quota-axi --json > "$QUOTA" 2>/dev/null || quota_rc=$?
+Q1=$(fm_timing_now_ms)
+QUOTA_MS=$(( Q1 - Q0 ))
+[ "$QUOTA_MS" -ge 0 ] || QUOTA_MS=0
+[ "$quota_rc" -eq 0 ] || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
@@ -515,4 +558,5 @@ TEXT=$(jq -r '
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
+emit_telemetry
 exit 0
