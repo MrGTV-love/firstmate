@@ -3715,7 +3715,116 @@ test_leaked_worktree_process_is_reaped() {
   fi
   assert_grep "reaping leaked worktree process" "$case_dir/stderr" \
     "leaked-process-reap: teardown did not report reaping the leaked process"
+  assert_present "$case_dir/state/task-x1.teardown-processes" \
+    "leaked-process-reap: teardown removed the durable process identity audit"
   pass "a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving"
+}
+
+test_process_identity_is_recorded_before_term_and_kill() {
+  local case_dir rc pid journal expected_start expected_cwd epoch signal audit_pid birth command start cwd matched
+  case_dir=$(make_case durable-process-identity)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  journal="$case_dir/state/task-x1.teardown-processes"
+  (cd "$case_dir/wt" && exec perl -e '
+    my ($journal, $seen, $ready) = @ARGV;
+    $SIG{TERM} = sub {
+      open my $in, "<", $journal or die "signal arrived without audit";
+      local $/; my $audit = <$in>;
+      open my $out, ">", $seen or die "open observation";
+      print {$out} $audit; close $out;
+    };
+    open my $ready_file, ">", $ready or die "ready"; close $ready_file;
+    while (1) { sleep 300; }
+  ' "$journal" "$case_dir/term-observed" "$case_dir/ready") &
+  pid=$!
+  disown
+  local i=0
+  while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case_dir/ready" ] || { kill -KILL "$pid"; fail "durable-process-identity: process not ready"; }
+  expected_start=$(LC_ALL=C ps -p "$pid" -o lstart=)
+  expected_cwd=$(cd "$case_dir/wt" && pwd -P)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null || true
+    fail "durable-process-identity: leaked process survived"
+  fi
+  expect_code 0 "$rc" "durable-process-identity: teardown should succeed"
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/term-observed" \
+    "durable-process-identity: TERM preceded its durable identity record"
+  assert_grep $'\tKILL\t'"$pid"$'\t' "$journal" \
+    "durable-process-identity: KILL has no durable identity record"
+  IFS=$'\t' read -r epoch signal audit_pid birth command start cwd matched < "$case_dir/term-observed"
+  case "$epoch" in ''|*[!0-9]*) fail "durable-process-identity: invalid timestamp" ;; esac
+  case "$command" in *perl*) ;; *) fail "durable-process-identity: command line missing" ;; esac
+  case "$birth" in lstart=*|starttime=*) ;; *) fail "durable-process-identity: birth identity missing" ;; esac
+  [ "$signal" = TERM ] && [ "$audit_pid" = "$pid" ] \
+    || fail "durable-process-identity: signal target missing"
+  [ "$start" = "$(printf '%q' "$expected_start")" ] \
+    || fail "durable-process-identity: process start time missing or incorrect"
+  [ "$cwd" = "$(printf '%q' "$expected_cwd")" ] && [ "$matched" = "$cwd" ] \
+    || fail "durable-process-identity: cwd or matched open path missing or incorrect"
+  pass "a real leaked process observes its durable identity audit before TERM, and KILL is audited too"
+}
+
+test_nested_registered_worktree_process_is_not_reaped() {
+  local case_dir rc pid other_pid nested before
+  case_dir=$(make_case nested-worktree-custody)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  nested="$case_dir/wt/other-lane"
+  git -C "$case_dir/project" worktree add -q --detach "$nested" main
+  git -C "$case_dir/project" worktree lock "$nested"
+  fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+  before=$(cat "$case_dir/state/unrelated.meta")
+  mkdir -p "$case_dir/unrelated"
+  (cd "$nested" && exec sleep 300) &
+  pid=$!
+  disown
+  (cd "$case_dir/unrelated" && exec sleep 300) &
+  other_pid=$!
+  disown
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  local survived=0 other_survived=0
+  kill -0 "$pid" 2>/dev/null && survived=1
+  kill -0 "$other_pid" 2>/dev/null && other_survived=1
+  kill -KILL "$pid" "$other_pid" 2>/dev/null || true
+  expect_code 1 "$rc" "nested-worktree-custody: teardown must refuse even with force"
+  [ "$survived" -eq 1 ] || fail "nested-worktree-custody: other lane process was killed"
+  [ "$other_survived" -eq 1 ] || fail "nested-worktree-custody: unrelated process was killed"
+  [ "$(cat "$case_dir/state/unrelated.meta")" = "$before" ] \
+    || fail "nested-worktree-custody: unrelated task record changed"
+  assert_present "$case_dir/state/task-x1.meta" "nested-worktree-custody: task record removed"
+  assert_grep "REFUSED: process $pid matches only another registered nested worktree" "$case_dir/stderr" \
+    "nested-worktree-custody: other lane custody not reported"
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "nested-worktree-custody: other lane recorded as a signal target"
+  pass "registered nested-lane and unrelated processes and records remain untouched on forced teardown"
+}
+
+test_process_audit_failure_refuses_before_signal() {
+  local case_dir rc pid survived=0
+  case_dir=$(make_case process-audit-failure)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  mkdir "$case_dir/state/task-x1.teardown-processes"
+  (cd "$case_dir/wt" && exec sleep 300) &
+  pid=$!
+  disown
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  kill -KILL "$pid" 2>/dev/null || true
+  expect_code 1 "$rc" "process-audit-failure: teardown must refuse"
+  [ "$survived" -eq 1 ] || fail "process-audit-failure: signal sent without durable audit"
+  assert_present "$case_dir/state/task-x1.meta" "process-audit-failure: task record removed"
+  assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" \
+    "process-audit-failure: missing refusal reason"
+  pass "an unwritable process audit refuses before signalling a real leaked process"
 }
 
 test_leaked_tasktmp_process_is_reaped() {
@@ -3962,29 +4071,30 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
 }
 
 test_persistent_scan_refuses_after_bounded_retries() {
-  local case_dir rc wt_path fake_pid=99999999
+  local case_dir rc spawner i=0
   case_dir=$(make_case persistent-reap-refusal)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
-  wt_path=$(cd "$case_dir/wt" && pwd -P)
-  cat > "$case_dir/fakebin/lsof" <<EOF
-#!/usr/bin/env bash
-printf 'p%s\nfcwd\nn%s\n' '$fake_pid' '$wt_path'
-EOF
-  cat > "$case_dir/fakebin/ps" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_PERSISTENT_PID:-}" ] \
-   && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
-  printf 'Tue Aug  4 10:00:00 2026\n'
-  exit 0
-fi
-exec "$REAL_PS_FOR_TEST" "$@"
-SH
-  chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
-
+  # A real parent outside the task roots immediately replenishes leaked children.
+  # Each killed child has a distinct kernel birth identity and a real cwd.
+  (cd "$case_dir" && exec perl -e '
+    my ($root, $ready) = @ARGV;
+    my $child;
+    $SIG{TERM} = sub { kill "KILL", $child if $child; waitpid($child, 0) if $child; exit 0; };
+    while (1) {
+      $child = fork(); defined $child or die "fork";
+      if (!$child) { chdir $root or die "chdir"; exec "sleep", "300"; die "exec"; }
+      open my $fh, ">", $ready or die "ready"; print {$fh} "$child\n"; close $fh;
+      waitpid($child, 0);
+    }
+  ' "$case_dir/wt" "$case_dir/child-ready") &
+  spawner=$!
+  disown
+  while [ ! -s "$case_dir/child-ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$case_dir/child-ready" ] || { kill -TERM "$spawner"; fail "persistent-reap-refusal: parent not ready"; }
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_PERSISTENT_PID="$fake_pid" \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -TERM "$spawner" 2>/dev/null || true
 
   expect_code 1 "$rc" "persistent-reap-refusal: teardown should refuse"
   assert_grep "remain after 3 reap attempts" "$case_dir/stderr" \
@@ -4345,6 +4455,9 @@ test_another_branchs_parked_run_is_never_touched
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
+test_process_identity_is_recorded_before_term_and_kill
+test_nested_registered_worktree_process_is_not_reaped
+test_process_audit_failure_refuses_before_signal
 test_lsof_absent_reaps_tmux_process_group
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
