@@ -299,7 +299,6 @@ FM_CLAUDE_LIVE_E2E=1 bash bin/fm-test-run.sh tests/fm-claude-stop-autoarm-live-e
 
 The same command also revalidated the Stop-owned cycles and competing-session boundary.
 Its arm fixture distinguishes a handling successor from a foreground arm, as the portable fixtures do: the successor confirms coverage but must not consume one of the two model-facing fixture events.
-Set `FM_CLAUDE_POSTTOOL_LIVE_E2E=1` as well to refresh only the three mid-turn delivery scenarios.
 
 The listener change was separately exercised against lavish-axi 0.1.79 and a real open browser review.
 An answer was captured while the same exclusive listener remained live, a second answer was captured without reconciliation, and closing the browser produced a captured disconnect without retiring the open session or ending its listener.

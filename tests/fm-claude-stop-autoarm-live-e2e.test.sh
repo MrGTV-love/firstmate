@@ -129,13 +129,6 @@ tool_result_text "$POST_NEGATIVE" | grep -qx 'NO_FEEDBACK_NOTICE' \
 printf 'ok - Claude %s delivered and handled captured Lavish feedback through native PostToolUse before turn end\n' "$CLAUDE_VERSION"
 }
 
-# This independent surface can be refreshed without running unrelated Stop
-# cycles; the ordinary full live guard exercises both.
-if [ "${FM_CLAUDE_POSTTOOL_LIVE_E2E:-0}" = 1 ]; then
-  test_posttool_delivery
-  exit 0
-fi
-
 mkdir -p "$LAB"
 # git clone of this worktree carries only committed state, so copy the
 # working-tree surfaces under test (same pattern as the continuity live E2E).
@@ -287,6 +280,5 @@ printf '%s\n' '{"session_id":"live-owner-control"}' \
 [ ! -s "$LAB/live-owner.out" ] && [ ! -s "$LAB/live-owner.err" ] || fail "competing Stop hook produced a rewake while another live session owned the home"
 wait "$LIVE_OWNER_PID"
 test_posttool_delivery
-
 
 printf 'ok - Claude %s live E2E reclaimed a stale session lock through session start, completed two tokenless Stop-owned rewake cycles, and preserved the competing-live-owner boundary\n' "$CLAUDE_VERSION"

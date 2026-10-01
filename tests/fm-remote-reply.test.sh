@@ -102,25 +102,17 @@ stop_reply_listener() {
 
 # Block until this generation's capture has been applied. Re-check ownership
 # while waiting: a live listener can exit after a replay supersedes its source.
-await_reply_result() { # <result-path> [wait-tries]
-  local result=$1 handled=${1%.result}.handled _ log="$TMP_ROOT/await-${1##*/}.log" tries=${2:-800}
-  for _ in $(seq 1 "$tries"); do
+await_reply_result() { # <result-path>
+  local result=$1 handled=${1%.result}.handled _
+  for _ in $(seq 1 800); do
     [ -s "$result" ] && [ -f "$handled" ] && return 0
     if [ "$(reply_owner)" != live ]; then
-      remote_env "$ROOT/bin/fm-procevent.sh" start "$SID" > "$log" 2>&1 &
+      remote_env "$ROOT/bin/fm-procevent.sh" start "$SID" >/dev/null 2>&1 &
     fi
     sleep 0.05
   done
-  printf 'reply wait failed: result=%s owner=%s\n' "$result" "$(reply_owner)" >&2
-  [ ! -f "$log" ] || cat "$log" >&2
-  [ ! -f "$result" ] || remote_env "$ADAPTER" classify "$result" >&2
   return 1
 }
-
-# Whole-log replays refetch every distinct offered document through real jobs,
-# so they need a batch wait rather than the short single-delta wait. The longer
-# bound changes no capture, acknowledgement, deduplication or decision checks.
-WHOLE_LOG_REPLY_WAIT_TRIES=8000
 
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then
@@ -670,10 +662,10 @@ pass "a failed mirror write never drops status content or advances the cursor"
 # loaded runner. Each attempt is a full wait that re-checks ownership of the
 # source, so the recapture is bounded by RECAPTURE_WAIT_ATTEMPTS of them.
 RECAPTURE_WAIT_ATTEMPTS=3
-await_recapture_result() { # <result-path> [wait-tries]
+await_recapture_result() { # <result-path>
   local attempt
   for attempt in $(seq 1 "$RECAPTURE_WAIT_ATTEMPTS"); do
-    await_reply_result "$1" "${2-}" && return 0
+    await_reply_result "$1" && return 0
   done
   return 1
 }
@@ -724,8 +716,8 @@ assert_not_contains "$(status_open_decisions "$PARENT/state/ios.status")" $'repl
 stop_reply_listener || fail "the reply listener did not stop before the cursor-loss recapture"
 rm -f "$PARENT/state/remote-replies/ios.cursor"
 GEN=$((GEN + 1))
-await_recapture_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" "$WHOLE_LOG_REPLY_WAIT_TRIES" \
-  || fail "the replay-identity whole-log recapture was not captured and applied"
+await_recapture_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" \
+  || fail "the replay-identity whole-log recapture was not captured"
 assert_present "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
   "the replay-identity whole-log recapture was not applied"
 [ "$(grep -cF "$REPLAY_LINE" "$PARENT/state/ios.status")" -eq 1 ] \
@@ -988,8 +980,8 @@ mv "$PARENT/state/.wake-queue" "$TMP_ROOT/wake-queue-before-replay" 2>/dev/null 
 stop_reply_listener || fail "the reply listener did not stop before the whole-log recapture"
 rm -f "$PARENT/state/remote-replies/ios.cursor"
 GEN=$((GEN + 1))
-await_recapture_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" "$WHOLE_LOG_REPLY_WAIT_TRIES" \
-  || fail "the cursor-loss recapture was not captured and applied"
+await_recapture_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" \
+  || fail "the cursor-loss recapture was not captured"
 assert_present "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
   "the whole-log recapture was not acknowledged by the adapter"
 # Documents that were undelivered when their lines first mirrored have since
