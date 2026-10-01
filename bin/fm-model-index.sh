@@ -200,7 +200,7 @@ RESOLVE_JQ="$LIB_JQ"'
     elif has("stand_in") then error("stand_in requires role")
     else . end;
   def retired_guard:
-    . as $p | if type == "object" and has("model") and retired($p.model)
+    . as $p | if type == "object" and (.model | type) == "string" and retired($p.model)
     then error("retired model: " + $p.model) else . end;
   def profile: resolve_profile | retired_guard;
   def profile_set: if type == "array" then map(profile) else profile end;
