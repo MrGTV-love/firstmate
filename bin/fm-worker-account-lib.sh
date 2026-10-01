@@ -300,9 +300,9 @@ fm_worker_account_run() {
 # ranks above a pinned root's stored login. The caller appends the root
 # assignment, or -u CLAUDE_CONFIG_DIR for the ordinary account.
 fm_worker_account_claude_shed() {
-  local var prefix=env
+  local var shed=env
   for var in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-    prefix="$prefix -u $var"
+    shed="$shed -u $var"
   done
-  printf '%s\n' "$prefix"
+  printf '%s\n' "$shed"
 }
