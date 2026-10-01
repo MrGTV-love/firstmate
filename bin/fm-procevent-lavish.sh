@@ -150,6 +150,14 @@
 # lavish-axi 0.1.79 follows those two lines with one generated `help[2]:` footer
 # naming the server log and the poll re-run; that exact three-line form is the
 # same interruption. Every listener sees it when the Lavish server restarts.
+# Their retried polls then race to auto-start that server, and each loser gets
+#
+#   error: Lavish Editor server did not start
+#   code: SERVER_ERROR
+#   help[1]: Run `lavish-axi server --port <port>` to inspect server startup
+#
+# while the winner's server comes up. With <port> exactly the port this poll
+# routes to, that is the same restart and takes the same bounded retry.
 #
 # That is an internal retry, not news, so registering the raw poll made the
 # generic runner capture it and wake the whole fleet. `poll` therefore re-runs
@@ -474,11 +482,12 @@ POLL_RETRY_DELAY_MIN=1
 POLL_RETRY_DELAY_MAX=60
 
 # Exit 10 only for the exact interruption, and nothing else. The whole response
-# must be one of its two published forms with those exact bytes: the bare
-# two-line form, or that form followed by the one help footer lavish-axi 0.1.79
-# generates for it. Whitespace variants, any other help text, a longer response
-# that merely opens with them, and any other SERVER_ERROR are genuine errors
-# this adapter must never swallow.
+# must be one of its published forms with those exact bytes: the bare two-line
+# form, that form followed by the one help footer lavish-axi 0.1.79 generates
+# for it, or 0.1.79's three-line server-did-not-start response naming the exact
+# port this poll routes to. Whitespace variants, any other help text or port, a
+# longer response that merely opens with them, and any other SERVER_ERROR are
+# genuine errors this adapter must never swallow.
 poll_response_filter() {  # <response-file>
   perl -e '
     use strict;
@@ -491,6 +500,12 @@ poll_response_filter() {  # <response-file>
       . "help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`"
       . " (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,"
       . "Re-run the last `lavish-axi poll <html-file>` command after the server is healthy\n";
+    my @forms = ($footer);
+    my $port = $ENV{LAVISH_AXI_PORT} // "";
+    # A restart race: another poll auto-started the server on the port this poll routes to.
+    push @forms, "error: Lavish Editor server did not start\ncode: SERVER_ERROR\n"
+      . "help[1]: Run `lavish-axi server --port $port` to inspect server startup\n"
+      if $port =~ /\A[0-9]+\z/;
     open my $staged, ">", $stage or exit 2;
     binmode STDIN;
     binmode STDOUT;
@@ -513,11 +528,14 @@ poll_response_filter() {  # <response-file>
         write_all(*STDOUT, $chunk);
         next;
       }
-      # Stage through the first byte that leaves the footer form, and no further.
+      # Stage through the first byte that leaves every form, and no further.
       my $seen = $candidate . $chunk;
-      my $span = length($seen) < length($footer) ? length($seen) : length($footer);
-      (substr($seen, 0, $span) ^ substr($footer, 0, $span)) =~ /^(\0*)/;
-      my $same = length $1;
+      my $same = 0;
+      for my $form (@forms) {
+        my $span = length($seen) < length($form) ? length($seen) : length($form);
+        (substr($seen, 0, $span) ^ substr($form, 0, $span)) =~ /^(\0*)/;
+        $same = length $1 if length $1 > $same;
+      }
       my $keep = $same < length($seen) ? $same + 1 : $same;
       write_all($staged, substr($seen, length($candidate), $keep - length($candidate)));
       if ($same == length($seen)) {
@@ -527,7 +545,7 @@ poll_response_filter() {  # <response-file>
         $streaming = 1;
       }
     }
-    exit 10 if !$streaming && ($candidate eq $bare || $candidate eq $footer);
+    exit 10 if !$streaming && grep { $candidate eq $_ } $bare, @forms;
     write_all(*STDOUT, $candidate) unless $streaming;
   ' "$1"
 }
