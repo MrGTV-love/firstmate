@@ -583,8 +583,18 @@ Typed-plane text is typed once; only Enter is retried.
 When native `agent get` identity is Claude, the adapter types only into an empty composer.
 A Claude composer that already holds text, or cannot be read, before the send is refused with nothing typed.
 Before that Enter, the adapter continues only when the selected composer shows the typed payload, or only Claude paste placeholders with no literal remainder.
+The payload is typed once.
+While the selected composer is empty or shows a prefix of the payload, the proof keeps reading it for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds (default 30), because a loaded host renders it well after the settle.
+A head-truncated suffix of the payload, alone or after leading paste placeholders, is refused and cleared on the read that shows it.
+Any other text is not this send's own, so it is refused on that read, never cleared, and reported `send-failed`, because Enter was never pressed.
+That includes a strict infix of the payload and any other literal beside a placeholder: either may be a human's typing, so the send leaves it in the composer rather than risk deleting it.
+Every Herdr composer read of a pane whose native identity is Claude retains normal-intensity truecolor text regardless of its luminance, because recognized slash commands can be dark blue or muted grey.
+The lifecycle pre-send guard, the payload proof, and post-Enter confirmation therefore agree about a colored draft, and the guard refuses it by name.
+Dim or faint suggestions are still removed, and other harnesses retain their existing placeholder policy.
+`fm_backend_herdr_composer_ghost_luma` owns that policy; a state read consults identity for it only when the two policies strip the selected composer rows differently.
+A submission reuses the identity it already probed for its post-Enter confirmation and clear reads, so a failed later probe cannot turn a swallowed colored command into a reported delivery; a Pi status is still read live, because only a live idle or done status proves its composer.
 Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
-Dated measurement: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup".
+Dated measurements: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup" and "Colored Claude slash commands".
 
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
@@ -671,12 +681,13 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 A blocked Pi is parked on an interactive prompt, so its blank composer region is a menu's and not a free composer's.
 That state defers instead of proving emptiness.
 A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
-Identity stays a lazy second read, consulted only when a separator pair could change the verdict.
+Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
 
 ### Placeholder and ghost text
 
 ANSI capture preserves de-emphasized placeholder style.
 `bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
+A pane whose native identity is Claude keeps dark truecolor text, as "Claude composer proof" describes.
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.
