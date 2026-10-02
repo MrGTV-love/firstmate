@@ -119,7 +119,9 @@ The lint script's header owns the exact selection and cache controls.
 
 Dependency selection and cache reuse retain the roots' source directives rather than replacing joint source analysis with separate library checks.
 Checking a library separately cannot preserve diagnostics that depend on both a function definition and its caller.
-Regression fixtures exercise cross-file missing-argument findings, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+Repeated imports retain their runtime initialization at each call while sharing a real source statement, rather than hiding that dependency from joint analysis.
+Parent-channel publication imports the small status-record owner instead of the complete classifier; the classifier consumes the same record owner for its own readers.
 
 Cold source-aware analysis can still require multi-GiB processes; cache reuse is a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
 macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.

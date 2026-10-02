@@ -93,7 +93,7 @@
 # the worker's own background work, pipeline or long command; blocked when
 # firstmate must act. The first-sight alert remains; repeats use the long cadence.
 # Emission-time syntax and legacy unknown-time handling are owned by
-# bin/fm-classify-lib.sh; each scaffold renders the stamp as a literal <epoch>
+# bin/fm-status-record-lib.sh; each scaffold renders the stamp as a literal <epoch>
 # placeholder the worker replaces with a numeric Unix time as it appends, so a
 # scaffold never emits a substitution a file-write tool would copy through.
 # Every scaffold also carries the steering-inbox receive-and-ack section:

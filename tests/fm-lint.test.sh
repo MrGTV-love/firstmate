@@ -1911,6 +1911,81 @@ SH
   pass "joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes"
 }
 
+test_private_source_keeps_changed_call_dependent_findings() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): private-source call regression"; return; }
+  local tmp repo fakebin diff_file out rc mode
+  tmp=$(fm_test_tmproot fm-lint-private-source-call)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf 'initial\n'
+}
+SH
+  cat > "$repo/bin/consumer.sh" <<'SH'
+#!/usr/bin/env bash
+_load_library() {
+  # shellcheck source=bin/library.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/library.sh"
+}
+_load_library "$@"
+needs_argument
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
+    || fail "private-source consumer did not initially pass: $out"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
+    || fail "private-source consumer did not reuse its clean result: $out"
+  assert_contains "$out" 'cache hit bin/consumer.sh' "private-source consumer was not cached"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf '%s\n' "$1"
+}
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+    "$repo/bin/fm-lint.sh" bin/library.sh 2>&1) \
+    || fail "private-source owner alone should remain clean: $out"
+  for mode in explicit changed cold-cache mutated-cache ci; do
+    rc=0
+    case "$mode" in
+      explicit)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+          "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
+        ;;
+      changed)
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+          FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
+          "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+        ;;
+      cold-cache)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cold-cache" \
+          "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
+        ;;
+      mutated-cache)
+        out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+          "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || rc=$?
+        assert_not_contains "$out" 'cache hit bin/consumer.sh' "changed private import reused a stale success"
+        ;;
+      ci)
+        out=$(CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+          "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+        assert_not_contains "$out" 'cache hit ' "CI reused a private-source success"
+        ;;
+    esac
+    [ "$rc" -eq 1 ] || fail "$mode private source hid the changed argument requirement: $out"
+    assert_contains "$out" SC2119 "$mode private source lost the imported call-site diagnostic"
+    assert_contains "$out" 'In bin/consumer.sh line' "$mode did not analyze the private import's consumer"
+  done
+  pass "private-source imports retain changed-library call diagnostics across selection and cache modes"
+}
+
 test_fast_cache_cannot_hide_full_analysis_findings() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): analysis-mode cache boundary"; return; }
   local tmp out rc
@@ -1937,6 +2012,7 @@ SH
 
 test_source_spellings_keep_changed_and_cached_dataflow_findings
 test_joint_sources_keep_call_dependent_findings
+test_private_source_keeps_changed_call_dependent_findings
 test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
