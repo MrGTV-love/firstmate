@@ -129,6 +129,8 @@
 # engine descendants its turn recorded, removes that turn's files, and
 # releases the branch actor's leases; it releases them again after every
 # engine turn.
+# Session launch policy refusal happens before activation and its cleanup trap,
+# so a forbidden engine leaves the predecessor's processes and custody intact.
 #
 # STATE (all under state/, owned here): .supervision-host (this host's pid and
 # the processes it runs), .supervision-host-engine (the engine conversation:
@@ -975,6 +977,16 @@ attended_acceptor() {  # <first-reason-line>
 # host, processes, arms, and leases alone.
 if ! host_still_owner; then
   stand_down "this session does not own supervision"
+fi
+# An opted-in session policy must be resolved before activation can stop or
+# retire a predecessor. Absent-policy host behavior remains unchanged.
+policy_enabled=$(fm_session_launch_policy_enabled "$CONFIG" 2>&1) \
+  || stand_down "$policy_enabled"
+if [ "$policy_enabled" = 1 ]; then
+  fm_supervision_host_config "$CONFIG" "$PRIMARY" \
+    || stand_down "config/session-launch-policy requires a configured permitted supervision engine"
+  [ -n "$FM_SUPERVISION_ENGINE" ] \
+    || stand_down "no permitted supervision engine: $FM_SUPERVISION_ENGINE_PROBLEM"
 fi
 trap cleanup EXIT
 trap 'exit 129' HUP

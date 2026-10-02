@@ -34,6 +34,11 @@
 # Test seam: FM_SUPERVISION_ENGINE_CLAUDE_BIN names the claude executable
 # (default: claude on PATH), so a hermetic test can run a stub engine through
 # the real argument construction.
+# The session launch policy is checked both when selecting an engine and on
+# every direct or resumed turn, before allocating process custody.
+
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-session-launch-policy-lib.sh"
 
 FM_SUPERVISION_ENGINES_VERIFIED='claude'
 
@@ -63,7 +68,7 @@ fm_supervision_engine_default_model() {  # <engine>
 # sentence naming why this home has no engine.
 # shellcheck disable=SC2034 # Output globals, read by the sourcing caller.
 fm_supervision_host_config() {
-  local config=$1 primary=${2:-} line engine model extra
+  local config=$1 primary=${2:-} line engine model extra policy_error
   FM_SUPERVISION_ENGINE=''
   FM_SUPERVISION_ENGINE_MODEL=''
   FM_SUPERVISION_ENGINE_PROBLEM=''
@@ -93,6 +98,10 @@ EOF
       fi
       ;;
   esac
+  if ! policy_error=$(fm_session_launch_policy_check "$config" "$engine" 2>&1); then
+    FM_SUPERVISION_ENGINE_PROBLEM=${policy_error%%$'\n'*}
+    return 0
+  fi
   case "$model" in
     '') model=$(fm_supervision_engine_default_model "$engine") || model= ;;
     *[!A-Za-z0-9._:/@-]*)
@@ -295,6 +304,7 @@ fm_supervision_engine_turn() {
   local engine=$1 model=$2 prompt=$3 message=$4 session=$5 mode=$6 timeout=$7 result=$8 errors=$9
   local pid_file=${10:-} bin grace ledger watched rc home_phys root_phys state_phys identity recorded
   local -a args
+  fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$engine" 2>"$errors" || return 127
   bin=$(fm_supervision_engine_bin "$engine" 2>"$errors") || return 127
   case "$timeout" in ''|0*|*[!0-9]*) timeout=1200 ;; esac
   grace=${FM_SUPERVISION_ENGINE_GRACE:-30}
@@ -309,6 +319,7 @@ fm_supervision_engine_turn() {
         --model "$model" --output-format json)
       root_phys=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || root_phys=$FM_ROOT
       home_phys=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || home_phys=$FM_HOME
+      # shellcheck disable=SC2153 # STATE is supplied by the sourcing host.
       state_phys=$(cd "$STATE" 2>/dev/null && pwd -P) || state_phys=$STATE
       # Claude path-checks direct file reads against its working directories,
       # so a home or state directory outside the code root is added.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Session launch policy shared by spawn and pre-stop control-plane recovery.
+# Session launch policy shared by spawning, recovery, and supervision engines.
 # docs/configuration.md "Session launch policy" owns the opt-in schema.
 # Absent configuration preserves existing behavior; a restriction never maps
 # a recorded harness or model to another profile. Opaque raw commands refuse.

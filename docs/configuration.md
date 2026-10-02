@@ -794,13 +794,14 @@ The `openai-codex` provider inside omp remains allowed; the restriction excludes
 
 Fresh ship, scout, batch, and secondmate spawns check the selected runtime before launch resources or remote inheritance change.
 Manual recovery checks the resolved replacement before checkpointing or stopping the old agent, and automatic session-end recovery uses that same control-plane check.
+The supervision host also refuses a disallowed engine before activation can stop its predecessor or retire its custody, and direct or resumed engine turns repeat the same check.
+Currently its only verified engine starts standalone Claude, so this opt-in prevents host activation even under an omp primary; use ordinary primary supervision until a permitted native engine is verified.
 A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
 Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.
 Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.
 
-[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh).
+[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh) and [`tests/fm-supervision-session-launch-policy.test.sh`](../tests/fm-supervision-session-launch-policy.test.sh).
 This setting governs Firstmate-owned launches only, not separately configured validation tools or the operator's own primary session.
-
 
 ### Installed hooks and launch details
 
