@@ -784,15 +784,18 @@ test_restart_preserves_expectation_and_parent_destination() {
   rec=$(fm_pending_reply_path "$state" "$corr")
   parent_status=$(fm_pending_reply_get "$rec" parent_status)
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
-  # Simulate process restart: re-source library and re-read the same record.
-  # shellcheck source=bin/fm-pending-reply-lib.sh
-  . "$ROOT/bin/fm-pending-reply-lib.sh"
-  [ -f "$rec" ] || fail "record must survive restart"
-  [ "$(fm_pending_reply_get "$rec" parent_status)" = "$parent_status" ] \
-    || fail "parent_status must be stable across restart"
-  [ "$(fm_pending_reply_get "$rec" parent_home)" = "$parent_home" ] \
-    || fail "parent_home must be stable across restart"
-  [ "$(phase_of "$state" "$corr")" = awaiting_report ] || fail "phase preserved"
+  # A real fresh process must recover these fields without inherited functions.
+  bash -c '
+    . "$1/bin/fm-pending-reply-lib.sh"
+    [ -f "$2" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_status)" = "$3" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_home)" = "$4" ] &&
+      [ "$(fm_pending_reply_get "$2" phase)" = awaiting_report ]
+  ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
+    || fail "fresh process must retain expectation and exact parent destination"
+  # Preserve the marker reinitialization performed by the old in-process reload.
+  # shellcheck source=bin/fm-marker-lib.sh
+  . "$ROOT/bin/fm-marker-lib.sh"
   # Compaction-safe: destination is absolute path fields, not chat memory.
   case "$parent_status" in
     /*.status) : ;;

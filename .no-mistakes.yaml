@@ -24,10 +24,10 @@ document:
 
 # Pin lint to the same owner CI invokes instead of leaving it to no-mistakes'
 # default handling, which does not invoke the repository's canonical lint gate.
-# `bin/fm-lint.sh` owns the context-sensitive ShellCheck modes and GitHub
+# `bin/fm-lint.sh` owns dependency-selected, cached local ShellCheck analysis and
 # workflow lint via pinned actionlint in `bin/fm-lint-workflows.sh`.
-# Invocation wiring is asserted by `tests/fm-lint.test.sh` and
-# `tests/fm-lint-workflows.test.sh`.
+# `tests/fm-lint.test.sh` exercises source selection, reuse and finding parity;
+# `tests/fm-lint-workflows.test.sh` exercises malformed workflow rejection.
 #
 # Keep commands.test absent; the firstmate-coding-guidelines skill owns this policy.
 commands:
