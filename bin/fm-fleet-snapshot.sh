@@ -57,7 +57,7 @@
 #     supervision rather than this snapshot path.
 #     paths.status_log.last_event is historical wake-event data only, never
 #     current state. age_seconds is null when the emission time is unknown;
-#     fm-classify-lib.sh owns the optional emission-time field, and only the
+#     fm-status-record-lib.sh owns the optional emission-time field, and only the
 #     age derived from it is published here. A future event time leaves that age
 #     unknown rather than clamped to zero.
 #     hints.open_decisions is the keyed open-decision set returned by

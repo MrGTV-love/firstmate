@@ -33,10 +33,18 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-marker-lib.sh
-. "$ROOT/bin/fm-marker-lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
-. "$ROOT/bin/fm-pending-reply-lib.sh"
+_fm_pending_test_source_marker() {
+  # shellcheck source=bin/fm-marker-lib.sh
+  . "$ROOT/bin/fm-marker-lib.sh"
+}
+
+_fm_pending_test_source_library() {
+  # shellcheck source=bin/fm-pending-reply-lib.sh
+  . "$ROOT/bin/fm-pending-reply-lib.sh"
+}
+
+_fm_pending_test_source_marker "$@"
+_fm_pending_test_source_library "$@"
 
 SEND="$ROOT/bin/fm-send.sh"
 REPORT="$ROOT/bin/fm-secondmate-report.sh"
@@ -622,7 +630,7 @@ test_delivery_confirmation_fallback_reconciles() {
     [ -f "$marker" ] || fail "delivery confirmation fallback marker should persist"
     [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
       || fail "failed primary commit should leave delivered_epoch empty"
-    . "$ROOT/bin/fm-pending-reply-lib.sh"
+    _fm_pending_test_source_library
     fm_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "watcher should reconcile the delivery marker"
     [ "$(fm_pending_reply_get "$rec" delivered_epoch)" = 5750 ] \
@@ -794,8 +802,7 @@ test_restart_preserves_expectation_and_parent_destination() {
   ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
     || fail "fresh process must retain expectation and exact parent destination"
   # Preserve the marker reinitialization performed by the old in-process reload.
-  # shellcheck source=bin/fm-marker-lib.sh
-  . "$ROOT/bin/fm-marker-lib.sh"
+  _fm_pending_test_source_marker
   # Compaction-safe: destination is absolute path fields, not chat memory.
   case "$parent_status" in
     /*.status) : ;;

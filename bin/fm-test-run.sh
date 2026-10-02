@@ -1422,7 +1422,7 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
-    bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
+    bin/fm-classify-lib.sh|bin/fm-status-record-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     bin/fm-afk*)

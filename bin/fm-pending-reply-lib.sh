@@ -110,20 +110,26 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-marker-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-backend.sh"
-# Not followed: this library consumes no symbols from bin/fm-tmux-lib.sh, so
-# following it under ShellCheck's external-source traversal would expand that
-# graph for zero cross-file checks. A source= directive on any other command
-# would bind it to these sources too, so each unfollowed site says /dev/null.
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-tmux-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-tmux-lib.sh"
-# Not followed: bin/fm-classify-lib.sh is already expanded inside
-# bin/fm-wake-lib.sh's single directed expansion below.
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-classify-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-classify-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'
 FM_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'
 FM_PENDING_REPLY_GRACE_DEFAULT=120
+
+# Keep each import at its caller's dynamic scope and run its initialization on
+# every invocation, while joint analysis follows one real source statement.
+_fm_pending_reply_source_wake() {
+  # shellcheck source=bin/fm-wake-lib.sh
+  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+}
+
+_fm_pending_reply_source_parent_channel() {
+  # shellcheck source=bin/fm-parent-channel-lib.sh
+  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+}
 
 fm_pending_reply_now() {
   if [ -n "${FM_PENDING_REPLY_NOW:-}" ]; then
@@ -414,8 +420,7 @@ fm_pending_reply_confirm_delivery() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # shellcheck source=/dev/null # Expanded once at fm_pending_reply_try_resolve.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_confirm_delivery_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -496,8 +501,7 @@ fm_pending_reply_reconcile_delivery() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # shellcheck source=/dev/null # Expanded once at fm_pending_reply_try_resolve.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_reconcile_delivery_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -528,8 +532,7 @@ fm_pending_reply_reset_known_undelivered() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # shellcheck source=/dev/null # Expanded once at fm_pending_reply_try_resolve.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_reset_known_undelivered_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -649,8 +652,7 @@ fm_pending_reply_try_resolve() {  # <state-dir> <corr_id> [status-file-override]
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # shellcheck source=bin/fm-wake-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_try_resolve_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1140,11 +1142,7 @@ fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # Not followed: bin/fm-wake-lib.sh is expanded once at the
-  # fm_pending_reply_try_resolve site; each followed site would re-expand its
-  # whole transitive graph under ShellCheck's external-source traversal.
-  # shellcheck source=/dev/null
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_close_escalation_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1209,11 +1207,7 @@ fm_pending_reply_maybe_escalate() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # Not followed: bin/fm-wake-lib.sh is expanded once at the
-  # fm_pending_reply_try_resolve site; each followed site would re-expand its
-  # whole transitive graph under ShellCheck's external-source traversal.
-  # shellcheck source=/dev/null
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_maybe_escalate_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1307,8 +1301,7 @@ fm_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
     return 0
   fi
   sightings=$(fm_pending_reply_get "$rec" wrong_home_sightings)
-  # shellcheck source=bin/fm-parent-channel-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+  _fm_pending_reply_source_parent_channel "$@"
   if fm_parent_channel_destination "$sm_home" "$sm_home/state" >/dev/null 2>&1 \
     && [ "$FM_PARENT_CHANNEL_ROUTE" = remote ]; then
     remote_parent_channel=1
@@ -1367,12 +1360,7 @@ fm_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <se
   [ "$stranded" != "$parent_status" ] || return 1
   line=$(fm_pending_reply_find_resolve_line "$stranded" "$corr")
   [ -n "$line" ] || return 1
-  # Not followed: bin/fm-parent-channel-lib.sh is expanded once at the
-  # fm_pending_reply_detect_wrong_home site; each followed site would
-  # re-expand its whole transitive graph under ShellCheck's external-source
-  # traversal.
-  # shellcheck source=/dev/null
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+  _fm_pending_reply_source_parent_channel "$@"
   fm_parent_channel_append_once "$parent_status" "$line"
 }
 
