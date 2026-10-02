@@ -53,13 +53,15 @@ printf 'previous turn custody\n' > "$STATE/.supervision-host-turn"
 printf 'previous engine conversation\n' > "$STATE/.supervision-host-engine"
 cp "$STATE/.supervision-host" "$TMP_ROOT/prior-host"
 ln -s /bin/bash "$TMP_ROOT/primary/omp"
+rc=0
 # shellcheck disable=SC2016 # The fixture primary shell owns the lock and CLI call.
 out=$(FM_SUPERVISION_HOST_PRIMARY=omp "$TMP_ROOT/primary/omp" -c '
   printf "%s\n" "$$" > "$STATE/.lock"
   "$1/bin/fm-supervision-host.sh" park --restart
   rc=$?
   exit "$rc"
-' _ "$ROOT" 2>&1) || fail "restricted host CLI failed unexpectedly: $out"
+' _ "$ROOT" 2>&1) || rc=$?
+[ "$rc" -eq 1 ] || fail "restricted host must return an actionable refusal (exit=$rc): $out"
 assert_contains "$out" 'session-launch-policy' 'host refuses policy before activating'
 kill -0 "$PREDECESSOR" 2>/dev/null || fail 'restricted host stopped predecessor'
 cmp -s "$TMP_ROOT/prior-host" "$STATE/.supervision-host" || fail 'restricted host replaced predecessor record'
@@ -68,6 +70,39 @@ cmp -s "$TMP_ROOT/prior-host" "$STATE/.supervision-host" || fail 'restricted hos
 [ ! -e "$FM_HOME/engine-effects" ] || fail 'host invoked engine'
 [ ! -e "$STATE/.watch.lock" ] || fail 'restricted host started monitoring'
 pass 'omp-primary host refusal invocations=0 predecessor=alive host-record=identical turn-custody=unchanged'
+
+# Drive the real Claude Stop consumer: a refusal must reach the primary, not
+# be mistaken for an ownership transfer. Both predecessor and first-host cases
+# use a disposable marked home and a Bash executable with Claude's identity.
+ln -s /bin/bash "$TMP_ROOT/primary/claude"
+for hook_home in "$FM_HOME" "$TMP_ROOT/first-host"; do
+  mkdir -p "$hook_home/state" "$hook_home/config"
+  printf 'fixture-policy-home\n' > "$hook_home/.fm-secondmate-home"
+  : > "$hook_home/AGENTS.md"
+  ln -s "$ROOT/bin" "$hook_home/bin"
+  printf 'claude sonnet\n' > "$hook_home/config/supervision-host"
+  printf 'omp-or-tc\n' > "$hook_home/config/session-launch-policy"
+  : > "$hook_home/state/task.meta"
+  rc=0
+  # shellcheck disable=SC2016 # Fixture child expands its own home and lock.
+  out=$(printf '{"session_id":"fixture-policy","stop_hook_active":false}' \
+    | FM_ROOT_OVERRIDE="$hook_home" FM_HOME="$hook_home" "$TMP_ROOT/primary/claude" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
+        rc=$?
+        exit "$rc"
+      ' 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "policy refusal disappeared in Claude Stop (exit=$rc): $out"
+  assert_contains "$out" 'supervision-host: launch policy refused:' 'policy refusal reaches Claude main'
+  [ ! -e "$hook_home/engine-effects" ] || fail 'Claude Stop invoked the disallowed engine'
+  [ ! -e "$hook_home/state/.watch.lock" ] || fail 'Claude Stop activated a host watcher'
+  assert_contains "$(cat "$hook_home/state/.claude-autoarm-epoch")" 'outcome=rewake' 'hook committed the policy failure to main'
+done
+kill -0 "$PREDECESSOR" 2>/dev/null || fail 'policy refusal through Stop killed predecessor'
+cmp -s "$TMP_ROOT/prior-host" "$STATE/.supervision-host" || fail 'Stop changed predecessor ownership'
+[ "$(cat "$STATE/.supervision-host-turn")" = 'previous turn custody' ] || fail 'Stop retired predecessor turn'
+[ "$(cat "$STATE/.supervision-host-engine")" = 'previous engine conversation' ] || fail 'Stop retired predecessor engine'
+pass 'Claude Stop delivers policy refusal to main with and without predecessor; invocations=0 predecessor-custody=unchanged'
 
 fm_supervision_host_config "$FM_HOME/config" omp || fail 'configured host unexpectedly disabled'
 [ -z "$FM_SUPERVISION_ENGINE" ] || fail 'restricted engine remained available to attended routing'

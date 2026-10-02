@@ -485,6 +485,9 @@ write_host_fixture() {  # <dir> <kind>
         printf 'printf "supervision-host: the away session could not take this wake: fixture; this wake is yours\\n"\n'
         printf 'for i in 1 2 3 4 5 6 7 8 9 10; do printf "supervision-host: outcome %%s for demo [routine]: fixture\\n" "$i"; done\n'
         ;;
+      policy-refusal)
+        printf 'exec %q "$@"\n' "$ROOT/bin/fm-supervision-host.sh"
+        ;;
       boundary)
         printf 'printf "supervision-host: cycle boundary - fixture\\n"\n'
         ;;
@@ -530,6 +533,31 @@ test_park_runs_the_supervision_host_only_when_opted_in() {
     || fail "the follow-up must keep the eight-line cap on wake lines: $body"
   case "$body" in *'not from the captain: it is not a return'*) ;; *) fail "an away handback must say it is not the captain's return: $body" ;; esac
   pass "cursor park: an opted-in home parks on the supervision host and relays every host line"
+}
+
+test_park_delivers_actual_host_policy_refusal() {
+  local dir out body
+  dir=$(make_primary_dir "$TMP_ROOT/park-host-policy")
+  : > "$dir/state/task1.meta"
+  mkdir -p "$dir/config"
+  printf 'claude sonnet\n' > "$dir/config/supervision-host"
+  printf 'omp-or-tc\n' > "$dir/config/session-launch-policy"
+  write_host_fixture "$dir" policy-refusal
+  cat > "$dir/engine" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_HOME/state/engine-invoked"
+exit 0
+SH
+  chmod +x "$dir/engine"
+  out=$(FM_ROOT_OVERRIDE="$dir" FM_SUPERVISION_ENGINE_CLAUDE_BIN="$dir/engine" run_park "$dir")
+  body=$(followup_of "$out")
+  assert_contains "$body" 'supervision-host: launch policy refused:' 'the actual policy failure reaches Cursor main'
+  [ "$(kind_of_followup "$out")" = watcher ] || fail "policy failure lost its actionable follow-up: $out"
+  [ ! -e "$dir/state/engine-invoked" ] || fail 'restricted Cursor host invoked the engine'
+  [ ! -e "$dir/state/.supervision-host" ] || fail 'restricted Cursor host activated ownership'
+  [ ! -e "$dir/state/.watch.lock" ] || fail 'restricted Cursor host activated monitoring'
+  [ "$(wc -l < "$dir/state/host-ran" | tr -d ' ')" -eq 1 ] || fail 'Cursor retried a policy refusal'
+  pass 'cursor park: actual launch-policy refusal reaches main without engine invocation or host activation'
 }
 
 test_park_host_boundary_stand_down_and_death() {
@@ -788,6 +816,7 @@ test_superseded_park_does_not_consume_nag_budget
 test_park_inert_when_afk
 test_park_runs_the_supervision_host_only_when_opted_in
 test_park_host_boundary_stand_down_and_death
+test_park_delivers_actual_host_policy_refusal
 test_park_inert_under_pi_coding_agent
 test_park_still_parks_with_pi_leak_and_cursor_identity
 test_park_stands_down_when_away_mode_activates_before_commit
