@@ -1754,7 +1754,10 @@ cat > "$LAVISH_SCRIPTED_BIN/lavish-axi" <<'SH'
 # Stand-in for `lavish-axi poll <file>`, scripted per scenario: LAVISH_SCRIPT
 # names the response for each successive poll, one word per poll, and its last
 # word repeats forever. `interrupt` is the exact transient response the server
-# returns while the board's marks stay available.
+# returns while the board's marks stay available. LAVISH_TIMES, when set,
+# collects the wall-clock time each poll began.
+[ -z "${LAVISH_TIMES-}" ] \
+  || perl -MTime::HiRes=time -e 'printf "%.6f\n", time' >> "$LAVISH_TIMES"
 n=$(cat "$LAVISH_COUNT" 2>/dev/null || echo 0)
 n=$((n + 1))
 printf '%s\n' "$n" > "$LAVISH_COUNT"
@@ -1817,18 +1820,35 @@ DEFAULT_RATE_ART="$TMP_ROOT/default-rate-board.html"
 printf '<h1>default rate</h1>\n' > "$DEFAULT_RATE_ART"
 lavish_session "$DEFAULT_RATE_ART"
 DEFAULT_RATE_COUNT="$TMP_ROOT/default-rate-count"
+DEFAULT_RATE_TIMES="$TMP_ROOT/default-rate-times"
+# Every attempt starts after launch and at least the shipped delay after the
+# attempt before it, so poll k can never begin before launch + (k - 1) * 5s. A
+# slow host only makes polls later, so wait for three real polls - a stop in
+# progress is the poller exiting or going quiet - then check each one's start.
+default_rate_launched=$(perl -MTime::HiRes=time -e 'printf "%.6f\n", time')
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" LAVISH_COUNT="$DEFAULT_RATE_COUNT" LAVISH_SCRIPT=interrupt \
-  FM_LAVISH_POLL_RETRY_DELAY='' \
+  LAVISH_TIMES="$DEFAULT_RATE_TIMES" FM_LAVISH_POLL_RETRY_DELAY='' \
   "$ROOT/bin/fm-procevent-lavish.sh" poll "$DEFAULT_RATE_ART" >/dev/null 2>&1 &
 DEFAULT_RATE_PID=$!
-perl -MTime::HiRes=sleep -e 'sleep 6.2'
+default_rate_progress=0
+for _ in $(seq 1 300); do
+  wait_for_lines "$DEFAULT_RATE_TIMES" 3 1 && { default_rate_progress=1; break; }
+  kill -0 "$DEFAULT_RATE_PID" 2>/dev/null || break
+done
 kill -TERM "$DEFAULT_RATE_PID" 2>/dev/null || true
 wait "$DEFAULT_RATE_PID" 2>/dev/null || true
-default_rate_count=$(cat "$DEFAULT_RATE_COUNT" 2>/dev/null || echo 0)
-[ "$default_rate_count" -ge 2 ] \
+[ "$default_rate_progress" -eq 1 ] \
   || fail "the default poll governor stopped an instantly returning source from making progress"
-[ "$default_rate_count" -le 2 ] \
-  || fail "the shipped poll governor allowed $default_rate_count iterations in 6.2 seconds"
+early_poll=$(perl -e '
+  my ($launched, $delay) = splice @ARGV, 0, 2;
+  my @starts = <>;
+  for my $k (0 .. $#starts) {
+    my $offset = $starts[$k] - $launched;
+    if ($offset < $k * $delay) { printf "%d at %.2fs", $k + 1, $offset; last }
+  }
+' "$default_rate_launched" 5 "$DEFAULT_RATE_TIMES")
+[ -z "$early_poll" ] \
+  || fail "the shipped poll governor started poll $early_poll after launch, inside its 5s delay"
 pass "the shipped poll governor bounds an instantly returning source"
 
 # A bounded test override keeps the retry policy's real bound under test without
@@ -3892,18 +3912,24 @@ chmod +x "$FAST_SOURCE"
 STORM_SOURCE="$TMP_ROOT/storm-source.sh"
 cat > "$STORM_SOURCE" <<'SH'
 #!/usr/bin/env bash
-perl -MTime::HiRes=time -e 'printf "%.6f\n", time' >> "$1"
+# Record the launch-pacing stamp this launch's runner persisted just before
+# running it: the runner's own launch time, free of this script's startup delay.
+stamps=("$2"/state/procevent/*.last-launch)
+cat -- "${stamps[@]}" >> "$1" 2>/dev/null || printf 'missing\n' >> "$1"
+# The orphaned reconcile waits for this launch's runner to exit, so it always
+# finds the source unowned and relaunches it rather than racing that runner's
+# claim release and sometimes ending the storm.
 FM_HOME="$2" perl -MPOSIX=setsid -e '
-  my @command = @ARGV;
+  my ($runner, @command) = @ARGV;
   defined(my $pid = fork) or exit 1;
   exit 0 if $pid;
   setsid() >= 0 or exit 1;
   open STDIN, "<", "/dev/null" or exit 1;
   open STDOUT, ">", "/dev/null" or exit 1;
   open STDERR, ">", "/dev/null" or exit 1;
-  select undef, undef, undef, 0.2;
+  select undef, undef, undef, 0.05 while kill 0, $runner;
   exec @command;
-' "$3/bin/fm-procevent.sh" reconcile
+' "$PPID" "$3/bin/fm-procevent.sh" reconcile
 exit 1
 SH
 chmod +x "$STORM_SOURCE"
@@ -3912,26 +3938,33 @@ HFLOOR="$TMP_ROOT/launch-floor"; new_home "$HFLOOR"
 fm_test_track_procevent_home "$HFLOOR"
 pe_register "$HFLOOR" lavish floor-src -- \
   "$STORM_SOURCE" "$TMP_ROOT/launch-times" "$HFLOOR" "$ROOT"
-# Three real launches can outlive a four-second lease on a loaded host. Give
-# this fixture a bounded observation window, then retire it as soon as sampled
-# rather than leaving its orphan loop running alongside the remaining tests.
+# The orphaned reconciles never refresh the owner lease, so it alone ends the
+# storm, however few launches a loaded host fits inside it. Keep the owner
+# present while three launches happen, then retire the fixture as soon as
+# sampled rather than leaving its orphan loop running alongside the remaining
+# tests. The floor is longer than one unthrottled relaunch cycle, so launches
+# that skipped it would show up as too close together.
 FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
-  FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HFLOOR" reconcile >/dev/null
-floor_deadline=$((SECONDS + 30))
-while :; do
-  floor_count=0
-  [ ! -f "$TMP_ROOT/launch-times" ] \
-    || floor_count=$(wc -l < "$TMP_ROOT/launch-times" | tr -d ' ')
-  [ "$floor_count" -ge 3 ] && break
-  [ "$SECONDS" -lt "$floor_deadline" ] \
-    || fail "the orphan-storm fixture launched only $floor_count times within its observation window"
-  sleep 0.1
+  FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3 pe "$HFLOOR" reconcile >/dev/null
+floor_progress=0
+for _ in $(seq 1 12); do
+  wait_for_lines "$TMP_ROOT/launch-times" 3 50 && { floor_progress=1; break; }
+  pe "$HFLOOR" list >/dev/null
 done
+[ "$floor_progress" -eq 1 ] \
+  || fail "the orphan-storm fixture stopped relaunching its source command"
 launch_count=$(wc -l < "$TMP_ROOT/launch-times" | tr -d ' ')
-launch_span=$(perl -e '@t=<>; printf "%.3f", $t[-1] - $t[0]' "$TMP_ROOT/launch-times")
+launch_gap=$(perl -e '
+  my $floor = shift;
+  my @t = <>;
+  for my $k (1 .. $#t) {
+    my $gap = $t[$k] - $t[$k - 1];
+    if ($gap < $floor) { printf "%.3f", $gap; last }
+  }
+' 3 "$TMP_ROOT/launch-times")
 pe "$HFLOOR" retire floor-src >/dev/null
-perl -e 'exit($ARGV[0] >= ($ARGV[1] - 1) * 0.8 ? 0 : 1)' "$launch_span" "$launch_count" \
-  || fail "an orphaned source launched $launch_count times in only ${launch_span}s"
+[ -z "$launch_gap" ] \
+  || fail "an orphaned source relaunched ${launch_gap}s after its previous launch, inside its 3s launch floor"
 [ "$launch_count" -le 6 ] \
   || fail "an orphaned source stormed $launch_count launches during its owner-dead grace window"
 pass "an orphaned source command obeys the launch floor during its grace window"
