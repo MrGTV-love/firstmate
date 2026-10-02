@@ -988,7 +988,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-A raw claude launch command (the unverified-adapter escape hatch) is also exempt from the guard.
+A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.
@@ -1001,8 +1001,10 @@ The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
 The same pin and allowlist exemptions apply.
 Variables that the pane shell's rc files or a direnv `.envrc` export after the window opens are not detected.
+Before stopping a worker, `fm-control.sh relaunch` checks the replacement harness, account pin, launch allowlist, and tmux environment against the same guard.
+A non-opt-in Claude launch also unsets both Anthropic credential variables in the worker command, so keys captured by an existing pane cannot reach Claude even though the preflight cannot inspect that pane's private environment.
 
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the guard mechanics and `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
+[`bin/fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) owns the guard mechanics shared by `fm-spawn.sh` and `fm-control.sh`, and [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 

@@ -183,6 +183,10 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
+# shellcheck source=bin/fm-config-inherit-lib.sh
+. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -882,8 +886,8 @@ resolve_relaunch_profile() {
   # signed out must refuse here, while nothing has changed yet.
   local account_model=$TARGET_MODEL
   [ "$account_model" != default ] || account_model=
-  fm_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
-    "$account_model" "$TARGET_HARNESS" >/dev/null || return 1
+  TARGET_WORKER_ACCOUNT=$(fm_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+    "$account_model" "$TARGET_HARNESS") || return 1
 }
 
 # safe_checkpoint: prove, before anything is stopped, that the work a relaunch
@@ -1026,6 +1030,13 @@ do_relaunch() {
   record_note
   journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
 
+  # Refuse before stopping the current worker, using the replacement harness,
+  # account pin, allowlist, and backend that fm-spawn will use.
+  fm_api_key_guard_launch_env_config "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+    || die "could not inspect the replacement launch environment before stopping $ID"
+  fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
+    "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
+    || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
   journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
   exit_result=$(do_exit)
   journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"

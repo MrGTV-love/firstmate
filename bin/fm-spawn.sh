@@ -533,24 +533,11 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
-if ! LAUNCH_ENV_ENABLED=$(fm_config_source_present "$CONFIG/launch-env-allowlist"); then
-  exit 1
-fi
-LAUNCH_ENV_NAMES=
-if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  if [ ! -f "$CONFIG/launch-env-allowlist" ] || [ ! -r "$CONFIG/launch-env-allowlist" ]; then
-    echo "error: config/launch-env-allowlist must be a readable regular file" >&2
-    exit 1
-  fi
-  if ! LAUNCH_ENV_NAMES=$(jq -Rrs '
-    split("\n") | map(select(. != "" and (startswith("#") | not))) |
-    if all(.[]; test("^[A-Za-z_][A-Za-z0-9_]*$")) then .[]
-    else error("expected environment names only") end
-  ' "$CONFIG/launch-env-allowlist" 2>/dev/null); then
-    echo "error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments" >&2
-    exit 1
-  fi
-fi
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
+fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
+LAUNCH_ENV_ENABLED=$FM_API_KEY_LAUNCH_ENV_ENABLED
+LAUNCH_ENV_NAMES=$FM_API_KEY_LAUNCH_ENV_NAMES
 # config/claude-permission-mode (header above): resolved once per spawn or
 # relaunch, before any mutation, so a malformed file refuses instead of
 # launching a worker on a permission posture the captain did not choose.
@@ -2419,74 +2406,9 @@ fi
 # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
 # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
 # refuse when a pin is active: the key cannot reach the worker.
-if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
-  if [ -z "$WORKER_ACCOUNT" ]; then
-    # No pin shed: determine whether each variable would reach the worker.
-    if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-      route_text=' through config/launch-env-allowlist'
-    else
-      route_text=' through ambient environment inheritance'
-    fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      would_reach=1
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
-        esac
-      fi
-      if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-        echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-      fi
-    done
-  fi
-  # Also check the environment a new tmux window gives the worker. The window
-  # inherits the tmux session environment layered over the tmux global
-  # environment, which can hold a key the spawning process no longer has (the
-  # server started while the shell exported it). A session entry wins, and a
-  # session removal marker (-NAME) means unset; otherwise the global value
-  # applies. The global environment is checked even before the target session
-  # exists, because a session created later inherits it. The pin shed
-  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
-  # Pane rc files and direnv .envrc exports are not detected by this check.
-  if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
-    tmux_session=
-    if [ -n "${TMUX:-}" ]; then
-      tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
-    elif tmux has-session -t firstmate 2>/dev/null; then
-      tmux_session=firstmate
-    fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) continue ;;  # Allowlist filters it out at launch time
-        esac
-      fi
-      tmux_env_scope=
-      if [ -n "$tmux_session" ] \
-         && tmux_env_entry=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null); then
-        case "$tmux_env_entry" in
-        "$check_var"=?*) tmux_env_scope=session ;;
-        esac
-      elif tmux_env_entry=$(tmux show-environment -g "$check_var" 2>/dev/null); then
-        case "$tmux_env_entry" in
-        "$check_var"=?*) tmux_env_scope=global ;;
-        esac
-      fi
-      case "$tmux_env_scope" in
-      session)
-        echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      global)
-        echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      esac
-    done
-  fi
+if ! fm_api_key_guard "$HARNESS" "$ALLOW_API_KEY" "$WORKER_ACCOUNT" \
+  "$LAUNCH_ENV_ENABLED" "$LAUNCH_ENV_NAMES" "$BACKEND"; then
+  exit 1
 fi
 
 secondmate_registry_value() {
@@ -5232,6 +5154,12 @@ if [ -n "$WORKER_ACCOUNT" ]; then
   esac
 elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
+fi
+# A pre-existing pane may have captured credentials absent from the spawning
+# process and tmux server. Shed both variables for a non-opt-in Claude worker;
+# a worker-account pin already applies the same shed to its launch command.
+if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$WORKER_ACCOUNT" ]; then
+  LAUNCH="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
