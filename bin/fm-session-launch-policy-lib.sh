@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Session launch policy shared by spawn and pre-stop control-plane recovery.
+# docs/configuration.md "Session launch policy" owns the opt-in schema.
+# Absent configuration preserves existing behavior; a restriction never maps
+# a recorded harness or model to another profile. Opaque raw commands refuse.
+# No runtime is executed by this check. tc run requires its verified native
+# launcher contract to land; a proxy wrapper that execs claude is not tc run.
+
+# shellcheck source=bin/fm-config-inherit-lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-config-inherit-lib.sh"
+
+fm_session_launch_policy_enabled() {  # <config-dir>; prints 0 or 1
+  local file="$1/session-launch-policy" present value
+  present=$(fm_config_source_present "$file") || return 1
+  if [ "$present" = 0 ]; then
+    printf '0\n'
+    return 0
+  fi
+  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+    printf 'error: config/session-launch-policy must be a readable regular file containing omp-or-tc\n' >&2
+    return 1
+  fi
+  value=$(jq -Rrs '. == "omp-or-tc" or . == "omp-or-tc\n"' "$file") || return 1
+  if [ "$value" != true ]; then
+    printf 'error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n' >&2
+    return 1
+  fi
+  printf '1\n'
+}
+
+fm_session_launch_policy_check() {  # <config-dir> <harness> [raw=0|1]
+  local enabled harness=$2 raw=${3:-0}
+  enabled=$(fm_session_launch_policy_enabled "$1") || return 1
+  [ "$enabled" = 1 ] || return 0
+  if [ "$raw" = 0 ] && [ "$harness" = omp ]; then
+    return 0
+  fi
+  printf "error: config/session-launch-policy=omp-or-tc refuses launch '%s'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\n" "$harness" >&2
+  printf 'help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded\n' >&2
+  return 1
+}

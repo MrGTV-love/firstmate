@@ -204,6 +204,8 @@
 #   a failed or inconclusive probe omits it so older Pi versions remain launchable.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
+#   config/session-launch-policy can restrict even explicit launches; its schema
+#   and tc-run prerequisite are owned by docs/configuration.md "Session launch policy".
 #   Devin is worker-only: --permission-mode dangerous and
 #   --respect-workspace-trust false allow unattended tools in a fresh worktree.
 #   --config points at a private per-task snapshot of the user config with
@@ -708,9 +710,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
-# Skip the watcher guard when re-exec'd for one pair of a batch (FM_SPAWN_NO_GUARD is
-# set by the batch loop below), so the guard runs once for the batch, not once per pair.
-[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/fm-guard.sh" || true
+# The watcher guard runs after the read-only session launch policy preflight.
 KIND=ship
 KIND_SET=0
 HARNESS_ARG=
@@ -972,6 +972,58 @@ else
     }
   fi
 fi
+
+# Refuse restricted launches before guards, locks, remote inheritance, endpoint
+# creation, or worktree allocation. Recheck the authoritative resolved launch
+# below, after locked adoption of a relaunch record.
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+SESSION_LAUNCH_POLICY=$(fm_session_launch_policy_enabled "$CONFIG") || exit 1
+if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
+  policy_harness=$HARNESS_ARG
+  policy_kind=$KIND
+  if [ "$RELAUNCH" = 1 ]; then
+    fm_task_id_creation_valid "${POS[0]}" || {
+      echo "error: invalid task id" >&2
+      exit 2
+    }
+    policy_meta="$STATE/${POS[0]}.meta"
+    fm_backlog_record_present "$policy_meta" "task record" "$STATE" || {
+      echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+      exit 1
+    }
+    policy_kind=$(fm_meta_get "$policy_meta" kind)
+    [ -n "$policy_harness" ] || policy_harness=$(fm_meta_get "$policy_meta" harness)
+  elif [ -z "$policy_harness" ]; then
+    if [ "$KIND" = secondmate ]; then
+      case "${POS[1]:-}" in
+      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+        policy_harness=${POS[1]:-} ;;
+      *' '*)
+        if [ "${#POS[@]}" -gt 2 ] || [ -d "${POS[1]}" ]; then
+          policy_harness=${POS[2]:-}
+        else
+          policy_harness=${POS[1]}
+        fi ;;
+      *) policy_harness=${POS[2]:-} ;;
+      esac
+    elif [ "${POS[0]}" = "${POS[0]%%=*}" ]; then
+      policy_harness=${POS[2]:-}
+    fi
+  fi
+  if [ -z "$policy_harness" ] && [ "$RELAUNCH" = 0 ]; then
+    if [ "$policy_kind" = secondmate ]; then
+      policy_harness=$("$FM_ROOT/bin/fm-harness.sh" secondmate)
+    else
+      policy_harness=$("$FM_ROOT/bin/fm-harness.sh" crew)
+    fi
+  fi
+  policy_raw=0
+  case "$policy_harness" in *[[:space:]]*) policy_raw=1 ;; esac
+  fm_session_launch_policy_check "$CONFIG" "$policy_harness" "$policy_raw" || exit 1
+fi
+# Skip the watcher guard when re-exec'd for one pair of a batch.
+[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/fm-guard.sh" || true
 
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
@@ -2391,6 +2443,8 @@ if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; t
     COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
   fi
 fi
+
+fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2

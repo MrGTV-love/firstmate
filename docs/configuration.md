@@ -776,9 +776,31 @@ Remote secondmate routes accept verified harness adapters only and reject raw la
 When `config/crew-dispatch.json` exists, crewmate and scout spawns require an explicit resolved harness instead of automatically falling back to `config/crew-harness`.
 
 The inherited-local-material contract is owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); its harness-relevant consequence is that a secondmate's own crewmates use the primary's dispatch profiles and static harness value.
-Those inherited values are defaults and rules only; `fm-spawn` still permits a consciously chosen explicit runtime outside the config.
+Those inherited values are defaults and rules only; explicit runtimes remain subject to the [session launch policy](#session-launch-policy-configsession-launch-policy) when enabled.
 
 `config/secondmate-harness` is not inherited because secondmates do not launch secondmates.
+
+### Session launch policy (config/session-launch-policy)
+
+The optional local, gitignored `config/session-launch-policy` contains exactly `omp-or-tc`, with an optional single trailing newline.
+Absence preserves existing launch behavior; an unreadable or malformed present file refuses new sessions instead of disabling the restriction.
+The setting is inherited through the existing local and remote secondmate configuration contract.
+
+This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
+Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
+A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
+Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
+The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
+
+Fresh ship, scout, batch, and secondmate spawns check the selected runtime before launch resources or remote inheritance change.
+Manual recovery checks the resolved replacement before checkpointing or stopping the old agent, and automatic session-end recovery uses that same control-plane check.
+A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
+Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.
+Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.
+
+[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh).
+This setting governs Firstmate-owned launches only, not separately configured validation tools or the operator's own primary session.
+
 
 ### Installed hooks and launch details
 
