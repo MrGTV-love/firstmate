@@ -4080,22 +4080,31 @@ for candidate in "$HROLLBACK/state/procevent"/rollback-src.*.last-launch; do
   [ -f "$candidate" ] && ROLLBACK_STAMP=$candidate
 done
 [ -n "$ROLLBACK_STAMP" ] || fail "the first launch did not persist its pacing state"
-printf '%s\n' "$(( $(date +%s) + 3600 ))" > "$ROLLBACK_STAMP"
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HROLLBACK" start rollback-src > "$TMP_ROOT/rollback.out" 2>&1 &
-ROLLBACK_START_PID=$!
-rollback_deadline=$((SECONDS + 4))
-while kill -0 "$ROLLBACK_START_PID" 2>/dev/null; do
-  if [ "$SECONDS" -ge "$rollback_deadline" ]; then
-    pe "$HROLLBACK" retire rollback-src >/dev/null 2>&1 || true
-    wait "$ROLLBACK_START_PID" 2>/dev/null || true
-    cat "$TMP_ROOT/rollback.out" >&2
-    fail "a pre-reboot monotonic stamp delayed the first launch"
-  fi
-  sleep 0.1
-done
-wait "$ROLLBACK_START_PID" || fail "the rollback-paced source failed"
+# Seed a stamp one floor ahead of this boot's monotonic clock, as a reading
+# taken before a reboot would be. The runner rewrites the stamp on the same
+# clock just before it launches, so that rewrite shows whether it slept out the
+# floor, however long a loaded host takes to reach it. A runner that honoured
+# the stale stamp sleeps at least one floor and then returns on its own.
+rollback_floor=60
+rollback_started=$(perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
+  'printf "%.6f\n", clock_gettime(CLOCK_MONOTONIC)')
+perl -e 'printf "%.6f\n", $ARGV[0] + $ARGV[1]' "$rollback_started" "$rollback_floor" \
+  > "$ROLLBACK_STAMP"
+FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=$rollback_floor pe "$HROLLBACK" start rollback-src >/dev/null \
+  || fail "the rollback-paced source failed"
 [ "$(wc -l < "$ROLLBACK_LOG" | tr -d ' ')" = 2 ] \
   || fail "the rollback-paced source did not invoke twice"
+rollback_delay=$(perl -e '
+  my ($started, $floor, $path) = @ARGV;
+  open my $in, "<", $path or exit 1;
+  my $launched = <$in>;
+  defined $launched or exit 1;
+  my $delay = $launched - $started;
+  printf "%.3f\n", $delay if $delay >= $floor;
+' "$rollback_started" "$rollback_floor" "$ROLLBACK_STAMP") \
+  || fail "the rollback-paced launch left no readable pacing state"
+[ -z "$rollback_delay" ] \
+  || fail "a pre-reboot monotonic stamp delayed the first launch by ${rollback_delay}s"
 pass "a pre-reboot monotonic stamp is treated as expired"
 
 storm_deadline=$((SECONDS + 15))
@@ -4508,6 +4517,13 @@ retry_pe() {  # <command...>
     FM_HOME="$RETRY_HOME" "$ROOT/bin/fm-procevent.sh" "$@"
 }
 
+# Keep the owner present until the injected stop is armed, as the orphan cases
+# above do, so the short lease cannot end the runner during its own startup or
+# before the test reads the pid it must arm. The lease, check cadence and
+# give-up bound below are unchanged.
+RETRY_OWNER_PRESENT="$TMP_ROOT/stop-retry-owner-present"
+touch "$RETRY_OWNER_PRESENT"
+keep_setup_owner "$RETRY_HOME" "$RETRY_OWNER_PRESENT" & RETRY_SETUP_OWNER=$!
 retry_pe register lavish retry-src -- "$ORPHAN_STUB" "$TMP_ROOT/stop-retry-marker" >/dev/null
 retry_pe reconcile >/dev/null
 wait_for "$RETRY_HOME/state/procevent/retry-src.runner" \
@@ -4519,6 +4535,8 @@ printf '%s\n' "$RETRY_PID" > "$RETRY_STATE/target"
 wait_for "$TMP_ROOT/stop-retry-marker.descendant" \
   || fail "the retry listener's child never spawned its own descendant"
 RETRY_DESCENDANT=$(cat "$TMP_ROOT/stop-retry-marker.descendant")
+rm -f "$RETRY_OWNER_PRESENT"
+wait "$RETRY_SETUP_OWNER"
 
 deadline=$((SECONDS + 60))
 while kill -0 -"$RETRY_PID" 2>/dev/null; do
