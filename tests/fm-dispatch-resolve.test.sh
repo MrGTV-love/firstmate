@@ -138,6 +138,12 @@ chmod +x "$FAKEBIN/curl"
 cat > "$FAKEBIN/quota-axi" <<'SH'
 #!/usr/bin/env bash
 set -u
+if [ "${1:-}" = --version ]; then
+  printf '%s\n' --version >> "${QUOTA_AXI_CALLS:?}"
+  [ "${FAKE_QUOTA_VERSION_FAIL:-0}" = 1 ] && exit 1
+  printf '%s\n' "${FAKE_QUOTA_VERSION:-0.1.51}"
+  exit 0
+fi
 if [ -n "${TYPESAFE_API_KEY+x}" ] || [ -n "${TYPESAFE_API_KEY_PRIVATE+x}" ]; then
   printf 'quota-axi:secret-present\n' >> "${CHILD_ENV_LOG:?}"
 else
@@ -791,7 +797,7 @@ assert_contains "$out" 'candidate: pi:openai-codex-work/gpt-5.6-terra  provider=
 assert_contains "$out" 'candidate: pi:openai-codex/gpt-5.6-sol  provider=codex  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models' "the sibling lane reads its own exhausted row"
 assert_contains "$out" 'candidate: codex:gpt-5.6-sol  provider=codex  -> eligible, unranked: provider codex has no quota row for account codex-home: disclosed uncertainty' "native Codex never infers an account from a Pi lane"
 assert_contains "$out" "  profile: --harness 'pi' --model 'openai-codex-work/gpt-5.6-terra'" "the lane with headroom is chosen"
-assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "schema 6 needs one quota-axi --json read"
+assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "schema 6 checks compatibility and reads one snapshot"
 
 SCHEMA6_NATIVE="$TMP_ROOT/schema6-native.json"
 jq '
@@ -866,12 +872,176 @@ assert_contains "$out" '  reason: quota-axi --json returned an invalid snapshot'
 cp "$BASE_RULES" "$RULES"
 pass "schema 6: each candidate binds to its account row; schema 5 is unchanged"
 
+# --- runway is judged against the task horizon, not the reset clock ------------
+GUARD_RULES="$TMP_ROOT/guard-rules.json"
+GUARD_QUOTA="$TMP_ROOT/guard-quota.json"
+jq '.rules = [.rules[3]] | .rules[0].use = [{harness:"codex",model:"gpt-6-luna"}]' "$BASE_RULES" > "$GUARD_RULES"
+cp "$GUARD_RULES" "$RULES"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.97,"default":0.03}}}}
+JSON
+jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining = 6 | .selection.spendPriority = 0.9)' "$QUOTA" > "$GUARD_QUOTA"
+guard_runway() {  # <name> <runway JSON>: write guard-<name>.json with that codex runway
+  jq --argjson runway "$2" '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[].runway) = $runway' "$GUARD_QUOTA" > "$TMP_ROOT/guard-$1.json"
+}
+guard_runway short '{"status":"projected_exhaustion","usableRunwaySeconds":3600,"projectionConfidence":"established"}'
+guard_runway long '{"status":"projected_exhaustion","usableRunwaySeconds":80796,"projectionConfidence":"established"}'
+guard_runway boundary '{"status":"projected_exhaustion","usableRunwaySeconds":14400,"projectionConfidence":"established"}'
+guard_runway early-short '{"status":"projected_exhaustion","usableRunwaySeconds":3600,"projectionConfidence":"early"}'
+guard_runway early-long '{"status":"projected_exhaustion","usableRunwaySeconds":80796,"projectionConfidence":"early"}'
+guard_runway safe '{"status":"through_reset"}'
+guard_runway unknown '{"status":"unknown"}'
+guard_runway exhausted_now '{"status":"exhausted_now"}'
+
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "established runway shorter than the task horizon does not authorize dispatch"
+assert_contains "$out" '  reason: highest-ranked candidate codex:gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven' "the default horizon is 240 minutes"
+assert_contains "$out" 'candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' "the candidate names its short runway"
+assert_not_contains "$out" '  profile:' "short runway emits no dispatch profile"
+for name in long boundary safe; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "$name runway covering the task horizon clears despite 6% remaining"
+  assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-6-luna'" "$name runway authorizes the profile"
+  assert_not_contains "$out" '[warning:' "$name runway is not a warning"
+done
+for name in early-short early-long unknown; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "$name runway is a disclosed warning, not a veto"
+  assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-6-luna'" "$name runway keeps the highest-ranked profile"
+  assert_contains "$out" '-> eligible [warning: ' "$name runway is disclosed on the candidate"
+done
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-short.json" run code out err "$BRIEF"
+assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]' "an early projection names its confidence"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "a projection without confidence is a warning, not a veto"
+assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=unknown)]' "absent projection fields are disclosed as unknown"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-exhausted_now.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "exhausted_now always vetoes"
+assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "exhausted_now is named"
+assert_not_contains "$out" '  profile:' "exhausted_now emits no dispatch profile"
+# An exact-model short runway is noticed even when the limiting rank row is safe.
+jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability) += [
+  {scope:"model:gpt-6-luna",status:"known",effectivePercentRemaining:50,runway:{status:"projected_exhaustion",usableRunwaySeconds:600,projectionConfidence:"established"},selection:{spendPriority:1}}
+]' "$TMP_ROOT/guard-safe.json" > "$TMP_ROOT/guard-bound.json"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-bound.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "every applicable bound participates in the horizon check"
+assert_contains "$out" '[warning: projected_exhaustion at model:gpt-6-luna (usableRunwaySeconds=600 projectionConfidence=established)]' "the candidate names the non-limiting short bound"
+
+# The horizon is a declared setting.
+jq '.task_horizon_minutes = 30' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "one hour of runway covers a declared 30-minute horizon"
+jq '.task_horizon_minutes = 120' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" 'shorter than the 120-minute task horizon' "a declared horizon replaces the default"
+assert_not_contains "$(cat "$LOG/body")" 'task_horizon_minutes' "the model never sees the task horizon"
+
+# A short winner is not replaced by a lower-ranked candidate in the same rule.
+jq '.rules[0].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "a short highest-ranked candidate escalates"
+assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible' "the lower-ranked candidate stays visible"
+assert_not_contains "$out" '  profile:' "no same-rule fallback profile is emitted"
+# A short matched rule never falls back to another rule or the default array.
+jq '.rules += [{when:"Cheap chores.",use:{harness:"cursor",model:"cursor-grok-4.6-medium"}}]
+  | .default = [{harness:"cursor",model:"cursor-grok-4.6-high"}]' "$GUARD_RULES" > "$RULES"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.9,"rule_2":0.08,"default":0.02}}}}
+JSON
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "a short matched rule escalates despite runway elsewhere"
+assert_not_contains "$out" 'candidate: cursor' "no other rule's or default candidate is evaluated"
+assert_not_contains "$out" '  profile:' "no cross-rule or weaker-class downgrade is emitted"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.97,"default":0.03}}}}
+JSON
+
+# omp's pooled Codex accounts rank on the visible account as a lower bound,
+# through the same task-horizon classification as a single account.
+jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"}]' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "a through_reset visible account proves pool runway"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible' "the pool ranks on its visible lower bound"
+assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "the pooled lane can be auto-selected"
+for name in long early-long early-short unknown; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "a $name visible reading ranks the pool"
+  assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "a $name visible reading authorizes the pooled profile"
+done
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-long.json" run code out err "$BRIEF"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "an established short visible projection is not viable"
+assert_contains "$out" '  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon' "a short pool escalates like a single account"
+assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' "a short pool stays ranked with its warning"
+assert_not_contains "$out" '  profile:' "a short pool cannot authorize a profile"
+for snapshot in "$TMP_ROOT/guard-exhausted_now.json" "$SCHEMA6_NATIVE"; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
+  assert_contains "$out" '  status: escalate' "an exhausted visible account cannot clear the pool"
+  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models)' "pool uncertainty is stated on the candidate"
+  assert_contains "$out" '[warning: exhausted_now at all_models]' "the visible account's exhaustion is disclosed"
+  assert_not_contains "$out" 'remaining=' "single-account headroom is not shown as pool headroom"
+  assert_not_contains "$out" 'not eligible' "single-account exhaustion cannot veto the pool"
+  assert_not_contains "$out" '  profile:' "an exhausted visible account cannot authorize a profile"
+done
+# A declared profile floor stays a captain veto for the pool.
+jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex",floor:{scope:"all_models",min_percent:50}}]' "$GUARD_RULES" > "$RULES"
+for snapshot in "$TMP_ROOT/guard-safe.json" "$TMP_ROOT/guard-exhausted_now.json"; do
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
+  assert_contains "$out" '-> not eligible: profile floor all_models below 50%' "a pool below its declared floor is not eligible"
+  assert_not_contains "$out" 'unranked' "a floor shortfall is not reported as an eligible alternative"
+done
+jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "a short highest-ranked pool escalates"
+assert_not_contains "$out" '  profile:' "a short pool is never replaced by a lower-ranked candidate"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-exhausted_now.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "an unranked exhausted pool does not block a measured candidate"
+assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "the measured profile clears beside the unranked pool"
+assert_contains "$out" '  note: 1 eligible candidate(s) unranked (codex)' "a clear choice still discloses pool uncertainty"
+
+# OpenRouter absent rows and credit-only rows are uncertainty, not quota runway.
+jq '.rules[0].use = [{harness:"omp",model:"openrouter/provider/model",provider:"openrouter"}]' "$GUARD_RULES" > "$RULES"
+TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "an absent OpenRouter row cannot clear"
+assert_contains "$out" 'candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter not in the quota snapshot' "absent OpenRouter coverage is disclosed"
+jq '.providers += [{provider:"openrouter",windows:[{id:"credits",remaining:100,unit:"USD"}],quotaSemantics:{status:"unknown",effectiveAvailability:[]}}]' "$QUOTA" > "$TMP_ROOT/guard-openrouter.json"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-openrouter.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "a positive OpenRouter credit balance does not establish runway"
+assert_contains "$out" 'eligible, unranked: provider openrouter unmeasured (unknown)' "credit-only evidence stays eligible but unranked"
+assert_not_contains "$out" '  profile:' "credit-only evidence never authorizes dispatch"
+
+# An unreadable or older version is an error before snapshot interpretation.
+cp "$GUARD_RULES" "$RULES"
+for version in 0.1.50 'quota-axi development build'; do
+  reset_log
+  TYPESAFE_API_KEY=$KEY FAKE_QUOTA_VERSION="$version" run code out err "$BRIEF"
+  expect_code 0 "$code" "incompatible quota version is a normal error outcome"
+  assert_contains "$out" '  status: error' "incompatible quota version never clears"
+  assert_contains "$out" 'quota-axi requires >= 0.1.51' "the error names the required minimum"
+  assert_equals '--version' "$(cat "$LOG/quota-axi.calls")" "an incompatible binary never supplies ranking evidence"
+  assert_not_contains "$out" '  profile:' "an incompatible version emits no dispatch profile"
+done
+for version in 0.1.51 0.1.55 0.2.0 1.0.0; do
+  TYPESAFE_API_KEY=$KEY FAKE_QUOTA_VERSION="$version" QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "compatible $version is usable"
+done
+reset_log
+TYPESAFE_API_KEY=$KEY FAKE_QUOTA_VERSION_FAIL=1 run code out err "$BRIEF"
+assert_contains "$out" '  status: error' "a failed version read never clears"
+assert_contains "$out" 'quota-axi requires >= 0.1.51' "the failed version read names the minimum"
+assert_equals '--version' "$(cat "$LOG/quota-axi.calls")" "a failed version read never takes a quota snapshot"
+cp "$BASE_RULES" "$RULES"
+pass "task-horizon runway, pooled-account, OpenRouter coverage, and minimum-version guards"
+
 # --- quota-axi is read exactly once --------------------------------------------
 reset_log
 write_response "$RESPONSE" rule_4 0.9
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "quota-axi path exits 0"
-assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "quota-axi --json is called exactly once"
+assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "quota-axi compatibility is checked and --json is called exactly once"
 assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "quota-axi snapshot drives the argmax"
 reset_log
 TYPESAFE_API_KEY=$KEY FAKE_QUOTA_FAIL=1 run code out err "$BRIEF"
@@ -968,6 +1138,8 @@ for bad in \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"select":"mystery"}]}|unknown select: mystery' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"min_confidence":"high"}]}|min_confidence must be a number from 0 through 1 when present' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"min_confidence":1.5}]}|min_confidence must be a number from 0 through 1 when present' \
+  '{"task_horizon_minutes":0,"rules":[{"when":"x","use":{"harness":"claude"}}]}|task_horizon_minutes must be a positive number when present' \
+  '{"task_horizon_minutes":"4h","rules":[{"when":"x","use":{"harness":"claude"}}]}|task_horizon_minutes must be a positive number when present' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"floor":{"scope":"model:fable","min_percent":20}}]}|rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"floor":{"scope":"model:fable","min_percent":20,"provider":"CLAUDE"}}]}|rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z' \
   '{"rules":[{"when":"x","use":{"harness":"claude","provider":""}}]}|each use profile needs harness; model, effort, and floor must be well formed, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present' \

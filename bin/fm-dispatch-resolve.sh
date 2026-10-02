@@ -24,12 +24,16 @@
 #   rule's declared `min_confidence` on that rule's probability, falling to the
 #   most probable other option that clears its own floor), the rule's declared
 #   `approval` and `floor`, each profile's declared `provider` and `floor`, the
-#   quota rows from ONE quota-axi --json snapshot (schema 5 or 6; each
-#   candidate binds to one row through quota_row in
-#   bin/fm-quota-axi-lib.sh, so a Pi lane such as openai-codex-work/...
-#   reads its own account's row and an expanded provider with no row for the
-#   candidate is unmeasured, never blocked), and the spendPriority argmax over
-#   the eligible candidates. The model never sees quota, catalogs, approvals,
+#   quota rows from ONE quota-axi --json snapshot after checking the shared
+#   compatibility floor in bin/fm-quota-axi-lib.sh (schema 5 or 6).
+#   Individual-account candidates bind through that library's quota_row join;
+#   an expanded provider with no matching row stays eligible but unranked, and
+#   omp's Codex pool ranks on its visible account as a lower bound, except that
+#   an exhausted reading leaves the pool unranked rather than vetoed. Ranking
+#   uses the spendPriority argmax over the matched
+#   rule's candidates; a winner whose established projected runway is shorter
+#   than the task horizon (top-level `task_horizon_minutes`, default 240)
+#   escalates, while early or unknown projections are disclosed warnings. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
@@ -51,11 +55,12 @@
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
-#     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible | eligible, unranked: <reason> | not eligible: <reason>
+#     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible [warning: ..] | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>]     (status clear only)
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
-#   escalate  -> the rule requires captain approval, no candidate is rankable, or a genuine tie
+#   escalate  -> approval required, no candidate rankable, a genuine tie, or
+#                a winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, or quota-axi failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
@@ -183,6 +188,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   elif any((.rules // [])[]; (profiles(.use) | length) == 0) then "each rule needs at least one use profile"
   elif any((.rules // [])[]; has("approval") and .approval != "captain") then "approval must be \"captain\" when present"
   elif any((.rules // [])[]; has("min_confidence") and ((.min_confidence | type) != "number" or .min_confidence < 0 or .min_confidence > 1)) then "min_confidence must be a number from 0 through 1 when present"
+  elif has("task_horizon_minutes") and ((.task_horizon_minutes | type) != "number" or .task_horizon_minutes <= 0) then "task_horizon_minutes must be a positive number when present"
   elif any((.rules // [])[]; has("select") and ((.select | type) != "string" or (.select | length) == 0)) then "select must be a non-empty string"
   elif any((.rules // [])[]; has("select") and .select != "quota-balanced") then
     "unknown select: " + ([.rules[] | select(has("select") and .select != "quota-balanced") | .select] | unique | join(", "))
@@ -345,6 +351,7 @@ jq -e --slurpfile rules "$RULES" '
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
 command -v quota-axi >/dev/null 2>&1 || emit_error "quota-axi not installed"
+fm_quota_axi_compatible || emit_error "quota-axi requires >= $FM_QUOTA_AXI_MIN; installed version is older, unreadable, or unparseable"
 quota-axi --json > "$QUOTA" 2>/dev/null || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
 
@@ -377,8 +384,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
-  def evaluate($c):
-    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+  def horizon_seconds: (($cfg.task_horizon_minutes // 240) * 60);
+  def runway_class($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "through_reset" then "ok"
+    elif $s == "projected_exhaustion" and ($row.runway.projectionConfidence // "") == "established"
+      and (($row.runway.usableRunwaySeconds | type) == "number") then
+      (if $row.runway.usableRunwaySeconds < horizon_seconds then "short" else "ok" end)
+    else "warn" end;
+  def runway_note($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "projected_exhaustion" then
+      "projected_exhaustion at \($row.scope) (usableRunwaySeconds=\($row.runway.usableRunwaySeconds // "unknown") projectionConfidence=\($row.runway.projectionConfidence // "unknown"))"
+    else "\($s) at \($row.scope)" end;
+  def assess($c; $p; $lane):
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
       {profile: $c, provider: $p, eligible: true, unranked: true,
@@ -389,18 +408,18 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       (applicable($p; $lane; ($c.model // ""))) as $rows |
       (evidence($rows)) as $bounds |
       (floor_state($c.floor; $p; $lane)) as $profile_floor_state |
-      if any($rows[]; (.runway.status // "") == "exhausted_now") then
-        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
-      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
-        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
-      elif $profile_floor_state == "below" then
+      if $profile_floor_state == "below" then
         ([rows($p; $lane)[] | select(
           .scope == $c.floor.scope and
           .effectivePercentRemaining < $c.floor.min_percent
         )] | first) as $floor_row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
+      elif any($rows[]; (.runway.status // "") == "exhausted_now") then
+        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
+      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
+        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}
@@ -421,6 +440,22 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
          spendPriority: $limiting.selection.spendPriority, runway: $limiting.runway.status, eligible: true, reason: "ok"}
       end
     end;
+  def evaluate($c):
+    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+    (assess($c; $p; $lane)) as $base |
+    (if $p == null then [] else applicable($p; $lane; ($c.model // "")) end) as $rows |
+    ($base.eligible and (($base.unranked // false) | not)) as $ranked |
+    ($c.harness == "omp" and $p == "codex") as $pooled |
+    ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
+    any($rows[]; runway_class(.) == "short") as $short |
+    if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
+    elif $pooled and ($base.eligible | not) then
+      {profile: $c, provider: $p, eligible: true, unranked: true,
+       reason: "omp Codex account pool is only lower-bounded by its visible account (\($base.reason))"}
+      + (if ($risks | length) > 0 then {warning: ($risks | join("; "))} else {} end)
+    elif $ranked and ($risks | length) > 0 then
+      $base + {warning: ($risks | join("; ")), short: $short}
+    else $base end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
       ($c | ltrimstr("rule_") | tonumber) as $n |
@@ -485,6 +520,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       ($elig | max_by(.spendPriority)) as $best |
       ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
       if $ties > 1 then $ev + {status: "escalate", reason: "genuine spendPriority tie", note: $sel.note, candidates: $cands}
+      elif $best.short then
+        $ev + {status: "escalate", reason: "highest-ranked candidate \($best.profile.harness):\($best.profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
       else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $best}
         + (if ($unranked | length) > 0 then
              {unranked_note: "\($unranked | length) eligible candidate(s) unranked (\([$unranked[].provider] | unique | join(", ")))"}
@@ -510,7 +547,8 @@ TEXT=$(jq -r '
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
-      + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)),
+      + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
+      + (if .warning then " [warning: \(.warning | flat)]" else "" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
