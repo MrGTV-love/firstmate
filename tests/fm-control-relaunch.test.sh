@@ -762,6 +762,41 @@ test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop() {
   pass "native Ultra relaunch preserves its profile and rejects an unsupported model before stopping"
 }
 
+test_model_index_resolves_and_refuses_before_stop() {
+  local dir out rc id=rl-index
+  dir=$(new_case model-index "$id")
+  add_ship_task "$dir" "$id" pi
+  printf pi > "$dir/fake/command"
+  printf pi > "$dir/fake/becomes"
+  printf '#!/usr/bin/env bash\nprintf "Options: --tui-mode\\n"\n' > "$dir/fakebin/pi"
+  chmod +x "$dir/fakebin/pi"
+  sed 's|^model=default$|model=codex-native/gpt-old|; s/^effort=default$/effort=ultra/' \
+    "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.tmp"
+  mv "$dir/home/state/$id.meta.tmp" "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config" "$dir/catalogs"
+  printf '%s\n' '{"version":1,"roles":{"native":{"pi":{"model":"codex-native/gpt-6-astra"}}},"retired":["gpt-old"]}' \
+    > "$dir/home/config/model-index.json"
+  printf '%s\n' '{"models":[{"id":"codex-native/gpt-6-astra"}]}' > "$dir/catalogs/pi.json"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --note "recorded model since retired"); rc=$?
+  expect_code 1 "$rc" "a recorded model the index has retired must refuse"
+  assert_contains "$out" "retired model: codex-native/gpt-old" "the refusal should name the retired id"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a retired-model relaunch stopped the running agent"
+  [ ! -s "$dir/fake/literal" ] || fail "a retired-model relaunch sent lifecycle input"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --model role:native --note "move to the indexed role"); rc=$?
+  expect_code 0 "$rc" "a role relaunch with native Ultra should resolve before its effort check: $out"
+  [ "$(meta_field "$dir" "$id" model)" = codex-native/gpt-6-astra ] || fail "the relaunch should record the resolved id"
+  assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "the resolved native model should keep its Ultra flag"
+  assert_not_contains "$(cat "$dir/fake/literal")" "role:native" "a role reference must not reach the harness"
+  printf '%s\n' '{"models":[{"id":"codex-native/gpt-7"}]}' > "$dir/catalogs/pi.json"
+  cp "$dir/fake/literal" "$dir/literal-before"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --note "vendor dropped the id"); rc=$?
+  expect_code 1 "$rc" "an index entry its catalog no longer lists must refuse"
+  assert_contains "$out" "id 'codex-native/gpt-6-astra' absent or retired in pi catalog" "the refusal should name the absent id"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a catalog-absent relaunch stopped the running agent"
+  cmp -s "$dir/literal-before" "$dir/fake/literal" || fail "a catalog-absent relaunch sent lifecycle input"
+  pass "fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop"
+}
+
 # A fake claude that answers `claude auth status` the way the real runner
 # does: signed in only when the selected config root holds a stored login.
 make_claude_auth_stub() {  # <case-dir>
@@ -2433,6 +2468,7 @@ test_harness_switch_resolves_a_prefixed_recorded_harness
 test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
+test_model_index_resolves_and_refuses_before_stop
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch
 test_recorded_api_key_opt_in_follows_the_relaunch

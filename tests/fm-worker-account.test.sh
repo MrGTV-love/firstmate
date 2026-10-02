@@ -31,6 +31,13 @@ if [ "\${1:-}" = auth ] && [ "\${2:-}" = status ]; then
   [ -f "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/.credentials.json" ]
   exit
 fi
+if [ "\${1:-}" = -p ] && [ "\${2:-}" = --input-format ]; then
+  printf 'CLAUDE_CONFIG_DIR=%s ANTHROPIC_API_KEY=%s\n' "\${CLAUDE_CONFIG_DIR-unset}" "\${ANTHROPIC_API_KEY-unset}" >> '$dir/claude-catalogs'
+  jq -Rsc '{type:"control_response",response:{subtype:"success",request_id:"model-index",
+    response:{models:[split("\n")[] | select(length > 0) | {value:., resolvedModel:.}]}}}' \
+    "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/catalog" 2>/dev/null
+  exit 0
+fi
 {
   printf 'CLAUDE_CONFIG_DIR=%s\n' "\${CLAUDE_CONFIG_DIR-unset}"
   printf 'ANTHROPIC_API_KEY=%s\n' "\${ANTHROPIC_API_KEY-unset}"
@@ -387,6 +394,43 @@ test_local_secondmate_reads_the_launching_home_pin() {
   pass "a local secondmate reads the launching home's pin and its own home's file is never inherited over"
 }
 
+test_model_index_catalog_follows_the_pinned_account() {
+  local out rc id=acct-catalog
+  new_case index-catalog claude
+  signed_in_claude_root "$CASE/work"
+  printf '%s\n' "$CASE/work" > "$HOME_DIR/config/claude-account"
+  printf 'pinned-only\n' > "$CASE/work/catalog"
+  mkdir -p "$CASE/ambient-claude"
+  printf 'ambient-only\n' > "$CASE/ambient-claude/catalog"
+  printf '%s\n' '{"version":1,"roles":{"pinned":{"claude":{"model":"pinned-only"}},"ambient":{"claude":{"model":"ambient-only"}}},"retired":[]}' \
+    > "$HOME_DIR/config/model-index.json"
+  out=$(spawn_ship "$id-pinned" --model role:pinned); rc=$?
+  expect_code 0 "$rc" "a role listed only by the pinned account's catalog should launch: $out"
+  assert_grep "model=pinned-only" "$HOME_DIR/state/$id-pinned.meta" "the pinned spawn should record the resolved id"
+  [ "$(cat "$CASE/claude-catalogs")" = "CLAUDE_CONFIG_DIR=$CASE/work ANTHROPIC_API_KEY=unset" ] \
+    || fail "the catalog must be read from the pinned root with outranking credentials shed: $(cat "$CASE/claude-catalogs")"
+  out=$(spawn_ship "$id-ambient" --model role:ambient); rc=$?
+  expect_code 1 "$rc" "a role listed only by the ambient account's catalog must refuse under the pin"
+  assert_refused_before_launch "$id-ambient" "$out" "id 'ambient-only' absent or retired in claude catalog"
+
+  new_case index-catalog-pi pi
+  mkdir -p "$CASE/pi-work" "$CASE/ambient-pi"
+  printf 'openai-codex\n' > "$CASE/pi-work/signed-in"
+  printf '%s\nopenai-codex\n' "$CASE/pi-work" > "$HOME_DIR/config/pi-account"
+  printf 'openai-codex  gpt-pinned  272K  32K  yes  no\n' > "$CASE/pi-work/listed"
+  printf 'openai-codex  gpt-ambient  272K  32K  yes  no\n' > "$CASE/ambient-pi/listed"
+  printf '%s\n' '{"version":1,"roles":{"pinned":{"pi":{"model":"openai-codex/gpt-pinned"}},"ambient":{"pi":{"model":"openai-codex/gpt-ambient"}}},"retired":[]}' \
+    > "$HOME_DIR/config/model-index.json"
+  out=$(PI_CODING_AGENT_DIR="$CASE/ambient-pi" spawn_ship "$id-pi-pinned" --model role:pinned); rc=$?
+  expect_code 0 "$rc" "a Pi role listed only by the pinned root's catalog should launch: $out"
+  assert_contains "$(cat "$CASE/launch.log")" "--model 'openai-codex/gpt-pinned'" "the pinned Pi spawn should launch the resolved id"
+  out=$(PI_CODING_AGENT_DIR="$CASE/ambient-pi" spawn_ship "$id-pi-ambient" --model role:ambient); rc=$?
+  expect_code 1 "$rc" "a Pi role listed only by the ambient root's catalog must refuse under the pin"
+  assert_refused_before_launch "$id-pi-ambient" "$out" "id 'openai-codex/gpt-ambient' absent or retired in pi catalog"
+  pass "a pinned worker's model-index verdict comes from its pinned account's catalog, not the ambient one"
+}
+
+test_model_index_catalog_follows_the_pinned_account
 test_absent_pin_keeps_the_launch_unchanged
 test_claude_pin_selects_the_root_and_sheds_ambient_credentials
 test_claude_pin_refuses_a_signed_out_root_despite_an_ambient_login

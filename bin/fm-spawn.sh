@@ -78,6 +78,8 @@
 #   only a shell that will not go refuses.
 #   --harness <name> is the explicit per-spawn harness/profile adapter. The old
 #   positional harness arg still works for back-compat.
+#   --model role:<role> or stand-in:<role> resolves the home model index before
+#   validation; metadata and launch flags always contain the concrete id.
 #   --model <name> and --effort <low|medium|high|xhigh|max|ultra> are concrete profile
 #   axes chosen by firstmate at intake. They are only threaded into harnesses whose
 #   installed CLIs were verified to support that axis; unsupported axes are omitted
@@ -993,6 +995,11 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
+  if [ "$model" != - ] && ! model=$("$SCRIPT_DIR/fm-model-index.sh" model "$harness" "$model"); then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  fi
   if [ "$effort" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$harness" "$model" "$effort"; then
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
@@ -2269,6 +2276,44 @@ case "$ARG3" in
   ;;
 esac
 
+# config/secondmate-harness may carry optional model/effort tokens alongside the
+# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
+# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
+# the harness itself came from the secondmate config fallback chain. Resolving
+# here on every spawn makes the pin durable across respawns. Precedence: explicit
+# --model/--effort flags still win over the file's tokens.
+if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
+  if [ "$MODEL_SET" -eq 0 ]; then
+    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
+    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
+  fi
+  if [ "$EFFORT_SET" -eq 0 ]; then
+    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
+    if [ -n "$SM_EFFORT" ]; then
+      case "$SM_EFFORT" in
+      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
+      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
+      esac
+    fi
+  fi
+fi
+# Resolve a role exactly once, after every model source and before any
+# model-aware launch validation. Resolution is offline; with an index, a retired
+# literal refuses here and the selected entry's catalog check runs below under
+# the worker account that will actually launch it.
+MODEL_INDEXED=0
+[ ! -e "$CONFIG/model-index.json" ] && [ ! -L "$CONFIG/model-index.json" ] || MODEL_INDEXED=1
+case "$MODEL" in role:*|stand-in:*)
+  [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
+  MODEL_INDEXED=1
+  ;;
+esac
+if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
+  MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+else
+  MODEL_INDEXED=0
+fi
+
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
   exit 1
@@ -2356,27 +2401,6 @@ agy)
   ;;
 esac
 
-# config/secondmate-harness may carry optional model/effort tokens alongside the
-# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
-# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
-# the harness itself came from the secondmate config fallback chain. Resolving
-# here on every spawn makes the pin durable across respawns. Precedence: explicit
-# --model/--effort flags still win over the file's tokens.
-if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
-  if [ "$MODEL_SET" -eq 0 ]; then
-    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
-    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
-  fi
-  if [ "$EFFORT_SET" -eq 0 ]; then
-    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
-    if [ -n "$SM_EFFORT" ]; then
-      case "$SM_EFFORT" in
-      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
-      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
-      esac
-    fi
-  fi
-fi
 # Ultra is an explicit native capability, never a Pi thinking-level alias.
 # Validate the fully resolved profile before worktree or endpoint provisioning.
 if [ "$EFFORT" = ultra ]; then
@@ -2408,6 +2432,17 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
     export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
   else
     unset CLAUDE_CONFIG_DIR
+  fi
+fi
+
+# The selected index entry is checked against the catalog of the account the
+# worker launches under: a pinned Claude root with its outranking credentials
+# shed, or a pinned Pi root. Unpinned workers inherit this environment.
+if [ "$MODEL_INDEXED" = 1 ]; then
+  if [ -n "$WORKER_ACCOUNT" ]; then
+    fm_worker_account_run "$HARNESS" "$WORKER_ACCOUNT_ROOT" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
+  else
+    "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
   fi
 fi
 

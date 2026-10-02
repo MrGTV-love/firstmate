@@ -56,7 +56,8 @@
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> the rule requires captain approval, no candidate is rankable, or a genuine tie
-#   error     -> API, network, response, or quota-axi failure; decide as today
+#   error     -> API, network, response, quota-axi, or chosen-model catalog
+#                failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
 #   existing unreadable rules file, malformed rules, or missing jq), which is
@@ -89,6 +90,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-brief-heading-lib.sh
 . "$SCRIPT_DIR/fm-brief-heading-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
@@ -137,7 +140,18 @@ fi
 command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
 trap 'rm -f "$RULES"' EXIT
+MODEL_CONFIG=$(mktemp -d) || die "mktemp failed"
+trap 'rm -f "$RULES"; rm -rf "$MODEL_CONFIG"' EXIT
+if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
+  cp "$CONFIG/model-index.json" "$MODEL_CONFIG/model-index.json" || die "could not snapshot model index"
+fi
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
+jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON)"
+# Resolve roles against the frozen index offline; only the chosen profile's
+# catalog is checked, after the never-send filter permits this intake to reach
+# the network.
+RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") || die "model index/profile resolution failed"
+printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
@@ -243,7 +257,7 @@ RESP_FILE=$(mktemp) || die "mktemp failed"
 QUOTA=$(mktemp) || { rm -f "$RESP_FILE"; die "mktemp failed"; }
 TASK_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA"; die "mktemp failed"; }
 SEND_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA" "$TASK_TEXT"; die "mktemp failed"; }
-trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"' EXIT
+trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$MODEL_CONFIG"' EXIT
 
 never_send_off() {
   echo "dispatch-resolve: off ($1; nothing sent)" >&2
@@ -492,6 +506,21 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       end
     end
   end') || emit_error "resolution failed"
+
+CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
+if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
+  IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
+  chosen_account=$(fm_worker_account_resolve "$chosen_harness" "$CONFIG") \
+    || emit_error "worker account pin for $chosen_harness does not resolve"
+  chosen_root=${chosen_account#*$'\t'}
+  chosen_root=${chosen_root%%$'\t'*}
+  if [ -n "$chosen_account" ]; then
+    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_run "$chosen_harness" "$chosen_root" \
+      "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
+  else
+    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
+  fi || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
+fi
 
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");

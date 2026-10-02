@@ -1809,6 +1809,59 @@ test_non_claude_harness_ignores_claude_permission_mode() {
   pass "config/claude-permission-mode changes claude launches only"
 }
 
+test_model_index_resolves_launch_and_refuses_retired_literals() {
+  local rec id out status launch catalogs
+  id='model-role-z24'
+  rec=$(make_spawn_case model-role codex "$id" retired-model-z25)
+  read_case_record "$rec"
+  catalogs="$CASE_DIR/catalogs"
+  mkdir -p "$catalogs"
+  printf '%s\n' '{"models":[{"id":"current-sol"}]}' > "$catalogs/codex.json"
+  printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"current-sol"}}},"retired":["prior-sol"]}' > "$HOME_DIR/config/model-index.json"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex --model role:strong)
+  status=$?
+  expect_code 0 "$status" "role-based spawn should succeed"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex current-sol default
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "--model 'current-sol'" "spawn must launch the resolved concrete id"
+  assert_not_contains "$launch" "role:strong" "a role reference must not reach the harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" retired-model-z25 "$PROJ_DIR" --harness codex --model prior-sol 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "retired literal model was launched: $out"
+  assert_absent "$HOME_DIR/state/retired-model-z25.meta" "retired model must refuse before metadata publication"
+  [ ! -s "$LAUNCH_LOG" ] || fail "retired model sent a launch"
+  pass "spawn records and launches concrete role ids and refuses retired literals before publication"
+}
+
+test_secondmate_model_pin_resolves_through_the_model_index() {
+  local rec id sm out status catalogs
+  id="model-role-secondmate-z26"
+  rec=$(make_spawn_case model-role-secondmate codex "$id")
+  read_case_record "$rec"
+  catalogs="$CASE_DIR/catalogs"
+  mkdir -p "$catalogs"
+  printf '%s\n' '{"models":[{"id":"current-sol"}]}' > "$catalogs/codex.json"
+  printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"current-sol"}}},"retired":["prior-sol"]}' > "$HOME_DIR/config/model-index.json"
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$id"
+  printf '%s\n' 'codex prior-sol high' > "$HOME_DIR/config/secondmate-harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a retired secondmate model pin was launched: $out"
+  assert_contains "$out" "retired model: prior-sol" "the secondmate pin refusal should name the retired id"
+  assert_absent "$HOME_DIR/state/$id.meta" "a retired secondmate pin must refuse before metadata publication"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a retired secondmate pin sent a launch"
+  printf '%s\n' 'codex role:strong high' > "$HOME_DIR/config/secondmate-harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  expect_code 0 "$status" "a role secondmate model pin should launch: $out"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex current-sol high
+  assert_not_contains "$(cat "$LAUNCH_LOG")" "role:strong" "a secondmate role pin must not reach the harness"
+  pass "a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index"
+}
+
+test_model_index_resolves_launch_and_refuses_retired_literals
+test_secondmate_model_pin_resolves_through_the_model_index
 test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_claude_launch_brief_publishes_record_doorbell

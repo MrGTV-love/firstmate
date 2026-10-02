@@ -6,6 +6,36 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Fleet model-index catalog discovery
+
+The [configuration contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns role selection and retirement policy.
+The token-free live guard reads one id from each installed harness's own listing, then runs the public `check` once with that id and an intentionally absent id.
+The adapter must accept the listed id and refuse only the absent one, and that single run queries the catalog once instead of racing repeated account-catalog requests.
+The portable regression also exercises Claude SDK initialization through a timed runner whose background child does not inherit stdin.
+
+Verified on 2026-09-30 with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-model-index.test.sh tests/fm-model-index-live-e2e.test.sh tests/fm-dispatch-resolve.test.sh
+```
+
+Live adapter output:
+
+```text
+ok - codex codex-cli 0.159.0: catalog id accepted; absent id refused
+ok - claude 2.1.285 (Claude Code): catalog id accepted; absent id refused
+ok - omp omp/18.4.4: catalog id accepted; absent id refused
+ok - pi 0.80.3: catalog id accepted; absent id refused
+skip - pi-signed catalog adapter: executable absent
+skip - opencode catalog adapter: executable absent
+skip - cursor catalog adapter: executable absent
+ok - agy 1.2.14: catalog id accepted; absent id refused
+# model-index live adapters checked: 5
+```
+
+Refresh with `bash bin/fm-test-run.sh tests/fm-model-index-live-e2e.test.sh` after a harness upgrade.
+An absent executable is reported explicitly; an installed adapter's malformed catalog or accepted absent id fails with its harness and version.
+
 ## Harness detection precedence
 
 Firstmate's own harness comes from two kinds of evidence, and `bin/fm-harness.sh` owns how they combine: an environment marker names its harness, and the nearest harness process in the parent chain proves who owns the process tree.

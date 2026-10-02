@@ -14,6 +14,12 @@
 # through their SSH route. Unchanged config and data/captain-shared.md-only
 # updates send no reread unless a previous send failure is pending for that home.
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
+# config/model-index.json is pushed only after its schema, the dispatch roles
+# it resolves, and bin/fm-model-index.sh check pass; a malformed index, an id
+# absent from a readable catalog, an unresolvable worker account pin, or
+# config/crew-dispatch.json roles that do not resolve against the index
+# withholds both files from every home, while the other material still pushes,
+# and the run exits non-zero.
 set -u
 
 usage() {
@@ -31,6 +37,10 @@ This is local-material-only:
   - reports each live home and each inheritable item as pushed, unchanged,
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
+  - withholds config/model-index.json and config/crew-dispatch.json from
+    every home when the index is malformed, bin/fm-model-index.sh check finds
+    an id absent from a readable catalog, a worker account pin does not
+    resolve, or the dispatch roles do not resolve against the index
 
 Live homes come from state/*.meta records with kind=secondmate.
 data/secondmates.md is only a fallback for missing home= fields in older or
@@ -76,6 +86,8 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
@@ -113,6 +125,44 @@ echo "config-push: $FM_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
+# An edited fleet model index is checked before it reaches any home: each
+# harness's entries against that harness's catalog, under only that harness's
+# worker account pin. An id proven absent, or a declared pin that does not
+# resolve, keeps every home on its current index and the dispatch profiles
+# whose roles it resolves; so does an inheritable crew-dispatch.json that does
+# not resolve against the index. An unavailable catalog is only a notice.
+index_check() {
+  local harnesses harness selection root dispatch=/dev/null
+  case " $FM_INHERITABLE_CONFIG " in
+    *" crew-dispatch.json "*) [ ! -e "$CONFIG/crew-dispatch.json" ] || dispatch="$CONFIG/crew-dispatch.json" ;;
+  esac
+  FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$dispatch" >/dev/null || return 1
+  harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$CONFIG/model-index.json" 2>/dev/null) || return 1
+  for harness in $harnesses; do
+    selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
+    if [ -n "$selection" ]; then
+      root=${selection#*$'\t'}
+      FM_CONFIG_OVERRIDE="$CONFIG" fm_worker_account_run "$harness" "${root%%$'\t'*}" \
+        "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    else
+      FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    fi
+  done
+}
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*)
+    if { [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; } && ! index_check; then
+      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun"
+      errors=1
+      inheritable=
+      for item in $FM_INHERITABLE_CONFIG; do
+        case "$item" in model-index.json | crew-dispatch.json) ;; *) inheritable="$inheritable $item" ;; esac
+      done
+      FM_INHERITABLE_CONFIG=${inheritable# }
+      export FM_INHERITABLE_CONFIG
+    fi
+    ;;
+esac
 while IFS='|' read -r id home _window meta; do
   [ -n "$id" ] || continue
   if [ -z "$home" ]; then
