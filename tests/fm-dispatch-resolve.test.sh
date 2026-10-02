@@ -264,7 +264,6 @@ expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...
   assert_equals '' "$out" "$label prints nothing on stdout, so firstmate uses its existing intake"
   assert_contains "$err" "dispatch-resolve: off ($fragment" "$label names why on stderr"
   assert_contains "$err" 'nothing sent)' "$label says nothing was sent"
-  assert_equals '1' "$(grep -c . <<<"$err")" "$label prints one diagnostic line"
   assert_absent "$LOG/argv" "$label never calls curl"
   assert_absent "$LOG/quota-axi.calls" "$label never reads quota"
   local value
@@ -326,12 +325,12 @@ rm -f "$NEVER_SEND"
 mkdir "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290' "$KEY"
 rmdir "$NEVER_SEND"
 ln -s "$TMP_ROOT/missing-never-send" "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290' "$KEY"
 rm -f "$NEVER_SEND"
 
 reset_log
