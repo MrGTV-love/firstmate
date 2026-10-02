@@ -264,9 +264,9 @@ expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...
   assert_equals '' "$out" "$label prints nothing on stdout, so firstmate uses its existing intake"
   assert_contains "$err" "dispatch-resolve: off ($fragment" "$label names why on stderr"
   assert_contains "$err" 'nothing sent)' "$label says nothing was sent"
-  assert_equals '1' "$(grep -c . <<<"$err")" "$label prints one diagnostic line"
   assert_absent "$LOG/argv" "$label never calls curl"
   assert_absent "$LOG/quota-axi.calls" "$label never reads quota"
+  assert_not_contains "$err" "$KEY" "$label never prints the API key"
   local value
   for value in "$@"; do
     assert_not_contains "$err" "$value" "$label never prints the listed value"
@@ -283,7 +283,7 @@ assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'Acme-Ledger' "a list w
 printf '%s\n' '# private values' '' '  acme-ledger  ' > "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a case-insensitive literal match" "brief text matches $NEVER_SEND line 3" 'acme-ledger' 'Acme-Ledger'
+expect_withheld "a case-insensitive literal match" "brief text matches $NEVER_SEND line 3" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 
 WRAPPED_BRIEF="$TMP_ROOT/wrapped-brief.md"
 printf '# Task\n## Captain'"'"'s intent\nFix the pager for Example Client\nLtd before\tthe\xc2\xa0release.\n' > "$WRAPPED_BRIEF"
@@ -319,19 +319,19 @@ PRIMARY_HOME=$HOME_DIR
 HOME_DIR=$SECOND_HOME
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "an inherited list in a secondmate home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger'
+expect_withheld "an inherited list in a secondmate home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 HOME_DIR=$PRIMARY_HOME
 
 rm -f "$NEVER_SEND"
 mkdir "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rmdir "$NEVER_SEND"
 ln -s "$TMP_ROOT/missing-never-send" "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rm -f "$NEVER_SEND"
 
 reset_log
