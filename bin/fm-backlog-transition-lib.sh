@@ -772,6 +772,38 @@ fm_backlog_row_dispatchable() {
   esac
 }
 
+# Replacement admission is read-only and shared by control's pre-stop check and
+# spawn's launch/commit checks. Reconciliation restores an existing instruction
+# owner, not permission to advance the task: only an In-flight row qualifies,
+# and no hold, dependency, or row transition is ever changed.
+fm_backlog_relaunch_admission() {  # <config> <data> <kind> <id> <reconcile-only: 0|1>
+  local config=$1 data=$2 kind=$3 id=$4 reconcile=$5 gate_status
+  FM_BACKLOG_TRANSITION_ERROR=
+  if fm_backlog_transition_applies "$config" "$data" "$kind"; then
+    if ! fm_backlog_row_probe "$data" "$id"; then
+      FM_BACKLOG_TRANSITION_ERROR="backlog item $id could not be read ($FM_BACKLOG_ROW_RESULT: $FM_BACKLOG_ROW_ERROR)"
+      return 1
+    fi
+    if [ "$reconcile" = 1 ]; then
+      case "$FM_BACKLOG_ROW_STATE" in
+        in_flight\ no\ no|in_flight\ yes\ no|in_flight\ no\ yes|in_flight\ yes\ yes) return 0 ;;
+      esac
+      FM_BACKLOG_TRANSITION_ERROR="reconciliation-only recovery requires an existing In-flight backlog item; $id reads $FM_BACKLOG_ROW_STATE"
+    elif fm_backlog_row_dispatchable "$FM_BACKLOG_ROW_STATE"; then
+      return 0
+    else
+      FM_BACKLOG_TRANSITION_ERROR="backlog item $id is not dispatchable in state $FM_BACKLOG_ROW_STATE"
+    fi
+    return 1
+  else
+    gate_status=$?
+    [ "$gate_status" != 2 ] || return 1
+    [ "$reconcile" = 1 ] || return 0
+    FM_BACKLOG_TRANSITION_ERROR="reconciliation-only recovery requires a readable automatic backlog ($FM_BACKLOG_TRANSITION_SKIP)"
+    return 1
+  fi
+}
+
 fm_backlog_dispatch_transition() {
   local meta=$1 data=$2 id=$3 state=$4 row row_status
   fm_backlog_record_present "$meta" "task record" "$state" || return 1

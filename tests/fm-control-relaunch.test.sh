@@ -2855,6 +2855,199 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   pass "config/claude-launcher=teamclaude: fresh herdr ship and second mate launches reach claude through TeamClaude"
 }
 
+test_held_relaunch_refuses_without_stopping_the_live_owner() {
+  local dir out rc=0
+  dir=$(new_case held-owner rlheld)
+  add_ship_task "$dir" rlheld
+  seed_backlog "$dir" rlheld in_flight
+  tasks-axi hold rlheld --reason "captain decision pending" --kind captain \
+    --file "$dir/home/data/backlog.md" >/dev/null
+  cp "$dir/home/state/rlheld.meta" "$dir/meta-before"
+  cp "$dir/home/data/rlheld/brief.md" "$dir/brief-before"
+  cp "$dir/home/data/backlog.md" "$dir/backlog-before"
+
+  out=$(run_control "$dir" rlheld relaunch --note "fresh context"); rc=$?
+  expect_code 1 "$rc" "a held replacement must refuse"
+  assert_contains "$out" "not dispatchable" "refusal should identify admission"
+  [ "$(cat "$dir/fake/command")" = claude ] \
+    || fail "a predictable replacement refusal stranded the live owner"
+  [ ! -s "$dir/fake/literal" ] || fail "refused admission sent lifecycle input"
+  cmp -s "$dir/meta-before" "$dir/home/state/rlheld.meta" || fail "refusal changed metadata"
+  cmp -s "$dir/brief-before" "$dir/home/data/rlheld/brief.md" || fail "refusal changed instructions"
+  cmp -s "$dir/backlog-before" "$dir/home/data/backlog.md" || fail "refusal changed the hold"
+  pass "held replacement admission refuses before touching the live owner"
+}
+
+test_exited_owner_reconciliation_preserves_holds_dependencies_and_work() {
+  local dir id restriction out rc head
+  for restriction in held dependency both; do
+    id="rlrecover-$restriction"
+    dir=$(new_case "recover-$restriction" "$id")
+    add_ship_task "$dir" "$id"
+    seed_backlog "$dir" "$id" in_flight
+    if [ "$restriction" != dependency ]; then
+      tasks-axi hold "$id" --reason "captain decision pending" --kind captain \
+        --file "$dir/home/data/backlog.md" >/dev/null
+    fi
+    if [ "$restriction" != held ]; then
+      tasks-axi add prerequisite "genuine unfinished dependency" --kind ship \
+        --file "$dir/home/data/backlog.md" >/dev/null
+      tasks-axi block "$id" --by prerequisite --file "$dir/home/data/backlog.md" >/dev/null
+    fi
+    printf 'retained commit\n' > "$dir/wt/retained.txt"
+    git -C "$dir/wt" add retained.txt
+    git -C "$dir/wt" commit -qm "fixture retained work"
+    head=$(git -C "$dir/wt" rev-parse HEAD)
+    printf 'uncommitted work\n' >> "$dir/wt/retained.txt"
+    printf 'untracked work\n' > "$dir/wt/untracked.txt"
+    mkdir -p "$dir/home/state/$id.inbox/handled"
+    printf 'Reconcile factual wait only; no validation permission.\n' > "$dir/home/state/$id.inbox/005.msg"
+    cp "$dir/home/state/$id.inbox/005.msg" "$dir/instruction-before"
+    cp "$dir/home/data/backlog.md" "$dir/backlog-before"
+    printf zsh > "$dir/fake/command"
+    break_tasks_axi_start "$dir"
+
+    rc=0
+    out=$(run_control "$dir" "$id" relaunch --reconcile-only --note "Read unread instructions; retain the genuine blocker.") || rc=$?
+    expect_code 0 "$rc" "$restriction exited-owner recovery should succeed"$'\n'"$out"
+    [ "$(meta_field "$dir" "$id" recovery)" = reconcile-only ] || fail "recovery scope was not recorded"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "replacement instruction owner was not launched"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "recovery changed the local copy"
+    [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head" ] || fail "recovery moved the preserved commit"
+    assert_contains "$(cat "$dir/wt/retained.txt")" "uncommitted work" "recovery lost dirty files"
+    [ "$(cat "$dir/wt/untracked.txt")" = "untracked work" ] || fail "recovery lost untracked files"
+    cmp -s "$dir/backlog-before" "$dir/home/data/backlog.md" || fail "recovery changed hold/dependency state"
+    cmp -s "$dir/instruction-before" "$dir/home/state/$id.inbox/005.msg" || fail "recovery consumed unread instructions"
+    rc=0
+    out=$(run_control "$dir" "$id" relaunch --note "try ordinary continuation") || rc=$?
+    expect_code 1 "$rc" "a recovered owner must still fail ordinary blocked dispatch"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused ordinary relaunch stopped the recovered owner"
+  done
+  pass "exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority"
+}
+
+test_session_end_replacement_cannot_convert_recovery_to_execution() {
+  local dir id=rlrecover-exit out rc=0 gen
+  dir=$(new_case recover-session-end "$id")
+  add_ship_task "$dir" "$id"
+  seed_backlog "$dir" "$id" in_flight
+  tasks-axi add prerequisite "genuine unfinished dependency" --kind ship \
+    --file "$dir/home/data/backlog.md" >/dev/null
+  tasks-axi block "$id" --by prerequisite --file "$dir/home/data/backlog.md" >/dev/null
+  printf zsh > "$dir/fake/command"
+  out=$(run_control "$dir" "$id" relaunch --reconcile-only --note "Reconcile only.") || rc=$?
+  expect_code 0 "$rc" "dependency-only recovery should succeed"$'\n'"$out"
+  # The recovered owner exits before it declares a wait. Completing the real
+  # prerequisite permits dispatch structurally, but is not continuation consent.
+  printf zsh > "$dir/fake/command"
+  gen=$(cat "$dir/home/state/$id.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/home/state" "$id" idle --gen "$gen" \
+    --source claude-hook --event session-end >/dev/null
+  tasks-axi 'done' prerequisite --file "$dir/home/data/backlog.md" >/dev/null
+  cp "$dir/home/data/backlog.md" "$dir/backlog-before-auto"
+  cat > "$dir/session-end.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$1/bin/fm-session-end-relaunch-lib.sh"
+fm_session_end_relaunch_scan "$2"
+[ "$FM_SESSION_END_WAKE" = "check: $3 auto-relaunched after session-end" ]
+SH
+  rc=0
+  out=$(env -u HERDR_ENV -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+    -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
+    FM_SESSION_END_LAUNCH_WAIT=1 \
+    bash "$dir/session-end.sh" "$ROOT" "$dir/home/state" "$id" 2>&1) || rc=$?
+  expect_code 0 "$rc" "automatic recovery replacement should stay bounded"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" recovery)" = reconcile-only ] \
+    || fail "automatic replacement removed recovery scope after the dependency completed"
+  cmp -s "$dir/backlog-before-auto" "$dir/home/data/backlog.md" \
+    || fail "automatic replacement changed task/dependency state"
+  # Direct launch callers must inherit the same restriction, not only control.
+  printf zsh > "$dir/fake/command"
+  rc=0
+  out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
+  expect_code 0 "$rc" "direct replacement of a recovered owner should remain bounded"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" recovery)" = reconcile-only ] \
+    || fail "direct replacement removed recovery scope"
+  pass "automatic and direct replacements preserve recovery scope after a genuine dependency completes"
+}
+
+test_reconciliation_refuses_live_queued_and_unowned_dispatch() {
+  local dir out rc
+  dir=$(new_case recovery-live rlrecoverylive)
+  add_ship_task "$dir" rlrecoverylive
+  seed_backlog "$dir" rlrecoverylive in_flight
+  rc=0
+  out=$(run_control "$dir" rlrecoverylive relaunch --reconcile-only --note "reconcile") || rc=$?
+  expect_code 1 "$rc" "reconciliation must not stop a live owner"
+  assert_contains "$out" "requires a proven exited owner" "live-owner refusal lost the reason"
+  [ ! -s "$dir/fake/literal" ] || fail "recovery sent input to a live owner"
+  tasks-axi reopen rlrecoverylive --file "$dir/home/data/backlog.md" >/dev/null
+  printf zsh > "$dir/fake/command"
+  rc=0
+  out=$(run_control "$dir" rlrecoverylive relaunch --reconcile-only --note "reconcile") || rc=$?
+  expect_code 1 "$rc" "reconciliation must not start queued work"
+  assert_contains "$out" "requires an existing In-flight" "queued refusal lost its reason"
+  rc=0
+  out=$(run_spawn "$dir" rlrecoverylive --reconcile-only --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "fresh dispatch must not use recovery admission"
+  assert_contains "$out" "applies only to --relaunch" "fresh dispatch recovery flag was not refused"
+  rm "$dir/home/data/backlog.md"
+  rc=0
+  out=$(run_control "$dir" rlrecoverylive relaunch --reconcile-only --note "reconcile") || rc=$?
+  expect_code 1 "$rc" "reconciliation must not assume a missing backlog has no blocker"
+  assert_contains "$out" "requires a readable automatic backlog" "missing backlog refusal lost its reason"
+  pass "reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority"
+}
+
+test_blocked_relaunch_admission_is_shared_across_supported_harnesses() {
+  local dir harness out rc
+  for harness in claude codex opencode pi pi-signed grok kimi cursor gemini muse rovo omp agy devin; do
+    dir=$(new_case "held-$harness" "rlaxis-$harness")
+    add_ship_task "$dir" "rlaxis-$harness" "$harness"
+    seed_backlog "$dir" "rlaxis-$harness" in_flight
+    tasks-axi hold "rlaxis-$harness" --reason "captain decision pending" --kind captain \
+      --file "$dir/home/data/backlog.md" >/dev/null
+    rc=0
+    out=$(run_control "$dir" "rlaxis-$harness" relaunch --note "fresh context") || rc=$?
+    expect_code 1 "$rc" "$harness must refuse held replacement"
+    assert_contains "$out" "not dispatchable" "$harness did not use shared structural admission"
+    [ ! -s "$dir/fake/literal" ] || fail "$harness received lifecycle input on refusal"
+  done
+  pass "all supported worker harnesses share pre-stop blocked replacement admission"
+}
+
+test_herdr_held_owner_refusal_and_exited_reconciliation() {
+  local dir out rc=0
+  herdr_case_or_skip held-herdr rlheldherdr || {
+    echo "skip - Herdr admission fixtures need jq"
+    return 0
+  }
+  dir=$HERDR_CASE_DIR
+  rm "$dir/fake/herdr-stopped"
+  : > "$dir/fake/herdr-agent-live"
+  seed_backlog "$dir" rlheldherdr in_flight
+  tasks-axi hold rlheldherdr --reason "captain decision pending" --kind captain \
+    --file "$dir/home/data/backlog.md" >/dev/null
+  cp "$dir/home/data/backlog.md" "$dir/backlog-before"
+  out=$(run_control "$dir" rlheldherdr relaunch --note "fresh context") || rc=$?
+  expect_code 1 "$rc" "Herdr held replacement must refuse"
+  assert_contains "$out" "not dispatchable" "Herdr admission lost its refusal"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "refused Herdr replacement sent lifecycle input"
+  [ -f "$dir/fake/herdr-agent-live" ] || fail "Herdr live owner was stopped"
+  rm "$dir/fake/herdr-agent-live"
+  rc=0
+  out=$(run_control "$dir" rlheldherdr relaunch --reconcile-only --note "Reconcile only.") || rc=$?
+  expect_code 0 "$rc" "Herdr exited instruction owner should recover"$'\n'"$out"
+  [ "$(meta_field "$dir" rlheldherdr window)" = "fmlab:%7" ] || fail "Herdr recovery changed endpoint"
+  [ "$(meta_field "$dir" rlheldherdr recovery)" = reconcile-only ] || fail "Herdr recovery lost scope"
+  cmp -s "$dir/backlog-before" "$dir/home/data/backlog.md" || fail "Herdr recovery changed the hold"
+  pass "Herdr shares pre-stop held admission and recovery-only exited-owner preservation"
+}
+
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it() {
   local dir out rc=0
   command -v tasks-axi >/dev/null 2>&1 || {
@@ -2898,6 +3091,16 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
   pass "relaunch heals an item that drifted out of In flight while the task stayed live"
 }
 
+if fm_tasks_axi_compatible; then
+  test_held_relaunch_refuses_without_stopping_the_live_owner
+  test_exited_owner_reconciliation_preserves_holds_dependencies_and_work
+  test_session_end_replacement_cannot_convert_recovery_to_execution
+  test_reconciliation_refuses_live_queued_and_unowned_dispatch
+  test_blocked_relaunch_admission_is_shared_across_supported_harnesses
+  test_herdr_held_owner_refusal_and_exited_reconciliation
+else
+  echo "skip - recovery admission fixtures require compatible tasks-axi"
+fi
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

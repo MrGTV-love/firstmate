@@ -73,7 +73,9 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    `--claude-debug` is off by default, refused unless the resolved replacement harness is claude, and passed through to the launch; the [`bin/fm-spawn.sh`](../bin/fm-spawn.sh) header owns what it turns on, including the diagnostics file that names the signal of the next stop.
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
-2. **Safe checkpoint.**
+2. **Check replacement admission, then checkpoint.**
+   The control plane checks the launch owner's read-only backlog admission before appending a note or stopping the old agent, so a predictable held or dependency-blocked replacement refusal leaves that owner intact.
+   [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns the shared rule; both control and direct replacement launch recheck it.
    The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
    For a `kind=secondmate` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
    A secondmate's own crewmates run in their own endpoints and outlive its relaunch; the relaunched secondmate reconciles them from its home's durable records at startup.
@@ -93,6 +95,13 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    [`docs/herdr-backend.md`](herdr-backend.md#agent-status-authority-and-relaunch) owns the mechanism and measured behavior.
 
 Switching harness is therefore one ordinary relaunch rather than a separate mechanism.
+
+### Recovering an exited instruction owner
+
+Restoring an exited owner to reconcile instructions is not permission to advance held or dependency-blocked work.
+The control and launch headers own the reconciliation-only option and its admission limits; [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns the replacement's current instruction contract, which supersedes historical execution instructions.
+The task's recorded recovery scope survives ordinary and automatic replacement, including a session-end replacement after a genuine dependency completes.
+Continuation requires an explicit new Firstmate instruction reconciling the real restrictions, not an inference from restored liveness or a completed prerequisite.
 
 ### Reclaiming a task whose endpoint is gone
 

@@ -486,6 +486,36 @@ test_matrix_omp_status_row_bounds_bare_composer() {
   pass "matrix: omp's status row bounds the bare composer's wrap region"
 }
 
+test_matrix_omp_effort_hint_remnant() {
+  # omp 18.4.10 draws cyan shortcut keys and a muted explanation on the
+  # otherwise empty row. The keys survive the shared ghost extractor.
+  local hint row screen typed plain
+  hint="${ESC}[38;2;0;180;255m⇧⇥${ESC}[38;2;229;229;231m ${ESC}[38;2;107;114;128mto change thinking effort"
+  row="❯ ${ESC}[38;2;229;229;231m                                                   $hint"
+  screen=$'transcript\n\n'"$row"$'\n π · ◔ GPT-6.1-Sol · ◫ 7.5%/272K'
+  assert_screen "omp styled effort hint on tmux" empty "$CAPS_TMUX" "$screen" 2
+  assert_screen "omp styled effort hint cursorless" empty "$CAPS_STYLED_NOID" "$screen"
+  plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
+  assert_screen "omp unstyled hint has no emptiness proof" unknown "$CAPS_PLAIN" "$plain"
+  [ "$(classify 1 '❯ ⇧⇥ to change thinking effort' "$FM_COMPOSER_IDLE_RE_DEFAULT" \
+    sensitive '❯ ⇧⇥ to change thinking effort' 1 0)" = pending ] \
+    || fail "the effort hint must never become a plain boxed placeholder"
+  typed="❯ ${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[39m"
+  assert_screen "typed complete hint stays pending" pending "$CAPS_TMUX" "$typed" 0
+  assert_screen "typed shortcut-only stays pending" pending "$CAPS_TMUX" '❯ ⇧⇥' 0
+  assert_screen "draft before rendered hint stays pending" pending "$CAPS_TMUX" \
+    "❯ ${ESC}[38;2;229;229;231mdo not discard this draft      $hint" 0
+  assert_screen "multiline draft before hint stays pending" pending "$CAPS_TMUX" \
+    "$row"$'\nkeep this second line' 1
+  assert_screen "queued text resembling the hint stays pending" pending "$CAPS_STYLED_NOID" \
+    $'Working…\n❯ ⇧⇥ to change thinking effort\n ⠧ 11s · ◔ GPT-6.1-Sol'
+  assert_screen "busy activity below hint is not erased" pending "$CAPS_STYLED_NOID" \
+    "$row"$'\nWorking on request...'
+  assert_screen "slash popup remains unreadable" unknown "$CAPS_TMUX" \
+    $'❯ /\n❯ ✦  skill:            37 skills\n  ❯ exit              Exit the application │' 0
+  pass "omp effort hint needs styling proof; drafts, activity, and popups keep refusing"
+}
+
 # codex_cell <grey> <glyph>: one codex 0.154 starfield cell exactly as the
 # harness draws it - a truecolor grey foreground, the composer's grey
 # background, the braille glyph, then a reset.
@@ -977,6 +1007,7 @@ test_matrix_muse_truecolor_glyph_survives_signal_loss
 test_matrix_cursor_reverse_video_placeholder_remnant
 test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
+test_matrix_omp_effort_hint_remnant
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_matrix_pi_dollar_status_footer_is_empty

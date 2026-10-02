@@ -468,9 +468,15 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
 # 2026.08.11-e8db854). Devin renders the anchored `Ask Devin to build features,
 # fix bugs, or work on your code` as dim text after its `❭` glyph (verified
-# live, devin 3000.11.1). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
-# matching is case-insensitive.
+# live, devin 3000.11.1).
+# FM_COMPOSER_IDLE_RE overrides for an unverified harness; matching is
+# case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
+# omp 18.4.10's bare-row hint leaves bright shortcut keys after its muted
+# explanation is ghost-stripped. It is a styled remnant, NOT a boxed or plain
+# placeholder: complete bright typed copies and unstyled captures never prove
+# emptiness. The existing proper-substring proof below owns that distinction.
+FM_COMPOSER_OMP_EFFORT_HINT_RE='^⇧⇥ to change thinking effort$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
@@ -710,7 +716,9 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
     fi
     fm_composer_normalize_trim_var plain_body
     if [ "${#content}" -lt "${#plain_body}" ] \
-       && fm_composer_idle_matches "$plain_body" "$idle_re" "$idle_case"; then
+       && { fm_composer_idle_matches "$plain_body" "$idle_re" "$idle_case" \
+            || { [ "$bordered" != 1 ] && [ "$plain_glyph" = '❯' ] \
+                 && fm_composer_idle_matches "$plain_body" "$FM_COMPOSER_OMP_EFFORT_HINT_RE" sensitive; }; }; then
       case "$plain_body" in
         *"$content"*) printf 'empty'; return 0 ;;
       esac

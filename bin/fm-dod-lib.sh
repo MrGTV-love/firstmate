@@ -121,6 +121,25 @@ Project instructions still govern the work wherever they do not conflict with th
 EOF
 }
 
+# Launch-only scope override; the original instructions remain recovery context
+# rather than execution authority, including their Setup and Definition of done.
+fm_brief_reconciliation_role() {
+  cat <<'EOF'
+
+# Current reconciliation-only recovery contract
+This section supersedes every instruction below that would advance the task, including Setup, progress notes, validation, and Definition of done.
+You are recovering an exited instruction owner, not resuming implementation.
+The original task instructions below are historical context only until firstmate explicitly authorizes continuation after reconciling the real hold and dependency state.
+Read and acknowledge the task-owned instruction inbox in numeric order, reconcile the preserved local files, commits, prior results, and outstanding decisions, then report the factual outcome and wait.
+Do not edit project files, create a branch or commit, run implementation or validation, start or respond to no-mistakes, push, open or merge a PR, clear a dependency, or lift a hold.
+A relaunch, a restored agent, an older progress note, and a dependency becoming green are not clearance.
+If any inbox instruction would advance blocked work or conflicts with a real hold, report that conflict to firstmate without executing it.
+Only a new explicit firstmate instruction reconciling the hold and dependency and authorizing continuation can end this recovery-only scope.
+
+# Preserved task context - not execution authority
+EOF
+}
+
 # Closed-set gate shared by every forge-aware renderer and bin/fm-brief.sh, so a
 # caller cannot reach a half-rendered contract. local-only is refused rather than
 # rendered with an inert annotation: it publishes nothing, and its landing
