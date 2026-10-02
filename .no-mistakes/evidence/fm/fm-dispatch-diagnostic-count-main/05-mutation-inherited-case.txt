@@ -1,0 +1,24 @@
+== mutant D
+249a250
+>   case "$NEVER_SEND_PATH" in *secondmate*) echo "debug key $TYPESAFE_API_KEY_PRIVATE" >&2;; esac
+### mutant D (leak only in inherited secondmate case) | test file @ fa2e0be | exit=0
+# all fm-dispatch-resolve tests passed
+
+### mutant D (leak only in inherited secondmate case) | test file @ 25c0723 | exit=1
+not ok - an inherited list in a secondmate home never prints the API key (unexpected: 'test-key-9f1c2d3e-never-on-argv')
+--- output ---
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-dispatch-resolve.u0NYo9/secondmate-home/config/dispatch-never-send line 1; nothing sent)
+debug key test-key-9f1c2d3e-never-on-argv
+
+== mutant E
+249a250
+>   case "$NEVER_SEND_PATH" in *secondmate*) grep -o '[0-9]\{4\}-[0-9]\{4\}' "$BRIEF" >&2;; esac
+### mutant E (leak only in inherited secondmate case) | test file @ fa2e0be | exit=0
+# all fm-dispatch-resolve tests passed
+
+### mutant E (leak only in inherited secondmate case) | test file @ 25c0723 | exit=1
+not ok - an inherited list in a secondmate home never prints the listed value (unexpected: '4417-2290')
+--- output ---
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-dispatch-resolve.o1lYA0/secondmate-home/config/dispatch-never-send line 1; nothing sent)
+4417-2290
+

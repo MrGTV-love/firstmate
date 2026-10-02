@@ -1,0 +1,34 @@
+=== case-insensitive literal match
+exit: 0
+stdout: []
+stderr (raw, every line):
+  | dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-lab.gXW7BL/config/dispatch-never-send line 3; nothing sent)
+tripwire: curl and quota-axi never ran
+no leak: live-lab-fake-key-0000-never-print
+no leak: Acme-Ledger
+no leak: acme-ledger
+no leak: 4417-2290
+
+=== directory at the list path
+exit: 0
+stdout: []
+stderr (raw, every line):
+  | dispatch-resolve: off (/Users/charlesabrooker/tmp/fm-lab.gXW7BL/config/dispatch-never-send is not a readable regular file; nothing sent)
+tripwire: curl and quota-axi never ran
+no leak: live-lab-fake-key-0000-never-print
+no leak: Acme-Ledger
+no leak: acme-ledger
+no leak: 4417-2290
+
+=== broken symlink at the list path
+exit: 0
+stdout: []
+stderr (raw, every line):
+  | dispatch-resolve: off (/Users/charlesabrooker/tmp/fm-lab.gXW7BL/config/dispatch-never-send is not a readable regular file; nothing sent)
+tripwire: curl and quota-axi never ran
+no leak: live-lab-fake-key-0000-never-print
+no leak: Acme-Ledger
+no leak: acme-ledger
+no leak: 4417-2290
+
+lab removed on exit: /Users/charlesabrooker/tmp/fm-lab.gXW7BL

@@ -1,0 +1,39 @@
+### mutant A | test file @ a4d559e | exit=1
+not ok - a case-insensitive literal match prints one diagnostic line (expected '1', got '2')
+
+### mutant A | test file @ fa2e0be | exit=0
+# all fm-dispatch-resolve tests passed
+
+### mutant A | test file @ 25c0723 | exit=0
+# all fm-dispatch-resolve tests passed
+
+### mutant B | test file @ a4d559e | exit=1
+not ok - a case-insensitive literal match prints one diagnostic line (expected '1', got '2')
+
+### mutant B | test file @ fa2e0be | exit=1
+not ok - a directory at the list path never prints the listed value (unexpected: 'test-key-9f1c2d3e-never-on-argv')
+--- output ---
+dispatch-resolve: off (/Users/charlesabrooker/tmp/fm-dispatch-resolve.gv9c2w/home/config/dispatch-never-send is not a readable regular file; nothing sent)
+debug: Authorization: Bearer test-key-9f1c2d3e-never-on-argv
+
+### mutant B | test file @ 25c0723 | exit=1
+not ok - a case-insensitive literal match never prints the API key (unexpected: 'test-key-9f1c2d3e-never-on-argv')
+--- output ---
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-dispatch-resolve.fq44qL/home/config/dispatch-never-send line 3; nothing sent)
+debug: Authorization: Bearer test-key-9f1c2d3e-never-on-argv
+
+### mutant C | test file @ a4d559e | exit=1
+not ok - a case-insensitive literal match prints one diagnostic line (expected '1', got '2')
+
+### mutant C | test file @ fa2e0be | exit=1
+not ok - a directory at the list path never prints the listed value (unexpected: '4417-2290')
+--- output ---
+dispatch-resolve: off (/Users/charlesabrooker/tmp/fm-dispatch-resolve.Nd015F/home/config/dispatch-never-send is not a readable regular file; nothing sent)
+4417-2290
+
+### mutant C | test file @ 25c0723 | exit=1
+not ok - a case-insensitive literal match never prints the listed value (unexpected: '4417-2290')
+--- output ---
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-dispatch-resolve.J8n6Fe/home/config/dispatch-never-send line 3; nothing sent)
+4417-2290
+

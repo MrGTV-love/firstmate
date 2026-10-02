@@ -1,0 +1,9 @@
+== mutant A
+249a250
+>   echo "unrelated platform warning line" >&2
+== mutant B
+249a250
+>   echo "debug: Authorization: Bearer $TYPESAFE_API_KEY_PRIVATE" >&2
+== mutant C
+249a250
+>   grep -o '[0-9]\{4\}-[0-9]\{4\}' "$BRIEF" >&2 || true
