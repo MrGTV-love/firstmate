@@ -388,8 +388,14 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the watcher process touches `state/.last-watcher-beat`.
-No helper process can make a wedged watcher appear healthy.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check.
+Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
+The main shell enforces the check deadline even if the check's timeout controller stops responding.
+Home-summary publication and process-event source reconciliation run separately, single-flight, so their inventory-sized work does not delay the main poll.
+Captured process-event results remain durable and are observed each poll, including while reconciliation is still running.
+There is no independent heartbeat timer: a main shell blocked on an unbounded operation, stopped, or dead stops publishing progress and becomes stale.
+Subprocesses doing scan or capture work cannot beat for a stopped main shell.
+This distinguishes a progressing slow pass from a stuck loop without raising grace; it cannot guarantee freshness when the host does not schedule the main shell for an entire grace window.
 An arm whose own script path sits under a disposable no-mistakes validation checkout (`.no-mistakes/worktrees/`) refuses with the typed failure line before touching any state, because a watcher started there outlives the validation step and keeps writing the real home's state from a checkout about to be deleted.
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
 The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked poll, so both run its EXIT cleanup.
@@ -449,7 +455,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - The once-per-generation announcement bound with the real Pi extension against a refused handling handshake.
 - A handling successor that must surface a real crew event instead of going blind.
 
-`tests/fm-watch-triage.test.sh` proves TERM stops a watcher blocked inside a poll's pane capture and still releases its lock and records an acknowledgeable stop.
+`tests/fm-watch-triage.test.sh` proves an unbounded pane capture stops refreshing the beacon, and TERM stops that watcher while still releasing its lock and recording an acknowledgeable stop.
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
 It checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
 
@@ -460,6 +466,7 @@ It checks that a newly appended keyed decision is classified without rereading e
 - The typed self-eviction failure.
 - Bounded and successor-linked lifecycle rows.
 - A SIGSTOP counterfactual that distinguishes a live PID from a stale beacon before classifying termination.
+- A single slow, deadline-bounded check keeps the strict watcher predicate healthy beyond grace, while stopping that same main poll makes its beacon stale even with its check child still alive.
 
 ### Claude auto-arm and turn-end guard
 

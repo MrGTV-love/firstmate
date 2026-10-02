@@ -124,9 +124,14 @@ A standalone read-only `pgrep` is allowed.
 Quoted text such as `echo 'pkill -f fm-watch'` is data and is allowed.
 
 Unsupported compound grammar - a loop, `case`, `if`, or other construct the classifier does not model - is failed closed for broad kills the same way it is for protected executions.
-When the command carries such grammar and its raw bytes reference both a `fm-watch` target and a `pkill` or `kill` verb, the classifier cannot prove which command position the kill occupies, so it denies with `broad-watcher-kill` rather than allowing.
-This backstop mirrors the protected-execution fail-closed rule and covers forms like `while true; do pkill -f fm-watch; done`, `for x in 1; do pkill -f fm-watch; done`, `case x in x) pkill -f fm-watch ;; esac`, and `until false; do kill $(pgrep -f fm-watch); done`.
-It is gated on the grammar being unsupported: in grammar the classifier does model, command-position analysis is authoritative, so data mentions such as `echo 'pkill -f fm-watch'` and a loop that only names the watcher without a kill verb such as `for f in 1; do echo fm-watch; done` remain allowed.
+When unsupported grammar references both a `fm-watch` target and a `pkill` or `kill` verb, the classifier conservatively denies with `broad-watcher-kill`.
+The narrow exception is a parsed `if`, `while`, or `until` construct whose only kills name one literal positive PID matching the active home's `state/.watch.lock/pid`, with an optional signal and `--`.
+Every other command in it must be a plain literal command that does not mention a kill verb; `!`, nested `if`/`while`/`until` keywords, and `then`/`else`/`do` are unwrapped before that check, including when they stand alone on a line.
+A `for`, `select`, `case`, grouped, or substituted shape never qualifies.
+A read-only watcher-path diagnostic in that command does not turn the exact-PID stop into a pattern kill.
+The exception never expands variables, permits process-group or multiple-PID kills, or licenses a protected watcher execution hidden in control syntax.
+Pattern kills, `pgrep`-derived kill operands, malformed commands, and unproved compound shapes retain the backstop.
+In supported grammar command-position analysis remains authoritative, so quoted data mentions remain allowed.
 
 ## Stable reason codes
 

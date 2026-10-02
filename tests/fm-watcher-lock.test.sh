@@ -189,6 +189,58 @@ test_live_stale_watch_lock_is_actionable() {
   pass "live watcher lock with stale heartbeat is actionable"
 }
 
+test_slow_check_beats_but_stopped_poll_goes_stale() {
+  local dir state fakebin pid i age
+  dir=$(make_case slow-check-beacon)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  cat > "$state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_HOME/state/check-started"
+while [ ! -e "$FM_HOME/state/check-release" ]; do sleep 0.1; done
+touch "$FM_HOME/state/check-finished"
+SH
+  chmod 0700 "$state/slow.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
+    || fail "could not register slow check"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_GUARD_GRACE=6 FM_CHECK_TIMEOUT=120 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  for ((i = 0; i < 300; i++)); do
+    [ ! -s "$state/check-started" ] || break
+    sleep 0.1
+  done
+  [ -s "$state/check-started" ] || fail "watcher never entered slow check"
+  # The pass is still inside one slow step beyond grace, not merely several
+  # quick cycles. Its bounded wait must keep supervision alive throughout.
+  sleep 8
+  [ ! -e "$state/check-finished" ] || fail "slow step finished before freshness proof"
+  is_live_non_zombie "$pid" || fail "watcher exited during slow check"
+  age=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_path_age "$2"' _ "$LIB" "$state/.last-watcher-beat")
+  [ "$age" -lt 6 ] || fail "working slow pass has stale beacon (${age}s)"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 6 "$4"' _ \
+    "$LIB" "$state" "$WATCH" "$dir" || fail "slow pass does not satisfy strict watcher health"
+
+  # Same live check, but a poll loop that cannot advance. An independent
+  # heartbeat helper would wrongly keep this stopped watcher looking healthy.
+  kill -STOP "$pid"
+  sleep 8
+  age=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_path_age "$2"' _ "$LIB" "$state/.last-watcher-beat")
+  [ "$age" -ge 6 ] || fail "stopped poll kept refreshing beacon (${age}s)"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 6 "$4"' _ \
+    "$LIB" "$state" "$WATCH" "$dir" && fail "stopped poll was reported healthy"
+  kill -CONT "$pid"
+  touch "$state/check-release"
+  for ((i = 0; i < 300; i++)); do
+    [ ! -e "$state/check-finished" ] || break
+    sleep 0.1
+  done
+  [ -e "$state/check-finished" ] || fail "slow check did not resume and finish"
+  stop_seed_watcher "$pid" "$dir/watch.err"
+  pass "slow bounded check stays fresh; stopped live poll goes stale and resumes"
+}
+
 test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   # A live holder whose beacon is stale past the ordinary grace is refused, but
   # a beacon stale past the hard bound evicts that holder (identity-verified
@@ -1555,6 +1607,7 @@ test_msys_pid_identity_uses_proc
 test_stale_watch_lock_reclaimed
 test_stale_watch_reclaim_publishes_before_clear
 test_live_stale_watch_lock_is_actionable
+test_slow_check_beats_but_stopped_poll_goes_stale
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

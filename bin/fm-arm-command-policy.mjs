@@ -14,7 +14,7 @@
 // runs only when this module is invoked directly, never on import.
 
 import path from "node:path";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REASONS = {
@@ -739,6 +739,44 @@ function isWatcherPgrep(position, context) {
   return position.words.slice(position.index + 1).some((word) => /(?:^|\/)fm-watch(?:\.sh)?\b/.test(word.value) || wordReferencesAny(word, context.watcherPatterns));
 }
 
+// Unsupported control grammar must not turn a PID-specific stop into a pattern
+// kill just because a preceding diagnostic mentions the watcher path.
+// Prove only this narrow shape; never expand variables or execute submitted text.
+function exactHomePidKill(program, context) {
+  let pid;
+  try {
+    pid = readFileSync(path.join(context.home, "state/.watch.lock/pid"), "utf8").trim();
+  } catch {
+    return false;
+  }
+  if (!/^[1-9]\d*$/.test(pid)) return false;
+  let found = false;
+  for (const original of program.nodes) {
+    if (original.some((token) => token.type === "group" || token.type === "word" && token.subs.length)) return false;
+    let tokens = original;
+    while (["if", "then", "else", "elif", "while", "until", "do", "!"].includes(tokens[0]?.value)) tokens = tokens.slice(1);
+    if (!tokens.length) continue;
+    const first = tokens[0]?.value;
+    if (["fi", "done"].includes(first) && tokens.length === 1) continue;
+    if (["if", "then", "else", "elif", "fi", "for", "select", "in", "while", "until", "case", "esac", "do", "done", "function", "coproc", "time", "{", "}", "[[", "]]", "!"].includes(first)) return false;
+    const position = commandPosition(tokens);
+    if (!position.command?.literal || position.unresolvedWrapperOption || position.wrapperPayloads.length) return false;
+    if (protectedIdentity(position.command.value, context.root) || shellInvocation(position) || sourcedScript(position) || evalPayload(position) !== null) return false;
+    const name = basename(position.command.value);
+    if (name !== "kill" && tokens.some((token) => /kill/.test(token.value || ""))) return false;
+    if (name !== "kill") continue;
+    const args = position.words.slice(position.index + 1);
+    if (args.some((word) => !word.literal)) return false;
+    let values = args.map((word) => word.value);
+    if (["-s", "-n"].includes(values[0])) values = values.slice(2);
+    else if (/^-(?:[A-Za-z]+|\d+)$/.test(values[0] || "")) values = values.slice(1);
+    if (values[0] === "--") values = values.slice(1);
+    if (values.length !== 1 || values[0] !== pid) return false;
+    found = true;
+  }
+  return found;
+}
+
 function analyzeProgram(command, context, depth = 0) {
   if (depth > 12) {
     return { error: "recursion limit", protectedFound: rawMentionsProtected(command), broadKill: rawMentionsBroadKill(command), pgrepWatcher: false, watcherPids: new Set() };
@@ -860,8 +898,9 @@ function analyzeProgram(command, context, depth = 0) {
   const directProtected = nodeInfos.some((info) => Boolean(info.protectedKind));
   const protectedFound = directProtected || nestedProtected || unclassifiableProtected;
   if (unclassifiableProtected) unsupported = true;
-  const broadKillFound = broadKill || (unsupported && rawMentionsBroadKill(command));
-  if (unsupported && (protectedFound || rawMentionsProtected(command) || broadKillFound)) {
+  const exactKill = unsupported && !protectedFound && exactHomePidKill(program, context);
+  const broadKillFound = broadKill || (unsupported && !exactKill && rawMentionsBroadKill(command));
+  if (unsupported && (protectedFound || (!exactKill && rawMentionsProtected(command)) || broadKillFound)) {
     return { error: "unsupported compound grammar", protectedFound: true, broadKill: broadKillFound, pgrepWatcher, watcherPids: activeContext.watcherPids, program, nodeInfos };
   }
   return { error: "", protectedFound, directProtected, nestedProtected, broadKill: broadKillFound, pgrepWatcher, watcherPids: activeContext.watcherPids, program, nodeInfos };
