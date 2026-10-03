@@ -453,14 +453,38 @@ SH
 
 
 test_ci_forces_full_lint_even_with_empty_diff() {
-  local listed expected
-  # No git stub: CI=true must short-circuit fm-lint.sh's mode selection before
-  # it ever consults git, so this proves CI wins regardless of local diff state.
-  listed=$(CI=true "$LINT" --list-files)
-  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
+  local tmp repo fakebin diff_file log expected listed out run
+  tmp=$(fm_test_tmproot fm-lint-ci-inventory)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/backends/fixture.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/tests/fixture.test.sh"
+  chmod +x "$repo/bin/backends/fixture.sh" "$repo/tests/fixture.test.sh"
+  fakebin=$(fm_fakebin "$tmp")
+  fm_lint_stub_git "$fakebin"
+  log="$tmp/shellcheck.log"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  diff_file="$tmp/diff.nul"
+  : > "$diff_file"
+  expected=$(find "$repo/bin" "$repo/bin/backends" "$repo/tests" -maxdepth 1 -type f -name '*.sh' -print \
+    | while IFS= read -r path; do printf '%s\n' "${path#"$repo/"}"; done | LC_ALL=C sort)
+  listed=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
-  pass "fm-lint.sh forces a full lint in CI even when the local diff would be empty"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "local cache warm-up failed: $out"
+  for run in 1 2; do
+    : > "$log"
+    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      FM_TEST_GIT_DIFF_FILE="$diff_file" \
+      "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
+    [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
+      || fail "CI run $run did not analyze the complete uncached inventory: $(cat "$log")"
+    assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+  done
+  pass "CI=true checks the complete uncached inventory even with an empty diff"
 }
 
 test_main_branch_forces_full_lint() {
@@ -1640,9 +1664,9 @@ SH
   [ "$rc" -eq 1 ] || fail "changed dependency defect was not rejected: $out"
   assert_contains "$out" SC1007 "changed mode lost the seeded library finding"
   rc=0
-  out=$(CI=true "$repo/bin/fm-lint.sh" --full 2>&1) || rc=$?
-  [ "$rc" -eq 1 ] || fail "full lint did not reject the same dependency defect: $out"
-  assert_contains "$out" SC1007 "full mode lost the seeded library finding"
+  out=$(CI=true "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "CI lint did not reject the same dependency defect: $out"
+  assert_contains "$out" SC1007 "CI lint lost the seeded library finding"
   rm "$repo/bin/library.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \

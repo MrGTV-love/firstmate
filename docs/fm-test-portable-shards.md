@@ -122,6 +122,7 @@ Checking a library separately cannot preserve diagnostics that depend on both a 
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
 Repeated imports retain their runtime initialization at each call while sharing a real source statement, rather than hiding that dependency from joint analysis.
 Parent-channel publication imports the small status-record owner instead of the complete classifier; the classifier consumes the same record owner for its own readers.
+Status-record changes select both owners' consuming test families; `tests/fm-test-run.test.sh` verifies the changed-owner selection through the runner.
 
 Cold source-aware analysis can still require multi-GiB processes; cache reuse is a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
 macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
