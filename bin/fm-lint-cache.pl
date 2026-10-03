@@ -46,6 +46,9 @@ sub dependencies {
     return @{$edges{$path}} if exists $edges{$path};
     my $body = contents($path);
     my %deps;
+    if (identity_path($path) eq 'bin/fm-backend.sh') {
+        $deps{"bin/backends/$_.sh"} = 1 for qw(tmux herdr zellij orca cmux);
+    }
     if (defined $body) {
         # Include every override, even one in a nested function or comment. This
         # deliberately over-selects rather than relying on shell execution order.

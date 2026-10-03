@@ -1699,6 +1699,98 @@ test_selection_adds_no_unchanged_imported_roots() {
   pass "selection analyzes unchanged imports only through changed or explicit callers"
 }
 
+test_runtime_backend_changes_select_every_dispatcher_consumer() {
+  local tmp diff_file selection caller backend listed
+  local -a consumers=()
+  tmp=$(fm_test_tmproot fm-lint-runtime-selection)
+  diff_file="$tmp/diff.nul"
+  selection="$tmp/selection.nul"
+  fm_lint_write_diff_file "$diff_file" bin/fm-backend.sh
+  perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+    || fail "dispatcher dependency selection failed"
+  listed=$'\n'
+  while IFS= read -r -d '' caller; do
+    consumers+=("$caller")
+    listed+="$caller"$'\n'
+  done < "$selection"
+  for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh; do
+    assert_contains "$listed" $'\n'"$caller"$'\n' "dispatcher baseline omitted $caller"
+  done
+  for backend in tmux herdr zellij orca cmux; do
+    fm_lint_write_diff_file "$diff_file" "bin/backends/$backend.sh"
+    perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+      || fail "$backend dependency selection failed"
+    listed=$'\n'
+    while IFS= read -r -d '' caller; do
+      listed+="$caller"$'\n'
+    done < "$selection"
+    assert_contains "$listed" $'\n'"bin/backends/$backend.sh"$'\n' \
+      "$backend change did not select its adapter root"
+    for caller in "${consumers[@]}"; do
+      assert_contains "$listed" $'\n'"$caller"$'\n' \
+        "$backend change did not select dispatcher consumer $caller"
+    done
+  done
+  fm_lint_write_diff_file "$diff_file" unrelated-input
+  perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+    || fail "unrelated-input dependency selection failed"
+  [ ! -s "$selection" ] || fail "an unrelated input selected runtime backend consumers"
+  pass "each runtime backend change selects every direct and transitive dispatcher consumer"
+}
+
+test_runtime_backend_inputs_invalidate_dispatcher_cache() {
+  local tmp repo fakebin log backend root attempt state out
+  tmp=$(fm_test_tmproot fm-lint-runtime-cache)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cp "$ROOT/bin/fm-backend.sh" "$repo/bin/fm-backend.sh"
+  cat >> "$repo/bin/consumer.sh" <<'SH'
+# shellcheck source=bin/fm-backend.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-backend.sh"
+SH
+  cat > "$tmp/adapter.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../library.sh"
+SH
+  for backend in tmux herdr zellij orca cmux; do
+    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
+  done
+  fakebin=$(fm_fakebin "$tmp")
+  log="$tmp/shellcheck.log"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  for backend in tmux herdr zellij orca cmux; do
+    for attempt in 1 2; do
+      for root in bin/fm-backend.sh bin/caller.sh; do
+        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+          "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
+          || fail "$backend cache warm-up $attempt failed for $root: $out"
+        if [ "$attempt" -eq 2 ]; then
+          assert_contains "$out" "cache hit $root" "clean $root result was not reusable"
+        fi
+      done
+    done
+    for state in changed deleted; do
+      if [ "$state" = changed ]; then
+        printf '\n' >> "$repo/bin/backends/$backend.sh"
+      else
+        rm "$repo/bin/backends/$backend.sh"
+      fi
+      : > "$log"
+      for root in bin/fm-backend.sh bin/caller.sh; do
+        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+          "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
+          || fail "$state $backend check failed for $root: $out"
+        assert_not_contains "$out" "cache hit $root" "$state $backend reused stale $root analysis"
+      done
+      [ "$(cat "$log")" = $'bin/fm-backend.sh\nbin/caller.sh' ] \
+        || fail "$state $backend did not recheck dispatcher and transitive caller: $(cat "$log")"
+    done
+    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
+  done
+  pass "changes and deletions of every runtime backend invalidate dispatcher and caller caches"
+}
+
 test_shared_cache_reuses_only_identical_successful_inputs() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): shared cache regression"; return; }
   local tmp one two fakebin real log out rc before after first second
@@ -2041,6 +2133,8 @@ test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
 test_selection_adds_no_unchanged_imported_roots
+test_runtime_backend_changes_select_every_dispatcher_consumer
+test_runtime_backend_inputs_invalidate_dispatcher_cache
 test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint

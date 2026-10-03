@@ -22,9 +22,9 @@
 #   - Otherwise it selects canonical roots whose transitive source closure
 #     contains a path changed since the merge-base, including staged, unstaged,
 #     untracked, deleted and renamed paths. An unchanged imported library is not
-#     a separate root; its callers analyze it through their sources. A source
-#     expression that cannot be resolved adds no selection edge and disables
-#     cache reuse; CI's full set still analyzes that root.
+#     a separate root; its callers analyze it through their sources. Runtime
+#     backend imports participate in selection and cache invalidation even when
+#     their static source annotations intentionally isolate adapter analysis.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
