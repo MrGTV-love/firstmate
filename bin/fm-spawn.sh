@@ -247,6 +247,9 @@
 #   itself a linked worktree of the project repository still launches. A pane
 #   that never reaches an isolated worktree refuses at the end of that wait,
 #   naming the last path seen and why it was rejected.
+#   A refused fresh Treehouse-backed launch closes only the endpoint created
+#   by this attempt, ending its get process lease even if allocation completes
+#   after the isolation deadline. Relaunches and adopted endpoints are untouched.
 #   That placement is proven only at launch. Every ship or scout pane therefore
 #   also receives `export FM_TASK_ID=<task-id>` before the launch command, on
 #   the same channel as GOTMPDIR, and bin/fm-test-run.sh refuses to execute the
@@ -1223,6 +1226,7 @@ CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
+SPAWN_TREEHOUSE_ABORT_TARGET=
 
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
@@ -1294,6 +1298,29 @@ spawn_abort_cleanup() {
   if [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" = 1 ]; then
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
     fm_lock_release "$HERDR_PRESENTATION_ORDER_LOCK" || true
+  fi
+  # The get process owns the pool lease, not the cwd we happened to observe.
+  # Closing this attempt's endpoint also cancels a get still preparing a slot;
+  # returning a guessed path here could release somebody else's allocation.
+  if [ -n "$SPAWN_TREEHOUSE_ABORT_TARGET" ] && [ "$KIND" != secondmate ] &&
+    [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
+    if [ "$BACKEND" = tmux ]; then
+      # Use the creation-time window id, never a name a later pane could reuse.
+      tmux kill-window -t "$SPAWN_TREEHOUSE_ABORT_TARGET" || {
+        echo "error: could not close this attempt's Treehouse acquisition window $SPAWN_TREEHOUSE_ABORT_TARGET" >&2
+        status=1
+      }
+    else
+      if ! fm_backend_kill "$BACKEND" "$SPAWN_TREEHOUSE_ABORT_TARGET" \
+        "${ZELLIJ_TAB_ID:-}" "$W"; then
+        echo "error: could not close this attempt's Treehouse acquisition endpoint $SPAWN_TREEHOUSE_ABORT_TARGET" >&2
+        status=1
+      elif [ "$BACKEND" = herdr ] &&
+        ! fm_backend_herdr_endpoint_confirmed_gone "$SPAWN_TREEHOUSE_ABORT_TARGET"; then
+        echo "error: Treehouse acquisition pane $SPAWN_TREEHOUSE_ABORT_TARGET was not confirmed closed; reconcile this attempt before retrying" >&2
+        status=1
+      fi
+    fi
   fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
@@ -3690,6 +3717,7 @@ else
     # stays $T (the name form), which is safe now that rename is disabled.
     WID=$(fm_backend_tmux_create_task "$SES" "$W" "$PROJ_ABS") || exit 1
     WT_TARGET="$WID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$WID
     ;;
   herdr)
     # fm_backend_herdr_workspace_label resolves the target workspace from
@@ -3754,6 +3782,7 @@ else
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=""
+            SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
             ;;
           2)
             spawn_herdr_presentation_order_lock_release
@@ -3816,6 +3845,7 @@ else
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=$FM_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
+            SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
             fm_backend_herdr_projection_order_best_effort \
               "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_PARENT_LABEL" "$HERDR_PARENT_WORKSPACE_ID"
             HERDR_HOME_ID=$(fm_backend_herdr_projection_home_identity "$HERDR_LABEL_HOME" 2>/dev/null || true)
@@ -3854,6 +3884,7 @@ else
       read -r HERDR_TAB_ID HERDR_PANE_ID <<EOF
 $HERDR_TASK_IDS
 EOF
+      SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
     fi
     if [ -z "$HERDR_TAB_ID" ] || [ -z "$HERDR_PANE_ID" ]; then
       echo "error: herdr did not return a tab/pane id for $W" >&2
@@ -3872,6 +3903,7 @@ EOF
       exit 1
     fi
     T="$ZELLIJ_SES:$ZELLIJ_PANE_ID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$T
     ;;
   cmux)
     fm_backend_cmux_container_ensure || exit 1
@@ -3884,6 +3916,7 @@ EOF
       exit 1
     fi
     T="$CMUX_WORKSPACE_ID:$CMUX_SURFACE_ID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$T
     ;;
   orca)
     set +e
@@ -4376,7 +4409,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree within 60s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); inspect window $T" >&2
+    echo "error: treehouse get did not enter an isolated worktree within 60s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
     exit 1
   fi
 
@@ -4396,7 +4429,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # through metadata publication, so no other spawn or return sees a half-claim.
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
+      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own" >&2
       exit 1
     fi
     SPAWN_SLOT_CLAIMED=1
@@ -4447,7 +4480,7 @@ claude*)
     spawn_trust_args=("$WT" "$PROJ_ABS")
   fi
   if ! "$FM_ROOT/bin/fm-claude-trust.sh" "${spawn_trust_args[@]}" >/dev/null; then
-    echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog; inspect window $T" >&2
+    echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog" >&2
     exit 1
   fi
   ;;
@@ -5438,7 +5471,6 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
-SPAWN_LAUNCH_SENT=1
 spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
@@ -5446,6 +5478,7 @@ if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   spawn_herdr_presentation_order_lock_release
 fi
 spawn_send_key "$T" Enter
+SPAWN_LAUNCH_SENT=1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
     kimi_spawn_fail "$KIMI_READY_FAILURE_DETAIL"

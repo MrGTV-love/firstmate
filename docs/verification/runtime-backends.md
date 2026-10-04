@@ -393,6 +393,42 @@ Removing the `--force` arm makes the forced generic case refuse; honoring `--for
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
+## Fresh acquisition abort
+
+`bin/fm-spawn.sh`'s header owns abort cleanup for fresh Treehouse-backed launches.
+Verified on 2026-10-04 on macOS arm64 with tmux 3.5a and Herdr 0.9.1 protocol 22:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-spawn-acquisition-cleanup.test.sh tests/fm-spawn-acquisition-herdr-e2e.test.sh
+```
+
+The regression runs the real spawn entrypoint and real terminals with a fake `treehouse get` that holds a process lease until its shell exits.
+Only the caller's polling sleeps are accelerated; the fake get waits for permission that the test grants after the isolation deadline has already refused the spawn.
+The tests observe the released lease, the vanished get process, and surviving unrelated panes and a previously successful acquisition.
+The foreign-copy case reaches Claude's existing workspace-trust refusal, while a separate dirty-copy case refuses after successful discovery.
+No real Treehouse pool or model session is used.
+Herdr runs both flat and projected layouts in generated lab sessions through `bin/fm-herdr-lab.sh`, whose teardown verifies the default-session tripwire.
+Both terminal shells and the fake get's interactive child use lab-private history files.
+
+Observed output, with the five Herdr rows printed once per layout:
+
+```text
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+```
+
+The Zellij and cmux creation paths also retain their response-derived endpoint identifiers for abort cleanup, but those real backends were not exercised by this command.
+Orca does not run Treehouse acquisition and retains its separate abort cleanup.
+Secondmate launches and adopted relaunch endpoints are outside this acquisition cleanup.
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.
