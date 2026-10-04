@@ -78,15 +78,21 @@ if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
   esac
   exit 0
 fi
-if [ -f "$D/recovery-case-id" ] && [ "$*" = '-Eww -o command= -p 2000000000' ]; then
-  printf 'PATH=/test'
-  if [ -f "$D/launched-command" ]; then
-    id=$(cat "$D/recovery-case-id")
-    gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
-    printf ' FM_SPAWN_GEN=%s' "$gen"
+if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
+  pid=$5
+  if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
+  expected=2000000000
+  [ ! -f "$D/recovery-pid" ] || expected=$(cat "$D/recovery-pid")
+  if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
+    printf 'PATH=/test'
+    if [ -f "$D/launched-command" ]; then
+      id=$(cat "$D/recovery-case-id")
+      gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
+      printf ' FM_SPAWN_GEN=%s' "$gen"
+    fi
+    printf '\n'
+    exit 0
   fi
-  printf '\n'
-  exit 0
 fi
 if [ -f "$D/herdr-agent-registration" ] \
   || { [ -f "$D/recovery-case-id" ] && [ ! -f "$D/herdr-agent-live" ]; }; then
@@ -2236,6 +2242,9 @@ make_herdr_stub() {  # <case-dir>
 #!/usr/bin/env bash
 set -u
 D=$FM_FAKE_DIR
+if [ -f "$D/herdr-sessions/${HERDR_SESSION:-}" ]; then
+  D=$(cat "$D/herdr-sessions/$HERDR_SESSION")
+fi
 printf '%s\n' "$*" >> "$D/herdr-log"
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ]; then
   if [ -f "$D/herdr-stopped" ]; then
@@ -2283,7 +2292,10 @@ case "${1:-} ${2:-}" in
   'pane process-info')
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/herdr-agent-live" ]; then
-        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[{"pid":2000000000,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n'
+        pid=2000000000
+        [ ! -f "$D/recovery-pid" ] || pid=$(cat "$D/recovery-pid")
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
+          "$(cat "$D/herdr-pane")" "$pid"
       else
         printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[]}}}\n'
       fi
@@ -2329,6 +2341,8 @@ case "${1:-} ${2:-}" in
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/exit-pending" ]; then
         printf '╭──────────╮\n│ /exit    │\n╰──────────╯\n'
+      elif [ -f "$D/recovery-pending" ]; then
+        printf '╭──────────╮\n│ %s    │\n╰──────────╯\n' "$(cat "$D/recovery-pending")"
       else
         printf '╭──────────╮\n│          │\n╰──────────╯\n'
       fi
@@ -2951,7 +2965,59 @@ test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   pass 'reboot recovery keeps secondmate profile instead of rereading config, plus pane, charter and child work'
 }
 
+test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
+  local a b out rc before_a before_b gen_b head_b
+  local CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+  herdr_case_or_skip reboot-fairness-a a fmlab-a || return 0
+  a=$HERDR_CASE_DIR
+  herdr_case_or_skip reboot-fairness-b b fmlab-b || return 0
+  b=$HERDR_CASE_DIR
+  rm -f "$a/fake/herdr-stopped" "$b/fake/herdr-stopped"
+  printf a > "$a/fake/recovery-case-id"
+  printf b > "$b/fake/recovery-case-id"
+  printf 2000000001 > "$a/fake/recovery-pid"
+  printf draft > "$a/fake/recovery-pending"
+  : > "$a/fake/herdr-agent-live"
+  : > "$b/fake/herdr-agent-live"
+  printf 'launch_proof=env-v1\nspawn_gen=old\n' >> "$a/home/state/a.meta"
+  printf 'launch_proof=env-v1\nspawn_gen=old\n' >> "$b/home/state/b.meta"
+  cp "$a/home/state/a.meta" "$b/home/state/a.meta"
+  mkdir -p "$b/home/data/a" "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
+  cp "$a/home/data/a/brief.md" "$b/home/data/a/brief.md"
+  printf '%s\n' "$a/fake" > "$b/fake/herdr-sessions/fmlab-a"
+  printf '%s\n' "$a/fake" > "$b/fake/herdr-pids/2000000001"
+  printf 'unfinished a\n' > "$a/wt/unlanded.txt"
+  printf 'unfinished b\n' > "$b/wt/unlanded.txt"
+  before_a=$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")
+  before_b=$(shasum -a 256 "$b/wt/unlanded.txt")
+  head_b=$(git -C "$b/wt" rev-parse HEAD)
+  rc=0
+  out=$(run_control "$b" recover --one) || rc=$?
+  expect_code 1 "$rc" "first tick must refuse pending a"$'\n'"$out"
+  [ "$(meta_field "$b" b spawn_gen)" = old ] || fail 'one tick attempted a second repair'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
+    || fail 'pending refusal changed a or its work'
+  out=$(run_control "$b" check --one) || fail "read-only check failed: $out"
+  rc=0
+  out=$(run_control "$b" recover --one) || rc=$?
+  expect_code 0 "$rc" "next tick must recover b despite pending a"$'\n'"$out"
+  gen_b=$(meta_field "$b" b spawn_gen)
+  [ -n "$gen_b" ] && [ "$gen_b" != old ] || fail 'later bare agent b was not replaced'
+  [ "$(journal_field "$b" b phase)" = complete ] || fail 'b recovery did not complete its lifecycle transaction'
+  [ "$(meta_field "$b" b window)" = 'fmlab-b:%7' ] || fail 'b recovery changed its endpoint'
+  [ "$(git -C "$b/wt" rev-parse HEAD)" = "$head_b" ] \
+    && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b recovery changed unfinished work'
+  rc=0
+  out=$(run_control "$b" recover --one) || rc=$?
+  expect_code 1 "$rc" "rotation must revisit still-pending a"$'\n'"$out"
+  [ "$(meta_field "$b" b spawn_gen)" = "$gen_b" ] || fail 'rotation replaced an already managed b'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
+    || fail 'repeated recovery touched pending a or its work'
+  pass 'bounded reboot ticks advance past pending a to recover b, preserve both copies, and wrap without replacing managed b'
+}
 
+
+test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

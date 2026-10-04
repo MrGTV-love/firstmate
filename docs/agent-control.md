@@ -100,6 +100,7 @@ Herdr can resume a live harness after reboot without the Firstmate launch comman
 For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates.
 Use an explicit `FM_HOME` with `check` for a read-only launch verdict, or `recover` to repair every positively unmanaged live agent.
 `recover --one` bounds an automatic supervision tick to one repair attempt.
+Bounded scans advance after refused attempts, so a pending record cannot starve later recoveries.
 Deferred startup recovery runs the sweep; the watcher repeats the bounded scan to catch panes restored only after a viewer attaches.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.

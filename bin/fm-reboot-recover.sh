@@ -11,8 +11,12 @@
 # Herdr's session-wide auto-resume setting is deliberately not changed: it
 # applies to unrelated panes too. Exact recorded launch recovery supplies the
 # settings its native resume drops. Unknown proof is reported, never acted on.
-# Failed recovery is surfaced and the remaining records are still inspected.
-# --one stops after the first repair attempt, for a bounded supervision cycle.
+# Failed recovery is surfaced; an unbounded sweep continues inspecting records.
+# --one stops after one repair attempt. Bounded recover scans rotate after the
+# previous attempt, including a refusal, so pending input cannot starve others.
+# STATE/.reboot-recovery-cursor holds the last attempted id. It advances
+# atomically before repair, including when the caller times out during repair.
+# check and unbounded recover do not read or change that scheduling cursor.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() { sed -n '2,${/^#/!q;p;}' "$0" | sed 's/^# \{0,1\}//'; }
@@ -43,7 +47,30 @@ STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
 . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
 fm_backend_source herdr
 result=0
-for meta in "$STATE"/*.meta; do
+records=("$STATE"/*.meta)
+count=${#records[@]}
+[ "$count" -gt 0 ] || exit 0
+start=0
+cursor="$STATE/.reboot-recovery-cursor"
+if [ "$ACTION" = recover ] && [ "$ONE" = 1 ]; then
+  if [ -e "$cursor" ] || [ -L "$cursor" ]; then
+    [ -f "$cursor" ] && [ ! -L "$cursor" ] || {
+      echo "error: recovery scheduling cursor is not a regular file: $cursor" >&2
+      exit 1
+    }
+    last=''
+    IFS= read -r last < "$cursor" || true
+    for ((index=0; index<count; index++)); do
+      if [ "${records[index]}" = "$STATE/$last.meta" ]; then
+        start=$(( (index + 1) % count ))
+        break
+      fi
+    done
+  fi
+fi
+for ((offset=0; offset<count; offset++)); do
+  index=$(( (start + offset) % count ))
+  meta=${records[index]}
   [ -f "$meta" ] && [ ! -L "$meta" ] || continue
   [ "$(fm_meta_get "$meta" backend)" = herdr ] || continue
   [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
@@ -71,6 +98,14 @@ for meta in "$STATE"/*.meta; do
     unmanaged) ;;
     *) result=1; continue ;;
   esac
+  if [ "$ONE" = 1 ]; then
+    tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
+    if ! printf '%s\n' "$id" > "$tmp" || ! mv -f -- "$tmp" "$cursor"; then
+      rm -f -- "$tmp"
+      echo "error: recovery scheduling cursor could not advance: $cursor" >&2
+      exit 1
+    fi
+  fi
   # fm-control rechecks proof under its per-task lock and pins every recorded
   # profile axis itself, including secondmates whose current config changed.
   if out=$("$SCRIPT_DIR/fm-control.sh" "$id" relaunch --recover-launch 2>&1); then
