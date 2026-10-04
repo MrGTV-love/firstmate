@@ -1,0 +1,16 @@
+Fixture/tool preparation commands (from current worktree):
+/usr/bin/git --version
+  exit=0; git version 2.50.1 (Apple Git-155)
+/usr/bin/git --exec-path && /usr/bin/xcrun --find git && /usr/bin/file /usr/bin/git
+  exit=0; Git exec path=/Library/Developer/CommandLineTools/usr/libexec/git-core; resolved executable=/Library/Developer/CommandLineTools/usr/bin/git
+mkdir -p .live-validation/remote/tmp .live-validation/remote/instruments .live-validation/remote/home .live-validation/remote/bin /Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/evidence/01M445ME32DXNHDANAED5TJK7X/remote && cp /Library/Developer/CommandLineTools/usr/bin/git .live-validation/remote/instruments/git-real
+  exit=0
+/usr/bin/cc -dynamiclib -Wall -Wextra -Werror -o .live-validation/remote/instruments/repack-race.dylib .live-validation/remote/instruments/repack-race.c
+  exit=0; compiler output empty
+mkdir -p .live-validation/remote/hold-bin
+  exit=0
+Targeted direct product scenario command:
+/usr/bin/python3 .live-validation/remote/run-direct.py
+  Product commands, outputs, traces, observed exits, and persisted-state checks are recorded in commands.log, *.product.log, *.trace2.jsonl, outcomes.json, and *.persisted-state.json.
+The fixture driver source and timing-only instrumentation source/wrappers are saved as fixture-* evidence files.
+No lifecycle suite, mocked SSH route, build, lint, formatter, Herdr, fleet pane, or Docker invocation is included.

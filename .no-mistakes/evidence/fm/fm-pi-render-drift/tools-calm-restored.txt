@@ -1,0 +1,44 @@
+                                                                                                                        
+ fm_branch_outcomes                                                                                                     
+   recent: 12                                                                                                           
+ {"seq":1,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_01 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":2,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_02 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":3,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_03 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":4,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_04 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":5,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_05 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":6,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_06 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":7,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_07 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":8,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_08 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":9,"epoch":1791142322,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_09 — checks      
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":10,"epoch":1791142323,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_10 — checks     
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":11,"epoch":1791142323,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_11 — checks     
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+ {"seq":12,"epoch":1791142323,"task":"render-lab","wake":"","verdict":"routine","summary":"LIVE_OUTCOME_12 — checks     
+ green","silent":false,"statusEndpoint":0,"statusIdent":"-"}                                                            
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ fm_branch_processed                                                                                                    
+   through: 0                                                                                                           
+ acknowledgement refused: through must be a positive outcome sequence number                                            
+                                                                                                                        
+                                                                                                                        
+ LIVE_RENDER_TOOLS_COMPLETE                                                                                             
+                                                                                                                        
+ Tool output: expanded                                                                                                  
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/tools/p...
+9.2%/32k (auto)                                                                                            deterministic

@@ -1,0 +1,11 @@
+{
+  "success": false,
+  "error": "Instrumented exact repack product failed: fatal: cannot handle real as a builtin\nerror: could not clone the remote Firstmate home\n",
+  "outcomes": [
+    {
+      "scenario": "successful direct public provision with two real project clones",
+      "exit": 0,
+      "head": "2e95b5a56cdc9d309b462bbc1235a747f1b8fa09"
+    }
+  ]
+}

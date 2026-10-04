@@ -1,0 +1,19 @@
+warning: templates not found in /Applications/Xcode.app/Contents/Developer/usr/share/git-core/templates
+Note: switching to '76a95a75c821cc33b15893c9edfdf0ae5f684add'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+provisioned: /Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/home-exact-repack projects=0

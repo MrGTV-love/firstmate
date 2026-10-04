@@ -1,0 +1,7 @@
+#!/bin/bash
+set -eu
+printf 'git-upload-pack' >> "$FM_LIVE_COMMAND_LOG"
+printf ' %q' "$@" >> "$FM_LIVE_COMMAND_LOG"
+printf '\n' >> "$FM_LIVE_COMMAND_LOG"
+export DYLD_INSERT_LIBRARIES="$FM_LIVE_DYLIB"
+exec "$FM_LIVE_REAL_GIT" upload-pack "$@"

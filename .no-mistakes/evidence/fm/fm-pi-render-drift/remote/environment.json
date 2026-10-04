@@ -1,0 +1,14 @@
+{
+  "worktree": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X",
+  "product": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/bin/fm-remote-home-provision.sh",
+  "product_sha256": "0612cb6f311b0decc8eb15c22c135a29143afdac35b333ebc2de6c11e7d1074f",
+  "isolated_environment": {
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/home",
+    "TMPDIR": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/tmp",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+    "LC_ALL": "C"
+  }
+}

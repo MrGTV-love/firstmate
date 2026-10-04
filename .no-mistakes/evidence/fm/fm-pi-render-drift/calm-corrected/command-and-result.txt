@@ -1,0 +1,10 @@
+Exact command from worktree root:
+env TMPDIR="$PWD/.live-validation/calm" FM_PI_PACKAGE_DIR="$PWD/.live-validation/pi/node_modules/@earendil-works/pi-coding-agent" PATH="$PWD/.live-validation/pi/node_modules/.bin:$PATH" FM_CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" CALM_EVIDENCE_DIR="/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/evidence/01M445ME32DXNHDANAED5TJK7X/calm-corrected" bash tests/.test-phase-calm.sh
+
+Only invocation: test_interactive_terminal_e2e. All original final suite calls omitted.
+Result: exit 0, wall time 38.84 seconds.
+Actual output:
+ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+
+Source correction: export wait and settled confirmation match 'Session exported to:' independent of wrapped absolute paths; both require nonempty requested export_file. Existing parser and browser checks still validate actual output. Existing feasibility prose updated. No product changes.
+Original failed run evidence remains in parent evidence directory; this directory contains corrected run artifacts. Wrapped original cleanup preserved root-level fixture artifacts before killing its private tmux and removing fixture.

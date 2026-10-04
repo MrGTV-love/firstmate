@@ -1,0 +1,15 @@
+{
+  "home": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/home-exact-repack",
+  "head": "76a95a75c821cc33b15893c9edfdf0ae5f684add",
+  "tracked_files_compared": 657,
+  "tracked_tree_sha256": "c095e3a831559a98c782226a82588744f8fbd3392d6e8c83aa4ca7411e0152f5",
+  "marker": "live-race\n",
+  "parent_record": "schema=fm-secondmate-parent.v1\nroute=remote\nparent_host=parent-live-validation\n",
+  "charter": "Real source-repack provisioning charter.\n",
+  "charter_mode": "0o600",
+  "registry": "",
+  "backlog": "## In flight\n\n## Queued\n\n## Done\n",
+  "fsck_exit": 0,
+  "tracked_diff_exit": 0,
+  "staging_paths": []
+}

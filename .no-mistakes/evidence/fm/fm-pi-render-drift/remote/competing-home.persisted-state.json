@@ -1,0 +1,30 @@
+{
+  "held_clone": {
+    "clone_pid": "73271",
+    "stage": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/.fm-home-provisioning.EW7ePe",
+    "state": "T"
+  },
+  "public_home_absent_while_clone_stopped": true,
+  "before": {
+    "sha256": "c79a12daa0b6b98e041345c0611f4a3bb47c1fb0273d094629573618bc07da83",
+    "inode": 1273740983,
+    "mode": 416,
+    "mtime_ns": 1791142799936256098,
+    "entries": [
+      "foreign"
+    ]
+  },
+  "after": {
+    "sha256": "c79a12daa0b6b98e041345c0611f4a3bb47c1fb0273d094629573618bc07da83",
+    "inode": 1273740983,
+    "mode": 416,
+    "mtime_ns": 1791142799936256098,
+    "entries": [
+      "foreign"
+    ]
+  },
+  "stage_removed": true,
+  "nested_stages": [],
+  "public_home_preserved": true,
+  "home_marker_exists": false
+}

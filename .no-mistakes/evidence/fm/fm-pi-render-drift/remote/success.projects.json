@@ -1,0 +1,16 @@
+[
+  {
+    "name": "alpha",
+    "origin": "file:///Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/origin-alpha.git",
+    "head": "266d3413ab371c2be8b3465de0cba37173b0daa2",
+    "payload_sha256": "4190fb8f5fe9542236ed12a0282c06cc986c7daa67521c6970f86637e87a9426",
+    "fsck_exit": 0
+  },
+  {
+    "name": "beta",
+    "origin": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/origin-beta.git",
+    "head": "c9d3ec4201ead06f9a2e5a60ab5546a8e452d263",
+    "payload_sha256": "06b24a0357aef17834c1cc29b64093ec42fff77d38def61312fd5882f925aee8",
+    "fsck_exit": 0
+  }
+]

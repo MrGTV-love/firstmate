@@ -1,0 +1,26 @@
+#!/bin/bash
+set -eu
+if [ "${1:-}" = clone ] && [ "$(dirname "${!#}")" = "$FM_LIVE_HOLD_PARENT" ]; then
+  dest="${!#}"
+  /usr/bin/git "$@" &
+  child=$!
+  i=0
+  while [ ! -d "$dest/.git/objects" ]; do
+    state=$(ps -o stat= -p "$child" 2>/dev/null | tr -d '[:space:]')
+    case "$state" in ''|Z*) wait "$child"; exit $? ;; esac
+    i=$((i + 1)); [ "$i" -lt 10000 ] || { kill "$child"; exit 125; }
+    sleep 0.002
+  done
+  kill -STOP "$child" 2>/dev/null || { wait "$child"; exit $?; }
+  while :; do
+    state=$(ps -o stat= -p "$child" 2>/dev/null | tr -d '[:space:]')
+    case "$state" in T*) break ;; ''|Z*) wait "$child"; exit $? ;; esac
+    sleep 0.002
+  done
+  printf 'clone_pid=%s\nstage=%s\nstate=%s\n' "$child" "$dest" "$state" > "$FM_LIVE_HOLD_MARKER"
+  while [ ! -f "$FM_LIVE_HOLD_RELEASE" ]; do sleep 0.01; done
+  kill -CONT "$child"
+  wait "$child"
+  exit $?
+fi
+exec /usr/bin/git "$@"

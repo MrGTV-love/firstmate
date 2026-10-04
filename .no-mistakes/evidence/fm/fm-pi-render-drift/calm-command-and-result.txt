@@ -1,0 +1,10 @@
+Command (from worktree root):
+env TMPDIR="$PWD/.live-validation/calm" FM_PI_PACKAGE_DIR="$PWD/.live-validation/pi/node_modules/@earendil-works/pi-coding-agent" PATH="$PWD/.live-validation/pi/node_modules/.bin:$PATH" FM_CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" CALM_EVIDENCE_DIR="/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/evidence/01M445ME32DXNHDANAED5TJK7X" bash tests/.test-phase-calm.sh
+
+Selected invocation: test_interactive_terminal_e2e only; original lines 4864-4878 excluded.
+Executed once. Exit 1 after 20.30 seconds.
+Actual stderr: not ok - /export did not complete while calm mode was on
+Actual final pane identifies Pi v0.99.0 and shows successful 'Session exported to:' on line 107, export path on lines 108-109.
+Assessment: test/setup false-negative, not evidence of export product failure. Long absolute worktree TMPDIR path makes Pi wrap the notification; wait_for_text searches the entire notification plus path as one literal line. Export HTML and session JSONL were generated and preserved. Browser export checks, export-settled, restored, boat, and restarted phases were not reached. No rerun and no lasting source modifications.
+Required test fix: wait for the success notification independent of path wrapping and assert export file existence (or normalize wrapped capture text); do not require the full absolute filename in one rendered line.
+Cleanup wrapper preserved existing root-level fixture files and final tmux scrollback before invoking original cleanup to kill private tmux and remove fixture root.

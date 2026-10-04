@@ -1,0 +1,4 @@
+git clone --quiet --no-local -- /Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/source-exact-repack /Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/.fm-home-provisioning.XlyWey
+git-upload-pack /Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/source-exact-repack/.git
+git pack-objects --revs --thin --stdout --delta-base-offset
+git index-pack --stdin --fix-thin --keep=fetch-pack\ 11194\ on\ GTT-CB.local --check-self-contained-and-connected

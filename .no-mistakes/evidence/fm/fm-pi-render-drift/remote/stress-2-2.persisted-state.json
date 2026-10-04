@@ -1,0 +1,15 @@
+{
+  "home": "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/home-stress-2-2",
+  "head": "3bac72c8ee1e3b63601a7d244e36b74e05ee52a0",
+  "tracked_files_compared": 680,
+  "tracked_tree_sha256": "2dd9011e01c035fcdcf142afdc7014c77793d9b6deeb25df2618971fa40e9340",
+  "marker": "live-race\n",
+  "parent_record": "schema=fm-secondmate-parent.v1\nroute=remote\nparent_host=parent-live-validation\n",
+  "charter": "Real source-repack provisioning charter.\n",
+  "charter_mode": "0o600",
+  "registry": "",
+  "backlog": "## In flight\n\n## Queued\n\n## Done\n",
+  "fsck_exit": 0,
+  "tracked_diff_exit": 0,
+  "staging_paths": []
+}

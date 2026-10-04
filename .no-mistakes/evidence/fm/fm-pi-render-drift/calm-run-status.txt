@@ -1,0 +1,2 @@
+exit_status=1
+tmux_socket=fm-calm-85352

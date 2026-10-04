@@ -1,0 +1,203 @@
+{
+  "success": true,
+  "outcomes": [
+    {
+      "scenario": "successful direct public provision with two real project clones",
+      "exit": 0,
+      "head": "2e95b5a56cdc9d309b462bbc1235a747f1b8fa09"
+    },
+    {
+      "scenario": "Darwin selected-object before-read repack",
+      "exit": 0,
+      "exact_before_read_race_observed": false,
+      "selected_loose_object_exists_after": true,
+      "characterization": "instrumented provision succeeded but interposer did not observe selected-object read; concurrent stress is authoritative"
+    },
+    {
+      "scenario": "real concurrent repack stress round 1",
+      "repack_command": [
+        "/usr/bin/git",
+        "-C",
+        "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/source-stress",
+        "repack",
+        "-adf"
+      ],
+      "repack_exit": 0,
+      "repack_started": "2026-10-04T19:39:29.321080+00:00",
+      "repack_finished": "2026-10-04T19:39:36.773513+00:00",
+      "active_readers_at_start": [
+        "stress-1-1"
+      ],
+      "selected_loose_object_removed": true,
+      "source_object_retained": true,
+      "provisions": [
+        {
+          "product": "stress-1-1",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:29.319994Z",
+              "end": "2026-10-04T19:39:32.642818Z",
+              "sid": "20261004T193929.286038Z-H640834fc-P000046d0/20261004T193929.308204Z-H640834fc-P000046f4/20261004T193929.319422Z-H640834fc-P00004710"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:29.319994Z",
+              "end": "2026-10-04T19:39:32.642818Z",
+              "sid": "20261004T193929.286038Z-H640834fc-P000046d0/20261004T193929.308204Z-H640834fc-P000046f4/20261004T193929.319422Z-H640834fc-P00004710"
+            }
+          ]
+        },
+        {
+          "product": "stress-1-2",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:29.322954Z",
+              "end": "2026-10-04T19:39:32.612738Z",
+              "sid": "20261004T193929.286318Z-H640834fc-P000046d3/20261004T193929.309316Z-H640834fc-P000046f8/20261004T193929.322250Z-H640834fc-P00004716"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:29.322954Z",
+              "end": "2026-10-04T19:39:32.612738Z",
+              "sid": "20261004T193929.286318Z-H640834fc-P000046d3/20261004T193929.309316Z-H640834fc-P000046f8/20261004T193929.322250Z-H640834fc-P00004716"
+            }
+          ]
+        }
+      ],
+      "characterization": "trace2 proves source pack-objects process/repack interval overlap, not a particular object disappearing between selection and read"
+    },
+    {
+      "scenario": "real concurrent repack stress round 2",
+      "repack_command": [
+        "/usr/bin/git",
+        "-C",
+        "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/source-stress",
+        "repack",
+        "-adf"
+      ],
+      "repack_exit": 0,
+      "repack_started": "2026-10-04T19:39:40.727448+00:00",
+      "repack_finished": "2026-10-04T19:39:46.098499+00:00",
+      "active_readers_at_start": [
+        "stress-2-1",
+        "stress-2-2"
+      ],
+      "selected_loose_object_removed": true,
+      "source_object_retained": true,
+      "provisions": [
+        {
+          "product": "stress-2-1",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:40.720724Z",
+              "end": "2026-10-04T19:39:41.405215Z",
+              "sid": "20261004T193940.686779Z-H640834fc-P00009d2b/20261004T193940.708728Z-H640834fc-P00009d44/20261004T193940.720168Z-H640834fc-P00009d5d"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:40.720724Z",
+              "end": "2026-10-04T19:39:41.405215Z",
+              "sid": "20261004T193940.686779Z-H640834fc-P00009d2b/20261004T193940.708728Z-H640834fc-P00009d44/20261004T193940.720168Z-H640834fc-P00009d5d"
+            }
+          ]
+        },
+        {
+          "product": "stress-2-2",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:40.720865Z",
+              "end": "2026-10-04T19:39:41.408298Z",
+              "sid": "20261004T193940.690790Z-H640834fc-P00009d32/20261004T193940.710406Z-H640834fc-P00009d4b/20261004T193940.720383Z-H640834fc-P00009d60"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:40.720865Z",
+              "end": "2026-10-04T19:39:41.408298Z",
+              "sid": "20261004T193940.690790Z-H640834fc-P00009d32/20261004T193940.710406Z-H640834fc-P00009d4b/20261004T193940.720383Z-H640834fc-P00009d60"
+            }
+          ]
+        }
+      ],
+      "characterization": "trace2 proves source pack-objects process/repack interval overlap, not a particular object disappearing between selection and read"
+    },
+    {
+      "scenario": "real concurrent repack stress round 3",
+      "repack_command": [
+        "/usr/bin/git",
+        "-C",
+        "/Users/charlesabrooker/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/remote/source-stress",
+        "repack",
+        "-adf"
+      ],
+      "repack_exit": 0,
+      "repack_started": "2026-10-04T19:39:49.679213+00:00",
+      "repack_finished": "2026-10-04T19:39:55.290780+00:00",
+      "active_readers_at_start": [
+        "stress-3-1",
+        "stress-3-2"
+      ],
+      "selected_loose_object_removed": true,
+      "source_object_retained": true,
+      "provisions": [
+        {
+          "product": "stress-3-1",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:49.670892Z",
+              "end": "2026-10-04T19:39:50.147627Z",
+              "sid": "20261004T193949.641969Z-H640834fc-P0000cc48/20261004T193949.662236Z-H640834fc-P0000cc65/20261004T193949.670432Z-H640834fc-P0000cc76"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:49.670892Z",
+              "end": "2026-10-04T19:39:50.147627Z",
+              "sid": "20261004T193949.641969Z-H640834fc-P0000cc48/20261004T193949.662236Z-H640834fc-P0000cc65/20261004T193949.670432Z-H640834fc-P0000cc76"
+            }
+          ]
+        },
+        {
+          "product": "stress-3-2",
+          "exit": 0,
+          "source_pack_objects_intervals": [
+            {
+              "start": "2026-10-04T19:39:49.673532Z",
+              "end": "2026-10-04T19:39:50.160459Z",
+              "sid": "20261004T193949.647814Z-H640834fc-P0000cc51/20261004T193949.665706Z-H640834fc-P0000cc6e/20261004T193949.673235Z-H640834fc-P0000cc7a"
+            }
+          ],
+          "overlap_intervals": [
+            {
+              "start": "2026-10-04T19:39:49.673532Z",
+              "end": "2026-10-04T19:39:50.160459Z",
+              "sid": "20261004T193949.647814Z-H640834fc-P0000cc51/20261004T193949.665706Z-H640834fc-P0000cc6e/20261004T193949.673235Z-H640834fc-P0000cc7a"
+            }
+          ]
+        }
+      ],
+      "characterization": "trace2 proves source pack-objects process/repack interval overlap, not a particular object disappearing between selection and read"
+    },
+    {
+      "scenario": "competing home appears while real clone is stopped in private staging",
+      "exit": 1,
+      "expected_refusal": true,
+      "rollback_removed_only_owned_staging": true,
+      "foreign_home_contents_inode_mode_mtime_unchanged": true
+    },
+    {
+      "scenario": "preexisting foreign home refusal",
+      "exit": 1,
+      "expected_refusal": true,
+      "foreign_home_preserved": true
+    }
+  ]
+}

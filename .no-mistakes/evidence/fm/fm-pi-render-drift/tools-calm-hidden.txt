@@ -1,0 +1,44 @@
+ ctrl+l to select model                                                                                                 
+ ctrl+o to expand tools                                                                                                 
+ ctrl+t to expand thinking                                                                                              
+ ctrl+g for external editor                                                                                             
+ / for commands                                                                                                         
+ ! to run bash                                                                                                          
+ !! to run bash (no context)                                                                                            
+ option+enter to queue follow-up                                                                                        
+ option+up to edit all queued messages                                                                                  
+ ctrl+v to paste files on macOS, images, or text                                                                        
+ drop files to attach                                                                                                   
+                                                                                                                        
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.                                  
+                                                                                                                        
+[Extensions]                                                                                                            
+  project                                                                                                               
+                                                                                                                        
+~/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/tools/proj
+ect/.pi/extensions/fm-branch-supervision.ts                                                                             
+                                                                                                                        
+~/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/tools/proj
+ect/.pi/extensions/fm-calm.ts                                                                                           
+  path                                                                                                                  
+                                                                                                                        
+~/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/tools/prov
+ider.ts                                                                                                                 
+                                                                                                                        
+                                                                                                                        
+ Warning: fd not found. Offline mode enabled, skipping download.                                                        
+ Warning: ripgrep not found. Offline mode enabled, skipping download.                                                   
+                                                                                                                        
+                                                                                                                        
+ Read the twelve supervision outcomes and demonstrate a refused acknowledgement.                                        
+                                                                                                                        
+                                                                                                                        
+ LIVE_RENDER_TOOLS_COMPLETE                                                                                             
+                                                                                                                        
+ Tool output: expanded                                                                                                  
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/tmp/fm-pi-render-drift-main016.mYxnxr/nm/worktrees/c6711555e1ec/01M445ME32DXNHDANAED5TJK7X/.live-validation/tools/p...
+7.4%/32k (auto)                                                                                            deterministic

@@ -1,0 +1,9 @@
+The first driver invocation completed and verified successful public provisioning with two real project clones, then stopped at a timing-instrument fixture error. A copy of the installed real Git binary was named git-real; Git's multicall dispatch interpreted that basename as builtin command "real" and printed "fatal: cannot handle real as a builtin". This is not a product regression or an observed source-repack race. The failed invocation and cleanup remain recorded in exact-repack.product.log, exact-repack.trace2.jsonl, initial-instrument-failure.outcomes.json, and commands.log.
+
+Correction: restore timing fixtures in the owned directory and copy the same resolved installed Git executable under basename git:
+cp /Library/Developer/CommandLineTools/usr/bin/git .live-validation/remote/instruments/git
+/usr/bin/cc -dynamiclib -Wall -Wextra -Werror -o .live-validation/remote/instruments/repack-race.dylib .live-validation/remote/instruments/repack-race.c
+  exit=0; compiler output empty
+The resumed fixture driver skips the already-successful provisioning/project scenario, retains its result, and executes only native source-repack observation, concurrent stress, and competing-home refusal/rollback. Its source is preserved as resume-fixture-run-direct.py.
+/usr/bin/python3 .live-validation/remote/run-direct.py
+Native instrument outputs use exact-repack-native.* so the failed instrument attempt remains separate. No permanent repository edits were made.
