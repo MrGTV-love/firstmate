@@ -5109,8 +5109,8 @@ for (const name of ["fm_branch_outcomes", "fm_branch_processed"]) {
 }
 
 pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
-const stockHtml = createToolHtmlRenderer({ getToolDefinition: () => stockDefinition, theme, cwd: process.cwd() });
-const actualHtml = createToolHtmlRenderer({ getToolDefinition: () => actualDefinition, theme, cwd: process.cwd() });
+const stockHtml = createToolHtmlRenderer({ getToolRenderers: () => stockDefinition, theme, cwd: process.cwd() });
+const actualHtml = createToolHtmlRenderer({ getToolRenderers: () => actualDefinition, theme, cwd: process.cwd() });
 const stockCall = stockHtml.renderCall("stock-html", "fm_branch_outcomes", args);
 const actualCall = actualHtml.renderCall("actual-html", "fm_branch_outcomes", args);
 const stockResult = stockHtml.renderResult("stock-html", "fm_branch_outcomes", result.content, result.details, false);

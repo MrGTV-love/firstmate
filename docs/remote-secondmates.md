@@ -677,6 +677,7 @@ The portable tests use these pieces:
 The lifecycle test covers seeding a registered project that this machine has never cloned.
 It asserts that the local project tree is unchanged afterwards.
 It carries Bitbucket, self-hosted, and scp-like origins through to the remote clone.
+It also repacks the source at Git's transport pack-creation boundary and checks that the provisioned home remains complete after the source's loose and packed objects are removed.
 The portable tests run with these commands:
 
 ```sh
