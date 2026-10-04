@@ -1421,13 +1421,17 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' pure-contract-unit
       ;;
-    bin/fm-status-record-lib.sh)
+    bin/fm-status-record-lib.sh|bin/fm-status-decision-lib.sh|\
+    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-utc-lib.sh)
       printf '%s\n' pure-contract-unit
       printf '%s\n' standalone
       printf '%s\n' secondmate
       printf '%s\n' session-bootstrap
       printf '%s\n' afk
       printf '%s\n' watcher-wake-lock
+      printf '%s\n' backend-dispatch
+      printf '%s\n' pr-forge
+      printf '%s\n' snapshot-bearings
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)

@@ -438,7 +438,11 @@ test_changed_status_record_selects_all_consuming_families() {
     fm-pending-reply.test.sh \
     fm-remote-transport-lanes.test.sh \
     fm-gotmp.test.sh \
-    fm-pi-branch-extension.test.sh; do
+    fm-pi-branch-extension.test.sh \
+    fm-send-resolve-key.test.sh \
+    fm-pr-merge.test.sh \
+    fm-pr-check-security.test.sh \
+    fm-fleet-snapshot-view.test.sh; do
     printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
     chmod +x "$repo/tests/$script"
   done
@@ -450,19 +454,23 @@ test_changed_status_record_selects_all_consuming_families() {
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
     || fail "status-record owner-only change failed selection"
   expected=$(
-    for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock; do
+    for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings; do
       "$repo/bin/fm-test-run.sh" --list --family "$family"
     done | LC_ALL=C sort -u
   )
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-    || fail "status-record change must select exactly its six consuming families: $listed"
+    || fail "status-record change must select exactly its nine consuming families: $listed"
   for script in \
     fm-classify-corr-token.test.sh \
     fm-pending-reply.test.sh \
     fm-remote-transport-lanes.test.sh \
     fm-afk-return.test.sh \
     fm-gotmp.test.sh \
-    fm-pi-branch-extension.test.sh; do
+    fm-pi-branch-extension.test.sh \
+    fm-send-resolve-key.test.sh \
+    fm-pr-merge.test.sh \
+    fm-pr-check-security.test.sh \
+    fm-fleet-snapshot-view.test.sh; do
     assert_contains "$listed" "tests/$script" "status-record change missed $script"
   done
   rm -rf "$tmp"

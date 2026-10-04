@@ -325,6 +325,11 @@ for _teardown_source in \
   fm-lock-lib.sh \
   fm-classify-lib.sh \
   fm-status-record-lib.sh \
+  fm-status-decision-lib.sh \
+  fm-status-event-lib.sh \
+  fm-status-wake-lib.sh \
+  fm-status-io-lib.sh \
+  fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \
   fm-public-followup-lib.sh \

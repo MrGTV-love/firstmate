@@ -125,9 +125,22 @@ Checking a library separately cannot preserve diagnostics that depend on both a 
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
 Repeated imports retain their runtime initialization at each call while sharing a real source statement, rather than hiding that dependency from joint analysis.
 Parent-channel publication imports the small status-record owner instead of the complete classifier; the classifier consumes the same record owner for its own readers.
-Status-record changes select both owners' consuming test families; `tests/fm-test-run.test.sh` verifies the changed-owner selection through the runner.
+The classifier composes canonical UTC, decision, event, status-I/O, and wake-presentation libraries.
+Pending-reply imports decision and status-I/O leaves, wake loads its presentation closure on demand, and the AFK contract imports only UTC; watcher and AFK-return consumers explicitly load the broader APIs they use.
+Changes to these status libraries select nine consuming test families, including backend-dispatch, pr-forge, and snapshot-bearings; `tests/fm-test-run.test.sh` verifies changed-owner selection through the runner.
 
-Cold source-aware analysis can still require multi-GiB processes; cache reuse is a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
+A same-host Darwin cold comparison on 2026-10-04 (UTC), using ShellCheck 0.11.0 with `/usr/bin/time -l "$SHELLCHECK" --norc --external-sources -- <root>`, recorded the following direct analyzer high-water RSS in bytes, wall seconds, and starting 1-minute load.
+The before source was the pre-partition implementation; the after source was the ownership-corrected working copy, not a committed-head or CI validation.
+Both roots exited 0 before and after, without success-cache reuse.
+
+| Root | Before RSS bytes | After RSS bytes | Before wall seconds | After wall seconds | Before load | After load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tests/fm-pending-reply.test.sh` | 1,555,906,560 | 923,418,624 | 63.47 | 127.55 | 26.43 | 57.77 |
+| `bin/fm-watch.sh` | 1,342,930,944 | 1,507,655,680 | 138.85 | 215.09 | 30.96 | 47.61 |
+
+Pending-reply's observed peak was lower, but watcher's was higher and both wall times increased under higher host load; these measurements do not establish a general cold-memory or latency improvement.
+Seeded joint checks retained SC2119 across the pending import seams, watcher UTC import, and resolve caller; owner-only and hidden-source counterfactuals did not retain that call-dependent finding.
+Cache reuse remains a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
 macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
 
 The performance objective is a complete green run under fifteen minutes including start delay: roughly twelve minutes of longest-path execution, at most two minutes of runner delay, and less than one minute of other overhead.
