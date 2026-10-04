@@ -2235,7 +2235,7 @@ ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.81.1
 ```
 
 At that verification, the extension reconstructed Pi's fallback and emitted the multiline resets required by Pi 0.84.4, unlike the older renderer.
-That reconstruction is superseded by the [current stock-component delegation and comparison baseline](../calm-mode-feasibility.md#2026-09-30-pi-0990-renderer-and-export-dom-verification).
+That reconstruction is superseded by the [current stock-component delegation](../calm-mode-feasibility.md#firstmate-pi-tool-audit).
 
 The same guard against the pre-change extension in the same lab measured a 676.9 ms worst keystroke echo while delivering two outcomes and a 295.3 ms worst echo with nothing to deliver, against a 49.2 ms extension-free floor, and failed as designed.
 Measured through the same real `fm_branch_report` tool and real `bin/` scripts with a 1 ms interval timer, the largest single block of the JavaScript thread fell from 273 ms to 2.0 ms for a routine outcome, from 286 ms to 2.0 ms for a captain outcome, and from 134 ms to 1.9 ms for main's acknowledgement, against a 1.3-2.2 ms idle-loop floor.
