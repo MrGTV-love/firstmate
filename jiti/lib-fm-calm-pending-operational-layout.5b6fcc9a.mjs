@@ -1,0 +1,310 @@
+"use strict";Object.defineProperty(exports, "__esModule", { value: true });exports.CALM_SUPERVISION_CONTINUES_NOTICE = exports.CALM_QUEUE_RETENTION_SESSION_METHODS = exports.CALM_QUEUED_ROWS_UNSUPPORTED_WARNING = void 0;exports.installCalmPendingOperationalLayout = installCalmPendingOperationalLayout;exports.refreshCalmPendingOperationalRows = refreshCalmPendingOperationalRows;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var PiCodingAgent = _interopRequireWildcard(await jitiImport("@earendil-works/pi-coding-agent"));
+var _fmCalmVisibility = await jitiImport("./fm-calm-visibility.ts");
+var _fmOperationalInput = await jitiImport("./fm-operational-input.ts");function _interopRequireWildcard(e, t) {if ("function" == typeof WeakMap) var r = new WeakMap(),n = new WeakMap();return (_interopRequireWildcard = function (e, t) {if (!t && e && e.__esModule) return e;var o,i,f = { __proto__: null, default: e };if (null === e || "object" != typeof e && "function" != typeof e) return f;if (o = t ? n : r) {if (o.has(e)) return o.get(e);o.set(e, f);}for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]);return f;})(e, t);} // Verified against Pi 0.87.1 (docs/calm-mode-feasibility.md), which draws queued
+// "Steering:"/"Follow-up:" rows, their spacer, and the dequeue hint in
+// InteractiveMode.updatePendingMessagesDisplay from InteractiveMode.getAllQueuedMessages.
+// A Firstmate notification sent while a turn runs waits there before it is ever a chat row,
+// so ./fm-calm-operational-user-layout.ts never sees it. This adapter filters only what that
+// one listing reads; the queue Pi delivers from and persists is untouched.
+//
+// Hiding a queued row makes Pi's InteractiveMode.restoreQueuedMessagesToEditor (Escape during
+// a run, and the dequeue key) the one place hidden text could come back: stock Pi empties the
+// whole queue into the editor through clearAllQueues. Two rules are absolute: a notification
+// this adapter hid never reappears as raw text, and none is dropped to keep presentation
+// clean. Under Calm the restore hands only the other messages to the editor and puts the
+// hidden notifications back in the queue in their original order.
+//
+// Putting them back needs members that live on the session object rather than the
+// prototype, so they cannot be probed at install. Each session is checked on its first
+// queued-listing draw while Calm is on, before any row is hidden. A session missing any of them
+// gets no queued-row hiding at all and one warning; its rows and Escape stay stock.
+// See https://github.com/kunchenguid/firstmate/issues/1588.
+//
+// Pi 0.87.1 stops its run loop once a restore is followed by an abort (Escape, or navigating
+// the session tree during a run), so a queue that still holds messages when the aborted run
+// settles is not delivered until something else starts a turn. After any restore that kept
+// notifications in Pi's agent queue, this adapter waits for the session to settle and, if it
+// is idle with messages still queued, starts that turn itself with one generic status line.
+// A run that keeps going drains the queue itself, so nothing starts after a plain dequeue. A
+// notification kept only in the compaction queue is flushed by Pi when compaction ends, so
+// it neither counts toward that turn nor announces one.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const CALM_QUEUE_RETENTION_SESSION_METHODS = exports.CALM_QUEUE_RETENTION_SESSION_METHODS = [
+"getSteeringMessages",
+"getFollowUpMessages",
+"clearQueue",
+"_queueSteer",
+"_queueFollowUp",
+"waitForIdle",
+"sendUserMessage"];
+
+
+// Generic by design: no notification text, marker, kind, path, or identifier.
+const CALM_QUEUED_ROWS_UNSUPPORTED_WARNING = exports.CALM_QUEUED_ROWS_UNSUPPORTED_WARNING =
+"Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible.";
+const CALM_SUPERVISION_CONTINUES_NOTICE = exports.CALM_SUPERVISION_CONTINUES_NOTICE =
+"Firstmate supervision continues in a new turn.";
+
+// Keep the introduction-version symbol stable so a compatible upgrade cannot
+// double-patch a live process.
+const CALM_PENDING_OPERATIONAL_LAYOUT_PATCH = Symbol.for(
+  "firstmate:calm-pending-operational-layout:pi-0.87.1"
+);
+
+function settle(queued) {
+  void Promise.resolve(queued).catch(() => {});
+}
+
+function installCalmPendingOperationalLayout() {
+  const registry = globalThis;
+
+
+  const hidesOperationalInput = () => (0, _fmCalmVisibility.calmPresentationHides)("synthetic-user");
+  const installed = registry[CALM_PENDING_OPERATIONAL_LAYOUT_PATCH];
+  if (installed) {
+    installed.hidesOperationalInput = hidesOperationalInput;
+    installed.isOperationalInput = _fmOperationalInput.isFirstmateOperationalPresentationText;
+    return;
+  }
+
+  const InteractiveMode = PiCodingAgent.InteractiveMode;
+  if (typeof InteractiveMode !== "function") {
+    throw new Error("Firstmate Calm requires Pi InteractiveMode");
+  }
+  const prototype = InteractiveMode.prototype;
+  const originalGetAllQueuedMessages = prototype.getAllQueuedMessages;
+  const originalUpdatePendingMessagesDisplay = prototype.updatePendingMessagesDisplay;
+  const originalClearAllQueues = prototype.clearAllQueues;
+  const originalRestoreQueuedMessagesToEditor = prototype.restoreQueuedMessagesToEditor;
+  for (const [name, method] of [
+  ["getAllQueuedMessages", originalGetAllQueuedMessages],
+  ["updatePendingMessagesDisplay", originalUpdatePendingMessagesDisplay],
+  ["clearAllQueues", originalClearAllQueues],
+  ["restoreQueuedMessagesToEditor", originalRestoreQueuedMessagesToEditor]])
+  {
+    if (typeof method !== "function") {
+      throw new Error(`Firstmate Calm requires Pi InteractiveMode.${name}`);
+    }
+  }
+
+  // The interactive mode that last drew queued rows, so a /calm toggle can redraw them.
+  let lastHost;
+  const patch = {
+    hidesOperationalInput,
+    isOperationalInput: _fmOperationalInput.isFirstmateOperationalPresentationText,
+    refresh: () => lastHost?.updatePendingMessagesDisplay()
+  };
+
+  const retentionBySession = new WeakMap();
+  function retainingSession(host) {
+    const session = host.session;
+    if (typeof session !== "object" || session === null) return undefined;
+    let supported = retentionBySession.get(session);
+    if (supported === undefined) {
+      const members = session;
+      supported =
+      CALM_QUEUE_RETENTION_SESSION_METHODS.every((name) => typeof members[name] === "function") &&
+      typeof members.isIdle === "boolean" &&
+      Array.isArray(host.compactionQueuedMessages);
+      retentionBySession.set(session, supported);
+      if (!supported) {
+        if (typeof host.showWarning === "function") {
+          host.showWarning(CALM_QUEUED_ROWS_UNSUPPORTED_WARNING);
+        } else {
+          console.error(CALM_QUEUED_ROWS_UNSUPPORTED_WARNING);
+        }
+      }
+    }
+    return supported ? session : undefined;
+  }
+
+  // What the latest draw of the queued listing actually hid, and for which session. The
+  // restore retains from this record rather than a fresh classification, so a row the
+  // captain never saw stays hidden even if the classifier cannot answer a second time.
+  let hidden;
+  // Set only for the synchronous draw below, so every other reader of the queue still
+  // sees exactly what Pi queued.
+  let hidingInto;
+  // Set only for the synchronous restore below, so any other clearAllQueues caller keeps
+  // Pi's stock semantics.
+  let restoring;
+
+  prototype.getAllQueuedMessages = function () {
+    const queued = originalGetAllQueuedMessages.call(this);
+    const texts = hidingInto;
+    if (!texts) return queued;
+    const stays = (text) => {
+      if (!patch.isOperationalInput(text)) return true;
+      texts.add(text);
+      return false;
+    };
+    return {
+      ...queued,
+      steering: queued.steering.filter(stays),
+      followUp: queued.followUp.filter(stays)
+    };
+  };
+
+  prototype.updatePendingMessagesDisplay = function () {
+    lastHost = this;
+    if (!patch.hidesOperationalInput() || !retainingSession(this)) {
+      hidden = undefined;
+      originalUpdatePendingMessagesDisplay.call(this);
+      return;
+    }
+    const texts = new Set();
+    hidingInto = texts;
+    try {
+      // Pi skips the spacer and dequeue hint when nothing is left to list, so an
+      // all-operational queue draws no rows at all.
+      originalUpdatePendingMessagesDisplay.call(this);
+    } finally {
+      hidingInto = undefined;
+    }
+    hidden = texts.size > 0 ? { session: this.session, texts } : undefined;
+  };
+
+  prototype.clearAllQueues = function () {
+    const current = restoring;
+    if (!current) return originalClearAllQueues.call(this);
+    const { session, retains } = current;
+    const steering = session.getSteeringMessages().filter(retains);
+    const followUp = session.getFollowUpMessages().filter(retains);
+    const compaction = this.compactionQueuedMessages.filter((message) => retains(message.text));
+    const cleared = originalClearAllQueues.call(this);
+    if (steering.length + followUp.length + compaction.length === 0) return cleared;
+    // Pi's already-expanded queueing entry points: no input handler or template expansion
+    // runs a second time on text that already went through them once.
+    for (const text of steering) settle(session._queueSteer(text));
+    for (const text of followUp) settle(session._queueFollowUp(text));
+    this.compactionQueuedMessages.push(...compaction);
+    current.keptInAgentQueue = steering.length + followUp.length;
+    return {
+      ...cleared,
+      steering: cleared.steering.filter((text) => !retains(text)),
+      followUp: cleared.followUp.filter((text) => !retains(text))
+    };
+  };
+
+  prototype.restoreQueuedMessagesToEditor = function (
+
+  options)
+  {
+    const hidesNow = patch.hidesOperationalInput();
+    const hiddenTexts = hidden && hidden.session === this.session ? hidden.texts : undefined;
+    const session = hidesNow || hiddenTexts ? retainingSession(this) : undefined;
+    if (!session) return originalRestoreQueuedMessagesToEditor.call(this, options);
+
+    // A notification queued since the last draw was never shown either, so while Calm
+    // hides, it is kept the same way; classification is asked once per text.
+    const answers = new Map();
+    const retains = (text) => {
+      if (hiddenTexts?.has(text)) return true;
+      if (!hidesNow) return false;
+      let answer = answers.get(text);
+      if (answer === undefined) {
+        answer = patch.isOperationalInput(text);
+        answers.set(text, answer);
+      }
+      return answer;
+    };
+    const current = { session, retains, keptInAgentQueue: 0 };
+    restoring = current;
+    try {
+      return originalRestoreQueuedMessagesToEditor.call(this, options);
+    } finally {
+      restoring = undefined;
+      if (current.keptInAgentQueue > 0) continueWhenSettled(this, session);
+    }
+  };
+
+  // Delivers what a settled run left queued. Messages already in the queue cannot start a
+  // turn by themselves, so the first is taken out and sent as the turn's prompt and the rest
+  // are put back behind it: steering first, then follow-ups, the order Pi delivers them in.
+  function continueWhenSettled(host, session) {
+    const settled = async () => {
+      do {
+        await session.waitForIdle();
+        // Pi resolves idle waiters in microtasks, and tree navigation resumes from its
+        // abort in the same microtask run and marks the session busy before its first await.
+        // Yielding a macrotask lets that navigation claim the session, so the turn starts on
+        // the navigated branch instead of racing it on the abandoned one.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (host.session !== session) return false;
+      } while (!session.isIdle);
+      return true;
+    };
+    settled().
+    then((idle) => {
+      if (!idle) return;
+      const { steering, followUp } = session.clearQueue();
+      const first = steering.length > 0 ? steering.shift() : followUp.shift();
+      if (first === undefined) return;
+      for (const text of steering) settle(session._queueSteer(text));
+      for (const text of followUp) settle(session._queueFollowUp(text));
+      host.showStatus?.(CALM_SUPERVISION_CONTINUES_NOTICE);
+      // Pi rejects before recording the prompt when it cannot start the turn, so the
+      // message is queued again rather than lost.
+      session.sendUserMessage(first).catch(() => settle(session._queueFollowUp(first)));
+    }).
+    catch(() => {});
+  }
+
+  registry[CALM_PENDING_OPERATIONAL_LAYOUT_PATCH] = patch;
+}
+
+// Redraws the queued listing after a /calm toggle so rows already listed follow the new
+// choice at once instead of at the next queue change.
+function refreshCalmPendingOperationalRows() {
+  const registry = globalThis;
+
+
+  registry[CALM_PENDING_OPERATIONAL_LAYOUT_PATCH]?.refresh();
+} /* v9-c4e6e7d530b2eb41 */
