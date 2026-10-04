@@ -97,6 +97,8 @@ if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
       id=$(cat "$D/recovery-case-id")
       gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
       printf ' FM_SPAWN_GEN=%s' "$gen"
+    elif [ -f "$D/recovery-spawn-gen" ]; then
+      printf ' FM_SPAWN_GEN=%s' "$(cat "$D/recovery-spawn-gen")"
     fi
     printf '\n'
     exit 0
@@ -2307,8 +2309,10 @@ case "${1:-} ${2:-}" in
             "$(cat "$D/herdr-pane")" "$pid"
           exit 0
         fi
-        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
-          "$(cat "$D/herdr-pane")" "$pid"
+        harness=omp
+        [ ! -f "$D/recovery-harness" ] || harness=$(cat "$D/recovery-harness")
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"%s","argv":["%s"],"cmdline":"%s"}]}}}\n' \
+          "$(cat "$D/herdr-pane")" "$pid" "$harness" "$harness" "$harness"
       else
         printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[]}}}\n'
       fi
@@ -2340,7 +2344,7 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
-    if [ -f "$D/recovery-case-id" ] && [ "$payload" = /exit ]; then
+    if [ -f "$D/recovery-case-id" ] && [ "$payload" = /quit ]; then
       : > "$D/exit-pending"
     fi
     case "$payload" in
@@ -2353,11 +2357,11 @@ case "${1:-} ${2:-}" in
   'pane read')
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/exit-pending" ]; then
-        printf '╭──────────╮\n│ /exit    │\n╰──────────╯\n'
+        printf '╭── π > recovery╮\n╰─ /quit ─╯\n'
       elif [ -f "$D/recovery-pending" ]; then
-        printf '╭──────────╮\n│ %s    │\n╰──────────╯\n' "$(cat "$D/recovery-pending")"
+        printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/recovery-pending")"
       else
-        printf '╭──────────╮\n│          │\n╰──────────╯\n'
+        printf '╭── π > recovery╮\n╰─  ─╯\n'
       fi
     fi
     exit 0 ;;
@@ -2958,8 +2962,17 @@ prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   rm -f "$dir/fake/herdr-stopped"
   printf '%s' "$id" > "$dir/fake/recovery-case-id"
   : > "$dir/fake/herdr-agent-live"
-  printf 'kind=%s\nlaunch_proof=env-v1\nspawn_gen=old\nmodel=opus\neffort=high\n' "$kind" \
+  printf 'harness=omp\nkind=%s\nlaunch_proof=env-v1\nspawn_gen=old\nmodel=openai-codex/gpt-6-astra\neffort=high\n' "$kind" \
     >> "$dir/home/state/$id.meta"
+  cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  models)
+    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"}]}'
+    ;;
+esac
+SH
+  chmod +x "$dir/fakebin/omp"
   printf 'preserve interrupted work\n' > "$dir/wt/unlanded.txt"
   if [ "$kind" = secondmate ]; then
     mkdir -p "$dir/wt/state" "$dir/wt/data" "$dir/wt/bin"
@@ -3003,6 +3016,59 @@ test_reboot_recovery_refuses_foreign_foreground_without_mutation() {
   pass "direct and automatic recovery refuse foreign foreground jobs without lifecycle input or task mutation"
 }
 
+test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
+  local dir id kind mode pin out rc before gen
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local preserved=()
+  for kind in ship scout secondmate; do
+    for mode in direct sweep; do
+      for pin in missing mismatched; do
+        id="reboot-claude-$kind-$mode-$pin"
+        herdr_case_or_skip "$id" "$id" || return 0
+        dir=$HERDR_CASE_DIR
+        prepare_herdr_recovery "$dir" "$id" "$kind"
+        printf 'harness=claude\nmodel=opus\neffort=high\n' >> "$dir/home/state/$id.meta"
+        printf claude > "$dir/fake/recovery-harness"
+        [ "$pin" != mismatched ] || printf other > "$dir/fake/recovery-spawn-gen"
+        gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm retained non-omp fixture"
+        printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+        printf 'working: preserve the retained launch\n' > "$dir/home/state/$id.status"
+        preserved=("$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt"
+          "$dir/home/state/$id.busy-gen" "$dir/home/state/$id.busy-state" "$dir/home/state/$id.status")
+        if [ "$kind" = secondmate ]; then
+          preserved+=("$dir/wt/AGENTS.md" "$dir/wt/data/charter.md")
+        fi
+        before=$(shasum -a 256 "${preserved[@]}")
+        rc=0
+        if [ "$mode" = direct ]; then
+          out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+          assert_contains "$out" "cannot prove its live launch settings" "$kind/$pin direct refusal must name unknown proof"
+        else
+          CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+          out=$(run_control "$dir" recover) || rc=$?
+          CONTROL="$ROOT/bin/fm-control.sh"
+          assert_contains "$out" "no lifecycle action taken" "$kind/$pin sweep refusal must name unknown proof"
+        fi
+        expect_code 1 "$rc" "$kind/$mode/$pin recovery must refuse a non-omp launch"$'\n'"$out"
+        [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
+          || fail "$kind/$mode/$pin recovery changed records, instructions or work"
+        assert_present "$dir/fake/herdr-agent-live" "$kind/$mode/$pin recovery stopped the retained agent"
+        assert_absent "$dir/home/state/$id.control-relaunch" "$kind/$mode/$pin recovery began a lifecycle transaction"
+        assert_absent "$dir/home/state/$id.control-relaunch.note" "$kind/$mode/$pin recovery recorded a note"
+        assert_absent "$dir/home/state/$id.control-relaunch.meta-prior" "$kind/$mode/$pin recovery staged a prior record"
+        assert_absent "$dir/home/state/$id.control-relaunch.brief-prior" "$kind/$mode/$pin recovery staged prior instructions"
+        assert_absent "$dir/home/state/$id.control-exit" "$kind/$mode/$pin recovery recorded lifecycle exit"
+        assert_absent "$dir/fake/exit-pending" "$kind/$mode/$pin recovery delivered an exit"
+        assert_absent "$dir/fake/launched-command" "$kind/$mode/$pin recovery launched a replacement"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "$kind/$mode/$pin recovery sent lifecycle input"
+        assert_absent "$dir/home/state/.control-$id.lock" "$kind/$mode/$pin refusal retained the control lock"
+        assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "$kind/$mode/$pin refusal retained the liveness lock"
+      done
+    done
+  done
+  pass "direct and sweep recovery refuse missing or mismatched non-omp pins for ships, scouts and secondmates without mutation"
+}
+
 test_reboot_recovery_completes_from_bounded_managed_observation() {
   local dir id=reboot-proof-once out rc=0 before
   herdr_case_or_skip "$id" "$id" || return 0
@@ -3018,6 +3084,9 @@ test_reboot_recovery_completes_from_bounded_managed_observation() {
   [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "recovery did not publish its replacement"
   [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "confirmed recovery moved its pane"
   [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "confirmed recovery moved its local copy"
+  [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail "confirmed recovery changed its recorded harness"
+  [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "confirmed recovery changed its recorded model"
+  [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "confirmed recovery changed its recorded effort"
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "confirmed recovery changed interrupted work"
   assert_contains "$out" "relaunched $id" "successful bounded proof must report completed recovery"
   pass "recovery completes from its bounded managed observation despite an unavailable later snapshot"
@@ -3120,7 +3189,9 @@ test_secondmate_recovery_excludes_liveness_through_managed_confirmation() {
   assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane close" "recovery must preserve its pane"
   [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "serialized recovery moved its pane"
   [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "serialized recovery moved its local copy"
-  [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "serialized recovery changed its recorded profile"
+  [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail "serialized recovery changed its recorded harness"
+  [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "serialized recovery changed its recorded profile"
+  [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "serialized recovery changed its recorded effort"
   [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "serialized recovery did not complete"
   assert_absent "$dir/home/state/.control-$id.lock" "successful recovery retained its control lock"
   assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "successful recovery retained its liveness lock"
@@ -3255,7 +3326,8 @@ test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows() {
     expect_code 0 "$rc" "$scenario recovery must remain eligible"$'\n'"$out"
     [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "$scenario recovery moved its pane"
     [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "$scenario recovery moved its local copy"
-    [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "$scenario recovery changed its recorded model"
+    [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail "$scenario recovery changed its recorded harness"
+    [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "$scenario recovery changed its recorded model"
     [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "$scenario recovery changed its recorded effort"
     [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "$scenario recovery changed unfinished work"
     [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "$scenario recovery did not finish its transaction"
@@ -3272,7 +3344,8 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
   dir=$HERDR_CASE_DIR
   prepare_herdr_recovery "$dir" "$id" ship
   ln -s "$ROOT/bin" "$dir/home/bin"
-  mkdir -p "$dir/user-home" "$dir/home/.agents/skills"
+  mkdir -p "$dir/user-home" "$dir/home/.agents/skills" "$dir/home/.omp"
+  cp "$ROOT/.omp/fm-worker-overlay.yml" "$dir/home/.omp/fm-worker-overlay.yml"
   before=$(shasum -a 256 "$dir/wt/unlanded.txt")
   out=$(env -u FM_HOME -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
@@ -3281,11 +3354,14 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
     FM_BOOTSTRAP_NETWORK=only FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     FM_CONTROL_LAUNCH_WAIT=0.05 "$ROOT/bin/fm-bootstrap.sh" 2>&1) || rc=$?
   expect_code 0 "$rc" "network bootstrap must recover its resolved home"$'\n'"$out"
-  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "bootstrap recovery did not complete"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] \
+    || fail "bootstrap recovery did not complete"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "bootstrap did not replace the bare incarnation"
   [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "bootstrap recovery moved its pane"
   [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "bootstrap recovery moved its local copy"
-  [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "bootstrap recovery changed its recorded model"
+  [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail "bootstrap recovery changed its recorded harness"
+  [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "bootstrap recovery changed its recorded model"
+  [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "bootstrap recovery changed its recorded effort"
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "bootstrap recovery changed unfinished work"
   pass "actual network bootstrap recovers its derived home without ambient FM_HOME"
 }
@@ -3294,23 +3370,16 @@ test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   local dir out rc=0 before
   herdr_case_or_skip reboot-secondmate reboot-sm || return 0
   dir=$HERDR_CASE_DIR
-  rm -f "$dir/fake/herdr-stopped"
-  printf reboot-sm > "$dir/fake/recovery-case-id"
-  : > "$dir/fake/herdr-agent-live"
+  prepare_herdr_recovery "$dir" reboot-sm secondmate
   mkdir -p "$dir/home/config"
   printf 'codex other-model low\n' > "$dir/home/config/secondmate-harness"
-  mkdir -p "$dir/wt/state" "$dir/wt/data" "$dir/wt/bin"
-  printf 'reboot-sm\n' > "$dir/wt/.fm-secondmate-home"
-  printf '# test home\n' > "$dir/wt/AGENTS.md"
-  printf '# test charter\n' > "$dir/wt/data/charter.md"
   printf 'window=child-session:child-pane\n' > "$dir/wt/state/child.meta"
   printf 'preserve child work\n' > "$dir/wt/unlanded.txt"
   before=$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")
-  printf 'kind=secondmate\nmode=secondmate\nhome=%s\nharness=claude\nmodel=opus\neffort=high\nlaunch_proof=env-v1\nspawn_gen=old\n' "$dir/wt" >> "$dir/home/state/reboot-sm.meta"
   out=$(run_control "$dir" reboot-sm relaunch --recover-launch) || rc=$?
   expect_code 0 "$rc" "bare secondmate recovery must complete"$'\n'"$out"
-  [ "$(meta_field "$dir" reboot-sm harness)" = claude ] || fail 'recovery picked up a different configured harness'
-  [ "$(meta_field "$dir" reboot-sm model)" = opus ] || fail 'recovery lost the recorded secondmate model'
+  [ "$(meta_field "$dir" reboot-sm harness)" = omp ] || fail 'recovery picked up a different configured harness'
+  [ "$(meta_field "$dir" reboot-sm model)" = openai-codex/gpt-6-astra ] || fail 'recovery lost the recorded secondmate model'
   [ "$(meta_field "$dir" reboot-sm effort)" = high ] || fail 'recovery lost the recorded secondmate effort'
   [ "$(meta_field "$dir" reboot-sm window)" = 'fmlab:%7' ] || fail 'recovery moved the secondmate pane'
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
@@ -3326,15 +3395,10 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   a=$HERDR_CASE_DIR
   herdr_case_or_skip reboot-fairness-b b fmlab-b || return 0
   b=$HERDR_CASE_DIR
-  rm -f "$a/fake/herdr-stopped" "$b/fake/herdr-stopped"
-  printf a > "$a/fake/recovery-case-id"
-  printf b > "$b/fake/recovery-case-id"
+  prepare_herdr_recovery "$a" a ship
+  prepare_herdr_recovery "$b" b ship
   printf 2000000001 > "$a/fake/recovery-pid"
   printf draft > "$a/fake/recovery-pending"
-  : > "$a/fake/herdr-agent-live"
-  : > "$b/fake/herdr-agent-live"
-  printf 'launch_proof=env-v1\nspawn_gen=old\n' >> "$a/home/state/a.meta"
-  printf 'launch_proof=env-v1\nspawn_gen=old\n' >> "$b/home/state/b.meta"
   cp "$a/home/state/a.meta" "$b/home/state/a.meta"
   mkdir -p "$b/home/data/a" "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
   cp "$a/home/data/a/brief.md" "$b/home/data/a/brief.md"
@@ -3358,6 +3422,9 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   [ -n "$gen_b" ] && [ "$gen_b" != old ] || fail 'later bare agent b was not replaced'
   [ "$(journal_field "$b" b phase)" = complete ] || fail 'b recovery did not complete its lifecycle transaction'
   [ "$(meta_field "$b" b window)" = 'fmlab-b:%7' ] || fail 'b recovery changed its endpoint'
+  [ "$(meta_field "$b" b harness)" = omp ] || fail 'b recovery changed its recorded harness'
+  [ "$(meta_field "$b" b model)" = openai-codex/gpt-6-astra ] || fail 'b recovery changed its recorded model'
+  [ "$(meta_field "$b" b effort)" = high ] || fail 'b recovery changed its recorded effort'
   [ "$(git -C "$b/wt" rev-parse HEAD)" = "$head_b" ] \
     && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b recovery changed unfinished work'
   rc=0
@@ -3457,6 +3524,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
 test_teamclaude_refusal_lands_before_the_old_agent_stops
 test_reboot_recovery_refuses_foreign_foreground_without_mutation
+test_reboot_recovery_refuses_non_omp_launches_without_mutation
 test_reboot_recovery_completes_from_bounded_managed_observation
 test_secondmate_reboot_recovery_preserves_profile_and_child_work
 test_secondmate_recovery_refuses_liveness_contention_before_attribution

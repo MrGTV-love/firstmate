@@ -96,12 +96,12 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 
 ### Recovering a bare native restore
 
-Herdr can resume a live harness after reboot without the Firstmate launch command.
-For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates.
-Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live agent.
+Herdr can resume a live omp harness after reboot without the Firstmate launch command.
+For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and repairs only positively unmanaged recorded `omp` agents.
+Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live omp agent.
 `recover --one` bounds an automatic supervision tick to one repair attempt.
 Bounded scans advance after refused attempts, so a pending record cannot starve later recoveries.
-Deferred startup recovery runs the sweep; the watcher repeats the bounded scan to catch panes restored only after a viewer attaches.
+Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities. The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and preserves all recovery diagnostics and repair results in its wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
 Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row. Existing manual and no-backlog exemptions remain unchanged.
 Recovery also refuses while the task has a pending authoritative backlog close.
@@ -117,11 +117,11 @@ The replacement receives a progress note directing it to reconcile completed wor
 An already managed agent is left alone, including on repeated sweeps.
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution.
-New Herdr launches record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
+New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
-Readable kernel environment with a matching incarnation proves a managed launch, including interpreter-based harnesses.
-A readable environment without that incarnation proves unmanaged only when the foreground process is independently attributed to the recorded harness family through the shared process and path identity helpers.
-Foreign Python, node, other harnesses, and unattributed foreground processes remain unknown; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
+Readable kernel environment with a matching incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses.
+A readable environment with a missing or mismatched incarnation proves unmanaged only for an exact recorded `harness=omp` whose foreground process is independently attributed to omp through the shared process and path identity helpers.
+Every other recorded harness remains unknown with missing or mismatched pins. Foreign Python, node, other harnesses, and unattributed foreground processes also remain unknown for recorded omp; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
 Unreadable or ambiguous proof never licenses lifecycle action.
 For older records with no launch-proof field, only a recorded `omp` harness running an executable with basename `omp` and exactly `omp --resume=<ref>` argv with a nonempty reference proves unmanaged restoration.
 Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove legacy native restoration; no installed-CLI symlink reconstruction is used.

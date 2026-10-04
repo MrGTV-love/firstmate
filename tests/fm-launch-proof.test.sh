@@ -127,6 +127,15 @@ process '["node","/foreign/agent.js"]' "$PID"
 assert_proof unknown 'a mismatched incarnation must not authorize foreign interpreter recovery'
 process '["omp","a prompt"]' "$PID"
 assert_proof unmanaged 'a mismatched incarnation must remain recoverable for attributed omp'
+for harness in $(fm_control_harnesses) claude-custom omp-custom unrecognized; do
+  [ "$harness" != omp ] || continue
+  printf 'window=lab:w1:p1\nharness=%s\nlaunch_proof=env-v1\nspawn_gen=different\n' "$harness" > "$META"
+  process "[\"$harness\",\"a prompt\"]" "$PID"
+  assert_proof unknown "a mismatched incarnation must not authorize recorded $harness recovery"
+  printf 'window=lab:w1:p1\nharness=%s\nlaunch_proof=env-v1\nspawn_gen=expected\n' "$harness" > "$META"
+  process '["node","/installed/agent.js"]' "$PID"
+  assert_proof managed "matching incarnation must remain managed for recorded $harness"
+done
 kill "$PID"; wait "$PID" 2>/dev/null || true
 start_probe ''
 printf 'window=lab:w1:p1\nharness=omp\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
@@ -147,11 +156,17 @@ INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_processes[0].na
 assert_proof unmanaged 'unmarked recorded omp process name must supply attribution'
 printf 'window=lab:w1:p1\nharness=claude-custom\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
 process '["/installed/claude/versions/1.0","a prompt"]' "$PID"
-assert_proof unmanaged 'shared path identity must attribute the exact recorded Claude family'
+assert_proof unknown 'unmarked recorded Claude must not authorize unmanaged recovery'
 process '["omp","a prompt"]' "$PID"
 assert_proof unknown 'an attributed but different harness family must not authorize recovery'
 printf 'window=lab:w1:p1\nharness=unrecognized\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
 assert_proof unknown 'an unsupported recorded harness must not authorize recovery'
+for harness in $(fm_control_harnesses) omp-custom; do
+  [ "$harness" != omp ] || continue
+  printf 'window=lab:w1:p1\nharness=%s\nlaunch_proof=env-v1\nspawn_gen=expected\n' "$harness" > "$META"
+  process "[\"$harness\",\"a prompt\"]" "$PID"
+  assert_proof unknown "missing incarnation must not authorize recorded $harness recovery"
+done
 kill "$PID"; wait "$PID" 2>/dev/null || true
 PID=
-pass 'env-v1 missing pins require recorded-family attribution while matching pins retain interpreter support'
+pass 'env-v1 unmanaged recovery requires recorded omp attribution while matching pins remain managed for every harness'

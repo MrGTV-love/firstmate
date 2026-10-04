@@ -35,7 +35,7 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   local meta=$1 target session pane info foreground pid argv harness proof gen
   local candidates ids='' name argv0 parents group
-  local verdict family process_family
+  local verdict process_family
   target=$(fm_meta_get "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
@@ -87,7 +87,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
     verdict=$(fm_launch_proof_pid "$pid" "$gen")
     [ "$verdict" = unmanaged ] || { printf '%s' "$verdict"; return; }
     harness=$(fm_meta_get "$meta" harness)
-    family=$(fm_control_harness_family "$harness") || { printf unknown; return; }
+    [ "$harness" = omp ] || { printf unknown; return; }
     name=$(printf '%s' "$foreground" | jq -r '.name // ""')
     argv0=$(printf '%s' "$foreground" | jq -r '.argv0 // .argv[0] // ""')
     [ "$(fm_agent_process_classify "$name" "$argv0" '' "$pid")" = agent ] \
@@ -97,7 +97,7 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
       || fm_control_harness_family "${argv0##*/}" 2>/dev/null \
       || fm_harness_path_name "$argv0" 2>/dev/null) \
       || { printf unknown; return; }
-    if [ "$process_family" = "$family" ]; then printf unmanaged; else printf unknown; fi
+    if [ "$process_family" = omp ]; then printf unmanaged; else printf unknown; fi
     return
   fi
   [ -z "$proof" ] || { printf unknown; return; }

@@ -1542,9 +1542,6 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   # those two always run together in the same phase. Clone refresh does not
   # depend on them, so it starts in the background and overlaps their wall clock.
   fleet_sync_pid=
-  if network_phase && network_sweep_authorized 'Herdr reboot launch recovery'; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
-  fi
   fleet_sync_out=
   if network_phase && network_sweep_authorized 'project clone refresh'; then
     fleet_sync_out=$(mktemp "${TMPDIR:-/tmp}/fm-bootstrap-fleet.XXXXXX") || fleet_sync_out=
@@ -1591,6 +1588,9 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"
     rm -f "$fleet_sync_out"
+  fi
+  if network_phase && network_sweep_authorized 'Herdr reboot launch recovery'; then
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
   fi
 fi
 local_phase && secondmate_handoff_detect

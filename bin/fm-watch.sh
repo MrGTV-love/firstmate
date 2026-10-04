@@ -281,7 +281,7 @@ reboot_recovery_tick() {
     FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
     "$SCRIPT_DIR/fm-reboot-recover.sh" recover --one 2>&1) || rc=$?
   [ -n "$out" ] || [ "$rc" -ne 0 ] || return 0
-  reason="check: Herdr reboot launch recovery: $(fm_session_end_first_line "$out")"
+  reason="check: Herdr reboot launch recovery: $(printf '%s' "$out" | fm_wake_clean_field)"
   [ "$rc" -eq 0 ] || reason="$reason (failed)"
   fm_wake_append check reboot-launch-recovery "$reason" || return 1
   wake "$reason"

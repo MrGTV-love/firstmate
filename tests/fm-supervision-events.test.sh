@@ -153,4 +153,56 @@ WTN=$(wc -l < "$TMP/wtcalls" | tr -d '[:space:]')
 [ "$WTN" = 2 ] || fail "after EVENT_CAP_FAIL_MAX connect failures the event path must be disabled for the process (expected 2 wait_transition calls, got $WTN)"
 pass "event_wait_or_sleep: consecutive event-path failures disable the fast-path and revert to pure polling (fail-closed)"
 
+(
+  fm_run_timed() {
+    case "$*" in
+      *"fm-reboot-recover.sh recover --one") ;;
+      *) fail "unexpected timed recovery boundary: $*" ;;
+    esac
+    printf '%s' "$RECOVERY_OUTPUT"
+    return "$RECOVERY_RC"
+  }
+  for RECOVERY_CASE in success failure empty-success empty-failure; do
+    reset_state
+    rm -f "$STATE_DIR/.reboot-recovery-tick"
+    fm_write_meta "$STATE_DIR/recovery.meta" "backend=herdr" "kind=ship"
+    RECOVERY_RC=0
+    RECOVERY_OUTPUT=''
+    case "$RECOVERY_CASE" in
+      success)
+        RECOVERY_OUTPUT=$'unknown: A state unavailable\nrecovered: B launch succeeded\nB continuation\twith detail\rretained'
+        ;;
+      failure)
+        RECOVERY_RC=1
+        RECOVERY_OUTPUT=$'unknown: A state unavailable\nfailed: B launch refused\nB continuation\twith detail\rretained'
+        ;;
+      empty-failure) RECOVERY_RC=124 ;;
+    esac
+    reboot_recovery_tick || fail "recovery tick failed for $RECOVERY_CASE"
+    if [ "$RECOVERY_CASE" = empty-success ]; then
+      [ ! -s "$WAKE_LOG" ] || fail "empty successful recovery must not wake"
+      [ ! -e "$STATE_DIR/.wake-queue" ] || fail "empty successful recovery must not enqueue"
+      continue
+    fi
+    EXPECTED_REASON="check: Herdr reboot launch recovery: "
+    case "$RECOVERY_CASE" in
+      success)
+        EXPECTED_REASON="${EXPECTED_REASON}unknown: A state unavailable recovered: B launch succeeded B continuation with detail retained"
+        ;;
+      failure)
+        EXPECTED_REASON="${EXPECTED_REASON}unknown: A state unavailable failed: B launch refused B continuation with detail retained (failed)"
+        ;;
+      empty-failure) EXPECTED_REASON="${EXPECTED_REASON} (failed)" ;;
+    esac
+    [ "$(cat "$WAKE_LOG")" = "$EXPECTED_REASON" ] \
+      || fail "immediate $RECOVERY_CASE wake lost recovery output: $(cat "$WAKE_LOG")"
+    awk -F '\t' -v expected="$EXPECTED_REASON" '
+      NF != 5 || $3 != "check" || $4 != "reboot-launch-recovery" || $5 != expected { bad = 1 }
+      END { exit !(NR == 1 && !bad) }
+    ' "$STATE_DIR/.wake-queue" \
+      || fail "durable $RECOVERY_CASE wake must retain all output in one TSV payload: $(cat "$STATE_DIR/.wake-queue")"
+  done
+) || fail "recovery wake transport assertions failed"
+pass "reboot recovery: complete diagnostics and success/failure results survive durable and immediate wakes"
+
 echo "# fm-supervision-events.test.sh: all assertions passed"
