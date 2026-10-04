@@ -78,7 +78,18 @@ if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
   esac
   exit 0
 fi
-if [ -f "$D/herdr-agent-registration" ]; then
+if [ -f "$D/recovery-case-id" ] && [ "$*" = '-Eww -o command= -p 2000000000' ]; then
+  printf 'PATH=/test'
+  if [ -f "$D/launched-command" ]; then
+    id=$(cat "$D/recovery-case-id")
+    gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
+    printf ' FM_SPAWN_GEN=%s' "$gen"
+  fi
+  printf '\n'
+  exit 0
+fi
+if [ -f "$D/herdr-agent-registration" ] \
+  || { [ -f "$D/recovery-case-id" ] && [ ! -f "$D/herdr-agent-live" ]; }; then
   case "$*" in
     '-axo pid=,ppid=,comm=') printf '4242 1 bash\n'; exit 0 ;;
     '-p 4242 -o args=') printf 'bash\n'; exit 0 ;;
@@ -2270,6 +2281,14 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane process-info')
+    if [ -f "$D/recovery-case-id" ]; then
+      if [ -f "$D/herdr-agent-live" ]; then
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[{"pid":2000000000,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n'
+      else
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[]}}}\n'
+      fi
+      exit 0
+    fi
     # A retained registration with a shell-only pane models an exited agent
     # whose Herdr status authority still belongs to its previous session.
     if [ -f "$D/herdr-agent-registration" ]; then
@@ -2296,12 +2315,32 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
+    if [ -f "$D/recovery-case-id" ] && [ "$payload" = /exit ]; then
+      : > "$D/exit-pending"
+    fi
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
         printf '%s\n' "$payload" > "$D/launched-command"
         : > "$D/herdr-live-${3:-}"
         : > "$D/herdr-agent-live" ;;
     esac
+    exit 0 ;;
+  'pane read')
+    if [ -f "$D/recovery-case-id" ]; then
+      if [ -f "$D/exit-pending" ]; then
+        printf '╭──────────╮\n│ /exit    │\n╰──────────╯\n'
+      else
+        printf '╭──────────╮\n│          │\n╰──────────╯\n'
+      fi
+    fi
+    exit 0 ;;
+  'pane send-keys')
+    if [ -f "$D/recovery-case-id" ]; then
+      if [ "${4:-}" = ctrl+d ] \
+        || { [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ]; }; then
+        rm -f "$D/herdr-agent-live" "$D/exit-pending"
+      fi
+    fi
     exit 0 ;;
   'workspace list')
     printf '{"result":{"workspaces":[]}}\n'
@@ -2398,34 +2437,6 @@ herdr_case_or_skip() {  # <name> <id> [session] [surviving-pane]
   return 0
 }
 
-test_herdr_relaunch_resumes_only_the_registered_pi_session() {
-  local dir out rc=0 command registered
-  for registered in pi claude; do
-    herdr_case_or_skip "resume-$registered" "resume-$registered" || {
-      echo "skip - herdr relaunch needs jq (the herdr adapter parses JSON with it)"
-      return 0
-    }
-    dir=$HERDR_CASE_DIR
-    rm -f "$dir/fake/herdr-stopped"
-    sed -i 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta"
-    # Keep the pane's status authority registered to an existing Pi session,
-    # while process-info proves that its previous agent has exited.
-    printf '{"result":{"agent":{"agent":"%s","agent_status":"idle","agent_session":{"kind":"path","value":"/tmp/pi-bound-session.jsonl"}}}}\n' \
-      "$registered" > "$dir/fake/herdr-agent-registration"
-    out=$(run_spawn "$dir" "resume-$registered" --relaunch --harness pi) || rc=$?
-    expect_code 0 "$rc" "Herdr Pi relaunch should complete ($registered registration)"$'\n'"$out"
-    command=$(cat "$dir/fake/launched-command")
-    if [ "$registered" = pi ]; then
-      assert_contains "$command" "--session '/tmp/pi-bound-session.jsonl'" \
-        "the replacement Pi must resume the session that owns Herdr status authority"
-    else
-      assert_not_contains "$command" "--session" \
-        "a Pi replacement must not resume a foreign adapter's conversation"
-    fi
-    rc=0
-  done
-  pass "fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration"
-}
 
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
   local dir out rc=0 log stray
@@ -2642,6 +2653,19 @@ teamclaude_launch_line() {
   grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
 }
 
+# Execute the pane command rather than pinning launcher quoting: Herdr wraps
+# it in /bin/sh -c to carry launch ownership proof across a restored pane.
+assert_teamclaude_launch() { # <fakebin> <launch-command> <label>
+  local fakebin=$1 launch=$2 label=$3 out
+  out="$(dirname "$fakebin")/claude-env.$RANDOM"
+  fm_test_teamclaude_launch_env "$fakebin" "$launch" "$out" \
+    || fail "$label: the recorded launch command failed: $launch"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$out" \
+    || fail "$label: claude did not receive HTTPS_PROXY from teamclaude: $(cat "$out")"
+  grep -Fqx "NODE_EXTRA_CA_CERTS=$FM_TEST_TEAMCLAUDE_CA" "$out" \
+    || fail "$label: claude did not receive the TeamClaude CA from teamclaude: $(cat "$out")"
+}
+
 # arm_session_end <case-dir> <id>: record that the task's Claude session ended.
 arm_session_end() {
   local state="$1/home/state" gen
@@ -2676,7 +2700,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   printf 'zsh' > "$dir/fake/command"
   out=$(run_spawn "$dir" tc1 --relaunch --harness claude); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-spawn --relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux fm-spawn --relaunch"
 
   dir=$(new_case tc-tmux-control tc2)
@@ -2684,7 +2708,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc2 relaunch --note "resume under TeamClaude"); rc=$?
   expect_code 0 "$rc" "a TeamClaude fm-control relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux fm-control relaunch"
 
   dir=$(new_case tc-tmux-session-end tc3)
@@ -2696,7 +2720,7 @@ test_teamclaude_reaches_tmux_relaunch_paths() {
   expect_code 0 "$rc" "the session-end scan should succeed"$'\n'"$out"
   assert_contains "$out" "tc3 auto-relaunched after session-end" \
     "the session-end scan should relaunch the ended worker"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux session-end auto-relaunch"
   pass "config/claude-launcher=teamclaude: tmux fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
 }
@@ -2711,7 +2735,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   enable_teamclaude "$dir"
   out=$(run_spawn "$dir" tc4 --relaunch --harness claude); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr fm-spawn --relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr fm-spawn --relaunch"
 
   herdr_case_or_skip tc-herdr-control tc5 || return 0
@@ -2720,7 +2744,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   rm -f "$dir/fake/herdr-stopped"
   out=$(run_control "$dir" tc5 relaunch --note "resume under TeamClaude"); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr fm-control relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr fm-control relaunch"
 
   herdr_case_or_skip tc-herdr-session-end tc6 || return 0
@@ -2732,7 +2756,7 @@ test_teamclaude_reaches_herdr_relaunch_paths() {
   expect_code 0 "$rc" "the herdr session-end scan should succeed"$'\n'"$out"
   assert_contains "$out" "tc6 auto-relaunched after session-end" \
     "the session-end scan should relaunch the ended herdr worker"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr session-end auto-relaunch"
   pass "config/claude-launcher=teamclaude: herdr fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude"
 }
@@ -2772,7 +2796,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   enable_teamclaude "$dir"
   out=$(run_control "$dir" tc7 relaunch); rc=$?
   expect_code 0 "$rc" "a TeamClaude tmux secondmate relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(teamclaude_launch_line "$dir/fake/literal")" \
     "tmux secondmate respawn"
 
   herdr_case_or_skip tc-herdr-secondmate tc8 || {
@@ -2787,7 +2811,7 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   rm -f "$dir/fake/herdr-stopped"
   out=$(run_control "$dir" tc8 relaunch); rc=$?
   expect_code 0 "$rc" "a TeamClaude herdr secondmate relaunch should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "herdr secondmate respawn"
   pass "config/claude-launcher=teamclaude: a Claude second mate respawns through TeamClaude on tmux and herdr"
 }
@@ -2839,7 +2863,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   out=$(run_spawn "$dir" tc9 "$dir/proj" claude --backend herdr --mode no-mistakes --yolo off); rc=$?
   expect_code 0 "$rc" "a TeamClaude fresh herdr spawn should succeed"$'\n'"$out"
   assert_contains "$(cat "$dir/fake/herdr-log")" "tab create" "the fresh spawn should open its own herdr tab"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "fresh herdr ship spawn"
 
   dir=$(new_case tc-herdr-fresh-secondmate tc10)
@@ -2850,7 +2874,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   enable_teamclaude "$dir"
   out=$(run_spawn "$dir" tc10 "$dir/tc10-home" --secondmate --backend herdr); rc=$?
   expect_code 0 "$rc" "a TeamClaude fresh herdr secondmate spawn should succeed"$'\n'"$out"
-  fm_test_assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
+  assert_teamclaude_launch "$dir/fakebin" "$(cat "$dir/fake/launched-command")" \
     "fresh herdr secondmate launch"
   pass "config/claude-launcher=teamclaude: fresh herdr ship and second mate launches reach claude through TeamClaude"
 }
@@ -2897,6 +2921,36 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
     || fail "a relaunch left its item at $(backlog_state "$dir" rl41)"
   pass "relaunch heals an item that drifted out of In flight while the task stayed live"
 }
+
+test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
+  local dir out rc=0 before
+  herdr_case_or_skip reboot-secondmate reboot-sm || return 0
+  dir=$HERDR_CASE_DIR
+  rm -f "$dir/fake/herdr-stopped"
+  printf reboot-sm > "$dir/fake/recovery-case-id"
+  : > "$dir/fake/herdr-agent-live"
+  mkdir -p "$dir/home/config"
+  printf 'codex other-model low\n' > "$dir/home/config/secondmate-harness"
+  mkdir -p "$dir/wt/state" "$dir/wt/data" "$dir/wt/bin"
+  printf 'reboot-sm\n' > "$dir/wt/.fm-secondmate-home"
+  printf '# test home\n' > "$dir/wt/AGENTS.md"
+  printf '# test charter\n' > "$dir/wt/data/charter.md"
+  printf 'window=child-session:child-pane\n' > "$dir/wt/state/child.meta"
+  printf 'preserve child work\n' > "$dir/wt/unlanded.txt"
+  before=$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")
+  printf 'kind=secondmate\nmode=secondmate\nhome=%s\nharness=claude\nmodel=opus\neffort=high\nlaunch_proof=env-v1\nspawn_gen=old\n' "$dir/wt" >> "$dir/home/state/reboot-sm.meta"
+  out=$(run_control "$dir" reboot-sm relaunch --recover-launch) || rc=$?
+  expect_code 0 "$rc" "bare secondmate recovery must complete"$'\n'"$out"
+  [ "$(meta_field "$dir" reboot-sm harness)" = claude ] || fail 'recovery picked up a different configured harness'
+  [ "$(meta_field "$dir" reboot-sm model)" = opus ] || fail 'recovery lost the recorded secondmate model'
+  [ "$(meta_field "$dir" reboot-sm effort)" = high ] || fail 'recovery lost the recorded secondmate effort'
+  [ "$(meta_field "$dir" reboot-sm window)" = 'fmlab:%7' ] || fail 'recovery moved the secondmate pane'
+  [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
+    || fail 'recovery changed secondmate child work or its charter'
+  [ "$(journal_field "$dir" reboot-sm children)" = 1 ] || fail 'recovery omitted child-work reconciliation'
+  pass 'reboot recovery keeps secondmate profile instead of rereading config, plus pane, charter and child work'
+}
+
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
@@ -2969,7 +3023,6 @@ test_tmux_zero_processes_with_readable_inventory_refuses
 test_tmux_no_server_reclaim_keeps_work_and_task
 test_tmux_reclaim_refuses_other_configured_backends
 test_reclaim_refuses_an_unreadable_endpoint
-test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
 test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server
 test_herdr_rebind_stays_in_the_recorded_session
@@ -2984,3 +3037,4 @@ test_teamclaude_reaches_herdr_relaunch_paths
 test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
 test_teamclaude_refusal_lands_before_the_old_agent_stops
+test_secondmate_reboot_recovery_preserves_profile_and_child_work

@@ -363,7 +363,7 @@ family_for_basename() {
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
-    fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
+    fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
     fm-supervision-host-live-e2e.test.sh|fm-supervision-host-attended-live-e2e.test.sh|\
@@ -378,6 +378,7 @@ family_for_basename() {
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
     fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-launch-proof.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
@@ -1571,6 +1572,11 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
+      ;;
+    bin/fm-launch-proof-lib.sh|bin/fm-reboot-recover.sh)
+      printf '%s\n' backend-dispatch
+      printf '%s\n' session-bootstrap
+      printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
       ;;
     bin/fm-composer-lib.sh)
       # The shared shape catalogue is vendor-rendered signal; a change to it

@@ -1901,6 +1901,44 @@ poll 8: {"agent_status":"working","session":".../2026-09-21T14-10-08-776Z_01a0c4
 
 The read that supplies the reference is `bin/backends/herdr.sh`'s `fm_backend_herdr_pane_agent_session_ref`, the per-harness rule is `bin/fm-control-lib.sh`'s `fm_control_relaunch_resume_flag`, and the launch argument is composed by `relaunch_resume_args` in `bin/fm-spawn.sh`; `docs/herdr-backend.md` "Agent status authority and relaunch" owns the contract. Nothing here changes `resume` as a control verb, and only a relaunch asks for it.
 
+### Bare native omp restoration and managed recovery
+
+Measured 2026-10-04 on macOS aarch64 (Darwin 25.5.0), Herdr 0.9.1 protocol 22, and omp 18.6.1.
+The earlier composer captures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` are real omp 18.6.0 frames from the same guarded named-lab procedure.
+
+```sh
+FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
+  bash bin/fm-test-run.sh tests/fm-launch-proof.test.sh tests/fm-omp-reboot-live-e2e.test.sh
+```
+
+The live test starts actual `omp --resume=<ref>` with a valid empty native session header in an isolated named Herdr lab, not a mocked screen or a metadata-only agent.
+It exercises the native command used by Herdr restoration, rather than rebooting the host or claiming a full OS-reboot test.
+All Herdr calls, including production-adapter calls through the test's session-pinning shim, use the guarded lab helper.
+The helper's default-session tripwire remains unchanged through cleanup.
+Both replacement agents visibly answer their instructions before the test stops them.
+
+Observed guarantees:
+
+- The complete compact bordered composer reads empty, while real typed input reads pending.
+- Recovery refuses a pending draft without clearing or submitting it; unknown and incomplete geometry also refuse in captured-frame regressions.
+- The normal control-plane transaction replaces the bare-resumed task in the same pane and local copy, preserving its branch, HEAD, dirty-file checksum, recorded `openai-codex/gpt-6.1-sol` model, and `low` effort.
+- A repeated recovery sweep leaves the managed incarnation unchanged.
+- A later bare resume in the same persistent shell does **not** inherit the previous managed incarnation.
+- Local-secondmate recovery preserves that same recorded profile even after its configured pin changes to Claude, and preserves its charter, child record, and dirty work.
+- The real replacement argv and cwd retain the managed worker configuration, `--auto-approve`, selected model, thinking effort, and recorded local copy; these checks read Herdr's actual foreground processes, not the published metadata.
+- Real omp helper workers share the foreground process group; the launcher may itself be a shell, so kernel ancestry attributes the primary non-shell process rather than assuming one foreground entry or authenticating a helper.
+
+```text
+ok - foreground agent ancestry owns launch proof, independently of shells, helpers and executable packaging
+ok - omp omp/18.6.1: task and local secondmate bare resumes recovered with exact profiles, same pane/branch/worktree, preserved dirty and child work, and no inherited launch proof
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0
+```
+
+The minimal secondmate test home deliberately has no inherited Firstmate code revision or gitignored configuration destinations, so the existing sync/inheritance owners report their skips.
+The actual recorded-profile replacement and preserved-work assertions still pass.
+No remote secondmate, unrelated pane, shared worktree pool, or global Herdr configuration is modified.
+The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-restoration) owns the decision to retain global auto-resume and repair only the recorded fleet.
+
 ### Away-mode transport
 
 The away daemon is no longer launched on Pi; the away posture there is the record `bin/fm-afk-contract.sh` owns.

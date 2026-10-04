@@ -66,6 +66,20 @@ make_named_shells() {  # <dir> -> echoes <bindir>
 test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
+  # Keep real process evidence inside this fixture's ancestry. Otherwise an
+  # actual omp running this suite makes every decoy inherit an omp ancestor.
+  local -x FM_TEST_DETECTION_BOUNDARY=$$ FM_TEST_REAL_PS
+  FM_TEST_REAL_PS=$(command -v ps)
+  local PATH="$bin:$PATH"
+  cat > "$bin/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p $FM_TEST_DETECTION_BOUNDARY" ]; then
+  printf '1\n'
+else
+  exec "$FM_TEST_REAL_PS" "$@"
+fi
+SH
+  chmod +x "$bin/ps"
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")

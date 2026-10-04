@@ -261,6 +261,32 @@ session_end_relaunch_tick() {
   [ -z "${FM_SESSION_END_WAKE:-}" ] || wake "$FM_SESSION_END_WAKE"
 }
 
+# Herdr may restore a recorded agent after startup's first scan (native restore
+# waits for a viewer). Keep recovery in the ordinary bounded supervision cycle.
+reboot_recovery_tick() {
+  local marker="$STATE/.reboot-recovery-tick" out rc=0 reason meta found=0
+  [ "$(age_of "$marker")" -ge 60 ] || return 0
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    [ "$(fm_meta_get "$meta" backend)" = herdr ] || continue
+    [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
+    found=1
+    break
+  done
+  [ "$found" = 1 ] || return 0
+  touch "$marker" || return 1
+  fm_session_end_bounds "$WATCHER_STALE_GRACE" || return 0
+  touch "$STATE/.last-watcher-beat" 2>/dev/null || true
+  out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
+    "$SCRIPT_DIR/fm-reboot-recover.sh" recover --one 2>&1) || rc=$?
+  [ -n "$out" ] || [ "$rc" -ne 0 ] || return 0
+  reason="check: Herdr reboot launch recovery: $(fm_session_end_first_line "$out")"
+  [ "$rc" -eq 0 ] || reason="$reason (failed)"
+  fm_wake_append check reboot-launch-recovery "$reason" || return 1
+  wake "$reason"
+}
+
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/fm-watch.sh"
@@ -2685,6 +2711,10 @@ while :; do
   # any relaunch and the restarted watcher will not re-probe early.
   secondmate_liveness_tick || {
     echo "watcher: secondmate liveness check failed" >&2
+    exit 1
+  }
+  reboot_recovery_tick || {
+    echo "watcher: Herdr reboot launch recovery failed" >&2
     exit 1
   }
   # An in-flight ship or scout whose SessionEnd record says the worker is

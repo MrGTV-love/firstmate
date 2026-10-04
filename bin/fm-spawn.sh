@@ -294,6 +294,9 @@
 #   prevents equal task ids in different Firstmate homes from sharing a file.
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
+# Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
+# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns the
+# recovery proof; Herdr's bare native resume cannot reproduce that boundary.
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,
@@ -4943,7 +4946,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -4969,6 +4972,7 @@ preserve_relaunch_meta() {
   [ "$ALLOW_API_KEY" -eq 0 ] || echo "api_key=allow"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  [ "$BACKEND" != herdr ] || echo "launch_proof=env-v1"
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;
@@ -5318,6 +5322,11 @@ if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+if [ "$BACKEND" = herdr ]; then
+  # Keep the incarnation out of the persistent pane shell. Set it at exec,
+  # where kernel environment readers can also prove an interpreter launcher.
+  LAUNCH="/usr/bin/env FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN") /bin/sh -c $(shell_quote "$LAUNCH")"
+fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the

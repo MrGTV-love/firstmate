@@ -22,6 +22,10 @@ That plane covers workers running in this home; a remotely placed secondmate is 
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
+For a live Herdr agent restored after reboot without Firstmate's launch settings, use the [recorded-launch recovery contract](../../../docs/agent-control.md#recovering-a-bare-native-restore) rather than treating its live pane as a dead endpoint.
+`FM_HOME=<owning-home> bin/fm-reboot-recover.sh check` attributes the launch; `recover` uses ordinary locked relaunch only on positively unmanaged recorded agents, including local secondmates.
+An unknown composer, unreadable proof, or pending draft is a refusal requiring investigation, never permission to clear input or kill the pane.
+
 ## Session-start reconciliation for a dead ordinary direct report
 
 This procedure covers ordinary `kind=ship` and `kind=scout` direct reports.

@@ -707,12 +707,27 @@ No Herdr-specific copy of that protocol exists.
 
 ### Husks after a server restart
 
-Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
-The underlying harness processes and live agent registrations do not survive.
-A restored same-labeled tab with a missing pane or no registered agent is a husk.
+Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids, but terminates the original harness processes.
+When a viewer attaches, Herdr's default `session.resume_agents_on_restore=true` can launch new processes from recorded native session references.
+Those bare resume commands do not reproduce Firstmate's launch configuration, model and effort flags, permission posture, or extensions.
+A restored same-labeled tab with a missing pane or no registered agent is a husk; a live native-resumed agent is not.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
+
+### Managed recovery after native restoration
+
+Firstmate leaves Herdr's global auto-resume configuration unchanged.
+Disabling `session.resume_agents_on_restore` would also disable restoration of unrelated agents in the same Herdr installation, outside the current home's recorded fleet.
+The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
+Changing a user's global configuration is therefore not the scoped repair.
+
+Instead, startup and bounded watcher recovery identify only this home's recorded unmanaged live agents and replace them through the normal control-plane relaunch.
+The same pane and local copy survive, with the recorded harness, model, effort, and all unlanded work.
+Viewer-delayed native restores are covered by the repeated scan.
+The [agent-control recovery contract](agent-control.md#recovering-a-bare-native-restore) owns commands, launch proof, legacy attribution, and refusal boundaries.
+The [runtime verification record](verification/runtime-backends.md) records the real bare-resumed omp proof and captured bordered composers.
+
 
 ### Stale agent registrations
 

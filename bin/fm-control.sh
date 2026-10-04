@@ -7,6 +7,12 @@
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
 #                                         (--note <text> | --note-file <path>)
+#        fm-control.sh <task-id> relaunch --recover-launch
+# --recover-launch is Herdr-only: under the control lock, repair a positively
+# unmanaged live agent using the exact recorded harness, model and effort.
+# A managed, stopped, or legacy-unproven agent is left untouched.
+# Unknown proof on an env-v1 launch refuses rather than restarting blindly.
+# This mode supplies the reboot progress note and cannot change a profile.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -246,6 +252,7 @@ NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
 control_want_value=
+RECOVER_LAUNCH=0
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
     case "$control_arg" in
@@ -281,6 +288,7 @@ for control_arg in "$@"; do
       NOTE_SET=1
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
+    --recover-launch) RECOVER_LAUNCH=1 ;;
     *) die "unexpected argument '$control_arg'" ;;
   esac
 done
@@ -290,8 +298,12 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, and --recover-launch apply to 'relaunch' only"
+fi
+if [ "$RECOVER_LAUNCH" = 1 ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] \
-    || die "--harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only"
+    || die "--recover-launch uses the recorded profile and recovery note; it cannot be combined with replacement options"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
@@ -372,8 +384,8 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
-# wait_agent_state <wanted...> <timeout>: poll until agent_state prints one of
-# the wanted values. Prints the final observed state; returns 0 on a match.
+# wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
+# Recovery's alive postcondition also requires the managed launch incarnation.
 wait_agent_state() {  # <timeout> <wanted>...
   local timeout=$1 state want elapsed=0
   shift
@@ -381,6 +393,10 @@ wait_agent_state() {  # <timeout> <wanted>...
     state=$(agent_state)
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
+        if [ "$want" = alive ] && [ "$RECOVER_LAUNCH" = 1 ] \
+          && [ "$(fm_launch_proof_herdr "$META")" != managed ]; then
+          continue
+        fi
         printf '%s' "$state"
         return 0
       fi
@@ -995,6 +1011,38 @@ do_relaunch() {
   local -a spawn_args
 
   require_state_verified_backend relaunch
+  if [ "$RECOVER_LAUNCH" = 1 ]; then
+    [ "$BACKEND" = herdr ] || die "--recover-launch is supported only for recorded Herdr endpoints"
+    # shellcheck source=bin/fm-launch-proof-lib.sh
+    . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+    fm_backend_source herdr || die "could not load Herdr launch recovery"
+    state=$(agent_state)
+    case "$state" in
+      dead|missing) echo "recovery-skipped $ID agent=$state"; return 0 ;;
+      alive) ;;
+      *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
+    esac
+    state=$(fm_launch_proof_herdr "$META")
+    case "$state" in
+      managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
+      unmanaged) ;;
+      unknown)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy-unproven"
+          return 0
+        fi
+        die "launch recovery for $ID cannot prove its live launch settings"
+        ;;
+      *) die "invalid launch proof for $ID: $state" ;;
+    esac
+    NEW_HARNESS=$RECORDED_HARNESS; HARNESS_SET=1
+    NEW_MODEL=$(fm_meta_get "$META" model); MODEL_SET=1
+    NEW_EFFORT=$(fm_meta_get "$META" effort); EFFORT_SET=1
+    [ -n "$NEW_MODEL" ] || NEW_MODEL=default
+    [ -n "$NEW_EFFORT" ] || NEW_EFFORT=default
+    NOTE="Herdr restored the previous agent without Firstmate's launch settings. This relaunch restores the recorded profile in the same local copy and pane, preserving all work. Read the latest task status and instruction inbox before continuing. Respect completed outcomes and outstanding decisions or external waits; do not repeat finished work."
+    NOTE_SET=1
+  fi
   resolve_relaunch_profile
   if [ "$CLAUDE_DEBUG" = 1 ] && [ "$TARGET_HARNESS" != claude ]; then
     die "--claude-debug applies only to a claude relaunch; $ID would be replaced on $TARGET_HARNESS"
@@ -1084,6 +1132,9 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
+  if [ "$RECOVER_LAUNCH" = 1 ] && [ "$(fm_launch_proof_herdr "$META")" != managed ]; then
+    die "the replacement agent for $ID is alive but its Firstmate launch settings could not be confirmed"
+  fi
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0

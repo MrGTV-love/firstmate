@@ -55,6 +55,9 @@
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
+#   omp-box    - omp's titled `╭── π > ...╮` header, zero or more
+#                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
+#                Unlike ordinary boxes, the floor is content, not just a rule.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
@@ -802,6 +805,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
+  FM_COMPOSER_SCAN_BOX_OMP=0
+  local box_omp=0
   pi_max=$FM_COMPOSER_PI_MAX_LINES
   case "$pi_max" in ''|*[!0-9]*|0) pi_max=8 ;; esac
   while IFS= read -r line; do
@@ -812,6 +817,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     kind=
     family=
     case "$trimmed" in
+      '╭── π > '*'╮') kind=top; family=omp ;;
       '╭'*'╮') kind=top; family=rounded ;;
       '┌'*'┐') kind=top; family=light ;;
       '╔'*'╗') kind=top; family=double ;;
@@ -822,6 +828,10 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       '┗'*'┛') kind=bottom; family=heavy ;;
       '+'*'+') kind=ascii; family=ascii ;;
     esac
+    if [ "$current_family" = omp ] && [[ "$trimmed" == '╰─ '*' ─╯' ]]; then
+      kind=bottom
+      family=omp
+    fi
     # This row's glyph proof, computed once for every envelope that contains
     # it: the same side-border strip _fm_composer_row_content performs, then
     # the agent-glyph test. A border row never carries a proof.
@@ -919,6 +929,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       content_rows=0
       box_glyph_row=-1
       box_glyph=''
+      box_omp=0
+      [ "$family" != omp ] || box_omp=1
       geometry_ambiguous=0
       geometry_check=1
       top_inner=$trimmed
@@ -928,13 +940,16 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         double) top_inner=${top_inner#╔}; top_inner=${top_inner%╗}; top_spaces=${top_inner//═/ } ;;
         heavy) top_inner=${top_inner#┏}; top_inner=${top_inner%┓}; top_spaces=${top_inner//━/ } ;;
         ascii) top_inner=${top_inner#+}; top_inner=${top_inner%+}; top_spaces=${top_inner//-/ } ;;
+        omp) top_spaces=; geometry_check=0 ;;
       esac
-      case "$top_spaces" in
-        *[![:space:]]*) geometry_check=0; geometry_ambiguous=1 ;;
-      esac
+      if [ "$family" != omp ]; then
+        case "$top_spaces" in
+          *[![:space:]]*) geometry_check=0; geometry_ambiguous=1 ;;
+        esac
+      fi
     elif [ "$kind" = bottom ] || { [ "$kind" = ascii ] && [ "$top" -ge 0 ]; }; then
       if [ "$top" -ge 0 ] && [ "$family" = "$current_family" ] \
-         && [ "$valid" = 1 ] && [ "$content_rows" -gt 0 ]; then
+         && [ "$valid" = 1 ] && { [ "$content_rows" -gt 0 ] || [ "$box_omp" = 1 ]; }; then
         [ "$indent" = "$current_indent" ] || geometry_ambiguous=1
         if [ "$geometry_check" = 1 ]; then
           bottom_inner=$trimmed
@@ -962,6 +977,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
             FM_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
             FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
             FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
+            FM_COMPOSER_SCAN_BOX_OMP=$box_omp
           fi
         else
           FM_COMPOSER_SCAN_BOX_TOP=$top
@@ -969,6 +985,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
           FM_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
           FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
           FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
+          FM_COMPOSER_SCAN_BOX_OMP=$box_omp
         fi
         FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
       else
@@ -996,7 +1013,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         '|'*'|') side_family=ascii ;;
       esac
       case "$current_family:$side_family" in
-        rounded:single|light:single|heavy:heavy|double:double|ascii:ascii)
+        rounded:single|omp:single|light:single|heavy:heavy|double:double|ascii:ascii)
           content_rows=$((content_rows + 1))
           if [ "$box_glyph_row" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
             box_glyph_row=$row_glyph_row
@@ -1136,6 +1153,22 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
   fi
   fm_composer_normalize_trim_var stripped
+  # omp's compact box carries input on its floor. Only styled evidence of the
+  # idle hint is removable: typing the same words in bright text stays pending.
+  case "$stripped" in
+    '╰─ '*' ─╯')
+      stripped=${stripped#'╰─ '}; stripped=${stripped%' ─╯'}
+      fm_composer_normalize_trim_var stripped
+      if [ "$styled" = 1 ] && [ "$stripped" = '⇧⇥' ]; then
+        local plain
+        plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+        fm_composer_normalize_trim_var plain
+        plain=${plain#'╰─ '}; plain=${plain%' ─╯'}
+        fm_composer_normalize_trim_var plain
+        [ "$plain" != '⇧⇥ to change thinking effort' ] || stripped=
+      fi
+      ;;
+  esac
   case "$stripped" in
     '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
     '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;
@@ -1441,6 +1474,7 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_KIND=box
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_BOX_TOP + 1))
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
+    [ "$FM_COMPOSER_SCAN_BOX_OMP" != 1 ] || FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_BOX_BOTTOM
     FM_COMPOSER_SELECTED_AMBIG=$FM_COMPOSER_SCAN_BOX_AMBIG
   fi
   # A bare candidate standing in a proven envelope's footer zone is that
@@ -1523,6 +1557,12 @@ _fm_composer_select_cursorless() {
     # glyph proved to be its furniture are not the lower live shape that makes
     # the envelope stale, so the staleness probe resumes past them.
     next=$((boundary + 1))
+    if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_OMP" = 1 ]; then
+      raw=$(_fm_composer_screen_row "$next" "$plain")
+      trimmed=$raw
+      fm_composer_normalize_trim_var trimmed
+      if _fm_composer_row_is_omp_status "$trimmed"; then next=$((next + 1)); fi
+    fi
     if [ "$footer" = 1 ] && [ "$FM_COMPOSER_FOOTER_AFTER" = "$boundary" ]; then
       next=$((FM_COMPOSER_FOOTER_LAST + 1))
     fi
@@ -1637,8 +1677,10 @@ EOF
       printf 'unknown'; return 0
     fi
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
+      local box_last=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
+      [ "$FM_COMPOSER_SCAN_BOX_OMP" != 1 ] || box_last=$FM_COMPOSER_SCAN_BOX_BOTTOM
       _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
-        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))"
+        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$box_last"
       return 0
     fi
     if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \

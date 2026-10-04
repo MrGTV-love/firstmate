@@ -94,6 +94,37 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 
 Switching harness is therefore one ordinary relaunch rather than a separate mechanism.
 
+### Recovering a bare native restore
+
+Herdr can resume a live harness after reboot without the Firstmate launch command.
+For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates.
+Use an explicit `FM_HOME` with `check` for a read-only launch verdict, or `recover` to repair every positively unmanaged live agent.
+`recover --one` bounds an automatic supervision tick to one repair attempt.
+Deferred startup recovery runs the sweep; the watcher repeats the bounded scan to catch panes restored only after a viewer attaches.
+Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
+The sweep never discovers other homes' panes or recursively enters a secondmate home.
+
+Each repair is the ordinary `bin/fm-control.sh <id> relaunch --recover-launch` transaction, not a second exit or spawn mechanism.
+The option is exclusive of profile overrides, notes, and debug options.
+Under the task's control lock it rechecks launch proof, pins **all three recorded profile axes**, checkpoints work, and requires a proven empty composer before stopping the old agent.
+Unlike an ordinary secondmate relaunch, it does not adopt a newly configured secondmate profile.
+It reuses the exact pane and local copy, preserves all unlanded work and secondmate child records, and never rewrites a standing charter.
+The replacement receives a progress note directing it to reconcile completed work and outstanding decisions before continuing.
+An already managed agent is left alone, including on repeated sweeps.
+
+`bin/fm-launch-proof-lib.sh` owns launch attribution.
+New Herdr launches record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
+The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
+Readable kernel environment with a matching incarnation proves a managed launch, while a readable environment without it proves an unmanaged launch.
+Unreadable or ambiguous proof never licenses lifecycle action.
+For older records with no launch-proof field, only an exact documented bare native resume command for the recorded harness proves unmanaged restoration; an ordinary legacy launch remains unchanged.
+An interpreter-launched native CLI is recognized only when its entry point resolves to the installed recorded harness; an arbitrary script or generic `agent` executable does not supply that identity.
+After replacement, matching managed-launch proof is required before transaction completion.
+The normal failed-launch and published-record reconciliation rules below still apply.
+
+This recovery does not change Herdr's session-wide auto-resume setting.
+The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
+
 ### Reclaiming a task whose endpoint is gone
 
 A terminal can disappear while its task's worktree, branch, commits, and uncommitted changes survive.

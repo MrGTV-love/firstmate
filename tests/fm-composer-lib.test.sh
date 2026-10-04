@@ -958,6 +958,34 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   pass "fm_composer_extract_selected_content: scopes user content and excludes furniture"
 }
 
+# Captured from omp 18.6.0 in a named Herdr lab, not a simulated vendor frame.
+# The title occupies the top border; actual input occupies the bottom border.
+test_omp_bordered_captured_frames() {
+  local empty pending plain out
+  empty=$(cat "$ROOT/tests/fixtures/omp-bordered-empty.ansi")
+  pending=$(cat "$ROOT/tests/fixtures/omp-bordered-pending.ansi")
+  assert_screen "real compact omp empty" empty "$CAPS_STYLED_NOID" "$empty"
+  assert_screen "real compact omp draft" pending "$CAPS_STYLED_NOID" "$pending"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$pending")
+  [ "$out" = 'recovery draft must survive' ] || fail "omp extraction includes title or loses input: $out"
+  plain=$(printf '%s\n' "$empty" | fm_composer_strip_ansi)
+  out=$(fm_composer_classify_screen "$CAPS_PLAIN" "$plain")
+  [ "$out" != empty ] || fail "without styling the hint could be a typed draft"
+  assert_screen "typed hint stays pending" pending "$CAPS_STYLED_NOID" \
+    $'╭── π > model > path ─╮\n╰─ ⇧⇥ to change thinking effort ─╯'
+  assert_screen "incomplete omp floor" unknown "$CAPS_STYLED_NOID" \
+    $'╭── π > model > path ─╮\n╰─ unfinished draft'
+  assert_screen "omp title alone" unknown "$CAPS_STYLED_NOID" \
+    '╭── π > model > path ─╮'
+  assert_screen "omp mismatched family" unknown "$CAPS_STYLED_NOID" \
+    $'╭── π > model > path ─╮\n└─ ─┘'
+  assert_screen "omp multiline draft" pending "$CAPS_STYLED_NOID" \
+    $'╭── π > model > path ─╮\n│ first line          │\n╰─ second line ─╯'
+  assert_screen "stale omp above shell" unknown "$CAPS_STYLED_NOID" "$empty"$'\n$'
+  pass "omp captured bordered frames preserve drafts and require a complete container"
+}
+test_omp_bordered_captured_frames
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
