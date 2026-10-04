@@ -384,6 +384,7 @@ When a host stays red, the seed prints the doctor's remaining gaps and their ope
 
 A known provisioning failure rolls back the new route.
 A new remote home is published only after its checkout is complete, so removing the public path during cloning cannot interrupt the clone.
+The home clone uses Git transport rather than copying the source's object files, so automatic source repacking cannot interrupt provisioning.
 If a competing home appears before publication, provisioning fails and leaves that home intact.
 SSH exit 255 preserves the route, because remote completion is unknown and must be reconciled on the same host.
 

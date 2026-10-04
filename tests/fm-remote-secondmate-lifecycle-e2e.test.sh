@@ -400,8 +400,10 @@ sleep 0.2
 [ "$(grep -cF clone "$TMP_ROOT/provision-clones")" -eq 1 ] \
   || fail "overlapping provisioning reached home classification concurrently"
 touch "$TMP_ROOT/provision.release"
-wait "$provision_one" || fail "first serialized provisioning attempt failed"
-wait "$provision_two" || fail "reconciled provisioning attempt failed"
+wait "$provision_one" \
+  || { cat "$TMP_ROOT/provision-one.out"; fail "first serialized provisioning attempt failed"; }
+wait "$provision_two" \
+  || { cat "$TMP_ROOT/provision-two.out"; fail "reconciled provisioning attempt failed"; }
 [ "$(cat "$TMP_ROOT/concurrent-home/.fm-secondmate-home")" = ios ] \
   || fail "serialized provisioning lost the published home"
 [ "$(grep -cF clone "$TMP_ROOT/provision-clones")" -eq 1 ] \
@@ -477,6 +479,145 @@ if find "$TMP_ROOT" -maxdepth 1 -name '.fm-home-provisioning.*' -print -quit | g
   fail "appeared-home provisioning left staging litter beside the home"
 fi
 pass "a home that appears mid-provision makes the provision die without touching it"
+
+# Repack the source after Git has selected a loose object but before opening
+# or linking it. Linux CI uses the same real Git/libc boundary as the observed
+# source-object disappearance; no clone result or object contents are mocked.
+if [ "$(uname -s)" = Linux ]; then
+  CC_BIN=$(command -v cc 2>/dev/null || command -v gcc 2>/dev/null || true)
+  [ -n "$CC_BIN" ] || fail "a C compiler is required for the source-repack regression"
+  cat > "$TMP_ROOT/repack-race.c" <<'C'
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+/* Only the selected private fixture object can trigger this real repack. */
+static void repack_before_read(const char *path, const char *operation) {
+    const char *object = getenv("FM_TEST_REPACK_OBJECT");
+    const char *marker = getenv("FM_TEST_REPACK_MARKER");
+    static int triggered;
+    if (triggered || !object || !marker)
+        return;
+    char absolute[PATH_MAX];
+    if (!realpath(path, absolute) || strcmp(absolute, object))
+        return;
+    triggered = 1;
+    int fd = open(marker, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) {
+        if (errno == EEXIST)
+            return;
+        _exit(125);
+    }
+    pid_t child = fork();
+    if (child == 0) {
+        unsetenv("LD_PRELOAD");
+        unsetenv("GIT_DIR");
+        unsetenv("GIT_WORK_TREE");
+        unsetenv("GIT_OBJECT_DIRECTORY");
+        unsetenv("GIT_ALTERNATE_OBJECT_DIRECTORIES");
+        execl(getenv("FM_TEST_REPACK_GIT"), "git", "-C",
+              getenv("FM_TEST_REPACK_ROOT"), "repack", "-ad", (char *)NULL);
+        _exit(125);
+    }
+    int status;
+    if (child < 0 || waitpid(child, &status, 0) != child ||
+        !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        _exit(125);
+    struct stat st;
+    if (lstat(object, &st) == 0 || errno != ENOENT)
+        _exit(125);
+    if (dprintf(fd, "%s\n", operation) < 0 || close(fd) != 0)
+        _exit(125);
+}
+
+int link(const char *source, const char *destination) {
+    int (*real_link)(const char *, const char *) = dlsym(RTLD_NEXT, "link");
+    repack_before_read(source, "link");
+    return real_link(source, destination);
+}
+
+int open(const char *path, int flags, ...) {
+    int (*real_open)(const char *, int, ...) = dlsym(RTLD_NEXT, "open");
+    mode_t mode = 0;
+    if (flags & O_CREAT) {
+        va_list args;
+        va_start(args, flags);
+        mode = va_arg(args, int);
+        va_end(args);
+    }
+    repack_before_read(path, "open");
+    return real_open(path, flags, mode);
+}
+
+int open64(const char *path, int flags, ...) {
+    int (*real_open)(const char *, int, ...) = dlsym(RTLD_NEXT, "open64");
+    mode_t mode = 0;
+    if (flags & O_CREAT) {
+        va_list args;
+        va_start(args, flags);
+        mode = va_arg(args, int);
+        va_end(args);
+    }
+    repack_before_read(path, "open64");
+    return real_open(path, flags, mode);
+}
+C
+  "$CC_BIN" -shared -fPIC -Wall -Wextra -Werror -o "$TMP_ROOT/repack-race.so" \
+    "$TMP_ROOT/repack-race.c" -ldl || fail "cannot build the source-repack fixture"
+  REPACK_ROOT="$TMP_ROOT/repack-root"
+  "$REAL_GIT" clone --quiet --no-local -- "$REMOTE_ROOT" "$REPACK_ROOT" \
+    || fail "cannot create the independent repack source"
+  "$REAL_GIT" -C "$REPACK_ROOT" config user.email test@example.com
+  "$REAL_GIT" -C "$REPACK_ROOT" config user.name Test
+  "$REAL_GIT" -C "$REPACK_ROOT" config maintenance.auto false
+  printf 'Source repack preserves this tracked content.\n' > "$REPACK_ROOT/repack-content"
+  "$REAL_GIT" -C "$REPACK_ROOT" add repack-content
+  "$REAL_GIT" -C "$REPACK_ROOT" commit -qm 'source-repack fixture' \
+    || fail "cannot commit the source-repack fixture"
+  REPACK_HEAD=$("$REAL_GIT" -C "$REPACK_ROOT" rev-parse HEAD)
+  REPACK_BLOB=$("$REAL_GIT" -C "$REPACK_ROOT" rev-parse HEAD:repack-content)
+  REPACK_OBJECT="$REPACK_ROOT/.git/objects/${REPACK_BLOB:0:2}/${REPACK_BLOB:2}"
+  [ -f "$REPACK_OBJECT" ] || fail "source-repack fixture did not start loose"
+  mkdir "$TMP_ROOT/repack-bin"
+  cat > "$TMP_ROOT/repack-bin/git" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = clone ]; then
+  export LD_PRELOAD='$TMP_ROOT/repack-race.so'
+  export FM_TEST_REPACK_OBJECT='$REPACK_OBJECT'
+  export FM_TEST_REPACK_MARKER='$TMP_ROOT/repack.completed'
+  export FM_TEST_REPACK_ROOT='$REPACK_ROOT'
+  export FM_TEST_REPACK_GIT='$REAL_GIT'
+fi
+exec '$REAL_GIT' "\$@"
+SH
+  chmod +x "$TMP_ROOT/repack-bin/git"
+  PATH="$TMP_ROOT/repack-bin:$PATH" FM_HOME="$TMP_ROOT/repacked-home" \
+    FM_ROOT_OVERRIDE="$REPACK_ROOT" \
+    bash "$REPACK_ROOT/bin/fm-remote-home-provision.sh" < "$TMP_ROOT/race.manifest" \
+    > "$TMP_ROOT/repack-provision.out" 2>&1 \
+    || { cat "$TMP_ROOT/repack-provision.out"; fail "source repack interrupted remote home provisioning"; }
+  [ -s "$TMP_ROOT/repack.completed" ] && [ ! -e "$REPACK_OBJECT" ] \
+    || fail "source-repack regression never removed the selected loose object"
+  "$REAL_GIT" -C "$REPACK_ROOT" cat-file -e "$REPACK_BLOB" \
+    || fail "source repack lost the selected object instead of packing it"
+  [ "$("$REAL_GIT" -C "$TMP_ROOT/repacked-home" rev-parse HEAD)" = "$REPACK_HEAD" ] \
+    && "$REAL_GIT" -C "$TMP_ROOT/repacked-home" fsck --full --no-progress \
+      > "$TMP_ROOT/repack-fsck.out" 2>&1 \
+    && cmp -s "$REPACK_ROOT/repack-content" "$TMP_ROOT/repacked-home/repack-content" \
+    && [ "$(cat "$TMP_ROOT/repacked-home/.fm-secondmate-home")" = race ] \
+    || fail "source repack published an incomplete remote home"
+  pass "source repack during cloning preserves a complete provisioned home"
+fi
+
 if [ "${FM_TEST_PROVISION_ONLY:-0}" = 1 ]; then
   echo "ALL TESTS PASSED"
   exit 0
@@ -969,9 +1110,11 @@ spawn_inherit_wait=0
 # Earlier inherited files traverse the worker before captain-shared.md, so give
 # a loaded portable runner 30 seconds to reach this deliberately blocked write.
 while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
-  kill -0 "$spawn_concurrent" 2>/dev/null || fail "remote spawn exited before its blocked inheritance write"
+  kill -0 "$spawn_concurrent" 2>/dev/null \
+    || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn exited before its blocked inheritance write"; }
   spawn_inherit_wait=$((spawn_inherit_wait + 1))
-  [ "$spawn_inherit_wait" -le 1500 ] || fail "remote spawn never reached its blocked inheritance write"
+  [ "$spawn_inherit_wait" -le 1500 ] \
+    || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn never reached its blocked inheritance write"; }
   sleep 0.02
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
