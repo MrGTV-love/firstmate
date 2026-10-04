@@ -99,33 +99,59 @@ PID=
 PARENTS=
 pass 'foreground agent ancestry owns launch proof, independently of shells, helpers and executable packaging'
 
-for tuple in 'pi --session' 'pi-signed --session' 'claude --resume' 'codex resume' 'agy --conversation' 'cursor --resume' 'grok --resume' 'kimi --session' 'opencode --session' 'devin --resume'; do
-  read -r harness flag <<< "$tuple"
-  printf 'window=lab:w1:p1\nharness=%s\n' "$harness" > "$META"
-  binary=$harness
-  [ "$harness" != pi-signed ] || binary=pi
-  [ "$harness" != cursor ] || binary=cursor-agent
-  process "$(jq -nc --arg b "$binary" --arg f "$flag" '[$b,$f,"session-ref"]')"
-  assert_proof unmanaged "bare native $harness resume must be recoverable"
-done
-pass 'legacy native restoration is attributed across Herdr supported resume adapters'
+printf 'window=lab:w1:p1\nharness=codex\n' > "$META"
+process '["codex","resume","session-ref"]'
+assert_proof unknown 'legacy non-omp resume must not authorize recovery'
+printf 'window=lab:w1:p1\nharness=omp\n' > "$META"
+process '["node","/installed/omp/entry.js","--resume=session-ref"]'
+assert_proof unknown 'legacy node entry points must not authorize omp recovery'
+process '["python3","/installed/omp/entry.py","--resume=session-ref"]'
+assert_proof unknown 'legacy Python entry points must not authorize omp recovery'
+process '["/installed/omp/versions/1.0","--resume=session-ref"]'
+assert_proof unknown 'legacy omp path components must not replace exact executable identity'
+process '["omp","--resume=session-ref"]'
+INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_processes[0].name = "node"')
+assert_proof unknown 'a reported interpreter must not authenticate legacy omp argv'
+process '["omp","--resume=session-ref"]'
+INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_processes[0].argv0 = "python3"')
+assert_proof unknown 'a reported interpreter argv0 must not authenticate legacy omp argv'
+process '["/installed/bin/omp","--resume=session-ref"]'
+assert_proof unmanaged 'an exact omp executable basename and equals-form resume must remain recoverable'
+printf 'window=lab:w1:p1\nharness=omp\nlaunch_proof=env-v2\n' > "$META"
+assert_proof unknown 'an unsupported proof boundary must not fall back to legacy argv'
+pass 'legacy recovery is limited to exact compiled omp equals-form resume'
 
-mkdir -p "$TMP/native/bin" "$TMP/native/pkg"
-printf '#!/usr/bin/env node\n' > "$TMP/native/pkg/entry.js"
-chmod +x "$TMP/native/pkg/entry.js"
-ln -s ../pkg/entry.js "$TMP/native/bin/pi"
-export PATH="$TMP/native/bin:$PATH"
-for harness in pi pi-signed; do
-  printf 'window=lab:w1:p1\nharness=%s\n' "$harness" > "$META"
-  process "$(jq -nc --arg script "$TMP/native/pkg/entry.js" '["node",$script,"--session","session-ref"]')"
-  assert_proof unmanaged "native $harness interpreter must resolve to its installed entry point"
-  process "$(jq -nc --arg script "$TMP/native/pkg/entry.js" '["node",$script,"--config","overlay","--session","session-ref"]')"
-  assert_proof unknown 'configured interpreter launch must not be mistaken for a bare restore'
-done
-printf '#!/usr/bin/env node\n' > "$TMP/native/pkg/foreign.js"
-process "$(jq -nc --arg script "$TMP/native/pkg/foreign.js" '["node",$script,"--session","session-ref"]')"
-assert_proof unknown 'an unrelated script with resume arguments must not authenticate the recorded adapter'
-printf 'window=lab:w1:p1\nharness=cursor\n' > "$META"
-process '["agent","--resume","session-ref"]'
-assert_proof unknown 'a generic agent executable supplies no Cursor ownership evidence'
-pass 'legacy shebang entry points follow the installed CLI symlink, while foreign scripts and generic agent names refuse'
+start_probe expected
+printf 'window=lab:w1:p1\nharness=omp\nlaunch_proof=env-v1\nspawn_gen=different\n' > "$META"
+process '["node","/foreign/agent.js"]' "$PID"
+assert_proof unknown 'a mismatched incarnation must not authorize foreign interpreter recovery'
+process '["omp","a prompt"]' "$PID"
+assert_proof unmanaged 'a mismatched incarnation must remain recoverable for attributed omp'
+kill "$PID"; wait "$PID" 2>/dev/null || true
+start_probe ''
+printf 'window=lab:w1:p1\nharness=omp\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
+process '["python3","/foreign/script.py"]' "$PID"
+assert_proof unknown 'unmarked foreign Python must not authorize recorded omp recovery'
+process '["node","/foreign/agent.js"]' "$PID"
+assert_proof unknown 'unmarked foreign node must not authorize recorded omp recovery'
+process '["claude","--resume","foreign"]' "$PID"
+assert_proof unknown 'unmarked foreign Claude must not authorize recorded omp recovery'
+process '["unknown-agent"]' "$PID"
+assert_proof unknown 'unmarked unknown executable must not authorize recovery'
+process '["omp","a prompt"]' "$PID"
+assert_proof unmanaged 'unmarked attributed omp argv fallback must authorize recovery'
+process '["/installed/bin/omp","a prompt"]' "$PID"
+assert_proof unmanaged 'unmarked attributed omp executable path must authorize recovery'
+process '["node","/installed/agent.js"]' "$PID"
+INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_processes[0].name = "omp"')
+assert_proof unmanaged 'unmarked recorded omp process name must supply attribution'
+printf 'window=lab:w1:p1\nharness=claude-custom\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
+process '["/installed/claude/versions/1.0","a prompt"]' "$PID"
+assert_proof unmanaged 'shared path identity must attribute the exact recorded Claude family'
+process '["omp","a prompt"]' "$PID"
+assert_proof unknown 'an attributed but different harness family must not authorize recovery'
+printf 'window=lab:w1:p1\nharness=unrecognized\nlaunch_proof=env-v1\nspawn_gen=expected\n' > "$META"
+assert_proof unknown 'an unsupported recorded harness must not authorize recovery'
+kill "$PID"; wait "$PID" 2>/dev/null || true
+PID=
+pass 'env-v1 missing pins require recorded-family attribution while matching pins retain interpreter support'

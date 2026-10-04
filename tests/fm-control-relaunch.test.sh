@@ -85,6 +85,10 @@ if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
   if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
     printf 'PATH=/test'
     if [ -f "$D/launched-command" ]; then
+      if [ -f "$D/recovery-proof-once" ]; then
+        [ ! -f "$D/recovery-proof-observed" ] || exit 1
+        : > "$D/recovery-proof-observed"
+      fi
       if [ -f "$D/recovery-proof-hold" ]; then
         : > "$D/recovery-proof-ready"
         while [ ! -e "$D/recovery-proof-release" ]; do /bin/sleep 0.01; done
@@ -2298,6 +2302,11 @@ case "${1:-} ${2:-}" in
       if [ -f "$D/herdr-agent-live" ]; then
         pid=2000000000
         [ ! -f "$D/recovery-pid" ] || pid=$(cat "$D/recovery-pid")
+        if [ -f "$D/recovery-foreign-foreground" ]; then
+          printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"python3","argv":["python3","-c","input()"],"cmdline":"python3 -c input()"}]}}}\n' \
+            "$(cat "$D/herdr-pane")" "$pid"
+          exit 0
+        fi
         printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
           "$(cat "$D/herdr-pane")" "$pid"
       else
@@ -2961,6 +2970,59 @@ prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   fi
 }
 
+test_reboot_recovery_refuses_foreign_foreground_without_mutation() {
+  local dir id kind mode out rc before CONTROL="$ROOT/bin/fm-control.sh"
+  for kind in ship scout secondmate; do
+    for mode in direct sweep; do
+      id="reboot-foreign-$kind-$mode"
+      herdr_case_or_skip "$id" "$id" || return 0
+      dir=$HERDR_CASE_DIR
+      prepare_herdr_recovery "$dir" "$id" "$kind"
+      : > "$dir/fake/recovery-foreign-foreground"
+      before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")
+      rc=0
+      if [ "$mode" = direct ]; then
+        out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+      else
+        CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+        out=$(run_control "$dir" recover) || rc=$?
+        CONTROL="$ROOT/bin/fm-control.sh"
+      fi
+      expect_code 1 "$rc" "$kind/$mode recovery must refuse foreign foreground"$'\n'"$out"
+      [ "$before" = "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")" ] \
+        || fail "$kind/$mode foreign foreground recovery changed records, instructions or work"
+      assert_present "$dir/fake/herdr-agent-live" "$kind/$mode recovery stopped the retained agent"
+      assert_absent "$dir/home/state/$id.control-relaunch" "$kind/$mode recovery began a lifecycle transaction"
+      assert_absent "$dir/home/state/$id.control-relaunch.note" "$kind/$mode recovery recorded a note"
+      assert_absent "$dir/fake/launched-command" "$kind/$mode recovery launched a replacement"
+      assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "$kind/$mode recovery sent input to a foreign job"
+      assert_absent "$dir/home/state/.control-$id.lock" "$kind/$mode refusal retained the control lock"
+      assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "$kind/$mode refusal retained the liveness lock"
+    done
+  done
+  pass "direct and automatic recovery refuse foreign foreground jobs without lifecycle input or task mutation"
+}
+
+test_reboot_recovery_completes_from_bounded_managed_observation() {
+  local dir id=reboot-proof-once out rc=0 before
+  herdr_case_or_skip "$id" "$id" || return 0
+  dir=$HERDR_CASE_DIR
+  prepare_herdr_recovery "$dir" "$id" ship
+  : > "$dir/fake/recovery-proof-once"
+  before=$(shasum -a 256 "$dir/wt/unlanded.txt")
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+  expect_code 0 "$rc" "bounded managed confirmation must complete recovery"$'\n'"$out"
+  assert_present "$dir/fake/recovery-proof-observed" "replacement confirmation must observe managed proof"
+  assert_present "$dir/fake/herdr-agent-live" "confirmed replacement must remain live"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "confirmed recovery did not complete"
+  [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "recovery did not publish its replacement"
+  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "confirmed recovery moved its pane"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "confirmed recovery moved its local copy"
+  [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "confirmed recovery changed interrupted work"
+  assert_contains "$out" "relaunched $id" "successful bounded proof must report completed recovery"
+  pass "recovery completes from its bounded managed observation despite an unavailable later snapshot"
+}
+
 recovery_liveness_episode() {  # <case-dir> <id>
   local dir=$1 id=$2
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
@@ -3394,6 +3456,8 @@ test_teamclaude_reaches_herdr_relaunch_paths
 test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
 test_teamclaude_refusal_lands_before_the_old_agent_stops
+test_reboot_recovery_refuses_foreign_foreground_without_mutation
+test_reboot_recovery_completes_from_bounded_managed_observation
 test_secondmate_reboot_recovery_preserves_profile_and_child_work
 test_secondmate_recovery_refuses_liveness_contention_before_attribution
 test_secondmate_recovery_excludes_liveness_through_managed_confirmation

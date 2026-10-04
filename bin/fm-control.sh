@@ -1173,9 +1173,6 @@ do_relaunch() {
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
-  if [ "$RECOVER_LAUNCH" = 1 ] && [ "$(fm_launch_proof_herdr "$META")" != managed ]; then
-    die "the replacement agent for $ID is alive but its Firstmate launch settings could not be confirmed"
-  fi
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0

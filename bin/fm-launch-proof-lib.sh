@@ -4,7 +4,7 @@
 # launch_proof=env-v1. This is an incarnation binding, not an auth credential.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Unknown never authorizes a relaunch.
-# Legacy records are recoverable only with exact bare native-resume argv;
+# Legacy records are recoverable only with exact bare compiled omp resume argv;
 # missing proof on an ordinary legacy launch is not evidence it is unmanaged.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
 
@@ -13,6 +13,8 @@ _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] 
 . "$_FM_LAUNCH_PROOF_DIR/fm-remote-herdr-owner-lib.sh"
 # shellcheck source=bin/fm-agent-process-lib.sh
 . "$_FM_LAUNCH_PROOF_DIR/fm-agent-process-lib.sh"
+# shellcheck source=bin/fm-control-lib.sh
+. "$_FM_LAUNCH_PROOF_DIR/fm-control-lib.sh"
 
 fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
   local pid=$1 gen=$2 environment
@@ -33,7 +35,7 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   local meta=$1 target session pane info foreground pid argv harness proof gen
   local candidates ids='' name argv0 parents group
-  local program native installed interpreted=0
+  local verdict family process_family
   target=$(fm_meta_get "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
@@ -82,50 +84,34 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
       | select(type == "number" and . > 1) | floor' 2>/dev/null) \
       || { printf unknown; return; }
     gen=$(fm_meta_get "$meta" spawn_gen)
-    fm_launch_proof_pid "$pid" "$gen"
+    verdict=$(fm_launch_proof_pid "$pid" "$gen")
+    [ "$verdict" = unmanaged ] || { printf '%s' "$verdict"; return; }
+    harness=$(fm_meta_get "$meta" harness)
+    family=$(fm_control_harness_family "$harness") || { printf unknown; return; }
+    name=$(printf '%s' "$foreground" | jq -r '.name // ""')
+    argv0=$(printf '%s' "$foreground" | jq -r '.argv0 // .argv[0] // ""')
+    [ "$(fm_agent_process_classify "$name" "$argv0" '' "$pid")" = agent ] \
+      || { printf unknown; return; }
+    process_family=$(fm_control_harness_family "${name##*/}" 2>/dev/null \
+      || fm_harness_path_name "$name" 2>/dev/null \
+      || fm_control_harness_family "${argv0##*/}" 2>/dev/null \
+      || fm_harness_path_name "$argv0" 2>/dev/null) \
+      || { printf unknown; return; }
+    if [ "$process_family" = "$family" ]; then printf unmanaged; else printf unknown; fi
     return
   fi
   [ -z "$proof" ] || { printf unknown; return; }
   harness=$(fm_meta_get "$meta" harness)
+  [ "$harness" = omp ] || { printf unknown; return; }
   argv=$(printf '%s' "$foreground" | jq -ec '.argv
     | select(type == "array" and length > 0 and all(.[]; type == "string"))' 2>/dev/null) \
     || { printf unknown; return; }
-  # Native commands may exec a version-named binary or a shebang interpreter.
-  # Resolve an interpreter's entry point against the installed recorded CLI,
-  # never a harness-shaped substring in a prompt or an arbitrary script path.
-  native=$harness
-  [ "$native" != pi-signed ] || native=pi
-  program=$(printf '%s' "$argv" | jq -r '.[0]')
-  case "${program##*/}" in
-    node|nodejs|bun|python|python[0-9]*)
-      interpreted=1
-      program=$(printf '%s' "$argv" | jq -r '.[1] // empty')
-      argv=$(printf '%s' "$argv" | jq -c '.[1:]')
-      ;;
-  esac
-  if [ "$harness" = cursor ]; then
-    fm_cursor_path_is_cursor "$program" || { printf unknown; return; }
-  elif [ "$interpreted" = 0 ] && { [ "${program##*/}" = "$native" ] \
-    || { [ "$native" = pi ] && [ "${program##*/}" = pi-launcher ]; } \
-    || [ "$(fm_harness_path_name "$program" 2>/dev/null)" = "$native" ]; }; then
-    :
-  else
-    installed=$(command -v "$native" 2>/dev/null || true)
-    [ -n "$installed" ] && [ -f "$installed" ] && [ -f "$program" ] \
-      && [ "$(fm_cursor_canonical_path "$installed")" = "$(fm_cursor_canonical_path "$program")" ] \
-      || { printf unknown; return; }
-  fi
-  # The native commands documented by Herdr contain only a resume flag and a
-  # session ref. Extra flags are not interpreted or silently discarded.
-  if printf '%s' "$argv" | jq -e --arg h "$harness" '
-    if $h == "omp" then
-      (length == 2 and (.[1] | startswith("--resume=") and length > 9))
-    elif $h == "codex" then length == 3 and .[1] == "resume" and .[2] != ""
-    elif $h == "pi" or $h == "pi-signed" or $h == "kimi" or $h == "opencode" then
-      length == 3 and .[1] == "--session" and .[2] != ""
-    elif $h == "agy" then length == 3 and .[1] == "--conversation" and .[2] != ""
-    elif $h == "claude" or $h == "cursor" or $h == "grok" or $h == "devin" then
-      length == 3 and .[1] == "--resume" and .[2] != ""
-    else false end
+  name=$(printf '%s' "$foreground" | jq -r '.name // .argv0 // .argv[0] // ""')
+  argv0=$(printf '%s' "$foreground" | jq -r '.argv0 // .argv[0] // ""')
+  [ "${name##*/}" = omp ] && [ "${argv0##*/}" = omp ] \
+    || { printf unknown; return; }
+  if printf '%s' "$argv" | jq -e '
+    length == 2 and (.[0] | split("/") | last) == "omp"
+      and (.[1] | startswith("--resume=") and length > 9)
   ' >/dev/null 2>&1; then printf unmanaged; else printf unknown; fi
 }

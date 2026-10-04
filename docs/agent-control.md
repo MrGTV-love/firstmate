@@ -119,11 +119,13 @@ An already managed agent is left alone, including on repeated sweeps.
 `bin/fm-launch-proof-lib.sh` owns launch attribution.
 New Herdr launches record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
-Readable kernel environment with a matching incarnation proves a managed launch, while a readable environment without it proves an unmanaged launch.
+Readable kernel environment with a matching incarnation proves a managed launch, including interpreter-based harnesses.
+A readable environment without that incarnation proves unmanaged only when the foreground process is independently attributed to the recorded harness family through the shared process and path identity helpers.
+Foreign Python, node, other harnesses, and unattributed foreground processes remain unknown; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
 Unreadable or ambiguous proof never licenses lifecycle action.
-For older records with no launch-proof field, only an exact documented bare native resume command for the recorded harness proves unmanaged restoration; an ordinary legacy launch remains unchanged.
-For omp, that native form is exactly `omp --resume=<ref>` with a nonempty reference; split `--resume <ref>` arguments do not prove native restoration.
-An interpreter-launched native CLI is recognized only when its entry point resolves to the installed recorded harness; an arbitrary script or generic `agent` executable does not supply that identity.
+For older records with no launch-proof field, only a recorded `omp` harness running an executable with basename `omp` and exactly `omp --resume=<ref>` argv with a nonempty reference proves unmanaged restoration.
+Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove legacy native restoration; no installed-CLI symlink reconstruction is used.
+An ordinary legacy launch remains unchanged, and a present but unsupported launch-proof field never falls back to legacy argv.
 After replacement, matching managed-launch proof is required before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
