@@ -1543,7 +1543,7 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   # depend on them, so it starts in the background and overlaps their wall clock.
   fleet_sync_pid=
   if network_phase && network_sweep_authorized 'Herdr reboot launch recovery'; then
-    "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
   fi
   fleet_sync_out=
   if network_phase && network_sweep_authorized 'project clone refresh'; then

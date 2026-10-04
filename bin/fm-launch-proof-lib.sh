@@ -120,7 +120,6 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   if printf '%s' "$argv" | jq -e --arg h "$harness" '
     if $h == "omp" then
       (length == 2 and (.[1] | startswith("--resume=") and length > 9))
-      or (length == 3 and .[1] == "--resume" and .[2] != "")
     elif $h == "codex" then length == 3 and .[1] == "resume" and .[2] != ""
     elif $h == "pi" or $h == "pi-signed" or $h == "kimi" or $h == "opencode" then
       length == 3 and .[1] == "--session" and .[2] != ""

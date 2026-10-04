@@ -53,6 +53,8 @@ process() { # <argv-json> [pid]
 assert_proof() { [ "$(fm_launch_proof_herdr "$META")" = "$1" ] || fail "$2"; }
 process '["omp","--resume=/a/session.jsonl"]'
 assert_proof unmanaged 'bare restored omp must be recoverable'
+process '["omp","--resume","/a/session.jsonl"]'
+assert_proof unknown 'split omp resume arguments must not authorize native restoration recovery'
 process '["omp","--config","overlay","--auto-approve","--resume=/a/session.jsonl"]'
 assert_proof unknown 'legacy absence must not restart a configured resume'
 process '["omp","--resume="]'

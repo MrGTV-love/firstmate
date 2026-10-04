@@ -1168,8 +1168,6 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
         [ "$plain" != '⇧⇥ to change thinking effort' ] || stripped=
       fi
       ;;
-  esac
-  case "$stripped" in
     '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
     '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;
     '║'*'║') stripped=${stripped#║}; stripped=${stripped%║} ;;
@@ -1184,15 +1182,19 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
 # geometry ambiguity turns pending into pending-unproven and empty into
 # unknown (an ambiguous container is not positive proof).
 _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <last-row>
-  local screen=$1 styled=$2 ambiguous=$3 first=$4 last=$5
+  local screen=$1 styled=$2 ambiguous=$3 first=$4 last=$5 literal=${6:-0}
   local row raw content plain state unknown_seen=0
   row=$first
   while [ "$row" -le "$last" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     content=$(_fm_composer_row_content "$raw" "$styled")
     plain=$(_fm_composer_row_content "$raw" 0)
-    state=$(fm_composer_classify_content 1 "$content" \
-      "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 1 "$styled")
+    if [ "$literal" = 1 ]; then
+      if [ -n "$content" ]; then state=pending; else state=empty; fi
+    else
+      state=$(fm_composer_classify_content 1 "$content" \
+        "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 1 "$styled")
+    fi
     case "$state" in
       pending)
         if [ "$ambiguous" = 1 ]; then printf 'pending-unproven'; else printf 'pending'; fi
@@ -1614,7 +1616,9 @@ EOF
         fi
         ;;
       box)
-        if [ "$prompt_row" -lt 0 ] \
+        if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 1 ]; then
+          :
+        elif [ "$prompt_row" -lt 0 ] \
            && fm_composer_leading_prompt_glyph_var glyph "$content"; then
           prompt_row=$row
           placeholder_position=1
@@ -1680,7 +1684,7 @@ EOF
       local box_last=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
       [ "$FM_COMPOSER_SCAN_BOX_OMP" != 1 ] || box_last=$FM_COMPOSER_SCAN_BOX_BOTTOM
       _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
-        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$box_last"
+        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$box_last" "$FM_COMPOSER_SCAN_BOX_OMP"
       return 0
     fi
     if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
@@ -1740,7 +1744,7 @@ EOF
       ;;
     box)
       _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SELECTED_AMBIG" \
-        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
+        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST" "$FM_COMPOSER_SCAN_BOX_OMP"
       ;;
     bare)
       if [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then

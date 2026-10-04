@@ -45,10 +45,9 @@ TASK_TMPS=()
 relaunch_cleanup() {
   local d
   for d in "${TASK_TMPS[@]:-}"; do
-    [ -n "$d" ] && rm -rf "$d"
+    [ -n "$d" ] && fm_test_remove_tree "$d"
   done
-  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
-  rm -rf "$TMP_ROOT"
+  fm_test_remove_tree "$TMP_ROOT"
 }
 trap relaunch_cleanup EXIT
 
@@ -86,6 +85,11 @@ if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
   if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
     printf 'PATH=/test'
     if [ -f "$D/launched-command" ]; then
+      if [ -f "$D/recovery-proof-hold" ]; then
+        : > "$D/recovery-proof-ready"
+        while [ ! -e "$D/recovery-proof-release" ]; do /bin/sleep 0.01; done
+      fi
+      [ ! -f "$D/recovery-proof-unmanaged" ] || { printf '\n'; exit 0; }
       id=$(cat "$D/recovery-case-id")
       gen=$(grep '^spawn_gen=' "$FM_HOME/state/$id.meta" | cut -d= -f2-)
       printf ' FM_SPAWN_GEN=%s' "$gen"
@@ -2353,6 +2357,10 @@ case "${1:-} ${2:-}" in
       if [ "${4:-}" = ctrl+d ] \
         || { [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ]; }; then
         rm -f "$D/herdr-agent-live" "$D/exit-pending"
+        if [ -f "$D/recovery-stop-hold" ]; then
+          : > "$D/recovery-stop-ready"
+          while [ ! -e "$D/recovery-stop-release" ]; do /bin/sleep 0.01; done
+        fi
       fi
     fi
     exit 0 ;;
@@ -2936,6 +2944,290 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
   pass "relaunch heals an item that drifted out of In flight while the task stayed live"
 }
 
+prepare_herdr_recovery() {  # <case-dir> <id> <kind>
+  local dir=$1 id=$2 kind=$3
+  rm -f "$dir/fake/herdr-stopped"
+  printf '%s' "$id" > "$dir/fake/recovery-case-id"
+  : > "$dir/fake/herdr-agent-live"
+  printf 'kind=%s\nlaunch_proof=env-v1\nspawn_gen=old\nmodel=opus\neffort=high\n' "$kind" \
+    >> "$dir/home/state/$id.meta"
+  printf 'preserve interrupted work\n' > "$dir/wt/unlanded.txt"
+  if [ "$kind" = secondmate ]; then
+    mkdir -p "$dir/wt/state" "$dir/wt/data" "$dir/wt/bin"
+    printf '%s\n' "$id" > "$dir/wt/.fm-secondmate-home"
+    printf '# test home\n' > "$dir/wt/AGENTS.md"
+    printf '# test charter\n' > "$dir/wt/data/charter.md"
+    printf 'mode=secondmate\nhome=%s\n' "$dir/wt" >> "$dir/home/state/$id.meta"
+  fi
+}
+
+recovery_liveness_episode() {  # <case-dir> <id>
+  local dir=$1 id=$2
+  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_ROOT="$ROOT" STATE="$dir/home/state" bash -c '
+      . "$1/bin/fm-secondmate-liveness-lib.sh"
+      if ! fm_secondmate_liveness_lock "$2"; then
+        printf "liveness-contended\n"
+        exit 0
+      fi
+      trap "fm_secondmate_liveness_unlock \"$2\"" EXIT
+      fm_secondmate_liveness_probe "$STATE/$2.meta" "$2" poll
+      if [ "$FM_SM_LIVE_STATUS" = relaunchable ]; then
+        fm_secondmate_liveness_relaunch "$STATE/$2.meta" "$2" 5
+      fi
+      printf "liveness-%s\n" "$FM_SM_LIVE_STATUS"
+    ' _ "$ROOT" "$id" 2>&1
+}
+
+wait_recovery_barrier() {  # <marker> <pid>
+  local i=0
+  while [ ! -e "$1" ] && kill -0 "$2" 2>/dev/null && [ "$i" -lt 1000 ]; do
+    /bin/sleep 0.01
+    i=$((i + 1))
+  done
+  [ -e "$1" ]
+}
+
+test_secondmate_recovery_refuses_liveness_contention_before_attribution() {
+  local dir id=reboot-sm-contended holder out rc=0 before
+  herdr_case_or_skip reboot-secondmate-contended "$id" || return 0
+  dir=$HERDR_CASE_DIR
+  prepare_herdr_recovery "$dir" "$id" secondmate
+  before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/wt/unlanded.txt")
+  FM_HOME="$dir/home" STATE="$dir/home/state" bash -c '
+    . "$1/bin/fm-secondmate-liveness-lib.sh"
+    fm_secondmate_liveness_lock "$2" || exit 1
+    trap "fm_secondmate_liveness_unlock \"$2\"" EXIT
+    : > "$3"
+    while [ ! -e "$4" ]; do /bin/sleep 0.01; done
+  ' _ "$ROOT" "$id" "$dir/holder-ready" "$dir/holder-release" &
+  holder=$!
+  wait_recovery_barrier "$dir/holder-ready" "$holder" || {
+    : > "$dir/holder-release"
+    wait "$holder" 2>/dev/null || true
+    fail "could not hold the secondmate liveness lock"
+  }
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+  : > "$dir/holder-release"
+  wait "$holder" || fail "liveness lock holder failed"
+  expect_code 1 "$rc" "recovery must refuse liveness contention"$'\n'"$out"
+  assert_contains "$out" "another secondmate liveness check" "recovery must name shared lock contention"
+  [ ! -s "$dir/fake/herdr-log" ] || fail "contended recovery attributed an endpoint before taking the liveness lock"
+  [ "$before" = "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/wt/unlanded.txt")" ] \
+    || fail "contended recovery changed the task"
+  assert_absent "$dir/home/state/.control-$id.lock" "contended recovery retained the control lock"
+  assert_contains "$(recovery_liveness_episode "$dir" "$id")" "liveness-alive" \
+    "contention cleanup must permit another liveness episode"
+  pass "direct secondmate recovery refuses a shared liveness hold before endpoint attribution"
+}
+
+test_secondmate_recovery_excludes_liveness_through_managed_confirmation() {
+  local dir id=reboot-sm-serialized pid out rc=0 stopped=0 launched=0 stopped_observation proof_observation
+  herdr_case_or_skip reboot-secondmate-serialized "$id" || return 0
+  dir=$HERDR_CASE_DIR
+  prepare_herdr_recovery "$dir" "$id" secondmate
+  : > "$dir/fake/recovery-stop-hold"
+  : > "$dir/fake/recovery-proof-hold"
+  run_control "$dir" "$id" relaunch --recover-launch > "$dir/control-output" &
+  pid=$!
+  wait_recovery_barrier "$dir/fake/recovery-stop-ready" "$pid" || {
+    : > "$dir/fake/recovery-stop-release"
+    : > "$dir/fake/recovery-proof-release"
+    wait "$pid" 2>/dev/null || true
+    fail "recovery never reached the stopped-agent barrier: $(cat "$dir/control-output")"
+  }
+  [ -e "$dir/fake/herdr-agent-live" ] || stopped=1
+  stopped_observation=$(recovery_liveness_episode "$dir" "$id")
+  : > "$dir/fake/recovery-stop-release"
+  wait_recovery_barrier "$dir/fake/recovery-proof-ready" "$pid" || {
+    : > "$dir/fake/recovery-proof-release"
+    wait "$pid" 2>/dev/null || true
+    fail "recovery never reached replacement proof confirmation: $(cat "$dir/control-output")"
+  }
+  [ ! -e "$dir/fake/herdr-agent-live" ] || launched=1
+  proof_observation=$(recovery_liveness_episode "$dir" "$id")
+  : > "$dir/fake/recovery-proof-release"
+  wait "$pid" || rc=$?
+  out=$(cat "$dir/control-output")
+  expect_code 0 "$rc" "serialized secondmate recovery must complete"$'\n'"$out"
+  [ "$stopped" = 1 ] || fail "the stopped-agent barrier must expose the liveness race"
+  [ "$launched" = 1 ] || fail "proof confirmation must observe a launched replacement"
+  assert_contains "$stopped_observation" "liveness-contended" "liveness must not reap the stopped recovery pane"
+  assert_contains "$proof_observation" "liveness-contended" "liveness must stay excluded through managed-proof confirmation"
+  assert_absent "$dir/home/state/.secondmate-relaunch-$id" "excluded liveness must record no reap or spawn attempt"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane close" "recovery must preserve its pane"
+  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "serialized recovery moved its pane"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "serialized recovery moved its local copy"
+  [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "serialized recovery changed its recorded profile"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "serialized recovery did not complete"
+  assert_absent "$dir/home/state/.control-$id.lock" "successful recovery retained its control lock"
+  assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "successful recovery retained its liveness lock"
+  assert_contains "$(recovery_liveness_episode "$dir" "$id")" "liveness-alive" \
+    "a completed recovery must release shared liveness serialization"
+  pass "liveness cannot reap a recovering secondmate before launch or during managed confirmation"
+}
+
+test_secondmate_recovery_releases_liveness_on_refusal_and_failed_confirmation() {
+  local dir id scenario out rc
+  for scenario in pending close proof; do
+    id="reboot-sm-failed-$scenario"
+    herdr_case_or_skip "$id" "$id" || return 0
+    dir=$HERDR_CASE_DIR
+    prepare_herdr_recovery "$dir" "$id" secondmate
+    case "$scenario" in
+      pending) printf draft > "$dir/fake/recovery-pending" ;;
+      close) printf 'pending close\n' > "$dir/home/state/$id.backlog-close" ;;
+      proof) : > "$dir/fake/recovery-proof-unmanaged" ;;
+    esac
+    rc=0
+    out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+    expect_code 1 "$rc" "failed secondmate recovery must refuse"$'\n'"$out"
+    assert_absent "$dir/home/state/.control-$id.lock" "$scenario failure retained its control lock"
+    assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "$scenario failure retained its liveness lock"
+    assert_contains "$(recovery_liveness_episode "$dir" "$id")" "liveness-alive" \
+      "$scenario failure cleanup must permit another liveness episode"
+    if [ "$scenario" != proof ]; then
+      assert_absent "$dir/fake/launched-command" "$scenario refusal launched a replacement"
+      [ "$(meta_field "$dir" "$id" spawn_gen)" = old ] || fail "$scenario refusal changed the incarnation"
+      if [ "$scenario" = close ]; then
+        assert_absent "$dir/home/state/$id.control-relaunch" "pending close refusal began a lifecycle transaction"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-text" "pending close refusal typed lifecycle input"
+      fi
+    else
+      assert_present "$dir/fake/launched-command" "failed proof must exercise post-launch cleanup"
+      [ "$(journal_field "$dir" "$id" phase)" = failed:launching ] || fail "failed confirmation lost its durable failure"
+    fi
+  done
+  pass "secondmate recovery releases both locks on pre-stop refusal and post-launch proof failure"
+}
+
+test_reboot_recovery_refuses_ineligible_backlog_without_stopping_workers() {
+  local dir id kind scenario file out rc before real
+  command -v tasks-axi >/dev/null 2>&1 && fm_tasks_axi_compatible || return 0
+  real=$(command -v tasks-axi)
+  for kind in ship scout; do
+    for scenario in closed held blocked missing unreadable inaccessible branch closing; do
+      id="reboot-$kind-$scenario"
+      herdr_case_or_skip "$id" "$id" || return 0
+      dir=$HERDR_CASE_DIR
+      prepare_herdr_recovery "$dir" "$id" "$kind"
+      file="$dir/home/data/backlog.md"
+      if [ "$scenario" = missing ] || [ "$scenario" = blocked ]; then
+        seed_backlog "$dir" blocker queued
+      else
+        seed_backlog "$dir" "$id" in_flight
+      fi
+      case "$scenario" in
+        closed) tasks-axi done "$id" --file "$file" >/dev/null || fail "could not close recovery fixture" ;;
+        held) tasks-axi hold "$id" --kind captain --reason "captain decision pending" --file "$file" >/dev/null \
+          || fail "could not hold recovery fixture" ;;
+        blocked) tasks-axi add "$id" "blocked recovery fixture" --kind "$kind" --blocked-by blocker --file "$file" >/dev/null \
+          || fail "could not block recovery fixture" ;;
+        unreadable)
+          cat > "$dir/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = show ] && [ "\${2:-}" = "$id" ]; then
+  echo 'error: fixture row unreadable' >&2
+  exit 1
+fi
+exec "$real" "\$@"
+SH
+          chmod +x "$dir/fakebin/tasks-axi"
+          ;;
+        inaccessible) rm -f "$file"; mkdir "$file" ;;
+        branch) FM_HOME="$dir/home" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null \
+          || fail "could not enter away posture for recovery fixture" ;;
+        closing)
+          if [ "$kind" = ship ]; then
+            printf 'pending close\n' > "$dir/home/state/$id.backlog-close"
+          else
+            ln -s missing-close "$dir/home/state/$id.backlog-close"
+          fi
+          ;;
+      esac
+      before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")
+      rc=0
+      if [ "$scenario" = branch ]; then
+        out=$(FM_SUPERVISION_ACTOR=branch run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+      else
+        out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+      fi
+      expect_code 1 "$rc" "$kind/$scenario recovery must refuse before stop"$'\n'"$out"
+      assert_contains "$out" "backlog" "$kind/$scenario recovery must name its eligibility failure"
+      [ "$before" = "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")" ] \
+        || fail "$kind/$scenario recovery changed task records, instructions or work"
+      assert_present "$dir/fake/herdr-agent-live" "$kind/$scenario recovery stopped the running worker"
+      assert_absent "$dir/fake/exit-pending" "$kind/$scenario recovery delivered an exit"
+      assert_absent "$dir/fake/launched-command" "$kind/$scenario recovery launched a replacement"
+      assert_absent "$dir/home/state/$id.control-relaunch" "$kind/$scenario recovery began a lifecycle transaction"
+      assert_absent "$dir/home/state/.control-$id.lock" "$kind/$scenario recovery retained its control lock"
+      assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-text" "$kind/$scenario recovery typed lifecycle input"
+    done
+  done
+  pass "automatic ship and scout recovery leave closed, held, blocked, missing, unreadable and branch-ineligible tasks running unchanged"
+}
+
+test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows() {
+  local dir id scenario kind out rc before
+  for scenario in no-backlog manual queued in_flight; do
+    case "$scenario" in
+      queued|in_flight) command -v tasks-axi >/dev/null 2>&1 && fm_tasks_axi_compatible || continue ;;
+    esac
+    id="reboot-eligible-$scenario"
+    kind=ship
+    [ "$scenario" != manual ] && [ "$scenario" != queued ] || kind=scout
+    herdr_case_or_skip "$id" "$id" || return 0
+    dir=$HERDR_CASE_DIR
+    prepare_herdr_recovery "$dir" "$id" "$kind"
+    before=$(shasum -a 256 "$dir/wt/unlanded.txt")
+    case "$scenario" in
+      manual)
+        mkdir -p "$dir/home/config"
+        printf 'manual\n' > "$dir/home/config/backlog-backend"
+        mkdir "$dir/home/data/backlog.md"
+        ;;
+      queued|in_flight) seed_backlog "$dir" "$id" "$scenario" ;;
+    esac
+    rc=0
+    out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+    expect_code 0 "$rc" "$scenario recovery must remain eligible"$'\n'"$out"
+    [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "$scenario recovery moved its pane"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "$scenario recovery moved its local copy"
+    [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "$scenario recovery changed its recorded model"
+    [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "$scenario recovery changed its recorded effort"
+    [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "$scenario recovery changed unfinished work"
+    [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "$scenario recovery did not finish its transaction"
+    case "$scenario" in
+      queued|in_flight) [ "$(backlog_state "$dir" "$id")" = in_flight ] || fail "$scenario recovery lost its In-flight row" ;;
+    esac
+  done
+  pass "recovery preserves manual/no-backlog exemptions and queued/In-flight dispatch eligibility in the recorded copy and pane"
+}
+
+test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
+  local dir id=reboot-bootstrap-derived out rc=0 before
+  herdr_case_or_skip "$id" "$id" || return 0
+  dir=$HERDR_CASE_DIR
+  prepare_herdr_recovery "$dir" "$id" ship
+  ln -s "$ROOT/bin" "$dir/home/bin"
+  mkdir -p "$dir/user-home" "$dir/home/.agents/skills"
+  before=$(shasum -a 256 "$dir/wt/unlanded.txt")
+  out=$(env -u FM_HOME -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+    -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+    PATH="$dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
+    FM_BOOTSTRAP_NETWORK=only FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+    FM_CONTROL_LAUNCH_WAIT=0.05 "$ROOT/bin/fm-bootstrap.sh" 2>&1) || rc=$?
+  expect_code 0 "$rc" "network bootstrap must recover its resolved home"$'\n'"$out"
+  [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "bootstrap recovery did not complete"
+  [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "bootstrap did not replace the bare incarnation"
+  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "bootstrap recovery moved its pane"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "bootstrap recovery moved its local copy"
+  [ "$(meta_field "$dir" "$id" model)" = opus ] || fail "bootstrap recovery changed its recorded model"
+  [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt")" ] || fail "bootstrap recovery changed unfinished work"
+  pass "actual network bootstrap recovers its derived home without ambient FM_HOME"
+}
+
 test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   local dir out rc=0 before
   herdr_case_or_skip reboot-secondmate reboot-sm || return 0
@@ -2997,7 +3289,6 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   [ "$(meta_field "$b" b spawn_gen)" = old ] || fail 'one tick attempted a second repair'
   [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
     || fail 'pending refusal changed a or its work'
-  out=$(run_control "$b" check --one) || fail "read-only check failed: $out"
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next tick must recover b despite pending a"$'\n'"$out"
@@ -3104,3 +3395,9 @@ test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
 test_teamclaude_refusal_lands_before_the_old_agent_stops
 test_secondmate_reboot_recovery_preserves_profile_and_child_work
+test_secondmate_recovery_refuses_liveness_contention_before_attribution
+test_secondmate_recovery_excludes_liveness_through_managed_confirmation
+test_secondmate_recovery_releases_liveness_on_refusal_and_failed_confirmation
+test_reboot_recovery_refuses_ineligible_backlog_without_stopping_workers
+test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows
+test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset

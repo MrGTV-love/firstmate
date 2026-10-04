@@ -98,16 +98,19 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 
 Herdr can resume a live harness after reboot without the Firstmate launch command.
 For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates.
-Use an explicit `FM_HOME` with `check` for a read-only launch verdict, or `recover` to repair every positively unmanaged live agent.
+Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live agent.
 `recover --one` bounds an automatic supervision tick to one repair attempt.
 Bounded scans advance after refused attempts, so a pending record cannot starve later recoveries.
 Deferred startup recovery runs the sweep; the watcher repeats the bounded scan to catch panes restored only after a viewer attaches.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
+Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row. Existing manual and no-backlog exemptions remain unchanged.
+Recovery also refuses while the task has a pending authoritative backlog close.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.
 
 Each repair is the ordinary `bin/fm-control.sh <id> relaunch --recover-launch` transaction, not a second exit or spawn mechanism.
 The option is exclusive of profile overrides, notes, and debug options.
 Under the task's control lock it rechecks launch proof, pins **all three recorded profile axes**, checkpoints work, and requires a proven empty composer before stopping the old agent.
+For a local secondmate, recovery also holds the existing liveness lock through stop, replacement proof, and any rollback, so liveness recovery cannot concurrently replace its endpoint; contention refuses without touching the agent.
 Unlike an ordinary secondmate relaunch, it does not adopt a newly configured secondmate profile.
 It reuses the exact pane and local copy, preserves all unlanded work and secondmate child records, and never rewrites a standing charter.
 The replacement receives a progress note directing it to reconcile completed work and outstanding decisions before continuing.
@@ -119,6 +122,7 @@ The unique ancestor-most non-shell process in the foreground group supplies the 
 Readable kernel environment with a matching incarnation proves a managed launch, while a readable environment without it proves an unmanaged launch.
 Unreadable or ambiguous proof never licenses lifecycle action.
 For older records with no launch-proof field, only an exact documented bare native resume command for the recorded harness proves unmanaged restoration; an ordinary legacy launch remains unchanged.
+For omp, that native form is exactly `omp --resume=<ref>` with a nonempty reference; split `--resume <ref>` arguments do not prove native restoration.
 An interpreter-launched native CLI is recognized only when its entry point resolves to the installed recorded harness; an arbitrary script or generic `agent` executable does not supply that identity.
 After replacement, matching managed-launch proof is required before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.

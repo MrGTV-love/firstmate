@@ -203,6 +203,7 @@ die() {  # <message>
 
 CONTROL_LOCK=
 CONTROL_LOCK_HELD=0
+SECONDMATE_LIVENESS_LOCK_HELD=0
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 
@@ -211,6 +212,10 @@ control_cleanup() {
   if [ "$RELAUNCH_ACTIVE" = 1 ] \
      && declare -F relaunch_rollback >/dev/null 2>&1; then
     relaunch_rollback || true
+  fi
+  if [ "$SECONDMATE_LIVENESS_LOCK_HELD" = 1 ]; then
+    SECONDMATE_LIVENESS_LOCK_HELD=0
+    fm_secondmate_liveness_unlock "$ID"
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -356,6 +361,13 @@ fi
 # instead, using the same `remote_host` signal bin/fm-send.sh routes on.
 if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
+fi
+
+if [ "$RECOVER_LAUNCH" = 1 ] && [ "$(fm_meta_get "$META" kind)" = secondmate ]; then
+  . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
+  fm_secondmate_liveness_lock "$ID" \
+    || die "another secondmate liveness check is already running for task $ID"
+  SECONDMATE_LIVENESS_LOCK_HELD=1
 fi
 
 fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
@@ -1007,7 +1019,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line
+  local exit_result state note_line backlog_gate_status recovery_actor
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1034,6 +1046,35 @@ do_relaunch() {
         die "launch recovery for $ID cannot prove its live launch settings"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
+    esac
+    if [ -e "$STATE/$ID.backlog-close" ] || [ -L "$STATE/$ID.backlog-close" ]; then
+      die "task $ID has a pending authoritative backlog close at $STATE/$ID.backlog-close; refusing launch recovery before stopping its agent"
+    fi
+    case "$KIND" in
+      ship|scout)
+        . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
+        . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+        if fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$KIND"; then
+          if fm_backlog_row_probe "$DATA" "$ID"; then
+            :
+          elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+            die "task $ID has no backlog item in this home; refusing launch recovery before stopping its agent"
+          else
+            die "task $ID's backlog item could not be read before launch recovery ($FM_BACKLOG_ROW_ERROR)"
+          fi
+          recovery_actor=$(fm_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
+          if [ "$recovery_actor" = branch ] && fm_lease_away_relocated; then
+            [ "$FM_BACKLOG_ROW_STATE" = "queued no no" ] \
+              || die "launch recovery refused - the supervision branch under the away-posture record may dispatch only queued unblocked work; task $ID's backlog state is $FM_BACKLOG_ROW_STATE"
+          elif ! fm_backlog_row_dispatchable "$FM_BACKLOG_ROW_STATE"; then
+            die "task $ID's backlog item is not dispatchable in state $FM_BACKLOG_ROW_STATE; refusing launch recovery before stopping its agent"
+          fi
+        else
+          backlog_gate_status=$?
+          [ "$backlog_gate_status" -eq 1 ] \
+            || die "task $ID cannot be recovered because its backlog is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)"
+        fi
+        ;;
     esac
     NEW_HARNESS=$RECORDED_HARNESS; HARNESS_SET=1
     NEW_MODEL=$(fm_meta_get "$META" model); MODEL_SET=1

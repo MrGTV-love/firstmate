@@ -965,6 +965,9 @@ test_omp_bordered_captured_frames() {
   empty=$(cat "$ROOT/tests/fixtures/omp-bordered-empty.ansi")
   pending=$(cat "$ROOT/tests/fixtures/omp-bordered-pending.ansi")
   assert_screen "real compact omp empty" empty "$CAPS_STYLED_NOID" "$empty"
+  assert_screen "real compact omp empty with cursor" empty "$CAPS_TMUX" "$empty" 16
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$empty")
+  [ -z "$out" ] || fail "empty omp extraction must omit its styled hint: $out"
   assert_screen "real compact omp draft" pending "$CAPS_STYLED_NOID" "$pending"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$pending")
   [ "$out" = 'recovery draft must survive' ] || fail "omp extraction includes title or loses input: $out"
@@ -985,6 +988,33 @@ test_omp_bordered_captured_frames() {
   pass "omp captured bordered frames preserve drafts and require a complete container"
 }
 test_omp_bordered_captured_frames
+
+test_omp_literal_input_rows() {
+  local draft screen out position cursor
+  for position in floor body; do
+    for draft in '#' '||' '# heading' '|draft|' '>' '$' '%' '❯' '›' '⟩' '→'; do
+      if [ "$position" = floor ]; then
+        screen=$'╭── π > model > path ─╮\n╰─ '"$draft"' ─╯'
+        cursor=1
+      else
+        screen=$'╭── π > model > path ─╮\n│ '"$draft"$' │\n╰─  ─╯'
+        cursor=1
+      fi
+      assert_screen "omp literal $position '$draft' with cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+      assert_screen "omp literal $position '$draft' cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+      assert_screen "omp literal $position '$draft' plain cursorless" pending "$CAPS_PLAIN" "$screen"
+      out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+      [ "$out" = "$draft" ] || fail "omp literal $position extraction lost '$draft': '$out'"
+    done
+  done
+  screen=$'╭── π > model > path ─╮\n│ # heading │\n╰─ |draft| ─╯'
+  assert_screen "omp literal multiline with cursor on floor" pending "$CAPS_TMUX" "$screen" 2
+  assert_screen "omp literal multiline cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = '# heading |draft|' ] || fail "omp multiline extraction changed literal input: '$out'"
+  pass "omp prompt-free input stays literal on its floor and body rows"
+}
+test_omp_literal_input_rows
 
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content

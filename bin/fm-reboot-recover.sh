@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Recover this home's recorded Herdr agents after native bare restoration.
-# Usage: FM_HOME=<home> fm-reboot-recover.sh [check|recover] [--one]
+# Usage: FM_HOME=<home> fm-reboot-recover.sh [recover] [--one]
 # Default recover repairs each positively unmanaged live ship, scout, or local
 # secondmate through fm-control relaunch --recover-launch, in its recorded pane
-# and local copy. check is read-only and prints one launch verdict per live
-# recorded Herdr agent. No namespace discovery, child-home traversal, config
-# change, endpoint removal, branch operation, or worktree allocation occurs.
+# and local copy. No namespace discovery, child-home traversal, config change,
+# endpoint removal, branch operation, or worktree allocation occurs.
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed: it
@@ -16,15 +15,14 @@
 # previous attempt, including a refusal, so pending input cannot starve others.
 # STATE/.reboot-recovery-cursor holds the last attempted id. It advances
 # atomically before repair, including when the caller times out during repair.
-# check and unbounded recover do not read or change that scheduling cursor.
+# Unbounded recover does not read or change that scheduling cursor.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() { sed -n '2,${/^#/!q;p;}' "$0" | sed 's/^# \{0,1\}//'; }
-ACTION=recover
 case "${1:-}" in
-  check|recover) ACTION=$1; shift ;;
+  recover) shift ;;
   ''|-*) ;;
-  *) echo "error: unknown recovery command '$1'; use check or recover (--help for options)" >&2; exit 2 ;;
+  *) echo "error: unknown recovery command '$1'; use recover (--help for options)" >&2; exit 2 ;;
 esac
 ONE=0
 while [ "$#" -gt 0 ]; do
@@ -52,7 +50,7 @@ count=${#records[@]}
 [ "$count" -gt 0 ] || exit 0
 start=0
 cursor="$STATE/.reboot-recovery-cursor"
-if [ "$ACTION" = recover ] && [ "$ONE" = 1 ]; then
+if [ "$ONE" = 1 ]; then
   if [ -e "$cursor" ] || [ -L "$cursor" ]; then
     [ -f "$cursor" ] && [ ! -L "$cursor" ] || {
       echo "error: recovery scheduling cursor is not a regular file: $cursor" >&2
@@ -83,10 +81,6 @@ for ((offset=0; offset<count; offset++)); do
   target=$FM_BACKEND_VALIDATED_TARGET
   [ "$(fm_backend_agent_state herdr "$target")" = alive ] || continue
   proof=$(fm_launch_proof_herdr "$meta")
-  if [ "$ACTION" = check ]; then
-    printf '%s launch=%s\n' "$id" "$proof"
-    continue
-  fi
   case "$proof" in
     managed) continue ;;
     unknown)
