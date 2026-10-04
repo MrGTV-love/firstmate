@@ -226,7 +226,7 @@ The test fixture enumerates every class below through the centralized policy, an
 | `genuine-agent-response` | Assistant text in `AssistantMessageComponent` | Visible. |
 | `assistant-working-note` | Assistant text in an `AssistantMessageComponent` message the model did not end its response with, identified by its own `stopReason` of `toolUse`, or of `length` with tool calls present | Each settled text block follows the cross-harness preservation contract in [`calm.md`](calm.md); hidden blocks are removed from the shallow presentation copy before layout, a `toolUse` message carrying only short narration occupies zero rows (verified on Pi 0.84.1), and a still-streaming `pending` message is never filtered. |
 | `assistant-thinking` | Thinking content in `AssistantMessageComponent` | Collapsed reasoning is removed from the shallow presentation copy before layout and occupies zero rows; explicit expansion renders the original reasoning. |
-| `assistant-tool-call` | `ToolExecutionComponent` | Seven built-ins, `fm_watch_arm_pi`, `fm_branch_outcomes`, and `fm_branch_processed` hidden; other arbitrary custom tools remain an unsupported boundary. |
+| `assistant-tool-call` | `ToolExecutionComponent` | The controlled main-session tools in the [Firstmate Pi tool audit](#firstmate-pi-tool-audit) hide; other arbitrary custom tools remain an unsupported boundary. |
 | `tool-result` | `ToolExecutionComponent` | Text results for the controlled tools hidden; other arbitrary custom results remain an unsupported boundary. |
 | `tool-image` | Image children appended outside tool renderer slots | Unsupported boundary; remains visible. |
 | `user-bash` | `BashExecutionComponent` for `!` and `!!` | Unsupported boundary; remains visible. |
@@ -299,7 +299,7 @@ The same real-Pi reproduction then delivered the notification exactly once in a 
 
 ## Regression coverage
 
-`tests/fm-calm-pi-extension.test.sh` compares wrapped and stock renderers and verifies all seven built-ins plus `fm_watch_arm_pi`; `tests/fm-pi-branch-extension.test.sh` compares both supervision tools against the installed stock component through pending, argument updates, partial results, errors, expansion, Calm toggling, and export fallback.
+`tests/fm-calm-pi-extension.test.sh` compares wrapped and stock renderers and verifies all seven built-ins plus `fm_watch_arm_pi`; `tests/fm-pi-branch-extension.test.sh` compares both supervision tools against the installed stock component through pending calls, argument updates, partial results, errors, expansion, Calm toggling, and updates received while hidden, and verifies `fm_branch_outcomes` stock HTML export fallback.
 Together they exercise redraw of already-rendered tool, thinking, current operational-user, and legacy synthetic rows, and cover every policy class.
 It covers persisted preference restoration across every session-start reason and a real restart, proves the working-ship presentation and Calm-off stock `Working...` row through a delayed deterministic provider, asserts no Calm status row, verifies operational messages remain exact ordinary user-role session entries and complete exports, and drives genuine 100 by 44, 160 by 36, and 180 by 44 terminal fixtures.
 A native deterministic `/skill:ahoy` turn produces thinking, tool-call, and tool-result blocks, asserts that the collapsed skill-to-final gap equals the two-row visible-only baseline, expands and re-collapses original thinking, restores Calm-off rendering, verifies persisted hidden history, and repeats the geometry assertion after restart with `terminal.clearOnShrink` explicitly off.
@@ -513,6 +513,7 @@ interactive-mode setToolsExpanded:
 ```
 
 The regression is pinned by the real-terminal `/export` case in `tests/fm-calm-pi-extension.test.sh`, which now asserts the confirmation is still on screen after Calm's redraw has settled and that the redraw restored every Calm-hidden row.
+The terminal assertions match the `Session exported to:` notification independently of the absolute filename, which can wrap in long worktree paths; a separate nonempty-file check and the export-data/browser checks validate the requested artifact.
 Reverting only the extension fix fails that assertion deterministically rather than racing the roughly 50ms window the confirmation used to survive:
 
 ```text
@@ -871,9 +872,9 @@ ok - Claude Code 2.1.283 (Claude Code) with Calm off shows the supervision notes
 
 Pi 0.99.0 introduced argument previews for tools without a custom call renderer and a show/hide control for exported custom messages marked `display: false`.
 The former made Firstmate's reconstructed supervision-tool headers differ from stock; the latter kept hidden messages in the DOM without making them visible in the default conversation.
-The supervision tools now delegate their visible rendering to Pi's stock component rather than copying its formatting rules.
+The [Firstmate Pi tool audit](#firstmate-pi-tool-audit) owns the current supervision-tool rendering boundary.
 The export regression evaluates actual browser visibility, preserved conversation and sidebar history, and the hidden-message control's reveal/restore behavior instead of requiring hidden data to be absent from serialized markup.
-No Pi dependency pin or test skip is needed.
+No Pi dependency pin or new test skip is needed for these surfaces; the existing installed-renderer comparison still skips Pi versions below its 0.84.4 baseline.
 
 Verified on 2026-09-30 with isolated Pi 0.99.0 packages and the matching CLI on `PATH`:
 

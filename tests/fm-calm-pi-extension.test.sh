@@ -4361,8 +4361,11 @@ JS
 
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l "/export $export_file"
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" M-s
-  wait_for_text "$export_snapshot" "Session exported to: $export_file" \
+  # Absolute fixture paths can wrap in Pi's terminal confirmation. Match its
+  # notification separately from the requested file, whose contents are checked below.
+  wait_for_text "$export_snapshot" "Session exported to:" \
     || fail "/export did not complete while calm mode was on"
+  [ -s "$export_file" ] || fail "/export did not create the requested HTML file"
   node - "$export_file" <<'JS' || fail "calm-mode HTML export lost tool data or persisted synthetic provenance"
 const html = require("node:fs").readFileSync(process.argv[2], "utf8");
 const match = html.match(/<script id="session-data" type="application\/json">([^<]+)<\/script>/);
@@ -4445,8 +4448,9 @@ JS
   # their export landed. The export-data assertions above take seconds of real time,
   # so this snapshot is taken well after that repaint has settled rather than racing it.
   tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" -S -600 >"$export_settled_snapshot"
-  assert_contains "$(cat "$export_settled_snapshot")" "Session exported to: $export_file" \
+  assert_contains "$(cat "$export_settled_snapshot")" "Session exported to:" \
     "Calm's post-export repaint overwrote Pi's export confirmation"
+  [ -s "$export_file" ] || fail "the requested HTML export disappeared after Calm's repaint"
   assert_not_contains "$(cat "$export_settled_snapshot")" "fm_watch_arm_pi" \
     "/export left the Firstmate watcher tool call shell in the Calm transcript"
   assert_not_contains "$(cat "$export_settled_snapshot")" "watcher: started Pi extension arm child" \
