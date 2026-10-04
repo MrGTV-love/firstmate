@@ -3,8 +3,8 @@
 #
 # Runs ShellCheck's default severity and extended, source-aware analysis with
 # ambient configuration disabled and one exact ShellCheck version.
-# CI selects the complete canonical set; local branches select changed files
-# and their transitive sourcing callers.
+# CI selects the complete canonical set; local branches select changed files,
+# known transitive sourcing callers, and possible callers of unresolved imports.
 # Every mode keeps --norc --external-sources and the same diagnostic rules.
 # --fast remains an explicit local-only opt-out from extended dataflow.
 # Selection and cache reuse retain the roots' source directives and call-site
@@ -25,6 +25,8 @@
 #     a separate root; its callers analyze it through their sources. Runtime
 #     backend imports participate in selection and cache invalidation even when
 #     their static source annotations intentionally isolate adapter analysis.
+#     Unresolved runtime imports select possible callers on changed/deleted shell
+#     or known source inputs and disable cache reuse, regardless of annotations.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis

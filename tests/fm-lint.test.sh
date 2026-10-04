@@ -1701,21 +1701,9 @@ test_selection_adds_no_unchanged_imported_roots() {
 
 test_runtime_backend_changes_select_every_dispatcher_consumer() {
   local tmp diff_file selection caller backend listed
-  local -a consumers=()
   tmp=$(fm_test_tmproot fm-lint-runtime-selection)
   diff_file="$tmp/diff.nul"
   selection="$tmp/selection.nul"
-  fm_lint_write_diff_file "$diff_file" bin/fm-backend.sh
-  perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
-    || fail "dispatcher dependency selection failed"
-  listed=$'\n'
-  while IFS= read -r -d '' caller; do
-    consumers+=("$caller")
-    listed+="$caller"$'\n'
-  done < "$selection"
-  for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh; do
-    assert_contains "$listed" $'\n'"$caller"$'\n' "dispatcher baseline omitted $caller"
-  done
   for backend in tmux herdr zellij orca cmux; do
     fm_lint_write_diff_file "$diff_file" "bin/backends/$backend.sh"
     perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
@@ -1726,7 +1714,7 @@ test_runtime_backend_changes_select_every_dispatcher_consumer() {
     done < "$selection"
     assert_contains "$listed" $'\n'"bin/backends/$backend.sh"$'\n' \
       "$backend change did not select its adapter root"
-    for caller in "${consumers[@]}"; do
+    for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh; do
       assert_contains "$listed" $'\n'"$caller"$'\n' \
         "$backend change did not select dispatcher consumer $caller"
     done
@@ -1876,9 +1864,6 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
       "$repo/bin/fm-lint.sh" --jobs 1 "bin/spelling-$index.sh" 2>&1) \
       || fail "source spelling $index did not initially pass: $out"
   done
-  # An unsupported command wrapper is not claimed to receive joint analysis.
-  # The helper must instead refuse reuse. An unrelated change must not select it:
-  # changed mode follows only resolved source closures, and CI lints every root.
   cat > "$repo/bin/unparsed.sh" <<'SH'
 #!/usr/bin/env bash
 builtin source bin/library.sh
@@ -2126,6 +2111,135 @@ SH
   pass "a fast-mode success cannot satisfy source-aware extended analysis"
 }
 
+test_unresolved_runtime_sources_select_possible_callers() {
+  local tmp repo diff_file selection listed caller changed override
+  tmp=$(fm_test_tmproot fm-lint-possible-callers)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  diff_file="$tmp/diff.nul"
+  selection="$tmp/selection.nul"
+  for override in /dev/null bin/library.sh; do
+    cat > "$repo/bin/runtime.sh" <<SH
+#!/usr/bin/env bash
+target=bin/library.sh
+target=\${1:-\$target}
+# shellcheck source=$override
+. "\$target"
+SH
+    cat > "$repo/bin/transitive.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/runtime.sh
+. bin/runtime.sh
+SH
+    for changed in bin/library.sh bin/deleted.sh; do
+      fm_lint_write_diff_file "$diff_file" "$changed"
+      perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$selection" \
+        || fail "possible-caller selection failed"
+      listed=$'\n'
+      while IFS= read -r -d '' caller; do listed+="$caller"$'\n'; done < "$selection"
+      for caller in bin/runtime.sh bin/transitive.sh; do
+        assert_contains "$listed" $'\n'"$caller"$'\n' \
+          "$override omitted possible caller $caller for $changed"
+      done
+      assert_not_contains "$listed" $'\n''bin/fm-lint-workflows.sh'$'\n' \
+        "possible-caller fallback selected a source-free root"
+    done
+    for changed in '' unrelated-input; do
+      fm_lint_write_diff_file "$diff_file" "$changed"
+      perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$selection" \
+        || fail "unrelated selection failed"
+      [ ! -s "$selection" ] || fail "empty or unrelated change selected possible callers"
+    done
+  done
+  for changed in bin/fm-operational-input.sh bin/fm-tmux-lib.sh \
+    bin/fm-supervise-daemon.sh bin/fm-gate-refuse-lib.sh; do
+    fm_lint_write_diff_file "$diff_file" "$changed"
+    perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+      || fail "assigned-variable consumer selection failed"
+    listed=$'\n'
+    while IFS= read -r -d '' caller; do listed+="$caller"$'\n'; done < "$selection"
+    case "$changed" in
+      bin/fm-operational-input.sh) caller=tests/fm-operational-input.test.sh ;;
+      bin/fm-tmux-lib.sh) caller=tests/fm-composer-ghost.test.sh ;;
+      bin/fm-supervise-daemon.sh)
+        assert_contains "$listed" $'\n''tests/fm-afk-inject-herdr-e2e.test.sh'$'\n' \
+          "daemon change omitted its Herdr sourcing consumer"
+        caller=tests/fm-afk-inject-e2e.test.sh ;;
+      bin/fm-gate-refuse-lib.sh) caller=tests/fm-gate-refuse.test.sh ;;
+    esac
+    assert_contains "$listed" $'\n'"$caller"$'\n' "assigned source omitted $caller"
+  done
+  pass "unresolved runtime sources select possible direct and transitive callers"
+}
+
+test_unresolved_runtime_sources_refuse_cached_success() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): runtime cache safety"; return; }
+  local tmp repo out attempt
+  tmp=$(fm_test_tmproot fm-lint-runtime-uncertainty)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf 'initial\n'
+}
+SH
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=bin/library.sh
+. "$target"
+needs_argument
+SH
+  cat > "$repo/bin/transitive.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/runtime.sh
+. bin/runtime.sh
+needs_argument
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+      || fail "runtime consumer check failed: $out"
+    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
+      "unproved runtime closure reused successful analysis"
+  done
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=/dev/null
+. "$target"
+printf 'ok\n'
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+      || fail "isolated runtime consumer check failed: $out"
+    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
+      "a /dev/null override authorized reuse of an unproved runtime closure"
+  done
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=bin/library.sh
+. "$target"
+needs_argument
+SH
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf '%s\n' "$1"
+}
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+    && fail "runtime consumer hid a changed imported argument requirement"
+  assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
+  pass "unproved transitive runtime closures never reuse successful analysis"
+}
+
+test_unresolved_runtime_sources_select_possible_callers
+test_unresolved_runtime_sources_refuse_cached_success
 test_source_spellings_keep_changed_and_cached_dataflow_findings
 test_joint_sources_keep_call_dependent_findings
 test_private_source_keeps_changed_call_dependent_findings

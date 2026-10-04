@@ -112,8 +112,11 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, reduced checks, or paid runner provisioning is part of this layout.
 
-Local branch selection includes changed shell files and their transitive sourcing callers, including runtime-dispatched backend adapters; unchanged imported libraries are analyzed only through those callers.
-Successful analyses are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
+Local branch selection includes changed shell files and their known transitive sourcing callers, including runtime-dispatched backend adapters; unchanged imported libraries are analyzed only through those callers.
+For changed or deleted shell/source inputs, unresolved runtime imports conservatively select possible callers through known transitive closures, independently of ShellCheck source overrides.
+This safety fallback can select extra roots; it does not resolve arbitrary computed Bash imports precisely.
+Successful analyses with proved closures are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
+Unproved runtime source closures are never reused from the successful-result cache.
 CI never reuses that cache.
 The lint script's header owns the exact selection and cache controls.
 
