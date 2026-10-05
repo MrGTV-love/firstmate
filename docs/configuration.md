@@ -1432,19 +1432,17 @@ Absent input preserves ordinary selection and does not send the whole brief inst
 All existing mandatory explicit/named and safety triggers run first and cannot be suppressed by this advisory result.
 Caller-supplied required IDs and locally resolvable named IDs are reported separately from optional suggestions and survive invalid or unavailable catalogs, with unresolved paths left for ordinary skill-index lookup; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
 Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
-LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts; whole-body hashes still track the original file bytes.
+LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts.
 
 Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
 Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
 Ambiguous shortlists receive a second evaluation using at most three bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
-Paths and whole-body hashes remain local; the judge does not receive the catalog's full instruction bodies.
+Paths remain local; the judge does not receive the catalog's full instruction bodies.
 TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
 Local discovery and required-trigger handling still include private skills; if the task summary names one, the request is withheld rather than rewriting that summary.
-Catalogs without verifiable Git tracking remain local, and changing an entry's tracking status invalidates cached advice.
+Catalogs without verifiable Git tracking remain local.
 Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
-The versioned model and exact task, catalog, policy, and required-ID hashes bind the private single-entry result cache; changed input invalidates reuse.
-Each invocation validates and consumes one private snapshot, so a concurrent task's cache publication cannot substitute its advice after validation.
-This is advisory-result memoization, not cached authority or dynamic quota.
+Each invocation evaluates the current task and public catalog with live, bounded requests; advice is not persisted or reused.
 
 Coverage is role- and input-specific:
 

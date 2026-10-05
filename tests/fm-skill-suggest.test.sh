@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Public skill-advice behavior: independent fits, no-fit, required names,
-# bounded two-stage disclosure, unavailable/malformed output and memoization.
+# bounded two-stage disclosure and unavailable/malformed output.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -70,7 +70,7 @@ chmod +x "$FAKEBIN/curl"
 export LOG
 TOOL="$ROOT/bin/fm-skill-suggest.sh"
 run() { PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="${KEY-}" MODE="${MODE:-multiple}" bash "$TOOL" --catalog "$CATALOG" "$@"; }
-reset() { rm -f "$LOG"/* "$HOME_DIR/state/skill-advice.json"; }
+reset() { rm -f "$LOG"/*; }
 REAL_DIRNAME=$(command -v dirname)
 export REAL_DIRNAME
 cat > "$FAKEBIN/dirname" <<'SH'
@@ -118,70 +118,53 @@ assert_contains "$out" 'required[1]' "role safety supplied by caller survives"
 assert_contains "$out" 'opening-instruction recheck' "ambiguous fits are rechecked"
 assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "one bounded batch per stage"
 jq -e '.state.catalog | length == 3 and all(.[]; (.excerpt | length) <= 700)' "$LOG/recheck" >/dev/null || fail "recheck must disclose at most three bounded excerpts"
-jq -e '.state.catalog | all(.[]; (has("path") or has("body_hash") or has("excerpt")) | not)' "$LOG/rank" >/dev/null || fail "rank must not disclose local paths, hashes or bodies"
+jq -e 'keys == ["model","questions","state"] and (.state | keys == ["catalog","task"]) and (.state.catalog | all(.[]; keys == ["description","id"]))' "$LOG/rank" >/dev/null || fail "rank must disclose only permitted outbound fields"
+jq -e 'keys == ["model","questions","state"] and (.state | keys == ["catalog","task"]) and (.state.catalog | all(.[]; keys == ["description","excerpt","id"]))' "$LOG/recheck" >/dev/null || fail "recheck must disclose only permitted outbound fields"
 jq -e '.state.catalog[] | select(.id == "alpha") | .description == "Use for alpha work, with its complete description retained."' "$LOG/rank" >/dev/null || fail "full folded description must survive"
 assert_present "$LOG/dirname-env" "ordinary request exercises early child"
 assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "ordinary request scrubs keys before dirname"
 assert_not_contains "$(cat "$LOG/rank")" safety "caller-required identity stays local"
 pass "multiple optional skills, safety requirements and bounded progressive disclosure"
 
-out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'source: cache' "identical result is reused"
-assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "memoized intake avoids network"
-printf 'Changed task intent.\n' > "$TASK"
-out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'source: live' "changed intent invalidates"
-printf '\nChanged instructions.\n' >> "$CATALOG/alpha/SKILL.md"
-out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'source: live' "changed catalog invalidates"
+for format in toon brief; do
+  if [ "$format" = brief ]; then
+    MODE=multiple
+    out=$(run --task-file "$TASK" --required safety --format "$format")
+    assert_contains "$out" 'Optional suggestion: alpha' "first brief invocation has optional advice"
+  fi
+  reset
+  MODE=none
+  out=$(run --task-file "$TASK" --required safety --format "$format")
+  if [ "$format" = toon ]; then
+    assert_contains "$out" 'status: none' "identical input uses the current no-fit response"
+    assert_contains "$out" 'suggestions[0]' "prior optional suggestions are not reused"
+    assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "repeated input preserves supplied requirements"
+    assert_contains "$out" 'source: live' "repeated input uses live advice"
+  else
+    assert_contains "$out" 'No optional suggestion (none:' "identical brief input uses the current no-fit response"
+    assert_not_contains "$out" 'Optional suggestion:' "prior brief suggestions are not reused"
+    assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "repeated brief input preserves supplied requirements"
+  fi
+  assert_equals '1' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$format repeated input makes a fresh bounded request"
+  assert_absent "$HOME_DIR/state" "$format live advice creates no private state directory"
+done
+MODE=multiple
+pass "identical public input uses the current live response and preserves requirements"
+
+reset
 printf 'safety\n' > "$HOME_DIR/config/dispatch-never-send"
 out=$(run --task-file "$TASK" --required safety)
-# Required IDs are local and are not sent, so withholding one is not a remote match.
-assert_contains "$out" 'source: live' "privacy policy change invalidates reuse without leaking local-only safety IDs"
-printf 'changed task\n' > "$HOME_DIR/config/dispatch-never-send"
+assert_contains "$out" 'suggestions[2]' "withholding local-only safety does not disable public advice"
+assert_not_contains "$(cat "$LOG/request")" safety "withheld required identity stays local"
+printf 'perform a combined task\n' > "$HOME_DIR/config/dispatch-never-send"
+reset
 out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'status: off' "new deny rule overrides cached advice"
+assert_contains "$out" 'status: off' "deny rule withholds matching task text"
+assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "withheld task preserves supplied requirements"
+assert_absent "$LOG/calls" "withheld task makes no live request"
 assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "withheld task never exposes keys to early children"
 rm "$HOME_DIR/config/dispatch-never-send"
-pass "memoization invalidates on task/catalog changes and respects updated privacy policy"
-
-# A different task may atomically replace the shared entry after validation.
-# Swap after the real jq validator returns, not by mocking its verdict.
-out=$(run --task-file "$TASK" --required safety)
-cp "$HOME_DIR/state/skill-advice.json" "$TMP_ROOT/validated-cache.json"
-OTHER_TASK="$TMP_ROOT/other-task"
-printf 'Use alpha for a separate task.\n' > "$OTHER_TASK"
-out=$(run --task-file "$OTHER_TASK" --required beta)
-cp "$HOME_DIR/state/skill-advice.json" "$TMP_ROOT/other-cache.json"
-cp "$TMP_ROOT/validated-cache.json" "$HOME_DIR/state/skill-advice.json"
-REAL_JQ=$(command -v jq)
-export REAL_JQ
-export CACHE_REPLACEMENT="$TMP_ROOT/other-cache.json" CACHE_TARGET="$HOME_DIR/state/skill-advice.json"
-cat > "$FAKEBIN/jq" <<'SH'
-#!/usr/bin/env bash
-set -u
-"$REAL_JQ" "$@"
-rc=$?
-if [ "$rc" -eq 0 ] && [ "${1:-}" = -e ]; then
-  case "$*" in
-    *'--arg key '*)
-      cp "$CACHE_REPLACEMENT" "$CACHE_TARGET.next" && mv "$CACHE_TARGET.next" "$CACHE_TARGET"
-      printf 'replaced\n' > "$LOG/cache-replaced"
-      ;;
-  esac
-fi
-exit "$rc"
-SH
-chmod +x "$FAKEBIN/jq"
-out=$(run --task-file "$TASK" --required safety)
-assert_present "$LOG/cache-replaced" "the other task's atomic replacement must actually occur"
-assert_contains "$out" 'source: cache' "validated cache snapshot is reusable"
-assert_contains "$out" 'required[1]' "cache replacement cannot substitute another task's required IDs"
-assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "this task's safety ID survives the replacement"
-assert_contains "$out" 'suggestions[2]' "this task's independent optional suggestions survive the replacement"
-rm "$FAKEBIN/jq"
-unset CACHE_REPLACEMENT CACHE_TARGET REAL_JQ
-pass "an atomic replacement after validation cannot substitute another task's advice"
+pass "privacy rules keep required identities local and withhold matching task text"
 
 reset
 BASE_CATALOG=$CATALOG
@@ -207,21 +190,20 @@ for stage in rank recheck; do
     assert_not_contains "$(cat "$LOG/$stage")" "$private_text" "$stage never transmits private skill fields or question keys"
   done
 done
-out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'source: cache' "public advice remains reusable"
-assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "cache reuse does not repeat requests"
-out=$(run --task-file "$TASK" --required alpha --required safety --format brief --no-cache)
+out=$(run --task-file "$TASK" --required alpha --required safety --format brief)
 assert_contains "$out" "Required named skill: alpha - read $CATALOG/alpha/SKILL.md." "caller-required private skill stays locally resolvable"
 assert_contains "$out" 'Optional suggestion: beta' "private requirement does not disable public advice"
 assert_not_contains "$(cat "$LOG/request")" alpha "caller-required private identity is not sent"
 git -C "$CATALOG" update-index --force-remove -- beta/SKILL.md
 printf 'beta/\n' >> "$CATALOG/.git/info/exclude"
 git -C "$CATALOG" check-ignore -q beta/SKILL.md || fail "formerly public skill must now be excluded"
+reset
 out=$(run --task-file "$TASK" --required safety)
-assert_contains "$out" 'source: live' "tracking-status change invalidates advice without changing skill bytes"
-assert_contains "$out" 'suggestions[0]' "now-private cached beta is no longer optional remote advice"
+assert_contains "$out" 'source: live' "remaining public skill is evaluated live"
+assert_contains "$out" 'suggestions[0]' "newly private beta is no longer optional remote advice"
+assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "tracking-status transition makes fresh bounded requests"
 for stage in rank recheck; do
-  assert_not_contains "$(cat "$LOG/$stage")" beta "$stage omits the newly private skill"
+  assert_not_contains "$(cat "$LOG/$stage")" beta "$stage request omits the newly private skill"
 done
 cp "$TASK" "$TMP_ROOT/private-task-save"
 printf 'Use alpha for this task.\n' > "$TASK"
@@ -229,7 +211,7 @@ printf '# Skill selection input\nUse alpha for this task.\n' > "$BRIEF"
 for input in --task-file --brief; do
   reset
   if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
-  out=$(run "$input" "$input_path" --required safety --no-cache)
+  out=$(run "$input" "$input_path" --required safety)
   assert_contains "$out" "\"alpha\",\"$CATALOG/alpha/SKILL.md\"" "task-named private skill remains required"
   assert_contains "$out" 'status: off' "private identity in task text is withheld rather than rewritten"
   assert_absent "$LOG/calls" "private task identity never reaches TypeSafe"
@@ -240,24 +222,24 @@ rm "$CATALOG/gamma/SKILL.md"
 ln -s "$TMP_ROOT/private-gamma.md" "$CATALOG/gamma/SKILL.md"
 git -C "$CATALOG" add -- gamma/SKILL.md
 reset
-out=$(run --task-file "$TASK" --required safety --no-cache)
+out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "local requirements survive a symlinked optional entry"
 assert_contains "$out" 'no public optional skills' "tracked symlink does not authorize private target disclosure"
 assert_absent "$LOG/calls" "all-private optional catalog makes no request"
 CATALOG="$TMP_ROOT/non-git-catalog"
 mkdir -p "$CATALOG"
 cp -R "$BASE_CATALOG/alpha" "$BASE_CATALOG/safety" "$CATALOG/"
-out=$(run --task-file "$TASK" --required safety --no-cache)
+out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "non-Git catalog keeps local requirements"
 assert_contains "$out" 'no public optional skills' "unverifiable catalog remains local"
 assert_absent "$LOG/calls" "non-Git catalog makes no request"
 CATALOG=$BASE_CATALOG
 MODE=multiple
-pass "private skills remain local across ranking, excerpts, requirements and cache transitions"
+pass "private skills remain local across ranking, excerpts, requirements and tracking transitions"
 
 for MODE in none recheck-none timeout malformed recheck-malformed wrong-model invalid-number missing-answer; do
   reset
-  out=$(run --task-file "$TASK" --required safety --no-cache)
+  out=$(run --task-file "$TASK" --required safety)
   assert_contains "$out" 'suggestions[0]' "$MODE never guesses optional skills"
   assert_contains "$out" 'required[1]' "$MODE never suppresses role safety"
   case "$MODE" in none|recheck-none) assert_contains "$out" 'status: none' "$MODE is a valid no-fit" ;; *) assert_contains "$out" 'status: fallback' "$MODE restores ordinary selection" ;; esac
@@ -278,7 +260,7 @@ for endings in lf crlf; do
   fi
   for format in toon brief; do
     reset
-    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    out=$(run --task-file "$TASK" --required safety --format "$format")
     if [ "$format" = toon ]; then
       assert_contains "$out" 'status: suggested' "$endings catalog supports optional selection"
       assert_contains "$out" "\"gamma\",\"$CATALOG/gamma/SKILL.md\"" "$endings resolves task-named requirement"
@@ -329,7 +311,7 @@ for indicator in '>' '>-' '|' '|-'; do
       cp "$TMP_ROOT/paragraph-alpha.md" "$CATALOG/alpha/SKILL.md"
     fi
     reset
-    out=$(run --task-file "$TASK" --required safety --no-cache)
+    out=$(run --task-file "$TASK" --required safety)
     assert_contains "$out" 'suggestions[2]' "$indicator $endings supports ordinary optional selection"
     assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$indicator $endings exercises rank and recheck"
     for stage in rank recheck; do
@@ -347,7 +329,7 @@ for scalar in 'Use for the first paragraph.' '"Use for the first paragraph."' "'
       cp "$TMP_ROOT/paragraph-alpha.md" "$CATALOG/alpha/SKILL.md"
     fi
     reset
-    out=$(run --task-file "$TASK" --required safety --required alpha --no-cache)
+    out=$(run --task-file "$TASK" --required safety --required alpha)
     assert_contains "$out" 'unsupported skill metadata' "$endings unsupported scalar continuation cannot be silently shortened"
     assert_contains "$out" "\"alpha\",\"$CATALOG/alpha/SKILL.md\"" "$endings identity-only parsing remains independent of descriptions"
     assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "$endings rejected continuation preserves sibling requirements"
@@ -370,7 +352,7 @@ Perform a combined task using safety.
 # Rules
 SECRET-RULES never sent.
 MD
-out=$(run --brief "$BRIEF" --format brief --no-cache)
+out=$(run --brief "$BRIEF" --format brief)
 assert_contains "$out" 'Required named skill: safety' "named safety preserved in additive advice"
 assert_contains "$out" 'Optional suggestion: alpha' "brief has optional advice"
 assert_not_contains "$(cat "$LOG/request")" SECRET "only permitted summary is disclosed"
@@ -381,7 +363,7 @@ pass "supported brief input carries only minimal permitted text and additive adv
 reset
 printf '\nSECRET-OPENING\n' >> "$CATALOG/alpha/SKILL.md"
 printf 'secret-opening\n' > "$HOME_DIR/config/dispatch-never-send"
-out=$(run --task-file "$TASK" --required safety --no-cache)
+out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" 'status: off' "opening excerpts are checked before stage two"
 assert_contains "$out" 'required[1]' "withheld excerpt never suppresses safety"
 assert_equals '1' "$(wc -l < "$LOG/calls" | tr -d ' ')" "withheld opening makes only the permitted first call"
@@ -400,7 +382,7 @@ for missing in frontmatter name description; do
   esac > "$CATALOG/delta/SKILL.md"
   printf 'Perform gamma work.\n' > "$TASK"
   for format in toon brief; do
-    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    out=$(run --task-file "$TASK" --required safety --format "$format")
     assert_contains "$out" 'unsupported skill metadata' "missing $missing cannot silently shrink the catalog"
     if [ "$format" = toon ]; then
       assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "missing $missing retains supplied requirement"
@@ -436,9 +418,7 @@ assert_requirements() {
   fi
 }
 BASE_CATALOG=$CATALOG
-REAL_SHASUM=$(command -v shasum)
-export REAL_SHASUM
-for boundary in description body hash count duplicate; do
+for boundary in description body count duplicate; do
   reset
   CATALOG="$TMP_ROOT/catalog-$boundary"
   mkdir -p "$CATALOG"
@@ -451,14 +431,6 @@ for boundary in description body hash count duplicate; do
     body)
       jq -nr '"x" * 524288' >> "$CATALOG/delta/SKILL.md"
       reason='skill body exceeds 512 KiB' ;;
-    hash)
-      cat > "$FAKEBIN/shasum" <<'SH'
-#!/usr/bin/env bash
-case "$*" in *'/delta/SKILL.md'*) exit 1 ;; esac
-exec "$REAL_SHASUM" "$@"
-SH
-      chmod +x "$FAKEBIN/shasum"
-      reason='catalog hash unavailable' ;;
     count)
       for ((i=1; i<=124; i++)); do
         mkdir -p "$CATALOG/extra-$i"
@@ -472,22 +444,21 @@ SH
       reason='duplicate skill IDs' ;;
   esac
   for format in toon brief; do
-    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    out=$(run --task-file "$TASK" --required safety --format "$format")
     assert_contains "$out" "$reason" "$boundary returns the catalog fallback"
     assert_requirements "$out" "$format" "$expected_path"
     assert_absent "$LOG/calls" "$boundary prevents remote optional advice"
   done
-  [ "$boundary" != hash ] || rm "$FAKEBIN/shasum"
 done
 CATALOG=$BASE_CATALOG
-pass "catalog body, hash, count, metadata and duplicate failures retain local requirements"
+pass "catalog body, count, metadata and duplicate failures retain local requirements"
 
 reset
 mkdir -p "$CATALOG/alias-directory"
 printf '%s\n' '---' 'name: actual-identity' 'description: [unsupported]' '---' '# Skill' > "$CATALOG/alias-directory/SKILL.md"
 printf 'Use actual-identity and alias-directory.\n' > "$TASK"
 for format in toon brief; do
-  out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+  out=$(run --task-file "$TASK" --required safety --format "$format")
   assert_contains "$out" actual-identity "frontmatter identity is recognized despite unsupported description"
   assert_not_contains "$out" '"alias-directory",' "directory name is not a required identity"
   assert_not_contains "$out" 'Required named skill: alias-directory' "brief does not treat directory as identity"
@@ -499,7 +470,7 @@ reset
 for missing_catalog in "$TMP_ROOT/absent-catalog" "$TMP_ROOT/empty-catalog"; do
   [ "$missing_catalog" != "$TMP_ROOT/empty-catalog" ] || mkdir -p "$missing_catalog"
   for format in toon brief; do
-    out=$(run --catalog "$missing_catalog" --task-file "$TASK" --required safety --format "$format" --no-cache)
+    out=$(run --catalog "$missing_catalog" --task-file "$TASK" --required safety --format "$format")
     assert_contains "$out" fallback "unavailable or empty catalog falls back"
     if [ "$format" = toon ]; then
       assert_contains "$out" '"safety",null' "unavailable identity path retains caller ID"
@@ -511,7 +482,7 @@ for missing_catalog in "$TMP_ROOT/absent-catalog" "$TMP_ROOT/empty-catalog"; do
   done
 done
 set +e
-out=$(run --task-file "$TASK" --required unknown --no-cache)
+out=$(run --task-file "$TASK" --required unknown)
 code=$?
 set -e
 assert_equals '2' "$code" "valid complete catalog still rejects unknown required IDs"
@@ -537,11 +508,11 @@ pass "missing jq reports supplied IDs and preserves requested brief authority"
 
 reset
 printf '# Task\nLegacy intent only.\n' > "$BRIEF"
-out=$(run --brief "$BRIEF" --no-cache)
+out=$(run --brief "$BRIEF")
 assert_contains "$out" 'status: fallback' "unapproved summary never uses legacy task text"
 assert_absent "$LOG/calls" "absent minimal summary makes no call"
 printf '%5000s' large > "$TASK"
-out=$(run --task-file "$TASK" --required safety --no-cache)
+out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" 'task exceeds 4 KiB' "oversized task not semantically truncated"
 assert_absent "$LOG/calls" "oversized task makes no call"
 
@@ -553,7 +524,7 @@ printf 'A permitted task.\n' > "$TASK"
   jq -nr '"  " + ("é" * 50000)'
   printf '%s\n' '---' '# Delta'
 } > "$CATALOG/delta/SKILL.md"
-out=$(run --task-file "$TASK" --required safety --no-cache)
+out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" 'request exceeds 96 KiB' "request size is bounded in bytes, not characters"
 assert_contains "$out" 'required[1]' "request budget never suppresses required skills"
 assert_absent "$LOG/calls" "oversized multibyte request makes no call"

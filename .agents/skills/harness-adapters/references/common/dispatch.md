@@ -22,7 +22,7 @@ At intake, put a minimal permitted summary and any explicit skill IDs under `# S
 Use the ordinary `bin/fm-skill-suggest.sh` tool for your own optional selection, then let the worker launch overlay supply the same advisory input to the worker.
 On a material intent change, invoke the tool with fresh minimal permitted text and send the additive advice through the existing steering path when useful.
 Keep the index and your judgment: a no-fit or unavailable answer never excuses a required skill load.
-[`docs/configuration.md`](../../../../../docs/configuration.md#advisory-skill-selection) owns setup, privacy, role coverage, and supported limits; the tool's help owns exact commands.
+[`docs/configuration.md`](../../../docs/configuration.md#advisory-skill-selection) owns setup, privacy, role coverage, and supported limits; the tool's help owns exact commands.
 
 
 ## Owners

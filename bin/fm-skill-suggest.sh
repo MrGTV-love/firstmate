@@ -3,16 +3,16 @@
 # Usage: fm-skill-suggest.sh --task-file <minimal-permitted-text-file> [options]
 #        fm-skill-suggest.sh --brief <filled-brief-file> [options]
 # Options: --required <skill-id> (repeatable), --catalog <skill-directory>,
-#          --format <toon|brief> (default toon), --no-cache, --help.
+#          --format <toon|brief> (default toon), --help.
 # --brief reads only # Skill selection input, a supervisor-authored minimal,
 # permitted task summary, never captain intent, boilerplate or a transcript.
 # Absent or oversized input returns ordinary selection, not a truncated task.
 # Call at intake and only on a material intent change.
-# The catalog defaults to this code root's .agents/skills; local paths and whole
-# body hashes stay local. Only IDs/descriptions reach stage one. Stage two
-# rechecks at most three opening excerpts (700 characters each) when ambiguous.
+# The catalog defaults to this code root's .agents/skills; local paths stay local.
+# Only public IDs/descriptions reach stage one. Stage two rechecks at most three
+# opening excerpts (700 characters each) when ambiguous.
 # Limits: 128 skills, 512 KiB per body, 4 KiB task, 96 KiB request, two requests
-# of five seconds each, no retries. Model: jev-1.13.0, pinned for cache identity.
+# of five seconds each, no retries. Model: jev-1.13.0.
 # Existing required triggers run first; explicit IDs in the task and --required
 # remain required independent of every Jev result. Optional fits >=0.6 may be
 # suggested (at most three); fits >=0.3 form the shortlist. Need or fits <0.85
@@ -21,9 +21,6 @@
 # Key/never-send policy is shared with dispatch via fm-typesafe-lib.sh.
 # Missing key, unavailable dependencies, withheld text or malformed answers
 # return off/fallback with required IDs intact; no API text or secrets are echoed.
-# Successful results are memoized by exact task/catalog/policy/model/required IDs
-# in ${FM_STATE_OVERRIDE:-$FM_HOME/state}/skill-advice.json (one private entry).
-# --no-cache neither reads nor writes it. A changed input invalidates it.
 # Output: compact TOON by default; --format brief is an additive launch/steer
 # section. Agents read paths with ordinary tools; nothing auto-loads skill bodies.
 set -u
@@ -34,12 +31,10 @@ SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FM_HOME=${FM_HOME:-$ROOT}
-STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
 CONFIG=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
 CATALOG="$ROOT/.agents/skills"
 MODEL=jev-1.13.0
 FORMAT=toon
-CACHE=1
 BRIEF='' TASK='' REQUIRED=()
 usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 die() { printf 'error: %s\nhelp: Run bin/fm-skill-suggest.sh --help\n' "$1"; exit 2; }
@@ -55,7 +50,6 @@ while [ $# -gt 0 ]; do
         --format) FORMAT=$2 ;;
       esac
       shift 2 ;;
-    --no-cache) CACHE=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument $1" ;;
   esac
@@ -91,9 +85,9 @@ render() {
     brief_authority
     jq -r '.required[] | if .path == null then "Required named skill: \(.id) - path unresolved; locate through the skill index." else "Required named skill: \(.id) - read \(.path)." end' <<<"$RESULT"
     jq -r '.suggestions[] | "Optional suggestion: \(.id) - read \(.path); fit=\(.fit), uncertain=\(.uncertain), evidence=\(.evidence)."' <<<"$RESULT"
-    jq -r 'if (.suggestions | length) == 0 then "No optional suggestion (\(.status): \(.reason)); continue ordinary selection." else "Advice source: \(.source); model: \(.model); catalog: \(.catalog_hash)." end' <<<"$RESULT"
+    jq -r 'if (.suggestions | length) == 0 then "No optional suggestion (\(.status): \(.reason)); continue ordinary selection." else "Advice source: \(.source); model: \(.model)." end' <<<"$RESULT"
   else
-    jq -r '"skill-advice:", "  status: \(.status)", "  reason: \(.reason | tojson)", "  uncertain: \(.uncertain)", "  source: \(.source // "unavailable")", "  model: \(.model // "jev-1.13.0")", "  catalog_hash: \(.catalog_hash // "unavailable")", "  stages: \(.stages // 0)", "  no_fit: \(.no_fit // null)", "  required[\(.required | length)]{id,path}:", (.required[] | "    \(.id | tojson),\(.path | tojson)"), "  suggestions[\(.suggestions | length)]{id,path,fit,uncertain,evidence}:", (.suggestions[] | "    \(.id | tojson),\(.path | tojson),\(.fit),\(.uncertain),\(.evidence | tojson)"), "help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools"' <<<"$RESULT"
+    jq -r '"skill-advice:", "  status: \(.status)", "  reason: \(.reason | tojson)", "  uncertain: \(.uncertain)", "  source: \(.source // "unavailable")", "  model: \(.model // "jev-1.13.0")", "  stages: \(.stages // 0)", "  no_fit: \(.no_fit // null)", "  required[\(.required | length)]{id,path}:", (.required[] | "    \(.id | tojson),\(.path | tojson)"), "  suggestions[\(.suggestions | length)]{id,path,fit,uncertain,evidence}:", (.suggestions[] | "    \(.id | tojson),\(.path | tojson),\(.fit),\(.uncertain),\(.evidence | tojson)"), "help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools"' <<<"$RESULT"
   fi
 }
 fallback() {
@@ -108,7 +102,7 @@ if [ -n "$BRIEF" ]; then
 else
   cp "$TASK" "$WORK/task" || die "could not read task"
 fi
-# Local catalog snapshot includes authoritative body paths and content hashes.
+# Local catalog snapshot includes authoritative body paths.
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 CATALOG=$(cd "$CATALOG" && pwd -P) || fallback fallback "catalog unavailable"
 : > "$WORK/identities"
@@ -129,10 +123,8 @@ for file in "$CATALOG"/*/SKILL.md; do
   COUNT=$((COUNT + 1))
   [ "$COUNT" -le 128 ] || fallback fallback "catalog exceeds 128 skills"
   [ "$(wc -c < "$file")" -le 524288 ] || fallback fallback "skill body exceeds 512 KiB"
-  hash=$(shasum -a 256 "$file") || fallback fallback "catalog hash unavailable"
-  hash=${hash%% *}
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
-  jq -eRsc --arg path "$file" --arg body_hash "$hash" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
+  jq -eRsc --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
   if [ ! -L "$file" ] && git --literal-pathspecs -C "$CATALOG" ls-files --error-unmatch -- "${file#"$CATALOG"/}" >/dev/null 2>&1; then
     jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
@@ -148,17 +140,12 @@ done
 jq -e -Rs 'test("\\S")' "$WORK/task" >/dev/null || fallback fallback "no task-specific intent; supply minimal permitted text"
 if ! fm_typesafe_key "$FM_HOME"; then fallback off "TypeSafe key unavailable"; fi
 command -v curl >/dev/null 2>&1 || fallback fallback "transport unavailable"
-# Nothing about local paths, full bodies or hashes is needed by the remote judge.
+# Nothing about local paths or full bodies is needed by the remote judge.
 jq --argjson required "$REQ_IDS" --slurpfile public "$WORK/public-paths" '[.[] | select(.path as $path | $public | index($path)) | select(.id as $id | $required | index($id) | not)]' "$WORK/catalog" > "$WORK/optional"
 if jq -e --rawfile task "$WORK/task" --slurpfile public "$WORK/public-paths" 'any(.[]; (.path as $path | $public | index($path) | not) and (.id as $id | $task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")))' "$WORK/catalog" >/dev/null; then
   fallback off "task names a private local skill; use ordinary selection"
 fi
 jq -e 'length > 0' "$WORK/optional" >/dev/null || fallback fallback "no public optional skills; use ordinary selection"
-POLICY_HASH=$({ cat "$0" "$SCRIPT_DIR/fm-skill-catalog.jq" "$SCRIPT_DIR/fm-typesafe-lib.sh"; if [ -f "$CONFIG/dispatch-never-send" ]; then cat "$CONFIG/dispatch-never-send"; fi; } | shasum -a 256)
-POLICY_HASH=${POLICY_HASH%% *}
-CATALOG_HASH=$(cat "$WORK/catalog" "$WORK/public-paths" | shasum -a 256); CATALOG_HASH=${CATALOG_HASH%% *}
-INTENT_HASH=$(shasum -a 256 "$WORK/task"); INTENT_HASH=${INTENT_HASH%% *}
-KEY=$(printf '%s\n' "$INTENT_HASH" "$CATALOG_HASH" "$POLICY_HASH" "$MODEL" "$REQ_IDS" | shasum -a 256); KEY=${KEY%% *}
 request() {
   jq -n --rawfile task "$WORK/task" --slurpfile catalog "$1" --arg model "$MODEL" --arg stage "$2" '
     {model:$model,state:{task:$task,catalog:[$catalog[0][] | {id,description} + (if $stage == "recheck" then {excerpt} else {} end)]},questions:
@@ -183,25 +170,6 @@ call() {
 }
 REQUEST=$(request "$WORK/optional" rank) || fallback fallback "could not construct request"
 check_request
-# The current deny policy is checked before cache reuse as well as before calls.
-if [ "$CACHE" -eq 1 ] && [ -f "$STATE/skill-advice.json" ] && [ ! -L "$STATE/skill-advice.json" ]; then
-  # Each invocation validates and consumes one inode snapshot: another task may
-  # atomically publish the shared entry at any point after this copy.
-  if cp "$STATE/skill-advice.json" "$WORK/cache.json" 2>/dev/null &&
-    jq -e --arg key "$KEY" --arg model "$MODEL" --argjson required "$(jq '.required' <<<"$RESULT")" --slurpfile catalog "$WORK/optional" '
-      .key == $key and .result.model == $model and .result.required == $required and
-      (.result.status == "suggested" or .result.status == "none") and
-      (.result.suggestions | type) == "array" and (.result.suggestions | length) <= 3 and
-      all(.result.suggestions[]; (.fit | type) == "number" and .fit >= 0.6 and .fit <= 1 and (.uncertain | type) == "boolean" and (.evidence == "description relevance" or .evidence == "opening-instruction recheck") and (.id as $id | .path as $path | any($catalog[0][]; .id == $id and .path == $path)))' "$WORK/cache.json" >/dev/null 2>&1; then
-    # Recheck cached excerpts against an updated never-send policy too.
-    jq --slurpfile cached "$WORK/cache.json" '[.[] | select(.id as $id | any($cached[0].result.suggestions[]; .id == $id))]' "$WORK/optional" > "$WORK/shortlist"
-    REQUEST=$(request "$WORK/shortlist" recheck)
-    check_request
-    RESULT=$(jq '.result | .source="cache"' "$WORK/cache.json")
-    render
-    exit 0
-  fi
-fi
 call
 NEED=$(jq '.answers.need.noul' "$WORK/response")
 jq --slurpfile response "$WORK/response" '[.[] | . + {fit:$response[0].answers["skill_" + .id].noul} | select(.fit >= 0.3)] | sort_by(-.fit,.id)' "$WORK/optional" > "$WORK/ranked"
@@ -222,15 +190,9 @@ if jq -e --argjson need "$NEED" '$need >= 0.3 and length > 0' "$WORK/shortlist" 
 else
   printf '[]\n' > "$WORK/shortlist"
 fi
-RESULT=$(jq --slurpfile shortlist "$WORK/shortlist" --argjson need "$NEED" --argjson stages "$STAGES" --arg evidence "$EVIDENCE" --arg model "$MODEL" --arg catalog "$CATALOG_HASH" --arg intent "$INTENT_HASH" --arg policy "$POLICY_HASH" '
-  . + {source:"live",model:$model,catalog_hash:$catalog,intent_hash:$intent,policy_hash:$policy,stages:$stages,no_fit:(1-$need),suggestions:[$shortlist[0][] | select($need >= 0.3 and .fit >= 0.6) | {id,path,fit,uncertain:(.fit < 0.85 or $need < 0.85),evidence:$evidence}]}
+RESULT=$(jq --slurpfile shortlist "$WORK/shortlist" --argjson need "$NEED" --argjson stages "$STAGES" --arg evidence "$EVIDENCE" --arg model "$MODEL" '
+  . + {source:"live",model:$model,stages:$stages,no_fit:(1-$need),suggestions:[$shortlist[0][] | select($need >= 0.3 and .fit >= 0.6) | {id,path,fit,uncertain:(.fit < 0.85 or $need < 0.85),evidence:$evidence}]}
   | .status=(if (.suggestions | length) > 0 then "suggested" else "none" end)
   | .reason=(if .status == "suggested" then "optional relevance only" else "no optional fit; ordinary selection remains available" end)
   | .uncertain=($need >= 0.3 and $need < 0.85 or any(.suggestions[]; .uncertain))' <<<"$RESULT") || fallback fallback "could not construct advice"
-if [ "$CACHE" -eq 1 ] && [ ! -L "$STATE" ] && [ ! -L "$STATE/skill-advice.json" ]; then
-  if mkdir -p "$STATE" && CACHE_TMP=$(mktemp "$STATE/.skill-advice.XXXXXX"); then
-    jq -n --arg key "$KEY" --argjson result "$RESULT" '{key:$key,result:$result}' > "$CACHE_TMP" && mv "$CACHE_TMP" "$STATE/skill-advice.json"
-    rm -f "$CACHE_TMP"
-  fi
-fi
 render

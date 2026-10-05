@@ -3151,7 +3151,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
       cat "$SOURCE_BRIEF" &&
       if fm_brief_heading_present "$SOURCE_BRIEF" "# Skill selection input"; then
-        FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+        FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" \
           bash "$SCRIPT_DIR/fm-skill-suggest.sh" --brief "$SOURCE_BRIEF" --format brief || true
       fi &&
       if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then

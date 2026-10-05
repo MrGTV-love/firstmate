@@ -19,6 +19,6 @@ gsub("\r\n"; "\n")
   elif $description.continuation != "" then error("unsupported multiline scalar")
   else $value | scalar end) as $text
 | if ($text | length) > 0 then
-    {id: $id, description: $text, path: $path, body_hash: $ARGS.named.body_hash, excerpt: $file.body[0:700]}
+    {id: $id, description: $text, path: $path, excerpt: $file.body[0:700]}
   else error("invalid skill metadata") end
   end
