@@ -1354,6 +1354,41 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
 
+## Jev command screening (shadow only)
+
+`bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
+The tracked project registrations cover Firstmate sessions; `fm-spawn.sh` installs the same caller for new Claude and omp fleet workers in other projects.
+Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
+Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
+
+The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+It does not grant account, billing, egress, command, or secret-access authority.
+No key means `missing_key`, not a synthetic judgment.
+Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
+
+Selection reuses Firstmate's shell command-position parser, including nested groups, substitutions and literal shell payloads.
+Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access commands are candidates; ordinary reads and printed command examples do not call Jev.
+Native `Read`/`read` paths select secret-shaped targets without opening the file.
+Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
+This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
+
+Only closed structural operation/scope enums and booleans enter Jev state.
+Arbitrary arguments, paths, URLs, command text, customer content, environment values, file bodies and tool-result bodies are never sent or logged.
+The existing `config/dispatch-never-send` list additionally withholds matching native inputs locally; unreadable or non-regular lists withhold rather than send.
+The key is removed from child environments and passed to `curl` through a header pipe, not argv.
+
+The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
+An interrupted attempt or unavailable usage remains unknown, not zero.
+Records require a private regular file; if attempt accounting cannot be written, no model request starts.
+Native completion hooks record success/failure by hashed tool identifier, never result content; a missing completion or denied tool stays unknown rather than being called successful.
+The script header and `--help` own invocation mechanics.
+
+`metrics` reports descriptive counts, p95 selected-command overhead, all-attempt known/unknown spend and labelled recall/would-block rates.
+`evaluate` consumes labelled native inputs without executing their commands; label provenance and independent labels remain the evaluator's responsibility.
+Absent labels yield unknown quality, and evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
+The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
+This implementation cannot enable blocking or reset that date.
+
 ## Toolchain
 
 On session start the first mate detects what its required toolchain is missing or too old and lists each problem with either an exact install command or manual instructions.

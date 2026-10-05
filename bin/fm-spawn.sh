@@ -4584,8 +4584,10 @@ if [ "$KIND" != secondmate ]; then
     j_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
+    j_guardrail=$(json_escape "node $(shell_quote "$FM_ROOT/bin/fm-jev-guardrail.mjs") hook --host claude")
+    j_guardrail_outcome=$(json_escape "node $(shell_quote "$FM_ROOT/bin/fm-jev-guardrail.mjs") outcome --host claude")
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail","timeout":5}]}],"PostToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail_outcome"}]}],"PostToolUseFailure":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail_outcome"}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;
@@ -4745,6 +4747,7 @@ EOF
 // inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
 // never current-state truth.
 import { execFile } from "node:child_process";
+import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -4753,6 +4756,7 @@ const busyEvent = (state: string, event: string) =>
     ], () => resolve());
   });
 export default function (pi: any) {
+  installGuardrail(pi);
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
