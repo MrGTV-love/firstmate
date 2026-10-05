@@ -620,6 +620,7 @@ for boundary in description body count duplicate; do
     body)
       jq -nr '"x" * 524288' >> "$CATALOG/delta/SKILL.md"
       reason='skill body exceeds 512 KiB' ;;
+
     count)
       for ((i=1; i<=124; i++)); do
         mkdir -p "$CATALOG/extra-$i"

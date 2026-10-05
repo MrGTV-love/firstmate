@@ -146,6 +146,7 @@ REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '$requ
 RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$required[] | . as $id | {id:$id,path:([$names[0][] | select(.id == $id) | .path][0] // null)}],suggestions:[]}')
 [ "$DISCOVERY_FAILED" = false ] || fallback fallback "unsupported skill metadata"
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
+
 : > "$WORK/rows"
 COUNT=0
 for file in "$CATALOG"/*/SKILL.md; do
