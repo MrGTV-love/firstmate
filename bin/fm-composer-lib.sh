@@ -1424,7 +1424,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
        && [ "$row" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then ambiguous=1; fi
     if { [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
          && fm_composer_row_has_edge "$trimmed"; } \
-       || _fm_composer_row_is_omp_status "$trimmed" \
+       || { ! _fm_composer_row_is_bare_literal "$row" && _fm_composer_row_is_omp_status "$trimmed"; } \
        || _fm_composer_row_is_braille_furniture "$trimmed" \
        || { ! _fm_composer_row_is_bare_literal "$row" \
             && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
@@ -1694,7 +1694,7 @@ _fm_composer_select_cursorless() {
       fm_composer_normalize_trim_var trimmed
       [ -n "$trimmed" ] || break
       if ! _fm_composer_row_is_bare_literal "$next" && fm_composer_row_has_edge "$trimmed"; then break; fi
-      _fm_composer_row_is_omp_status "$trimmed" && break
+      if ! _fm_composer_row_is_bare_literal "$next" && _fm_composer_row_is_omp_status "$trimmed"; then break; fi
       _fm_composer_row_is_braille_furniture "$trimmed" && break
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))

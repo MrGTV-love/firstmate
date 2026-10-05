@@ -18,6 +18,51 @@ assert_screen() {
   [ "$out" = "$want" ] || fail "$label under LC_ALL=C: expected $want, got '$out'"
 }
 
+test_owned_frame_status_substrings_remain_input() {
+  local frame screen expected caps want cursor last out enclosed
+  for frame in $'  ╭── π > model > path · 15.4%/272K ─╮\n  ╰─ ─╯' \
+               $'  ╭── π > model > path ─╮\n  │ text · 15.4%/272K │\n  ╰─ ─╯' \
+               $'  ╭── π > model > path ─╮\n  ╰─ text · 15.4%/272K ─╯'; do
+    expected=${frame//$'\n'/ }
+    expected=${expected//  /}
+    case "$frame" in *'│'*) last=3 ;; *) last=2 ;; esac
+    for enclosed in 0 1; do
+      screen=$'❯ \n'"$frame"
+      cursor=0
+      if [ "$enclosed" = 1 ]; then
+        screen=$'────────────────────\n'"$screen"$'\n────────────────────'
+        cursor=1
+      fi
+      screen="$screen"$'\n π · model · 15.4%/272K'
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        want=pending
+        [ "$caps" != "$CAPS_PLAIN" ] || want=unknown
+        assert_screen "owned frame status substring, enclosure=$enclosed" "$want" "$caps" "$screen"
+        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "owned frame status substring extraction refused"
+        [ "$out" = "$expected" ] || fail "owned frame status substring extraction: expected '$expected', got '$out'"
+        out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "owned frame status substring extraction under LC_ALL=C refused"
+        [ "$out" = "$expected" ] || fail "owned frame status substring extraction under LC_ALL=C: expected '$expected', got '$out'"
+      done
+      while [ "$cursor" -le "$((last + enclosed))" ]; do
+        assert_screen "owned frame status substring cursor row $cursor, enclosure=$enclosed" \
+          pending "$CAPS_TMUX" "$screen" "$cursor" $'omp\tidle'
+        cursor=$((cursor + 1))
+      done
+    done
+  done
+  screen=$'❯ \n π · model · 15.4%/272K'
+  assert_screen "unowned status still bounds empty native root" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "unowned status still bounds empty root cursor" empty "$CAPS_TMUX" "$screen" 0
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+    || fail "empty root with unowned status extraction refused"
+  [ -z "$out" ] || fail "unowned status was extracted as draft: '$out'"
+  pass "owned frame header, body and floor status substrings preserve the entire draft"
+}
+
+test_owned_frame_status_substrings_remain_input
+
 test_native_prompt_continuations_own_literal_frames() {
   local continuation frame screen expected caps cursor last out frame_expected
   for continuation in '> quote' '# heading' '$ command' '% command' '❯ nested draft' '› nested draft' '⟩ nested draft' '→ nested draft'; do
