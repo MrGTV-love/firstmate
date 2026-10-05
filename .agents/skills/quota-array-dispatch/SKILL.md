@@ -30,6 +30,7 @@ The helper selects a candidate only when its applicable quota has known positive
 This is an optional narrow helper with a known limitation: it maps each harness to one primary provider family only, so a candidate whose established provider differs from that primary family is checked against the wrong quota row.
 omp has no primary family, so the helper keys an `omp:` candidate on its model prefix, mapping only `openai-codex/` and `claude-bridge/` and refusing every other prefix; the helper's header owns that mapping.
 For OMP `openai-codex/` candidates it reads one additional pooled OMP usage report, preserves native successful-response warnings at 0%, and never redeems saved resets.
+For a TeamClaude-selected launch or a Claude account pin without an established quota mapping, native Claude's default row is unrelated evidence: typed resolution keeps the route eligible but unranked and cannot activate a stand-in from that row, while the positive-headroom chooser skips it as unknown.
 Authoritative multi-provider routing - including provider discovery from the harness catalog and quota matching by that explicit provider - stays owned by this skill's intake procedure above and AGENTS.md section 4, not by the helper.
 Use it only when the brief already fixed the candidate order and every candidate's provider is the harness's primary family.
 It does not replace the reasoning-class, runway-feasibility, or authentication gates above.
