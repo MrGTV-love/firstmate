@@ -122,6 +122,7 @@ jq -sc 'group_by(.id) | map({id:.[0].id,path:(if length == 1 then .[0].path else
 REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '$required + [.[] | .id as $id | select($task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")) | .id] | unique' "$WORK/names")
 RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$required[] | . as $id | {id:$id,path:([$names[0][] | select(.id == $id) | .path][0] // null)}],suggestions:[]}')
 : > "$WORK/rows"
+: > "$WORK/public-paths"
 COUNT=0
 for file in "$CATALOG"/*/SKILL.md; do
   [ -f "$file" ] || continue
@@ -133,6 +134,9 @@ for file in "$CATALOG"/*/SKILL.md; do
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
   jq -eRsc --arg path "$file" --arg body_hash "$hash" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
+  if [ ! -L "$file" ] && git --literal-pathspecs -C "$CATALOG" ls-files --error-unmatch -- "${file#"$CATALOG"/}" >/dev/null 2>&1; then
+    jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
+  fi
 done
 [ "$COUNT" -gt 0 ] || fallback fallback "empty catalog"
 jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"
@@ -145,10 +149,14 @@ jq -e -Rs 'test("\\S")' "$WORK/task" >/dev/null || fallback fallback "no task-sp
 if ! fm_typesafe_key "$FM_HOME"; then fallback off "TypeSafe key unavailable"; fi
 command -v curl >/dev/null 2>&1 || fallback fallback "transport unavailable"
 # Nothing about local paths, full bodies or hashes is needed by the remote judge.
-jq --argjson required "$REQ_IDS" '[.[] | select(.id as $id | $required | index($id) | not)]' "$WORK/catalog" > "$WORK/optional"
+jq --argjson required "$REQ_IDS" --slurpfile public "$WORK/public-paths" '[.[] | select(.path as $path | $public | index($path)) | select(.id as $id | $required | index($id) | not)]' "$WORK/catalog" > "$WORK/optional"
+if jq -e --rawfile task "$WORK/task" --slurpfile public "$WORK/public-paths" 'any(.[]; (.path as $path | $public | index($path) | not) and (.id as $id | $task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")))' "$WORK/catalog" >/dev/null; then
+  fallback off "task names a private local skill; use ordinary selection"
+fi
+jq -e 'length > 0' "$WORK/optional" >/dev/null || fallback fallback "no public optional skills; use ordinary selection"
 POLICY_HASH=$({ cat "$0" "$SCRIPT_DIR/fm-skill-catalog.jq" "$SCRIPT_DIR/fm-typesafe-lib.sh"; if [ -f "$CONFIG/dispatch-never-send" ]; then cat "$CONFIG/dispatch-never-send"; fi; } | shasum -a 256)
 POLICY_HASH=${POLICY_HASH%% *}
-CATALOG_HASH=$(shasum -a 256 "$WORK/catalog"); CATALOG_HASH=${CATALOG_HASH%% *}
+CATALOG_HASH=$(cat "$WORK/catalog" "$WORK/public-paths" | shasum -a 256); CATALOG_HASH=${CATALOG_HASH%% *}
 INTENT_HASH=$(shasum -a 256 "$WORK/task"); INTENT_HASH=${INTENT_HASH%% *}
 KEY=$(printf '%s\n' "$INTENT_HASH" "$CATALOG_HASH" "$POLICY_HASH" "$MODEL" "$REQ_IDS" | shasum -a 256); KEY=${KEY%% *}
 request() {
@@ -180,7 +188,7 @@ if [ "$CACHE" -eq 1 ] && [ -f "$STATE/skill-advice.json" ] && [ ! -L "$STATE/ski
   # Each invocation validates and consumes one inode snapshot: another task may
   # atomically publish the shared entry at any point after this copy.
   if cp "$STATE/skill-advice.json" "$WORK/cache.json" 2>/dev/null &&
-    jq -e --arg key "$KEY" --arg model "$MODEL" --argjson required "$(jq '.required' <<<"$RESULT")" --slurpfile catalog "$WORK/catalog" '
+    jq -e --arg key "$KEY" --arg model "$MODEL" --argjson required "$(jq '.required' <<<"$RESULT")" --slurpfile catalog "$WORK/optional" '
       .key == $key and .result.model == $model and .result.required == $required and
       (.result.status == "suggested" or .result.status == "none") and
       (.result.suggestions | type) == "array" and (.result.suggestions | length) <= 3 and

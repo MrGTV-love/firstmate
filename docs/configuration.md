@@ -1437,6 +1437,9 @@ LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening e
 Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
 Ambiguous shortlists receive a second evaluation using at most three bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
 Paths and whole-body hashes remain local; the judge does not receive the catalog's full instruction bodies.
+TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
+Local discovery and required-trigger handling still include private skills; if the task summary names one, the request is withheld rather than rewriting that summary.
+Catalogs without verifiable Git tracking remain local, and changing an entry's tracking status invalidates cached advice.
 Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
 The versioned model and exact task, catalog, policy, and required-ID hashes bind the private single-entry result cache; changed input invalidates reuse.
 Each invocation validates and consumes one private snapshot, so a concurrent task's cache publication cannot substitute its advice after validation.
