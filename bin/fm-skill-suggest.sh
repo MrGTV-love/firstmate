@@ -38,7 +38,7 @@ CATALOG="$ROOT/.agents/skills"
 MODEL=jev-1.13.0
 FORMAT=toon
 CACHE=1
-BRIEF= TASK= REQUIRED=()
+BRIEF='' TASK='' REQUIRED=()
 usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 die() { printf 'error: %s\nhelp: Run bin/fm-skill-suggest.sh --help\n' "$1"; exit 2; }
 while [ $# -gt 0 ]; do
@@ -104,6 +104,7 @@ for file in "$CATALOG"/*/SKILL.md; do
   [ "$(wc -c < "$file")" -le 524288 ] || fallback fallback "skill body exceeds 512 KiB"
   hash=$(shasum -a 256 "$file") || fallback fallback "catalog hash unavailable"
   hash=${hash%% *}
+  # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
   jq -Rsc --arg path "$file" --arg body_hash "$hash" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
 done

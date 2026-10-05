@@ -29,6 +29,7 @@ fm_typesafe_post() {
   printf '%s' "$http"
 }
 
+# shellcheck disable=SC2034 # FM_TYPESAFE_WITHHELD_REASON is a caller-consumed result.
 fm_typesafe_permitted() {
   local request=$1 path=$2 scratch=$3 list value n=0 rc
   FM_TYPESAFE_WITHHELD_REASON=
