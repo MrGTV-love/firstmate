@@ -34,7 +34,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | --- | --- | --- |
 | `interrupt` | Deliver the harness's verified interrupt sequence while leaving the agent running. | Delivery succeeds while the endpoint still exists and the agent is still alive where the backend can classify that; cancellation is confirmed only from an adapter-owned acknowledgement and otherwise reports `cancel=unconfirmed`. |
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
-| `relaunch` | Replace the agent in the recorded worktree, or an explicitly validated replacement for a proven-absent copy, and reuse its endpoint whenever it survives. | The new agent is alive on the endpoint the task's record now names, and that record names the harness and worktree actually running. |
+| `relaunch` | Replace the running agent with a new one in the same worktree - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
 Interrupt never rewrites busy state as proof of its own success.
@@ -73,7 +73,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    `--claude-debug` is off by default, refused unless the resolved replacement harness is claude, and passed through to the launch; the [`bin/fm-spawn.sh`](../bin/fm-spawn.sh) header owns what it turns on, including the diagnostics file that names the signal of the next stop.
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
 2. **Safe checkpoint.**
-   The recorded worktree must exist and be a worktree root, unless an explicit [relocation](#relocating-a-task-whose-worktree-is-gone) proves a replacement; its head and dirty state are recorded.
+   The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
    For a `kind=secondmate` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
    A secondmate's own crewmates run in their own endpoints and outlive its relaunch; the relaunched secondmate reconciles them from its home's durable records at startup.
 3. **Record the note.**
@@ -84,7 +84,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A known non-delivery (`send-failed`) removes that marker before refusing; this includes the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
    A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait, and `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads it.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
-   When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in the validated worktree and republishes the binding - see [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
+   When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that same worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**
    The endpoint's runtime may bind pane status to one session identity; the launch owner preserves it only when that runtime records a reference the replacement adapter can consume, and otherwise launches the ordinary fresh session.
    This reference is a launch input, never authority to send, close, or act on the pane.
@@ -97,10 +97,10 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 A terminal can disappear while its task's worktree, branch, commits, and uncommitted changes survive.
 Reclaim supports Herdr's session-scoped absence proof and tmux's machine-wide no-user-server proof.
 
-Two endpoint verdicts are agent-free, and both license a relaunch:
+Two endpoint verdicts can permit a relaunch, subject to the backend policy below:
 
 - `dead` - the endpoint exists and confidently holds no agent. It is **adopted**, so the task keeps its exact recorded address.
-- gone, **proven** - there is no endpoint and therefore no agent, and it cannot be adopted, so the launch owner **creates one fresh endpoint in the recorded worktree** and the republished record rebinds the task to it.
+- gone, **proven** - there is no endpoint and therefore no agent, and it cannot be adopted; when the backend policy below permits reclaim, the launch owner **creates one fresh Herdr endpoint in the recorded worktree** and the republished record rebinds the task to it.
 
 That proof is its own step, because the classifier's `missing` is not one state: it conflates *the endpoint was destroyed* with *the endpoint is unreachable from here right now*.
 An unreachable endpoint can still hold the live agent a rebind would duplicate, so absence is proven and never inferred from a failed read - and whether it is provable at all is a property of the backend:
@@ -126,13 +126,13 @@ What a reclaim is not:
 
 - It is **not a teardown**. The worktree is reused exactly as the previous agent left it; nothing unlanded is ever discarded, and the ordinary `--note` requirement still applies.
 - It does **not** change the task's identity.
-  The task id, armed poll and registration, and status log are untouched; endpoint binding moves, and worktree binding moves only through explicit validated relocation.
+  The task id, worktree, armed poll and registration, and status log are untouched; only the endpoint binding in the record moves.
   Its instructions are the one exception, and only in the way an ordinary relaunch already changes them: a ship or scout reclaim appends the required `--note` under a `## Progress note (<timestamp>)` heading in `data/<id>/brief.md`, so re-read that brief rather than assuming it is byte-identical - a reclaim that failed and was retried leaves one block per attempt.
   A secondmate's standing charter is never rewritten.
 - It is **not** a peer seat's operation. `fm-control` resolves an exact task id against **this** home's `state/`, so only the home that owns the task can reclaim it.
 - It does **not** cover a secondmate. A secondmate whose endpoint is gone already has one recovery path - `bin/fm-spawn.sh <id> --secondmate`, driven by the session-start sweep or the watcher's liveness tick - so control-plane reclaim refuses and names it rather than becoming a second path to the same outcome.
 
-The re-created tab is opened in the herdr session the record names, never in whichever session the recovering seat happens to sit in - relocating a task onto another herdr server would be an identity change published as a self-consistent but wrong record.
+For a task already recorded on Herdr, the re-created tab is opened in the herdr session the record names, never in whichever session the recovering seat happens to sit in - relocating a task onto another herdr server would be an identity change published as a self-consistent but wrong record.
 A seat that *claims* a herdr launcher pane belonging to a different session is refused rather than allowed to place the endpoint somewhere else, so reclaim such a task from a seat in the recorded session.
 A seat with no herdr launcher pane at all - a plain ssh or cron shell, which is the ordinary way an operator reclaims - is not refused: placement falls back to the recorded session's labeled container, so the tab still lands in the session the record names.
 The reclaim pins the recorded **session** but not the **workspace**: the container follows the reclaiming seat, so a reclaim run from a seat inside the recorded session places the new tab in *that seat's* workspace rather than the recorded `herdr_workspace_id`, even when the recorded workspace still exists and only the pane was destroyed.
@@ -140,29 +140,17 @@ The record is republished consistently and no work is lost, but the task's `herd
 The pane id necessarily changes (the pane did not survive), and the record follows it.
 A Herdr reclaim deliberately uses the flat container shape rather than presentation projection: projection is a presentation-only layout that is never endpoint or ownership authority, and flat is already the documented fallback for every recovery it cannot bind exactly ([`docs/herdr-backend.md`](herdr-backend.md)).
 
-A proven-gone tmux endpoint has no surviving socket identity to reuse.
-Its replacement uses the task home's current backend resolution, just as a new spawn does, rather than assuming the recorded tmux backend is still the home's choice.
-The selected backend must pass spawn validation and support the control plane's replacement-alive proof; an unsupported or unverified choice refuses rather than falling back.
-Herdr reclaim continues to use its recorded session unchanged.
+A proven-gone tmux endpoint is replaced on Herdr **only when the task home's current configured spawn backend is `herdr` and passes spawn validation**.
+Every other configured backend, including `tmux`, `zellij`, and `cmux`, retains the relaunch refusal: reclaim never recreates tmux endpoints and never migrates to another backend.
+The Herdr replacement uses the home's current Herdr session resolution and the same flat placement path as an ordinary Herdr reclaim.
+It never starts a tmux server, so reclaiming one rebooted task does not invalidate the no-server absence proof for the home's remaining missing tmux tasks.
+Herdr-to-Herdr reclaim continues to use its recorded session unchanged.
 
 **Known limitation - a refusal before the record is republished leaves a stray husk pane** (follow-up bead `fm-herdr-rebind-leak-20260913`).
 The rebind registers no abort cleanup, so a refusal in the window between the new tab being created and the record being republished leaves that pane behind while the record still names the old, gone one.
 The stray pane holds a bare shell - the harness is not delivered until after publication - so the next reclaim cleans up after it: the re-created tab carries the same `fm-<id>` label, `tab create` finds it, classifies it a husk, and closes and replaces it.
 That self-heals only when the retry resolves the *same* workspace, which the placement rule above does not guarantee.
 The worktree and the task's records are unaffected either way.
-
-### Relocating a task whose worktree is gone
-
-`fm-control.sh <id> relaunch --worktree <path> --note <text>` can explicitly rebind a ship or scout whose recorded local copy is proven absent.
-The command never allocates, moves, removes, or repairs a worktree; the replacement must already exist.
-An existing file, directory, dangling symlink, or inaccessible ancestry at the recorded path refuses.
-The replacement must be an isolated linked worktree of the recorded project's same local repository, not the spawning project itself, its primary checkout, or a subdirectory.
-Its checked-out branch must exactly equal the recorded branch, and its HEAD must contain the recorded commit.
-That historical commit comes from `worktree_head` or `pr_head` metadata, or a prior task-bound control journal checkpoint for the recorded path; absent or unresolvable evidence refuses rather than guessing from today's branch tip.
-A path already recorded by any other task in this home refuses, including an alias resolving to the same physical directory.
-Validation runs before the old agent is stopped and repeats in the launch owner under publication locking; relocation publications in one home are serialized.
-The record is republished only with the replacement launch, preserving the task id, status log, armed poll, branch, and ordinary progress-note requirement.
-No unlanded work is discarded, and secondmate recovery remains outside this path.
 
 ### Failure and rollback
 
@@ -213,5 +201,5 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, tmux no-server reclaim and conservative process-read refusals, and explicit worktree relocation.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

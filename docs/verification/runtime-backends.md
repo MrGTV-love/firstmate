@@ -131,28 +131,18 @@ zsh
 A persistent parent shell waiting for a child remained reported as the parent process, while a shell that directly execed a simple command changed identity with the process itself.
 Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-spawn.sh` launches.
 
-### Control-plane absence and relocation
+### Control-plane endpoint absence
 
-[Agent lifecycle control](../agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns the reclaim and relocation contract.
-Verified on 2026-10-05 on macOS 26.5.2 arm64 with Bash 3.2.57 using the portable process-table and backend stubs:
+[Agent lifecycle control](../agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns the reclaim contract.
+Refresh its portable production-command verification with:
 
 ```sh
 bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
 ```
 
-Bounded observed output:
-
-```text
-ok - tmux: unreadable, empty, malformed and changing process snapshots refuse both verbs
-ok - tmux: a readable server contradicting the process snapshot refuses
-ok - tmux: zero user-owned servers permits exit and one fresh endpoint, preserving work, note and poll
-ok - relaunch: explicit relocation accepts the same branch and containing head, and refuses unsafe destinations
-ok - tmux: no-server reclaim uses the home's configured Herdr backend and republishes its binding
-```
-
 The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
 Its process seam also separates a current-user server on another socket from a server owned by another uid.
-The relocation cases cover exact and descendant heads, prior checkpoint and PR-head evidence, wrong branches, unrelated heads, another task's path or symlink alias, surviving copies, primary or spawning copies, foreign repositories, subdirectories, absent head evidence, and dangling recorded paths.
+The reclaim cases cover two missing tmux tasks in one home, recovered sequentially onto configured Herdr while preserving work, task identity, status, armed polls, and progress notes, plus refusal of every other configured backend.
 
 ### Agent liveness name sources
 

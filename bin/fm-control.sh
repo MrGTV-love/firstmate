@@ -5,7 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
-#                                         [--effort <level>] [--claude-debug] [--worktree <path>]
+#                                         [--effort <level>] [--claude-debug]
 #                                         (--note <text> | --note-file <path>)
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
@@ -14,10 +14,6 @@
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
-# --worktree is relaunch-only: an explicitly supplied isolated worktree can
-# replace a proven-absent recorded path, never an existing or unreadable copy.
-# bin/fm-control-worktree-lib.sh owns repository, branch, recorded-head ancestry
-# and other-task ownership validation; it never allocates or moves a worktree.
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
 # DATA plane: conversational text for the agent to read, always routing-marked
@@ -61,11 +57,10 @@
 #              still exists - on the same or a newly chosen
 #              harness/model/effort - so switching harness is one ordinary use
 #              of this verb. When the recorded endpoint is instead proven gone -
-#              the launch owner creates one fresh endpoint in that worktree
-#              and republishes the binding. Herdr keeps its recorded session;
-#              a tmux no-server reclaim uses the home's current configured
-#              spawn backend, validated for the alive postcondition.
-#              Explicit relocation is validated before stopping anything.
+#              the launch owner republishes the endpoint binding in that worktree.
+#              Herdr keeps its recorded session; a proven-gone tmux endpoint
+#              may be replaced only with Herdr when the home's current configured
+#              backend resolves to herdr and passes spawn validation.
 #              An explicit `default` model or effort clears that
 #              axis for the replacement. With no explicit axis, a secondmate
 #              re-resolves its durable config/secondmate-harness pin (harness
@@ -241,8 +236,6 @@ EFFORT_SET=0
 NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
-RELOCATION_WT=
-RELOCATION_SET=0
 control_want_value=
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
@@ -254,7 +247,6 @@ for control_arg in "$@"; do
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
-      worktree) RELOCATION_WT=$control_arg; RELOCATION_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -271,8 +263,6 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
-    --worktree) control_want_value=worktree ;;
-    --worktree=*) RELOCATION_WT=${control_arg#--worktree=}; RELOCATION_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -291,13 +281,12 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RELOCATION_SET" = 0 ] \
-    || die "--harness, --model, --effort, --note, --worktree, and --claude-debug apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] \
+    || die "--harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
-[ "$RELOCATION_SET" = 0 ] || [ -n "$RELOCATION_WT" ] || die "--worktree requires a non-empty value"
 case "$NEW_EFFORT" in
   ''|default|low|medium|high|xhigh|max|ultra) ;;
   *) die "--effort must be one of default, low, medium, high, xhigh, max, ultra" ;;
@@ -896,15 +885,6 @@ CHECKPOINT_LINES=()
 safe_checkpoint() {
   local wt_real wt_top wt_top_real head head_ref head_ref_status status_output dirty children marker child_meta
   CHECKPOINT_LINES=()
-  if [ "$RELOCATION_SET" = 1 ]; then
-    # Validate before journaling or stopping; spawn repeats under its meta lock.
-    # shellcheck source=bin/fm-control-worktree-lib.sh
-    . "$SCRIPT_DIR/fm-control-worktree-lib.sh"
-    fm_control_worktree_relocation "$META" "$ID" "$STATE" "$RELOCATION_WT" || exit 1
-    CHECKPOINT_LINES+=("relocation_from=$WT" "relocation_head=$FM_CONTROL_RELOCATION_HEAD")
-    WT=$FM_CONTROL_RELOCATION_PATH
-    RELOCATION_WT=$WT
-  fi
   [ -n "$WT" ] || die "task $ID has no recorded worktree; refusing to relaunch without a recorded local copy to preserve"
   [ -d "$WT" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work"
   wt_real=$(cd "$WT" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $WT cannot be resolved"
@@ -982,13 +962,8 @@ record_note() {
         echo
         echo "## Progress note ($stamp)"
         echo
-        if [ "$RELOCATION_SET" = 1 ]; then
-          echo "This task was relaunched in $WT after its recorded copy was proven absent."
-          echo "The replacement contains the recorded commit on the same branch; inspect its local changes before continuing."
-        else
-          echo "This task was relaunched. Continue from here; the local copy and every"
-          echo "uncommitted change are exactly as the previous worker left them."
-        fi
+        echo "This task was relaunched. Continue from here; the local copy and every"
+        echo "uncommitted change are exactly as the previous worker left them."
         echo
         echo "First, check your instruction inbox: list $STATE/$ID.inbox/*.msg, act on"
         echo "each message in numeric order, then mv each handled file into"
@@ -1052,7 +1027,6 @@ do_relaunch() {
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
-  [ "$RELOCATION_SET" = 0 ] || spawn_args+=(--worktree "$RELOCATION_WT")
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   if [ "$TARGET_API_KEY_ALLOW" = 1 ]; then
@@ -1076,7 +1050,6 @@ do_relaunch() {
        && [ -n "$FM_BACKEND_VALIDATED_TARGET" ]; then
       T=$FM_BACKEND_VALIDATED_TARGET
       BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-      WT=$(fm_meta_get "$META" worktree)
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi

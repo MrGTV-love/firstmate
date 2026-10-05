@@ -42,7 +42,7 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--worktree <path>]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
@@ -54,8 +54,7 @@
 #   kind and project or home come from the task's validated state/<id>.meta,
 #   so --backend, --scout, --secondmate, a project positional, and batch pairs
 #   are refused. Harness, model, and effort may change explicitly.
-#   --worktree uses the shared fm-control-worktree-lib.sh relocation proof;
-#   it never creates or moves a worktree. Relaunch refuses unless the endpoint is
+#   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
 #   the new incarnation. Two verdicts are agent-free: a `dead` endpoint is
@@ -64,8 +63,8 @@
 #   its own step, because a backend's `missing` also covers an endpoint that is
 #   merely unreachable from here. fm_control_endpoint_absence_verdict owns the
 #   proof for Herdr and the tmux no-user-server case. Herdr keeps its recorded
-#   session; a gone tmux endpoint uses the home's current configured spawn
-#   backend, validated for the replacement-alive postcondition.
+#   session; a gone tmux endpoint requires the home's current configured spawn
+#   backend to resolve to Herdr and pass spawn validation.
 #   The validated worktree is reused untouched either way;
 #   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
 #   secondmate whose endpoint is gone is respawned by its own owner
@@ -664,8 +663,6 @@ BRANCH_PREFIX_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
 CLAUDE_DEBUG=0
-RELOCATION_WT=
-RELOCATION_SET=0
 ALLOW_API_KEY=0
 POS=()
 want_value=
@@ -678,10 +675,6 @@ for a in "$@"; do
       ;;
     esac
     case "$want_value" in
-    worktree)
-      RELOCATION_WT=$a
-      RELOCATION_SET=1
-      ;;
     harness)
       HARNESS_ARG=$a
       HARNESS_SET=1
@@ -733,8 +726,6 @@ for a in "$@"; do
     ;;
   --relaunch) RELAUNCH=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
-  --worktree) want_value=worktree ;;
-  --worktree=*) RELOCATION_WT=${a#--worktree=}; RELOCATION_SET=1 ;;
   --harness) want_value=harness ;;
   --harness=*)
     HARNESS_ARG=${a#--harness=}
@@ -837,9 +828,6 @@ esac
 # task's own durable record below. Contradicting it on the command line is a
 # refusal rather than a silently-ignored flag.
 if [ "$RELAUNCH" -eq 1 ]; then
-  [ "$RELOCATION_SET" = 0 ] || [ -n "$RELOCATION_WT" ] || {
-    echo 'error: --worktree requires a non-empty value' >&2; exit 1;
-  }
   [ "$BACKEND_SET" -eq 0 ] || {
     echo "error: --relaunch reuses the task's recorded backend; --backend cannot override it" >&2
     exit 1
@@ -861,9 +849,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   }
 else
-  [ "$RELOCATION_SET" = 0 ] || {
-    echo 'error: --worktree applies to --relaunch only' >&2; exit 1;
-  }
   [ "$CLAUDE_DEBUG" -eq 0 ] || {
     echo "error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug" >&2
     exit 1
@@ -1231,8 +1216,6 @@ RELAUNCH_REPLACEMENT_BUSY_GEN=
 RELAUNCH_REPLACEMENT_HARNESS=
 RELAUNCH_REPLACEMENT_STATE=
 RELAUNCH_REPLACEMENT_WT=
-SPAWN_RELOCATION_LOCK=
-SPAWN_RELOCATION_LOCK_HELD=0
 CONFIG_INHERIT_LOCK=
 CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
@@ -1353,10 +1336,6 @@ spawn_abort_cleanup() {
   if [ "$SPAWN_TASK_LOCK_HELD" = 1 ]; then
     SPAWN_TASK_LOCK_HELD=0
     fm_lock_release "$SPAWN_TASK_LOCK" || true
-  fi
-  if [ "$SPAWN_RELOCATION_LOCK_HELD" = 1 ]; then
-    SPAWN_RELOCATION_LOCK_HELD=0
-    fm_lock_release "$SPAWN_RELOCATION_LOCK" || true
   fi
   if [ "$SPAWN_FRESH_COMMIT_PENDING" = 1 ]; then
     if ! spawn_fresh_commit_rollback; then
@@ -1800,11 +1779,11 @@ if [ "$RELAUNCH" -eq 1 ]; then
     # No recorded socket survived. Resolve exactly as a fresh home spawn,
     # without guessing another backend when its validation refuses.
     BACKEND=$(fm_backend_name)
-    fm_backend_validate_spawn "$BACKEND" || exit 1
-    fm_control_backend_state_verified "$BACKEND" || {
-      echo "error: configured backend '$BACKEND' cannot prove a replacement agent alive; refusing tmux reclaim" >&2
+    [ "$BACKEND" = herdr ] || {
+      echo "error: configured backend '$BACKEND' is not herdr; refusing to replace task $ID's proven-gone tmux endpoint" >&2
       exit 1
     }
+    fm_backend_validate_spawn "$BACKEND" || exit 1
     fm_backend_source "$BACKEND" || exit 1
   fi
   MODE=$(fm_meta_get "$RELAUNCH_META" mode)
@@ -1818,17 +1797,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
-  if [ "$RELOCATION_SET" = 1 ]; then
-    SPAWN_RELOCATION_LOCK="$STATE/.control-relocation.lock"
-    fm_lock_try_acquire "$SPAWN_RELOCATION_LOCK" || {
-      echo 'error: another worktree relocation is publishing in this home' >&2; exit 1;
-    }
-    SPAWN_RELOCATION_LOCK_HELD=1
-    # shellcheck source=bin/fm-control-worktree-lib.sh
-    . "$SCRIPT_DIR/fm-control-worktree-lib.sh"
-    fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATION_WT" || exit 1
-    RELAUNCH_WT=$FM_CONTROL_RELOCATION_PATH
-  fi
   [ -n "$RELAUNCH_WT" ] && [ -d "$RELAUNCH_WT" ] || {
     echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
     exit 1
@@ -3641,8 +3609,8 @@ if [ "$RELAUNCH" -eq 1 ]; then
     # ids) from these values, which is the whole rebind - the task id, brief,
     # worktree, armed poll and status log are untouched.
     #
-    # Herdr preserves its recorded session; a proven-gone tmux task uses the
-    # home's configured, validated backend. No worktree is allocated here.
+    # Herdr preserves its recorded session; a proven-gone tmux task requires the
+    # home's configured, validated Herdr backend. No worktree is allocated here.
     #
     # This deliberately uses the FLAT container shape rather than Herdr's
     # presentation projection: projection is a presentation-only layout that is
@@ -3662,13 +3630,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
     # session from a seat that is not in it would silently relocate the task
     # onto another herdr server - an identity change, published as a
     # self-consistent but wrong record.
-    if [ "$BACKEND" = tmux ]; then
-      # Ignore the stale ambient TMUX identity of a server proven gone.
-      SES=$(TMUX='' fm_backend_tmux_container_ensure) || exit 1
-      T="$SES:$W"
-      WID=$(fm_backend_tmux_create_task "$SES" "$W" "$WT") || exit 1
-      WT_TARGET=$WID
-    else
     HERDR_REBIND_SES=${RELAUNCH_TARGET%%:*}
     [ "$RELAUNCH_PRIOR_BACKEND" = herdr ] || HERDR_REBIND_SES=$HERDR_SES
     HERDR_CONTAINER_RAW=$(HERDR_PANE_ID="$RELAUNCH_LAUNCHER_PANE_ID" \
@@ -3710,7 +3671,6 @@ EOF
     T="$HERDR_SES:$HERDR_PANE_ID"
     SES=$HERDR_SES
     WT_TARGET=$T
-    fi
   fi
 else
   case "$BACKEND" in

@@ -68,6 +68,7 @@ if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
       if [ -f "$D/process-read" ]; then mode=live; else : > "$D/process-read"; mode=none; fi
       ;;
   esac
+  if [ -s "$D/created-windows" ] || [ -s "$D/created-sessions" ]; then mode=live; fi
   printf '%s 111 bash\n' "$uid"
   case "$mode" in
     live) printf '%s 222 /usr/local/bin/tmux: server\n' "$uid" ;;
@@ -309,15 +310,6 @@ run_spawn() {  # <case-dir> <args...>
 
 meta_field() {  # <case-dir> <id> <key>
   grep "^$3=" "$1/home/state/$2.meta" | tail -1 | cut -d= -f2-
-}
-
-# Endpoint validation requires exactly one worktree/project identity.
-set_case_meta_field() { # <case-dir> <id> <key> <value>
-  local meta="$1/home/state/$2.meta"
-  awk -F= -v key="$3" -v value="$4" '
-    $1 != key { print }
-    END { printf "%s=%s\n", key, value }
-  ' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
 }
 
 journal_field() {  # <case-dir> <id> <key>
@@ -2012,124 +2004,92 @@ test_tmux_zero_processes_with_readable_inventory_refuses() {
 }
 
 test_tmux_no_server_reclaim_keeps_work_and_task() {
-  local dir out rc head_before mode id
+  local dir second out rc head_before mode id wt first_id second_id first_endpoint
+  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
   for mode in none foreign; do
-    id="rl82$mode"
-    dir=$(new_case tmux-no-user-server "$id")
-    add_ship_task "$dir" "$id"
-    head_before=$(git -C "$dir/wt" rev-parse HEAD)
-    printf 'unlanded content\n' > "$dir/wt/dirty.txt"
-    printf 'working: preserved history\n' > "$dir/home/state/$id.status"
-    printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/$id.check.sh"
-    chmod 0700 "$dir/home/state/$id.check.sh"
-    FM_HOME="$dir/home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "cannot arm reclaim check"
+    first_id="rl82${mode}a"
+    second_id="rl82${mode}b"
+    dir=$(new_case "tmux-no-user-server-$mode" "$first_id")
+    second=$(new_case "tmux-second-$mode" "$second_id")
+    add_ship_task "$dir" "$first_id"
+    add_ship_task "$second" "$second_id"
+    cp "$second/home/state/$second_id.meta" "$dir/home/state/$second_id.meta"
+    mkdir -p "$dir/home/data/$second_id"
+    cp "$second/home/data/$second_id/brief.md" "$dir/home/data/$second_id/brief.md"
+    make_herdr_stub "$dir"
+    printf '%s' "$mode" > "$dir/fake/process-mode"
     : > "$dir/fake/server-dead"
     : > "$dir/fake/stale-socket"
-    printf '%s' "$mode" > "$dir/fake/process-mode"
-    out=$(run_control "$dir" "$id" exit); rc=$?
-    expect_code 0 "$rc" "no user tmux server should prove exit"$'\n'"$out"
-    assert_contains "$out" endpoint-gone "exit should report proven absence"
-    out=$(run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
-    expect_code 0 "$rc" "no user tmux server should permit reclaim"$'\n'"$out"
-    [ "$(meta_field "$dir" "$id" window)" = "firstmate:fm-$id" ] || fail "reclaim did not publish the fresh endpoint"
-    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "reclaim changed the local copy"
-    [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] || fail "reclaim moved the branch head"
-    [ "$(git -C "$dir/wt" symbolic-ref --short HEAD)" = "task-$id" ] || fail "reclaim switched branches"
-    [ "$(cat "$dir/wt/dirty.txt")" = "unlanded content" ] || fail "reclaim lost uncommitted work"
-    [ "$(cat "$dir/fake/created-windows")" = "fm-$id" ] || fail "reclaim did not create exactly one window"
-    assert_present "$dir/home/state/$id.check-trust" "reclaim broke armed poll registration"
-    assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "reclaim truncated status"
-    assert_contains "$(cat "$dir/home/data/$id/brief.md")" "resume after reboot" "reclaim omitted note"
-    assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "reclaim launched outside recorded worktree"
+    printf '%%none' > "$dir/fake/herdr-pane"
+    : > "$dir/fake/herdr-log"
+    : > "$dir/fake/herdr-stopped"
+    mkdir -p "$dir/home/config"
+    printf herdr > "$dir/home/config/backend"
+    first_endpoint=
+    for id in "$first_id" "$second_id"; do
+      wt=$(meta_field "$dir" "$id" worktree)
+      head_before=$(git -C "$wt" rev-parse HEAD)
+      printf 'unlanded content\n' > "$wt/dirty.txt"
+      printf 'working: preserved history\n' > "$dir/home/state/$id.status"
+      printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/$id.check.sh"
+      chmod 0700 "$dir/home/state/$id.check.sh"
+      FM_HOME="$dir/home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "cannot arm reclaim check"
+      out=$(run_control "$dir" "$id" exit); rc=$?
+      expect_code 0 "$rc" "no user tmux server should prove exit for $id"$'\n'"$out"
+      assert_contains "$out" endpoint-gone "exit should report proven absence"
+      out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+      expect_code 0 "$rc" "no user tmux server should permit Herdr reclaim for $id"$'\n'"$out"
+      [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr"
+      [ "$(meta_field "$dir" "$id" endpoint_task_id)" = "$id" ] || fail "reclaim changed task identity"
+      [ "$(meta_field "$dir" "$id" worktree)" = "$wt" ] || fail "reclaim changed the local copy"
+      [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] || fail "reclaim moved the branch head"
+      [ "$(git -C "$wt" symbolic-ref --short HEAD)" = "task-$id" ] || fail "reclaim switched branches"
+      [ "$(cat "$wt/dirty.txt")" = "unlanded content" ] || fail "reclaim lost uncommitted work"
+      assert_present "$dir/home/state/$id.check-trust" "reclaim broke armed poll registration"
+      assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "reclaim truncated status"
+      assert_contains "$(cat "$dir/home/data/$id/brief.md")" "resume after reboot" "reclaim omitted note"
+      assert_absent "$dir/fake/created-windows" "Herdr reclaim created a tmux endpoint"
+      assert_absent "$dir/fake/created-sessions" "Herdr reclaim started a tmux server"
+      if [ "$id" = "$first_id" ]; then
+        first_endpoint=$(meta_field "$dir" "$id" window)
+        [ "$first_endpoint" = 'fmlab:%9' ] || fail "first replacement has the wrong binding"
+      else
+        [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%10' ] || fail "second replacement has the wrong binding"
+      fi
+    done
+    [ "$(meta_field "$dir" "$first_id" window)" = "$first_endpoint" ] || fail "second reclaim rebound the first task"
+    [ "$(wc -l < "$dir/fake/herdr-created-tabs" | tr -d ' ')" = 2 ] || fail "reclaim did not create exactly two tabs"
+    for id in "$first_id" "$second_id"; do
+      out=$(run_control "$dir" "$id" interrupt); rc=$?
+      expect_code 0 "$rc" "both replacement agents must remain reachable and alive"$'\n'"$out"
+    done
   done
-  pass "tmux: zero user-owned servers permits exit and one fresh endpoint, preserving work, note and poll"
+  pass "tmux: two missing tasks reclaim sequentially onto Herdr, preserving work, note and poll"
 }
 
-test_relaunch_explicit_worktree_relocation() {
-  local dir out rc id variant original_head before expected_head
-  for variant in valid descendant journal prhead branch head owner owneralias present primary linkedproject repository subdir nohead symlink; do
-    id="rl83$variant"
-    dir=$(new_case "relocate-$variant" "$id")
-    add_ship_task "$dir" "$id"
-    original_head=$(git -C "$dir/wt" rev-parse HEAD)
-    expected_head=$original_head
-    set_case_meta_field "$dir" "$id" worktree "$dir/vanished/wt"
-    printf 'branch=task-%s\nworktree_head=%s\n' "$id" "$original_head" >> "$dir/home/state/$id.meta"
+test_tmux_reclaim_refuses_other_configured_backends() {
+  local dir backend out rc before brief_before
+  for backend in tmux zellij cmux orca unknown; do
+    dir=$(new_case "tmux-reclaim-$backend" "rl84$backend")
+    add_ship_task "$dir" "rl84$backend"
     printf none > "$dir/fake/process-mode"
     : > "$dir/fake/server-dead"
-    case "$variant" in
-      descendant)
-        printf 'more committed work\n' > "$dir/wt/later.txt"
-        git -C "$dir/wt" add later.txt
-        git -C "$dir/wt" -c user.name=t -c user.email=t@example.com commit -qm later
-        expected_head=$(git -C "$dir/wt" rev-parse HEAD)
-        ;;
-      journal)
-        printf 'worktree_head=\n' >> "$dir/home/state/$id.meta"
-        printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/vanished/wt" "$original_head" > "$dir/home/state/$id.control-relaunch"
-        ;;
-      prhead) printf 'worktree_head=\npr_head=%s\n' "$original_head" >> "$dir/home/state/$id.meta" ;;
-      owneralias)
-        ln -s "$dir/wt" "$dir/alias"
-        printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/other.meta"
-        ;;
-      branch) printf 'branch=another-branch\n' >> "$dir/home/state/$id.meta" ;;
-      head)
-        original_head=$(printf 'unrelated\n' | git -C "$dir/proj" -c user.name=t -c user.email=t@example.com commit-tree "$(git -C "$dir/proj" rev-parse 'HEAD^{tree}')")
-        printf 'worktree_head=%s\n' "$original_head" >> "$dir/home/state/$id.meta"
-        ;;
-      owner) printf 'worktree=%s\n' "$dir/wt" > "$dir/home/state/other.meta" ;;
-      present) set_case_meta_field "$dir" "$id" worktree "$dir/wt" ;;
-      primary) ;;
-      linkedproject) set_case_meta_field "$dir" "$id" project "$dir/wt" ;;
-      repository) fm_git_worktree "$dir/foreign-proj" "$dir/foreign-wt" "task-$id" ;;
-      subdir) mkdir "$dir/wt/subdir" ;;
-      nohead) printf 'worktree_head=\n' >> "$dir/home/state/$id.meta" ;;
-      symlink) mkdir -p "$dir/vanished"; ln -s "$dir/nonexistent" "$dir/vanished/wt" ;;
-    esac
-    before=$(cat "$dir/home/state/$id.meta")
-    case "$variant" in
-      primary) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/proj" --note "resume"); rc=$? ;;
-      repository) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/foreign-wt" --note "resume"); rc=$? ;;
-      subdir) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/wt/subdir" --note "resume"); rc=$? ;;
-      *) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/wt" --note "resume"); rc=$? ;;
-    esac
-    if [ "$variant" = valid ] || [ "$variant" = descendant ] || [ "$variant" = journal ] || [ "$variant" = prhead ]; then
-      expect_code 0 "$rc" "same-branch relocation should rebind"$'\n'"$out"
-      [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "relocation did not publish its destination"
-      [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$expected_head" ] || fail "relocation changed HEAD"
-      assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "relocation launched outside the replacement"
-    else
-      expect_code 1 "$rc" "unsafe relocation should refuse ($variant)"$'\n'"$out"
-      [ "$(cat "$dir/home/state/$id.meta")" = "$before" ] || fail "refused relocation changed metadata ($variant)"
-      assert_absent "$dir/fake/created-windows" "refused relocation created an endpoint ($variant)"
-      [ ! -s "$dir/fake/literal" ] || fail "refused relocation sent lifecycle input ($variant)"
-    fi
+    mkdir -p "$dir/home/config"
+    printf '%s' "$backend" > "$dir/home/config/backend"
+    before=$(cat "$dir/home/state/rl84$backend.meta")
+    brief_before=$(cat "$dir/home/data/rl84$backend/brief.md")
+    out=$(run_spawn "$dir" "rl84$backend" --relaunch); rc=$?
+    expect_code 1 "$rc" "direct reclaim must refuse configured $backend"$'\n'"$out"
+    out=$(run_control "$dir" "rl84$backend" relaunch --note "resume"); rc=$?
+    expect_code 1 "$rc" "control reclaim must refuse configured $backend"$'\n'"$out"
+    [ "$(cat "$dir/home/state/rl84$backend.meta")" = "$before" ] || fail "refused reclaim changed binding"
+    assert_contains "$(cat "$dir/home/data/rl84$backend/brief.md")" "$brief_before" "refused reclaim lost prior instructions"
+    assert_absent "$dir/fake/created-windows" "refused reclaim created a tmux endpoint"
+    assert_absent "$dir/fake/created-sessions" "refused reclaim started a tmux server"
+    assert_absent "$dir/fake/herdr-created-tabs" "refused reclaim created a Herdr endpoint"
+    [ ! -s "$dir/fake/literal" ] || fail "refused reclaim delivered launch input"
   done
-  pass "relaunch: explicit relocation accepts the same branch and containing head, and refuses unsafe destinations"
-}
-
-test_tmux_reclaim_uses_configured_backend() {
-  local dir out rc
-  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
-  dir=$(new_case tmux-to-herdr rl84)
-  add_ship_task "$dir" rl84
-  make_herdr_stub "$dir"
-  printf none > "$dir/fake/process-mode"
-  : > "$dir/fake/server-dead"
-  printf '%%none' > "$dir/fake/herdr-pane"
-  : > "$dir/fake/herdr-log"
-  : > "$dir/fake/herdr-stopped"
-  mkdir -p "$dir/home/config"
-  printf herdr > "$dir/home/config/backend"
-  out=$(FM_FAKE_SESSION=fmlab run_control "$dir" rl84 relaunch --note "resume on the configured backend"); rc=$?
-  expect_code 0 "$rc" "tmux reclaim should use the home's configured backend"$'\n'"$out"
-  [ "$(meta_field "$dir" rl84 backend)" = herdr ] || fail "reclaim silently kept recorded tmux backend"
-  [ "$(meta_field "$dir" rl84 window)" = 'fmlab:%9' ] || fail "replacement was not bound to the created Herdr pane"
-  [ "$(meta_field "$dir" rl84 worktree)" = "$dir/wt" ] || fail "backend switch changed the worktree"
-  assert_absent "$dir/fake/created-windows" "configured Herdr reclaim also created a tmux endpoint"
-  [ "$(wc -l < "$dir/fake/herdr-created-tabs" | tr -d ' ')" = 1 ] || fail "reclaim created more than one tab"
-  pass "tmux: no-server reclaim uses the home's configured Herdr backend and republishes its binding"
+  pass "tmux: no-server reclaim refuses every configured backend other than Herdr"
 }
 
 test_reclaim_refuses_an_unreadable_endpoint() {
@@ -2192,7 +2152,10 @@ if [ -f "$D/herdr-stopped" ]; then
 fi
 case "${1:-} ${2:-}" in
   'pane get')
-    if [ "${3:-}" = "$(cat "$D/herdr-pane")" ]; then
+    if [ -f "$D/herdr-cwd-${3:-}" ]; then
+      printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
+        "${3:-}" "$(cat "$D/herdr-cwd-${3:-}")"
+    elif [ "${3:-}" = "$(cat "$D/herdr-pane")" ]; then
       printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
         "${3:-}" "$(cat "$D/cwd")"
     else
@@ -2204,7 +2167,7 @@ case "${1:-} ${2:-}" in
   'agent get')
     if [ -f "$D/herdr-agent-registration" ]; then
       cat "$D/herdr-agent-registration"
-    elif [ -f "$D/herdr-agent-live" ]; then
+    elif [ -f "$D/herdr-live-${3:-}" ] || { [ ! -f "$D/herdr-cwd-${3:-}" ] && [ -f "$D/herdr-agent-live" ]; }; then
       # The agent came back with its server. Nothing here is reclaimable.
       printf '{"result":{"agent":{"agent_status":"idle"}}}\n'
     else
@@ -2217,10 +2180,10 @@ case "${1:-} ${2:-}" in
     # whose Herdr status authority still belongs to its previous session.
     if [ -f "$D/herdr-agent-registration" ]; then
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[]}}}\n' \
-        "$(cat "$D/herdr-pane")"
+        "${4:-}"
     else
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
-        "$(cat "$D/herdr-pane")"
+        "${4:-}"
     fi
     exit 0 ;;
   'pane send-text')
@@ -2237,6 +2200,7 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
         printf '%s\n' "$payload" > "$D/launched-command"
+        : > "$D/herdr-live-${3:-}"
         : > "$D/herdr-agent-live" ;;
     esac
     exit 0 ;;
@@ -2257,9 +2221,18 @@ case "${1:-} ${2:-}" in
     # The re-created endpoint. Recording it lets a case prove the pane the
     # record ends up naming is the one this call minted.
     printf '%s\n' "$*" >> "$D/herdr-created-tabs"
-    printf '{"result":{"tab":{"tab_id":"tabnew"},"root_pane":{"pane_id":"%%9"}}}\n'
-    # From here on the new pane is the one that reads back.
-    printf '%s' '%9' > "$D/herdr-pane"
+    pane="%$((8 + $(wc -l < "$D/herdr-created-tabs")))"
+    cwd=
+    for ((i=3; i <= $#; i++)); do
+      if [ "${!i}" = --cwd ]; then
+        i=$((i + 1))
+        cwd=${!i}
+        break
+      fi
+    done
+    printf '%s' "$cwd" > "$D/herdr-cwd-$pane"
+    printf '{"result":{"tab":{"tab_id":"tab%s"},"root_pane":{"pane_id":"%s"}}}\n' "${pane#%}" "$pane"
+    printf '%s' "$pane" > "$D/herdr-pane"
     exit 0 ;;
 esac
 exit 0
@@ -2662,8 +2635,7 @@ test_tmux_refuses_when_the_server_is_gone
 test_tmux_process_read_uncertainty_refuses
 test_tmux_zero_processes_with_readable_inventory_refuses
 test_tmux_no_server_reclaim_keeps_work_and_task
-test_relaunch_explicit_worktree_relocation
-test_tmux_reclaim_uses_configured_backend
+test_tmux_reclaim_refuses_other_configured_backends
 test_reclaim_refuses_an_unreadable_endpoint
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
