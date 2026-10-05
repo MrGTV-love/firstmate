@@ -816,6 +816,24 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     left_stripped="${line#"${line%%[![:space:]]*}"}"
     trimmed=$left_stripped
     fm_composer_normalize_trim_var trimmed
+    if [ "$top" -lt 0 ] && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] \
+       && [ "$row" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
+       && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
+            || fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; then
+      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
+      bare_indent=${bare_line%%[![:space:]]*}
+      case "${bare_line#"$bare_indent"}" in
+        '❯ '*)
+          case "$indent" in
+            "$bare_indent  "*)
+              if _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
+                FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${row}|"
+              fi
+              ;;
+          esac
+          ;;
+      esac
+    fi
     kind=
     family=
     case "$trimmed" in
@@ -954,11 +972,13 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # shell glyphs are deliberately not candidates (dead-shell rule). Keep
     # lower shell prompts as staleness evidence for cursorless selection.
     # Pi's cost footer can open with `$0.000`; that is furniture, not a prompt.
-    if [ "$top" -lt 0 ] && fm_composer_leading_shell_glyph_var glyph "$trimmed" \
-       && ! _fm_composer_row_is_pi_status "$trimmed"; then
-      FM_COMPOSER_SCAN_SHELL_ROW=$row
-    elif fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
-      FM_COMPOSER_SCAN_BARE_ROW=$row
+    if ! _fm_composer_row_is_bare_literal "$row"; then
+      if [ "$top" -lt 0 ] && fm_composer_leading_shell_glyph_var glyph "$trimmed" \
+         && ! _fm_composer_row_is_pi_status "$trimmed"; then
+        FM_COMPOSER_SCAN_SHELL_ROW=$row
+      elif fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+        FM_COMPOSER_SCAN_BARE_ROW=$row
+      fi
     fi
     # Cursor safety: a cursor sitting on a structural edge row is never an
     # input row.
@@ -1352,7 +1372,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
     if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
-    if fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
+    if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
     row=$((row + 1))
   done
   return 0
