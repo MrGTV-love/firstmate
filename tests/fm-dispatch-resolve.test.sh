@@ -1495,6 +1495,34 @@ assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use
 cp "$BASE_RULES" "$RULES"
 pass "typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty"
 
+# Native Claude quota cannot authorize a stand-in for another authentication scope.
+jq '.rules[3].use={harness:"claude",model:"sonnet",effort:"high"} |
+  .rules[3].fallback=[{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]' "$BASE_RULES" > "$RULES"
+jq '(.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/claude-native-empty.json"
+write_response "$RESPONSE" rule_4 0.9
+for scope_file in claude-launcher claude-account; do
+  case "$scope_file" in
+    claude-launcher) printf 'teamclaude\n' > "$HOME_DIR/config/$scope_file" ;;
+    claude-account) printf 'different-account\n' > "$HOME_DIR/config/$scope_file" ;;
+  esac
+  reset_log
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/claude-native-empty.json" run code out err "$BRIEF"
+  assert_contains "$out" '-> eligible, unranked:' "unmapped selected authentication remains eligible"
+  assert_not_contains "$out" '-> not eligible:' "native default-account exhaustion must not veto another scope"
+  assert_not_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "unrelated exhaustion must not activate the stand-in"
+  jq '.rules[3].floor={scope:"all_models",min_percent:20,provider:"claude"}' "$RULES" > "$TMP_ROOT/unmapped-floor.json"
+  mv "$TMP_ROOT/unmapped-floor.json" "$RULES"
+  reset_log
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/claude-native-empty.json" run code out err "$BRIEF"
+  assert_not_contains "$out" '  profile:' "an unrelated native floor must not select the weaker default"
+  jq 'del(.rules[3].floor)' "$RULES" > "$TMP_ROOT/no-unmapped-floor.json"
+  mv "$TMP_ROOT/no-unmapped-floor.json" "$RULES"
+  rm "$HOME_DIR/config/$scope_file"
+done
+cp "$BASE_RULES" "$RULES"
+pass "typed dispatch never binds native Claude exhaustion to a proxy or account pin"
+
 # --- configuration errors exit 2 and select nothing ----------------------------------
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err

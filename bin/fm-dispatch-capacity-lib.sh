@@ -62,18 +62,20 @@ fm_omp_codex_capacity() {
   ' 2>/dev/null || printf '%s\n' '{"status":"unknown","accounts":[],"reason":"invalid omp usage JSON"}'
 }
 
+fm_dispatch_claude_quota_unbound() {
+  local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
+  [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
+    { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }
+}
+
 fm_dispatch_capacity() {
   local harness=$1 model=$2 quota config
   case "$harness:$model" in
     omp:openai-codex/*) fm_omp_codex_capacity "$model"; return ;;
     claude:*)
       config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
-      if [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; then
-        printf '%s\n' '{"status":"unknown","reason":"TeamClaude proxy quota has no established default-account mapping"}'
-        return
-      fi
-      if [ -e "$config/claude-account" ]; then
-        printf '%s\n' '{"status":"unknown","reason":"Claude account pin has no established quota mapping"}'
+      if fm_dispatch_claude_quota_unbound "$config"; then
+        printf '%s\n' '{"status":"unknown","reason":"selected Claude authentication has no established native default-account quota mapping"}'
         return
       fi
       quota=$(fm_run_timed 10 quota-axi --json 2>/dev/null </dev/null) || quota='{}'
