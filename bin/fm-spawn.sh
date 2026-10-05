@@ -823,10 +823,9 @@ case "$EFFORT" in
   ;;
 esac
 
-# --relaunch reuses an existing task's endpoint, worktree, project, and kind,
-# so every axis this block resolves for a fresh spawn instead comes from that
-# task's own durable record below. Contradicting it on the command line is a
-# refusal rather than a silently-ignored flag.
+# --relaunch preserves the recorded task rather than accepting fresh-spawn
+# identity overrides. The header owns the flags; docs/agent-control.md owns
+# the proven-gone endpoint replacement policy.
 if [ "$RELAUNCH" -eq 1 ]; then
   [ "$BACKEND_SET" -eq 0 ] || {
     echo "error: --relaunch reuses the task's recorded backend; --backend cannot override it" >&2
@@ -1689,11 +1688,10 @@ ARG3=
 FIRSTMATE_HOME=
 RAW_LAUNCH=0
 
-# --relaunch adoption: every identity axis comes from the task's own validated
-# durable record, never from the command line, so a relaunch can only ever
-# re-launch the task it names. The endpoint identity check is the same shared
-# validation teardown uses, so a malformed, ambiguous, or foreign record
-# refuses here exactly as it refuses there.
+# --relaunch validates the recorded task before considering any replacement:
+# an unreachable endpoint may still hold a live agent. The shared endpoint
+# identity check refuses malformed, ambiguous, or foreign records exactly as
+# it does for teardown.
 RELAUNCH_PRIOR_HARNESS=
 # 1 when the recorded endpoint is authoritatively gone and this relaunch must
 # create a fresh one for the task rather than adopt its recorded address.
@@ -1732,15 +1730,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: backend '$BACKEND' has no recovery-grade agent-state classifier, so a relaunch cannot prove the previous agent exited; refusing rather than risking two agents in one endpoint" >&2
     exit 1
   }
-  # Two states are agent-free, and both license a relaunch:
-  #   dead    - the endpoint exists and confidently holds no agent. The
-  #             endpoint is ADOPTED, so the task keeps its exact address.
-  #   missing - the endpoint itself is gone. There is no endpoint AND therefore
-  #             no agent, so a relaunch cannot adopt it: it CREATES a fresh
-  #             endpoint in the recorded worktree and the published record
-  #             rebinds to it.
-  # A raw missing read still needs the shared absence proof before a rebind.
-  # fm_control_endpoint_absence_verdict owns the per-backend evidence.
+  # A raw `missing` read does not establish an agent-free endpoint: the shared
+  # absence proof must first rule out an unreachable live agent.
+  # docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns
+  # which proven-gone endpoints may be replaced.
   RELAUNCH_STATE=$(fm_backend_agent_state "$BACKEND" "$RELAUNCH_TARGET")
   if [ "$RELAUNCH_STATE" = missing ]; then
     RELAUNCH_ABSENCE=$(fm_control_endpoint_absence_verdict "$BACKEND" "$RELAUNCH_TARGET")
@@ -1776,7 +1769,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   fi
   if [ "$RELAUNCH_REBIND" = 1 ] && [ "$RELAUNCH_PRIOR_BACKEND" = tmux ]; then
-    # No recorded socket survived. Resolve exactly as a fresh home spawn,
+    # Absence is proven. Resolve exactly as a fresh home spawn,
     # without guessing another backend when its validation refuses.
     BACKEND=$(fm_backend_name)
     [ "$BACKEND" = herdr ] || {
@@ -3624,12 +3617,9 @@ if [ "$RELAUNCH" -eq 1 ]; then
     # docs/agent-control.md rather than fixed here, because the remedy is
     # machinery the ordinary flat spawn path does not have either.
     #
-    # Re-create the tab under the RECORDED herdr session. Without the explicit
-    # session the container would resolve from the AMBIENT one
-    # (${HERDR_SESSION:-default}), so reclaiming a task recorded on a named
-    # session from a seat that is not in it would silently relocate the task
-    # onto another herdr server - an identity change, published as a
-    # self-consistent but wrong record.
+    # Pin an existing Herdr task to its recorded session: ambient session
+    # resolution would silently move it to another server. A tmux-to-Herdr
+    # replacement instead uses the home's current Herdr session resolution.
     HERDR_REBIND_SES=${RELAUNCH_TARGET%%:*}
     [ "$RELAUNCH_PRIOR_BACKEND" = herdr ] || HERDR_REBIND_SES=$HERDR_SES
     HERDR_CONTAINER_RAW=$(HERDR_PANE_ID="$RELAUNCH_LAUNCHER_PANE_ID" \
@@ -3643,7 +3633,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
       #
       # A seat with NO herdr pane never reaches the cross-session guard at all:
       # fm_backend_herdr_launcher_identity returns 2 for it and the placement
-      # falls back to the recorded session's labeled container, which is what
+      # falls back to the selected session's labeled container, which is what
       # makes a plain ssh or cron reclaim work. Its ambient session still reads
       # `default` (fm_backend_herdr_session's fallback), so the inequality alone
       # would fire for EVERY named-session task reclaimed from a plain shell and

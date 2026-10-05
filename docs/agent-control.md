@@ -112,7 +112,7 @@ An unreachable endpoint can still hold the live agent a rebind would duplicate, 
   So in that state `exit` - which otherwise reads as a read-only inspection - leaves an idle herdr server behind.
 - **tmux can prove only the no-user-server case.**
   Two successful full process-table snapshots must positively show no tmux process owned by the current uid, and socket reads must corroborate that no server is answering.
-  Clients are counted conservatively too; unreadable, empty, malformed, changing, or contradictory reads refuse.
+  Clients are counted conservatively too; unreadable, empty, malformed, or contradictory reads refuse.
   Stale socket files without a process do not prove a live server.
   Otherwise `list-windows -a` still describes only the server the current process addresses, and the record carries no socket identity.
   A renamed session, moved window, foreign socket, or dead addressed server therefore still refuses whenever any user-owned tmux process exists anywhere on the machine.
