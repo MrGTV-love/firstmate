@@ -45,6 +45,7 @@ relaunch_cleanup() {
   for d in "${TASK_TMPS[@]:-}"; do
     [ -n "$d" ] && rm -rf "$d"
   done
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
 }
 trap relaunch_cleanup EXIT
@@ -52,6 +53,39 @@ trap relaunch_cleanup EXIT
 # The same lifecycle-modelling tmux stub as tests/fm-control.test.sh: the
 # harness's exit command stops the agent, and a launch-brief literal starts the
 # harness named in `becomes`.
+make_process_table_stub() { # <case-dir>
+  cat > "$1/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+D=$FM_FAKE_DIR
+if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
+  mode=$(cat "$D/process-mode" 2>/dev/null || printf live)
+  uid=$(id -u)
+  case "$mode" in
+    broken) exit 1 ;;
+    empty) exit 0 ;;
+    malformed) printf 'not a process row\n'; exit 0 ;;
+    transient)
+      if [ -f "$D/process-read" ]; then mode=live; else : > "$D/process-read"; mode=none; fi
+      ;;
+  esac
+  printf '%s 111 bash\n' "$uid"
+  case "$mode" in
+    live) printf '%s 222 /usr/local/bin/tmux: server\n' "$uid" ;;
+    foreign) printf '%s 222 tmux: server\n' "$((uid + 1))" ;;
+  esac
+  exit 0
+fi
+if [ -f "$D/herdr-agent-registration" ]; then
+  case "$*" in
+    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n'; exit 0 ;;
+    '-p 4242 -o args=') printf 'bash\n'; exit 0 ;;
+  esac
+fi
+exec /bin/ps "$@"
+SH
+  chmod +x "$1/fakebin/ps"
+}
+
 make_tmux_stub() {  # <dir>
   local fb="$1/fakebin"
   mkdir -p "$fb"
@@ -159,15 +193,21 @@ case "${1:-}" in
     # answering `missing`. Echo a stable window id the way the real -P -F does.
     shift
     name=
+    cwd=
+    ses=
     while [ $# -gt 0 ]; do
       case "$1" in
         -n) name=${2:-}; shift 2 ;;
-        -c|-t) shift 2 ;;
+        -c) cwd=${2:-}; shift 2 ;;
+        -t) ses=${2%:}; shift 2 ;;
         *) shift ;;
       esac
     done
     printf '%s\n' "$name" >> "$D/windows"
     printf '%s\n' "$name" >> "$D/created-windows"
+    printf '%s' "$cwd" > "$D/cwd"
+    printf '%s' "$ses" > "$D/session-name"
+    rm -f "$D/server-dead" "$D/session-missing"
     printf '@9\n'
     exit 0 ;;
 esac
@@ -180,6 +220,7 @@ SH
 exit 0
 SH
   chmod +x "$fb/sleep"
+  make_process_table_stub "$1"
 }
 
 # new_case <name> [id] -> echoes a case dir with a live claude ship task.
@@ -238,6 +279,7 @@ run_control() {  # <case-dir> <args...>
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HERDR_SESSION="${FM_FAKE_SESSION:-}" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -267,6 +309,15 @@ run_spawn() {  # <case-dir> <args...>
 
 meta_field() {  # <case-dir> <id> <key>
   grep "^$3=" "$1/home/state/$2.meta" | tail -1 | cut -d= -f2-
+}
+
+# Endpoint validation requires exactly one worktree/project identity.
+set_case_meta_field() { # <case-dir> <id> <key> <value>
+  local meta="$1/home/state/$2.meta"
+  awk -F= -v key="$3" -v value="$4" '
+    $1 != key { print }
+    END { printf "%s=%s\n", key, value }
+  ' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
 }
 
 journal_field() {  # <case-dir> <id> <key>
@@ -1879,12 +1930,8 @@ strand_endpoint() {  # <case-dir> <id>
   : > "$1/fake/windows"
 }
 
-# Every tmux `missing` refuses on BOTH verbs, whatever produced it. tmux is the
-# one verified backend whose absence cannot be proven from a task record: the
-# record carries no socket identity for the endpoint, and any inventory
-# describes only the server this process happens to address. So a window that
-# is merely on a server this seat cannot reach is indistinguishable from one
-# that was destroyed, and neither verb will guess.
+# A missing endpoint still refuses while ANY user-owned tmux process exists,
+# including a server on a foreign socket. Socket-local absence is not proof.
 assert_tmux_missing_refuses() {  # <case-dir> <id> <what-was-staged>
   local dir=$1 id=$2 what=$3 out rc brief_before
 
@@ -1940,6 +1987,149 @@ test_tmux_refuses_when_the_server_is_gone() {
   : > "$dir/fake/server-dead"
   assert_tmux_missing_refuses "$dir" rl62 "no tmux server on this socket"
   pass "tmux: a dead server on this socket refuses both verbs rather than proving absence"
+}
+
+test_tmux_process_read_uncertainty_refuses() {
+  local dir mode
+  for mode in broken empty malformed transient; do
+    dir=$(new_case "tmux-process-$mode" "rl80$mode")
+    add_ship_task "$dir" "rl80$mode"
+    : > "$dir/fake/server-dead"
+    printf '%s' "$mode" > "$dir/fake/process-mode"
+    assert_tmux_missing_refuses "$dir" "rl80$mode" "process read $mode"
+  done
+  pass "tmux: unreadable, empty, malformed and changing process snapshots refuse both verbs"
+}
+
+test_tmux_zero_processes_with_readable_inventory_refuses() {
+  local dir
+  dir=$(new_case tmux-contradiction rl81)
+  add_ship_task "$dir" rl81
+  strand_endpoint "$dir" rl81
+  printf none > "$dir/fake/process-mode"
+  assert_tmux_missing_refuses "$dir" rl81 "a server inventory contradicts the process snapshot"
+  pass "tmux: a readable server contradicting the process snapshot refuses"
+}
+
+test_tmux_no_server_reclaim_keeps_work_and_task() {
+  local dir out rc head_before mode id
+  for mode in none foreign; do
+    id="rl82$mode"
+    dir=$(new_case tmux-no-user-server "$id")
+    add_ship_task "$dir" "$id"
+    head_before=$(git -C "$dir/wt" rev-parse HEAD)
+    printf 'unlanded content\n' > "$dir/wt/dirty.txt"
+    printf 'working: preserved history\n' > "$dir/home/state/$id.status"
+    printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/$id.check.sh"
+    chmod 0700 "$dir/home/state/$id.check.sh"
+    FM_HOME="$dir/home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "cannot arm reclaim check"
+    : > "$dir/fake/server-dead"
+    : > "$dir/fake/stale-socket"
+    printf '%s' "$mode" > "$dir/fake/process-mode"
+    out=$(run_control "$dir" "$id" exit); rc=$?
+    expect_code 0 "$rc" "no user tmux server should prove exit"$'\n'"$out"
+    assert_contains "$out" endpoint-gone "exit should report proven absence"
+    out=$(run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+    expect_code 0 "$rc" "no user tmux server should permit reclaim"$'\n'"$out"
+    [ "$(meta_field "$dir" "$id" window)" = "firstmate:fm-$id" ] || fail "reclaim did not publish the fresh endpoint"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "reclaim changed the local copy"
+    [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] || fail "reclaim moved the branch head"
+    [ "$(git -C "$dir/wt" symbolic-ref --short HEAD)" = "task-$id" ] || fail "reclaim switched branches"
+    [ "$(cat "$dir/wt/dirty.txt")" = "unlanded content" ] || fail "reclaim lost uncommitted work"
+    [ "$(cat "$dir/fake/created-windows")" = "fm-$id" ] || fail "reclaim did not create exactly one window"
+    assert_present "$dir/home/state/$id.check-trust" "reclaim broke armed poll registration"
+    assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "reclaim truncated status"
+    assert_contains "$(cat "$dir/home/data/$id/brief.md")" "resume after reboot" "reclaim omitted note"
+    assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "reclaim launched outside recorded worktree"
+  done
+  pass "tmux: zero user-owned servers permits exit and one fresh endpoint, preserving work, note and poll"
+}
+
+test_relaunch_explicit_worktree_relocation() {
+  local dir out rc id variant original_head before expected_head
+  for variant in valid descendant journal prhead branch head owner owneralias present primary linkedproject repository subdir nohead symlink; do
+    id="rl83$variant"
+    dir=$(new_case "relocate-$variant" "$id")
+    add_ship_task "$dir" "$id"
+    original_head=$(git -C "$dir/wt" rev-parse HEAD)
+    expected_head=$original_head
+    set_case_meta_field "$dir" "$id" worktree "$dir/vanished/wt"
+    printf 'branch=task-%s\nworktree_head=%s\n' "$id" "$original_head" >> "$dir/home/state/$id.meta"
+    printf none > "$dir/fake/process-mode"
+    : > "$dir/fake/server-dead"
+    case "$variant" in
+      descendant)
+        printf 'more committed work\n' > "$dir/wt/later.txt"
+        git -C "$dir/wt" add later.txt
+        git -C "$dir/wt" -c user.name=t -c user.email=t@example.com commit -qm later
+        expected_head=$(git -C "$dir/wt" rev-parse HEAD)
+        ;;
+      journal)
+        printf 'worktree_head=\n' >> "$dir/home/state/$id.meta"
+        printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/vanished/wt" "$original_head" > "$dir/home/state/$id.control-relaunch"
+        ;;
+      prhead) printf 'worktree_head=\npr_head=%s\n' "$original_head" >> "$dir/home/state/$id.meta" ;;
+      owneralias)
+        ln -s "$dir/wt" "$dir/alias"
+        printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/other.meta"
+        ;;
+      branch) printf 'branch=another-branch\n' >> "$dir/home/state/$id.meta" ;;
+      head)
+        original_head=$(printf 'unrelated\n' | git -C "$dir/proj" -c user.name=t -c user.email=t@example.com commit-tree "$(git -C "$dir/proj" rev-parse 'HEAD^{tree}')")
+        printf 'worktree_head=%s\n' "$original_head" >> "$dir/home/state/$id.meta"
+        ;;
+      owner) printf 'worktree=%s\n' "$dir/wt" > "$dir/home/state/other.meta" ;;
+      present) set_case_meta_field "$dir" "$id" worktree "$dir/wt" ;;
+      primary) ;;
+      linkedproject) set_case_meta_field "$dir" "$id" project "$dir/wt" ;;
+      repository) fm_git_worktree "$dir/foreign-proj" "$dir/foreign-wt" "task-$id" ;;
+      subdir) mkdir "$dir/wt/subdir" ;;
+      nohead) printf 'worktree_head=\n' >> "$dir/home/state/$id.meta" ;;
+      symlink) mkdir -p "$dir/vanished"; ln -s "$dir/nonexistent" "$dir/vanished/wt" ;;
+    esac
+    before=$(cat "$dir/home/state/$id.meta")
+    case "$variant" in
+      primary) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/proj" --note "resume"); rc=$? ;;
+      repository) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/foreign-wt" --note "resume"); rc=$? ;;
+      subdir) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/wt/subdir" --note "resume"); rc=$? ;;
+      *) out=$(run_control "$dir" "$id" relaunch --worktree "$dir/wt" --note "resume"); rc=$? ;;
+    esac
+    if [ "$variant" = valid ] || [ "$variant" = descendant ] || [ "$variant" = journal ] || [ "$variant" = prhead ]; then
+      expect_code 0 "$rc" "same-branch relocation should rebind"$'\n'"$out"
+      [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "relocation did not publish its destination"
+      [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$expected_head" ] || fail "relocation changed HEAD"
+      assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "relocation launched outside the replacement"
+    else
+      expect_code 1 "$rc" "unsafe relocation should refuse ($variant)"$'\n'"$out"
+      [ "$(cat "$dir/home/state/$id.meta")" = "$before" ] || fail "refused relocation changed metadata ($variant)"
+      assert_absent "$dir/fake/created-windows" "refused relocation created an endpoint ($variant)"
+      [ ! -s "$dir/fake/literal" ] || fail "refused relocation sent lifecycle input ($variant)"
+    fi
+  done
+  pass "relaunch: explicit relocation accepts the same branch and containing head, and refuses unsafe destinations"
+}
+
+test_tmux_reclaim_uses_configured_backend() {
+  local dir out rc
+  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
+  dir=$(new_case tmux-to-herdr rl84)
+  add_ship_task "$dir" rl84
+  make_herdr_stub "$dir"
+  printf none > "$dir/fake/process-mode"
+  : > "$dir/fake/server-dead"
+  printf '%%none' > "$dir/fake/herdr-pane"
+  : > "$dir/fake/herdr-log"
+  : > "$dir/fake/herdr-stopped"
+  mkdir -p "$dir/home/config"
+  printf herdr > "$dir/home/config/backend"
+  out=$(FM_FAKE_SESSION=fmlab run_control "$dir" rl84 relaunch --note "resume on the configured backend"); rc=$?
+  expect_code 0 "$rc" "tmux reclaim should use the home's configured backend"$'\n'"$out"
+  [ "$(meta_field "$dir" rl84 backend)" = herdr ] || fail "reclaim silently kept recorded tmux backend"
+  [ "$(meta_field "$dir" rl84 window)" = 'fmlab:%9' ] || fail "replacement was not bound to the created Herdr pane"
+  [ "$(meta_field "$dir" rl84 worktree)" = "$dir/wt" ] || fail "backend switch changed the worktree"
+  assert_absent "$dir/fake/created-windows" "configured Herdr reclaim also created a tmux endpoint"
+  [ "$(wc -l < "$dir/fake/herdr-created-tabs" | tr -d ' ')" = 1 ] || fail "reclaim created more than one tab"
+  pass "tmux: no-server reclaim uses the home's configured Herdr backend and republishes its binding"
 }
 
 test_reclaim_refuses_an_unreadable_endpoint() {
@@ -2075,19 +2265,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/herdr"
-  cat > "$fb/ps" <<'SH'
-#!/usr/bin/env bash
-if [ -f "$FM_FAKE_DIR/herdr-agent-registration" ]; then
-  case "$*" in
-    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
-    '-p 4242 -o args=') printf 'bash\n' ;;
-    *) exec /bin/ps "$@" ;;
-  esac
-else
-  exec /bin/ps "$@"
-fi
-SH
-  chmod +x "$fb/ps"
+  make_process_table_stub "$1"
 }
 
 # add_herdr_ship_task <case-dir> <id> [session] [surviving-pane]: a ship task
@@ -2481,6 +2659,11 @@ test_spawn_relaunch_refuses_a_pane_outside_the_worktree
 test_tmux_refuses_a_window_missing_from_its_session
 test_tmux_refuses_a_session_that_cannot_be_found
 test_tmux_refuses_when_the_server_is_gone
+test_tmux_process_read_uncertainty_refuses
+test_tmux_zero_processes_with_readable_inventory_refuses
+test_tmux_no_server_reclaim_keeps_work_and_task
+test_relaunch_explicit_worktree_relocation
+test_tmux_reclaim_uses_configured_backend
 test_reclaim_refuses_an_unreadable_endpoint
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
