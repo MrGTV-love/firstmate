@@ -1924,8 +1924,9 @@ A focused live rerun with all four inherited overrides pointing at operator-owne
 Observed guarantees:
 
 - The complete compact bordered composer reads empty, while real typed input reads pending.
-- Recovery refuses a pending draft without clearing or submitting it; unknown and incomplete geometry also refuse in captured-frame regressions.
+- Direct recovery and recovery sweeps refuse prose, `!git diff`, and `$ print(1)` drafts even with retained busy state, preserving draft bytes, busy generation/state, metadata, instructions, branch, HEAD, and dirty work without beginning a lifecycle transaction. A separate native omp 18.6.1 reproduction confirmed that Escape clears the two execution-mode drafts, so this proof precedes any interrupt. Unknown and incomplete geometry also refuse in captured-frame regressions.
 - Complete omp-looking boxes nested inside Pi composer rules remain enclosing Pi draft content, not independent proof of an empty omp composer. The focused parser regression fails before the shared ownership correction and passes afterward, covering cursor and cursorless classification, lazy identity probing, content extraction, later separator pairs, and both UTF-8 and `LC_ALL=C`.
+- Indented compact omp-looking frames inside a contiguous bare multiline draft remain literal draft text for cursor and cursorless classification and extraction, including after an earlier Pi transcript. Standalone compact boxes and Pi containment retain their existing behavior.
 - The normal control-plane transaction replaces the bare-resumed task in the same pane and local copy, preserving its branch, HEAD, dirty-file checksum, recorded `openai-codex/gpt-6.1-sol` model, and `low` effort.
 - A repeated recovery sweep leaves the managed incarnation unchanged.
 - A later bare resume in the same persistent shell does **not** inherit the previous managed incarnation.
@@ -1941,6 +1942,9 @@ FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0
 
 The minimal secondmate test home deliberately has no inherited Firstmate code revision or gitignored configuration destinations, so the existing sync/inheritance owners report their skips.
 The actual recorded-profile replacement and preserved-work assertions still pass.
+
+The focused relaunch fixtures also passed with all five inherited state/data/config/projects/source-root overrides pointing at separate owned poison paths, which remained untouched. Actual cleanup preserved pre-existing task and home-hashed launch directories while removing only exclusively claimed namespaces; unique fixture task IDs retained bounded-scan fairness and interruption progress.
+
 No remote secondmate, unrelated pane, shared worktree pool, or global Herdr configuration is modified.
 The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-restoration) owns the decision to retain global auto-resume and repair only the recorded fleet.
 

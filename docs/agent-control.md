@@ -109,7 +109,7 @@ The sweep never discovers other homes' panes or recursively enters a secondmate 
 
 Each repair is the ordinary `bin/fm-control.sh <id> relaunch --recover-launch` transaction, not a second exit or spawn mechanism.
 The option is exclusive of profile overrides, notes, and debug options.
-Under the task's control lock it rechecks launch proof, pins **all three recorded profile axes**, checkpoints work, and requires a proven empty composer before stopping the old agent.
+Under the task's control lock it rechecks launch proof and requires a proven empty composer **before any interrupt**, checkpoint, or progress note. Retained busy metadata does not authorize Escape into a draft: omp clears idle Bash/Python execution-mode drafts on that key. Pending or unproven input refuses without changing the draft or task records. An empty composer proceeds with **all three recorded profile axes** pinned and the ordinary checkpoint-and-relaunch transaction.
 For a local secondmate, recovery also holds the existing liveness lock through stop, replacement proof, and any rollback, so liveness recovery cannot concurrently replace its endpoint; contention refuses without touching the agent.
 Unlike an ordinary secondmate relaunch, it does not adopt a newly configured secondmate profile.
 It reuses the exact pane and local copy, preserves all unlanded work and secondmate child records, and never rewrites a standing charter.

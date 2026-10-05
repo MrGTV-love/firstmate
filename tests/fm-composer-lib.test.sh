@@ -1105,6 +1105,58 @@ test_omp_literal_input_rows() {
 }
 test_omp_literal_input_rows
 
+test_bare_draft_owns_indented_compact_omp_literal() {
+  local floor screen expected caps cursor out status
+  status=' π  · ◔ GPT-6-Astra · 🌳 …-workspace · ⑂ detached · ◫ 15.4%/272K ⟲ · (sub)'
+  for floor in '╰─ ─╯' '╰─  ─╯' '╰─ typed text ─╯'; do
+    screen=$'❯ preface\n  ╭── π > model > path ─╮\n  '"$floor"
+    expected="preface ╭── π > model > path ─╮ $floor"
+    [ "$floor" != '╰─  ─╯' ] || expected='preface ╭── π > model > path ─╮ ╰─ ─╯'
+    for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID"; do
+      assert_screen "bare draft owns compact literal '$floor' cursorless" pending "$caps" "$screen"
+      out=$(fm_composer_extract_selected_content "$caps" "$screen")
+      [ "$out" = "$expected" ] || fail "compact literal extraction dropped bare draft: '$out'"
+    done
+    assert_screen "plain bare compact literal stays unproven" unknown "$CAPS_PLAIN" "$screen"
+    out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$screen")
+    [ "$out" = "$expected" ] || fail "plain compact literal extraction dropped bare draft: '$out'"
+    for cursor in 0 1 2; do
+      assert_screen "bare compact literal cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+    done
+    screen="$screen"$'\n'"$status"
+    assert_screen "status bounds bare compact literal" pending "$CAPS_STYLED_NOID" "$screen"
+    out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+    [ "$out" = "$expected" ] || fail "compact literal extraction included status: '$out'"
+    assert_screen "status cursor is not draft input" unknown "$CAPS_TMUX" "$screen" 3
+  done
+  screen=$'❯ preface\n  continuation\n  ╭── π > model > path ─╮\n  ╰─  ─╯\n  ╭── π > model > path ─╮\n  ╰─  ─╯\n  tail'
+  assert_screen "multiple compact literals remain bare draft" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "cursor after compact literals remains bare draft" pending "$CAPS_TMUX" "$screen" 6
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  expected='preface continuation ╭── π > model > path ─╮ ╰─ ─╯ ╭── π > model > path ─╮ ╰─ ─╯ tail'
+  [ "$out" = "$expected" ] || fail "multiple compact literals lost content: '$out'"
+  screen=$'────────\nold Pi draft\n────────\n\n❯ preface\n  ╭── π > model > path ─╮\n  ╰─  ─╯'
+  expected='preface ╭── π > model > path ─╮ ╰─ ─╯'
+  assert_screen "completed Pi transcript does not veto bare literal" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "completed Pi transcript preserves bare floor cursor" pending "$CAPS_TMUX" "$screen" 6
+  assert_screen "completed Pi transcript preserves plain degradation" unknown "$CAPS_PLAIN" "$screen"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = "$expected" ] || fail "earlier Pi pair vetoed bare literal extraction: '$out'"
+  screen=$'────────\n❯ preface\n  ╭── π > model > path ─╮\n  ╰─  ─╯\n────────'
+  assert_screen "enclosing Pi retains bare overlap identity verdict" pending "$CAPS_STYLED" "$screen" '' $'pi\tidle'
+  assert_screen "enclosing Pi retains plain identity verdict" pending \
+    $'styled=0\ncursor=0\nidentity=1' "$screen" '' $'pi\tidle'
+  assert_screen "enclosing Pi retains floor cursor verdict" pending "$CAPS_TMUX" "$screen" 3 $'pi\tidle'
+  assert_screen "enclosing Pi floor still requests identity" need-identity "$CAPS_TMUX" "$screen" 3
+  screen=$'❯ old draft\n\n  ╭── π > model > path ─╮\n  ╰─  ─╯'
+  assert_screen "blank-separated compact omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "standalone compact floor cursor remains empty" empty "$CAPS_TMUX" "$screen" 3
+  screen=$'❯ old draft\n╭── π > model > path ─╮\n╰─  ─╯'
+  assert_screen "unindented compact omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
+  pass "bare drafts own indented compact omp literals without claiming standalone boxes or status"
+}
+test_bare_draft_owns_indented_compact_omp_literal
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty

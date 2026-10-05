@@ -1019,7 +1019,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line backlog_gate_status recovery_actor
+  local exit_result state note_line backlog_gate_status recovery_actor composer_state
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1075,6 +1075,12 @@ do_relaunch() {
             || die "task $ID cannot be recovered because its backlog is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)"
         fi
         ;;
+    esac
+    composer_state=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
+      || composer_state=unknown
+    case "$composer_state" in
+      empty) ;;
+      *) die "task $ID's recovery composer state is '$composer_state', not proven empty; refusing launch recovery before interrupting its agent" ;;
     esac
     NEW_HARNESS=$RECORDED_HARNESS; HARNESS_SET=1
     NEW_MODEL=$(fm_meta_get "$META" model); MODEL_SET=1

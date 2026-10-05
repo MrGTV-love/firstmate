@@ -807,6 +807,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   FM_COMPOSER_SCAN_BOX_OMP=0
   local box_omp=0
+  local bare_line bare_indent literal_floor literal_indent
+  FM_COMPOSER_SCAN_BARE_LITERAL_ROWS='|'
   pi_max=$FM_COMPOSER_PI_MAX_LINES
   case "$pi_max" in ''|*[!0-9]*|0) pi_max=8 ;; esac
   while IFS= read -r line; do
@@ -831,6 +833,26 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     if [ "$current_family" = omp ] && [[ "$trimmed" == '╰─ '*' ─╯' ]]; then
       kind=bottom
       family=omp
+    fi
+    if [ "$kind" = top ] && [ "$family" = omp ] && [ "$top" -lt 0 ] \
+       && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ]; then
+      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
+      bare_indent=${bare_line%%[![:space:]]*}
+      literal_floor=$(_fm_composer_screen_row "$((row + 1))" "$pane")
+      literal_indent=${literal_floor%%[![:space:]]*}
+      fm_composer_normalize_trim_var literal_floor
+      if [ "${#indent}" -gt "${#bare_indent}" ] && [ "$literal_indent" = "$indent" ] \
+         && _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
+        case "$literal_floor" in
+          '╰─ ─╯'|'╰─ '*' ─╯')
+            FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${row}|$((row + 1))|"
+            ;;
+        esac
+      fi
+    fi
+    if _fm_composer_row_is_bare_literal "$row"; then
+      kind=
+      family=
     fi
     # This row's glyph proof, computed once for every envelope that contains
     # it: the same side-border strip _fm_composer_row_content performs, then
@@ -868,6 +890,14 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         fi
         FM_COMPOSER_SCAN_PI_GLYPH_ROW=$pi_glyph_row
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
+        probe=$((pi_open + 1))
+        while [ "$probe" -lt "$row" ]; do
+          if _fm_composer_row_is_bare_literal "$probe"; then
+            FM_COMPOSER_SCAN_BARE_LITERAL_ROWS=${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS/"|$probe|"/|}
+            if [ -n "$cy" ] && [ "$cy" -eq "$probe" ]; then FM_COMPOSER_SCAN_CURSOR_EDGE=1; fi
+          fi
+          probe=$((probe + 1))
+        done
         if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 1 ] \
            && [ "$pi_open" -lt "$FM_COMPOSER_SCAN_BOX_TOP" ] \
            && [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -lt "$row" ]; then
@@ -923,7 +953,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     fi
     # Cursor safety: a cursor sitting on a structural edge row is never an
     # input row.
-    if [ -n "$cy" ] && [ "$row" -eq "$cy" ] && fm_composer_row_has_edge "$trimmed"; then
+    if [ -n "$cy" ] && [ "$row" -eq "$cy" ] && ! _fm_composer_row_is_bare_literal "$row" \
+       && fm_composer_row_has_edge "$trimmed"; then
       FM_COMPOSER_SCAN_CURSOR_EDGE=1
     fi
     # Complete-box state machine (all border families, geometry, ambiguity).
@@ -1286,6 +1317,13 @@ _fm_composer_bare_row_strip_furniture_var() {  # <varname>
   fi
 }
 
+_fm_composer_row_is_bare_literal() {  # <row>
+  case "${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS:-|}" in
+    *"|$1|"*) return 0 ;;
+  esac
+  return 1
+}
+
 # _fm_composer_wrap_region_ok: 0 when every row STRICTLY BELOW <glyph-row>
 # through <cursor-row> is non-blank and carries no structural edge - the
 # contiguity proof that those rows are the bare composer's wrapped input
@@ -1298,7 +1336,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
     trimmed=$line
     fm_composer_normalize_trim_var trimmed
     [ -n "$trimmed" ] || return 1
-    if fm_composer_row_has_edge "$trimmed"; then return 1; fi
+    if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
     if fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
@@ -1546,7 +1584,7 @@ _fm_composer_select_cursorless() {
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
       [ -n "$trimmed" ] || break
-      fm_composer_row_has_edge "$trimmed" && break
+      if ! _fm_composer_row_is_bare_literal "$next" && fm_composer_row_has_edge "$trimmed"; then break; fi
       _fm_composer_row_is_omp_status "$trimmed" && break
       _fm_composer_row_is_braille_furniture "$trimmed" && break
       FM_COMPOSER_SELECTED_LAST=$next

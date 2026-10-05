@@ -18,6 +18,7 @@
 #      flag, an extra positional, or a backend that cannot prove the previous
 #      agent exited.
 set -u
+unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_ROOT_OVERRIDE
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -2419,6 +2420,16 @@ SH
   make_process_table_stub "$1"
 }
 
+claim_herdr_task_tmps() {  # <home> <id>
+  local home=$1 id=$2 homehash path
+  homehash=$(cd "$home" && pwd -P) || return 1
+  homehash=$(printf '%s' "$homehash" | shasum -a 256 | cut -d' ' -f1) || return 1
+  for path in "/tmp/fm-$id" "/tmp/fm-$id+$homehash"; do
+    (umask 077 && mkdir "$path") 2>/dev/null || return 1
+    TASK_TMPS+=("$path")
+  done
+}
+
 # add_herdr_ship_task <case-dir> <id> [session] [surviving-pane]: a ship task
 # recorded on the herdr backend, with its server stopped so its endpoint
 # classifies `missing`. <surviving-pane> is the pane id the fake will answer for
@@ -2427,6 +2438,8 @@ SH
 add_herdr_ship_task() {  # <case-dir> <id> [session] [surviving-pane]
   local dir=$1 id=$2 ses=${3:-fmlab} survivor=${4:-'%7'}
   local home="$dir/home" proj="$dir/proj" wt="$dir/wt"
+  claim_herdr_task_tmps "$home" "$id" \
+    || fail "fixture task or launch temp directory already exists or cannot be claimed for $id"
   fm_git_worktree "$proj" "$wt" "task-$id"
   mkdir -p "$home/data/$id"
   cat > "$home/data/$id/brief.md" <<EOF
@@ -2459,7 +2472,6 @@ EOF
   printf '%s' "$survivor" > "$dir/fake/herdr-pane"
   : > "$dir/fake/herdr-log"
   : > "$dir/fake/herdr-stopped"
-  TASK_TMPS+=("/tmp/fm-$id")
 }
 
 # Sets HERDR_CASE_DIR rather than echoing it, so callers invoke it as a plain
@@ -2476,6 +2488,48 @@ herdr_case_or_skip() {  # <name> <id> [session] [surviving-pane]
   make_herdr_stub "$HERDR_CASE_DIR"
   return 0
 }
+
+HERDR_CASE_ID=
+recovery_case_or_skip() {  # <name> <id-suffix> [session] [surviving-pane]
+  HERDR_CASE_ID="rcv-$$-${TMP_ROOT##*.}-$2"
+  herdr_case_or_skip "$1" "$HERDR_CASE_ID" "${3:-fmlab}" "${4:-%7}"
+}
+
+test_recovery_fixture_claims_only_owned_temp_directories() {
+  local dir id path homehash scenario before
+  for scenario in task launch; do
+    id="rcv-$$-${TMP_ROOT##*.}-ownership-$scenario"
+    dir=$(new_case "ownership-$scenario" "$id")
+    homehash=$(cd "$dir/home" && pwd -P)
+    homehash=$(printf '%s' "$homehash" | shasum -a 256 | cut -d' ' -f1)
+    path="/tmp/fm-$id"
+    [ "$scenario" != launch ] || path="/tmp/fm-$id+$homehash"
+    (umask 077 && mkdir "$path") || fail "could not exclusively own collision fixture"
+    TASK_TMPS+=("$path")
+    printf 'preserve existing directory\n' > "$path/sentinel"
+    before=$(shasum -a 256 "$path/sentinel")
+    (
+      TASK_TMPS=()
+      TMP_ROOT="$dir/child-cleanup"
+      mkdir "$TMP_ROOT" || exit 1
+      trap relaunch_cleanup EXIT
+      if claim_herdr_task_tmps "$dir/home" "$id"; then
+        exit 1
+      fi
+      if [ "$scenario" = launch ]; then
+        [ -d "/tmp/fm-$id" ] || exit 1
+      fi
+    ) || fail "fixture did not refuse a preexisting $scenario directory"
+    [ "$before" = "$(shasum -a 256 "$path/sentinel")" ] \
+      || fail "fixture cleanup removed or changed a preexisting $scenario directory"
+    assert_absent "$dir/child-cleanup" "child fixture cleanup did not run"
+    if [ "$scenario" = launch ]; then
+      assert_absent "/tmp/fm-$id" "failed launch claim leaked its newly claimed task directory"
+    fi
+  done
+  pass "recovery fixture cleanup preserves preexisting task/launch directories and removes only its own claims"
+}
+
 
 
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
@@ -2988,12 +3042,72 @@ SH
   fi
 }
 
+test_reboot_recovery_refuses_busy_command_drafts_without_mutation() {
+  local dir id kind mode draft command out rc before gen head_before
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  local preserved=()
+  for kind in ship scout secondmate; do
+    for mode in direct sweep; do
+      for draft in bash python; do
+        id="reboot-busy-draft-$kind-$mode-$draft"
+        recovery_case_or_skip "$id" "$id" || return 0
+        id=$HERDR_CASE_ID
+        dir=$HERDR_CASE_DIR
+        prepare_herdr_recovery "$dir" "$id" "$kind"
+        case "$draft" in
+          bash) command='!git diff' ;;
+          python) command='$ print(1)' ;;
+        esac
+        printf '%s' "$command" > "$dir/fake/recovery-pending"
+        gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") \
+          || fail "could not arm retained busy draft fixture"
+        printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+        preserved=("$dir/home/state/$id.meta" "$dir/home/state/$id.busy-gen"
+          "$dir/home/state/$id.busy-state" "$dir/home/data/$id/brief.md"
+          "$dir/fake/recovery-pending" "$dir/wt/unlanded.txt")
+        if [ "$kind" = secondmate ]; then
+          preserved+=("$dir/wt/AGENTS.md" "$dir/wt/data/charter.md")
+        fi
+        before=$(shasum -a 256 "${preserved[@]}")
+        head_before=$(git -C "$dir/wt" rev-parse HEAD)
+        rc=0
+        if [ "$mode" = direct ]; then
+          out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+          assert_contains "$out" "not proven empty" "$kind/$draft direct refusal must name the composer guard"
+        else
+          CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+          out=$(run_control "$dir" recover) || rc=$?
+          CONTROL="$ROOT/bin/fm-control.sh"
+        fi
+        expect_code 1 "$rc" "$kind/$mode/$draft recovery must refuse a retained busy command draft"$'\n'"$out"
+        [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
+          || fail "$kind/$mode/$draft recovery changed metadata, busy state, generation, draft, instructions or work"
+        [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] \
+          || fail "$kind/$mode/$draft recovery changed the worktree HEAD"
+        assert_present "$dir/fake/herdr-agent-live" "$kind/$mode/$draft recovery stopped the retained agent"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "$kind/$mode/$draft recovery sent lifecycle input, including Escape"
+        assert_absent "$dir/fake/exit-pending" "$kind/$mode/$draft recovery delivered an exit"
+        assert_absent "$dir/fake/launched-command" "$kind/$mode/$draft recovery launched a replacement"
+        assert_absent "$dir/home/state/$id.control-relaunch" "$kind/$mode/$draft recovery began a lifecycle transaction"
+        assert_absent "$dir/home/state/$id.control-relaunch.note" "$kind/$mode/$draft recovery recorded a note"
+        assert_absent "$dir/home/state/$id.control-relaunch.meta-prior" "$kind/$mode/$draft recovery staged a prior record"
+        assert_absent "$dir/home/state/$id.control-relaunch.brief-prior" "$kind/$mode/$draft recovery staged prior instructions"
+        assert_absent "$dir/home/state/$id.control-exit" "$kind/$mode/$draft recovery recorded a lifecycle exit"
+        assert_absent "$dir/home/state/.control-$id.lock" "$kind/$mode/$draft refusal retained the control lock"
+        assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "$kind/$mode/$draft refusal retained the liveness lock"
+      done
+    done
+  done
+  pass "direct and sweep recovery preserve retained busy Bash/Python drafts before any lifecycle input"
+}
+
 test_reboot_recovery_refuses_foreign_foreground_without_mutation() {
   local dir id kind mode out rc before CONTROL="$ROOT/bin/fm-control.sh"
   for kind in ship scout secondmate; do
     for mode in direct sweep; do
       id="reboot-foreign-$kind-$mode"
-      herdr_case_or_skip "$id" "$id" || return 0
+      recovery_case_or_skip "$id" "$id" || return 0
+      id=$HERDR_CASE_ID
       dir=$HERDR_CASE_DIR
       prepare_herdr_recovery "$dir" "$id" "$kind"
       : > "$dir/fake/recovery-foreign-foreground"
@@ -3029,7 +3143,8 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
     for mode in direct sweep; do
       for pin in missing mismatched; do
         id="reboot-claude-$kind-$mode-$pin"
-        herdr_case_or_skip "$id" "$id" || return 0
+        recovery_case_or_skip "$id" "$id" || return 0
+        id=$HERDR_CASE_ID
         dir=$HERDR_CASE_DIR
         prepare_herdr_recovery "$dir" "$id" "$kind"
         printf 'harness=claude\nmodel=opus\neffort=high\n' >> "$dir/home/state/$id.meta"
@@ -3076,7 +3191,8 @@ test_reboot_recovery_refuses_non_omp_launches_without_mutation() {
 
 test_reboot_recovery_completes_from_bounded_managed_observation() {
   local dir id=reboot-proof-once out rc=0 before
-  herdr_case_or_skip "$id" "$id" || return 0
+  recovery_case_or_skip "$id" "$id" || return 0
+  id=$HERDR_CASE_ID
   dir=$HERDR_CASE_DIR
   prepare_herdr_recovery "$dir" "$id" ship
   : > "$dir/fake/recovery-proof-once"
@@ -3126,7 +3242,8 @@ wait_recovery_barrier() {  # <marker> <pid>
 
 test_secondmate_recovery_refuses_liveness_contention_before_attribution() {
   local dir id=reboot-sm-contended holder out rc=0 before
-  herdr_case_or_skip reboot-secondmate-contended "$id" || return 0
+  recovery_case_or_skip reboot-secondmate-contended "$id" || return 0
+  id=$HERDR_CASE_ID
   dir=$HERDR_CASE_DIR
   prepare_herdr_recovery "$dir" "$id" secondmate
   before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/wt/unlanded.txt")
@@ -3159,7 +3276,8 @@ test_secondmate_recovery_refuses_liveness_contention_before_attribution() {
 
 test_secondmate_recovery_excludes_liveness_through_managed_confirmation() {
   local dir id=reboot-sm-serialized pid out rc=0 stopped=0 launched=0 stopped_observation proof_observation
-  herdr_case_or_skip reboot-secondmate-serialized "$id" || return 0
+  recovery_case_or_skip reboot-secondmate-serialized "$id" || return 0
+  id=$HERDR_CASE_ID
   dir=$HERDR_CASE_DIR
   prepare_herdr_recovery "$dir" "$id" secondmate
   : > "$dir/fake/recovery-stop-hold"
@@ -3209,7 +3327,8 @@ test_secondmate_recovery_releases_liveness_on_refusal_and_failed_confirmation() 
   local dir id scenario out rc
   for scenario in pending close proof; do
     id="reboot-sm-failed-$scenario"
-    herdr_case_or_skip "$id" "$id" || return 0
+    recovery_case_or_skip "$id" "$id" || return 0
+    id=$HERDR_CASE_ID
     dir=$HERDR_CASE_DIR
     prepare_herdr_recovery "$dir" "$id" secondmate
     case "$scenario" in
@@ -3246,7 +3365,8 @@ test_reboot_recovery_refuses_ineligible_backlog_without_stopping_workers() {
   for kind in ship scout; do
     for scenario in closed held blocked missing unreadable inaccessible branch closing; do
       id="reboot-$kind-$scenario"
-      herdr_case_or_skip "$id" "$id" || return 0
+      recovery_case_or_skip "$id" "$id" || return 0
+      id=$HERDR_CASE_ID
       dir=$HERDR_CASE_DIR
       prepare_herdr_recovery "$dir" "$id" "$kind"
       file="$dir/home/data/backlog.md"
@@ -3314,7 +3434,8 @@ test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows() {
     id="reboot-eligible-$scenario"
     kind=ship
     [ "$scenario" != manual ] && [ "$scenario" != queued ] || kind=scout
-    herdr_case_or_skip "$id" "$id" || return 0
+    recovery_case_or_skip "$id" "$id" || return 0
+    id=$HERDR_CASE_ID
     dir=$HERDR_CASE_DIR
     prepare_herdr_recovery "$dir" "$id" "$kind"
     before=$(shasum -a 256 "$dir/wt/unlanded.txt")
@@ -3345,7 +3466,8 @@ test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows() {
 
 test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
   local dir id=reboot-bootstrap-derived out rc=0 before
-  herdr_case_or_skip "$id" "$id" || return 0
+  recovery_case_or_skip "$id" "$id" || return 0
+  id=$HERDR_CASE_ID
   dir=$HERDR_CASE_DIR
   prepare_herdr_recovery "$dir" "$id" ship
   ln -s "$ROOT/bin" "$dir/home/bin"
@@ -3372,100 +3494,101 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
 }
 
 test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
-  local dir out rc=0 before
-  herdr_case_or_skip reboot-secondmate reboot-sm || return 0
+  local dir id out rc=0 before
+  recovery_case_or_skip reboot-secondmate reboot-sm || return 0
+  id=$HERDR_CASE_ID
   dir=$HERDR_CASE_DIR
-  prepare_herdr_recovery "$dir" reboot-sm secondmate
+  prepare_herdr_recovery "$dir" "$id" secondmate
   mkdir -p "$dir/home/config"
   printf 'codex other-model low\n' > "$dir/home/config/secondmate-harness"
   printf 'window=child-session:child-pane\n' > "$dir/wt/state/child.meta"
   printf 'preserve child work\n' > "$dir/wt/unlanded.txt"
   before=$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")
-  out=$(run_control "$dir" reboot-sm relaunch --recover-launch) || rc=$?
+  out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
   expect_code 0 "$rc" "bare secondmate recovery must complete"$'\n'"$out"
-  [ "$(meta_field "$dir" reboot-sm harness)" = omp ] || fail 'recovery picked up a different configured harness'
-  [ "$(meta_field "$dir" reboot-sm model)" = openai-codex/gpt-6-astra ] || fail 'recovery lost the recorded secondmate model'
-  [ "$(meta_field "$dir" reboot-sm effort)" = high ] || fail 'recovery lost the recorded secondmate effort'
-  [ "$(meta_field "$dir" reboot-sm window)" = 'fmlab:%7' ] || fail 'recovery moved the secondmate pane'
+  [ "$(meta_field "$dir" "$id" harness)" = omp ] || fail 'recovery picked up a different configured harness'
+  [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail 'recovery lost the recorded secondmate model'
+  [ "$(meta_field "$dir" "$id" effort)" = high ] || fail 'recovery lost the recorded secondmate effort'
+  [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail 'recovery moved the secondmate pane'
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
     || fail 'recovery changed secondmate child work or its charter'
-  [ "$(journal_field "$dir" reboot-sm children)" = 1 ] || fail 'recovery omitted child-work reconciliation'
+  [ "$(journal_field "$dir" "$id" children)" = 1 ] || fail 'recovery omitted child-work reconciliation'
   pass 'reboot recovery keeps secondmate profile instead of rereading config, plus pane, charter and child work'
 }
 
 test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
-  local a b out rc before_a before_b gen_b head_b
+  local a b id_a id_b out rc before_a before_b gen_b head_b
   local CONTROL="$ROOT/bin/fm-reboot-recover.sh"
-  herdr_case_or_skip reboot-fairness-a a fmlab-a || return 0
-  a=$HERDR_CASE_DIR
-  herdr_case_or_skip reboot-fairness-b b fmlab-b || return 0
-  b=$HERDR_CASE_DIR
-  prepare_herdr_recovery "$a" a ship
-  prepare_herdr_recovery "$b" b ship
+  recovery_case_or_skip reboot-fairness-a fairness-a fmlab-a || return 0
+  a=$HERDR_CASE_DIR id_a=$HERDR_CASE_ID
+  recovery_case_or_skip reboot-fairness-b fairness-b fmlab-b || return 0
+  b=$HERDR_CASE_DIR id_b=$HERDR_CASE_ID
+  prepare_herdr_recovery "$a" "$id_a" ship
+  prepare_herdr_recovery "$b" "$id_b" ship
   printf 2000000001 > "$a/fake/recovery-pid"
   printf draft > "$a/fake/recovery-pending"
-  cp "$a/home/state/a.meta" "$b/home/state/a.meta"
-  mkdir -p "$b/home/data/a" "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
-  cp "$a/home/data/a/brief.md" "$b/home/data/a/brief.md"
+  cp "$a/home/state/$id_a.meta" "$b/home/state/$id_a.meta"
+  mkdir -p "$b/home/data/$id_a" "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
+  cp "$a/home/data/$id_a/brief.md" "$b/home/data/$id_a/brief.md"
   printf '%s\n' "$a/fake" > "$b/fake/herdr-sessions/fmlab-a"
   printf '%s\n' "$a/fake" > "$b/fake/herdr-pids/2000000001"
   printf 'unfinished a\n' > "$a/wt/unlanded.txt"
   printf 'unfinished b\n' > "$b/wt/unlanded.txt"
-  before_a=$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")
+  before_a=$(shasum -a 256 "$b/home/state/$id_a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")
   before_b=$(shasum -a 256 "$b/wt/unlanded.txt")
   head_b=$(git -C "$b/wt" rev-parse HEAD)
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 1 "$rc" "first tick must refuse pending a"$'\n'"$out"
-  [ "$(meta_field "$b" b spawn_gen)" = old ] || fail 'one tick attempted a second repair'
-  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
+  [ "$(meta_field "$b" "$id_b" spawn_gen)" = old ] || fail 'one tick attempted a second repair'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
     || fail 'pending refusal changed a or its work'
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next tick must recover b despite pending a"$'\n'"$out"
-  gen_b=$(meta_field "$b" b spawn_gen)
+  gen_b=$(meta_field "$b" "$id_b" spawn_gen)
   [ -n "$gen_b" ] && [ "$gen_b" != old ] || fail 'later bare agent b was not replaced'
-  [ "$(journal_field "$b" b phase)" = complete ] || fail 'b recovery did not complete its lifecycle transaction'
-  [ "$(meta_field "$b" b window)" = 'fmlab-b:%7' ] || fail 'b recovery changed its endpoint'
-  [ "$(meta_field "$b" b harness)" = omp ] || fail 'b recovery changed its recorded harness'
-  [ "$(meta_field "$b" b model)" = openai-codex/gpt-6-astra ] || fail 'b recovery changed its recorded model'
-  [ "$(meta_field "$b" b effort)" = high ] || fail 'b recovery changed its recorded effort'
+  [ "$(journal_field "$b" "$id_b" phase)" = complete ] || fail 'b recovery did not complete its lifecycle transaction'
+  [ "$(meta_field "$b" "$id_b" window)" = 'fmlab-b:%7' ] || fail 'b recovery changed its endpoint'
+  [ "$(meta_field "$b" "$id_b" harness)" = omp ] || fail 'b recovery changed its recorded harness'
+  [ "$(meta_field "$b" "$id_b" model)" = openai-codex/gpt-6-astra ] || fail 'b recovery changed its recorded model'
+  [ "$(meta_field "$b" "$id_b" effort)" = high ] || fail 'b recovery changed its recorded effort'
   [ "$(git -C "$b/wt" rev-parse HEAD)" = "$head_b" ] \
     && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b recovery changed unfinished work'
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 1 "$rc" "rotation must revisit still-pending a"$'\n'"$out"
-  [ "$(meta_field "$b" b spawn_gen)" = "$gen_b" ] || fail 'rotation replaced an already managed b'
-  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
+  [ "$(meta_field "$b" "$id_b" spawn_gen)" = "$gen_b" ] || fail 'rotation replaced an already managed b'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
     || fail 'repeated recovery touched pending a or its work'
   pass 'bounded reboot ticks advance past pending a to recover b, preserve both copies, and wrap without replacing managed b'
 }
 
 test_bounded_reboot_recovery_advances_after_interrupted_inspection() {
-  local a b c dir id out rc before_a before_b head_b
+  local a b c dir id id_a id_b id_c session out rc before_a before_b head_b
   local CONTROL
-  herdr_case_or_skip reboot-interrupted-a a fmlab-a || return 0
-  a=$HERDR_CASE_DIR
-  herdr_case_or_skip reboot-interrupted-b b fmlab-b || return 0
-  b=$HERDR_CASE_DIR
-  herdr_case_or_skip reboot-interrupted-c c fmlab-c || return 0
-  c=$HERDR_CASE_DIR
-  prepare_herdr_recovery "$a" a ship
-  prepare_herdr_recovery "$b" b ship
-  prepare_herdr_recovery "$c" c ship
+  recovery_case_or_skip reboot-interrupted-a interrupted-a fmlab-a || return 0
+  a=$HERDR_CASE_DIR id_a=$HERDR_CASE_ID
+  recovery_case_or_skip reboot-interrupted-b interrupted-b fmlab-b || return 0
+  b=$HERDR_CASE_DIR id_b=$HERDR_CASE_ID
+  recovery_case_or_skip reboot-interrupted-c interrupted-c fmlab-c || return 0
+  c=$HERDR_CASE_DIR id_c=$HERDR_CASE_ID
+  prepare_herdr_recovery "$a" "$id_a" ship
+  prepare_herdr_recovery "$b" "$id_b" ship
+  prepare_herdr_recovery "$c" "$id_c" ship
   mkdir -p "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
-  for id in a c; do
-    dir=$a
-    [ "$id" != c ] || dir=$c
-    [ "$id" != a ] || printf 2000000001 > "$dir/fake/recovery-pid"
-    [ "$id" != c ] || printf 2000000002 > "$dir/fake/recovery-pid"
+  for id in "$id_a" "$id_c"; do
+    dir=$a session=fmlab-a
+    [ "$id" != "$id_c" ] || { dir=$c; session=fmlab-c; }
+    [ "$id" != "$id_a" ] || printf 2000000001 > "$dir/fake/recovery-pid"
+    [ "$id" != "$id_c" ] || printf 2000000002 > "$dir/fake/recovery-pid"
     cp "$dir/home/state/$id.meta" "$b/home/state/$id.meta"
     mkdir -p "$b/home/data/$id"
     cp "$dir/home/data/$id/brief.md" "$b/home/data/$id/brief.md"
-    printf '%s\n' "$dir/fake" > "$b/fake/herdr-sessions/fmlab-$id"
+    printf '%s\n' "$dir/fake" > "$b/fake/herdr-sessions/$session"
     printf '%s\n' "$dir/fake" > "$b/fake/herdr-pids/$(cat "$dir/fake/recovery-pid")"
   done
-  before_a=$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")
+  before_a=$(shasum -a 256 "$b/home/state/$id_a.meta" "$b/home/data/$id_a/brief.md" "$a/wt/unlanded.txt")
   before_b=$(shasum -a 256 "$b/wt/unlanded.txt")
   head_b=$(git -C "$b/wt" rev-parse HEAD)
   cat > "$b/fakebin/interrupt-recovery" <<SH
@@ -3479,27 +3602,27 @@ SH
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 143 "$rc" "the first bounded tick must be interrupted at its early agent-state probe"$'\n'"$out"
   assert_present "$a/fake/recovery-inspection-entered" "interruption never reached the early probe"
-  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = a ] || fail 'interrupted inspection did not persist a'
-  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")" ] \
+  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = "$id_a" ] || fail 'interrupted inspection did not persist a'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$b/home/data/$id_a/brief.md" "$a/wt/unlanded.txt")" ] \
     || fail 'interrupted inspection changed a or its work'
   assert_present "$a/fake/herdr-agent-live" "interrupted inspection stopped a"
-  assert_absent "$b/home/state/a.control-relaunch" "interrupted inspection began a repair"
+  assert_absent "$b/home/state/$id_a.control-relaunch" "interrupted inspection began a repair"
   assert_absent "$a/fake/launched-command" "interrupted inspection replaced a"
   assert_not_contains "$(cat "$a/fake/herdr-log")" "pane send-" "interrupted inspection sent lifecycle input"
-  [ "$(meta_field "$b" b spawn_gen)" = old ] || fail 'interrupted tick repaired b'
+  [ "$(meta_field "$b" "$id_b" spawn_gen)" = old ] || fail 'interrupted tick repaired b'
   CONTROL="$ROOT/bin/fm-reboot-recover.sh"
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "the next bounded tick must recover b without reentering a"$'\n'"$out"
-  [ "$(journal_field "$b" b phase)" = complete ] || fail 'later bare omp b was not repaired'
-  [ "$(meta_field "$b" b spawn_gen)" != old ] || fail 'b retained its bare incarnation'
-  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = b ] || fail 'the second tick advanced beyond its one repair'
-  [ "$(meta_field "$b" c spawn_gen)" = old ] || fail 'one bounded tick repaired c too'
-  assert_absent "$b/home/state/c.control-relaunch" "one bounded tick attempted c too"
-  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")" ] \
+  [ "$(journal_field "$b" "$id_b" phase)" = complete ] || fail 'later bare omp b was not repaired'
+  [ "$(meta_field "$b" "$id_b" spawn_gen)" != old ] || fail 'b retained its bare incarnation'
+  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = "$id_b" ] || fail 'the second tick advanced beyond its one repair'
+  [ "$(meta_field "$b" "$id_c" spawn_gen)" = old ] || fail 'one bounded tick repaired c too'
+  assert_absent "$b/home/state/$id_c.control-relaunch" "one bounded tick attempted c too"
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$b/home/data/$id_a/brief.md" "$a/wt/unlanded.txt")" ] \
     || fail 'the next tick changed interrupted a'
-  [ "$(meta_field "$b" b window)" = 'fmlab-b:%7' ] || fail 'b repair moved its endpoint'
-  [ "$(meta_field "$b" b worktree)" = "$b/wt" ] || fail 'b repair moved its local copy'
+  [ "$(meta_field "$b" "$id_b" window)" = 'fmlab-b:%7' ] || fail 'b repair moved its endpoint'
+  [ "$(meta_field "$b" "$id_b" worktree)" = "$b/wt" ] || fail 'b repair moved its local copy'
   [ "$(git -C "$b/wt" rev-parse HEAD)" = "$head_b" ] \
     && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b repair changed preserved work'
   pass 'bounded recovery persists early inspection progress before interruption and repairs only the later bare omp next tick'
@@ -3603,3 +3726,5 @@ test_secondmate_recovery_releases_liveness_on_refusal_and_failed_confirmation
 test_reboot_recovery_refuses_ineligible_backlog_without_stopping_workers
 test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows
 test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset
+test_reboot_recovery_refuses_busy_command_drafts_without_mutation
+test_recovery_fixture_claims_only_owned_temp_directories

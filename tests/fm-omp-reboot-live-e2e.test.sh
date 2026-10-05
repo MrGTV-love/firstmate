@@ -161,20 +161,46 @@ for _ in $(seq 1 60); do
 done
 [ "$proof" = unmanaged ] && [ "$composer" = empty ] && [ "$live" = alive ] || fail "omp $(omp --version): bare resume did not reach an attributable live empty composer ($proof/$composer/$live)"
 run pane read "$PANE" --format ansi > "$TMP/bare-empty.ansi"
-run pane send-text "$PANE" 'preserve draft'
-sleep 0.3
-DRAFT=$(fm_backend_herdr_composer_content "$SESSION:$PANE")
-[ "$DRAFT" = 'preserve draft' ] || fail 'test draft was not captured before recovery'
-if out=$("$ROOT/bin/fm-control.sh" "$TASK_ID" relaunch --recover-launch 2>&1); then
-  fail "recovery must refuse a pending composer: $out"
-fi
-[ "$(fm_backend_composer_state herdr "$SESSION:$PANE" "fm-$TASK_ID")" = pending ] || fail 'pending input was not preserved'
-[ "$(fm_backend_herdr_composer_content "$SESSION:$PANE")" = "$DRAFT" ] || fail 'recovery altered the pending draft'
-# Only remove our own test draft, never user input.
-run pane send-keys "$PANE" ctrl+u
-for _ in $(seq 1 30); do
-  [ "$(fm_backend_composer_state herdr "$SESSION:$PANE" "fm-$TASK_ID")" != empty ] || break
-  sleep 0.1
+RETAINED_GEN=$("$ROOT/bin/fm-busy-event.sh" arm "$FM_STATE_OVERRIDE" "$TASK_ID" \
+  --state busy --source omp-ext --event agent_start)
+printf 'busy_gen=%s\n' "$RETAINED_GEN" >> "$META"
+PRESERVED=("$META" "$FM_STATE_OVERRIDE/$TASK_ID.busy-gen" "$FM_STATE_OVERRIDE/$TASK_ID.busy-state"
+  "$FM_DATA_OVERRIDE/$TASK_ID/brief.md" "$WT/unlanded.txt")
+for DRAFT in 'preserve draft' '!git diff' '$ print(1)'; do
+  run pane send-text "$PANE" "$DRAFT"
+  sleep 0.3
+  [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE")" = "$DRAFT" ] \
+    || fail 'test draft was not captured before recovery'
+  DRAFT_BEFORE=$(shasum -a 256 "${PRESERVED[@]}")
+  for RECOVERY in direct sweep; do
+    if [ "$RECOVERY" = direct ]; then
+      if out=$("$ROOT/bin/fm-control.sh" "$TASK_ID" relaunch --recover-launch 2>&1); then
+        fail "recovery must refuse a pending composer: $out"
+      fi
+    else
+      if out=$("$ROOT/bin/fm-reboot-recover.sh" recover 2>&1); then
+        fail "recovery sweep must refuse a pending composer: $out"
+      fi
+    fi
+    [ "$(fm_backend_composer_state herdr "$SESSION:$PANE" "fm-$TASK_ID")" = pending ] \
+      || fail 'pending input was not preserved'
+    [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE")" = "$DRAFT" ] \
+      || fail 'recovery altered the pending draft'
+    [ "$(shasum -a 256 "${PRESERVED[@]}")" = "$DRAFT_BEFORE" ] \
+      || fail 'pending refusal changed metadata, busy state, instructions or work'
+    [ "$(git -C "$WT" rev-parse HEAD)" = "$BEFORE" ] \
+      && [ "$(git -C "$WT" symbolic-ref HEAD)" = "$BRANCH" ] \
+      || fail 'pending refusal changed HEAD or branch'
+    [ ! -e "$FM_STATE_OVERRIDE/$TASK_ID.control-relaunch" ] \
+      || fail 'pending refusal began a lifecycle transaction'
+    [ "$(fm_backend_agent_state herdr "$SESSION:$PANE")" = alive ] \
+      || fail 'pending refusal stopped the restored agent'
+  done
+  run pane send-keys "$PANE" ctrl+u
+  for _ in $(seq 1 30); do
+    [ "$(fm_backend_composer_state herdr "$SESSION:$PANE" "fm-$TASK_ID")" != empty ] || break
+    sleep 0.1
+  done
 done
 if ! "$ROOT/bin/fm-reboot-recover.sh" recover; then
   run pane process-info --pane "$PANE"
