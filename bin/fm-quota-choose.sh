@@ -38,15 +38,13 @@
 # not by this helper. Use this helper only when the brief already fixed the
 # candidate order and every candidate's provider is the harness's primary family.
 #
-# omp (Oh My Pi) has no single primary family, so its candidate model prefix
-# selects the family: openai-codex/<id> checks the codex row and
-# claude-bridge/<id> checks the claude row, each against the bare <id> for
-# model: and product: scopes. Any other or absent prefix is refused up front,
-# the same shape as an unknown harness, because no quota-axi row measures it.
-# quota-axi reports Codex quota unavailable on this host because omp carries
-# its own Codex login, so an openai-codex candidate reads as unknown quota here
-# and is never selected on this host; its runway is disclosed uncertainty for
-# the agent-side gates, not measured headroom.
+# omp (Oh My Pi) has no single primary family. openai-codex/<id> reads every
+# pooled account from one `omp usage --provider openai-codex --json` report:
+# native usable capacity wins over quota-axi's single-account exhaustion.
+# Unknown pool headroom is not positive; saved resets are never spent or counted.
+# claude-bridge/<id> retains the matched claude row and bare-id scoped bounds.
+# Other or absent prefixes are refused because this helper does not model them.
+# No pool spendPriority is invented; candidate order was fixed at intake.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

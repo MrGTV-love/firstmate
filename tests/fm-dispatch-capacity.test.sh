@@ -76,11 +76,10 @@ if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" '[]' > "$TMP_ROOT/res
 fi
 strong='{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}'
 team='[{"harness":"claude","model":"claude-opus-5-5[1m]","effort":"high","requires":"teamclaude"}]'
-# In the current adapter, a bare Claude command is not a supported tc route.
-if [ ! -f "$ROOT/bin/fm-claude-launcher-lib.sh" ]; then
-  if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team" > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
-    fail "bare Claude must not impersonate the pending TeamClaude integration"
-  fi
+# A bare Claude executable is not the required configured TeamClaude route,
+# whether or not the separate launch-owner library has landed.
+if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team" > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "bare Claude must not impersonate the supported TeamClaude route"
 fi
 write_pool 98
 jq '.rules[0].fallback=[]' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/conflicting.json"
@@ -108,5 +107,11 @@ assert_equals usable "$(jq -r .status <<<"$out")" "another Claude account must n
 printf 'pinned-account\n' > "$TMP_ROOT/config/claude-account"
 out=$(fm_dispatch_capacity claude claude-sonnet-5-5)
 assert_equals unknown "$(jq -r .status <<<"$out")" "a pin without established quota mapping is not inferred"
+rm "$TMP_ROOT/config/claude-account"
+jq '(.providers[] | select(.accountKey=="default").quotaSemantics.effectiveAvailability[0].effectivePercentRemaining)=0' "$QUOTA_FIXTURE" > "$TMP_ROOT/native-claude-zero.json"
+mv "$TMP_ROOT/native-claude-zero.json" "$QUOTA_FIXTURE"
+printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
+out=$(fm_dispatch_capacity claude claude-opus-5-5)
+assert_equals unknown "$(jq -r .status <<<"$out")" "native Claude's exhausted account is not the TeamClaude proxy's quota"
 pass "capacity does not conflate default and pinned Claude accounts"
 printf '# all fm-dispatch-capacity tests passed\n'

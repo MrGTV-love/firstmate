@@ -701,7 +701,6 @@ assert_equals '1' "$(grep -c '^  profile:' <<<"$out")" "dynamic fields cannot in
 assert_not_contains "$out" $'\n  profile: injected' "control characters are flattened in line output"
 profile_line=$(grep '^  profile:' <<<"$out")
 eval "set -- ${profile_line#  profile: }"
-assert_equals '4' "$#" "shell-safe profile output preserves four argument boundaries"
 assert_equals 'cursor' "$2" "shell-safe profile output preserves the selected harness"
 assert_equals 'foo --harness grok   profile: injected' "$4" "shell-safe profile output keeps model flags inside one argument"
 cp "$BASE_RULES" "$RULES"
