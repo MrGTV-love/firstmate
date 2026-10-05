@@ -45,6 +45,25 @@
 #   dispatch-resolve:
 #     status: clear | ambiguous | escalate | error
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
+#     timings: api_ms/quota_ms/local_ms/total_ms
+#     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
+#   These diagnostics accompany normal resolution and structured errors, but
+#   no-rules results contain only status/reason; off paths have no stdout.
+#   api_ms and its latency_ms alias are curl's own time_total in whole
+#   milliseconds, so they carry no local helper overhead. Unknown api_ms prints
+#   null; unknown latency_ms prints -. Unattempted quota_ms prints null.
+#   quota_ms and total_ms include helper overhead; total is measured from
+#   opted-in setup through rendering, before printing diagnostics.
+#   local_ms is the nonnegative residual after subtracting known API and quota
+#   durations; unknown stages are not subtracted, so it can include their time.
+#   bin/fm-timing-lib.sh owns the epoch-clock implementation used by these stamps.
+#   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
+#   $0.042 per million input tokens, output free; unavailable usage prints null.
+#   model and returned_model accept only numeric Jev version ids, else unknown;
+#   returned_model survives quota failures alongside paid-call usage, without
+#   echoing arbitrary API text.
+#   Only numeric usage and the returned model id are observed, never request text
+#   or raw API error bodies, which may echo sensitive input.
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible [warning: ..] | eligible, unranked: <reason> | not eligible: <reason>
@@ -91,6 +110,7 @@ CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
 TS_BASE=https://api.typesafe.ai
 TS_TIMEOUT=5
+TS_INPUT_USD_PER_MILLION=0.042
 DEFAULT_WHEN="No listed rule applies to this task."
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
@@ -125,6 +145,9 @@ if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
   exit 0
 fi
+
+RUN_T0=$(fm_timing_now_ms)
+LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 
 # ---- inputs --------------------------------------------------------------------
 [ -n "$BRIEF" ] || die "brief file required (see --help)"
@@ -226,10 +249,40 @@ done < <(jq -r '
 
 RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
 
+# Response model text is untrusted: only numeric Jev version ids are reported.
+JEV_MODEL_ID_JQ='
+  def jev_model_id:
+    if type == "string" and length <= 80 and test("\\Ajev-[0-9]+(\\.[0-9]+)*\\z")
+    then . else null end;'
+
+# Append diagnostics to both success and error results without changing routing.
+# Read only validated metadata; API errors can echo the key or private brief.
+emit_telemetry() {
+  local end total local_ms
+  end=$(fm_timing_now_ms)
+  total=$(( end - RUN_T0 ))
+  [ "$total" -ge 0 ] || total=0
+  local_ms=$(( total - ${LAT_MS/null/0} - ${QUOTA_MS/null/0} ))
+  [ "$local_ms" -ge 0 ] || local_ms=0
+  printf '  timings: api_ms=%s quota_ms=%s local_ms=%s total_ms=%s\n' \
+    "$LAT_MS" "$QUOTA_MS" "$local_ms" "$total"
+  if [ "$RESPONSE_VALID" -eq 1 ]; then
+    jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" "$JEV_MODEL_ID_JQ"'
+      def count: if type == "number" and . >= 0 and . == floor then . else null end;
+      (.usage.input_tokens | count) as $input |
+      (.usage.output_tokens | count) as $output |
+      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price) returned_model=\(.model | jev_model_id)"
+    ' "$RESP_FILE" 2>/dev/null || true
+  else
+    printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s returned_model=null\n' "$TS_INPUT_USD_PER_MILLION"
+  fi
+}
+
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
+  emit_telemetry
   exit 0
 }
 
@@ -300,7 +353,6 @@ if [ -n "$SECTIONS" ]; then
 else
   cp "$BRIEF" "$TASK_TEXT" || die "could not read brief: $BRIEF"
 fi
-LAT_MS=null
 command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
     --arg none_criterion "$DEFAULT_WHEN" --slurpfile rules "$RULES" '
@@ -318,14 +370,18 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
-  T0=$(fm_timing_now_ms)
-  HTTP=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code}' \
+  curl_rc=0
+  CURL_WRITE=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code} %{time_total}' \
     -X POST "$TS_BASE/v1/systemone" -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
-    --data-binary @- 2>/dev/null) || HTTP=000
-  T1=$(fm_timing_now_ms)
-  LAT_MS=$(( T1 - T0 ))
-  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms: $(head -c 200 "$RESP_FILE" 2>/dev/null | tr '\n' ' ')"
+    --data-binary @- 2>/dev/null) || curl_rc=$?
+  HTTP=${CURL_WRITE%% *}
+  [ "$curl_rc" -eq 0 ] || HTTP=000
+  LAT_MS=null
+  case "$CURL_WRITE" in
+    *' '*) LAT_MS=$(fm_timing_seconds_ms "${CURL_WRITE#* }") || LAT_MS=null ;;
+  esac
+  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
     (.answers.rule.choice | type) == "string" and
@@ -340,16 +396,23 @@ jq -e --slurpfile rules "$RULES" '
        (.usage.input_tokens | type) == "number" and
        (.usage.output_tokens | type) == "number"))' \
   "$RESP_FILE" >/dev/null 2>&1 || emit_error "response is not a rule Choice answer"
+RESPONSE_VALID=1
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
 command -v quota-axi >/dev/null 2>&1 || emit_error "quota-axi not installed"
 fm_quota_axi_compatible || emit_error "quota-axi requires >= $FM_QUOTA_AXI_MIN; installed version is older, unreadable, or unparseable"
-quota-axi --json > "$QUOTA" 2>/dev/null || emit_error "quota-axi --json failed"
+Q0=$(fm_timing_now_ms)
+quota_rc=0
+quota-axi --json > "$QUOTA" 2>/dev/null || quota_rc=$?
+Q1=$(fm_timing_now_ms)
+QUOTA_MS=$(( Q1 - Q0 ))
+[ "$QUOTA_MS" -ge 0 ] || QUOTA_MS=0
+[ "$quota_rc" -eq 0 ] || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
-  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ"'
+  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   def prov($p; $lane): quota_row($q; $p; $lane);
@@ -488,7 +551,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
    else {source: $choice, use: profiles($rule.use), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
-    model: $r.model, latency_ms: $lat, tokens: ($r.usage // null),
+    model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
     rule: $picked,
     rule_when: when_of($picked),
     confidence: $a.confidence, probabilities: $a.probabilities
@@ -545,4 +608,5 @@ TEXT=$(jq -r '
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
+emit_telemetry
 exit 0

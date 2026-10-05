@@ -1238,6 +1238,7 @@ Every result above exits 0.
 - Response probabilities must contain exactly every offered choice, use numeric values from 0 through 1, and sum to approximately 1 within 0.01.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, or missing `jq`, each reported and never selected around.
 - Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
+- Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
 
 **Firstmate retains the dispatch decision**
 
