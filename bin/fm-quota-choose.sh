@@ -318,6 +318,19 @@ else
 fi
 
 printf '%s\n' "$QUOTA_JSON" | fm_quota_json_valid || die "invalid quota-axi provider data"
+# OMP's pool is a different quota surface from quota-axi's single Codex account.
+# Inspect it once per chooser invocation and never invent an economic rank.
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+OMP_USAGE=
+for c in "${CANDIDATES[@]}"; do
+  case "$c" in
+    omp:openai-codex/*)
+      OMP_USAGE=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || OMP_USAGE='{}'
+      [ -n "$OMP_USAGE" ] || OMP_USAGE='{}'
+      break ;;
+  esac
+done
 
 # provider_for_harness <harness> [<model>]
 # The harness -> primary provider family table is owned by
@@ -376,6 +389,14 @@ for c in "${CANDIDATES[@]}"; do
   model=${c#*:}
   [ "$model" = "$c" ] && model="default"
   provider=$(provider_for_harness "$harness" "$model")
+  if [ "$harness" = omp ] && [[ "$model" == openai-codex/* ]]; then
+    pool=$(fm_omp_codex_capacity "$model" "$OMP_USAGE")
+    if [ "$(jq -r .status <<<"$pool")" = usable ]; then
+      chosen="$harness $model"
+      break
+    fi
+    continue
+  fi
   scope_model=$model
   [ "$harness" != omp ] || scope_model=${model#*/}
   lane=$(jq -rn --arg h "$harness" --arg m "$model" "$FM_QUOTA_ROW_JQ"'quota_lane($h; $m)')

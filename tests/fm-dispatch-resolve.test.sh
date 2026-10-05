@@ -166,6 +166,15 @@ if [ "${FAKE_QUOTA_DELAY:-0}" != 0 ]; then sleep "$FAKE_QUOTA_DELAY"; fi
 cat "${QUOTA_AXI_FIXTURE:?}"
 SH
 chmod +x "$FAKEBIN/quota-axi"
+cat > "$FAKEBIN/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  usage) cat "${OMP_USAGE_FIXTURE:?}" ;;
+  models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
+  *) exit 2 ;;
+esac
+SH
+chmod +x "$FAKEBIN/omp"
 
 REAL_DIRNAME=$(command -v dirname)
 export REAL_DIRNAME
@@ -1450,6 +1459,42 @@ reset_log
 TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=500 run code out err "$BRIEF"
 assert_contains "$out" '  status: error' "http 500 is a TOON error outcome"
 pass "API, transport, and response failures are error outcomes with exit 0"
+
+# --- OMP routing consumes the pool, never the single-account Codex row ----------
+cp "$BASE_RULES" "$RULES"
+jq '.rules[3].use={harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high",provider:"codex"} |
+  .rules[3].fallback=[{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}]' "$RULES" > "$TMP_ROOT/pool-rules.json"
+mv "$TMP_ROOT/pool-rules.json" "$RULES"
+write_quota "$QUOTA" 0.7597
+jq '(.providers[] | select(.provider=="codex").quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/native-empty.json"
+export OMP_USAGE_FIXTURE="$TMP_ROOT/omp-usage.json"
+jq -n --argjson now "$(date +%s)" '{reports:[
+  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
+]}' > "$OMP_USAGE_FIXTURE"
+write_response "$RESPONSE" rule_4 0.9
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
+assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
+assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
+assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "pooled resolution retains one economic snapshot"
+jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
+mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
+assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
+assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "fallback reuses the captured economic evidence"
+jq '.reports[1].fetchedAt=0' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/stale-pool.json"
+mv "$TMP_ROOT/stale-pool.json" "$OMP_USAGE_FIXTURE"
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "unknown pooled capacity does not authorize paid fallback"
+assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use the stand-in"
+cp "$BASE_RULES" "$RULES"
+pass "typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty"
 
 # --- configuration errors exit 2 and select nothing ----------------------------------
 reset_log
