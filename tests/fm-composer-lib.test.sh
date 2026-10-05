@@ -1105,6 +1105,17 @@ test_omp_literal_input_rows() {
 }
 test_omp_literal_input_rows
 
+assert_extraction_refused() {
+  local label=$1 caps=$2 screen=$3 out status=0
+  out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
+  [ "$status" -ne 0 ] && [ -z "$out" ] \
+    || fail "$label: expected nonzero empty extraction, got status $status and '$out'"
+  status=0
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") || status=$?
+  [ "$status" -ne 0 ] && [ -z "$out" ] \
+    || fail "$label under LC_ALL=C: expected nonzero empty extraction, got status $status and '$out'"
+}
+
 test_bare_draft_owns_indented_compact_omp_literal() {
   local floor screen expected caps cursor out status
   status=' π  · ◔ GPT-6-Astra · 🌳 …-workspace · ⑂ detached · ◫ 15.4%/272K ⟲ · (sub)'
@@ -1149,8 +1160,9 @@ test_bare_draft_owns_indented_compact_omp_literal() {
   assert_screen "enclosing Pi retains floor cursor verdict" pending "$CAPS_TMUX" "$screen" 3 $'pi\tidle'
   assert_screen "enclosing Pi floor still requests identity" need-identity "$CAPS_TMUX" "$screen" 3
   screen=$'❯ old draft\n\n  ╭── π > model > path ─╮\n  ╰─  ─╯'
-  assert_screen "blank-separated compact omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "standalone compact floor cursor remains empty" empty "$CAPS_TMUX" "$screen" 3
+  assert_screen "blank-separated compact omp stays ambiguous" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "blank-separated compact floor cursor stays ambiguous" unknown "$CAPS_TMUX" "$screen" 3
+  assert_extraction_refused "blank-separated compact omp" "$CAPS_STYLED_NOID" "$screen"
   screen=$'❯ old draft\n╭── π > model > path ─╮\n╰─  ─╯'
   assert_screen "unindented compact omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
   pass "bare drafts own indented compact omp literals without claiming standalone boxes or status"
@@ -1245,11 +1257,10 @@ test_pi_and_standalone_multirow_omp_ownership() {
   assert_screen "enclosing Pi literal without identity capability stays unproven" unknown "$CAPS_STYLED_NOID" "$screen"
 
   screen=$'❯ old draft\n\n'"$frame"
-  assert_screen "blank-separated multirow omp remains standalone" pending "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "standalone multirow omp remains proven on plain capture" pending "$CAPS_PLAIN" "$screen"
-  assert_screen "standalone multirow floor cursor reads real body input" pending "$CAPS_TMUX" "$screen" 5
-  out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$screen")
-  [ "$out" = 'typed | > ❯' ] || fail "standalone multirow extraction must strip only real box furniture: '$out'"
+  assert_screen "blank-separated multirow omp stays ambiguous" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "blank-separated multirow omp plain capture stays ambiguous" unknown "$CAPS_PLAIN" "$screen"
+  assert_screen "blank-separated multirow floor cursor stays ambiguous" unknown "$CAPS_TMUX" "$screen" 5
+  assert_extraction_refused "blank-separated multirow omp" "$CAPS_PLAIN" "$screen"
   screen=$'❯ old draft\n╭── π > model > path ─╮\n│ │\n│ │\n╰─  ─╯'
   assert_screen "unindented empty multirow omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
   assert_screen "plain empty standalone multirow omp remains empty" empty "$CAPS_PLAIN" "$screen"
@@ -1259,6 +1270,136 @@ test_pi_and_standalone_multirow_omp_ownership() {
   pass "multirow literal Pi ownership and real standalone box behavior remain distinct"
 }
 test_pi_and_standalone_multirow_omp_ownership
+
+test_blank_separated_indented_omp_frames_are_ambiguous() {
+  local root gutter gap frame screen last cursor caps identity out expected floor gap_index gap_offset=0 replacement
+  for root in '❯ ' '❯ old draft'; do
+    for gutter in ' ' '  '; do
+      replacement=$'\n'"$gutter"
+      gap_index=$gap_offset
+      for frame in $'╭── π > model > path ─╮\n╰─ ─╯' \
+                   $'╭── π > model > path ─╮\n╰─  ─╯' \
+                   $'╭── π > model > path ─╮\n╰─ typed floor ─╯' \
+                   $'╭── π > model > path ─╮\n│ │\n╰─ ─╯' \
+                   $'╭── π > model > path ─╮\n│ │\n╰─  ─╯' \
+                   $'╭── π > model > path ─╮\n│ typed body │\n╰─ ─╯' \
+                   $'╭── π > model > path ─╮\n│ typed body │\n╰─  ─╯' \
+                   $'╭── π > model > path ─╮\n│ typed body │\n╰─ typed floor ─╯'; do
+        case $((gap_index % 4)) in
+          0) gap='' ;;
+          1) gap='  ' ;;
+          2) gap=$'\t' ;;
+          3) gap=$NBSP ;;
+        esac
+        gap_index=$((gap_index + 1))
+        screen="$root"$'\n'"$gap"$'\n'"$gutter${frame//$'\n'/$replacement}"
+        case "$frame" in
+          *'│'*) last=4 ;;
+          *) last=3 ;;
+        esac
+        for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "blank-separated '$root' gutter '$gutter' frame '$frame' stays ambiguous" unknown "$caps" "$screen"
+          assert_extraction_refused "blank-separated '$root' gutter '$gutter' frame '$frame'" "$caps" "$screen"
+        done
+        for cursor in 0 1 "$last"; do
+          assert_screen "blank-separated '$root' gutter '$gutter' cursor row $cursor stays ambiguous" unknown \
+            "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        done
+      done
+      gap_offset=$((gap_offset + 1))
+    done
+  done
+
+  screen=$'❯ \n\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'
+  for identity in '' probe-absent $'zsh\t' $'pi\tidle'; do
+    assert_screen "blank-separated ambiguity cannot be resolved by identity '$identity'" unknown \
+      "$CAPS_STYLED" "$screen" '' "$identity"
+    assert_screen "blank-separated root ambiguity cannot be resolved by identity '$identity'" unknown \
+      "$CAPS_TMUX" "$screen" 0 "$identity"
+    assert_screen "plain blank-separated floor ambiguity cannot be resolved by identity '$identity'" unknown \
+      $'styled=0\ncursor=1\nidentity=1\nrows=20' "$screen" 4 "$identity"
+  done
+
+  for floor in '╰─ ─╯' '╰─  ─╯'; do
+    screen=$'────────\n❯ \n\n  ╭── π > model > path ─╮\n  │ │\n  '"$floor"$'\n────────'
+    expected='❯ ╭── π > model > path ─╮ │ │ ╰─ ─╯'
+    for caps in "$CAPS_STYLED" $'styled=0\ncursor=0\nidentity=1\nrows=20'; do
+      assert_screen "genuine Pi containment of blank-separated literal requests identity" need-identity "$caps" "$screen"
+      assert_screen "genuine Pi containment of blank-separated literal stays pending" pending "$caps" "$screen" '' $'pi\tidle'
+      assert_screen "genuine Pi containment without Pi identity stays unproven" unknown "$caps" "$screen" '' $'zsh\t'
+      out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+        || fail "genuine Pi blank-separated literal extraction refused"
+      [ "$out" = "$expected" ] || fail "genuine Pi blank-separated extraction lost literal frame: '$out'"
+      out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+        || fail "genuine Pi blank-separated literal extraction under LC_ALL=C refused"
+      [ "$out" = "$expected" ] || fail "genuine Pi blank-separated extraction under LC_ALL=C lost literal frame: '$out'"
+    done
+    for cursor in 1 2 3 4 5; do
+      if [ "$floor" = '╰─ ─╯' ] && [ "$cursor" -ge 3 ]; then
+        out=$(fm_composer_classify_screen "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle')
+        [ "$out" != empty ] || fail "genuine Pi unproven minimal frame cursor row $cursor must never authorize injection"
+        out=$(LC_ALL=C fm_composer_classify_screen "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle')
+        [ "$out" != empty ] || fail "genuine Pi unproven minimal frame cursor row $cursor under LC_ALL=C must never authorize injection"
+      else
+        assert_screen "genuine Pi blank-separated literal cursor row $cursor requests identity" need-identity "$CAPS_TMUX" "$screen" "$cursor"
+        assert_screen "genuine Pi blank-separated literal cursor row $cursor stays pending" pending "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle'
+      fi
+    done
+
+    if [ "$floor" = '╰─  ─╯' ]; then
+      screen=$'unrelated transcript\n\n  ╭── π > model > path ─╮\n  │ │\n  '"$floor"
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "ordinary standalone indented omp after transcript stays empty" empty "$caps" "$screen"
+        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "ordinary standalone indented omp extraction refused"
+        [ -z "$out" ] || fail "ordinary standalone indented omp inherited transcript: '$out'"
+        out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "ordinary standalone indented omp extraction under LC_ALL=C refused"
+        [ -z "$out" ] || fail "ordinary standalone indented omp under LC_ALL=C inherited transcript: '$out'"
+      done
+      assert_screen "ordinary standalone indented omp floor cursor stays empty" empty "$CAPS_TMUX" "$screen" 4
+    fi
+  done
+  frame=$'  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'
+  screen=$'❯ \n\n'"$frame"$'\n'"$frame"
+  assert_screen "second contiguous indented frame cannot outrank blank-separated ambiguity" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "plain second contiguous indented frame cannot outrank ambiguity" unknown "$CAPS_PLAIN" "$screen"
+  assert_extraction_refused "multiple contiguous blank-separated indented frames" "$CAPS_STYLED_NOID" "$screen"
+  for cursor in 0 1 2 3 4 5 6 7; do
+    assert_screen "multiple ambiguous frames cursor row $cursor stays unproven" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+  done
+  screen="$screen"$'\n╭── π > model > path ─╮\n╰─  ─╯'
+  assert_screen "later unindented standalone box ends blank-separated ambiguity" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "later unindented standalone floor proves its own empty input" empty "$CAPS_TMUX" "$screen" 9
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+    || fail "later unindented standalone box extraction refused"
+  [ -z "$out" ] || fail "later unindented standalone box inherited earlier ambiguous frames: '$out'"
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+    || fail "later unindented standalone box extraction under LC_ALL=C refused"
+  [ -z "$out" ] || fail "later unindented standalone box under LC_ALL=C inherited earlier ambiguous frames: '$out'"
+  screen=$'❯ first draft\n\n'"$frame"$'\n❯ \n\n'"$frame"
+  for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1\nrows=20'; do
+    for cursor in 0 4 9; do
+      assert_screen "later blank-separated native root preserves ambiguity at cursor row $cursor" unknown \
+        "$caps" "$screen" "$cursor" probe-absent
+    done
+  done
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    assert_screen "latest separate native ambiguity remains unproven cursorless" unknown "$caps" "$screen"
+    assert_extraction_refused "latest separate native ambiguity" "$caps" "$screen"
+  done
+  screen=$'❯ first draft\n\n'"$frame"$'\n╭── π > model > path ─╮\n╰─  ─╯\n❯ \n\n'"$frame"
+  for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1\nrows=20'; do
+    assert_screen "unindented standalone box between ambiguity intervals keeps its own cursor proof" empty \
+      "$caps" "$screen" 6 probe-absent
+    for cursor in 4 11; do
+      assert_screen "separate ambiguity intervals retain cursor row $cursor without claiming intervening box" unknown \
+        "$caps" "$screen" "$cursor" probe-absent
+    done
+  done
+  pass "blank-separated indented omp frames refuse ambiguous drafts without changing genuine Pi or standalone ownership"
+}
+test_blank_separated_indented_omp_frames_are_ambiguous
 
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content

@@ -110,3 +110,78 @@ test_native_prompt_continuations_own_literal_frames() {
 }
 
 test_native_prompt_continuations_own_literal_frames
+
+test_separator_enclosed_native_prompt_continuations() {
+  local continuation frame screen expected frame_expected last cursor caps out identity
+  local bright=$'\033[1;38;2;255;255;255m' reset=$'\033[0m'
+  for continuation in '❯ nested draft' '› nested draft' '⟩ nested draft' '→ nested draft' '❭ nested draft'; do
+    for frame in '' \
+                 $'  ╭── π > model > path ─╮\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  ╰─  ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'; do
+      screen=$'────────\n❯ \n  '"$continuation"
+      expected="$continuation"
+      case "$frame" in
+        '') last=2 ;;
+        *'│ │'*)
+          last=5
+          frame_expected='╭── π > model > path ─╮ │ │ ╰─ ─╯'
+          ;;
+        *)
+          last=4
+          frame_expected='╭── π > model > path ─╮ ╰─ ─╯'
+          ;;
+      esac
+      if [ -n "$frame" ]; then
+        screen="$screen"$'\n'"$frame"
+        expected="$expected $frame_expected"
+      fi
+      screen="$screen"$'\n────────'
+      assert_screen "separator native '$continuation' complete styled draft" pending "$CAPS_STYLED_NOID" "$screen"
+      assert_screen "separator native '$continuation' plain draft stays unproven" unknown "$CAPS_PLAIN" "$screen"
+      assert_screen "separator native '$continuation' lazily requests identity" need-identity "$CAPS_STYLED" "$screen"
+      for identity in probe-absent $'zsh\t' $'claude\tidle' $'pi\tidle' $'pi\tworking'; do
+        assert_screen "separator native '$continuation' identity '$identity' keeps complete draft" pending \
+          "$CAPS_STYLED" "$screen" '' "$identity"
+      done
+      assert_screen "plain separator native '$continuation' Pi owns literal content" pending \
+        $'styled=0\ncursor=0\nidentity=1\nrows=20' "$screen" '' $'pi\tidle'
+      assert_screen "plain separator native '$continuation' non-Pi stays unproven" unknown \
+        $'styled=0\ncursor=0\nidentity=1\nrows=20' "$screen" '' $'zsh\t'
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "separator native '$continuation' complete extraction refused"
+        [ "$out" = "$expected" ] || fail "separator native '$continuation' extraction: expected '$expected', got '$out'"
+        out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "separator native '$continuation' complete extraction under LC_ALL=C refused"
+        [ "$out" = "$expected" ] || fail "separator native '$continuation' extraction under LC_ALL=C: expected '$expected', got '$out'"
+      done
+      cursor=1
+      while [ "$cursor" -le "$last" ]; do
+        assert_screen "separator native '$continuation' cursor row $cursor absent identity" pending \
+          "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        cursor=$((cursor + 1))
+      done
+      assert_screen "separator native '$continuation' empty root requests identity" need-identity "$CAPS_TMUX" "$screen" 1
+      assert_screen "separator native '$continuation' empty root non-Pi identity" pending "$CAPS_TMUX" "$screen" 1 $'zsh\t'
+      assert_screen "separator native '$continuation' empty root Pi identity" pending "$CAPS_TMUX" "$screen" 1 $'pi\tidle'
+      assert_screen "separator native '$continuation' final content row Pi identity" pending "$CAPS_TMUX" "$screen" "$last" $'pi\tidle'
+      assert_screen "plain separator native '$continuation' empty root stays unproven" unknown \
+        $'styled=0\ncursor=1\nidentity=0\nrows=20' "$screen" 1
+    done
+    screen=$'────────\n'"${bright}❯ ${reset}"$'\n  '"${bright}${continuation}${reset}"$'\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯\n────────'
+    expected="$continuation ╭── π > model > path ─╮ │ │ ╰─ ─╯"
+    assert_screen "bright separator native '$continuation' root cursor" pending "$CAPS_TMUX" "$screen" 1 probe-absent
+    assert_screen "bright separator native '$continuation' cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+    out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+      || fail "bright separator native '$continuation' extraction refused"
+    [ "$out" = "$expected" ] || fail "bright separator native '$continuation' extraction changed literal content: '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+      || fail "bright separator native '$continuation' extraction under LC_ALL=C refused"
+    [ "$out" = "$expected" ] || fail "bright separator native '$continuation' extraction under LC_ALL=C changed literal content: '$out'"
+  done
+  pass "separator-enclosed native prompt continuations retain every draft row and literal frame"
+}
+
+test_separator_enclosed_native_prompt_continuations

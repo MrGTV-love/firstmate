@@ -809,6 +809,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local box_omp=0
   local bare_line bare_indent literal_line literal_indent literal_row literal_rows
   FM_COMPOSER_SCAN_BARE_LITERAL_ROWS='|'
+  FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=-1
+  FM_COMPOSER_SCAN_BARE_AMBIG_LAST=-1
+  local literal_owned=0
   pi_max=$FM_COMPOSER_PI_MAX_LINES
   case "$pi_max" in ''|*[!0-9]*|0) pi_max=8 ;; esac
   while IFS= read -r line; do
@@ -856,8 +859,15 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
        && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ]; then
       bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
       bare_indent=${bare_line%%[![:space:]]*}
-      if [ "${#indent}" -gt "${#bare_indent}" ] \
-         && _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
+      literal_owned=0
+      if [ "${#indent}" -gt "${#bare_indent}" ]; then
+        if _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
+          literal_owned=1
+        elif _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))" 1; then
+          literal_owned=2
+        fi
+      fi
+      if [ "$literal_owned" -gt 0 ]; then
         literal_row=$((row + 1))
         literal_rows="${row}|"
         while :; do
@@ -869,7 +879,14 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
           case "$literal_line" in
             '│'*'│') literal_row=$((literal_row + 1)) ;;
             '╰─ ─╯'|'╰─ '*' ─╯')
-              FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${literal_rows}"
+              if [ "$literal_owned" = 1 ]; then
+                FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${literal_rows}"
+              elif [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+                   || [ "$cy" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+                   || [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then
+                FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$FM_COMPOSER_SCAN_BARE_ROW
+                FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$literal_row
+              fi
               break
               ;;
             *) break ;;
@@ -917,14 +934,6 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         fi
         FM_COMPOSER_SCAN_PI_GLYPH_ROW=$pi_glyph_row
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
-        probe=$((pi_open + 1))
-        while [ "$probe" -lt "$row" ]; do
-          if _fm_composer_row_is_bare_literal "$probe"; then
-            FM_COMPOSER_SCAN_BARE_LITERAL_ROWS=${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS/"|$probe|"/|}
-            if [ -n "$cy" ] && [ "$cy" -eq "$probe" ]; then FM_COMPOSER_SCAN_CURSOR_EDGE=1; fi
-          fi
-          probe=$((probe + 1))
-        done
         if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 1 ] \
            && [ "$pi_open" -lt "$FM_COMPOSER_SCAN_BOX_TOP" ] \
            && [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -lt "$row" ]; then
@@ -1362,14 +1371,23 @@ _fm_composer_row_is_bare_literal() {  # <row>
 # contiguity proof that those rows are the bare composer's wrapped input
 # rather than unrelated screen content.
 _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
-  local plain=$1 g=$2 cy=$3 row line trimmed glyph
+  local plain=$1 g=$2 cy=$3 allow_blank=${4:-0} row line trimmed glyph ambiguous=0
   row=$((g + 1))
   while [ "$row" -le "$cy" ]; do
     line=$(_fm_composer_screen_row "$row" "$plain")
     trimmed=$line
     fm_composer_normalize_trim_var trimmed
-    [ -n "$trimmed" ] || return 1
-    if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_row_has_edge "$trimmed"; then return 1; fi
+    if [ -z "$trimmed" ]; then
+      [ "$allow_blank" = 1 ] || return 1
+      row=$((row + 1))
+      continue
+    fi
+    ambiguous=0
+    if [ "$allow_blank" = 1 ] && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+       && [ "$row" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+       && [ "$row" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then ambiguous=1; fi
+    if [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
+       && fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
     if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
@@ -1597,6 +1615,21 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
   fi
+  if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+     && [ "$FM_COMPOSER_SELECTED_FIRST" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ] \
+     && [ "$FM_COMPOSER_SELECTED_LAST" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ]; then
+    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+       && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+      generic=$FM_COMPOSER_SCAN_PI_CLOSE
+      FM_COMPOSER_SELECTED_KIND=pi
+      FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+      FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+    else
+      FM_COMPOSER_SELECTED_KIND=
+      return 1
+    fi
+  fi
   if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
     FM_COMPOSER_SELECTED_KIND=
     return 1
@@ -1765,6 +1798,18 @@ EOF
     if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
       printf 'unknown'; return 0
     fi
+    if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+       && [ "$cy" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+       && [ "$cy" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then
+      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+         && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+         && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      else
+        printf 'unknown'
+      fi
+      return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
       local box_last=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
       [ "$FM_COMPOSER_SCAN_BOX_OMP" != 1 ] || box_last=$FM_COMPOSER_SCAN_BOX_BOTTOM
@@ -1781,9 +1826,6 @@ EOF
     fi
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -ge "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && [ "$FM_COMPOSER_SCAN_BARE_LITERAL_ROWS" != '|' ] \
-       && ! { [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-              && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-              && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; } \
        && _fm_composer_wrap_region_ok "$plain" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"; then
       local bare_last=$FM_COMPOSER_SCAN_BARE_ROW next=$((FM_COMPOSER_SCAN_BARE_ROW + 1)) owned=0
       while _fm_composer_wrap_region_ok "$plain" "$((next - 1))" "$next"; do
@@ -1792,7 +1834,14 @@ EOF
         next=$((next + 1))
       done
       if [ "$owned" = 1 ] && [ "$cy" -le "$bare_last" ]; then
-        _fm_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$bare_last"
+        if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+           && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+           && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+          _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" \
+            "$FM_COMPOSER_SCAN_BARE_ROW" "$bare_last"
+        else
+          _fm_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$bare_last"
+        fi
         return 0
       fi
     fi
@@ -1815,7 +1864,14 @@ EOF
     # and earns its retry.
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && _fm_composer_wrap_region_ok "$plain" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"; then
-      _fm_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"
+      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+         && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+         && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" \
+          "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"
+      else
+        _fm_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"
+      fi
       return 0
     fi
     if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
@@ -1849,14 +1905,14 @@ EOF
         "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST" "$FM_COMPOSER_SCAN_BOX_OMP"
       ;;
     bare)
-      if [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
-        _fm_composer_classify_bare_wrap "$screen" "$styled" \
-          "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
-      elif [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
          && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
          && [ "$FM_COMPOSER_SELECTED_FIRST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
         _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" \
-          "$FM_COMPOSER_SELECTED_FIRST"
+          "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
+      elif [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
+        _fm_composer_classify_bare_wrap "$screen" "$styled" \
+          "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
       else
         _fm_composer_classify_bare_row "$screen" "$styled" "$FM_COMPOSER_SELECTED_FIRST"
       fi
@@ -1932,24 +1988,20 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
 }
 
 _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> <bare-row>
-  local screen=$1 styled=$2 has_identity=$3 identity=$4 row=$5 agent
-  if [ "$has_identity" != 1 ]; then
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
-    return 0
-  fi
-  if [ -z "$identity" ]; then
+  local screen=$1 styled=$2 has_identity=$3 identity=$4 row=$5 last=${6:-$5} agent
+  if [ "$has_identity" = 1 ] && [ -z "$identity" ]; then
     printf 'need-identity'
     return 0
   fi
-  if [ "$identity" = probe-absent ]; then
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
-    return 0
-  fi
   agent=${identity%%$'\t'*}
-  if [ "$agent" = pi ]; then
+  if [ "$has_identity" = 1 ] && [ "$agent" = pi ]; then
     _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
   else
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
+    if [ "$last" -gt "$row" ]; then
+      _fm_composer_classify_bare_wrap "$screen" "$styled" "$row" "$last"
+    else
+      _fm_composer_classify_bare_row "$screen" "$styled" "$row"
+    fi
   fi
 }
 
