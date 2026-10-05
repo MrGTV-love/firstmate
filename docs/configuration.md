@@ -1348,7 +1348,7 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 **Key handling and fixed settings**
 
-- The resolver and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
+- The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
 - The resolver sends the key to `curl` only as a header read from a file descriptor, never on argv, and nothing prints, logs, or writes it.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
@@ -1430,7 +1430,7 @@ For worker launch integration, the supervisor puts that same minimal summary and
 Absent input preserves ordinary selection and does not send the whole brief instead.
 
 All existing mandatory explicit/named and safety triggers run first and cannot be suppressed by this advisory result.
-Named IDs and caller-supplied required IDs are reported separately from optional suggestions; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
+Caller-supplied required IDs and locally resolvable named IDs are reported separately from optional suggestions and survive invalid or unavailable catalogs, with unresolved paths left for ordinary skill-index lookup; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
 Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
 
 Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.

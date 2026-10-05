@@ -27,9 +27,11 @@
 # Output: compact TOON by default; --format brief is an additive launch/steer
 # section. Agents read paths with ordinary tools; nothing auto-loads skill bodies.
 set -u
+SCRIPT_DIR=${BASH_SOURCE[0]%/*}
+[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ] || SCRIPT_DIR=.
 # shellcheck source=bin/fm-typesafe-lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/fm-typesafe-lib.sh"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/fm-typesafe-lib.sh"
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FM_HOME=${FM_HOME:-$ROOT}
 STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
@@ -61,19 +63,33 @@ done
 case "$FORMAT" in toon|brief) ;; *) die "--format must be toon or brief" ;; esac
 [ -n "$BRIEF$TASK" ] || die "--task-file or --brief is required"
 [ -r "${TASK:-$BRIEF}" ] && [ -f "${TASK:-$BRIEF}" ] || die "task input must be a readable regular file"
-command -v jq >/dev/null 2>&1 || { printf 'skill-advice: fallback (jq unavailable; use ordinary selection)\n'; exit 0; }
+brief_authority() {
+  printf '\n# Skill selection advice\n\n'
+  printf '%s\n' 'Apply all existing mandatory explicit/named and safety triggers first, even if absent below.'
+  printf '%s\n' 'This additive advice does not replace the skill index, authorize actions, or suppress any workflow.'
+  printf '%s\n' 'Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.'
+}
+if ! command -v jq >/dev/null 2>&1; then
+  [ "$FORMAT" != brief ] || brief_authority
+  for id in ${REQUIRED[@]+"${REQUIRED[@]}"}; do
+    printf 'Required named skill: %s - path unresolved; locate through the skill index.\n' "$id"
+  done
+  printf '%s\n' 'skill-advice: fallback (jq unavailable; use ordinary selection)' \
+    'Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools.'
+  exit 0
+fi
 WORK=$(mktemp -d) || die "could not allocate temporary files"
 trap 'rm -rf "$WORK"' EXIT
 umask 077
 REQ_IDS='[]'
-RESULT='{"status":"fallback","required":[],"suggestions":[],"uncertain":true,"reason":"ordinary selection"}'
+for id in ${REQUIRED[@]+"${REQUIRED[@]}"}; do
+  REQ_IDS=$(jq -c --arg id "$id" '. + [$id] | unique' <<<"$REQ_IDS")
+done
+RESULT=$(jq -n --argjson required "$REQ_IDS" '{status:"fallback",required:[$required[] | {id:.,path:null}],suggestions:[],uncertain:true,reason:"ordinary selection"}')
 render() {
   if [ "$FORMAT" = brief ]; then
-    printf '\n# Skill selection advice\n\n'
-    printf '%s\n' 'Apply all existing mandatory explicit/named and safety triggers first, even if absent below.'
-    printf '%s\n' 'This additive advice does not replace the skill index, authorize actions, or suppress any workflow.'
-    printf '%s\n' 'Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.'
-    jq -r '.required[] | "Required named skill: \(.id) - read \(.path)."' <<<"$RESULT"
+    brief_authority
+    jq -r '.required[] | if .path == null then "Required named skill: \(.id) - path unresolved; locate through the skill index." else "Required named skill: \(.id) - read \(.path)." end' <<<"$RESULT"
     jq -r '.suggestions[] | "Optional suggestion: \(.id) - read \(.path); fit=\(.fit), uncertain=\(.uncertain), evidence=\(.evidence)."' <<<"$RESULT"
     jq -r 'if (.suggestions | length) == 0 then "No optional suggestion (\(.status): \(.reason)); continue ordinary selection." else "Advice source: \(.source); model: \(.model); catalog: \(.catalog_hash)." end' <<<"$RESULT"
   else
@@ -95,6 +111,16 @@ fi
 # Local catalog snapshot includes authoritative body paths and content hashes.
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 CATALOG=$(cd "$CATALOG" && pwd -P) || fallback fallback "catalog unavailable"
+: > "$WORK/identities"
+for file in "$CATALOG"/*/SKILL.md; do
+  [ -f "$file" ] || continue
+  dd if="$file" bs=524288 count=1 2>/dev/null |
+    awk 'NR == 1 { if ($0 !~ /^---\r?$/) exit; print; next } { print; if ($0 ~ /^---\r?$/) exit }' |
+    jq -eRsc --arg mode identity --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" >> "$WORK/identities" 2>/dev/null || :
+done
+jq -sc 'group_by(.id) | map({id:.[0].id,path:(if length == 1 then .[0].path else null end)})' "$WORK/identities" > "$WORK/names"
+REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '$required + [.[] | .id as $id | select($task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")) | .id] | unique' "$WORK/names")
+RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$required[] | . as $id | {id:$id,path:([$names[0][] | select(.id == $id) | .path][0] // null)}],suggestions:[]}')
 : > "$WORK/rows"
 COUNT=0
 for file in "$CATALOG"/*/SKILL.md; do
@@ -113,11 +139,7 @@ jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"
 jq -e 'map(.id) | length == (unique | length)' "$WORK/catalog" >/dev/null || fallback fallback "duplicate skill IDs"
 for id in ${REQUIRED[@]+"${REQUIRED[@]}"}; do
   jq -e --arg id "$id" 'any(.[]; .id == $id)' "$WORK/catalog" >/dev/null || die "unknown required skill ID"
-  REQ_IDS=$(jq -c --arg id "$id" '. + [$id]' <<<"$REQ_IDS")
 done
-# Name recognition is local and independent of Jev, including on API failures.
-REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '[.[] | .id as $id | select(($required | index($id)) != null or ($task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)"))) | .id] | unique' "$WORK/catalog")
-RESULT=$(jq -n --slurpfile catalog "$WORK/catalog" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$catalog[0][] | select(.id as $id | $required | index($id)) | {id,path}],suggestions:[]}')
 [ "$(wc -c < "$WORK/task")" -le 4096 ] || fallback fallback "task exceeds 4 KiB; supply minimal permitted text"
 jq -e -Rs 'test("\\S")' "$WORK/task" >/dev/null || fallback fallback "no task-specific intent; supply minimal permitted text"
 if ! fm_typesafe_key "$FM_HOME"; then fallback off "TypeSafe key unavailable"; fi

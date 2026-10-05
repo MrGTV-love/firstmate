@@ -84,10 +84,12 @@
 #   inspectable answer plus every candidate's evidence, in code.
 set -u
 
+SCRIPT_DIR=${BASH_SOURCE[0]%/*}
+[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ] || SCRIPT_DIR=.
 # shellcheck source=bin/fm-typesafe-lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/fm-typesafe-lib.sh"
+. "$SCRIPT_DIR/fm-typesafe-lib.sh"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-$FM_ROOT}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"

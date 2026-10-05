@@ -69,6 +69,38 @@ export LOG
 TOOL="$ROOT/bin/fm-skill-suggest.sh"
 run() { PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="${KEY-}" MODE="${MODE:-multiple}" bash "$TOOL" --catalog "$CATALOG" "$@"; }
 reset() { rm -f "$LOG"/* "$HOME_DIR/state/skill-advice.json"; }
+REAL_DIRNAME=$(command -v dirname)
+export REAL_DIRNAME
+cat > "$FAKEBIN/dirname" <<'SH'
+#!/usr/bin/env bash
+if [ "${TYPESAFE_API_KEY+x}${TYPESAFE_API_KEY_PRIVATE+x}" != "" ]; then
+  printf 'secret-present\n' >> "$LOG/dirname-env"
+else
+  printf 'clean\n' >> "$LOG/dirname-env"
+fi
+exec "$REAL_DIRNAME" "$@"
+SH
+chmod +x "$FAKEBIN/dirname"
+KEY=startup-secret
+out=$(run --help)
+assert_contains "$out" 'Suggest optional skills' "help remains available"
+assert_present "$LOG/dirname-env" "help exercises an early child"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "help scrubs inherited keys before dirname"
+out=$(PATH="$FAKEBIN:$PATH" TYPESAFE_API_KEY=startup-secret bash -c 'cd "$1"; bash fm-skill-suggest.sh --help' _ "$ROOT/bin")
+assert_contains "$out" 'Suggest optional skills' "bare filename source path works"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "bare filename scrubs before child startup"
+out=$(PATH="$FAKEBIN:$ROOT/bin:$PATH" TYPESAFE_API_KEY=startup-secret fm-skill-suggest.sh --help)
+assert_contains "$out" 'Suggest optional skills' "PATH invocation source path works"
+out=$(PATH="$FAKEBIN:$PATH" TYPESAFE_API_KEY=startup-secret bash -c 'cd "$1"; bash bin/fm-skill-suggest.sh --help' _ "$ROOT")
+assert_contains "$out" 'Suggest optional skills' "relative source path works"
+SPACE_BIN="$TMP_ROOT/space containing/bin"
+mkdir -p "$SPACE_BIN"
+cp "$TOOL" "$ROOT/bin/fm-typesafe-lib.sh" "$ROOT/bin/fm-env-lib.sh" "$SPACE_BIN/"
+out=$(PATH="$FAKEBIN:$PATH" TYPESAFE_API_KEY=startup-secret bash "$SPACE_BIN/fm-skill-suggest.sh" --help)
+assert_contains "$out" 'Suggest optional skills' "space-containing source path works"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "all help entry paths scrub before children"
+pass "picker startup source paths preserve early-child key isolation"
+KEY=
 printf 'Perform alpha and related work.\n' > "$TASK"
 out=$(run --task-file "$TASK")
 assert_contains "$out" 'status: off' "missing key uses ordinary selection"
@@ -86,6 +118,9 @@ assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "one bounded batch per s
 jq -e '.state.catalog | length == 3 and all(.[]; (.excerpt | length) <= 700)' "$LOG/recheck" >/dev/null || fail "recheck must disclose at most three bounded excerpts"
 jq -e '.state.catalog | all(.[]; (has("path") or has("body_hash") or has("excerpt")) | not)' "$LOG/rank" >/dev/null || fail "rank must not disclose local paths, hashes or bodies"
 jq -e '.state.catalog[] | select(.id == "alpha") | .description == "Use for alpha work, with its complete description retained."' "$LOG/rank" >/dev/null || fail "full folded description must survive"
+assert_present "$LOG/dirname-env" "ordinary request exercises early child"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "ordinary request scrubs keys before dirname"
+assert_not_contains "$(cat "$LOG/rank")" safety "caller-required identity stays local"
 pass "multiple optional skills, safety requirements and bounded progressive disclosure"
 
 out=$(run --task-file "$TASK" --required safety)
@@ -104,6 +139,7 @@ assert_contains "$out" 'source: live' "privacy policy change invalidates reuse w
 printf 'changed task\n' > "$HOME_DIR/config/dispatch-never-send"
 out=$(run --task-file "$TASK" --required safety)
 assert_contains "$out" 'status: off' "new deny rule overrides cached advice"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "withheld task never exposes keys to early children"
 rm "$HOME_DIR/config/dispatch-never-send"
 pass "memoization invalidates on task/catalog changes and respects updated privacy policy"
 
@@ -182,6 +218,7 @@ out=$(run --task-file "$TASK" --required safety --no-cache)
 assert_contains "$out" 'status: off' "opening excerpts are checked before stage two"
 assert_contains "$out" 'required[1]' "withheld excerpt never suppresses safety"
 assert_equals '1' "$(wc -l < "$LOG/calls" | tr -d ' ')" "withheld opening makes only the permitted first call"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "withheld excerpt never exposes keys to early children"
 assert_not_contains "$(cat "$LOG/rank")" SECRET-OPENING "whole bodies are not ranked"
 rm "$HOME_DIR/config/dispatch-never-send"
 pass "a forbidden opening excerpt stops disclosure before the recheck"
@@ -194,13 +231,142 @@ for missing in frontmatter name description; do
     name) printf '%s\n' '---' 'description: Use for delta work.' '---' '# Delta' ;;
     description) printf '%s\n' '---' 'name: delta' '---' '# Delta' ;;
   esac > "$CATALOG/delta/SKILL.md"
-  out=$(run --task-file "$TASK" --required safety --format brief --no-cache)
-  assert_contains "$out" 'fallback: unsupported skill metadata' "missing $missing cannot silently shrink the catalog"
-  assert_contains "$out" 'mandatory explicit/named and safety triggers first' "malformed metadata preserves ordinary required-trigger selection"
-  assert_absent "$LOG/calls" "missing $missing stops before any API call"
+  printf 'Perform gamma work.\n' > "$TASK"
+  for format in toon brief; do
+    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    assert_contains "$out" 'unsupported skill metadata' "missing $missing cannot silently shrink the catalog"
+    if [ "$format" = toon ]; then
+      assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "missing $missing retains supplied requirement"
+      assert_contains "$out" "\"gamma\",\"$CATALOG/gamma/SKILL.md\"" "missing $missing retains named requirement after bad entry"
+      assert_contains "$out" 'suggestions[0]' "invalid catalog withholds optional advice"
+    else
+      assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "brief retains supplied requirement"
+      assert_contains "$out" "Required named skill: gamma - read $CATALOG/gamma/SKILL.md." "brief retains named requirement after bad entry"
+      assert_contains "$out" 'mandatory explicit/named and safety triggers first' "malformed metadata preserves authority"
+      assert_not_contains "$out" 'read null' "brief never directs a null-path read"
+    fi
+    assert_absent "$LOG/calls" "missing $missing stops before any API call"
+  done
 done
 cp "$TMP_ROOT/valid-delta.md" "$CATALOG/delta/SKILL.md"
 pass "missing frontmatter, name or description restores ordinary selection without a call"
+
+printf 'Perform gamma work.\n' > "$TASK"
+assert_requirements() {
+  local out=$1 format=$2 path=$3
+  if [ "$format" = toon ]; then
+    assert_contains "$out" "\"safety\",$path" "supplied requirement survives catalog failure"
+    assert_contains "$out" "\"gamma\",\"$CATALOG/gamma/SKILL.md\"" "named requirement survives catalog failure"
+    assert_contains "$out" 'suggestions[0]' "invalid catalog cannot give optional advice"
+  else
+    if [ "$path" = null ]; then
+      assert_contains "$out" 'Required named skill: safety - path unresolved' "ambiguous requirement has no arbitrary path"
+    else
+      assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "supplied requirement survives in brief"
+    fi
+    assert_contains "$out" "Required named skill: gamma - read $CATALOG/gamma/SKILL.md." "named requirement survives in brief"
+    assert_not_contains "$out" 'read null' "brief never asks to read null"
+  fi
+}
+BASE_CATALOG=$CATALOG
+REAL_SHASUM=$(command -v shasum)
+export REAL_SHASUM
+for boundary in description body hash count duplicate; do
+  reset
+  CATALOG="$TMP_ROOT/catalog-$boundary"
+  mkdir -p "$CATALOG"
+  cp -R "$BASE_CATALOG/." "$CATALOG/"
+  expected_path="\"$CATALOG/safety/SKILL.md\""
+  case "$boundary" in
+    description)
+      printf '%s\n' '---' 'name: delta' 'description: [unsupported]' '---' '# Delta' > "$CATALOG/delta/SKILL.md"
+      reason='unsupported skill metadata' ;;
+    body)
+      jq -nr '"x" * 524288' >> "$CATALOG/delta/SKILL.md"
+      reason='skill body exceeds 512 KiB' ;;
+    hash)
+      cat > "$FAKEBIN/shasum" <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'/delta/SKILL.md'*) exit 1 ;; esac
+exec "$REAL_SHASUM" "$@"
+SH
+      chmod +x "$FAKEBIN/shasum"
+      reason='catalog hash unavailable' ;;
+    count)
+      for ((i=1; i<=124; i++)); do
+        mkdir -p "$CATALOG/extra-$i"
+        printf '%s\n' '---' "name: extra-$i" 'description: Extra work.' '---' '# Extra' > "$CATALOG/extra-$i/SKILL.md"
+      done
+      reason='catalog exceeds 128 skills' ;;
+    duplicate)
+      mkdir -p "$CATALOG/duplicate"
+      cp "$CATALOG/safety/SKILL.md" "$CATALOG/duplicate/SKILL.md"
+      expected_path=null
+      reason='duplicate skill IDs' ;;
+  esac
+  for format in toon brief; do
+    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    assert_contains "$out" "$reason" "$boundary returns the catalog fallback"
+    assert_requirements "$out" "$format" "$expected_path"
+    assert_absent "$LOG/calls" "$boundary prevents remote optional advice"
+  done
+  [ "$boundary" != hash ] || rm "$FAKEBIN/shasum"
+done
+CATALOG=$BASE_CATALOG
+pass "catalog body, hash, count, metadata and duplicate failures retain local requirements"
+
+reset
+mkdir -p "$CATALOG/alias-directory"
+printf '%s\n' '---' 'name: actual-identity' 'description: [unsupported]' '---' '# Skill' > "$CATALOG/alias-directory/SKILL.md"
+printf 'Use actual-identity and alias-directory.\n' > "$TASK"
+for format in toon brief; do
+  out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+  assert_contains "$out" actual-identity "frontmatter identity is recognized despite unsupported description"
+  assert_not_contains "$out" '"alias-directory",' "directory name is not a required identity"
+  assert_not_contains "$out" 'Required named skill: alias-directory' "brief does not treat directory as identity"
+done
+rm -rf "$CATALOG/alias-directory"
+pass "named requirements use frontmatter identity instead of directory names"
+
+reset
+for missing_catalog in "$TMP_ROOT/absent-catalog" "$TMP_ROOT/empty-catalog"; do
+  [ "$missing_catalog" != "$TMP_ROOT/empty-catalog" ] || mkdir -p "$missing_catalog"
+  for format in toon brief; do
+    out=$(run --catalog "$missing_catalog" --task-file "$TASK" --required safety --format "$format" --no-cache)
+    assert_contains "$out" fallback "unavailable or empty catalog falls back"
+    if [ "$format" = toon ]; then
+      assert_contains "$out" '"safety",null' "unavailable identity path retains caller ID"
+    else
+      assert_contains "$out" 'Required named skill: safety - path unresolved' "unavailable identity path is explicit"
+      assert_not_contains "$out" 'read null' "unavailable catalog never gives null read instruction"
+    fi
+    assert_absent "$LOG/calls" "unavailable catalog never calls judge"
+  done
+done
+set +e
+out=$(run --task-file "$TASK" --required unknown --no-cache)
+code=$?
+set -e
+assert_equals '2' "$code" "valid complete catalog still rejects unknown required IDs"
+assert_contains "$out" 'unknown required skill ID' "unknown requirement remains a usage error"
+pass "unavailable catalogs preserve unresolved requirements without changing valid-catalog errors"
+
+NOJQ_BIN="$TMP_ROOT/no-jq-bin"
+mkdir -p "$NOJQ_BIN"
+ln -s "$(command -v bash)" "$NOJQ_BIN/bash"
+ln -s "$REAL_DIRNAME" "$NOJQ_BIN/dirname"
+for format in toon brief; do
+  out=$(PATH="$NOJQ_BIN" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=startup-secret bash "$TOOL" --task-file "$TASK" --required safety --required unknown --format "$format")
+  assert_contains "$out" 'jq unavailable' "missing jq is advisory fallback"
+  assert_contains "$out" 'Required named skill: safety - path unresolved' "missing jq preserves caller requirement"
+  assert_contains "$out" 'Required named skill: unknown - path unresolved' "missing jq preserves unresolved caller ID"
+  assert_contains "$out" 'Required triggers and agent judgment remain authoritative' "missing jq retains authority"
+  if [ "$format" = brief ]; then
+    assert_contains "$out" '# Skill selection advice' "missing jq respects brief format"
+    assert_contains "$out" 'mandatory explicit/named and safety triggers first' "missing jq respects brief authority"
+  fi
+done
+pass "missing jq reports supplied IDs and preserves requested brief authority"
 
 reset
 printf '# Task\nLegacy intent only.\n' > "$BRIEF"
