@@ -385,7 +385,7 @@
       "audience": "operator-current"
     },
     {
-      "path": "docs/jev-guards.md",
+      "path": "docs/host-guards.md",
       "audience": "maintainer-architecture"
     },
     {

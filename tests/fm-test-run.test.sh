@@ -428,6 +428,55 @@ test_changed_dependency_selection_and_unmapped_failure() {
   pass "changed selection covers dependents, fails closed for live unmapped source, and accepts retired unconsumed source"
 }
 
+test_changed_status_record_selects_all_consuming_families() {
+  local tmp repo listed expected family script
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-status-record.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for script in \
+    fm-classify-corr-token.test.sh \
+    fm-pending-reply.test.sh \
+    fm-remote-transport-lanes.test.sh \
+    fm-gotmp.test.sh \
+    fm-pi-branch-extension.test.sh \
+    fm-send-resolve-key.test.sh \
+    fm-pr-merge.test.sh \
+    fm-pr-check-security.test.sh \
+    fm-fleet-snapshot-view.test.sh; do
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  : >"$repo/bin/fm-status-record-lib.sh"
+  git -C "$repo" add bin/fm-status-record-lib.sh tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm status-record-fixture
+
+  printf '\n' >>"$repo/bin/fm-status-record-lib.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "status-record owner-only change failed selection"
+  expected=$(
+    for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings; do
+      "$repo/bin/fm-test-run.sh" --list --family "$family"
+    done | LC_ALL=C sort -u
+  )
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "status-record change must select exactly its nine consuming families: $listed"
+  for script in \
+    fm-classify-corr-token.test.sh \
+    fm-pending-reply.test.sh \
+    fm-remote-transport-lanes.test.sh \
+    fm-afk-return.test.sh \
+    fm-gotmp.test.sh \
+    fm-pi-branch-extension.test.sh \
+    fm-send-resolve-key.test.sh \
+    fm-pr-merge.test.sh \
+    fm-pr-check-security.test.sh \
+    fm-fleet-snapshot-view.test.sh; do
+    assert_contains "$listed" "tests/$script" "status-record change missed $script"
+  done
+  rm -rf "$tmp"
+  pass "status-record owner-only change selects all consuming families and named consumers"
+}
+
 # A direct test reference is per-script evidence. Widening it to the referencing
 # test's whole family is what turned a one-line change to a shared helper into
 # every real-Herdr E2E, including scripts with no dependency on it at all.
@@ -1785,6 +1834,7 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_changed_status_record_selects_all_consuming_families
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs

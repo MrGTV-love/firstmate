@@ -4,7 +4,6 @@
 #        perl fm-lint-cache.pl check <cache-dir|off> <root> <shellcheck> <args> -- <file>
 # ShellCheck retains source-aware extended analysis; only identical successful checks
 # are reused. flock serializes identical misses across worktrees, not unrelated roots.
-# Unknown source forms disable reuse; selection follows only resolved source closures.
 #
 use Cwd qw(abs_path);
 use strict;
@@ -46,6 +45,10 @@ sub dependencies {
     return @{$edges{$path}} if exists $edges{$path};
     my $body = contents($path);
     my %deps;
+    my $finite_backend = identity_path($path) eq 'bin/fm-backend.sh';
+    if ($finite_backend) {
+        $deps{"bin/backends/$_.sh"} = 1 for qw(tmux herdr zellij orca cmux);
+    }
     if (defined $body) {
         # Include every override, even one in a nested function or comment. This
         # deliberately over-selects rather than relying on shell execution order.
@@ -57,16 +60,14 @@ sub dependencies {
         # prefix ($dir/file -> ./file). Track both that path and repository-local
         # basename candidates for runtime reverse-dependency selection.
         my %recognized_sources;
-        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)(?:\s*\d*(?:>>?|<<?|<&|>&|&>)\s*$prefix_word)*\s*(?:"([^"\n]+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
+        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)(?:\s*\d*(?:>>?|<<?|<&|>&|&>)\s*$prefix_word)*\s*(?:"((?:\$\([^)\n]*\)|[^"\n])+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
             my $source = defined $2 ? $2 : defined $3 ? $3 : $4;
             my $bare_word = defined $4;
             my $offset = $-[1];
             $recognized_sources{$offset} = 1;
             my $word_end = $+[0];
-            my $prefix = substr($body, 0, $offset);
-            my $has_override = $prefix =~ /(?:^|\n)\s*#\s*shellcheck[^\n]*\bsource=[^\n]+(?:\n|\z)(?:\s*#[^\n]*\n)*\s*\z/;
             if ($word_end < length($body) && substr($body, $word_end, 1) !~ /[\s;#&|(){}<>]/) {
-                $unknown{$path} = 1 unless $has_override;
+                $unknown{$path} = 1;
                 next;
             }
             my $line_prefix = substr($body, 0, $offset);
@@ -83,12 +84,7 @@ sub dependencies {
                 $source =~ s{^\./}{};
                 $deps{$source} = 1;
             } else {
-                next if $has_override;
-                # A bare variable has no literal filename for ShellCheck to
-                # follow. It therefore contributes no external analysis input.
-                next if $source =~ /^\$(?:[A-Za-z_]\w*|[0-9]|\{[^}]+\})\z/;
-                # Other unresolved word shapes and custom search paths may add
-                # inputs we cannot prove; never reuse a cached result for them.
+                next if $finite_backend && $source eq '$adapter';
                 $unknown{$path} = 1;
             }
         }
@@ -124,12 +120,19 @@ if ($mode eq 'select') {
     my %changed;
     while (<STDIN>) { chomp; s{^\./}{}; $changed{$_} = 1; }
     my $policy_changed = grep { $changed{$_} } qw(bin/fm-lint.sh bin/fm-lint-cache.pl);
-    my %selected;
+    my (%selected, %closures, %inputs);
     for my $path (@inventory) {
         my %seen;
         closure($path, \%seen);
+        $closures{$path} = \%seen;
+        $inputs{$_} = 1 for keys %seen;
+    }
+    my $source_changed = grep { $inputs{$_} || /\.sh\z/ } keys %changed;
+    for my $path (@inventory) {
+        my $seen = $closures{$path};
         $selected{$path} = 1 if $policy_changed || $changed{$path}
-            || grep { $changed{$_} } keys %seen;
+            || (grep { $changed{$_} } keys %$seen)
+            || ($source_changed && (grep { $unknown{$_} } keys %$seen));
     }
     print "$_\0" for grep { $selected{$_} } @inventory;
     exit 0;

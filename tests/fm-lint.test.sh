@@ -453,14 +453,38 @@ SH
 
 
 test_ci_forces_full_lint_even_with_empty_diff() {
-  local listed expected
-  # No git stub: CI=true must short-circuit fm-lint.sh's mode selection before
-  # it ever consults git, so this proves CI wins regardless of local diff state.
-  listed=$(CI=true "$LINT" --list-files)
-  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
+  local tmp repo fakebin diff_file log expected listed out run
+  tmp=$(fm_test_tmproot fm-lint-ci-inventory)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/backends/fixture.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/tests/fixture.test.sh"
+  chmod +x "$repo/bin/backends/fixture.sh" "$repo/tests/fixture.test.sh"
+  fakebin=$(fm_fakebin "$tmp")
+  fm_lint_stub_git "$fakebin"
+  log="$tmp/shellcheck.log"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  diff_file="$tmp/diff.nul"
+  : > "$diff_file"
+  expected=$(find "$repo/bin" "$repo/bin/backends" "$repo/tests" -maxdepth 1 -type f -name '*.sh' -print \
+    | while IFS= read -r path; do printf '%s\n' "${path#"$repo/"}"; done | LC_ALL=C sort)
+  listed=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
-  pass "fm-lint.sh forces a full lint in CI even when the local diff would be empty"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
+    || fail "local cache warm-up failed: $out"
+  for run in 1 2; do
+    : > "$log"
+    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      FM_TEST_GIT_DIFF_FILE="$diff_file" \
+      "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
+    [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
+      || fail "CI run $run did not analyze the complete uncached inventory: $(cat "$log")"
+    assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+  done
+  pass "CI=true checks the complete uncached inventory even with an empty diff"
 }
 
 test_main_branch_forces_full_lint() {
@@ -1640,9 +1664,9 @@ SH
   [ "$rc" -eq 1 ] || fail "changed dependency defect was not rejected: $out"
   assert_contains "$out" SC1007 "changed mode lost the seeded library finding"
   rc=0
-  out=$(CI=true "$repo/bin/fm-lint.sh" --full 2>&1) || rc=$?
-  [ "$rc" -eq 1 ] || fail "full lint did not reject the same dependency defect: $out"
-  assert_contains "$out" SC1007 "full mode lost the seeded library finding"
+  out=$(CI=true "$repo/bin/fm-lint.sh" 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "CI lint did not reject the same dependency defect: $out"
+  assert_contains "$out" SC1007 "CI lint lost the seeded library finding"
   rm "$repo/bin/library.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
@@ -1673,6 +1697,86 @@ test_selection_adds_no_unchanged_imported_roots() {
   [ "$(cat "$log")" = bin/caller.sh ] \
     || fail "explicit path added imported roots"$'\n'"logged: $(cat "$log")"
   pass "selection analyzes unchanged imports only through changed or explicit callers"
+}
+
+test_runtime_backend_changes_select_every_dispatcher_consumer() {
+  local tmp diff_file selection caller backend listed
+  tmp=$(fm_test_tmproot fm-lint-runtime-selection)
+  diff_file="$tmp/diff.nul"
+  selection="$tmp/selection.nul"
+  for backend in tmux herdr zellij orca cmux; do
+    fm_lint_write_diff_file "$diff_file" "bin/backends/$backend.sh"
+    perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+      || fail "$backend dependency selection failed"
+    listed=$'\n'
+    while IFS= read -r -d '' caller; do
+      listed+="$caller"$'\n'
+    done < "$selection"
+    assert_contains "$listed" $'\n'"bin/backends/$backend.sh"$'\n' \
+      "$backend change did not select its adapter root"
+    for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh; do
+      assert_contains "$listed" $'\n'"$caller"$'\n' \
+        "$backend change did not select dispatcher consumer $caller"
+    done
+  done
+  fm_lint_write_diff_file "$diff_file" unrelated-input
+  perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+    || fail "unrelated-input dependency selection failed"
+  [ ! -s "$selection" ] || fail "an unrelated input selected runtime backend consumers"
+  pass "each runtime backend change selects every direct and transitive dispatcher consumer"
+}
+
+test_runtime_backend_inputs_invalidate_dispatcher_cache() {
+  local tmp repo fakebin log backend root attempt state out
+  tmp=$(fm_test_tmproot fm-lint-runtime-cache)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cp "$ROOT/bin/fm-backend.sh" "$repo/bin/fm-backend.sh"
+  cat >> "$repo/bin/consumer.sh" <<'SH'
+# shellcheck source=bin/fm-backend.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-backend.sh"
+SH
+  cat > "$tmp/adapter.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../library.sh"
+SH
+  for backend in tmux herdr zellij orca cmux; do
+    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
+  done
+  fakebin=$(fm_fakebin "$tmp")
+  log="$tmp/shellcheck.log"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  for backend in tmux herdr zellij orca cmux; do
+    for attempt in 1 2; do
+      for root in bin/fm-backend.sh bin/caller.sh; do
+        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+          "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
+          || fail "$backend cache warm-up $attempt failed for $root: $out"
+        if [ "$attempt" -eq 2 ]; then
+          assert_contains "$out" "cache hit $root" "clean $root result was not reusable"
+        fi
+      done
+    done
+    for state in changed deleted; do
+      if [ "$state" = changed ]; then
+        printf '\n' >> "$repo/bin/backends/$backend.sh"
+      else
+        rm "$repo/bin/backends/$backend.sh"
+      fi
+      : > "$log"
+      for root in bin/fm-backend.sh bin/caller.sh; do
+        out=$(perl "$repo/bin/fm-lint-cache.pl" check "$tmp/cache" "$repo" \
+          "$fakebin/shellcheck" --norc --external-sources -- "$root" 2>&1) \
+          || fail "$state $backend check failed for $root: $out"
+        assert_not_contains "$out" "cache hit $root" "$state $backend reused stale $root analysis"
+      done
+      [ "$(cat "$log")" = $'bin/fm-backend.sh\nbin/caller.sh' ] \
+        || fail "$state $backend did not recheck dispatcher and transitive caller: $(cat "$log")"
+    done
+    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
+  done
+  pass "changes and deletions of every runtime backend invalidate dispatcher and caller caches"
 }
 
 test_shared_cache_reuses_only_identical_successful_inputs() {
@@ -1760,9 +1864,6 @@ ce bin/library.sh' 'source 2>/dev/null bin/library.sh' 'source b"in"/library.sh'
       "$repo/bin/fm-lint.sh" --jobs 1 "bin/spelling-$index.sh" 2>&1) \
       || fail "source spelling $index did not initially pass: $out"
   done
-  # An unsupported command wrapper is not claimed to receive joint analysis.
-  # The helper must instead refuse reuse. An unrelated change must not select it:
-  # changed mode follows only resolved source closures, and CI lints every root.
   cat > "$repo/bin/unparsed.sh" <<'SH'
 #!/usr/bin/env bash
 builtin source bin/library.sh
@@ -2010,6 +2111,135 @@ SH
   pass "a fast-mode success cannot satisfy source-aware extended analysis"
 }
 
+test_unresolved_runtime_sources_select_possible_callers() {
+  local tmp repo diff_file selection listed caller changed override
+  tmp=$(fm_test_tmproot fm-lint-possible-callers)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  diff_file="$tmp/diff.nul"
+  selection="$tmp/selection.nul"
+  for override in /dev/null bin/library.sh; do
+    cat > "$repo/bin/runtime.sh" <<SH
+#!/usr/bin/env bash
+target=bin/library.sh
+target=\${1:-\$target}
+# shellcheck source=$override
+. "\$target"
+SH
+    cat > "$repo/bin/transitive.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/runtime.sh
+. bin/runtime.sh
+SH
+    for changed in bin/library.sh bin/deleted.sh; do
+      fm_lint_write_diff_file "$diff_file" "$changed"
+      perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$selection" \
+        || fail "possible-caller selection failed"
+      listed=$'\n'
+      while IFS= read -r -d '' caller; do listed+="$caller"$'\n'; done < "$selection"
+      for caller in bin/runtime.sh bin/transitive.sh; do
+        assert_contains "$listed" $'\n'"$caller"$'\n' \
+          "$override omitted possible caller $caller for $changed"
+      done
+      assert_not_contains "$listed" $'\n''bin/fm-lint-workflows.sh'$'\n' \
+        "possible-caller fallback selected a source-free root"
+    done
+    for changed in '' unrelated-input; do
+      fm_lint_write_diff_file "$diff_file" "$changed"
+      perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$selection" \
+        || fail "unrelated selection failed"
+      [ ! -s "$selection" ] || fail "empty or unrelated change selected possible callers"
+    done
+  done
+  for changed in bin/fm-operational-input.sh bin/fm-tmux-lib.sh \
+    bin/fm-supervise-daemon.sh bin/fm-gate-refuse-lib.sh; do
+    fm_lint_write_diff_file "$diff_file" "$changed"
+    perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
+      || fail "assigned-variable consumer selection failed"
+    listed=$'\n'
+    while IFS= read -r -d '' caller; do listed+="$caller"$'\n'; done < "$selection"
+    case "$changed" in
+      bin/fm-operational-input.sh) caller=tests/fm-operational-input.test.sh ;;
+      bin/fm-tmux-lib.sh) caller=tests/fm-composer-ghost.test.sh ;;
+      bin/fm-supervise-daemon.sh)
+        assert_contains "$listed" $'\n''tests/fm-afk-inject-herdr-e2e.test.sh'$'\n' \
+          "daemon change omitted its Herdr sourcing consumer"
+        caller=tests/fm-afk-inject-e2e.test.sh ;;
+      bin/fm-gate-refuse-lib.sh) caller=tests/fm-gate-refuse.test.sh ;;
+    esac
+    assert_contains "$listed" $'\n'"$caller"$'\n' "assigned source omitted $caller"
+  done
+  pass "unresolved runtime sources select possible direct and transitive callers"
+}
+
+test_unresolved_runtime_sources_refuse_cached_success() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): runtime cache safety"; return; }
+  local tmp repo out attempt
+  tmp=$(fm_test_tmproot fm-lint-runtime-uncertainty)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf 'initial\n'
+}
+SH
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=bin/library.sh
+. "$target"
+needs_argument
+SH
+  cat > "$repo/bin/transitive.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/runtime.sh
+. bin/runtime.sh
+needs_argument
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+      || fail "runtime consumer check failed: $out"
+    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
+      "unproved runtime closure reused successful analysis"
+  done
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=/dev/null
+. "$target"
+printf 'ok\n'
+SH
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+      || fail "isolated runtime consumer check failed: $out"
+    assert_not_contains "$out" 'cache hit bin/transitive.sh' \
+      "a /dev/null override authorized reuse of an unproved runtime closure"
+  done
+  cat > "$repo/bin/runtime.sh" <<'SH'
+#!/usr/bin/env bash
+target=${1:-bin/library.sh}
+# shellcheck source=bin/library.sh
+. "$target"
+needs_argument
+SH
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+needs_argument() {
+  printf '%s\n' "$1"
+}
+SH
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" bin/transitive.sh 2>&1) \
+    && fail "runtime consumer hid a changed imported argument requirement"
+  assert_contains "$out" SC2119 "runtime consumer lost its joint missing-argument finding"
+  pass "unproved transitive runtime closures never reuse successful analysis"
+}
+
+test_unresolved_runtime_sources_select_possible_callers
+test_unresolved_runtime_sources_refuse_cached_success
 test_source_spellings_keep_changed_and_cached_dataflow_findings
 test_joint_sources_keep_call_dependent_findings
 test_private_source_keeps_changed_call_dependent_findings
@@ -2017,6 +2247,8 @@ test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
 test_selection_adds_no_unchanged_imported_roots
+test_runtime_backend_changes_select_every_dispatcher_consumer
+test_runtime_backend_inputs_invalidate_dispatcher_cache
 test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint

@@ -162,7 +162,7 @@ test_normal_correlated_reply_resolves_once() {
 }
 
 test_completed_turn_no_report_triggers_one_recovery() {
-  local home state corr hook_log rec
+  local home state corr hook_log rec recovery_count
   home=$(setup_parent one-recovery)
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-hook.log"
@@ -192,8 +192,8 @@ test_completed_turn_no_report_triggers_one_recovery() {
   if fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
     fail "second recovery must refuse"
   fi
-  lines=$(wc -l < "$hook_log" | tr -d ' ')
-  [ "$lines" = 1 ] || fail "expected exactly one recovery send, got $lines"
+  recovery_count=$(wc -l < "$hook_log" | tr -d ' ')
+  [ "$recovery_count" = 1 ] || fail "expected exactly one recovery send, got $recovery_count"
   rec=$(fm_pending_reply_path "$state" "$corr")
   case "$(cat "$hook_log")" in
     *"corr=$corr"*) : ;;

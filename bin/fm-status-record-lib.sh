@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Shared emission-time metadata and retry identity for status records.
-# Classification and open-decision folding remain in fm-classify-lib.sh.
 # Sourcing this library only defines functions; it does not initialize globals.
 
 # --- optional event emission time -------------------------------------------

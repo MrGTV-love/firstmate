@@ -1,0 +1,373 @@
+#!/usr/bin/env bash
+# shellcheck source=bin/fm-status-record-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-record-lib.sh"
+
+# The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
+# status decision opened by needs-decision or blocked. See status_open_decisions
+# below for the status-fold contract. The transfer verb is written only after
+# fm-captain-hold.sh has verified the corresponding captain-held backlog item.
+FM_CLASSIFY_RESOLVE_VERB_DEFAULT='resolved'
+FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
+
+# --- durable keyed decisions ------------------------------------------------
+#
+# The status stream is an append-only EVENT log. Reading it last-event-wins
+# (last_status_line above) cannot represent "an earlier decision is still open
+# after a later, unrelated event": a subsequent done/paused/working line silently
+# masks a still-open needs-decision. status_open_decisions is the ONE authoritative
+# statement of the status-fold contract that fixes this - a needs-decision/blocked
+# line OPENS a keyed decision, and an explicit resolution or a verified
+# captain-held backlog transfer referencing that key CLOSES it.
+# Ship/scout terminal declarations supersede stale log decisions; a secondmate's
+# terminal event may describe other work and cannot close an unrelated decision.
+# Who WRITES the closing line is owned elsewhere: the answering firstmate closes
+# at answer time through fm-send's --resolve-key (bin/fm-send.sh header), and a
+# worker self-closes only a blocker that cleared without an answer (bin/fm-brief.sh
+# rule 6), so closure never depends on a busy worker's discipline.
+#
+# Decision key grammar (backward-compatible with the existing "<verb>: <note>"
+# format): an OPTIONAL "[key=<slug>]" token names the decision. Its documented
+# position sits between the verb and the colon, and a complete token at the
+# head of the note is accepted as an EQUIVALENT position, because that
+# misplaced-colon shape is common real worker output whose stated key must
+# never silently collapse into the shared "default" bucket (issue #2109):
+#   needs-decision [key=api-shape]: <summary>
+#   needs-decision: [key=api-shape] <summary>
+#   resolved       [key=api-shape]: <how it was decided>
+# Both positions state the same key and yield the same note (a consumed
+# note-head token is key metadata, stripped from the note); when both positions
+# carry a token, the documented before-colon one wins and the note-head token
+# stays note text. A token deeper inside the note is prose, never a stated key,
+# so a summary merely MENTIONING "[key=x]" cannot open or close that decision.
+# A line with no token in either position uses the key "default", preserving
+# the historical one-open-decision-per-task behavior (a bare "resolved:" closes
+# "default"). A stated key whose slug fails the charset below is rejected (the
+# folds skip the line), never rewritten to "default".
+# The parsers are pure reads of a single line. Status metadata may contain any
+# number of "[name=value]" tags before the colon, in any order, so verb parsing
+# ends at the first tag rather than special-casing "[key=...]".
+#
+# Correlation tokens. That bracket rule already covers every BRACKETED tag,
+# including the "[corr=<16 hex>]" form bin/fm-secondmate-report.sh writes. It
+# does not cover the UNBRACKETED token that bin/fm-pending-reply-lib.sh writes
+# (fm_pending_reply_corr_token), which a secondmate answering a marked request
+# echoes on its parent status line ahead of the key tag (bin/fm-brief.sh), so a
+# real transition routinely arrives as
+#   needs-decision corr=<16 hex> [key=texte-du-mur]: <summary>
+#   resolved       corr=<16 hex> [key=texte-du-mur]: <how it was decided>
+# and a recovery turn can leave two such tokens on one line. All of those must
+# read as the bare verb, in BOTH directions: a verb parse that keeps the token
+# glued on matches no arm of _fm_decision_fold_line, so the opener never opens
+# and the closer never closes, and a captain decision goes silently missing.
+# Recognition starts only AFTER the retained leading verb: a token-first line
+# keeps that token, so its following word cannot impersonate a transition and
+# close a decision the captain is owed.
+#
+# The token grammar is OWNED by bin/fm-pending-reply-lib.sh
+# (fm_pending_reply_corr_token, FM_PENDING_REPLY_CORR_RE). That library sources
+# this one, so it cannot be sourced back here; the pattern below is a deliberate
+# second statement of the SHAPE alone, and tests/fm-classify-corr-token.test.sh
+# pins the two together through the real writers so they cannot drift.
+#
+# Recognition is deliberately narrow: EXACTLY the token that writer emits, whole
+# word, and nothing else. An arbitrary "<name>=<value>" token is NOT skipped.
+# Skipping unknown tokens would be the permissive road - it would let any
+# free-text word carrying an equals sign ("resolved x=1 [key=k]: ...") reduce to
+# a bare verb and impersonate a transition, which is the takeover the strict
+# parse and _fm_decision_key_transition_allowed exist to prevent. Recognising
+# only what a firstmate library actually writes costs one more line here each
+# time a real new token shape is introduced, and that is the intended trade: a
+# new shape is a deliberate, reviewed edit rather than a silent widening. A line
+# whose token is malformed, wrong-length, or merely mentioned in prose keeps its
+# extra words and therefore stays a non-transition, exactly as before.
+#
+# The 16 hex classes are written out literally rather than built from a
+# variable, the same way bin/fm-secondmate-report.sh validates the id it is
+# handed: a variable holding a glob is only re-read as a pattern under some
+# shells' expansion rules, and a safety parse must not turn on that.
+#
+# 0 if <word> is, in whole, an unbracketed correlation token this fleet's own
+# tooling writes. The bracketed form never reaches here: the tag rule above has
+# already ended the verb parse at its opening bracket.
+_fm_classify_is_corr_token() {  # <word>
+  case "$1" in
+    corr=[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f])
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+# Printed, or assigned to <out-var> when one is given, so a per-line caller on a
+# hot path can take the verb without forking a command substitution. Under bash's
+# dynamic scope an <out-var> named like one of this function's own locals (v, out,
+# word) would be assigned here and lost, so callers pass a distinct name.
+status_line_verb() {  # <status-line> [<out-var>] -> leading verb word
+  local v=${1%%:*} out='' word
+  v=${v%%\[*}
+  v=${v#"${v%%[![:space:]]*}"}
+  v=${v%"${v##*[![:space:]]}"}
+  # Fast path, and the whole no-regression guarantee: a prefix that cannot
+  # contain a correlation token is returned byte-for-byte as before, so every
+  # line without one keeps its exact historical verb, spacing included.
+  case "$v" in
+    *corr=*)
+      # Retain the first word, then drop only recognised tokens from the remaining
+      # whole words. Anything unrecognised stays, so prose still matches no verb.
+      word=${v%%[[:space:]]*}
+      out=$word
+      v=${v#"$word"}
+      v=${v#"${v%%[![:space:]]*}"}
+      while [ -n "$v" ]; do
+        word=${v%%[[:space:]]*}
+        v=${v#"$word"}
+        v=${v#"${v%%[![:space:]]*}"}
+        _fm_classify_is_corr_token "$word" && continue
+        out="$out $word"
+      done
+      ;;
+    *) out=$v ;;
+  esac
+  if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$out"; else printf '%s' "$out"; fi
+}
+# 0 when a complete "[key=...]" token sits in the documented position before
+# the line's first colon (or anywhere on a line that has no colon at all).
+_fm_key_before_colon() {  # <status-line>
+  case "${1%%:*}" in
+    *\[key=*\]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# Raw slug of a complete "[key=<slug>]" token at the head of the note (the
+# first thing after the line's first colon, ignoring whitespace). Fails when
+# the line has no colon or no complete token there; slug charset validity is
+# the caller's check via _fm_decision_slug_ok, exactly as for the before-colon
+# position.
+_fm_key_at_note_head() {  # <status-line> -> raw slug
+  local rest
+  case "$1" in
+    *:*) rest=${1#*:} ;;
+    *) return 1 ;;
+  esac
+  rest=${rest#"${rest%%[![:space:]]*}"}
+  case "$rest" in
+    \[key=*\]*) rest=${rest#\[key=}; printf '%s' "${rest%%\]*}" ;;
+    *) return 1 ;;
+  esac
+}
+# 0 when a stated key slug is well-formed: nonempty, A-Za-z0-9._- only.
+_fm_decision_slug_ok() {  # <slug>
+  case "$1" in
+    ''|*[!A-Za-z0-9._-]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+# Both readers below locate the head/note separator on an unstamped copy, so a
+# worker-written stamp cannot move it: a readable time like [at=10:30] carries
+# colons that would otherwise end the head mid-tag and hand the caller a note
+# and a key sliced out of the timestamp. The line's own bytes are never altered.
+status_line_note() {  # <status-line> -> text after the first colon, trimmed
+  local n k unstamped
+  _fm_status_unstamped "$1" unstamped
+  case "$unstamped" in
+    *:*) n=${unstamped#*:}; n=${n#"${n%%[![:space:]]*}"} ;;
+    *) printf '%s' "$unstamped"; return 0 ;;
+  esac
+  # A note-head token that states this line's key (no before-colon token, valid
+  # slug) is key metadata, not note text: strip it so both stated-key positions
+  # yield the same note.
+  if ! _fm_key_before_colon "$unstamped" && k=$(_fm_key_at_note_head "$unstamped") \
+    && _fm_decision_slug_ok "$k"; then
+    n=${n#"[key=$k]"}
+    n=${n#"${n%%[![:space:]]*}"}
+  fi
+  printf '%s' "$n"
+}
+_fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (default "default") when no token
+  local k unstamped
+  _fm_status_unstamped "$1" unstamped
+  if _fm_key_before_colon "$unstamped"; then
+    k=${unstamped%%:*}
+    k=${k#*\[key=}
+    k=${k%%\]*}
+  else
+    k=$(_fm_key_at_note_head "$unstamped") || { printf '%s' "${2-default}"; return 0; }
+  fi
+  _fm_decision_slug_ok "$k" || return 1
+  printf '%s' "$k"
+}
+# Drop the record for <key> from a newline-terminated "<key>\t<verb>\t<note>" set.
+# Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
+_fm_decision_drop() {  # <open-set> <key>
+  local set=$1 key=$2 line out=''
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      "$key"$'\t'*) : ;;
+      *) out="${out}${line}"$'\n' ;;
+    esac
+  done <<EOF
+$set
+EOF
+  printf '%s' "$out"
+}
+# Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
+# set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
+# rule status_open_decisions documents above. Pure text transform, no file I/O.
+# This is the ONE place the per-line open/resolved rule is written; both the
+# whole-file fold (status_open_decisions) and the incremental cursor-backed fold
+# (status_open_decisions_incremental) below call this instead of re-deriving the
+# rule, so the two consumption strategies can never drift apart on semantics.
+# Reserved decision-key namespaces, and the rule that makes them mean something.
+#
+# A key like `pending-reply-<id>` names a decision that one library raises and is
+# the only thing that ever closes it. Every writer reaches this same stream: a
+# local mate appends straight into it, and a remote mate's lines are mirrored
+# into it verbatim. So without a rule here, any writer could claim a reserved
+# key with an unrelated note, take the key over in this fold, and permanently
+# block the owner's close - leaving a decision nothing will ever resolve - or
+# clear the owner's decision with a bare resolution.
+#
+# The rule is deliberately generic, so this fold needs no knowledge of any
+# particular owner: a reserved key may only be opened or closed by a line whose
+# note speaks that namespace's own vocabulary, which its owner states by
+# beginning the note with a `<namespace>...:` token. A line failing that is not a
+# decision transition at all here and is folded as ordinary status. This is a
+# consumer-side rule on purpose - it protects local and remote writers
+# identically, and it can never fail a whole delta or wedge a stream the way a
+# writer-side rejection would.
+FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT='pending-reply-'
+
+# 0 when <key> is not reserved, or is reserved and <note> speaks its vocabulary.
+_fm_decision_key_transition_allowed() {  # <key> <note>
+  local key=$1 note=$2 prefix
+  for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
+    case "$key" in
+      "$prefix"*)
+        case "$note" in
+          "$prefix"*:*) return 0 ;;
+          *) return 1 ;;
+        esac
+        ;;
+    esac
+  done
+  return 0
+}
+
+_fm_is_pending_reply_escalation() {  # <key> <note>
+  case "$1" in pending-reply-*) ;; *) return 1 ;; esac
+  case "$2" in
+    pending-reply-missed:*|pending-reply-delivery-unknown:*|pending-reply-recovery-delivery-failed:*|pending-reply-recovery-delivery-unknown:*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_fm_status_kind() {
+  local meta=${1%.status}.meta kind=${2:-} line
+  if [ -z "$kind" ]; then
+    [ -f "$meta" ] && [ -r "$meta" ] && [ ! -L "$meta" ] || { printf unknown; return 0; }
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in kind=*) kind=${line#kind=} ;; esac
+    done < "$meta"
+    kind=${kind:-ship}
+  fi
+  case "$kind" in ship|scout|secondmate) printf '%s' "$kind" ;; *) printf unknown ;; esac
+}
+
+_fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind>
+  local open=$1 line=$2 resolve=$3 held=$4 kind=$5 verb key note unstamped
+  # Both colon tests below ask where the head ends, the same question the note
+  # and key readers ask, so they read the same unstamped copy those readers do.
+  # A worker-written time tag must never decide whether a decision opens or
+  # closes: a readable [at=10:30] carries colons that would otherwise make bare
+  # prose look like a transition, or make a keyless line open a phantom
+  # decision no later line could close. The stored and surfaced bytes stay the
+  # caller's own.
+  _fm_status_unstamped "$line" unstamped
+  # Declaration guard. A transition's verb ends at a colon, or - in the colonless
+  # form _fm_decision_key still accepts below - at a complete "[key=...]" token.
+  # A line holding neither is continuation prose, a bare word, or blank, and can
+  # never move the set. A `case` glob answers that in one pattern match; the
+  # equivalent parameter expansion costs tens of milliseconds per line under bash
+  # 3.2's global bracket-class substitution, which is the whole per-line cost of
+  # both folds on a status log of ordinary width. Same verdict, bounded cost.
+  case "$unstamped" in
+    *:*|*\[key=*\]*) ;;
+    *) printf '%s' "$open"; return 0 ;;
+  esac
+  status_line_verb "$line" verb
+  case "$unstamped" in
+    *:*) case "$verb:$kind" in done:ship|done:scout|failed:ship|failed:scout) return 0 ;; esac ;;
+  esac
+  case "$verb" in
+    needs-decision|blocked|"$resolve"|"$held") ;;
+    *) printf '%s' "$open"; return 0 ;;
+  esac
+  key=$(_fm_decision_key "$line") || { printf '%s' "$open"; return 0; }
+  _fm_decision_key_transition_allowed "$key" "$(status_line_note "$line")" \
+    || { printf '%s' "$open"; return 0; }
+  case "$verb" in
+    needs-decision|blocked)
+      note=$(status_line_note "$line")
+      open=$(_fm_decision_drop "$open" "$key")
+      [ -n "$open" ] && open="${open}"$'\n'
+      open="${open}${key}"$'\t'"${verb}"$'\t'"${note}"$'\n'
+      ;;
+    "$resolve"|"$held")
+      open=$(_fm_decision_drop "$open" "$key")
+      [ -n "$open" ] && open="${open}"$'\n'
+      ;;
+  esac
+  printf '%s' "$open"
+}
+
+# Fold the WHOLE status stream into the set of decisions still open. Prints one
+# TAB-separated "<key>\t<verb>\t<summary>" line per still-open decision, in
+# most-recently-opened-last order; prints nothing when none are open. Reads the
+# status file, plus its sibling `.meta` for the task kind the terminal rule needs
+# when the caller passes no <kind>; no globals beyond the optional
+# FM_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
+# snapshot and any point-in-time consumer must use instead of trusting the last
+# status line.
+# The scan_open_decisions wrapper below enumerates a whole directory rather than
+# a single caller-chosen path, so a status file that is itself a symlink (e.g.
+# escaping the state directory) is rejected outright with a plain [ -L ] check
+# before any read - a cheap builtin, unlike fm_wake_latest_event's O_NOFOLLOW
+# subprocess read, which exists for that function's much narrower payload-driven
+# path resolution rather than this directory-local glob.
+status_open_decisions() {  # <status-file> [<kind>]
+  local f=$1 kind=${2:-} line resolve held open='' verb
+  [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
+  kind=$(_fm_status_kind "$f" "$kind")
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  while IFS= read -r line || [ -n "$line" ]; do
+    status_line_verb "$line" verb
+    case "$verb" in
+      needs-decision|blocked|done|failed|"$resolve"|"$held")
+        open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+        ;;
+    esac
+  done < "$f"
+  printf '%s' "$open"
+}
+# 0 when <key> has a record in a folded "<key>\t<verb>\t<note>" open set.
+_fm_open_set_has() {  # <open-set> <key>
+  case "$1" in
+    "$2"$'\t'*|*$'\n'"$2"$'\t'*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# The verb stored for <key> in a folded open set (empty when it has no record).
+_fm_open_set_verb() {  # <open-set> <key>
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      "$2"$'\t'*) line=${line#*$'\t'}; printf '%s' "${line%%$'\t'*}"; return 0 ;;
+    esac
+  done <<EOF
+$1
+EOF
+  return 0
+}

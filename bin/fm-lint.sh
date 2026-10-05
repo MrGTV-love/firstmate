@@ -3,8 +3,8 @@
 #
 # Runs ShellCheck's default severity and extended, source-aware analysis with
 # ambient configuration disabled and one exact ShellCheck version.
-# CI selects the complete canonical set; local branches select changed files
-# and their transitive sourcing callers.
+# CI selects the complete canonical set; local branches select changed files,
+# known transitive sourcing callers, and possible callers of unresolved imports.
 # Every mode keeps --norc --external-sources and the same diagnostic rules.
 # --fast remains an explicit local-only opt-out from extended dataflow.
 # Selection and cache reuse retain the roots' source directives and call-site
@@ -22,9 +22,11 @@
 #   - Otherwise it selects canonical roots whose transitive source closure
 #     contains a path changed since the merge-base, including staged, unstaged,
 #     untracked, deleted and renamed paths. An unchanged imported library is not
-#     a separate root; its callers analyze it through their sources. A source
-#     expression that cannot be resolved adds no selection edge and disables
-#     cache reuse; CI's full set still analyzes that root.
+#     a separate root; its callers analyze it through their sources. Runtime
+#     backend imports participate in selection and cache invalidation even when
+#     their static source annotations intentionally isolate adapter analysis.
+#     Unresolved runtime imports select possible callers on changed/deleted shell
+#     or known source inputs and disable cache reuse, regardless of annotations.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
@@ -43,7 +45,6 @@
 # "off" disables reuse. CI always disables reuse so every canonical root is checked.
 # Nothing prunes that directory; each key leaves small files until removed by hand.
 # A missing, unwritable or unresolvable cache falls back to real analysis.
-# --full selects the complete inventory locally without requiring CI=true.
 #
 # Dependency selection and caching are private Perl helpers using the Perl
 # runtime already required for worker cleanup; no extra tool is installed.
@@ -103,7 +104,6 @@
 #   fm-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   fm-lint.sh --required-version      print the ShellCheck pin
 #   fm-lint.sh --list-files            print the file set that would be linted
-#   fm-lint.sh --full                  lint the complete canonical shell inventory
 #   fm-lint.sh --help                  print this usage
 set -u
 
@@ -642,13 +642,8 @@ ANALYSIS_MODE=full
 PARTITION=
 PARTITION_REQUESTED=0
 LIST_FILES=0
-FULL_REQUESTED=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --full)
-      FULL_REQUESTED=1
-      shift
-      ;;
     --jobs)
       [ "$#" -ge 2 ] || { printf 'fm-lint.sh: --jobs requires 1 or 2.\n' >&2; exit 2; }
       JOBS=$2
@@ -759,11 +754,10 @@ fi
 }
 if [ "$#" -gt 0 ]; then
   EXPLICIT_PATHS=1
-  [ "$FULL_REQUESTED" -eq 0 ] || { printf 'fm-lint.sh: --full does not accept explicit paths.\n' >&2; exit 2; }
   ROOTS=("$@")
 else
   full_lint=1
-  if [ "$FULL_REQUESTED" -eq 0 ] && [ -z "$PARTITION" ] && [ "${GITHUB_ACTIONS:-}" != true ] && [ "${CI:-}" != true ] \
+  if [ -z "$PARTITION" ] && [ "${GITHUB_ACTIONS:-}" != true ] && [ "${CI:-}" != true ] \
     && command -v git >/dev/null 2>&1 \
     && git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
     && [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" != main ]; then
