@@ -4071,7 +4071,12 @@ SH
       FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
       HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
-      bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit; printf "%s\\n" "$FM_SESSION_END_WAKE"' _ "$ROOT")
+      bash -s -- "$ROOT" <<'SH'
+. "$1/bin/fm-session-end-relaunch-lib.sh"
+fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit
+printf "%s\n" "$FM_SESSION_END_WAKE"
+SH
+    )
     rc=$?
     expect_code 0 "$rc" "supervised quota recovery must reconcile the route: $out"
     assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"

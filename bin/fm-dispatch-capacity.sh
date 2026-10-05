@@ -8,7 +8,7 @@ set -eu
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
-harness= model= json=0
+harness='' model='' json=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --harness|--model)
