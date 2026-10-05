@@ -2188,6 +2188,11 @@ case "${1:-} ${2:-}" in
         "${4:-}"
     fi
     exit 0 ;;
+  'pane run')
+    if [ "${4:-}" = 'treehouse get' ] && [ -f "$D/herdr-treehouse-worktree" ]; then
+      cp "$D/herdr-treehouse-worktree" "$D/herdr-cwd-${3:-}"
+    fi
+    exit 0 ;;
   'pane send-text')
     # Mirrors the tmux fake's `becomes`: delivering the launch brief is what
     # makes an agent exist on this pane, so the control plane's alive-wait can
@@ -2735,6 +2740,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   fm_test_spawn_brief "$dir/home" tc9
   mkdir -p "$dir/home/projects"
   printf '%s' "$dir/wt" > "$dir/fake/cwd"
+  printf '%s' "$dir/wt" > "$dir/fake/herdr-treehouse-worktree"
   printf '%s' '%9' > "$dir/fake/herdr-pane"
   enable_teamclaude "$dir"
   TASK_TMPS+=("/tmp/fm-tc9")
