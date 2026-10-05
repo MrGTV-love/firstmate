@@ -3286,11 +3286,11 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # after the composer shows the payload (fm_backend_herdr_composer_await_payload,
 # judged by fm_backend_herdr_composer_payload_progress). An empty or partly
 # drawn composer is read again until the payload shows or the bound runs out.
-# This send's own truncated text, or a payload that never showed, does not
-# press Enter: the composer is cleared back to empty and the verdict is
-# send-failed, or unknown when the clear cannot be verified. Text the send did
-# not type on its own does not press Enter either; it is never cleared, and the
-# verdict is send-failed. Other harnesses skip this proof. Verified hazard
+# This send's own truncated suffix does not press Enter: the composer is
+# cleared back to empty and the verdict is send-failed, or unknown when the
+# clear cannot be verified. An unproven timeout or text the send did not type
+# on its own does not press Enter either; it is never cleared, and the verdict
+# is send-failed. Other harnesses skip this proof. Verified hazard
 # (herdr-verification-p2.md "slash/$ autocomplete popup"): a `/`- or
 # `$`-prefixed send opens a completion popup within ~0.1s, exactly like tmux's
 # claude/codex popups, so the caller's <settle> before the first Enter matters
@@ -3484,9 +3484,9 @@ fm_backend_herdr_composer_payload_progress() {  # <text> <after>
 }
 
 # fm_backend_herdr_composer_await_payload: 0 once the selected composer shows
-# <text>, 1 when it holds this send's own truncated text (or the wait ran out),
-# and 2 when it holds text this send did not type on its own. Only the read
-# repeats; the payload is typed once. A loaded host renders a typed payload
+# <text>, 1 when it holds this send's own truncated suffix, and 2 when the
+# proof times out or it holds text this send did not type on its own. Only the
+# read repeats; the payload is typed once. A loaded host renders a typed payload
 # well after the submit's settle (measured 2026-09-30, load average near 90:
 # 2.7 to 21 seconds for `/compact` in Claude 2.1.285 on Herdr 0.9.1), so an
 # empty or partly drawn composer keeps being read for up to
@@ -3504,13 +3504,13 @@ fm_backend_herdr_composer_await_payload() {  # <target> <text> <identity>
       truncated) return 1 ;;
       foreign) return 2 ;;
     esac
-    [ $((SECONDS - start)) -lt "${FM_BACKEND_HERDR_PROOF_WAIT:-30}" ] || return 1
+    [ $((SECONDS - start)) -lt "${FM_BACKEND_HERDR_PROOF_WAIT:-30}" ] || return 2
     sleep 0.5
   done
 }
 
-# fm_backend_herdr_composer_clear: after a refused proof, press Ctrl+U until
-# the shared classifier reads the composer as empty. Claude documents Ctrl+U
+# fm_backend_herdr_composer_clear: after an owned-suffix refusal, press Ctrl+U
+# until the shared classifier reads the composer as empty. Claude documents Ctrl+U
 # as delete-to-line-start, repeated across lines of a multiline draft; Ctrl+C
 # is not used because it interrupts a running turn. Live Claude deletes one
 # wrapped screen row per press, so a single-line leftover can need several

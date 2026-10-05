@@ -48,6 +48,7 @@ FAKEBIN="$TMP_ROOT/fakebin"
 mkdir -p "$FAKEBIN"
 PROD_ID="submitprod$$"
 COLOR_ID="submitcolor$$"
+PROD_LAUNCH_DIR=
 CHECKED=0
 
 cleanup() {
@@ -56,10 +57,12 @@ cleanup() {
   if ! PATH="$ORIGINAL_PATH" "$LAB_HELPER" teardown "$SESSION"; then
     rc=1
   fi
-  # fm-spawn stages a relaunch under this per-task temp root and write-protects
-  # the task's git hook directory in the control home.
+  # fm-spawn write-protects the task's git hook directory in the control home.
   chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
-  rm -rf "$TMP_ROOT" "/tmp/fm-$PROD_ID"
+  if [ -n "$PROD_LAUNCH_DIR" ]; then
+    rm -rf "$PROD_LAUNCH_DIR"
+  fi
+  rm -rf "/tmp/fm-$PROD_ID" "$TMP_ROOT"
   exit "$rc"
 }
 trap cleanup EXIT
@@ -96,6 +99,15 @@ PROD_PROJ="$TMP_ROOT/proj"
 PROD_WT="$TMP_ROOT/wt"
 RELAUNCH_TOKEN="FMHERDRRELAUNCH$$_$RANDOM"
 mkdir -p "$CONTROL_HOME/state" "$CONTROL_HOME/data/$PROD_ID"
+CONTROL_HOME_ROOT=$(cd "$CONTROL_HOME" 2>/dev/null && pwd -P) || CONTROL_HOME_ROOT=$CONTROL_HOME
+if command -v shasum >/dev/null 2>&1; then
+  CONTROL_HOME_HASH=$(printf '%s' "$CONTROL_HOME_ROOT" | shasum -a 256 | awk '{print $1}')
+elif command -v sha256sum >/dev/null 2>&1; then
+  CONTROL_HOME_HASH=$(printf '%s' "$CONTROL_HOME_ROOT" | sha256sum | awk '{print $1}')
+else
+  fail "test needs shasum or sha256sum"
+fi
+PROD_LAUNCH_DIR="/tmp/fm-$PROD_ID+$CONTROL_HOME_HASH"
 fm_git_worktree "$PROD_PROJ" "$PROD_WT" "$PROD_ID" \
   || fail "could not create the production-shape worktree"
 cat > "$CONTROL_HOME/data/$PROD_ID/brief.md" <<EOF

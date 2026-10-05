@@ -4797,8 +4797,8 @@ test_send_text_submit_unknown_on_composer_capture_failure() {
 
 # On a Claude pane, a long payload the selected composer still holds is
 # submitted whole. A composer that kept only a suffix, a stale transcript head
-# above that suffix, or a paste placeholder plus a literal remainder does not
-# receive Enter, is cleared back to empty, and is not reported delivered.
+# above that suffix, or a paste placeholder followed by an owned suffix does
+# not receive Enter, is cleared back to empty, and is not reported delivered.
 herdr_long_payload() {  # <middle-length>
   awk -v n="$1" 'BEGIN { printf "HEAD"; for (i = 0; i < n; i++) printf "m"; printf "TAIL" }'
 }
@@ -5146,6 +5146,32 @@ test_send_text_submit_claude_payload_prefix_growth_is_still_proven() {
   pass "fm_backend_herdr_send_text_submit: a Claude payload drawn as a growing prefix is still proven and submitted"
 }
 
+test_send_text_submit_claude_unproven_timeout_refuses_without_clearing() {
+  local dir log resp fb out kind
+  for kind in prefix empty unreadable; do
+    dir="$TMP_ROOT/submit-timeout-$kind"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    herdr_submit_claude_prefix "$resp" /compact
+    case "$kind" in
+      prefix) printf '  \xe2\x9d\xaf /co\n' > "$resp/4.out" ;;
+      empty) printf '  \xe2\x9d\xaf\n' > "$resp/4.out" ;;
+      unreadable) printf '1\n' > "$resp/4.exit"; printf '1\n' > "$resp/5.exit" ;;
+    esac
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_PROOF_WAIT=0 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+    [ "$out" = send-failed ] || fail "an unproven $kind timeout must report known non-delivery, got '$out'"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] \
+      || fail "the $kind timeout must type the payload only once"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f' "$log")" -eq 0 ] \
+      || fail "the $kind timeout must neither clear nor submit unproven composer text"
+    if [ "$kind" = unreadable ]; then
+      [ "$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")" -eq 3 ] \
+        || fail "unreadable proof must try both styled and plain capture before refusing at the deadline"
+    fi
+  done
+  pass "fm_backend_herdr_send_text_submit: prefix, empty and unreadable proof timeouts refuse without clear or Enter"
+}
+
 # A head-truncated suffix can never grow into the payload, so it is refused and
 # cleared on the read that shows it, however long the wait bound is.
 test_send_text_submit_claude_truncated_suffix_refuses_without_waiting() {
@@ -5211,13 +5237,13 @@ test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
   dir="$TMP_ROOT/submit-dim-slash"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
   herdr_submit_claude_prefix "$resp" /exit
   printf '❯ \033[2;38;2;51;102;255m/exit\033[0m\n' > "$resp/4.out"
-  printf '❯\n' > "$resp/6.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /exit 3 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "dim suggestion must not prove /exit, got '$out'"
   [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
     || fail "a dim suggestion must not authorize Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a dim suggestion timeout must not authorize clearing"
   pass "Claude payload proof still refuses dim suggestions"
 }
 
@@ -6130,6 +6156,7 @@ test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
 test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry
 test_send_text_submit_claude_payload_rendered_late_is_still_proven
 test_send_text_submit_claude_payload_prefix_growth_is_still_proven
+test_send_text_submit_claude_unproven_timeout_refuses_without_clearing
 test_send_text_submit_claude_truncated_suffix_refuses_without_waiting
 test_send_text_submit_claude_foreign_text_refuses_without_clearing
 test_send_text_submit_claude_ambiguous_text_refuses_without_clearing

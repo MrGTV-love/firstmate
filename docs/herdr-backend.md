@@ -599,14 +599,11 @@ Dated measurements: docs/verification/runtime-backends.md "Claude exit behind th
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
-A composer that holds a shorter suffix, or a placeholder plus a literal remainder, does not receive Enter.
-Instead:
-
-1. The adapter presses Ctrl+U until the shared classifier reads the composer as empty.
-2. It then reports `send-failed`, so a resend starts from a clean composer.
-
-Ctrl+C is not used for this, because Claude documents it as interrupting a running operation.
-If the composer cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
+Only a proven head-truncated suffix of the payload, alone or after leading paste placeholders, authorizes Ctrl+U; a strict infix or foreign or ambiguous placeholder-adjacent literal stays untouched.
+For that owned suffix, the adapter presses Ctrl+U until the shared classifier reads the composer as empty, then reports `send-failed` so a resend starts from a clean composer.
+If that clear cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
+If the proof wait expires while the composer shows a prefix of the payload, is empty, or cannot be read, the submit reports `send-failed` without Enter or clearing the composer.
+Ctrl+C is not used for clearing, because Claude documents it as interrupting a running operation.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
 They skip it because their paste placeholders and composer shapes are not live-verified.
