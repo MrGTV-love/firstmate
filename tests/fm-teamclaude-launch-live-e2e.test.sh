@@ -46,10 +46,10 @@ chmod +x "$LAB/fakebin/claude"
 # A clean environment: the home, a PATH whose claude records ahead of the
 # directory the teamclaude found above came from, and the TeamClaude
 # configuration that status check read, under the names fm-spawn hands it.
-launch_env=(HOME="$HOME" FM_GUARD_CLAUDE_ENV="$LAB/claude-env"
+launch_env=(HOME="$HOME" FM_GUARD_CLAUDE_ENV="$LAB/claude-env" FM_TC_CONFIG_SNAPSHOT=1
   PATH="$LAB/fakebin${TC_PATH_DIR:+:$TC_PATH_DIR}:$(fm_test_bash_only_dir "$LAB"):/usr/bin:/bin")
-[ -z "${XDG_CONFIG_HOME:-}" ] || launch_env+=(FM_TC_XDG_CONFIG_HOME="$XDG_CONFIG_HOME")
-[ -z "${TEAMCLAUDE_CONFIG:-}" ] || launch_env+=(FM_TC_TEAMCLAUDE_CONFIG="$TEAMCLAUDE_CONFIG")
+[ "${XDG_CONFIG_HOME+x}" != x ] || launch_env+=(FM_TC_XDG_CONFIG_HOME="$XDG_CONFIG_HOME")
+[ "${TEAMCLAUDE_CONFIG+x}" != x ] || launch_env+=(FM_TC_TEAMCLAUDE_CONFIG="$TEAMCLAUDE_CONFIG")
 out=$(env -i "${launch_env[@]}" "$ROOT/bin/fm-teamclaude-launch.sh" --version 2>&1) \
   || fail "teamclaude $TC_VERSION: the launcher refused against a running proxy: $out"
 [ -s "$LAB/claude-env" ] || fail "teamclaude $TC_VERSION: the launcher never started claude"

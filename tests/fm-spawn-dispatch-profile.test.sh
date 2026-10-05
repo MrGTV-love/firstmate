@@ -2025,6 +2025,125 @@ test_teamclaude_config_paths_reach_only_teamclaude() {
   pass "TeamClaude configuration paths reach only the worker's teamclaude calls, and a relative one refuses"
 }
 
+make_config_sensitive_teamclaude() {
+  local fakebin=$1
+  cat > "$fakebin/teamclaude" <<'SH'
+#!/usr/bin/env bash
+config=$FM_TEST_TC_DEFAULT
+if [ -n "${TEAMCLAUDE_CONFIG:-}" ]; then
+  config=$TEAMCLAUDE_CONFIG
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
+  config=$XDG_CONFIG_HOME/teamclaude.json
+fi
+{
+  IFS= read -r proxy
+  IFS= read -r ca
+} < "$config" || exit 1
+printf '%s|%s|%s|%s|%s|%s|%s\n' "${1:-}" "${XDG_CONFIG_HOME+set}" \
+  "${XDG_CONFIG_HOME-}" "${TEAMCLAUDE_CONFIG+set}" "${TEAMCLAUDE_CONFIG-}" \
+  "$proxy" "$ca" >> "$FM_FAKE_TEAMCLAUDE_ENV_LOG"
+case "${1:-}" in
+  status) exit 0 ;;
+  env)
+    printf "export HTTPS_PROXY='%s'\nexport NODE_EXTRA_CA_CERTS='%s'\n" "$proxy" "$ca"
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$fakebin/teamclaude"
+}
+
+test_teamclaude_snapshot_overrides_stale_pane_configuration() {
+  local scenario rec id out status xdg_presence xdg_value tc_presence tc_value
+  local selected proxy ca expected preflight pane_log env_out bash_dir launch_kind
+  local -a launch_args
+  for scenario in unset xdg teamclaude both empty xdg-empty teamclaude-empty; do
+    id="teamclaude-snapshot-$scenario"
+    rec=$(make_teamclaude_case "teamclaude-snapshot-$scenario" "$id")
+    read_case_record "$rec"
+    make_config_sensitive_teamclaude "$FAKEBIN_DIR"
+    mkdir -p "$CASE_DIR/caller xdg" "$CASE_DIR/pane-xdg"
+    printf '%s\n' http://caller-default:13456 "$CASE_DIR/default-ca.pem" > "$CASE_DIR/default-config"
+    printf '%s\n' http://caller-xdg:13456 "$CASE_DIR/xdg-ca.pem" > "$CASE_DIR/caller xdg/teamclaude.json"
+    printf '%s\n' http://caller-explicit:13456 "$CASE_DIR/explicit-ca.pem" > "$CASE_DIR/caller explicit.json"
+    printf '%s\n' http://stale-pane:13456 "$CASE_DIR/stale-ca.pem" > "$CASE_DIR/pane-config"
+    printf '%s\n' http://stale-xdg:13456 "$CASE_DIR/stale-xdg-ca.pem" > "$CASE_DIR/pane-xdg/teamclaude.json"
+    xdg_presence= tc_presence= xdg_value= tc_value=
+    selected="$CASE_DIR/default-config"
+    launch_kind=template
+    launch_args=("$id" "$PROJ_DIR")
+    case "$scenario" in
+      xdg) xdg_presence=set; xdg_value="$CASE_DIR/caller xdg"; selected="$xdg_value/teamclaude.json" ;;
+      teamclaude)
+        tc_presence=set; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      both)
+        xdg_presence=set; xdg_value="$CASE_DIR/caller xdg"
+        tc_presence=set; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        ;;
+      empty)
+        xdg_presence=set; tc_presence=set
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      xdg-empty) xdg_presence=set ;;
+      teamclaude-empty) tc_presence=set ;;
+    esac
+    {
+      IFS= read -r proxy
+      IFS= read -r ca
+    } < "$selected"
+    expected="$xdg_presence|$xdg_value|$tc_presence|$tc_value|$proxy|$ca"
+    preflight="$CASE_DIR/preflight.log"
+    : > "$preflight"
+    : > "$LAUNCH_LOG"
+    out=$(
+      unset XDG_CONFIG_HOME TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
+      [ "$xdg_presence" != set ] || export XDG_CONFIG_HOME="$xdg_value"
+      [ "$tc_presence" != set ] || export TEAMCLAUDE_CONFIG="$tc_value"
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$preflight" \
+        FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+          "${launch_args[@]}" --mode no-mistakes --yolo off
+    )
+    status=$?
+    expect_code 0 "$status" "$scenario: $launch_kind spawn must use caller configuration"$'\n'"$out"
+    [ "$(cat "$preflight")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: preflight must read caller selector presence, values, proxy and CA: $(cat "$preflight")"
+    pane_log="$CASE_DIR/pane-teamclaude.log"
+    env_out="$CASE_DIR/pane-claude.env"
+    : > "$pane_log"
+    : > "$env_out"
+    bash_dir=$(fm_test_bash_only_dir "$CASE_DIR")
+    env -i HOME="$CASE_DIR/pane-home" PATH="$FAKEBIN_DIR:$bash_dir:/usr/bin:/bin" \
+      XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TC_CONFIG_SNAPSHOT=stale FM_TC_XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" \
+      FM_TC_TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$pane_log" \
+      FM_FAKE_CLAUDE_ENV_LOG="$env_out" \
+      /bin/sh -c "$(cat "$LAUNCH_LOG")" </dev/null > "$CASE_DIR/pane-output" 2>&1
+    status=$?
+    expect_code 0 "$status" "$scenario: recorded $launch_kind command must run in the stale pane"
+    [ "$(cat "$pane_log")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: launch must match caller configuration, not stale pane selectors: $(cat "$pane_log")"
+    grep -Fqx "HTTPS_PROXY=$proxy" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected proxy"
+    grep -Fqx "NODE_EXTRA_CA_CERTS=$ca" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected CA"
+    grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/pane-xdg" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's XDG_CONFIG_HOME"
+    grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/pane-config" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's TEAMCLAUDE_CONFIG"
+    ! grep -q '^FM_TC_' "$env_out" \
+      || fail "$scenario: private snapshot variables must not reach Claude"
+    if [ "$launch_kind" = raw ]; then
+      [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+        || fail "$scenario: the raw command must retain its Claude arguments"
+    fi
+  done
+  pass "TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration"
+}
+
 test_teamclaude_launcher_is_inherited_by_secondmates() {
   local dir src dest status
   dir="$TMP_ROOT/teamclaude-inherit"
@@ -2048,6 +2167,7 @@ test_absent_claude_launcher_keeps_the_direct_launch
 test_teamclaude_launcher_proxies_a_claude_secondmate_launch
 test_teamclaude_launcher_refusals_leave_no_task
 test_teamclaude_config_paths_reach_only_teamclaude
+test_teamclaude_snapshot_overrides_stale_pane_configuration
 test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
 

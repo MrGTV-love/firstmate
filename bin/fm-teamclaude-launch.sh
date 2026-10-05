@@ -72,8 +72,11 @@ teamclaude_bin() {
 # An nvm-installed teamclaude is a `#!/usr/bin/env node` script whose node lives
 # beside it, and a pane PATH need not include that directory.
 run_teamclaude() (
-  [ -z "${FM_TC_XDG_CONFIG_HOME:-}" ] || export XDG_CONFIG_HOME="$FM_TC_XDG_CONFIG_HOME"
-  [ -z "${FM_TC_TEAMCLAUDE_CONFIG:-}" ] || export TEAMCLAUDE_CONFIG="$FM_TC_TEAMCLAUDE_CONFIG"
+  if [ "${FM_TC_CONFIG_SNAPSHOT:-}" = 1 ]; then
+    unset XDG_CONFIG_HOME TEAMCLAUDE_CONFIG
+    [ "${FM_TC_XDG_CONFIG_HOME+x}" != x ] || export XDG_CONFIG_HOME="$FM_TC_XDG_CONFIG_HOME"
+    [ "${FM_TC_TEAMCLAUDE_CONFIG+x}" != x ] || export TEAMCLAUDE_CONFIG="$FM_TC_TEAMCLAUDE_CONFIG"
+  fi
   PATH="$TC_DIR:$PATH" fm_run_timed "$FM_TEAMCLAUDE_TIMEOUT" "$TC_BIN" "$@"
 )
 
@@ -112,5 +115,5 @@ else
   set -- claude "$@"
 fi
 apply_proxy_env
-unset FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
+unset FM_TC_CONFIG_SNAPSHOT FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
 exec "$@"

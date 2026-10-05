@@ -842,7 +842,7 @@ The launcher refuses again in the pane, rather than start Claude unproxied, if T
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
 Firstmate requires either override to be an absolute path.
-The launch hands it to the launcher's own `teamclaude` calls only, so the pane reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
 A raw launch command whose program is `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.

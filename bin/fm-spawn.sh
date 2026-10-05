@@ -5255,9 +5255,11 @@ fi
 # a TeamClaude launch hands its wrapper the configuration its --check above
 # validated, under names only the wrapper's teamclaude calls read.
 if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
+  tc_env='env -u FM_TC_XDG_CONFIG_HOME -u FM_TC_TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT=1'
   for tc_var in XDG_CONFIG_HOME TEAMCLAUDE_CONFIG; do
-    [ -z "${!tc_var:-}" ] || LAUNCH="FM_TC_$tc_var=$(shell_quote "${!tc_var}") $LAUNCH"
+    [ "${!tc_var+x}" != x ] || tc_env="$tc_env FM_TC_$tc_var=$(shell_quote "${!tc_var}")"
   done
+  LAUNCH="$tc_env $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")

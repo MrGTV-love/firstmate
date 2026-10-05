@@ -50,6 +50,7 @@ test_config_paths_reach_teamclaude_but_not_claude() {
   fm_test_fake_teamclaude "$dir/fakebin"
   out=$(env -i HOME="$dir/home" PATH="$dir/fakebin:$BASH_DIR:/usr/bin:/bin" \
     FM_FAKE_CLAUDE_ENV_LOG="$dir/claude-env" FM_FAKE_TEAMCLAUDE_ENV_LOG="$dir/teamclaude-env" \
+    FM_TC_CONFIG_SNAPSHOT=1 \
     FM_TC_XDG_CONFIG_HOME="$dir/xdg" FM_TC_TEAMCLAUDE_CONFIG="$dir/teamclaude.json" \
     "$LAUNCHER" --version </dev/null 2>&1); rc=$?
   expect_code 0 "$rc" "a launch with TeamClaude configuration paths should start claude"$'\n'"$out"
