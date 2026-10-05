@@ -340,21 +340,11 @@
 #   secondmate reads this launching home's file; pins are never inherited.
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 # Claude launcher (config/claude-launcher):
-#   One token selecting the executable every claude launch (ship, scout,
-#   secondmate, relaunch, and a raw command whose harness is claude) starts.
-#   Absent keeps today's bare `claude`; `teamclaude` starts
-#   bin/fm-teamclaude-launch.sh instead, which
-#   applies the local TeamClaude proxy's client environment and then replaces
-#   itself with claude, so the proxy never depends on a pane shell alias.
-#   bin/fm-claude-launcher-lib.sh owns parsing and runs that wrapper's --check
-#   before any endpoint, worktree, or record exists, refusing when TeamClaude
-#   is missing, stopped, or unanswering; the wrapper refuses again in the pane
-#   rather than launch Claude unproxied. An absolute XDG_CONFIG_HOME or
-#   TEAMCLAUDE_CONFIG reaches only the wrapper's own teamclaude calls, as
-#   FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, so the pane reads the
-#   configuration the check read without changing Claude's environment; a
-#   relative one refuses. A raw claude command runs, word for word, under the
-#   wrapper's --exec. Inherited like config/claude-permission-mode.
+#   docs/configuration.md "Claude launcher" owns selection and inheritance;
+#   bin/fm-teamclaude-launch.sh owns the wrapper's invocation mechanics.
+#   bin/fm-claude-launcher-lib.sh checks the selection before any endpoint,
+#   worktree, or record exists; the wrapper checks again in the pane rather
+#   than launch Claude unproxied.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
 #     __BRIEF__    absolute path to data/<task-id>/brief.md
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode

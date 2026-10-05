@@ -841,11 +841,11 @@ The proxy therefore reaches Claude on tmux and Herdr alike, without depending on
 The launcher refuses again in the pane, rather than start Claude unproxied, if TeamClaude is missing there, the proxy stopped, or the export sets no `HTTPS_PROXY`.
 Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
 TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
-Firstmate requires either override to be an absolute path.
+Firstmate requires any nonempty override to be an absolute path.
 The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
-A raw launch command whose program is `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+A raw launch command whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
 That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
 `tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
@@ -954,7 +954,7 @@ SSH_AUTH_SOCK
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools.
+Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -1012,7 +1012,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-A raw claude launch command (the unverified-adapter escape hatch) is also exempt from the guard.
+The same guard applies to raw launch commands whose harness resolves to `claude`.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.

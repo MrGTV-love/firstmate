@@ -409,7 +409,7 @@ Dropping the retention-is-not-durable line makes the refusal claim a retention t
 ## TeamClaude launcher
 
 Verified 2026-09-29 on TeamClaude 1.1.21-affinity.0 with its proxy running in its default forward-proxy mode.
-`config/claude-launcher=teamclaude` starts Claude through `bin/fm-teamclaude-launch.sh`, whose verdict depends on what the installed TeamClaude CLI answers and exports.
+The [Claude launcher configuration](../configuration.md#claude-launcher-configclaude-launcher) owns the routing contract; this guard checks the installed TeamClaude CLI's answers and exports.
 The live guard runs the real launcher in a clean environment against the real CLI, with a recording `claude` in place of the real one, so it spends no model tokens.
 
 ```sh

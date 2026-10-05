@@ -26,9 +26,11 @@
 # before any task state exists.
 #
 # TeamClaude's own configuration owns the port and proxy credentials.
-# FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, when fm-spawn sets them,
-# become XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG for the teamclaude calls only and
-# never reach claude.
+# FM_TC_CONFIG_SNAPSHOT pins both the presence and absence of the caller's
+# selectors via FM_TC_XDG_CONFIG_HOME and FM_TC_TEAMCLAUDE_CONFIG, for
+# teamclaude calls only, so stale pane selectors cannot change proxy or CA.
+# Claude keeps its own selectors; the private snapshot variables are removed
+# before exec.
 # This wrapper never prints the environment it applies.
 set -euo pipefail
 

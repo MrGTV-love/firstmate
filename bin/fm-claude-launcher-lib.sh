@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fm-claude-launcher-lib.sh - the single owner of config/claude-launcher: how
-# the file is parsed and the TeamClaude proxy check a Claude template launch
+# the file is parsed and the TeamClaude proxy check every Claude launch
 # must pass before anything changes.
 #
 # docs/configuration.md "Claude launcher" owns the operator-facing contract.
