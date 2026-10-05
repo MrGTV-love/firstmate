@@ -529,7 +529,6 @@ for scalar in 'Use for the first paragraph.' '"Use for the first paragraph."' "'
 done
 cp "$TMP_ROOT/paragraph-alpha-save.md" "$CATALOG/alpha/SKILL.md"
 pass "blank-separated description paragraphs survive both stages or fail closed without losing requirements"
-
 reset
 cat > "$BRIEF" <<'MD'
 # Task

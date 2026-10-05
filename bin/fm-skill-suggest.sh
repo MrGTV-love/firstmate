@@ -52,6 +52,7 @@ while [ $# -gt 0 ]; do
         --format) FORMAT=$2 ;;
       esac
       shift 2 ;;
+
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument $1" ;;
   esac
@@ -196,6 +197,7 @@ call() {
 }
 REQUEST=$(request "$WORK/optional" rank) || fallback fallback "could not construct request"
 check_request
+
 call
 NEED=$(jq '.answers.need.noul' "$WORK/response")
 jq --slurpfile response "$WORK/response" '[.[] | . + {fit:$response[0].answers["skill_" + .id].noul} | select(.fit >= 0.3)] | sort_by(-.fit,.id)' "$WORK/optional" > "$WORK/ranked"
