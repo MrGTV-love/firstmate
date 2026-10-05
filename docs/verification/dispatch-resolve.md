@@ -114,7 +114,8 @@ It proves an `omp` Codex pool ranks on its visible account through the same task
 It proves an absent OpenRouter row and a credit-only OpenRouter row stay eligible but unranked, and that an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot is taken.
 It checks stage accounting in a successful call with known API and quota durations, API time from curl's own transfer time, and unknown API timing when curl reports none.
 It checks millisecond epoch stamps without `EPOCHREALTIME`; when Bash on PATH exposes that builtin, it also checks that the fast path starts no Perl.
-It checks that missing usage stays unknown rather than zero, a quota failure keeps the paid call's cost and returned Jev version, and neither telemetry, the `model:` line on a clear or quota-error result, nor an HTTP error echoes the key, brief text, or an arbitrary response model.
+It checks that missing usage stays unknown rather than zero and a quota failure keeps the paid call's cost and returned Jev version.
+It checks that telemetry on clear and quota-error results, the `model:` line on clear results, and HTTP errors never echo the key, brief text, or arbitrary response model text.
 `tests/fm-bootstrap.test.sh` proves bootstrap ignores resolver-only fields without the typed key, accepts a positive `task_horizon_minutes` and rejects a nonpositive one, validates each malformed shape when the environment or home `.env` activates typed resolution, and prevents an environment-provided key from reaching child processes.
 
 ```console
