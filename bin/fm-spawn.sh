@@ -5254,8 +5254,8 @@ fi
 # shellcheck disable=SC2016 # The destination shell expands this function.
 IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
 fm_launch_git_hooks() {
-  local fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
-  local fm_i=0 fm_out=0 fm_key fm_value
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
   case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
   while [ "$fm_i" -lt "$fm_count" ]; do
     eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
@@ -5284,7 +5284,7 @@ fm_launch_git_hooks() {
 }
 SH
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX
-fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset -f fm_launch_git_hooks; $LAUNCH"
+fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; $LAUNCH"
 # Every agent this fleet launches - crewmate, scout, and secondmate, on a fresh
 # spawn and on a relaunch alike - runs with the compact-adviser kill switch on.
 # This is an export statement rather than a forwarded ambient name or a

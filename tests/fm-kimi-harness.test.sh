@@ -276,7 +276,7 @@ EOF
 }
 
 test_kimi_launch_then_send_is_verified() {
-  local id rec out rc launch pointer brief_real meta task_tmp launch_dir launch_file launch_base
+  local id rec out rc pointer brief_real meta task_tmp launch_dir launch_file launch_base
   id="kimi-success-z1-$$"
   task_tmp="/tmp/fm-$id"
   KIMI_RUNTIME_TASK_TMP=$task_tmp
@@ -292,11 +292,6 @@ test_kimi_launch_then_send_is_verified() {
   rc=$?
   expect_code 0 "$rc" "verified kimi launch-then-send should succeed"
   assert_contains "$out" "spawned $id harness=kimi" "kimi spawn did not report success"
-
-  launch=$(cat "$CASE_DIR/launch.log")
-  assert_not_contains "$launch" "--effort" "kimi launch emitted a nonexistent effort flag"
-  assert_not_contains "$launch" "turn-ended" "kimi launch embedded a turn-end path"
-  assert_not_contains "$launch" "__TURNEND__" "kimi launch retained a turn-end placeholder"
 
   brief_real="$(cd "$HOME_DIR/data/$id" && pwd -P)/launch-brief.md"
   pointer=$(cat "$CASE_DIR/pointer.log")

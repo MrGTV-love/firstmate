@@ -11,20 +11,22 @@ Exact task chronology, branch names, temporary homes, local paths, process ids, 
 Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
 
 ```sh
-bash bin/fm-test-run.sh tests/fm-git-strip-ai-trailers.test.sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-git-strip-ai-trailers.test.sh tests/fm-spawn-dispatch-profile.test.sh tests/fm-kimi-harness.test.sh
 ```
 
 Observed transition result:
 
 ```text
-ok - supported same-task tmux relaunch reconciles generated hooks and preserves operator configuration
+ok - supported same-task bash tmux relaunch reconciles generated hooks and preserves operator configuration
+ok - supported same-task ksh tmux relaunch reconciles generated hooks and preserves operator configuration
 # all fm-git-strip-ai-trailers tests passed
 ```
 
-The regression drives fresh launch and supported already-stopped-task relaunch through `fm-spawn.sh` on its own private tmux socket, retaining the same task, pane, and isolated copy.
+The regression drives fresh launch and supported already-stopped-task relaunch through `fm-spawn.sh` on its own private tmux socket in both Bash and ksh, retaining the same task, pane, and isolated copy.
 Git's effective local and command scopes prove the strip-to-keep transition, preservation of unrelated duplicate keys and literal values, preservation of an operator hooks-path override, and idempotent return to stripping.
 The executable replacing omp is a model-free Git probe, not live-harness evidence.
 The shared launch prefix applies before harness execution on each local backend; this record proves the actual tmux path, not other backends' lifecycle behavior.
+The focused three-file run completed with zero failures and zero gate skips; Claude credential forwarding and ship/scout permissions were checked through model-free executable environment and argv probes.
 [`configuration.md`](../configuration.md#commit-attribution) owns the operator-facing posture and `fm-spawn.sh --help` owns reconciliation mechanics.
 
 ## Harness detection precedence

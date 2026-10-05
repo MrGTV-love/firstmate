@@ -309,19 +309,30 @@ test_strip_msgfile_alone_does_not_rewrite_author_fields() {
 # a Git probe, not a model call: it exits immediately, leaving the SAME shell
 # for the supported already-stopped-task relaunch path.
 test_relaunch_reconciles_only_its_generated_hooks() {
-  local real_tmux dir home proj wt fakebin socket id hooks endpoint pane out scope n
-  real_tmux=$(command -v tmux) || {
-    printf 'skip: tmux absent; launch/relaunch hook transition not exercised\n'
+  local ksh
+  test_relaunch_reconciles_only_its_generated_hooks_in_shell bash /bin/bash
+  ksh=$(command -v ksh) || {
+    printf 'skip: ksh absent; ksh launch/relaunch hook transition not exercised\n'
     return
   }
-  dir="$TMP_ROOT/relaunch"
+  test_relaunch_reconciles_only_its_generated_hooks_in_shell ksh "$ksh"
+}
+
+test_relaunch_reconciles_only_its_generated_hooks_in_shell() {
+  local shell_name="$1" shell_path="$2" shell_command
+  local real_tmux dir home proj wt fakebin socket id hooks endpoint pane out scope n
+  real_tmux=$(command -v tmux) || {
+    printf 'skip: tmux absent; %s launch/relaunch hook transition not exercised\n' "$shell_name"
+    return
+  }
+  dir="$TMP_ROOT/relaunch-$shell_name"
   mkdir -p "$dir"
   dir=$(cd "$dir" && pwd -P)
   home="$dir/home"
   proj="$dir/project"
   wt="$dir/wt"
   socket="$dir/tmux.sock"
-  id="hooks-relaunch-$$"
+  id="hooks-relaunch-$shell_name-$$"
   fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
   fm_test_spawn_home "$home" omp
   fm_test_spawn_brief "$home" "$id"
@@ -347,15 +358,18 @@ export PATH='$fakebin:$PATH'
 treehouse() { if [ "\${1:-}" = get ]; then cd '$wt'; fi; }
 PS1='fixture> '
 SH
+  case "$shell_name" in
+    bash) shell_command="'$shell_path' --noprofile --rcfile '$dir/rc' -i" ;;
+    ksh) shell_command="'$shell_path' -i" ;;
+  esac
   # The socket and every terminal belong to this fixture; no shared tmux
   # environment, user shell startup file, or live worker is read or changed.
-  env -i HOME="$home/user-home" PATH="$fakebin:$PATH" TERM=xterm \
+  env -i HOME="$home/user-home" PATH="$fakebin:$PATH" TERM=xterm ENV="$dir/rc" \
     GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" GIT_CONFIG_NOSYSTEM=1 \
     "$real_tmux" -S "$socket" -f /dev/null new-session -d -s firstmate \
-    -c "$proj" "/bin/bash --noprofile --rcfile '$dir/rc' -i" \
-    || fail "cannot start owned tmux fixture"
-  "$real_tmux" -S "$socket" set-option -g default-command \
-    "/bin/bash --noprofile --rcfile '$dir/rc' -i"
+    -c "$proj" "$shell_command" \
+    || fail "cannot start owned $shell_name tmux fixture"
+  "$real_tmux" -S "$socket" set-option -g default-command "$shell_command"
   trap '"$real_tmux" -S "$socket" kill-server 2>/dev/null || :; rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*; fm_test_cleanup' EXIT
   out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" \
     --mode no-mistakes --yolo off --harness omp --backend tmux)
@@ -436,7 +450,7 @@ SH
   "$real_tmux" -S "$socket" kill-server
   rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
   trap fm_test_cleanup EXIT
-  pass "supported same-task tmux relaunch reconciles generated hooks and preserves operator configuration"
+  pass "supported same-task $shell_name tmux relaunch reconciles generated hooks and preserves operator configuration"
 }
 
 test_cursor_trailer_does_not_reach_the_commit_object
