@@ -364,6 +364,7 @@ if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
 fi
 
 if [ "$RECOVER_LAUNCH" = 1 ] && [ "$(fm_meta_get "$META" kind)" = secondmate ]; then
+  # shellcheck source=bin/fm-secondmate-liveness-lib.sh
   . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
   fm_secondmate_liveness_lock "$ID" \
     || die "another secondmate liveness check is already running for task $ID"
@@ -1052,7 +1053,9 @@ do_relaunch() {
     fi
     case "$KIND" in
       ship|scout)
+        # shellcheck source=bin/fm-tasks-axi-lib.sh
         . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
+        # shellcheck source=bin/fm-backlog-transition-lib.sh
         . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
         if fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$KIND"; then
           if fm_backlog_row_probe "$DATA" "$ID"; then

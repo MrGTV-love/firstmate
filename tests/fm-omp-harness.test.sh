@@ -197,7 +197,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
   read_case_record "$rec"
-  id=omp-model-refused-q2
+  id='omp-model-refused-q2'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-nope)
   status=$?
   expect_code 1 "$status" "a model absent from a listed provider must refuse"
@@ -206,7 +206,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-bridge omp omp-model-bridge-q3)
   read_case_record "$rec"
-  id=omp-model-bridge-q3
+  id='omp-model-bridge-q3'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model claude-bridge/claude-opus-4-8)
   status=$?
   expect_code 0 "$status" "an extension-registered provider must pass through: $out"
@@ -215,7 +215,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-fuzzy omp omp-model-fuzzy-q4)
   read_case_record "$rec"
-  id=omp-model-fuzzy-q4
+  id='omp-model-fuzzy-q4'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model astra)
   status=$?
   expect_code 0 "$status" "a bare fuzzy pattern is omp's own matcher's job: $out"

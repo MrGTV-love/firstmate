@@ -154,6 +154,7 @@ WTN=$(wc -l < "$TMP/wtcalls" | tr -d '[:space:]')
 pass "event_wait_or_sleep: consecutive event-path failures disable the fast-path and revert to pure polling (fail-closed)"
 
 (
+  # shellcheck disable=SC2329 # Runtime override called by the isolated watcher.
   fm_run_timed() {
     case "$*" in
       *"fm-reboot-recover.sh recover --one") ;;

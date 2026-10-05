@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -u
 
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=/dev/null
 . "$ROOT/bin/fm-composer-lib.sh"
 
 CAPS_TMUX=$'styled=1\ncursor=1\nidentity=1\nrows=0'

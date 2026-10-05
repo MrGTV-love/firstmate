@@ -1835,7 +1835,6 @@ test_concurrent_relaunch_is_refused() {
   pass "fm-control relaunch: two control actions on one task serialize instead of interleaving"
 }
 
-# shellcheck disable=SC2031
 test_direct_spawn_relaunch_participates_in_the_lifecycle_lock() {
   local dir out rc lock holder i=0
   dir=$(new_case spawnlock rl26)
@@ -1843,6 +1842,7 @@ test_direct_spawn_relaunch_participates_in_the_lifecycle_lock() {
   printf 'zsh' > "$dir/fake/command"
   lock="$dir/home/state/.control-rl26.lock"
   (
+    # shellcheck source=/dev/null
     . "$ROOT/bin/fm-wake-lib.sh"
     fm_lock_try_acquire "$lock" || exit 1
     sleep 30
@@ -1863,13 +1863,13 @@ test_direct_spawn_relaunch_participates_in_the_lifecycle_lock() {
   pass "fm-spawn relaunch: direct entry participates in lifecycle serialization"
 }
 
-# shellcheck disable=SC2031
 test_promotion_participates_in_the_lifecycle_lock_before_metadata_resolution() {
   local dir out rc lock holder i=0
   dir=$(new_case promotelock rl29)
   add_ship_task "$dir" rl29 claude
   lock="$dir/home/state/.control-rl29.lock"
   (
+    # shellcheck source=/dev/null
     . "$ROOT/bin/fm-wake-lib.sh"
     fm_lock_try_acquire "$lock" || exit 1
     sleep 30
