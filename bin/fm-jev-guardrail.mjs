@@ -24,7 +24,7 @@ const privateKey = process.env.TYPESAFE_API_KEY || '';
 delete process.env.TYPESAFE_API_KEY;
 delete process.env.TYPESAFE_API_KEY_PRIVATE;
 const model = 'jev-1.13.0';
-const policyVersion = 3;
+const policyVersion = 4;
 const clock = () => performance.now();
 const elapsed = start => Math.round((clock() - start) * 1000) / 1000;
 const secretPath = value => /(?:^|[/\\])(?:\.env(?:[.\w-]*)?|\.ssh|\.aws|\.gnupg|credentials(?:[.\w-]*)?|secrets?(?:[.\w-]*)?|id_(?:rsa|ed25519)|[^/]*\.(?:pem|key))(?:$|[/\\])/i.test(value);
@@ -61,7 +61,19 @@ function describe(command, depth = 0) {
     }
     const position = parser.commandPosition(node);
     for (const payload of position.wrapperPayloads) descend(payload);
-    if (!position.command) continue;
+    if (!position.command) {
+      // The shared parser consumes env as a wrapper even when it has no
+      // child command. That form dumps the environment; -S child payloads
+      // and informational options do not.
+      if (position.wrappers.at(-1) === 'env' && !position.wrapperPayloads.length &&
+          !position.words.some(word => word.value === '--help' || word.value === '--version')) {
+        const envIndex = position.words.findLastIndex(word => basename(word.value) === 'env');
+        const lookup = position.wrappers.includes('command') &&
+          position.words.some((word, index) => index < envIndex && /^-[^-]*[vV]/.test(word.value));
+        if (!lookup) add('secret_read', [], { scope: 'secret' });
+      }
+      continue;
+    }
     const name = basename(position.command.value);
     const args = position.words.slice(position.index + 1).map(w => w.value);
     if (shells.has(name)) {
@@ -83,7 +95,7 @@ function describe(command, depth = 0) {
       if (args.some(v => /^(?:delete|destroy|remove|rm|drop)(?:-|$)/.test(v))) add('delete', args);
       if (args.some(v => /^(?:deploy|apply|upgrade|publish|release)(?:[:=-]|$)/.test(v))) add('deploy', args);
       if (args.some(v => /^(?:secrets?|get-secret-value|access-secret-version)$/.test(v))) add('secret_read', args, { scope: 'secret' });
-    } else if (name === 'security' && args.some(v => /^find-(?:generic|internet)-password$/.test(v)) || ['printenv', 'env'].includes(name) && args.length === 0) add('secret_read', [], { scope: 'secret' });
+    } else if (name === 'security' && args.some(v => /^find-(?:generic|internet)-password$/.test(v)) || name === 'printenv' && args.length === 0) add('secret_read', [], { scope: 'secret' });
     else if (readers.has(name) && args.some(secretPath)) add('secret_read', [], { scope: 'secret' });
     else if (['curl', 'wget'].includes(name) && args.some(v => secretPath(v.replace(/^@/, '')) || /^(?:authorization:|cookie:)/i.test(v))) add('secret_read', [], { scope: 'secret' });
     else if (['python', 'python3', 'node', 'ruby', 'perl'].includes(name) && args.some(v => /^-(?:c|e)$/.test(v)) && args.some(v => /(?:remove|unlink|rmtree|delete|secret|credential|\.env|deploy)/i.test(v))) add('opaque_execution', [], { scope: 'unknown' });

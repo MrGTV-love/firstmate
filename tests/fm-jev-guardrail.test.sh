@@ -35,11 +35,15 @@ const hook = (command, overrides = {}, native = 'claude') => {
   return records().at(-1);
 };
 try {
-  for (const command of ['cat README.md', 'git status --short', 'printf "rm -rf /production"', 'cat <<EOF\nrm -rf /production\nEOF', 'echo harmless # rm -rf /']) assert.equal(hook(command).status, 'excluded', command);
-  for (const command of ['rm -f ./sandbox/item', 'git push --force-with-lease origin topic', 'kubectl --context prod apply -f plan.yml', 'cat .env', 'cat < .env', 'sh -c "rm -rf /production"', 'printf "%s" "$(cat .env)"', '(sudo rm -rf /production)', 'rmdir ./sandbox', "python3 -c 'import os; os.unlink(\"private\")'"]) assert.equal(hook(command).status, 'missing_key', command);
+  for (const command of ['cat README.md', 'git status --short', 'printf "rm -rf /production"', 'cat <<EOF\nrm -rf /production\nEOF', 'echo harmless # rm -rf /', 'env X=1 cat README.md', 'env --help', 'env --version', 'env -S "cat README.md"', 'command -v env', 'command -p -V env']) assert.equal(hook(command).status, 'excluded', command);
+  for (const command of ['env', 'env X=1', '/usr/bin/env', 'command env -v', 'rm -f ./sandbox/item', 'git push --force-with-lease origin topic', 'kubectl --context prod apply -f plan.yml', 'cat .env', 'cat < .env', 'sh -c "rm -rf /production"', 'printf "%s" "$(cat .env)"', '(sudo rm -rf /production)', 'rmdir ./sandbox', "python3 -c 'import os; os.unlink(\"private\")'"]) assert.equal(hook(command).status, 'missing_key', command);
   assert.equal(hook('rm -rf ./sandbox', {}, 'omp').status, 'missing_key');
   assert.equal(records().filter(r => r.event === 'attempt').length, 0);
   console.log('ok - command-position selection excludes ordinary reads and literal examples; selects nested risky operations');
+  assert.equal(hook('env', { TYPESAFE_API_KEY: 'synthetic-key' }).status, 'judged');
+  assert.deepEqual(JSON.parse(readFileSync(env.LOG_REQUEST, 'utf8')).state.operations,
+    [{operation:'secret_read',scope:'secret',recursive:false,force:false}]);
+  console.log('ok - wrapper-only env dumps are screened without executing env; wrapped reads, help and command lookup remain excluded');
 
   const secret = 'synthetic-secret-customer-content';
   const result = hook(`TOKEN=${secret} rm -rf /production/${secret}; printf '${secret}'`, { TYPESAFE_API_KEY: 'synthetic-key' });
