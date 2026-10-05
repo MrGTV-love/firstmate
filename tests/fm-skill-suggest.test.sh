@@ -426,6 +426,7 @@ assert_absent "$LOG/calls" "private duplicate never bypasses local privacy class
 rm -rf "$HOME_SKILLS"
 cp "$TMP_ROOT/split-task-save" "$TASK"
 pass "equivalent public split-home copies resolve locally without expanding remote projection"
+
 for MODE in none recheck-none timeout malformed recheck-malformed wrong-model invalid-number missing-answer; do
   reset
   out=$(run --task-file "$TASK" --required safety)
