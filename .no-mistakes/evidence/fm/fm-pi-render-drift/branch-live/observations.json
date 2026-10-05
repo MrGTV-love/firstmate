@@ -1,0 +1,60 @@
+{
+  "1.0.2": {
+    "collapsed_arg_preview": true,
+    "collapsed_line_count_hint": true,
+    "collapsed_omits_row14": true,
+    "expanded_separate_args": true,
+    "expanded_all14_rows": true,
+    "expanded_no_truncation_hint": true,
+    "calm_hides_tool_shells_results": true,
+    "calm_keeps_dialog": true,
+    "calm_after_export_stays_hidden": true,
+    "export_confirmation_survives": true,
+    "calm_off_restores_all14_rows_and_errors": true,
+    "export_omits_custom_renderer_override": true,
+    "export_actual_tool_result_error_flags": [
+      [
+        "fm_branch_outcomes",
+        false
+      ],
+      [
+        "fm_branch_processed",
+        true
+      ],
+      [
+        "fm_branch_processed",
+        true
+      ]
+    ],
+    "export_contains_all14_rows": true
+  },
+  "0.99.0": {
+    "collapsed_arg_preview": true,
+    "collapsed_line_count_hint": true,
+    "collapsed_omits_row14": true,
+    "expanded_separate_args": true,
+    "expanded_all14_rows": true,
+    "expanded_no_truncation_hint": true,
+    "calm_hides_tool_shells_results": true,
+    "calm_keeps_dialog": true,
+    "calm_after_export_stays_hidden": true,
+    "export_confirmation_survives": true,
+    "calm_off_restores_all14_rows_and_errors": true,
+    "export_omits_custom_renderer_override": true,
+    "export_actual_tool_result_error_flags": [
+      [
+        "fm_branch_outcomes",
+        false
+      ],
+      [
+        "fm_branch_processed",
+        true
+      ],
+      [
+        "fm_branch_processed",
+        true
+      ]
+    ],
+    "export_contains_all14_rows": true
+  }
+}

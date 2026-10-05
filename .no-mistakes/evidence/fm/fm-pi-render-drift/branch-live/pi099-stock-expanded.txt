@@ -1,0 +1,100 @@
+ option+up to edit all queued messages
+ ctrl+v to paste files on macOS, images, or text
+ drop files to attach
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  path
+
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/branch-live/provide
+r.ts
+
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.pi/extensions/fm-branch-supervisi
+on.ts
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.pi/extensions/fm-calm.ts
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+ This project is not trusted. Project .pi resources and packages are ignored. Use /trust to save a trust decision, then
+ restart pi.
+
+
+ Exercise branch renderers with the deterministic local fixture.
+
+
+
+ fm_branch_outcomes
+   recent: 14
+ {"seq": 1, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-01:
+ LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LIN
+ E-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-L
+ INE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG
+ -LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-", "silent": false,
+ "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 2, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-02: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 3, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-03: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 4, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-04: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 5, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-05: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 6, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-06: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 7, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-07: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 8, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-08: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 9, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-09: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 10, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-10: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 11, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-11: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 12, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-12: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 13, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-13: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+ {"seq": 14, "epoch": 1791072000, "task": "branch-render-lab", "wake": "disposable-fixture-only", "verdict": "routine",
+ "summary": "OUTCOME-14: ordinary result row confirms multiline stock expansion and durable read path.", "silent":
+ false, "statusEndpoint": 0, "statusIdent": ""}
+
+
+
+ fm_branch_processed
+   through: 0
+ acknowledgement refused: through must be a positive outcome sequence number
+
+
+
+ fm_branch_processed
+   through: 999
+ acknowledgement refused: this session does not own the fleet lock
+
+
+ Branch renderer lab complete. Actual registered tools executed; the provider is a deterministic local fixture, not a
+ live LLM.
+
+ Tool output: expanded
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW (detached)
+2.9%/100k (auto)                                                                                           deterministic

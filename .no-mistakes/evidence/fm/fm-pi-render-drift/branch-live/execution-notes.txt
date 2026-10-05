@@ -1,0 +1,22 @@
+Product under test: real native fullscreen Pi TUI v1.0.2 and v0.99.0, production .pi/extensions/fm-calm.ts and .pi/extensions/fm-branch-supervision.ts from this worktree. No production/test/doc files modified. Provider was a deterministic in-process fixture, not a live LLM or hosted service. Registered production tools actually executed: fm_branch_outcomes(recent=14) read the seeded disposable outcome store via production bin/fm-branch-outcome.sh; fm_branch_processed(through=0) returned the production validation error; fm_branch_processed(through=999) returned the production no-owner error. No successful acknowledgement or fleet lifecycle was exercised; no fleet lock was acquired.
+
+Exact env-isolated Pi launches are recorded verbatim in launched-command.txt (1.0.2) and launched-command099.txt (0.99.0). Both launches ran through:
+tmux -S /tmp/fml.jEDWKI/tmux-501/branch-render-live new-session -d -s branch-render-live -x 120 -y 100 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW '<recorded env-isolated command>'
+
+Setup:
+bash bin/fm-lab-home.sh create .gate-test-lab/branch-live/fm-home
+bash bin/fm-lab-home.sh tmux-dir .gate-test-lab/branch-live/fm-home
+The first tmux -S launch failed with 'error creating /tmp/fml.jEDWKI/tmux-501/branch-render-live (No such file or directory)' because -S does not create its parent directory. Fixed by mkdir -p /tmp/fml.jEDWKI/tmux-501; subsequent launches succeeded. Isolated Pi startup warned fd/ripgrep were missing with offline download skipped, and project was untrusted; explicit extension paths loaded correctly despite discovery being disabled.
+
+Native input sequence, each version:
+Exercise branch renderers with the deterministic local fixture. [Enter]
+Ctrl+O
+/calm [Enter]
+/export /Users/charlesabrooker/.no-mistakes/evidence/01M44P33S4FCMC3A82HAN56PSW/branch-live/pi102-calm-stock-export.html [Enter] (1.0.2)
+/export /Users/charlesabrooker/.no-mistakes/evidence/01M44P33S4FCMC3A82HAN56PSW/branch-live/pi099-calm-stock-export.html [Enter] (0.99.0)
+/calm [Enter]
+Ctrl+D
+
+Captured both plain and ANSI panes at stock-collapsed, stock-expanded, calm-hidden, calm-after-export, calm-restored. Captures made at least one second after each display command. Both HTML exports contain native session tool calls/results; decoded payloads have no renderedTools override, retain all 14 outcome rows and both isError=true processed results. HTML exports are available for parent browser screenshot verification; no browser rendering was exercised by this worker.
+
+Cleanup executed: both Pi processes exited via Ctrl+D; private tmux server no longer running; bash bin/fm-lab-home.sh teardown .gate-test-lab/branch-live/fm-home exited 0; rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/branch-live. Only this lab removed. Parent vendor099 and all evidence preserved.

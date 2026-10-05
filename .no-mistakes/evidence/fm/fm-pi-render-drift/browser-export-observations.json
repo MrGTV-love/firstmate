@@ -1,0 +1,16 @@
+{
+  "product": "Real Pi /export HTML from isolated terminal sessions",
+  "versions": [
+    "1.0.2",
+    "0.99.0"
+  ],
+  "checks": {
+    "defaultConversationContainsGenuineUserAndAssistant": true,
+    "defaultConversationHasVisibleSyntheticProvenance": false,
+    "defaultConversationHasVisibleHiddenCustomRows": false,
+    "syntheticHistoryRetainedInTree": true,
+    "explicitShowHiddenMessagesRevealsSyntheticProvenance": true,
+    "secondToggleRestoresConversationBoundary": true
+  },
+  "method": "Opened actual generated exports in isolated Chromium, checked browser visibility, clicked real Show hidden messages twice, and captured default/revealed screenshots."
+}

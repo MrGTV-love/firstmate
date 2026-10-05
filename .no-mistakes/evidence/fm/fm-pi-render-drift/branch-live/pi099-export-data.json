@@ -1,0 +1,493 @@
+{
+  "header": {
+    "type": "session",
+    "version": 3,
+    "id": "branch-render-live",
+    "timestamp": "2026-10-05T00:32:07.726Z",
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW"
+  },
+  "entries": [
+    {
+      "type": "model_change",
+      "id": "2c49840b",
+      "parentId": null,
+      "timestamp": "2026-10-05T00:32:07.826Z",
+      "provider": "branch-render-lab",
+      "modelId": "deterministic"
+    },
+    {
+      "type": "thinking_level_change",
+      "id": "29025c42",
+      "parentId": "2c49840b",
+      "timestamp": "2026-10-05T00:32:07.828Z",
+      "thinkingLevel": "off"
+    },
+    {
+      "type": "message",
+      "id": "bfedad99",
+      "parentId": "29025c42",
+      "timestamp": "2026-10-05T00:32:26.133Z",
+      "message": {
+        "role": "system",
+        "content": "",
+        "sections": {
+          "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+          "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- fm_branch_outcomes: Read what the supervision branch handled (durable outcome store).\n- fm_branch_processed: Acknowledge processed captain-facing supervision outcomes by sequence.\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+          "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+          "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/README.md\n- Additional docs: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/docs\n- Examples: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+          "cwd": "<cwd>\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW\n</cwd>"
+        },
+        "timestamp": 1791160346132,
+        "toolsAdded": [
+          {
+            "name": "read",
+            "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "path"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Path to the file to read (relative or absolute)"
+                },
+                "offset": {
+                  "type": "number",
+                  "description": "Line number to start reading from (1-indexed)"
+                },
+                "limit": {
+                  "type": "number",
+                  "description": "Maximum number of lines to read"
+                }
+              }
+            },
+            "constrainedSampling": {
+              "type": "json_schema",
+              "strict": "prefer"
+            }
+          },
+          {
+            "name": "bash",
+            "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "command"
+              ],
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "Shell command to execute"
+                },
+                "timeout": {
+                  "type": "number",
+                  "description": "Timeout in seconds (optional, no default timeout)"
+                }
+              }
+            },
+            "constrainedSampling": {
+              "type": "json_schema",
+              "strict": "prefer"
+            }
+          },
+          {
+            "name": "edit",
+            "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "path",
+                "edits"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Path to the file to edit (relative or absolute)"
+                },
+                "edits": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "oldText",
+                      "newText"
+                    ],
+                    "properties": {
+                      "oldText": {
+                        "type": "string",
+                        "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+                      },
+                      "newText": {
+                        "type": "string",
+                        "description": "Replacement text for this targeted edit."
+                      }
+                    }
+                  },
+                  "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+                }
+              }
+            },
+            "constrainedSampling": {
+              "type": "json_schema",
+              "strict": "prefer"
+            }
+          },
+          {
+            "name": "write",
+            "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "path",
+                "content"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Path to the file to write (relative or absolute)"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Content to write to the file"
+                }
+              }
+            },
+            "constrainedSampling": {
+              "type": "json_schema",
+              "strict": "prefer"
+            }
+          },
+          {
+            "name": "fm_branch_outcomes",
+            "description": "Read the durable outcome store of the supervision branch: what fleet events it handled, each verdict, and each summary. Use when the captain asks what happened in the fleet.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "recent": {
+                  "type": "number",
+                  "description": "How many most-recent outcomes to read (default 20)"
+                }
+              }
+            }
+          },
+          {
+            "name": "fm_branch_processed",
+            "description": "Acknowledge that every captain-facing supervision outcome up to a sequence number has been processed by this conversation. Call it exactly once after handling a supervision processing request, with through set to the highest sequence that request listed; an outcome that is not acknowledged is presented again.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "through"
+              ],
+              "properties": {
+                "through": {
+                  "type": "number",
+                  "description": "The highest outcome sequence number this conversation has processed"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "message",
+      "id": "fcc7a7f9",
+      "parentId": "bfedad99",
+      "timestamp": "2026-10-05T00:32:26.134Z",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Exercise branch renderers with the deterministic local fixture."
+          }
+        ],
+        "timestamp": 1791160346131
+      }
+    },
+    {
+      "type": "message",
+      "id": "103e3977",
+      "parentId": "fcc7a7f9",
+      "timestamp": "2026-10-05T00:32:26.138Z",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "toolCall",
+            "id": "branch-lab-outcomes",
+            "name": "fm_branch_outcomes",
+            "arguments": {
+              "recent": 14
+            }
+          },
+          {
+            "type": "toolCall",
+            "id": "branch-lab-invalid",
+            "name": "fm_branch_processed",
+            "arguments": {
+              "through": 0
+            }
+          },
+          {
+            "type": "toolCall",
+            "id": "branch-lab-no-owner",
+            "name": "fm_branch_processed",
+            "arguments": {
+              "through": 999
+            }
+          }
+        ],
+        "api": "branch-render-lab-api",
+        "provider": "branch-render-lab",
+        "model": "deterministic",
+        "timestamp": 1791160346137,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "thinkingLevel": "off"
+      }
+    },
+    {
+      "type": "message",
+      "id": "9192612e",
+      "parentId": "103e3977",
+      "timestamp": "2026-10-05T00:32:26.246Z",
+      "message": {
+        "role": "toolResult",
+        "toolCallId": "branch-lab-outcomes",
+        "toolName": "fm_branch_outcomes",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"seq\": 1, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-01: LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-LONG-LINE-\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 2, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-02: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 3, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-03: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 4, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-04: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 5, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-05: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 6, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-06: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 7, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-07: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 8, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-08: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 9, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-09: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 10, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-10: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 11, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-11: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 12, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-12: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 13, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-13: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}\n{\"seq\": 14, \"epoch\": 1791072000, \"task\": \"branch-render-lab\", \"wake\": \"disposable-fixture-only\", \"verdict\": \"routine\", \"summary\": \"OUTCOME-14: ordinary result row confirms multiline stock expansion and durable read path.\", \"silent\": false, \"statusEndpoint\": 0, \"statusIdent\": \"\"}"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791160346246
+      }
+    },
+    {
+      "type": "message",
+      "id": "f173b858",
+      "parentId": "9192612e",
+      "timestamp": "2026-10-05T00:32:26.246Z",
+      "message": {
+        "role": "toolResult",
+        "toolCallId": "branch-lab-invalid",
+        "toolName": "fm_branch_processed",
+        "content": [
+          {
+            "type": "text",
+            "text": "acknowledgement refused: through must be a positive outcome sequence number"
+          }
+        ],
+        "isError": true,
+        "timestamp": 1791160346246
+      }
+    },
+    {
+      "type": "message",
+      "id": "60e1c6c1",
+      "parentId": "f173b858",
+      "timestamp": "2026-10-05T00:32:26.246Z",
+      "message": {
+        "role": "toolResult",
+        "toolCallId": "branch-lab-no-owner",
+        "toolName": "fm_branch_processed",
+        "content": [
+          {
+            "type": "text",
+            "text": "acknowledgement refused: this session does not own the fleet lock"
+          }
+        ],
+        "isError": true,
+        "timestamp": 1791160346246
+      }
+    },
+    {
+      "type": "message",
+      "id": "78944bd2",
+      "parentId": "60e1c6c1",
+      "timestamp": "2026-10-05T00:32:26.248Z",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Branch renderer lab complete. Actual registered tools executed; the provider is a deterministic local fixture, not a live LLM."
+          }
+        ],
+        "api": "branch-render-lab-api",
+        "provider": "branch-render-lab",
+        "model": "deterministic",
+        "timestamp": 1791160346248,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "stop",
+        "thinkingLevel": "off"
+      }
+    }
+  ],
+  "leafId": "78944bd2",
+  "systemPrompt": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- fm_branch_outcomes: Read what the supervision branch handled (durable outcome store).\n- fm_branch_processed: Acknowledge processed captain-facing supervision outcomes by sequence.\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>\n\n<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/README.md\n- Additional docs: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/docs\n- Examples: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW/.gate-test-lab/vendor099/node_modules/@earendil-works/pi-coding-agent/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>\n\n<cwd>\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44P33S4FCMC3A82HAN56PSW\n</cwd>",
+  "tools": [
+    {
+      "name": "read",
+      "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+          }
+        }
+      }
+    },
+    {
+      "name": "bash",
+      "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+          }
+        }
+      }
+    },
+    {
+      "name": "edit",
+      "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "path",
+          "edits"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "oldText",
+                "newText"
+              ],
+              "properties": {
+                "oldText": {
+                  "type": "string",
+                  "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+                },
+                "newText": {
+                  "type": "string",
+                  "description": "Replacement text for this targeted edit."
+                }
+              }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+        }
+      }
+    },
+    {
+      "name": "write",
+      "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "path",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+          }
+        }
+      }
+    },
+    {
+      "name": "fm_branch_outcomes",
+      "description": "Read the durable outcome store of the supervision branch: what fleet events it handled, each verdict, and each summary. Use when the captain asks what happened in the fleet.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "recent": {
+            "type": "number",
+            "description": "How many most-recent outcomes to read (default 20)"
+          }
+        }
+      }
+    },
+    {
+      "name": "fm_branch_processed",
+      "description": "Acknowledge that every captain-facing supervision outcome up to a sequence number has been processed by this conversation. Call it exactly once after handling a supervision processing request, with through set to the highest sequence that request listed; an outcome that is not acknowledged is presented again.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "through"
+        ],
+        "properties": {
+          "through": {
+            "type": "number",
+            "description": "The highest outcome sequence number this conversation has processed"
+          }
+        }
+      }
+    }
+  ]
+}
