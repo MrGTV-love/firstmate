@@ -1242,17 +1242,10 @@ test_create_task_refuses_duplicate_label() {
 
 # --- restored-layout husk close-and-replace (herdr session.json restore) -----
 #
-# herdr persists and restores its whole session layout (workspaces/tabs/
-# panes) across a server restart, including a reboot. A restored fm-<id> task
-# tab comes back a HUSK - a dead pane, or a plain agent-less shell sitting in
-# the saved cwd - never the crewmate that used to be there. Before this fix,
-# create_task refused ANY same-labeled tab unconditionally, so every fleet
-# respawn after such a restart needed the operator to manually close each
-# husk pane first. These tests cover the four cases the fix must get right:
-# a genuinely LIVE duplicate still refuses (unchanged), a DEAD pane husk and a
-# NO-AGENT (restored plain shell) husk both close-and-replace, and an
-# AMBIGUOUS/unparseable read refuses (fail-safe, never guesses toward
-# closing).
+# docs/herdr-backend.md "Restart and liveness behavior" owns restoration.
+# These cases distinguish confirmed DEAD and NO-AGENT husks, which permit
+# close-and-replace, from LIVE duplicates and AMBIGUOUS/unparseable reads,
+# which refuse. A restored label alone never authorizes closing.
 
 test_create_task_refuses_duplicate_label_when_agent_live() {
   local dir log resp fb out status

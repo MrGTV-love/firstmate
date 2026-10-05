@@ -9,22 +9,23 @@
 # those calls is individually bounded, so one unreachable host could consume the
 # whole FM_SESSION_START_TIMEOUT budget and truncate the digest outright, turning
 # a slow network into a startup that never printed the work queue at all.
-# This script runs exactly that work OFF the blocking path: the digest is
-# composed from bounded local reads while these checks run concurrently in a
-# detached worker, and their result is reported back inline when it finishes in
-# time, or as a durable wake when it does not. The locked startup's bounded
-# inactive-outcome scan also runs here because its local current-state reads can
-# be just as slow; that scan publishes its own findings to the durable wake queue.
+# This script runs that work OFF the blocking path: the digest is composed
+# from bounded local reads while these checks run in a detached worker, and
+# their result is reported back inline when it finishes in time, or as a durable
+# wake when it does not. Recorded Herdr launch recovery also runs here through
+# bootstrap; docs/agent-control.md "Recovering a bare native restore" owns it.
+# The locked startup's bounded inactive-outcome scan also runs here because its
+# local current-state reads can be just as slow; it publishes its own findings
+# to the durable wake queue.
 #
 # WHAT IS PRESERVED. Nothing is dropped. bin/fm-bootstrap.sh remains the single
 # owner of every network sweep and still runs all of them, unchanged, via its
 # FM_BOOTSTRAP_NETWORK=only phase. bin/fm-inactive-reconcile.sh remains the
 # owner of the startup scan and its separate watcher cadence. Deferral changes
 # WHEN they run, not WHETHER, and three properties make the later run safe:
-#   - The work is idempotent detection. A run whose report is lost (killed
-#     worker, truncated digest, crashed session) loses no finding: the next run
-#     re-derives the same inactive terminal child, dead secondmate, stuck clone,
-#     or undelivered handoff. There is no once-only signal to miss.
+#   - The work is idempotent reconciliation. A run whose report is lost can
+#     re-read current state on the next run, including whether a native-restored
+#     launch is already managed. There is no once-only signal to miss.
 #   - Results are durable and always surface. Network sweep output lands in
 #     state/.startup-network.report and reaches the agent either inline in the
 #     digest or, when it finishes too late for the digest to inline it, as a

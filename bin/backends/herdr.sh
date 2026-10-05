@@ -2225,13 +2225,10 @@ EOF
 #                 and its tab from `pane get`/`tab list`).
 #   no-agent    - `pane get` succeeds (the pane structurally exists) but `agent
 #                 get` responds with error code agent_not_found: nothing is
-#                 registered in it - exactly what a herdr session-layout restore
-#                 produces (verified empirically: `session stop` + fresh `herdr
-#                 server` restart leaves the pane alive, agent_status "unknown",
-#                 agent get -> agent_not_found - docs/herdr-backend.md "ID
-#                 stability across a server restart"), and what a future
-#                 `resume_agents_on_restore = false` restore would produce too
-#                 (a plain shell, never an agent).
+#                 registered in it. A shell-only layout restore can produce
+#                 this state, but a live native-resumed agent cannot be assumed
+#                 absent; docs/herdr-backend.md "Restart and liveness behavior"
+#                 owns restoration and managed recovery.
 #   stale-agent - `agent get` reports a registered agent_status (working, idle,
 #                 done, or blocked) but fm_backend_herdr_pane_process_state
 #                 proves the pane is shell-only: the registered agent's process
@@ -2453,18 +2450,11 @@ fm_backend_herdr_agent_alive() {  # <target>
 # uniqueness itself (verified: two tabs can share a label), so the duplicate
 # check is ours, mirroring tmux's manual check.
 #
-# A same-labeled tab already existing no longer means an automatic refusal:
-# herdr persists and restores its whole session layout (workspaces/tabs/
-# panes) across a server restart, including a reboot, and a restored fm-<id>
-# task tab comes back a HUSK - a dead pane, or (today, and unconditionally
-# once a future `resume_agents_on_restore = false` config ships) a plain
-# agent-less shell sitting in the saved cwd, never the crewmate that used to
-# be there. Before this fix, every fleet respawn after such a restart needed
-# the operator to manually close each husk pane first before firstmate could
-# spawn into it again. fm_backend_herdr_tab_is_husk classifies the existing
-# tab's pane conservatively (dead or no-agent only; anything live or
-# ambiguous refuses exactly as before) and, when it is a confirmed husk,
-# this function CLOSES AND REPLACES it instead of refusing.
+# A same-labeled tab already existing no longer means an automatic refusal.
+# fm_backend_herdr_tab_is_husk classifies its pane conservatively: only a
+# confirmed dead or no-agent husk permits close-and-replace; live or ambiguous
+# states refuse. Restoration is not itself husk proof: see
+# docs/herdr-backend.md "Restart and liveness behavior".
 #
 # Ordering is deliberate: the REPLACEMENT tab is created FIRST, and the husk
 # is closed only AFTER that succeeds - never the reverse. Closing a

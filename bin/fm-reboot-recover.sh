@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Recover this home's recorded Herdr agents after native bare restoration.
 # Usage: FM_HOME=<home> fm-reboot-recover.sh [recover] [--one]
-# Default recover repairs each positively unmanaged live ship, scout, or local
-# secondmate through fm-control relaunch --recover-launch, in its recorded pane
-# and local copy. No namespace discovery, child-home traversal, config change,
+# Default recover repairs each positively unmanaged live recorded omp ship,
+# scout, or local secondmate through fm-control relaunch --recover-launch, in
+# its recorded pane and local copy. No namespace discovery, child-home traversal, config change,
 # endpoint removal, branch operation, or worktree allocation occurs.
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed: it
 # applies to unrelated panes too. Exact recorded launch recovery supplies the
-# settings its native resume drops. Unknown proof is reported, never acted on.
+# settings its native resume drops. Unknown versioned launch proof is reported;
+# legacy-unproven records are silently skipped. Neither authorizes lifecycle action.
 # Failed recovery is surfaced; an unbounded sweep continues inspecting records.
 # --one stops after one repair attempt. Bounded recover scans rotate after the
 # last selected local Herdr record, including interrupted inspections and refusals.
