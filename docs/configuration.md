@@ -1439,7 +1439,7 @@ Blank-separated paragraphs in supported block descriptions are retained in both 
 Ambiguous shortlists receive a second evaluation using at most three bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
 Paths remain local; the judge does not receive the catalog's full instruction bodies.
 TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
-Local discovery and required-trigger handling still include private skills; if the task summary names one, the request is withheld rather than rewriting that summary.
+Local discovery and required-trigger handling include private skills from both the selected catalog and the active Firstmate home, even when that home differs from the code root; if the task summary names one, the request is withheld rather than rewriting that summary.
 Catalogs without verifiable Git tracking remain local.
 Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
 Each invocation evaluates the current task and public catalog with live, bounded requests; advice is not persisted or reused.

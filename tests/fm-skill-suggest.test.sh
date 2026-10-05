@@ -237,6 +237,73 @@ CATALOG=$BASE_CATALOG
 MODE=multiple
 pass "private skills remain local across ranking, excerpts, requirements and tracking transitions"
 
+reset
+SPLIT_CODE="$TMP_ROOT/split-code"
+HOME_SKILLS="$HOME_DIR/.agents/skills"
+PRIVATE_SKILL="$HOME_SKILLS/acme-private/SKILL.md"
+mkdir -p "$SPLIT_CODE/bin" "$SPLIT_CODE/.agents" "$HOME_SKILLS/acme-private"
+cp "$TOOL" "$ROOT/bin/fm-skill-catalog.jq" "$ROOT/bin/fm-typesafe-lib.sh" \
+  "$ROOT/bin/fm-env-lib.sh" "$ROOT/bin/fm-brief-heading-lib.sh" "$SPLIT_CODE/bin/"
+cp -R "$CATALOG" "$SPLIT_CODE/.agents/skills"
+printf '%s\n' '---' 'name: acme-private' 'description: HOME-PRIVATE-DESCRIPTION' \
+  '---' 'HOME-PRIVATE-OPENING' > "$PRIVATE_SKILL"
+git init -q "$HOME_DIR"
+printf '.agents/skills/acme-private/\n' >> "$HOME_DIR/.git/info/exclude"
+git -C "$HOME_DIR" check-ignore -q .agents/skills/acme-private/SKILL.md || fail "active-home private fixture must be git-excluded"
+cp "$TASK" "$TMP_ROOT/split-task-save"
+for selection in default explicit; do
+  CATALOG_ARGS=()
+  [ "$selection" != explicit ] || CATALOG_ARGS=(--catalog "$CATALOG")
+  reset
+  out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+    bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" ${CATALOG_ARGS[@]+"${CATALOG_ARGS[@]}"} \
+    --task-file "$TASK" --required acme-private --required safety --format brief)
+  assert_contains "$out" "Required named skill: acme-private - read $PRIVATE_SKILL." "$selection resolves caller-required active-home private skill"
+  assert_contains "$out" 'Optional suggestion: alpha' "$selection retains public code-catalog advice"
+  assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$selection exercises both outbound stages with a local-only requirement"
+  for stage in rank recheck; do
+    for private_text in acme-private HOME-PRIVATE-DESCRIPTION HOME-PRIVATE-OPENING; do
+      assert_not_contains "$(cat "$LOG/$stage")" "$private_text" "$selection $stage never discloses active-home private fields"
+    done
+  done
+  printf 'Use acme-private for this task.\n' > "$TASK"
+  printf '# Skill selection input\nUse acme-private for this task.\n' > "$BRIEF"
+  for input in --task-file --brief; do
+    if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+    for format in toon brief; do
+      reset
+      out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+        bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" ${CATALOG_ARGS[@]+"${CATALOG_ARGS[@]}"} \
+        "$input" "$input_path" --required safety --format "$format")
+      if [ "$format" = toon ]; then
+        assert_contains "$out" "\"acme-private\",\"$PRIVATE_SKILL\"" "$selection $input retains the task-named private requirement"
+        assert_contains "$out" 'status: off' "$selection $input withholds private task text"
+      else
+        assert_contains "$out" "Required named skill: acme-private - read $PRIVATE_SKILL." "$selection $input retains the private requirement in brief advice"
+        assert_contains "$out" 'No optional suggestion (off:' "$selection $input brief withholds private task text"
+      fi
+      assert_absent "$LOG/calls" "$selection $input $format never sends the private task identity"
+    done
+  done
+  cp "$TMP_ROOT/split-task-save" "$TASK"
+done
+printf 'Use acme-private for this task.\n' > "$TASK"
+reset
+out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+  bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" --catalog "$TMP_ROOT/absent-split-catalog" \
+  --task-file "$TASK" --format brief)
+assert_contains "$out" "Required named skill: acme-private - read $PRIVATE_SKILL." "unavailable remote catalog retains active-home named requirements"
+assert_absent "$LOG/calls" "unavailable split-home catalog never sends task text"
+printf 'Use alpha for this task.\n' > "$TASK"
+reset
+out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$SPLIT_CODE" TYPESAFE_API_KEY="$KEY" \
+  bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" --task-file "$TASK" --format brief)
+assert_contains "$out" "Required named skill: alpha - read $SPLIT_CODE/.agents/skills/alpha/SKILL.md." "shared home and catalog discover one authoritative path"
+assert_contains "$out" 'Optional suggestion: beta' "shared home and code root retain ordinary public selection"
+rm -rf "$HOME_SKILLS/acme-private"
+cp "$TMP_ROOT/split-task-save" "$TASK"
+pass "split-home private identities stay required and local across all public input and output paths"
+
 for MODE in none recheck-none timeout malformed recheck-malformed wrong-model invalid-number missing-answer; do
   reset
   out=$(run --task-file "$TASK" --required safety)

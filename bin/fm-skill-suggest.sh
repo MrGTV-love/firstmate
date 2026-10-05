@@ -103,18 +103,20 @@ else
   cp "$TASK" "$WORK/task" || die "could not read task"
 fi
 # Local catalog snapshot includes authoritative body paths.
-[ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
-CATALOG=$(cd "$CATALOG" && pwd -P) || fallback fallback "catalog unavailable"
+[ ! -d "$CATALOG" ] || CATALOG=$(cd "$CATALOG" && pwd -P) || fallback fallback "catalog unavailable"
+HOME_CATALOG="$FM_HOME/.agents/skills"
+[ ! -d "$HOME_CATALOG" ] || HOME_CATALOG=$(cd "$HOME_CATALOG" && pwd -P) || fallback fallback "home catalog unavailable"
 : > "$WORK/identities"
-for file in "$CATALOG"/*/SKILL.md; do
+for file in "$CATALOG"/*/SKILL.md "$HOME_CATALOG"/*/SKILL.md; do
   [ -f "$file" ] || continue
   dd if="$file" bs=524288 count=1 2>/dev/null |
     awk 'NR == 1 { if ($0 !~ /^---\r?$/) exit; print; next } { print; if ($0 ~ /^---\r?$/) exit }' |
     jq -eRsc --arg mode identity --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" >> "$WORK/identities" 2>/dev/null || :
 done
-jq -sc 'group_by(.id) | map({id:.[0].id,path:(if length == 1 then .[0].path else null end)})' "$WORK/identities" > "$WORK/names"
+jq -sc 'unique_by(.path) | group_by(.id) | map({id:.[0].id,path:(if length == 1 then .[0].path else null end)})' "$WORK/identities" > "$WORK/names"
 REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '$required + [.[] | .id as $id | select($task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")) | .id] | unique' "$WORK/names")
 RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$required[] | . as $id | {id:$id,path:([$names[0][] | select(.id == $id) | .path][0] // null)}],suggestions:[]}')
+[ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 : > "$WORK/rows"
 : > "$WORK/public-paths"
 COUNT=0
@@ -134,7 +136,7 @@ done
 jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"
 jq -e 'map(.id) | length == (unique | length)' "$WORK/catalog" >/dev/null || fallback fallback "duplicate skill IDs"
 for id in ${REQUIRED[@]+"${REQUIRED[@]}"}; do
-  jq -e --arg id "$id" 'any(.[]; .id == $id)' "$WORK/catalog" >/dev/null || die "unknown required skill ID"
+  jq -e --arg id "$id" 'any(.[]; .id == $id)' "$WORK/names" >/dev/null || die "unknown required skill ID"
 done
 [ "$(wc -c < "$WORK/task")" -le 4096 ] || fallback fallback "task exceeds 4 KiB; supply minimal permitted text"
 jq -e -Rs 'test("\\S")' "$WORK/task" >/dev/null || fallback fallback "no task-specific intent; supply minimal permitted text"
@@ -142,7 +144,7 @@ if ! fm_typesafe_key "$FM_HOME"; then fallback off "TypeSafe key unavailable"; f
 command -v curl >/dev/null 2>&1 || fallback fallback "transport unavailable"
 # Nothing about local paths or full bodies is needed by the remote judge.
 jq --argjson required "$REQ_IDS" --slurpfile public "$WORK/public-paths" '[.[] | select(.path as $path | $public | index($path)) | select(.id as $id | $required | index($id) | not)]' "$WORK/catalog" > "$WORK/optional"
-if jq -e --rawfile task "$WORK/task" --slurpfile public "$WORK/public-paths" 'any(.[]; (.path as $path | $public | index($path) | not) and (.id as $id | $task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")))' "$WORK/catalog" >/dev/null; then
+if jq -es --rawfile task "$WORK/task" --slurpfile public "$WORK/public-paths" 'any(.[]; (.path as $path | $public | index($path) | not) and (.id as $id | $task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")))' "$WORK/identities" >/dev/null; then
   fallback off "task names a private local skill; use ordinary selection"
 fi
 jq -e 'length > 0' "$WORK/optional" >/dev/null || fallback fallback "no public optional skills; use ordinary selection"
