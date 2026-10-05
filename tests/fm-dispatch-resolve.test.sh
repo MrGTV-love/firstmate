@@ -294,7 +294,7 @@ jq -ne --argjson cost "$cost" '$cost == (812 * 0.042 / 1000000)' >/dev/null \
 assert_equals 0.042 "$(telemetry_field "$out" jev_input_usd_per_million)" "estimate exposes its catalog rate"
 assert_not_contains "$out$err" "$KEY" "timing and cost output never expose the key"
 assert_not_contains "$out$err" 'off-by-one in the pager' "timing and cost output never expose brief text"
-assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "timing does not add quota snapshots"
+assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "timing preserves compatibility checking and one quota snapshot"
 pass "stock Bash resolver separates API, quota, local and total timing, with input-only Jev cost"
 
 # Without EPOCHREALTIME, as on stock macOS Bash 3.2, stamps still come from the
