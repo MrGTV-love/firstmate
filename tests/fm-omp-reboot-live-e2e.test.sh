@@ -18,8 +18,10 @@ OWNED_LAUNCH_DIR=
 OWNED_SESSION=0
 cleanup() {
   local status=$?
-  if [ "$OWNED_SESSION" = 1 ]; then
-    PATH="$REAL_PATH" "$HELPER" teardown "$SESSION" || status=1
+  if [ "$OWNED_SESSION" = 1 ] && ! PATH="$REAL_PATH" "$HELPER" teardown "$SESSION"; then
+    printf "guarded teardown failed for session '%s'; retained resources for manual cleanup:\n  private tree: %s\n  task namespace: %s\n  launch namespace: %s\n" \
+      "$SESSION" "$TMP" "${OWNED_TASK_TMP:-not claimed}" "${OWNED_LAUNCH_DIR:-not claimed}" >&2
+    exit 1
   fi
   if [ -n "$OWNED_TASK_TMP" ]; then
     rm -rf -- "$OWNED_TASK_TMP" || status=1

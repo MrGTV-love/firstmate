@@ -1920,6 +1920,8 @@ Both replacement agents visibly answer their instructions before the test stops 
 The fixture pins `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, `FM_CONFIG_OVERRIDE`, and `FM_PROJECTS_OVERRIDE` to its private home before lifecycle calls and profile setup.
 It uses an invocation-unique task identifier and exclusively reserves the task-temp and home-hashed launch namespaces; cleanup removes only successfully reserved namespaces.
 A focused live rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
+Cleanup removes the owned private tree and staging namespaces only after guarded teardown succeeds; a refusal retains the home, worktree, resume file, and staging dependencies and reports the session and retained paths for manual cleanup.
+A focused actual-script smoke with a controlled helper and worktree-local resources verified retention on teardown refusal, removal on success, and both outcomes after an injected fresh-claim provision failure; it did not contact Herdr or launch an agent.
 
 Observed guarantees:
 
