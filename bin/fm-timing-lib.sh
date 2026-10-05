@@ -54,7 +54,7 @@ fm_timing_enabled() {
 
 # Whole milliseconds from a decimal seconds value such as EPOCHREALTIME or curl's
 # %{time_total}. Either decimal separator is accepted because EPOCHREALTIME
-# follows the locale. Prints nothing and fails for anything else.
+# follows the locale. Fractional precision beyond milliseconds is discarded.
 fm_timing_seconds_ms() {  # <seconds>
   local raw=${1:-} sec frac
   case "$raw" in

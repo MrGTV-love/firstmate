@@ -45,12 +45,18 @@
 #   dispatch-resolve:
 #     status: clear | ambiguous | escalate | error
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
-#     timings: api_ms/quota_ms/local_ms/total_ms (local is total minus both calls)
+#     timings: api_ms/quota_ms/local_ms/total_ms
 #     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
-#   api_ms and its latency_ms alias are curl's own time_total, so they carry no
-#   local helper overhead; null when curl reports none. quota, local and total
-#   include helper overhead; total is measured from opted-in setup through
-#   rendering, before printing diagnostics.
+#   These diagnostics accompany normal resolution and structured errors, but
+#   no-rules results contain only status/reason; off paths have no stdout.
+#   api_ms and its latency_ms alias are curl's own time_total in whole
+#   milliseconds, so they carry no local helper overhead. Unknown api_ms prints
+#   null; unknown latency_ms prints -. Unattempted quota_ms prints null.
+#   quota_ms and total_ms include helper overhead; total is measured from
+#   opted-in setup through rendering, before printing diagnostics.
+#   local_ms is the nonnegative residual after subtracting known API and quota
+#   durations; unknown stages are not subtracted, so it can include their time.
+#   bin/fm-timing-lib.sh owns the epoch-clock implementation used by these stamps.
 #   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
 #   $0.042 per million input tokens, output free; unavailable usage prints null.
 #   model and returned_model accept only numeric Jev version ids, else unknown;
