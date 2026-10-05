@@ -1,0 +1,57 @@
+{
+  "loaded_body_ids": [
+    "firstmate-coding-guidelines",
+    "stuck-crewmate-recovery",
+    "diagnostic-reasoning",
+    "harness-adapters",
+    "captain-hold-lifecycle"
+  ],
+  "loaded_resources": [
+    "harness-adapters/references/common/control-and-recovery.md"
+  ],
+  "selection_observations": {
+    "advice_source": "advice.txt identifies live jev-1.13.0 opening-instruction recheck output.",
+    "accepted_optional_suggestions": [
+      "stuck-crewmate-recovery",
+      "diagnostic-reasoning",
+      "harness-adapters"
+    ],
+    "rejected_optional_suggestions": [],
+    "mandatory_preservation": "All three optional suggestions independently meet mandatory triggers: failed steer/stuck worker, diagnostic report, and harness trust/recovery. firstmate-coding-guidelines was explicitly required. Added captain-hold-lifecycle from the full index for investigation completion boundaries.",
+    "usefulness": "Useful and relevant: advice surfaced all three directly applicable bodies and preserved the named skill. It did not supply the investigation-completion trigger; full-index judgment supplied that. No context-savings claim.",
+    "unloaded_harness_reference_reason": "The synthetic task does not identify the affected crewmate's recorded harness. The fact that this experiment runs in omp does not establish that target's harness. Select exactly its recorded harness reference after authorized evidence establishes it; no harness-specific keys or trust recipe are recommended here."
+  },
+  "triage_plan": [
+    {
+      "step": 1,
+      "recommendation": "Treat the reported repeated trust failure and failed steer as observations, not proof of a dead agent. Record expected behavior (worker processes its brief), exact rendered prompt/error, attempted steer and acknowledgement, timing, repeatability, task identity, and last confirmed progress from supplied or subsequently authorized evidence. No live reproduction is authorized in this slice."
+    },
+    {
+      "step": 2,
+      "recommendation": "Request a narrowly scoped, sanitized evidence packet from the owning operator: recorded worker kind, harness, backend and endpoint identity; existing brief; timestamped pane/transcript excerpts surrounding launch, trust prompt, steer and subsequent activity; delivery/acknowledgement outcomes; and unhandled durable steering-message status. Inspect these only under separate permission: current assignment prohibits operator data/config reads and endpoint/process actions. Do not sweep other homes or infer ownership from matching labels."
+    },
+    {
+      "step": 3,
+      "recommendation": "Separate initiating trigger (launch/trust transition or attempted steer), possible masking conditions (readiness/queued input, wrong endpoint/home, harness-specific gate, or stale observation), and visible symptom (repeated prompt/no instruction processing). Compare with an existing proven successful launch on the same recorded harness and relevant adapter history. Find the earliest divergence rather than blaming the latest nearby change."
+    },
+    {
+      "step": 4,
+      "recommendation": "Once the recorded harness is established, load its single reference via the harness-adapters routing matrix together with the already-read control-and-recovery resource. Compare the captured prompt with that reference's documented trust gate and submission postcondition. Delivery success alone cannot establish trust completion: require evidence that the target actually began processing its instructions. Do not guess a key, accept trust, change trust stores, or send another steer in this assignment."
+    },
+    {
+      "step": 5,
+      "recommendation": "Reconcile task work before proposing recovery: inspect authorized existing task/run evidence for active, parked, terminal, or already-landed work; reconcile recorded ownership and existing worktree, including preserved commits/uncommitted changes. Endpoint absence is only a presence signal. An active authoritative validation run must not be duplicated; landed work is not a recovery case. Unknown remote state is not proof of death."
+    },
+    {
+      "step": 6,
+      "recommendation": "Use existing evidence to seek disconfirmation: processing after the alleged failure falsifies a continuing trust blockade; an acknowledged steer with later progress weakens a lost-steer hypothesis; repeated identical prompts without processing supports a gate/readiness issue but does not prove its cause. The smallest future counterfactual should vary one established condition on the real user path under explicit authorization; do not execute it now."
+    },
+    {
+      "step": 7,
+      "recommendation": "Escalate immediately when harness identity is unknown/unverified, endpoint/worktree ownership conflicts, the existing work cannot be safely reconciled, or the proposed next action crosses this read-only authority. Report exact evidence, uncertainty, preserved progress and consequence. If later authorized, the recovery owner orders targeted inspection, brief-aligned correction, verified control-plane interruption/redirection, then same-task/same-worktree relaunch for genuine wedging. Never raw pane/key surgery, a fresh generic spawn, forced teardown, or shared-daemon restart. A second failed authorized relaunch is the documented failure-escalation threshold; no relaunch has occurred here."
+    }
+  ],
+  "completion_boundaries": "This deliverable completes a synthetic triage plan, not the worker's diagnosis or recovery. No concrete captain choice was discovered from real worker evidence, so none is fabricated. If later investigation exposes a genuine unresolved captain choice, the owning firstmate must preserve it through captain-hold-lifecycle under appropriate write authority; this slice cannot register or complete lifecycle records.",
+  "shared_repository_changes": "No source change is proposed without causal evidence and separate implementation authority. If a fix is later authorized, follow firstmate-coding-guidelines: patch the existing authoritative owner, inspect affected supported harness/backend integrations, avoid duplicate contracts, and use the faithful reproduction as regression evidence. Harness-dependent verdicts need real-harness evidence rather than fake output alone.",
+  "actions_performed": "Ordinary reads only: synthetic task, complete public index, live advice, five relevant skill bodies, and the common trust/recovery resource. No intentional writes, host search, operator data/config inspection, network call, lifecycle action, process operation, tests, builds, linters or formatters."
+}

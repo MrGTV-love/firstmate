@@ -1,0 +1,15 @@
+skill-advice:
+  status: suggested
+  reason: "optional relevance only"
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.20999999999999996
+  required[3]{id,path}:
+    "firstmate-coding-guidelines","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md"
+    "gate-public-home","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home/.agents/skills/gate-public-home/SKILL.md"
+    "harness-adapters","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md"
+  suggestions[1]{id,path,fit,uncertain,evidence}:
+    "stuck-crewmate-recovery","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md",0.92,true,"opening-instruction recheck"
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

@@ -1,0 +1,348 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Current-head Jev skill-picker live evidence</title><style>body{font:16px system-ui;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#17212b;background:#fafafa}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef1f5;padding:1rem;border-radius:6px;font-size:13px}section{border-top:1px solid #ccd3dc;margin-top:2rem}a{color:#075a9c}</style><h1>Jev skill-picker live evidence</h1><p>Exercised revision: <code>9d8a97571740d46986f00524f8734658907d1c38</code>. These are actual CLI outputs and genuine TypeSafe HTTP observations, not a simulated UI.</p><h2>Real in-run omp body selection</h2><pre>{
+  &quot;surface&quot;: &quot;real in-run omp task agents in the existing parent session; no standalone CLI launch or fleet stamp&quot;,
+  &quot;advice_generated_by&quot;: &quot;current-head bin/fm-skill-suggest.sh --brief ... --format brief using genuine jev-1.13.0&quot;,
+  &quot;task&quot;: &quot;Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes.&quot;,
+  &quot;advised_tool_read_body_ids&quot;: [
+    &quot;captain-hold-lifecycle&quot;,
+    &quot;diagnostic-reasoning&quot;,
+    &quot;firstmate-coding-guidelines&quot;,
+    &quot;harness-adapters&quot;,
+    &quot;stuck-crewmate-recovery&quot;
+  ],
+  &quot;baseline_tool_read_body_ids&quot;: [
+    &quot;captain-hold-lifecycle&quot;,
+    &quot;diagnostic-reasoning&quot;,
+    &quot;firstmate-coding-guidelines&quot;,
+    &quot;harness-adapters&quot;,
+    &quot;operational-home-layout&quot;,
+    &quot;stuck-crewmate-recovery&quot;
+  ],
+  &quot;advised_tool_read_paths&quot;: [
+    &quot;.gate-skill-live/task.txt&quot;,
+    &quot;.gate-skill-live/public-skill-index.json&quot;,
+    &quot;.gate-skill-live/public-skill-index.json&quot;,
+    &quot;.gate-skill-live/advice.txt&quot;,
+    &quot;.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;,
+    &quot;.agents/skills/stuck-crewmate-recovery/SKILL.md&quot;,
+    &quot;.agents/skills/diagnostic-reasoning/SKILL.md&quot;,
+    &quot;.agents/skills/harness-adapters/SKILL.md&quot;,
+    &quot;.agents/skills/harness-adapters/references/common/control-and-recovery.md&quot;,
+    &quot;.agents/skills/captain-hold-lifecycle/SKILL.md&quot;
+  ],
+  &quot;baseline_tool_read_paths&quot;: [
+    &quot;.gate-skill-live/task.txt&quot;,
+    &quot;.gate-skill-live/public-skill-index.json&quot;,
+    &quot;.gate-skill-live/public-skill-index.json&quot;,
+    &quot;.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;,
+    &quot;.agents/skills/diagnostic-reasoning/SKILL.md&quot;,
+    &quot;.agents/skills/stuck-crewmate-recovery/SKILL.md&quot;,
+    &quot;.agents/skills/harness-adapters/SKILL.md&quot;,
+    &quot;.agents/skills/harness-adapters/references/common/control-and-recovery.md&quot;,
+    &quot;.agents/skills/captain-hold-lifecycle/SKILL.md&quot;,
+    &quot;.agents/skills/operational-home-layout/SKILL.md&quot;
+  ],
+  &quot;authority_preservation&quot;: &quot;Explicit firstmate-coding-guidelines and all three task-triggered workflows read in both runs. Both independently added captain-hold-lifecycle, omitted by Jev.&quot;,
+  &quot;observed_difference&quot;: &quot;Advised run read five bodies, baseline six; baseline additionally judged operational-home-layout relevant.&quot;,
+  &quot;benefit_limit&quot;: &quot;This one synthetic pair does not establish fewer unnecessary loads, lower total context/tokens, or cost savings. Both retain the full index, and the relevant Jev suggestions also independently match required triggers.&quot;,
+  &quot;outcome&quot;: &quot;Both produced concrete read-only triage and escalation recommendations, including no trust approval, guessed harness commands, relaunch, operator-state reads, or lifecycle actions.&quot;
+}</pre><p><a href="advised-agent-tool-transcript.txt">Advised actual tool calls</a> · <a href="ordinary-agent-tool-transcript.txt">Baseline actual tool calls</a> · <a href="advised-agent-result.json">Advised recommendation</a> · <a href="ordinary-agent-result.json">Baseline recommendation</a></p><h2>Validation limits</h2><p>Portable public-interface regressions ran through <code>bin/fm-test-run.sh tests/fm-skill-suggest.test.sh tests/fm-dispatch-resolve.test.sh</code> and passed without gate skips. Fake transport results are not claimed as live Jev evidence. No linter, formatter, static analysis, full suite, standalone agent or fleet lifecycle was run.</p><p>Automatic fm-spawn worker launch was not driven: its standalone agent would require the authorized start-claim stamp outside this worktree. The provided helper hard-codes that external location and has no workspace-local override; the workspace boundary prohibits that write. Real in-run omp agents above exercise subsequent body selection without a standalone launch or stamp. No measured total context or cost benefit is established.</p><section id="genuine-jev-launch-triage"><h2>genuine-jev-launch-triage</h2><p>Product exit: 0; real curl calls: 2</p><pre>skill-advice:
+  status: suggested
+  reason: &quot;optional relevance only&quot;
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.12
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[3]{id,path,fit,uncertain,evidence}:
+    &quot;stuck-crewmate-recovery&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md&quot;,0.91,false,&quot;opening-instruction recheck&quot;
+    &quot;diagnostic-reasoning&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md&quot;,0.81,true,&quot;opening-instruction recheck&quot;
+    &quot;harness-adapters&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md&quot;,0.79,true,&quot;opening-instruction recheck&quot;
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.311,
+    &quot;request_bytes&quot;: 22233,
+    &quot;catalog_entries&quot;: 27,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  },
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.205,
+    &quot;request_bytes&quot;: 5355,
+    &quot;catalog_entries&quot;: 3,
+    &quot;bounded_excerpt_characters&quot;: [
+      700,
+      700,
+      700
+    ],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="genuine-jev-launch-triage.http.jsonl">Full permitted request/response record</a></section><section id="missing-key-required"><h2>missing-key-required</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: off
+  reason: &quot;TypeSafe key unavailable&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+    &quot;harness-adapters&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="genuine-jev-no-fit"><h2>genuine-jev-no-fit</h2><p>Product exit: 0; real curl calls: 1</p><pre>skill-advice:
+  status: none
+  reason: &quot;no optional fit; ordinary selection remains available&quot;
+  uncertain: false
+  source: live
+  model: jev-1.13.0
+  stages: 1
+  no_fit: 0.95
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.253,
+    &quot;request_bytes&quot;: 22092,
+    &quot;catalog_entries&quot;: 27,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="genuine-jev-no-fit.http.jsonl">Full permitted request/response record</a></section><section id="split-home-private-name"><h2>split-home-private-name</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: off
+  reason: &quot;task names a private local skill; use ordinary selection&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[3]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+    &quot;gate-private&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home/.agents/skills/gate-private/SKILL.md&quot;
+    &quot;harness-adapters&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="split-home-malformed-identity"><h2>split-home-malformed-identity</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: fallback
+  reason: &quot;unsupported skill metadata&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[3]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+    &quot;gate-private&quot;,null
+    &quot;harness-adapters&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="split-home-equivalent-public"><h2>split-home-equivalent-public</h2><p>Product exit: 0; real curl calls: 2</p><pre>skill-advice:
+  status: suggested
+  reason: &quot;optional relevance only&quot;
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.20999999999999996
+  required[3]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+    &quot;gate-public-home&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home/.agents/skills/gate-public-home/SKILL.md&quot;
+    &quot;harness-adapters&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md&quot;
+  suggestions[1]{id,path,fit,uncertain,evidence}:
+    &quot;stuck-crewmate-recovery&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md&quot;,0.92,true,&quot;opening-instruction recheck&quot;
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.427,
+    &quot;request_bytes&quot;: 21245,
+    &quot;catalog_entries&quot;: 26,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  },
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.31,
+    &quot;request_bytes&quot;: 4919,
+    &quot;catalog_entries&quot;: 3,
+    &quot;bounded_excerpt_characters&quot;: [
+      700,
+      700,
+      700
+    ],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="split-home-equivalent-public.http.jsonl">Full permitted request/response record</a></section><section id="genuine-jev-brief-overlay"><h2>genuine-jev-brief-overlay</h2><p>Product exit: 0; real curl calls: 2</p><pre>
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: firstmate-coding-guidelines - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md.
+Optional suggestion: stuck-crewmate-recovery - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md; fit=0.91, uncertain=false, evidence=opening-instruction recheck.
+Optional suggestion: diagnostic-reasoning - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md; fit=0.83, uncertain=true, evidence=opening-instruction recheck.
+Optional suggestion: harness-adapters - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md; fit=0.76, uncertain=true, evidence=opening-instruction recheck.
+Advice source: live; model: jev-1.13.0.
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.23,
+    &quot;request_bytes&quot;: 22237,
+    &quot;catalog_entries&quot;: 27,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  },
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.223,
+    &quot;request_bytes&quot;: 5359,
+    &quot;catalog_entries&quot;: 3,
+    &quot;bounded_excerpt_characters&quot;: [
+      700,
+      700,
+      700
+    ],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="genuine-jev-brief-overlay.http.jsonl">Full permitted request/response record</a></section><section id="denied-summary"><h2>denied-summary</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: off
+  reason: &quot;text withheld by dispatch-never-send policy&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="denied-recheck-excerpt"><h2>denied-recheck-excerpt</h2><p>Product exit: 0; real curl calls: 1</p><pre>skill-advice:
+  status: off
+  reason: &quot;text withheld by dispatch-never-send policy&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.289,
+    &quot;request_bytes&quot;: 22233,
+    &quot;catalog_entries&quot;: 27,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="denied-recheck-excerpt.http.jsonl">Full permitted request/response record</a></section><section id="real-curl-deadline"><h2>real-curl-deadline</h2><p>Product exit: 0; real curl calls: 1</p><pre>skill-advice:
+  status: fallback
+  reason: &quot;TypeSafe transport or HTTP failure&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;000&quot;,
+    &quot;curl_exit&quot;: 28,
+    &quot;elapsed_seconds&quot;: 5.097,
+    &quot;request_bytes&quot;: 22233,
+    &quot;catalog_entries&quot;: 27,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: null,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="real-curl-deadline.http.jsonl">Full permitted request/response record</a></section><section id="utf8-wire-budget"><h2>utf8-wire-budget</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: fallback
+  reason: &quot;request exceeds 96 KiB&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/wire-budget-catalog/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="oversized-task-preserves-required"><h2>oversized-task-preserves-required</h2><p>Product exit: 0; real curl calls: 0</p><pre>skill-advice:
+  status: fallback
+  reason: &quot;task exceeds 4 KiB; supply minimal permitted text&quot;
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre></section><section id="genuine-jev-complete-paragraphs"><h2>genuine-jev-complete-paragraphs</h2><p>Product exit: 0; real curl calls: 2</p><pre>skill-advice:
+  status: suggested
+  reason: &quot;optional relevance only&quot;
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.6699999999999999
+  required[1]{id,path}:
+    &quot;firstmate-coding-guidelines&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/firstmate-coding-guidelines/SKILL.md&quot;
+  suggestions[1]{id,path,fit,uncertain,evidence}:
+    &quot;paragraph-guidance&quot;,&quot;/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/paragraph-guidance/SKILL.md&quot;,0.95,true,&quot;opening-instruction recheck&quot;
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+</pre><h3>Real HTTP observations</h3><pre>[
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.249,
+    &quot;request_bytes&quot;: 960,
+    &quot;catalog_entries&quot;: 1,
+    &quot;bounded_excerpt_characters&quot;: [],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  },
+  {
+    &quot;http_status&quot;: &quot;200&quot;,
+    &quot;curl_exit&quot;: 0,
+    &quot;elapsed_seconds&quot;: 0.33,
+    &quot;request_bytes&quot;: 1062,
+    &quot;catalog_entries&quot;: 1,
+    &quot;bounded_excerpt_characters&quot;: [
+      77
+    ],
+    &quot;model&quot;: &quot;jev-1.13.0&quot;,
+    &quot;key_absent_from_curl_environment&quot;: true
+  }
+]</pre><a href="genuine-jev-complete-paragraphs.http.jsonl">Full permitted request/response record</a></section><section id="removed-no-cache-option"><h2>removed-no-cache-option</h2><p>Product exit: 2; real curl calls: 0</p><pre>error: unknown argument --no-cache
+help: Run bin/fm-skill-suggest.sh --help
+</pre></section></html>

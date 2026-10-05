@@ -1,0 +1,48 @@
+{
+  "surface": "real in-run omp task agents in the existing parent session; no standalone CLI launch or fleet stamp",
+  "advice_generated_by": "current-head bin/fm-skill-suggest.sh --brief ... --format brief using genuine jev-1.13.0",
+  "task": "Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes.",
+  "advised_tool_read_body_ids": [
+    "captain-hold-lifecycle",
+    "diagnostic-reasoning",
+    "firstmate-coding-guidelines",
+    "harness-adapters",
+    "stuck-crewmate-recovery"
+  ],
+  "baseline_tool_read_body_ids": [
+    "captain-hold-lifecycle",
+    "diagnostic-reasoning",
+    "firstmate-coding-guidelines",
+    "harness-adapters",
+    "operational-home-layout",
+    "stuck-crewmate-recovery"
+  ],
+  "advised_tool_read_paths": [
+    ".gate-skill-live/task.txt",
+    ".gate-skill-live/public-skill-index.json",
+    ".gate-skill-live/public-skill-index.json",
+    ".gate-skill-live/advice.txt",
+    ".agents/skills/firstmate-coding-guidelines/SKILL.md",
+    ".agents/skills/stuck-crewmate-recovery/SKILL.md",
+    ".agents/skills/diagnostic-reasoning/SKILL.md",
+    ".agents/skills/harness-adapters/SKILL.md",
+    ".agents/skills/harness-adapters/references/common/control-and-recovery.md",
+    ".agents/skills/captain-hold-lifecycle/SKILL.md"
+  ],
+  "baseline_tool_read_paths": [
+    ".gate-skill-live/task.txt",
+    ".gate-skill-live/public-skill-index.json",
+    ".gate-skill-live/public-skill-index.json",
+    ".agents/skills/firstmate-coding-guidelines/SKILL.md",
+    ".agents/skills/diagnostic-reasoning/SKILL.md",
+    ".agents/skills/stuck-crewmate-recovery/SKILL.md",
+    ".agents/skills/harness-adapters/SKILL.md",
+    ".agents/skills/harness-adapters/references/common/control-and-recovery.md",
+    ".agents/skills/captain-hold-lifecycle/SKILL.md",
+    ".agents/skills/operational-home-layout/SKILL.md"
+  ],
+  "authority_preservation": "Explicit firstmate-coding-guidelines and all three task-triggered workflows read in both runs. Both independently added captain-hold-lifecycle, omitted by Jev.",
+  "observed_difference": "Advised run read five bodies, baseline six; baseline additionally judged operational-home-layout relevant.",
+  "benefit_limit": "This one synthetic pair does not establish fewer unnecessary loads, lower total context/tokens, or cost savings. Both retain the full index, and the relevant Jev suggestions also independently match required triggers.",
+  "outcome": "Both produced concrete read-only triage and escalation recommendations, including no trust approval, guessed harness commands, relaunch, operator-state reads, or lifecycle actions."
+}

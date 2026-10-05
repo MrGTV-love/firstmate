@@ -1,0 +1,56 @@
+{
+  "mode": "No-advice baseline; synthetic read-only triage recommendation, not a diagnosis of an inspected live worker.",
+  "loaded_body_ids": [
+    "firstmate-coding-guidelines",
+    "diagnostic-reasoning",
+    "stuck-crewmate-recovery",
+    "harness-adapters",
+    "captain-hold-lifecycle",
+    "operational-home-layout"
+  ],
+  "loaded_resources": [
+    "harness-adapters/references/common/control-and-recovery.md"
+  ],
+  "selection_reasons": {
+    "firstmate-coding-guidelines": "Explicit caller-required skill and proposed shared-repository change policy.",
+    "diagnostic-reasoning": "Reported repeatable failure requires causal separation and disconfirming evidence.",
+    "stuck-crewmate-recovery": "Repeated obstacle and failed steer directly trigger recovery playbook.",
+    "harness-adapters": "Trust-prompt/recovery recommendations require adapter routing and safety boundaries.",
+    "captain-hold-lifecycle": "Investigation completion and possible captain-owned escalation choices.",
+    "operational-home-layout": "Correctly locating and interpreting proposed task metadata, brief, inbox, and status evidence."
+  },
+  "triage_plan": [
+    {
+      "step": 1,
+      "recommendation": "Establish expected behavior (worker passes the legitimate workspace trust gate and processes its brief), reported observation (repeated trust failure and failed steer), exact prompt text, attempt timestamps, and whether any subsequent instruction processing occurred. Treat this as reported behavior, not independently observed evidence. Do not reproduce by spawning or submitting input under this read-only assignment."
+    },
+    {
+      "step": 2,
+      "recommendation": "For a later authorized targeted inspection, identify the owning home and task, obtain its recorded kind, harness, backend, endpoint and worktree identity, and compare the original brief against the intended steer. These operational records are not read in this experiment. Do not infer the worker's harness from this experiment's omp runtime, model/provider, or window label. Unknown harness is an escalation boundary; once known, load exactly its harness reference before offering trust-specific instructions."
+    },
+    {
+      "step": 3,
+      "recommendation": "Inspect an authorized current pane snapshot and the task's durable steering inbox, including pending versus handled records, alongside timestamped task activity. Distinguish failed delivery, delivered-but-unacknowledged input, acknowledged instruction without processing, queued input behind a trust gate, and an actual post-trust loop. A successful send or trust-choice delivery is not evidence of success: require visible processing of instructions. Status append history and endpoint presence alone are not current work-state truth."
+    },
+    {
+      "step": 4,
+      "recommendation": "Reconcile recorded work before recommending recovery: inspect targeted authoritative crew/run state, branch/current-code match, validation activity, completion/landed evidence, recorded backend inventory and preserved worktree changes. An active authoritative validation run must not acquire a duplicate worker. An ended task is not a stuck-worker recovery case. Unreadable remote state is unknown, not dead; secondmate ownership routes to its separate recovery policy if that kind is discovered."
+    },
+    {
+      "step": 5,
+      "recommendation": "Separate initiating trigger (the launch/trust transition or steer event, still to establish), masking conditions (actual worktree location, harness version/readiness and trust-state differences, still hypotheses), and visible symptom (reported repeated prompt/failure and lack of progress). Compare existing failing evidence with a proven successful same-harness launch path and relevant adapter history to find the earliest meaningful divergence. Use existing recordings for read-only counterfactual comparison: if the gate is responsible, processing should begin after proven gate clearance. Processing before/after the alleged failure, a still-pending inbox message, a different actual directory, or an active matched run can disconfirm or narrow the leading explanation. Any new live counterfactual requires separate authorization."
+    },
+    {
+      "step": 6,
+      "recommendation": "Escalate immediately with exact contradictory evidence if ownership/worktree identity cannot be safely reconciled, the recorded harness is unknown/unverified, or handling the trust gate requires authority outside this assignment. Otherwise report the narrowest evidenced category and missing proof; do not turn a trust hypothesis into a code fix. Under future authorization, the recovery ladder is targeted inspection, brief-based correction, controlled interrupt plus redirect, then genuine-wedge relaunch preserving the same task/worktree; a second failed relaunch is the playbook's failure/escalation threshold. No stage is executed here."
+    },
+    {
+      "step": 7,
+      "recommendation": "Deliver expected/observed behavior, chronology, trust and steering evidence, authoritative run/ownership findings, hypotheses plus disconfirming evidence, preserved-work consequences and the next bounded decision. If an actual unresolved captain-owned choice is discovered, it must later be recorded through the owning home's captain-hold policy before operational investigation closure; this experiment cannot write that record. A hypothetical escalation option alone creates no held task. Any subsequently authorized shared-repository fix must update its existing authoritative owner, not duplicate contracts, and follow firstmate-coding-guidelines including supported-harness evidence requirements."
+    }
+  ],
+  "boundaries": "Only the synthetic task, full public trigger index, selected skill bodies and common reference were read. No advice or evidence directory was read; no operational configuration/data, host search, process/lifecycle action, credential handling, network call, source edit, or verification command was performed. No specific trust key/choice or lifecycle command is recommended for an unidentified worker harness.",
+  "rejected_optional_suggestions": [],
+  "optional_advice_assessment": "Jev advice was deliberately not accessed; usefulness cannot be assessed in this baseline. Index scanning did not justify bootstrap/session-start, dispatch/profile, secondmate, pipeline-validation, or named-harness bodies without corresponding incident evidence.",
+  "performance_claims": "None."
+}

@@ -1,0 +1,12 @@
+skill-advice:
+  status: off
+  reason: "text withheld by dispatch-never-send policy"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    "firstmate-coding-guidelines","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

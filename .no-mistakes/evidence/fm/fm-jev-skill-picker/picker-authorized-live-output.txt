@@ -1,0 +1,16 @@
+skill-advice:
+  status: suggested
+  reason: "optional relevance only"
+  uncertain: false
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.09999999999999998
+  required[2]{id,path}:
+    "diagnostic-reasoning","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md"
+    "harness-adapters","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md"
+  suggestions[3]{id,path,fit,uncertain,evidence}:
+    "stuck-crewmate-recovery","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md",0.9,false,"opening-instruction recheck"
+    "validation-supervision","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/validation-supervision/SKILL.md",0.87,false,"opening-instruction recheck"
+    "ask-user-authority","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/ask-user-authority/SKILL.md",0.89,false,"opening-instruction recheck"
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

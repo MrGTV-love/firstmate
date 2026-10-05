@@ -1,0 +1,11 @@
+
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: firstmate-coding-guidelines - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md.
+Optional suggestion: stuck-crewmate-recovery - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md; fit=0.91, uncertain=false, evidence=opening-instruction recheck.
+Optional suggestion: diagnostic-reasoning - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md; fit=0.83, uncertain=true, evidence=opening-instruction recheck.
+Optional suggestion: harness-adapters - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md; fit=0.76, uncertain=true, evidence=opening-instruction recheck.
+Advice source: live; model: jev-1.13.0.

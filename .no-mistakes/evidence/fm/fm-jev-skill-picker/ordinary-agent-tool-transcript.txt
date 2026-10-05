@@ -1,0 +1,56 @@
+[~/.omp/agent/sessions/-.no-mistakes-worktrees-32d18ed9638d-01M4588S3J3MYVFWSBF0PPBBGZ/2026-10-05T17-45-48-602Z_01a10d2b-fb3a-717f-b839-f783ba9a29d0/OrdinarySelection-2.jsonl#3760]
+1:# OrdinarySelection-2 (idle)
+2:
+3:## user
+4:
+5:Complete assignment thoroughly:
+6:
+7:# Target
+8:Perform the same synthetic read-only triage task without optional Jev advice as a baseline.
+9:# Change
+10:First read .gate-skill-live/task.txt and .gate-skill-live/public-skill-index.json. Do not read .gate-skill-live/advice.txt or the evidence directory. Preserve mandatory workflows and ordinary agent judgment. Select and read needed bodies via ordinary tools, then give the requested concrete triage recommendation. # Acceptance
+11:Real tool calls and result provide a comparable no-advice body-selection baseline; no code changes, lifecycle work, or claimed performance savings.
+12:
+13:## assistant
+14:
+15:→ read(.gate-skill-live/task.txt) ⇒ ok · 2 lines
+16:
+17:## assistant
+18:
+19:→ read(.gate-skill-live/public-skill-index.json) ⇒ ok · 33 lines
+20:
+21:## assistant
+22:
+23:→ read(.gate-skill-live/public-skill-index.json:raw) ⇒ ok · 142 lines
+24:
+25:## assistant
+26:
+27:→ read(.agents/skills/firstmate-coding-guidelines/SKILL.md:raw) ⇒ ok · 136 lines
+28:
+29:## assistant
+30:
+31:→ read(.agents/skills/diagnostic-reasoning/SKILL.md:raw) ⇒ ok · 54 lines
+32:
+33:## assistant
+34:
+35:→ read(.agents/skills/stuck-crewmate-recovery/SKILL.md:raw) ⇒ ok · 83 lines
+36:
+37:## assistant
+38:
+39:→ read(.agents/skills/harness-adapters/SKILL.md:raw) ⇒ ok · 103 lines
+40:
+41:## assistant
+42:
+43:→ read(.agents/skills/harness-adapters/references/common/control-and-recovery.md:raw) ⇒ ok · 47 lines
+44:
+45:## assistant
+46:
+47:→ read(.agents/skills/captain-hold-lifecycle/SKILL.md:raw) ⇒ ok · 69 lines
+48:
+49:## assistant
+50:
+51:→ read(.agents/skills/operational-home-layout/SKILL.md:raw) ⇒ ok · 124 lines
+52:
+53:## assistant
+54:
+55:→ yield({"data":{"mode":"No-advice baseline; synthetic read-only triage recommendation, not a diagnosis of an inspected live wo…) ⇒ ok · 1 line

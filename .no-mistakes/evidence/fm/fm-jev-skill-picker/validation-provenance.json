@@ -1,0 +1,11 @@
+{
+  "head": "9d8a97571740d46986f00524f8734658907d1c38",
+  "focused_regression_command": "env TMPDIR=<worktree>/.gate-skill-live/tmp bin/fm-test-run.sh tests/fm-skill-suggest.test.sh tests/fm-dispatch-resolve.test.sh",
+  "focused_regressions_exit": 0,
+  "focused_regressions_gate_skips": false,
+  "fleet_readiness": "--step refused for swap growth; waited and rechecked without a limit until PASS before tests",
+  "auth": "Approved fmx_env_get read in only each test process; no credential printed, written, copied, or placed on argv; real curl auth FD forwarded untouched.",
+  "transient_setup": "worktree-local disposable homes, independent Git-tracked public catalog copies, public synthetic paragraph/UTF-8 fixtures, and loopback CONNECT timeout fixture",
+  "worker_launch_limit": "Standalone launch requires fleet-start-check.sh --claim, which intentionally writes /Users/charlesabrooker/firstmate/state/fleet-last-start and an external lock; workspace boundary excludes those writes. No workspace-local stamp override; no tc on PATH. In-run omp task agents used instead.",
+  "visual_evidence": "No TUI layout was changed or driven. Rendered HTML presents actual end-user CLI advice and errors, backed by raw outputs and real tool-call transcripts."
+}

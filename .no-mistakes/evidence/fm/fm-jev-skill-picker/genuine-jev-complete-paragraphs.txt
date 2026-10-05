@@ -1,0 +1,13 @@
+skill-advice:
+  status: suggested
+  reason: "optional relevance only"
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.6699999999999999
+  required[1]{id,path}:
+    "firstmate-coding-guidelines","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/firstmate-coding-guidelines/SKILL.md"
+  suggestions[1]{id,path,fit,uncertain,evidence}:
+    "paragraph-guidance","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/paragraph-guidance/SKILL.md",0.95,true,"opening-instruction recheck"
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

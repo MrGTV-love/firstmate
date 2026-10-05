@@ -1,0 +1,157 @@
+SCENARIO: No opt-in preserves task-named and caller-required workflows
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: off
+  reason: "TypeSafe key unavailable"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.93s observed_proxy_contacts=0
+
+SCENARIO: Split-home private name with syntax whitespace stays local
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: off
+  reason: "task names a private local skill; use ordinary selection"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "acme-private","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/home/.agents/skills/acme-private/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.49s observed_proxy_contacts=0
+
+SCENARIO: Malformed private identity fails closed and retains other requirements
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required acme-private --required safety
+skill-advice:
+  status: fallback
+  reason: "unsupported skill metadata"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[3]{id,path}:
+    "acme-private",null
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.207s observed_proxy_contacts=0
+
+SCENARIO: Equivalent public split-home copies resolve without false privacy refusal
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: fallback
+  reason: "TypeSafe transport or HTTP failure"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.402s observed_proxy_contacts=1
+
+SCENARIO: Deny policy recognizes whitespace-normalized task content
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: off
+  reason: "text withheld by dispatch-never-send policy"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[1]{id,path}:
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.669s observed_proxy_contacts=0
+
+SCENARIO: Oversized task refuses rather than truncating named workflows
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: fallback
+  reason: "task exceeds 4 KiB; supply minimal permitted text"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=0.407s observed_proxy_contacts=0
+
+SCENARIO: Real curl timeout is bounded and restores ordinary selection
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: fallback
+  reason: "TypeSafe transport or HTTP failure"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=5.478s observed_proxy_contacts=1
+
+SCENARIO: Brief output is additive and preserves authority under missing opt-in
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety --format brief
+
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: alpha - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md.
+Required named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md.
+No optional suggestion (off: TypeSafe key unavailable); continue ordinary selection.
+
+exit=0 duration=0.365s observed_proxy_contacts=0
+
+SCENARIO: UTF-8 wire-byte ceiling stops an oversized public request
+$ bash bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/task.txt --required safety
+skill-advice:
+  status: fallback
+  reason: "request exceeds 96 KiB"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "alpha","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/alpha/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.nm-picker-live-z1rpgyfr/public/skills/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+
+exit=0 duration=1.966s observed_proxy_contacts=0

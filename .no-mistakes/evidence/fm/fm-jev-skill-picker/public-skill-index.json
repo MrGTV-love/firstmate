@@ -1,0 +1,142 @@
+[
+  {
+    "id": "afk",
+    "description": "Enter the away posture when the captain invokes /afk, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`, or any `state/.subsuper-*` marker is involved. It writes the durable away-posture record with the captain's away words verbatim as the whole mandate in the same turn as /afk, before any other work and without waiting for a further go, reads the words back in plain sentences after entry, announces hold-for-return only at entry, keeps the one supervision session running in the away posture (on Pi the supervision branch acts on the words by its own judgment and takes every safe actionable wake with main parked, as the supervision host does on a non-Pi home that opted into it; the daemon still delivers batched digests elsewhere for now), and on the first unmarked message renders the return brief from durable records before ordinary work resumes.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/afk/SKILL.md"
+  },
+  {
+    "id": "agent-skill-trigger-index",
+    "description": "Load only when auditing or maintaining the complete agent-only skill trigger index.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/agent-skill-trigger-index/SKILL.md"
+  },
+  {
+    "id": "ahoy",
+    "description": "Recap visible session events and guide the captain through visibly unanswered decisions when the captain explicitly invokes /ahoy, with a Bearings fallback when /ahoy is the session's first real captain message.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/ahoy/SKILL.md"
+  },
+  {
+    "id": "ask-user-authority",
+    "description": "Agent-only decision procedure for ask-user findings. Use before deciding any ask-user finding. This skill is the single owner of finding-decision policy: firstmate always applies judgment, decides findings that are unambiguous toward accepted intent, and escalates only genuinely ambiguous, expanding, or destructive ones. Finding authority is this skill's criteria, not the project's yolo posture.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/ask-user-authority/SKILL.md"
+  },
+  {
+    "id": "away-quiet-supervision",
+    "description": "Load whenever /afk or /quiet is invoked, an away or quiet record exists, or a marked away-supervisor message arrives.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/away-quiet-supervision/SKILL.md"
+  },
+  {
+    "id": "bearings",
+    "description": "Generate a \"pick up where I left off\" fleet digest from firstmate's live fleet state. Use when the captain invokes /bearings or asks for a bearings report, morning brief, status report, catch-up, \"where did I leave off\", or \"what's in the works\". Plain /bearings is chat-only by default, /bearings file explicitly writes the dated data/status-report-<YYYY-MM-DD>.md artifact, and /bearings lavish additionally builds and arms the interactive fleet board; live PR enrichment remains opt-in and composes with the other modes. Also use on a contributions check wake or when filing work linked to an upstream issue. Also load this skill's board-wake handling when a procevent lavish wake's source id matches the canonical source id of the stable bearings board path.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/bearings/SKILL.md"
+  },
+  {
+    "id": "bootstrap-diagnostics",
+    "description": "Agent-only handling playbook for session-start bootstrap diagnostics. Use whenever the session-start digest's bootstrap or network-checks section prints an actionable diagnostic line - MISSING, MISSING_MANUAL, PRESENTATION_UNAVAILABLE, BACKEND_INVALID, NEEDS_GH_AUTH, TANGLE, STARTUP_MEMORY_BUDGET, CREW_DISPATCH invalid, FLEET_SYNC, NETWORK_CHECKS, HOME_SUMMARY, BACKLOG_RECONCILE, SECONDMATE_SYNC, SECONDMATE_LIVENESS, SECONDMATE_HANDOFF, NUDGE_SECONDMATES, or FMX - or reports that an interrupted backlog cleanup may have left an endpoint or local copy, or when a standalone bin/fm-bootstrap.sh or bin/fm-startup-network.sh run prints one of those lines. A silent bootstrap section, or any other BOOTSTRAP_INFO fact, means no skill load.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/bootstrap-diagnostics/SKILL.md"
+  },
+  {
+    "id": "captain-hold-lifecycle",
+    "description": "Agent-only policy for completing investigations and visual reviews without losing unresolved captain calls, and for closing what the captain owns with his actual words. Load before treating an investigation, scout report, structured review, or Lavish review as complete, before ending a visual review that exposed a captain decision, when recording or routing the captain's answer, and on any RECORD DIVERGENCE line the wake drain prints.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/captain-hold-lifecycle/SKILL.md"
+  },
+  {
+    "id": "decision-hold-lifecycle",
+    "description": "Renamed pointer kept for in-flight briefs: the decisions concept collapsed into \"a task held for the captain\". Load captain-hold-lifecycle instead; this stub only redirects and will be removed one release after the collapse.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/decision-hold-lifecycle/SKILL.md"
+  },
+  {
+    "id": "diagnostic-reasoning",
+    "description": "Agent-only procedure for diagnosing reported bugs. Use before scoping a reported bug and before acting on a diagnostic report. Owns end-user-aligned reproduction, causal separation, divergent-path and history inspection, counterfactual testing, and disconfirming evidence.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md"
+  },
+  {
+    "id": "firstmate-codexapp",
+    "description": "Agent-only playbook for coordinating visible Codex Desktop threads alongside Firstmate without pretending they are a selectable shell backend. Use before creating, reading, steering, archiving, debugging, or reviewing a Codex App visible thread for Firstmate work, and before responding to requests to make Codex App native to Firstmate.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-codexapp/SKILL.md"
+  },
+  {
+    "id": "firstmate-coding-guidelines",
+    "description": "Agent-only reference for changing firstmate's shared, tracked material per AGENTS.md section 1. Use before editing any of that material, whether working as firstmate directly or as a crewmate briefed on a firstmate-repo task. Covers the knowledge-placement decision tree, the one-owner rule for contracts, the inline-stub pattern for content moved into a skill, AGENTS.md size discipline, trigger hygiene for new skills, and repo style rules (one sentence per line, plain dash, no agent co-author, shellcheck-clean bin scripts, colocated tests, and maintainer-verification evidence).",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md"
+  },
+  {
+    "id": "firstmate-orca",
+    "description": "Agent-only operator checklist for Firstmate's Orca runtime backend. Use when switching to Orca, spawning or supervising Orca-backed work, smoke-testing Orca backend behavior, debugging Orca task state, or reconciling Orca-backed task metadata.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-orca/SKILL.md"
+  },
+  {
+    "id": "fmx-respond",
+    "description": "Agent-only playbook for handling Relay mentions and follow-ups. Use on an \"x-mention <request_id>\" check wake to read the stashed mention, classify it, act autonomously on eligible requests, reply or dismiss, and link spawned work. Also use on an \"x-mode-error ...\" check wake to report the Relay configuration blocker instead of answering a mention. Also use on milestone and terminal wakes for a Relay-linked task before posting completion follow-ups, using typed promised-final reconciliation when registered and --final otherwise. Also use on a \"public-followup ...\" check wake, and whenever a promised final public reply must be created, reconciled, or delivered. Loaded only when Relay is enabled.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/fmx-respond/SKILL.md"
+  },
+  {
+    "id": "harness-adapters",
+    "description": "Agent-only reference for firstmate harness operations. Use before spawning or recovering a crewmate or secondmate, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter. Contains verified facts for claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, gemini, muse, rovo, omp, agy, and devin.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md"
+  },
+  {
+    "id": "operational-home-layout",
+    "description": "Load when locating, interpreting, or changing Firstmate home, config, data, state, project, or generated runtime paths.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/operational-home-layout/SKILL.md"
+  },
+  {
+    "id": "process-event-sources",
+    "description": "Agent-only procedure for registered process-to-event sources and their wakes. Use before arming a long-polling source firstmate owns, before registering a deterministic condition->action watch, on any `procevent <adapter> <source-id> <sequence>` check wake, and on any `process-event source stranded` or `process-event source failed to start` check wake. Owns the arming commands, the condition->action eligibility boundary, the durable result read, which wakes must be routed to their adapter instead of acknowledged generically, the handled acknowledgement contract, the one-owner rule, the precise durability boundary, and the Lavish adapter's loss limitation.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/process-event-sources/SKILL.md"
+  },
+  {
+    "id": "project-management",
+    "description": "Agent-only procedure for Firstmate project management. Use before adding, creating, removing, or initializing a project. Cloning or registering a project is add intake and uses the same trigger. Owns project add, create, clone, remove, initialization, registry, delivery-mode, autonomy, and outward-consent decisions.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/project-management/SKILL.md"
+  },
+  {
+    "id": "quiet",
+    "description": "Enter quiet supervision mode when the captain invokes /quiet or asks for quiet mode, quiet-while-present, or fewer routine wake turns while they stay in the session. Where Pi's supervision branch or an attended supervision host already keeps routine wakes off the conversation, it enters nothing and says so. Elsewhere it sets the same durable away/quiet-mode flag as /afk, in `quiet` mode, so the sub-supervisor daemon self-handles routine wakes and escalates captain-relevant events exactly as away mode does, but ordinary captain chat does NOT exit it - only an explicit `/quiet off` does.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/quiet/SKILL.md"
+  },
+  {
+    "id": "quota-array-dispatch",
+    "description": "Agent-only decision procedure for resolving a matched crew-dispatch profile array from quota-axi's default TOON, ranking by spendPriority after three orthogonal gates. Load when a dispatch rule or default resolves to more than one profile candidate.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/quota-array-dispatch/SKILL.md"
+  },
+  {
+    "id": "scout-completion",
+    "description": "Load when a scout reports completion, presents a visual artifact for iteration, or is being considered for promotion to implementation.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/scout-completion/SKILL.md"
+  },
+  {
+    "id": "secondmate-provisioning",
+    "description": "Agent-only reference for persistent secondmate setup and retirement. Use when creating, seeding, validating, launching, recovering, handing backlog to, pushing inherited local material into, or retiring a secondmate home, or when editing data/secondmates.md. Covers local leases, whole-home remote routes, transactional seeding, record intake for an existing or inherited domain, project clone restrictions, secondmate harness pins, inherited local-material push, idle charter, handoff helper, and teardown safety.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/secondmate-provisioning/SKILL.md"
+  },
+  {
+    "id": "session-start-recovery",
+    "description": "Load when the session-start digest reports unfinished checks, actionable diagnostics, recovery inputs, or output requiring interpretation.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/session-start-recovery/SKILL.md"
+  },
+  {
+    "id": "ship-landing",
+    "description": "Load when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/ship-landing/SKILL.md"
+  },
+  {
+    "id": "stow",
+    "description": "Sweep the current session for uncaptured durable knowledge, file it to disk, persist the open work records this session knows are unfiled or now wrong, and curate the home's tiered, decaying startup memory before a context reset. Use when the captain invokes /stow (e.g. \"/stow\", \"stow what you've learned\"), before a session reset or context compaction, or periodically to keep operational memory current.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stow/SKILL.md"
+  },
+  {
+    "id": "stuck-crewmate-recovery",
+    "description": "Agent-only playbook for stuck or missing ordinary Firstmate direct reports. Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer. Also use on the inverse case: a live crewmate reporting the no-mistakes pipeline dead, unreachable, or timed out. Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md"
+  },
+  {
+    "id": "updatefirstmate",
+    "description": "Self-update a running firstmate and its secondmates to the latest from origin. Use when the captain invokes /updatefirstmate (e.g. \"/updatefirstmate\", \"update firstmate\", \"pull the latest firstmate\"). Updates this firstmate repo's default branch and every local or remote secondmate through its guarded convergence path (never forced, never disruptive), then re-reads AGENTS.md and restarts every live second mate through the persist-gated restart, with a fallback re-read nudge only where a restart cannot be proven.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/updatefirstmate/SKILL.md"
+  },
+  {
+    "id": "validation-supervision",
+    "description": "Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, and before deciding or answering any ask-user finding.",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/validation-supervision/SKILL.md"
+  }
+]

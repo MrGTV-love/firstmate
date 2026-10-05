@@ -1,0 +1,8 @@
+{
+  "fixture": "loopback proxy accepts CONNECT and deliberately never establishes a tunnel; no API response is fabricated",
+  "observed_connect": [
+    "CONNECT api.typesafe.ai:443 HTTP/1.1"
+  ],
+  "transport_exit": 28,
+  "transport_elapsed_seconds": 5.097
+}

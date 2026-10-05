@@ -1,0 +1,247 @@
+[
+  {
+    "name": "genuine-jev-launch-triage",
+    "exit": 0,
+    "elapsed_seconds": 4.42,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/genuine-jev-launch-triage.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: true\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.12\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"stuck-crewmate-recovery\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md\",0.91,false,\"opening-instruction recheck\"\n    \"diagnostic-reasoning\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md\",0.81,true,\"opening-instruction recheck\"\n    \"harness-adapters\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md\",0.79,true,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 2,
+    "input": "Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes."
+  },
+  {
+    "name": "missing-key-required",
+    "exit": 0,
+    "elapsed_seconds": 3.456,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/missing-key-required.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: off\n  reason: \"TypeSafe key unavailable\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n    \"harness-adapters\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "Use harness-adapters to plan a read-only investigation."
+  },
+  {
+    "name": "genuine-jev-no-fit",
+    "exit": 0,
+    "elapsed_seconds": 3.279,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/genuine-jev-no-fit.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: none\n  reason: \"no optional fit; ordinary selection remains available\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 1\n  no_fit: 0.95\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 1,
+    "input": "Compute 17 plus 25 and answer the number only. No project management, repository changes, agent operations, troubleshooting, workflows or external actions are involved."
+  },
+  {
+    "name": "split-home-private-name",
+    "exit": 0,
+    "elapsed_seconds": 2.161,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home-private-name.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n    \"gate-private\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home/.agents/skills/gate-private/SKILL.md\"\n    \"harness-adapters\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "Use gate-private and harness-adapters for read-only launch triage."
+  },
+  {
+    "name": "split-home-malformed-identity",
+    "exit": 0,
+    "elapsed_seconds": 1.956,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home-malformed-identity.task.txt",
+      "--required",
+      "gate-private",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n    \"gate-private\",null\n    \"harness-adapters\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "Use gate-private and harness-adapters for read-only launch triage."
+  },
+  {
+    "name": "split-home-equivalent-public",
+    "exit": 0,
+    "elapsed_seconds": 6.484,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home-equivalent-public.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: true\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.20999999999999996\n  required[3]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n    \"gate-public-home\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/split-home/.agents/skills/gate-public-home/SKILL.md\"\n    \"harness-adapters\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md\"\n  suggestions[1]{id,path,fit,uncertain,evidence}:\n    \"stuck-crewmate-recovery\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md\",0.92,true,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 2,
+    "input": "Use harness-adapters and gate-public-home to plan read-only triage for a stuck crewmate after a failed steer. Do not execute lifecycle changes."
+  },
+  {
+    "name": "genuine-jev-brief-overlay",
+    "exit": 0,
+    "elapsed_seconds": 3.306,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--brief",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/genuine-jev-brief-overlay.brief.md",
+      "--required",
+      "firstmate-coding-guidelines",
+      "--format",
+      "brief"
+    ],
+    "output": "\n# Skill selection advice\n\nApply all existing mandatory explicit/named and safety triggers first, even if absent below.\nThis additive advice does not replace the skill index, authorize actions, or suppress any workflow.\nRead relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.\nRequired named skill: firstmate-coding-guidelines - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md.\nOptional suggestion: stuck-crewmate-recovery - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/stuck-crewmate-recovery/SKILL.md; fit=0.91, uncertain=false, evidence=opening-instruction recheck.\nOptional suggestion: diagnostic-reasoning - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/diagnostic-reasoning/SKILL.md; fit=0.83, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: harness-adapters - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/harness-adapters/SKILL.md; fit=0.76, uncertain=true, evidence=opening-instruction recheck.\nAdvice source: live; model: jev-1.13.0.\n",
+    "stderr": "",
+    "real_http_calls": 2,
+    "input": "# Captain intent\nCAPTAIN-SECTION-MUST-NOT-SEND\n\n# Task\nWHOLE-BRIEF-MUST-NOT-SEND\n\n# Skill selection input\nPlan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes.\n\n# Done when\nUNRELATED-DONE-MUST-NOT-SEND\n"
+  },
+  {
+    "name": "denied-summary",
+    "exit": 0,
+    "elapsed_seconds": 10.064,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/denied-summary.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "Read-only launch triage for withheld-synthetic-summary."
+  },
+  {
+    "name": "denied-recheck-excerpt",
+    "exit": 0,
+    "elapsed_seconds": 5.617,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/denied-recheck-excerpt.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 1,
+    "input": "Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes."
+  },
+  {
+    "name": "real-curl-deadline",
+    "exit": 0,
+    "elapsed_seconds": 7.858,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/real-curl-deadline.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: fallback\n  reason: \"TypeSafe transport or HTTP failure\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 1,
+    "input": "Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes."
+  },
+  {
+    "name": "utf8-wire-budget",
+    "exit": 0,
+    "elapsed_seconds": 0.978,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/utf8-wire-budget.task.txt",
+      "--catalog",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/wire-budget-catalog",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: fallback\n  reason: \"request exceeds 96 KiB\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/wire-budget-catalog/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "A synthetic read-only planning task."
+  },
+  {
+    "name": "oversized-task-preserves-required",
+    "exit": 0,
+    "elapsed_seconds": 5.258,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/oversized-task-preserves-required.task.txt",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: fallback\n  reason: \"task exceeds 4 KiB; supply minimal permitted text\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.agents/skills/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界\n"
+  },
+  {
+    "name": "genuine-jev-complete-paragraphs",
+    "exit": 0,
+    "elapsed_seconds": 2.26,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/genuine-jev-complete-paragraphs.task.txt",
+      "--catalog",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog",
+      "--required",
+      "firstmate-coding-guidelines"
+    ],
+    "output": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: true\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.6699999999999999\n  required[1]{id,path}:\n    \"firstmate-coding-guidelines\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/firstmate-coding-guidelines/SKILL.md\"\n  suggestions[1]{id,path,fit,uncertain,evidence}:\n    \"paragraph-guidance\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/paragraph-catalog/paragraph-guidance/SKILL.md\",0.95,true,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "real_http_calls": 2,
+    "input": "Prepare a read-only startup-triage plan that includes workflow boundaries and escalation evidence."
+  },
+  {
+    "name": "removed-no-cache-option",
+    "exit": 2,
+    "elapsed_seconds": 0.12,
+    "argv": [
+      "bash",
+      "bin/fm-skill-suggest.sh",
+      "--task-file",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4588S3J3MYVFWSBF0PPBBGZ/.gate-skill-live/removed-no-cache-option.task.txt",
+      "--no-cache"
+    ],
+    "output": "error: unknown argument --no-cache\nhelp: Run bin/fm-skill-suggest.sh --help\n",
+    "stderr": "",
+    "real_http_calls": 0,
+    "input": "Plan a read-only diagnosis of a crewmate that repeatedly fails at a harness trust prompt and appears stuck after a failed steer. Explain what evidence to inspect and when to escalate. No lifecycle or system changes are authorized. Follow firstmate-coding-guidelines for any proposed shared repository changes."
+  }
+]
