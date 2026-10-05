@@ -29,6 +29,21 @@ The shared launch prefix applies before harness execution on each local backend;
 The focused three-file run completed with zero failures and zero gate skips; Claude credential forwarding and ship/scout permissions were checked through model-free executable environment and argv probes.
 [`configuration.md`](../configuration.md#commit-attribution) owns the operator-facing posture and `fm-spawn.sh --help` owns reconciliation mechanics.
 
+### Launch-prefix-independent CI probes
+
+Verified on 2026-10-05 on macOS arm64:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh tests/fm-trace-context-spawn.test.sh tests/fm-claude-trust.test.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+All four suites passed with zero gate skips.
+Claude brief delivery and credential-store selection are observed by model-free workers executing the complete staged command, without stripping shell prefixes.
+Trace probes observe enabled and reused carriers, disabled-relaunch clearing, cleanup after delivery or metadata-publication failure, and no worker execution after unsafe delivery.
+The private Bash/ksh tmux fixture also proves the allowlisted strip-to-keep transition clears the persistent pane's obsolete task override while preserving unrelated Git entries and operator routing.
+The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session case; this run is focused local evidence, not a rerun of the entire portable CI shard.
+
+
 ## Harness detection precedence
 
 Firstmate's own harness comes from two kinds of evidence, and `bin/fm-harness.sh` owns how they combine: an environment marker names its harness, and the nearest harness process in the parent chain proves who owns the process tree.

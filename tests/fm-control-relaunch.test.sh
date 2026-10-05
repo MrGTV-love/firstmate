@@ -117,6 +117,7 @@ case "${1:-}" in
           [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+          printf '%s\n' "$payload" > "$D/launch"
           cat "$D/becomes" > "$D/command"
           [ -z "${FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
           ;;
@@ -131,6 +132,7 @@ case "${1:-}" in
           fi
           ;;
         'export TRACEPARENT='*)
+          printf '%s\n' "$payload" > "$D/trace-env"
           [ -z "${FM_FAKE_TRACE_EXPORTED:-}" ] || : > "$FM_FAKE_TRACE_EXPORTED"
           ;;
       esac
@@ -306,6 +308,32 @@ run_spawn() {  # <case-dir> <args...>
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     "$SPAWN" "$@" 2>&1
+}
+
+# Execute the complete staged replacement command with a model-free worker.
+# A stale pane carrier must be replaced when tracing is on and unset when off.
+assert_relaunch_worker_trace() {  # <case-dir> <expected-carrier>
+  local dir=$1 expected=$2 out rc launch
+  mkdir -p "$dir/trace-probe-bin" "$dir/user-home" "$dir/trace-probe-config"
+  cat > "$dir/trace-probe-bin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${TRACEPARENT-unset}" > "$FM_TRACE_PROBE"
+SH
+  chmod +x "$dir/trace-probe-bin/claude"
+  [ -s "$dir/fake/launch" ] || fail "relaunch did not stage a replacement command"
+  launch=$(cat "$dir/fake/launch")
+  # Enabled carriers arrive through the ordinary pre-launch pane channel.
+  [ ! -f "$dir/fake/trace-env" ] || launch="$(cat "$dir/fake/trace-env"); $launch"
+  out=$(fm_eval_launch "$launch" "$dir/wt" "$dir/trace-probe-bin" \
+    -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+    -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR="$dir/trace-probe-config" \
+    FM_TRACE_PROBE="$dir/trace-probe" \
+    TRACEPARENT=00-cccccccccccccccccccccccccccccccc-dddddddddddddddd-01); rc=$?
+  expect_code 0 "$rc" "staged relaunch should reach the fake worker"$'\n'"$out"
+  [ -f "$dir/trace-probe" ] || fail "staged relaunch did not execute the fake worker"
+  [ "$(cat "$dir/trace-probe")" = "$expected" ] \
+    || fail "replacement worker trace carrier did not match '$expected'"
 }
 
 meta_field() {  # <case-dir> <id> <key>
@@ -604,6 +632,7 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
   traceparent=$(meta_field "$dir" rl28 traceparent)
   fm_trace_context_valid "$traceparent" \
     || fail "concurrent metadata publication erased the replacement's trace carrier"
+  assert_relaunch_worker_trace "$dir" "$traceparent"
   pass "fm-control relaunch: delivery and concurrent task metadata publication serialize"
 }
 
@@ -620,10 +649,7 @@ test_disabled_relaunch_clears_prior_trace_context() {
   expect_code 0 "$rc" "disabled relaunch should succeed"$'\n'"$out"
   [ -z "$(meta_field "$dir" rl33 traceparent)" ] \
     || fail "disabled relaunch must remove the prior trace carrier from metadata"
-  grep -q '^unset TRACEPARENT; .*claude' "$dir/fake/literal" \
-    || fail "disabled relaunch must clear the pane carrier before replacement launch"
-  ! grep -q '^export TRACEPARENT=' "$dir/fake/literal" \
-    || fail "disabled relaunch must not export a replacement trace carrier"
+  assert_relaunch_worker_trace "$dir" unset
   pass "fm-control relaunch: disabling tracing clears metadata and pane context"
 }
 
