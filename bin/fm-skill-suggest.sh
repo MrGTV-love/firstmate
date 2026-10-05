@@ -148,6 +148,7 @@ RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{s
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 
 : > "$WORK/rows"
+: > "$WORK/public-paths"
 COUNT=0
 for file in "$CATALOG"/*/SKILL.md; do
   [ -f "$file" ] || continue
@@ -157,6 +158,9 @@ for file in "$CATALOG"/*/SKILL.md; do
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
   jq -eRsc --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
+  if [ ! -L "$file" ] && git --literal-pathspecs -C "$CATALOG" ls-files --error-unmatch -- "${file#"$CATALOG"/}" >/dev/null 2>&1; then
+    jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
+  fi
 done
 [ "$COUNT" -gt 0 ] || fallback fallback "empty catalog"
 jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"
