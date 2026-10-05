@@ -1,0 +1,260 @@
+OBSERVED OK: new disposable fixture root
+
+=== SCENARIO: Ship refuses dirty and unlanded work, then succeeds after real local-main landing ===
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home
+stderr (complete):
+exit=0
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+/tmp/fml.PllgW9
+stderr (complete):
+exit=0
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project add tracked.txt [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project commit -qm initial [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ treehouse get --lease --lease-holder task-landed --no-fetch --base main [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project]
+stdout:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project
+stderr (complete):
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project' to release it.
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project checkout -qb fm/task-landed [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project rev-parse --path-format=absolute --git-common-dir [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project/.git
+stderr (complete):
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project rev-parse --path-format=absolute --git-common-dir [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project/.git
+stderr (complete):
+exit=0
+OBSERVED OK: project and owned pool slot share real Git common directory
+$ tmux -L fm-lab new-session -d -s fm-lab-teardown -n control -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed 'sleep 600' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ tmux -L fm-lab new-window -d -t fm-lab-teardown: -n fm-task-landed -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed 'sleep 600' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ tmux -L fm-lab display-message -p -t fm-lab-teardown:control '#{socket_path},#{pid},0' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+/private/tmp/fml.PllgW9/tmux-501/fm-lab,53852,0
+stderr (complete):
+exit=0
+$ tasks-axi add task-landed 'Disposable landed' --kind ship --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+ok: added task-landed (ship) -> Queued
+task:
+  id: task-landed
+  title: Disposable landed
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-04
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start task-landed --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block task-landed --by <other> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md` to record a dependency
+stderr (complete):
+exit=0
+$ tasks-axi start task-landed --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+ok: start task-landed -> In flight
+help[1]:
+  - Run `tasks-axi done task-landed --pr <url> --file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md` when it ships
+stderr (complete):
+exit=0
+started real process pid=54715 cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/unrelated
+started real process pid=54727 cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project
+started real process pid=54740 cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/tasktmp
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/target-product/bin/fm-teardown.sh task-landed [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/target-product/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/target-product/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: local-only worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project has work not yet merged into main and not on any remote.
+uncommitted changes present
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+exit=1
+OBSERVED OK: product refuses dirty-work before destructive cleanup
+OBSERVED OK: refusal preserves record, claim, backlog and worktree bytes
+OBSERVED OK: refusal preserves worktree and tasktmp processes
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+fm-task-landed
+stderr (complete):
+exit=0
+OBSERVED OK: refusal preserves target endpoint
+OBSERVED OK: unrelated process alive
+OBSERVED OK: unrelated task metadata byte-identical
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+fm-task-landed
+stderr (complete):
+exit=0
+OBSERVED OK: unrelated private tmux endpoint present
+OBSERVED OK: no account-wide administrative reaper invocation
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project add tracked.txt [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project commit -qm 'task change' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/target-product/bin/fm-teardown.sh task-landed [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: local-only worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project has work not yet merged into main and not on any remote.
+commits not yet on main:
+e410ece task change
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+exit=1
+OBSERVED OK: product refuses unlanded-commit before destructive cleanup
+OBSERVED OK: refusal preserves record, claim, backlog and worktree bytes
+OBSERVED OK: refusal preserves worktree and tasktmp processes
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+fm-task-landed
+stderr (complete):
+exit=0
+OBSERVED OK: refusal preserves target endpoint
+OBSERVED OK: unrelated process alive
+OBSERVED OK: unrelated task metadata byte-identical
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+fm-task-landed
+stderr (complete):
+exit=0
+OBSERVED OK: unrelated private tmux endpoint present
+OBSERVED OK: no account-wide administrative reaper invocation
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project merge --ff-only fm/task-landed [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+Updating 7536353..e410ece
+Fast-forward
+ tracked.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+stderr (complete):
+exit=0
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/target-product/bin/fm-teardown.sh task-landed [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown task-landed complete (window fm-lab-teardown:fm-task-landed, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project)
+Backlog: task-landed is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+stderr (complete):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for task-landed: 54727 54740
+exit=0
+OBSERVED OK: normal teardown succeeds without force, bypass or overrides
+OBSERVED OK: task metadata and owned claim retired
+OBSERVED OK: real task worktree and tasktmp processes received TERM
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+stderr (complete):
+exit=0
+OBSERVED OK: exact task endpoint closed
+$ tasks-axi show task-landed --file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home/data/backlog.md [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+task:
+  id: task-landed
+  title: Disposable landed
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-10-04
+  deps: none
+  links: none
+  body: local main
+stderr (complete):
+exit=0
+OBSERVED OK: backlog moved to done
+OBSERVED OK: no pending backlog close left
+$ treehouse status [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/project]
+stdout:
+base  main  (repository default)
+1     available    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project  (detached)
+stderr (complete):
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+exit=0
+OBSERVED OK: Treehouse slot returned to available pool
+OBSERVED OK: unrelated process alive
+OBSERVED OK: unrelated task metadata byte-identical
+$ tmux -L fm-lab list-windows -t fm-lab-teardown -F '#{window_name}' [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+control
+stderr (complete):
+exit=0
+OBSERVED OK: unrelated private tmux endpoint present
+OBSERVED OK: no account-wide administrative reaper invocation
+PERSISTED BACKLOG:
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] task-landed - Disposable landed (kind: ship) (done 2026-10-04)
+  local main
+
+$ tmux -L fm-lab kill-server [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home [cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM]
+stdout:
+stderr (complete):
+exit=0
+Disposable fixture root removed: True

@@ -1,0 +1,33 @@
+[
+  {
+    "name": "Before-change normal task cleanup attempts an account-wide sweep (safely intercepted)",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Clean ship cleanup reaps only owned processes, closes backlog and returns pool slot without account sweep",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Scout refuses missing report and inventory, then completes preserving inventoried captain call",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Duplicate task ownership refuses returning another task slot; reconciliation permits cleanup",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Ship refuses dirty and unlanded work, then succeeds after real local-main landing",
+    "result": "fail",
+    "live": true,
+    "error": "AssertionError('product refusal: has work not on any remote and not on main')"
+  },
+  {
+    "name": "Captain-held completed scout is cleaned up while its backlog item stays queued and held",
+    "result": "pass",
+    "live": true
+  }
+]

@@ -1,0 +1,7 @@
+[
+  {
+    "name": "Ship refuses dirty and unlanded work, then succeeds after real local-main landing",
+    "result": "pass",
+    "live": true
+  }
+]

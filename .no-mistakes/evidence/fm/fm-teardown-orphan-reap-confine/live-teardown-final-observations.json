@@ -1,0 +1,45 @@
+{
+  "scenarios": [
+    {
+      "name": "Before-change normal task cleanup attempts an account-wide sweep (safely intercepted)",
+      "result": "pass",
+      "live": true
+    },
+    {
+      "name": "Clean ship cleanup reaps only owned processes, closes backlog and returns pool slot without account sweep",
+      "result": "pass",
+      "live": true
+    },
+    {
+      "name": "Scout refuses missing report and inventory, then completes preserving inventoried captain call",
+      "result": "pass",
+      "live": true
+    },
+    {
+      "name": "Duplicate task ownership refuses returning another task slot; reconciliation permits cleanup",
+      "result": "pass",
+      "live": true
+    },
+    {
+      "name": "Ship refuses dirty and unlanded work, then succeeds after real local-main landing",
+      "result": "pass",
+      "live": true
+    },
+    {
+      "name": "Captain-held completed scout is cleaned up while its backlog item stays queued and held",
+      "result": "pass",
+      "live": true
+    }
+  ],
+  "setup_correction": "Initial driver guessed the local-only unlanded-refusal wording. The product correctly refused; the throwaway driver wording assertion was removed and only the landing scenario was re-driven through successful cleanup. Initial transcript/results preserved.",
+  "fixture_removed": true,
+  "source_or_permanent_tests_changed": false,
+  "real_administrative_reaper_executed": false,
+  "scope_contract": {
+    "admin_command_byte_identical": true,
+    "base_admin_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88",
+    "target_admin_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88",
+    "runtime_executed": false,
+    "note": "Explicit unchanged-file acceptance contract checked without executing the administrative command. Live lifecycle proof is recorded separately."
+  }
+}

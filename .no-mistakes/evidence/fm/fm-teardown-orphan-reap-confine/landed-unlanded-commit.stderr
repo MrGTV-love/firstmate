@@ -1,0 +1,6 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: local-only worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/landed/pool/.treehouse/project-8b62a2/1/project has work not yet merged into main and not on any remote.
+commits not yet on main:
+e410ece task change
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.

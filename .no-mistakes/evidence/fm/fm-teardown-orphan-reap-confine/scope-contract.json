@@ -1,0 +1,7 @@
+{
+  "admin_command_byte_identical": true,
+  "base_admin_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88",
+  "target_admin_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88",
+  "runtime_executed": false,
+  "note": "Explicit unchanged-file acceptance contract checked without executing the administrative command. Live lifecycle proof is recorded separately."
+}

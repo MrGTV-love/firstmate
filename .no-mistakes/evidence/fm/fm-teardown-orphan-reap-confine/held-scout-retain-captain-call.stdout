@@ -1,0 +1,6 @@
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown task-held-scout complete (window fm-lab-teardown:fm-task-held-scout, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/held-scout/pool/.treehouse/project-0c3a33/1/project)
+Backlog: task-held-scout stays open in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M452J6VP26D8ZRCRHPMA51MM/.live-teardown-lab/held-scout/home/data/backlog.md, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer.
