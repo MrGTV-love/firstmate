@@ -1,0 +1,6 @@
+Read-only auth status: normal existing Claude login available (claude.ai).
+Isolated HOME alone: no usable login.
+Existing user-specific macOS Keychain OAuth token reused through supported CLAUDE_CODE_OAUTH_TOKEN in process memory only.
+Isolated HOME auth status: loggedIn=true, authMethod=oauth_token.
+Real authenticated model turns completed through the installed TeamClaude proxy on tmux and Herdr.
+No sign-in, sign-out, token refresh command, credential-store edit, or credential copy was performed.

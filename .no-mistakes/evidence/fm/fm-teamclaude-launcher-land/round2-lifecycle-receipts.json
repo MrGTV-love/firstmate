@@ -1,0 +1,67 @@
+{
+  "tmux-proxy": {
+    "meta": {
+      "window": "firstmate:fm-tmux-proxy",
+      "endpoint_task_id": "tmux-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219733.82973.1328",
+      "spawn_gen": "s1791219734.79852.1965",
+      "control_relaunch_tx": "69705.20261005T170211Z.32037"
+    },
+    "control-relaunch": "v1\ntask=tmux-proxy\nphase=complete\nts=2026-10-05T17:02:29Z\nbackend=tmux\nendpoint=firstmate:fm-tmux-proxy\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project\nkind=scout\nfrom_harness=claude\nfrom_model=fable\nfrom_effort=default\nto_harness=claude\nto_model=fable\nto_effort=default\nworktree_head=365a1ea7d6f7956b38912114e0361c6db63a7f99\nworktree_dirty=no\nnote_file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary/state/tmux-proxy.control-relaunch.note\nexit_result=stopped\n",
+    "session_end_ledger": "1791218855\tattempt\n1791218865\trelaunched\n"
+  },
+  "herdr-proxy": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w1:p2",
+      "endpoint_task_id": "herdr-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/2/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-herdr-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219639.34708.2471",
+      "spawn_gen": "s1791219639.25829.28761",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t2",
+      "herdr_pane_id": "w1:p2",
+      "control_relaunch_tx": "23660.20261005T170034Z.26841"
+    },
+    "control-relaunch": "v1\ntask=herdr-proxy\nphase=complete\nts=2026-10-05T17:00:44Z\nbackend=herdr\nendpoint=fm-lab-tc-launcher-36055-7885:w1:p2\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/2/project\nkind=scout\nfrom_harness=claude\nfrom_model=fable\nfrom_effort=default\nto_harness=claude\nto_model=fable\nto_effort=default\nworktree_head=365a1ea7d6f7956b38912114e0361c6db63a7f99\nworktree_dirty=no\nnote_file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary/state/herdr-proxy.control-relaunch.note\nexit_result=already-stopped\n",
+    "session_end_ledger": "1791219633\tattempt\n1791219644\trelaunched\n"
+  },
+  "proxy-mate": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w2:p3",
+      "endpoint_task_id": "proxy-mate",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "harness": "claude",
+      "kind": "secondmate",
+      "mode": "secondmate",
+      "yolo": "off",
+      "tasktmp": "/tmp/fm-proxy-mate",
+      "model": "fable",
+      "effort": "default",
+      "spawn_gen": "s1791220020.68432.10514",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w2",
+      "herdr_tab_id": "w2:t3",
+      "herdr_pane_id": "w2:p3",
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "projects": ""
+    },
+    "control-exit": "gen=-\n"
+  }
+}

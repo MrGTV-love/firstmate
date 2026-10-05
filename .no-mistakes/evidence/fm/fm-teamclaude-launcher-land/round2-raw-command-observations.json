@@ -1,0 +1,48 @@
+[
+  {
+    "task": "raw-tmux",
+    "backend": "tmux",
+    "actual_argv": [
+      "claude --model opus"
+    ],
+    "actual_environment": [
+      {
+        "pid": 37384,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-xdg",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        }
+      }
+    ]
+  },
+  {
+    "task": "raw-herdr",
+    "backend": "herdr",
+    "actual_argv": [
+      "claude --model opus"
+    ],
+    "actual_environment": [
+      {
+        "pid": 62371,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        }
+      }
+    ]
+  }
+]

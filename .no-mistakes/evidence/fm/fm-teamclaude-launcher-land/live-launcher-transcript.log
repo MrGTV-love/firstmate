@@ -1,0 +1,711 @@
+### Real proxy 0 status
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy/node_modules/.bin/teamclaude status
+exit=1
+Cannot connect to proxy at localhost:64673
+Is the server running? Start with: teamclaude server
+Details: fetch failed
+
+### Real proxy 0 status
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy/node_modules/.bin/teamclaude status
+exit=0
+TeamClaude status
+Active       disabled-disposable-record
+Switch at    98%
+Sessions     0 active / 0 known · single-account
+Probe        off (passive only)
+Server       up 14s
+
+> disabled-disposable-record (apikey, prio 0) disabled / active
+  Quota    unknown
+  Blocked  disabled by operator
+  Usage    0 req, 0 tok
+  Probe    off
+
+### Real proxy 1 status
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy/node_modules/.bin/teamclaude status
+exit=0
+TeamClaude status
+Active       disabled-disposable-record
+Switch at    98%
+Sessions     0 active / 0 known · single-account
+Probe        off (passive only)
+Server       up 15s
+
+> disabled-disposable-record (apikey, prio 0) disabled / active
+  Quota    unknown
+  Blocked  disabled by operator
+  Usage    0 req, 0 tok
+  Probe    off
+
+### Launcher preflight against default proxy
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --check
+exit=0
+
+### Real Claude CLI through wrapper
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --model opus --version
+exit=0
+2.1.289 (Claude Code)
+
+### Caller selectors absent despite stale pane selectors
+$ /usr/bin/env -u FM_TC_XDG_CONFIG_HOME -u FM_TC_TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec python3 -c import os,json; print(json.dumps({k:os.environ.get(k) for k in ["HTTPS_PROXY","NODE_EXTRA_CA_CERTS","XDG_CONFIG_HOME","TEAMCLAUDE_CONFIG","FM_TC_CONFIG_SNAPSHOT","FM_TC_XDG_CONFIG_HOME","FM_TC_TEAMCLAUDE_CONFIG"]}),flush=True); os.execvp("claude",["claude","--model","opus","--version"])
+exit=0
+{"HTTPS_PROXY": "http://127.0.0.1:64673", "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem", "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg", "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json", "FM_TC_CONFIG_SNAPSHOT": null, "FM_TC_XDG_CONFIG_HOME": null, "FM_TC_TEAMCLAUDE_CONFIG": null}
+2.1.289 (Claude Code)
+
+### Caller XDG set and TEAMCLAUDE_CONFIG absent
+$ /usr/bin/env -u FM_TC_XDG_CONFIG_HOME -u FM_TC_TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT=1 FM_TC_XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec python3 -c import os,json; print(json.dumps({k:os.environ.get(k) for k in ["HTTPS_PROXY","NODE_EXTRA_CA_CERTS","XDG_CONFIG_HOME","TEAMCLAUDE_CONFIG","FM_TC_CONFIG_SNAPSHOT","FM_TC_XDG_CONFIG_HOME","FM_TC_TEAMCLAUDE_CONFIG"]}),flush=True); os.execvp("claude",["claude","--model","opus","--version"])
+exit=0
+{"HTTPS_PROXY": "http://127.0.0.1:64673", "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem", "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg", "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json", "FM_TC_CONFIG_SNAPSHOT": null, "FM_TC_XDG_CONFIG_HOME": null, "FM_TC_TEAMCLAUDE_CONFIG": null}
+2.1.289 (Claude Code)
+
+### Caller explicit TEAMCLAUDE_CONFIG
+$ /usr/bin/env -u FM_TC_XDG_CONFIG_HOME -u FM_TC_TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT=1 FM_TC_TEAMCLAUDE_CONFIG=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec python3 -c import os,json; print(json.dumps({k:os.environ.get(k) for k in ["HTTPS_PROXY","NODE_EXTRA_CA_CERTS","XDG_CONFIG_HOME","TEAMCLAUDE_CONFIG","FM_TC_CONFIG_SNAPSHOT","FM_TC_XDG_CONFIG_HOME","FM_TC_TEAMCLAUDE_CONFIG"]}),flush=True); os.execvp("claude",["claude","--model","opus","--version"])
+exit=0
+{"HTTPS_PROXY": "http://127.0.0.1:64674", "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude-ca.pem", "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg", "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json", "FM_TC_CONFIG_SNAPSHOT": null, "FM_TC_XDG_CONFIG_HOME": null, "FM_TC_TEAMCLAUDE_CONFIG": null}
+2.1.289 (Claude Code)
+
+### Caller selectors explicitly empty
+$ /usr/bin/env -u FM_TC_XDG_CONFIG_HOME -u FM_TC_TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT=1 FM_TC_XDG_CONFIG_HOME= FM_TC_TEAMCLAUDE_CONFIG= /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec python3 -c import os,json; print(json.dumps({k:os.environ.get(k) for k in ["HTTPS_PROXY","NODE_EXTRA_CA_CERTS","XDG_CONFIG_HOME","TEAMCLAUDE_CONFIG","FM_TC_CONFIG_SNAPSHOT","FM_TC_XDG_CONFIG_HOME","FM_TC_TEAMCLAUDE_CONFIG"]}),flush=True); os.execvp("claude",["claude","--model","opus","--version"])
+exit=0
+{"HTTPS_PROXY": "http://127.0.0.1:64673", "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem", "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg", "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json", "FM_TC_CONFIG_SNAPSHOT": null, "FM_TC_XDG_CONFIG_HOME": null, "FM_TC_TEAMCLAUDE_CONFIG": null}
+2.1.289 (Claude Code)
+
+### Explicit TeamClaude drift guard against disposable real proxy
+$ bash bin/fm-test-run.sh tests/fm-teamclaude-launch-live-e2e.test.sh
+exit=1
+FM_TEST_BEGIN 2026-10-05T06:57:31Z tests/fm-teamclaude-launch-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+not ok - teamclaude 1.1.21: the launcher refused against a running proxy: error: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it
+FM_TEST_END 2026-10-05T06:57:32Z tests/fm-teamclaude-launch-live-e2e.test.sh exit=1 duration_ms=1345 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=1911
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=1345 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-teamclaude-launch-live-e2e.test.sh duration_ms=1345
+
+### Explicit TeamClaude drift guard with local Node beside CLI
+$ bash bin/fm-test-run.sh tests/fm-teamclaude-launch-live-e2e.test.sh
+exit=0
+FM_TEST_BEGIN 2026-10-05T06:57:55Z tests/fm-teamclaude-launch-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - teamclaude 1.1.21: the launcher hands claude HTTPS_PROXY and a readable TeamClaude CA
+FM_TEST_END 2026-10-05T06:57:57Z tests/fm-teamclaude-launch-live-e2e.test.sh exit=0 duration_ms=2003 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=2226
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=2003 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-teamclaude-launch-live-e2e.test.sh duration_ms=2003
+
+### Mint marked disposable Firstmate home
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+
+### Private tmux setup
+error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/tmux/tmux-501/fm-lab (File name too long)
+
+### Private tmux shortened-path startup
+exit=0
+
+### Inspect private primary socket and grid
+$ tmux -L fm-lab display-message -p -t primary #{socket_path}|#{pid}|#{pane_id}|#{pane_width}x#{pane_height}
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/tmux-501/fm-lab|15129|%0|140x45
+
+### Capture actual isolated primary
+$ tmux -L fm-lab capture-pane -p -t primary
+exit=0
+Welcome to Claude Code v2.1.289
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Let's get started.
+
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+
+     Auto (match terminal)
+ ❯ ✔ Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+
+
+
+
+
+
+
+
+
+### Scaffold disposable scout brief
+$ bash bin/fm-brief.sh live-raw launcher-validation --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/data/live-raw/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+### Spawn raw Claude version command on real private tmux
+$ bash bin/fm-spawn.sh live-raw /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --version
+exit=0
+spawned live-raw harness=claude kind=scout window=primary:fm-live-raw worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+
+### Capture raw worker output
+$ tmux -L fm-lab capture-pane -p -t primary:live-raw
+exit=1
+can't find window: live-raw
+
+### Capture actual raw worker output
+$ tmux -L fm-lab capture-pane -p -t primary:fm-live-raw
+exit=0
+treehouse get
+charlesabrooker@GTT-CB project % treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/1/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/1/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s1791183663.953
+19.2219.sh'
+2.1.289 (Claude Code)
+charlesabrooker@GTT-CB project %
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Persisted raw worker metadata
+window=primary:fm-live-raw
+endpoint_task_id=live-raw
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/1/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-live-raw
+model=default
+effort=default
+busy_gen=g1791183663.5430.12205
+spawn_gen=s1791183663.95319.2219
+
+### Seed private tmux stale TeamClaude selector
+$ tmux -L fm-lab set-environment -g TEAMCLAUDE_CONFIG /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json
+exit=0
+
+### Seed private tmux stale XDG selector
+$ tmux -L fm-lab set-environment -g XDG_CONFIG_HOME /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg
+exit=0
+
+### Scaffold actual template worker
+$ bash bin/fm-brief.sh live-template launcher-validation --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/data/live-template/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+### Spawn real Claude template with caller selectors unset
+$ bash bin/fm-spawn.sh live-template /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout --harness claude
+exit=0
+spawned live-template harness=claude kind=scout window=primary:fm-live-template worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/2/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+### Capture actual Claude template worker
+$ tmux -L fm-lab capture-pane -p -t primary:fm-live-template
+exit=0
+treehouse get
+charlesabrooker@GTT-CB project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/2/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/2/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-template/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-template
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-template+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s179118374
+5.52624.24226.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Kernel-observed real template Claude process environment
+[
+  {
+    "pid": 72492,
+    "executable": "claude",
+    "environment": {
+      "HTTPS_PROXY": "http://127.0.0.1:64673",
+      "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem",
+      "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg",
+      "FM_TC_CONFIG_SNAPSHOT": null,
+      "FM_TC_TEAMCLAUDE_CONFIG": null,
+      "FM_TC_XDG_CONFIG_HOME": null
+    }
+  }
+]
+### Relaunch completed raw worker as real Claude template
+$ bash bin/fm-spawn.sh live-raw --relaunch --harness claude
+exit=0
+spawned live-raw harness=claude kind=scout window=primary:fm-live-raw worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+### Kernel-observed primary:fm-live-raw
+[
+  {
+    "pid": 71285,
+    "executable": "claude",
+    "environment": {
+      "HTTPS_PROXY": "http://127.0.0.1:64673",
+      "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem",
+      "TEAMCLAUDE_CONFIG": null,
+      "XDG_CONFIG_HOME": null,
+      "FM_TC_CONFIG_SNAPSHOT": null,
+      "FM_TC_TEAMCLAUDE_CONFIG": null,
+      "FM_TC_XDG_CONFIG_HOME": null
+    }
+  }
+]
+### live-bad-config
+$ bash bin/fm-spawn.sh live-bad-config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --version
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: config/claude-launcher holds 'direct'; the only accepted value is teamclaude (remove the file to launch claude directly)
+
+live-bad-config: no task metadata and no tmux worker endpoint published.
+
+### live-api-key
+$ bash bin/fm-spawn.sh live-api-key /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --version
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+live-api-key: no task metadata and no tmux worker endpoint published.
+
+### Scaffold default-direct worker
+$ bash bin/fm-brief.sh live-direct launcher-validation --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/data/live-direct/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+### Spawn actual Claude with launcher configuration absent
+$ bash bin/fm-spawn.sh live-direct /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout --harness claude
+exit=0
+spawned live-direct harness=claude kind=scout window=primary:fm-live-direct worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/3/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+### Kernel-observed primary:fm-live-direct
+[
+  {
+    "pid": 19744,
+    "executable": "claude",
+    "environment": {
+      "HTTPS_PROXY": null,
+      "NODE_EXTRA_CA_CERTS": null,
+      "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg",
+      "FM_TC_CONFIG_SNAPSHOT": null,
+      "FM_TC_TEAMCLAUDE_CONFIG": null,
+      "FM_TC_XDG_CONFIG_HOME": null
+    }
+  }
+]
+### Change stale pane selector to the other healthy proxy
+$ tmux -L fm-lab set-environment -g TEAMCLAUDE_CONFIG /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude.json
+exit=0
+
+### Scaffold raw interactive worker
+$ bash bin/fm-brief.sh live-raw-xdg launcher-validation --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/data/live-raw-xdg/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+### Spawn real raw opus worker using caller XDG selector
+$ bash bin/fm-spawn.sh live-raw-xdg /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --settings '{"disableAllHooks":true}'
+exit=0
+spawned live-raw-xdg harness=claude kind=scout window=primary:fm-live-raw-xdg worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/4/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+### Inspect actual raw worker startup output
+$ tmux -L fm-lab capture-pane -p -t primary:fm-live-raw-xdg
+exit=0
+charlesabrooker@GTT-CB project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/4/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/4/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-xdg/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-xdg
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-xdg+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s1791183890
+.83458.8396.sh'
+Welcome to Claude Code v2.1.289
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Unable to connect to Anthropic services
+
+ Failed to connect to api.anthropic.com: Status 429
+
+ A proxy is configured via https_proxy. Check that it allows connections to the host above. See
+ https://code.claude.com/docs/en/network-config
+
+ Please check your internet connection and network settings.
+
+ Note: Claude Code might not be available in your country. Check supported countries at https://anthropic.com/supported-countries
+charlesabrooker@GTT-CB project %
+
+
+
+
+
+### Scaffold raw version and environment proof
+$ bash bin/fm-brief.sh live-raw-proof launcher-validation --scout
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/data/live-raw-proof/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+### Spawn unchanged raw version and proxy-observation command
+$ bash bin/fm-spawn.sh live-raw-proof /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --version; printf "%s\n" "HTTPS_PROXY=$HTTPS_PROXY" "NODE_EXTRA_CA_CERTS=$NODE_EXTRA_CA_CERTS" "TEAMCLAUDE_CONFIG=$TEAMCLAUDE_CONFIG" "FM_TC_CONFIG_SNAPSHOT=${FM_TC_CONFIG_SNAPSHOT-unset}"
+exit=0
+spawned live-raw-proof harness=claude kind=scout window=primary:fm-live-raw-proof worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.treehouse/project-6a7b92/5/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+### Capture raw command result with proxy and CA
+$ tmux -L fm-lab capture-pane -p -t primary:fm-live-raw-proof
+exit=0
+charlesabrooker@GTT-CB project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/5/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/5/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-proof/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911839
+50.91923.31118.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Completed real raw command result
+charlesabrooker@GTT-CB project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/5/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/5/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-proof/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911839
+50.91923.31118.sh'
+2.1.289 (Claude Code)
+HTTPS_PROXY=http://127.0.0.1:64674
+NODE_EXTRA_CA_CERTS=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/team
+claude-ca.pem
+TEAMCLAUDE_CONFIG=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.con
+fig/teamclaude.json
+FM_TC_CONFIG_SNAPSHOT=unset
+charlesabrooker@GTT-CB project %
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Capture raw worker output with terminal soft wraps joined
+$ tmux -L fm-lab capture-pane -p -J -t primary:fm-live-raw-proof
+exit=0
+charlesabrooker@GTT-CB project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-6a7b92/5/project. Type 'exit' to return.
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/5/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-proof/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911839
+50.91923.31118.sh'
+2.1.289 (Claude Code)
+HTTPS_PROXY=http://127.0.0.1:64674
+NODE_EXTRA_CA_CERTS=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude-ca.pem
+TEAMCLAUDE_CONFIG=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude.json
+FM_TC_CONFIG_SNAPSHOT=unset
+charlesabrooker@GTT-CB project % 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Stopped real proxy refuses wrapper before command execution
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/should-not-launch
+exit=1
+error: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it
+
+### Control relaunch refuses stopped proxy while old Claude stays running
+$ bash bin/fm-control.sh relaunch live-direct --harness claude --note Disposable lab checkpoint; do not submit any model prompt.
+exit=2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+error: 'live-direct' is not a control verb
+allowed verbs:
+  interrupt
+  exit
+  relaunch
+
+### Control relaunch refuses stopped proxy while old Claude stays running
+$ bash bin/fm-control.sh live-direct relaunch --harness claude --note Disposable lab checkpoint; do not submit any model prompt.
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+error: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it
+
+Old agent preserved after refusal: pid=19744, executable=claude; replacement not launched.
+
+### Stopped proxy refuses raw fresh spawn before publication
+$ bash bin/fm-spawn.sh live-stopped /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/project --scout claude --model opus --version
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it
+
+Stopped-proxy fresh spawn: no metadata or tmux endpoint created.
+
+### Missing TeamClaude refuses wrapper without executing command
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/missing-should-not-launch
+exit=1
+error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it
+
+### Real proxy export without HTTPS_PROXY refuses
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/bin/fm-teamclaude-launch.sh --exec /usr/bin/touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab/baseurl-should-not-launch
+exit=1
+error: TeamClaude client environment did not set HTTPS_PROXY; refusing to launch Claude without it
+
+### Inspect completed-task pane after control attempt
+$ tmux -L fm-lab capture-pane -p -J -t primary:fm-live-raw-proof
+exit=0
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911839
+50.91923.31118.sh'
+2.1.289 (Claude Code)
+HTTPS_PROXY=http://127.0.0.1:64674
+NODE_EXTRA_CA_CERTS=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude-ca.pem
+TEAMCLAUDE_CONFIG=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude.json
+FM_TC_CONFIG_SNAPSHOT=unset
+charlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali
+dation/proxy-home/.treehouse/project-6a7b92/5/project'
+charlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-proof/gotmp
+charlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof
+charlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911841
+65.12062.22344.sh'
+Welcome to Claude Code v2.1.289
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Unable to connect to Anthropic services
+
+ Failed to connect to api.anthropic.com: Status 429
+
+ A proxy is configured via https_proxy. Check that it allows connections to the host above. See
+ https://code.claude.com/docs/en/network-config
+
+ Please check your internet connection and network settings.
+
+ Note: Claude Code might not be available in your country. Check supported countries at https://anthropic.com/supported-countries
+charlesabrooker@GTT-CB project % 
+
+### Stop private lab tmux server
+$ tmux -L fm-lab kill-server
+exit=0
+
+### Release lab helper bookkeeping
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/lab
+exit=0

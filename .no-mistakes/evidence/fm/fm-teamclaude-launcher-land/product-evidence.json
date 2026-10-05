@@ -1,0 +1,87 @@
+{
+  "tools": {
+    "TeamClaude": "@karpeleslab/teamclaude 1.1.21 (workspace-local public distribution)",
+    "Claude Code": "2.1.289",
+    "tmux_grid": "140x45"
+  },
+  "isolation": {
+    "home": "worktree-contained disposable FM_HOME and HOME",
+    "proxy_ports": [
+      64673,
+      64674
+    ],
+    "accounts": "one explicitly disabled synthetic record per proxy; no login or account import; no model prompt submitted",
+    "backend": "only a private fm-lab tmux socket; no Herdr lifecycle"
+  },
+  "observed_template_environment": [
+    {
+      "pid": 72492,
+      "executable": "claude",
+      "environment": {
+        "HTTPS_PROXY": "http://127.0.0.1:64673",
+        "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem",
+        "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json",
+        "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg",
+        "FM_TC_CONFIG_SNAPSHOT": null,
+        "FM_TC_TEAMCLAUDE_CONFIG": null,
+        "FM_TC_XDG_CONFIG_HOME": null
+      }
+    }
+  ],
+  "observed_spawn_relaunch_environment": [
+    {
+      "pid": 71285,
+      "executable": "claude",
+      "environment": {
+        "HTTPS_PROXY": "http://127.0.0.1:64673",
+        "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude-ca.pem",
+        "TEAMCLAUDE_CONFIG": null,
+        "XDG_CONFIG_HOME": null,
+        "FM_TC_CONFIG_SNAPSHOT": null,
+        "FM_TC_TEAMCLAUDE_CONFIG": null,
+        "FM_TC_XDG_CONFIG_HOME": null
+      }
+    }
+  ],
+  "observed_absent_launcher_environment": [
+    {
+      "pid": 19744,
+      "executable": "claude",
+      "environment": {
+        "HTTPS_PROXY": null,
+        "NODE_EXTRA_CA_CERTS": null,
+        "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude.json",
+        "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/stale-xdg",
+        "FM_TC_CONFIG_SNAPSHOT": null,
+        "FM_TC_TEAMCLAUDE_CONFIG": null,
+        "FM_TC_XDG_CONFIG_HOME": null
+      }
+    }
+  ],
+  "raw_command_output": "charlesabrooker@GTT-CB project % treehouse get\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Setting up worktree...\n\ud83c\udf33 Entered worktree at ~/.treehouse/project-6a7b92/5/project. Type 'exit' to return.\ncharlesabrooker@GTT-CB project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-vali\ndation/proxy-home/.treehouse/project-6a7b92/5/project'\ncharlesabrooker@GTT-CB project % export GOTMPDIR=/tmp/fm-live-raw-proof/gotmp\ncharlesabrooker@GTT-CB project % export COMPACT_ADVISER_DISABLE=1\ncharlesabrooker@GTT-CB project % export FM_TASK_ID=live-raw-proof\ncharlesabrooker@GTT-CB project % . '/tmp/fm-live-raw-proof+3262c08fe0fbe23aca8b6b047fb50598931599dbc6d5e4bd7b9d041f61675c7d/launch.s17911839\n50.91923.31118.sh'\n2.1.289 (Claude Code)\nHTTPS_PROXY=http://127.0.0.1:64674\nNODE_EXTRA_CA_CERTS=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/explicit/teamclaude-ca.pem\nTEAMCLAUDE_CONFIG=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-validation/proxy-home/.config/teamclaude.json\nFM_TC_CONFIG_SNAPSHOT=unset\ncharlesabrooker@GTT-CB project % \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+  "stopped_proxy_control_refusal": {
+    "old_agent_pid": 19744,
+    "preserved_after_refusal": true,
+    "result": "TeamClaude proxy is not running; refusing to launch Claude without it"
+  },
+  "limits": [
+    "The successful-control-relaunch driver reached a replacement Claude startup but timed out after 60 seconds; the disabled proxy account returned HTTP 429, so authenticated interactive completion was not demonstrated.",
+    "Real Herdr lifecycle is explicitly forbidden by the recorded decision.",
+    "A live secondmate home cannot be created within this source worktree because the product refuses that placement; portable fixtures are exercised via the normal test toolchain temp exception."
+  ],
+  "test_fixture_fix": {
+    "file": "tests/fm-control-relaunch.test.sh",
+    "cause": "The fake Herdr tab-create response overwrote its pane cwd with the spawning project, but its treehouse-get input never modeled the move into the allocated worktree. The production spawn correctly refused the non-isolated cwd.",
+    "change": "For cases providing an allocated-worktree fixture, the fake Herdr pane run treehouse get command now updates only that pane\u2019s cwd to the allocated copy. The fresh-spawn case provides its existing worktree path.",
+    "before_evidence": "corrected-regressions.log",
+    "after_evidence": "final-control-regressions.log",
+    "verification": "Canonical runner completed tests/fm-control-relaunch.test.sh with exit 0 after the pane-run fixture correction, including fresh Herdr ship/secondmate dispatch and pre-stop TeamClaude refusal."
+  },
+  "control_completion_attempt": {
+    "command": "bash bin/fm-control.sh live-raw-proof relaunch --harness claude --note <environment-observation-only note>",
+    "driver_timeout_seconds": 60,
+    "observed": "The task republished a new spawn generation and the actual Claude replacement rendered its configured-proxy startup error (HTTP 429 from the deliberately disabled fixture account).",
+    "conclusion": "Authenticated interactive readiness/completion was not established; this is not reported as a pass."
+  },
+  "cleanup": "Both explicitly owned TeamClaude processes and the private fm-lab tmux server were stopped; all workspace-local disposable packages, homes, project/pool, and socket directory were removed."
+}

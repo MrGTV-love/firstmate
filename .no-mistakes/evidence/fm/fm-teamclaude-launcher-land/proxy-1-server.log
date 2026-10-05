@@ -1,0 +1,17 @@
+
+============================================================
+  TeamClaude Proxy
+============================================================
+  Bind:       127.0.0.1:64674 (localhost only)
+  Accounts:   1
+  Threshold:  98%
+  Upstream:   https://api.anthropic.com
+
+  [1] disabled-disposable-record (apikey)
+
+  Run Claude through proxy:  teamclaude run
+  Show env vars:             teamclaude env
+============================================================
+
+
+[TeamClaude] Shutting down...

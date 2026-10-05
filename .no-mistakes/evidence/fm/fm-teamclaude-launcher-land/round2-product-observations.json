@@ -1,0 +1,525 @@
+{
+  "tmux-authenticated-proxy": {
+    "meta": {
+      "window": "firstmate:fm-tmux-proxy",
+      "endpoint_task_id": "tmux-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791218601.44304.23801",
+      "spawn_gen": "s1791218602.40087.19759"
+    },
+    "actual_processes": [
+      {
+        "pid": 49908,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-healthy-control-relaunch": {
+    "meta": {
+      "window": "firstmate:fm-tmux-proxy",
+      "endpoint_task_id": "tmux-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791218706.50256.6638",
+      "spawn_gen": "s1791218707.26611.20478",
+      "control_relaunch_tx": "6952.20261005T164454Z.1000"
+    },
+    "actual_processes": [
+      {
+        "pid": 57225,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-session-end-auto-replacement": {
+    "meta": {
+      "window": "firstmate:fm-tmux-proxy",
+      "endpoint_task_id": "tmux-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791218860.33172.15712",
+      "spawn_gen": "s1791218861.24142.20648",
+      "control_relaunch_tx": "21357.20261005T164736Z.19763"
+    },
+    "actual_processes": [
+      {
+        "pid": 40758,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "herdr-fresh-authenticated-proxy": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w1:p2",
+      "endpoint_task_id": "herdr-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/2/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-herdr-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219108.56790.11979",
+      "spawn_gen": "s1791219109.51343.23236",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t2",
+      "herdr_pane_id": "w1:p2"
+    },
+    "actual_processes": [
+      {
+        "pid": 70108,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "herdr-healthy-control-relaunch": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w1:p2",
+      "endpoint_task_id": "herdr-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/2/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-herdr-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219259.63762.20355",
+      "spawn_gen": "s1791219260.31036.19258",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t2",
+      "herdr_pane_id": "w1:p2",
+      "control_relaunch_tx": "96042.20261005T165406Z.7601"
+    },
+    "actual_processes": [
+      {
+        "pid": 75823,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-secondmate-launch": {
+    "meta": {
+      "window": "firstmate:fm-proxy-mate",
+      "endpoint_task_id": "proxy-mate",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "harness": "claude",
+      "kind": "secondmate",
+      "mode": "secondmate",
+      "yolo": "off",
+      "tasktmp": "/tmp/fm-proxy-mate",
+      "model": "fable",
+      "effort": "default",
+      "spawn_gen": "s1791219355.38924.18423",
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "projects": ""
+    },
+    "actual_processes": [
+      {
+        "pid": 62022,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-secondmate-respawn": {
+    "meta": {
+      "window": "firstmate:fm-proxy-mate",
+      "endpoint_task_id": "proxy-mate",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "harness": "claude",
+      "kind": "secondmate",
+      "mode": "secondmate",
+      "yolo": "off",
+      "tasktmp": "/tmp/fm-proxy-mate",
+      "model": "fable",
+      "effort": "default",
+      "spawn_gen": "s1791219550.48184.3080",
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "projects": ""
+    },
+    "actual_processes": [
+      {
+        "pid": 12692,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "herdr-session-end-auto-replacement": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w1:p2",
+      "endpoint_task_id": "herdr-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/2/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-herdr-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219639.34708.2471",
+      "spawn_gen": "s1791219639.25829.28761",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t2",
+      "herdr_pane_id": "w1:p2",
+      "control_relaunch_tx": "23660.20261005T170034Z.26841"
+    },
+    "actual_processes": [
+      {
+        "pid": 41842,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-unset-selector-snapshot": {
+    "meta": {
+      "window": "firstmate:fm-tmux-proxy",
+      "endpoint_task_id": "tmux-proxy",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/1/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-proxy",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791219733.82973.1328",
+      "spawn_gen": "s1791219734.79852.1965",
+      "control_relaunch_tx": "69705.20261005T170211Z.32037"
+    },
+    "actual_processes": [
+      {
+        "pid": 7222,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": null,
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "raw-tmux-proxy-and-argv": {
+    "meta": {
+      "window": "firstmate:fm-raw-tmux",
+      "endpoint_task_id": "raw-tmux",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/3/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-raw-tmux",
+      "model": "default",
+      "effort": "default",
+      "busy_gen": "g1791219811.9877.22771",
+      "spawn_gen": "s1791219811.99817.2732"
+    },
+    "actual_processes": [
+      {
+        "pid": 37384,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-xdg",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "raw-herdr-proxy-and-argv": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w1:p3",
+      "endpoint_task_id": "raw-herdr",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/4/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-raw-herdr",
+      "model": "default",
+      "effort": "default",
+      "busy_gen": "g1791219836.54146.26264",
+      "spawn_gen": "s1791219837.47654.8200",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t3",
+      "herdr_pane_id": "w1:p3"
+    },
+    "actual_processes": [
+      {
+        "pid": 62371,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "absent-launcher-direct-claude": {
+    "meta": {
+      "window": "firstmate:fm-direct-default",
+      "endpoint_task_id": "direct-default",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/5/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-direct-default",
+      "model": "default",
+      "effort": "default",
+      "busy_gen": "g1791219915.92143.22929",
+      "spawn_gen": "s1791219916.47676.14583"
+    },
+    "actual_processes": [
+      {
+        "pid": 27525,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": null,
+          "NODE_EXTRA_CA_CERTS": null,
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-xdg",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        }
+      }
+    ]
+  },
+  "herdr-secondmate-launch": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w2:p2",
+      "endpoint_task_id": "proxy-mate",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "harness": "claude",
+      "kind": "secondmate",
+      "mode": "secondmate",
+      "yolo": "off",
+      "tasktmp": "/tmp/fm-proxy-mate",
+      "model": "fable",
+      "effort": "default",
+      "spawn_gen": "s1791219950.52208.27229",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w2",
+      "herdr_tab_id": "w2:t2",
+      "herdr_pane_id": "w2:p2",
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "projects": ""
+    },
+    "actual_processes": [
+      {
+        "pid": 73567,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "herdr-secondmate-respawn": {
+    "meta": {
+      "window": "fm-lab-tc-launcher-36055-7885:w2:p3",
+      "endpoint_task_id": "proxy-mate",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "harness": "claude",
+      "kind": "secondmate",
+      "mode": "secondmate",
+      "yolo": "off",
+      "tasktmp": "/tmp/fm-proxy-mate",
+      "model": "fable",
+      "effort": "default",
+      "spawn_gen": "s1791220020.68432.10514",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-tc-launcher-36055-7885",
+      "herdr_workspace_id": "w2",
+      "herdr_tab_id": "w2:t3",
+      "herdr_pane_id": "w2:p3",
+      "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/mate",
+      "projects": ""
+    },
+    "actual_processes": [
+      {
+        "pid": 91424,
+        "executable": "claude",
+        "kernel_name": "2.1.289",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.config/teamclaude-ca.pem",
+          "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home",
+          "TEAMCLAUDE_CONFIG": null,
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.config",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  },
+  "tmux-fresh-xdg-only-snapshot": {
+    "meta": {
+      "window": "firstmate:fm-tmux-fresh-ready",
+      "endpoint_task_id": "tmux-fresh-ready",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.treehouse/project-7d0c88/6/project",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/project",
+      "harness": "claude",
+      "kind": "scout",
+      "tasktmp": "/tmp/fm-tmux-fresh-ready",
+      "model": "fable",
+      "effort": "default",
+      "busy_gen": "g1791220166.63009.24783",
+      "spawn_gen": "s1791220168.53434.13833"
+    },
+    "actual_processes": [
+      {
+        "pid": 89207,
+        "executable": "claude",
+        "environment": {
+          "HTTPS_PROXY": "http://127.0.0.1:13456",
+          "NODE_EXTRA_CA_CERTS": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/user-home/.config/teamclaude-ca.pem",
+          "TEAMCLAUDE_CONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-pane.json",
+          "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/stale-xdg",
+          "FM_TC_CONFIG_SNAPSHOT": null,
+          "FM_TC_TEAMCLAUDE_CONFIG": null,
+          "FM_TC_XDG_CONFIG_HOME": null
+        },
+        "readable_ca_at_observation": true
+      }
+    ]
+  }
+}

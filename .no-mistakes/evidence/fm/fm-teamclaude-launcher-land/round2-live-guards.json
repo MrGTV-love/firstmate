@@ -1,0 +1,58 @@
+[
+  {
+    "name": "stopped-proxy",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it\n",
+    "task_record_exists": false,
+    "endpoint_exists": false
+  },
+  {
+    "name": "unknown-launcher",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: config/claude-launcher holds 'direct'; the only accepted value is teamclaude (remove the file to launch claude directly)\n",
+    "task_record_exists": false,
+    "endpoint_exists": false
+  },
+  {
+    "name": "api-key-refusal",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API\n",
+    "task_record_exists": false,
+    "endpoint_exists": false
+  },
+  {
+    "name": "missing-teamclaude",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it\n",
+    "task_record_exists": false,
+    "endpoint_exists": false
+  },
+  {
+    "name": "stopped-control",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nerror: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it\n",
+    "same_agent": true,
+    "same_generation": true
+  },
+  {
+    "name": "nonexecutable-wrapper",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  6 task(s) in flight, but no watcher has a fresh beacon (last beat: 303s ago, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/runtime/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/runtime/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\nerror: config/claude-launcher=teamclaude needs the executable launcher /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/runtime/bin/fm-teamclaude-launch.sh; refusing to launch Claude without the proxy\n",
+    "task_record_exists": false,
+    "endpoint_exists": false
+  },
+  {
+    "name": "stopped-herdr-control",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-round2/primary\nerror: TeamClaude proxy is not running or did not answer its status check (start it with: teamclaude server); refusing to launch Claude without it\n",
+    "same_agent": true,
+    "same_generation": true
+  },
+  {
+    "name": "missing-configured-wrapper",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-missing-wrapper-check/home\nerror: config/claude-launcher=teamclaude needs the executable launcher /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-missing-wrapper-check/runtime/bin/fm-teamclaude-launch.sh; refusing to launch Claude without the proxy\n",
+    "task_record_exists": false,
+    "wrapper_absent": true
+  }
+]

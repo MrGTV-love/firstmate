@@ -1,0 +1,37 @@
+{
+  "default_before": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "default_after": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "default_tripwire_unchanged": true,
+  "owned_herdr_session_removed": true,
+  "private_tmux_server_stopped": true,
+  "private_tmux_socket_removed": true,
+  "owned_claude_processes_stopped": true,
+  "receipts": [
+    {
+      "backend": "herdr",
+      "returncode": 0,
+      "output": ""
+    },
+    {
+      "backend": "tmux",
+      "returncode": 0
+    },
+    {
+      "backend": "tmux-socket",
+      "returncode": 0,
+      "output": ""
+    }
+  ],
+  "worktree_disposable_files_removed": true,
+  "missing_wrapper_fixture_removed": true
+}

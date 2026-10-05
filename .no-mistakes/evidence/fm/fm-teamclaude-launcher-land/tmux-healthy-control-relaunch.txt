@@ -1,0 +1,64 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-7d0c88/1/project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+GTT-CB:project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launcher-live-
+round2/user-home/.treehouse/project-7d0c88/1/project'
+GTT-CB:project charlesabrooker$ export GOTMPDIR=/tmp/fm-tmux-proxy/gotmp
+GTT-CB:project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+GTT-CB:project charlesabrooker$ export FM_TASK_ID=tmux-proxy
+GTT-CB:project charlesabrooker$ . '/tmp/fm-tmux-proxy+7ee0696e6c3b5627f470048c6ab16c94260a0cba484c1a463d1813c369a16f9d/launch.s1791218514.78
+945.7375.sh'
+Welcome to Claude Code v2.1.289
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Fable 5.1 · Claude API
+ ▝▝   ▝▝   ~/.treehouse/project-7d0c88/1/project
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45AXM8H10HATH7V3C0YBK5D/.launc
+  her-live-round2/primary/state/operational-inbox/1791218709-133c3f2d6fc34d59.msg' and handle its contents as Firstmate operational input.
+
+  Read 1 file, listed 1 directory, ran 1 shell command
+
+⏺ CLAUDE_LIVE_READY
+
+  Observation (single command, no files modified, no services started):
+
+  CLAUDE_LIVE_READY HTTPS_PROXY=http://127.0.0.1:13456 NODE_EXTRA_CA_CERTS=/Users/charlesabrooker/.config/teamclaude-ca.pem
+
+  - HTTPS_PROXY is set to the local TeamClaude proxy (http://127.0.0.1:13456) and NODE_EXTRA_CA_CERTS points at the TeamClaude CA bundle —
+    both arrived through the launcher's environment, with no shell alias involved.
+  - The steering inbox has no pending messages, so there is nothing to acknowledge.
+  - Per the spec, the work item is left open (no done/failed/paused line written); the controller owns cleanup. I am now stopping tool use.
+
+✻ Sautéed for 35s · done 11:45 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
