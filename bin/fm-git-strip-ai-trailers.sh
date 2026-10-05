@@ -11,8 +11,8 @@
 #       hook that runs this strip, plus one wrapper per client-side hook name
 #       git documents except reference-transaction and post-index-change,
 #       which are deliberately excluded (see FM_GIT_CLIENT_HOOKS below).
-#       Each wrapper unsets GIT_CONFIG_* and then resolves
-#       core.hooksPath (or $GIT_DIR/hooks) in the repository git is actually
+#       Each wrapper clears GIT_CONFIG_COUNT so Git ignores numbered overrides,
+#       then resolves core.hooksPath (or $GIT_DIR/hooks) in the repository git is actually
 #       running in, so a husky directory that only appears after npm install
 #       still runs, and git -C some-other-repo does not inherit the task
 #       worktree's hooks. That lookup also ignores GIT_CONFIG_PARAMETERS,

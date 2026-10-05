@@ -438,11 +438,14 @@
 # runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
 # owns the identities, the hook install, and chaining the repository git is
 # actually running in so a project husky hook still runs. Author identity is
-# not rewritten. Every launch reconciles only numbered core.hooksPath entries
-# equal to this task's generated directory before selecting the current posture,
-# so an opted-in relaunch does not inherit its old strip-layer override.
-# Unrelated entries and operator hooksPath overrides are retained in order;
-# stripping appends this task's override rather than replacing their config.
+# not rewritten. Every launch reconciles numbered GIT_CONFIG entries in the
+# persistent destination shell before any config/launch-env-allowlist filter,
+# without changing shell selection. It removes only core.hooksPath entries equal
+# to this task's generated directory, compacts survivors in order, and appends
+# this task's override only when stripping is selected. Unrelated entries and
+# operator hooksPath overrides remain in the pane; the allowlist governs which
+# reach the worker. Reconciliation repeats inside the filtered launch shell so
+# stripping still selects the generated hooks after env -i.
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -5245,12 +5248,10 @@ if [ "$KIND" = secondmate ]; then
   # injected carrier and this on/off snapshot are guaranteed to agree.
   LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
-# Reconcile in the destination shell, not firstmate's environment: a supported
-# relaunch reuses the shell that exported the previous launch's hook override.
-# Match this task's exact generated key/value pair, never arbitrary hooks paths
-# or all GIT_CONFIG_* variables. Compact survivors in order and append the
-# current strip override only when selected. This prefix also runs inside the
-# allowlisted launch shell and before every step of a compound raw launch.
+# Reconcile before the allowlist boundary: a child cannot unset stale exports
+# in the persistent destination shell. Repeat inside the filtered child so
+# stripping survives env -i; the header owns the reconciliation contract.
+# Use assignments rather than local declarations: destination shells include ksh.
 # shellcheck disable=SC2016 # The destination shell expands this function.
 IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
 fm_launch_git_hooks() {
