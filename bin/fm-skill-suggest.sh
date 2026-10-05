@@ -105,7 +105,7 @@ for file in "$CATALOG"/*/SKILL.md; do
   hash=$(shasum -a 256 "$file") || fallback fallback "catalog hash unavailable"
   hash=${hash%% *}
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
-  jq -Rsc --arg path "$file" --arg body_hash "$hash" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
+  jq -eRsc --arg path "$file" --arg body_hash "$hash" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
 done
 [ "$COUNT" -gt 0 ] || fallback fallback "empty catalog"

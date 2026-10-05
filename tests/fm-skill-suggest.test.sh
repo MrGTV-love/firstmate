@@ -186,6 +186,22 @@ assert_not_contains "$(cat "$LOG/rank")" SECRET-OPENING "whole bodies are not ra
 rm "$HOME_DIR/config/dispatch-never-send"
 pass "a forbidden opening excerpt stops disclosure before the recheck"
 
+cp "$CATALOG/delta/SKILL.md" "$TMP_ROOT/valid-delta.md"
+for missing in frontmatter name description; do
+  reset
+  case "$missing" in
+    frontmatter) printf '# Delta\nNo metadata.\n' ;;
+    name) printf '%s\n' '---' 'description: Use for delta work.' '---' '# Delta' ;;
+    description) printf '%s\n' '---' 'name: delta' '---' '# Delta' ;;
+  esac > "$CATALOG/delta/SKILL.md"
+  out=$(run --task-file "$TASK" --required safety --format brief --no-cache)
+  assert_contains "$out" 'fallback: unsupported skill metadata' "missing $missing cannot silently shrink the catalog"
+  assert_contains "$out" 'mandatory explicit/named and safety triggers first' "malformed metadata preserves ordinary required-trigger selection"
+  assert_absent "$LOG/calls" "missing $missing stops before any API call"
+done
+cp "$TMP_ROOT/valid-delta.md" "$CATALOG/delta/SKILL.md"
+pass "missing frontmatter, name or description restores ordinary selection without a call"
+
 reset
 printf '# Task\nLegacy intent only.\n' > "$BRIEF"
 out=$(run --brief "$BRIEF" --no-cache)
