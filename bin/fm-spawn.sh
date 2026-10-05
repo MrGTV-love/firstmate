@@ -5283,8 +5283,8 @@ fm_launch_git_hooks() {
   fi
 }
 SH
-LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX
-fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; $LAUNCH"
+GIT_HOOKS_LAUNCH_PREFIX="$GIT_HOOKS_LAUNCH_PREFIX
+fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
 # Every agent this fleet launches - crewmate, scout, and secondmate, on a fresh
 # spawn and on a relaunch alike - runs with the compact-adviser kill switch on.
 # This is an export statement rather than a forwarded ambient name or a
@@ -5408,8 +5408,9 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     # shellcheck disable=SC2016
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
   fi
-  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$LAUNCH")"
+  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 fi
+LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.

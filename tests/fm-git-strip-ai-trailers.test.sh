@@ -447,6 +447,57 @@ SH
       "$(cat "$dir/scope")" "strip launch lost operator routing or accumulated generated entries"
     assert_equals operator "$(cat "$dir/preserved")" "strip launch lost unrelated configuration"
   done
+  : > "$home/config/keep-ai-trailers"
+  : > "$home/config/launch-env-allowlist"
+  rm "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "allowlisted keep-ai-trailers relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "allowlisted replacement never ran the Git probe"
+  assert_equals $'local\t.project-hooks' "$(cat "$dir/scope")" \
+    "allowlisted keep-ai-trailers worker selected a command-scope hook override"
+  assert_equals '' "$(cat "$dir/preserved")" "allowlist leaked unrelated pane Git configuration"
+  assert_equals "$endpoint" "$(fm_meta_get "$home/state/$id.meta" window)" "allowlisted relaunch replaced the endpoint"
+  assert_equals "$pane" "$("$real_tmux" -S "$socket" display-message -p -t "$endpoint" '#{pane_id}')" "allowlisted relaunch replaced the pane"
+  assert_equals "$wt" "$(fm_meta_get "$home/state/$id.meta" worktree)" "allowlisted relaunch replaced the isolated copy"
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; env > '$dir/pane-env'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/pane-scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/pane-scope" ] || fail "persistent pane never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$home/state/other.git-hooks")" \
+    "$(cat "$dir/pane-scope")" "persistent pane retained obsolete hooks or lost operator routing"
+  assert_equals operator "$(cat "$dir/pane-preserved")" "persistent pane lost unrelated Git configuration"
+  assert_contains "$(cat "$dir/pane-env")" 'GIT_CONFIG_COUNT=2' "persistent pane did not compact Git configuration"
+  assert_not_contains "$(cat "$dir/pane-env")" "$hooks" "persistent pane still exports obsolete task hooks"
+
+  rm "$home/config/keep-ai-trailers" "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "allowlisted strip-enabled relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "allowlisted strip-enabled replacement never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$hooks")" \
+    "$(cat "$dir/scope")" "allowlisted strip worker lost task hooks or inherited operator routing"
+  assert_equals '' "$(cat "$dir/preserved")" "strip launch bypassed the environment filter"
+  rm "$dir/pane-scope"
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/pane-scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/pane-scope" ] || fail "strip-enabled persistent pane never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s\ncommand\t%s' "$home/state/other.git-hooks" "$hooks")" \
+    "$(cat "$dir/pane-scope")" "allowlisted strip launch lost pane routing or accumulated generated entries"
+  assert_equals operator "$(cat "$dir/pane-preserved")" "allowlisted strip launch lost pane Git configuration"
   "$real_tmux" -S "$socket" kill-server
   rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
   trap fm_test_cleanup EXIT
