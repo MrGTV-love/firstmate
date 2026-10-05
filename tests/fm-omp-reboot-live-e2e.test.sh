@@ -15,9 +15,12 @@ TASK_ID="reboot-${TMP##*/}"
 REAL_PATH=$PATH
 OWNED_TASK_TMP=
 OWNED_LAUNCH_DIR=
+OWNED_SESSION=0
 cleanup() {
   local status=$?
-  PATH="$REAL_PATH" "$HELPER" teardown "$SESSION" || status=1
+  if [ "$OWNED_SESSION" = 1 ]; then
+    PATH="$REAL_PATH" "$HELPER" teardown "$SESSION" || status=1
+  fi
   if [ -n "$OWNED_TASK_TMP" ]; then
     rm -rf -- "$OWNED_TASK_TMP" || status=1
   fi
@@ -34,6 +37,8 @@ export FM_STATE_OVERRIDE="$FM_HOME/state" FM_DATA_OVERRIDE="$FM_HOME/data"
 export FM_CONFIG_OVERRIDE="$FM_HOME/config" FM_PROJECTS_OVERRIDE="$FM_HOME/projects"
 export FM_SPAWN_NO_GUARD=1
 unset HERDR_PANE_ID HERDR_SOCKET_PATH HERDR_ENV TMUX TMUX_PANE FM_SPAWN_GEN
+"$HELPER" prepare "$SESSION"
+OWNED_SESSION=1
 mkdir -p "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE/$TASK_ID" "$FM_CONFIG_OVERRIDE" \
   "$FM_PROJECTS_OVERRIDE" "$TMP/fakebin"
 HOME_ROOT=$(cd "$FM_HOME" && pwd -P)

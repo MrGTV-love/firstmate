@@ -432,7 +432,12 @@ fm_herdr_lab_provision() { # <session>
     }
     fm_herdr_lab_check_tripwire "$name" || return 1
   else
-    fm_herdr_lab_prepare "$name" || return 1
+    tripwire=$(fm_herdr_lab_tripwire_path "$name")
+    if [ -f "$tripwire" ]; then
+      fm_herdr_lab_check_tripwire "$name" || return 1
+    else
+      fm_herdr_lab_prepare "$name" || return 1
+    fi
   fi
   fm_herdr_lab_raw "$name" server >/dev/null 2>&1 &
   server_pid=$!

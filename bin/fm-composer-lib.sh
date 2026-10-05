@@ -807,7 +807,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   FM_COMPOSER_SCAN_BOX_OMP=0
   local box_omp=0
-  local bare_line bare_indent literal_floor literal_indent
+  local bare_line bare_indent literal_line literal_indent literal_row literal_rows
   FM_COMPOSER_SCAN_BARE_LITERAL_ROWS='|'
   pi_max=$FM_COMPOSER_PI_MAX_LINES
   case "$pi_max" in ''|*[!0-9]*|0) pi_max=8 ;; esac
@@ -838,16 +838,25 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
        && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ]; then
       bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
       bare_indent=${bare_line%%[![:space:]]*}
-      literal_floor=$(_fm_composer_screen_row "$((row + 1))" "$pane")
-      literal_indent=${literal_floor%%[![:space:]]*}
-      fm_composer_normalize_trim_var literal_floor
-      if [ "${#indent}" -gt "${#bare_indent}" ] && [ "$literal_indent" = "$indent" ] \
+      if [ "${#indent}" -gt "${#bare_indent}" ] \
          && _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
-        case "$literal_floor" in
-          '╰─ ─╯'|'╰─ '*' ─╯')
-            FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${row}|$((row + 1))|"
-            ;;
-        esac
+        literal_row=$((row + 1))
+        literal_rows="${row}|"
+        while :; do
+          literal_line=$(_fm_composer_screen_row "$literal_row" "$pane")
+          literal_indent=${literal_line%%[![:space:]]*}
+          [ "$literal_indent" = "$indent" ] || break
+          fm_composer_normalize_trim_var literal_line
+          literal_rows="${literal_rows}${literal_row}|"
+          case "$literal_line" in
+            '│'*'│') literal_row=$((literal_row + 1)) ;;
+            '╰─ ─╯'|'╰─ '*' ─╯')
+              FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${literal_rows}"
+              break
+              ;;
+            *) break ;;
+          esac
+        done
       fi
     fi
     if _fm_composer_row_is_bare_literal "$row"; then
@@ -1187,13 +1196,17 @@ _fm_composer_screen_row() {  # <n> <screen>
 # ghost-strip when styled, plain otherwise, normalize-trim, and strip one
 # matching pair of side border glyphs.
 _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
-  local raw=$1 styled=$2 omp=${3:-0} stripped
+  local raw=$1 styled=$2 omp=${3:-0} literal=${4:-0} stripped
   if [ "$styled" = 1 ]; then
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
   else
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
   fi
   fm_composer_normalize_trim_var stripped
+  if [ "$literal" = 1 ]; then
+    printf '%s' "$stripped"
+    return 0
+  fi
   # omp's compact box carries input on its floor. Only styled evidence of the
   # idle hint is removable: typing the same words in bright text stays pending.
   case "$stripped" in
@@ -1356,7 +1369,7 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
   row=$g
   while [ "$row" -le "$cy" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" 0 1)
     if [ "$row" -eq "$g" ]; then
       _fm_composer_bare_row_strip_furniture_var content
       if fm_composer_leading_agent_glyph_var glyph "$content"; then
@@ -1631,7 +1644,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0 literal=0
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1642,10 +1655,11 @@ EOF
   _fm_composer_scan_screen "$plain" '' 1
   _fm_composer_select_cursorless "$plain" || return 1
   [ "$FM_COMPOSER_SELECTED_KIND" != box ] || omp=$FM_COMPOSER_SCAN_BOX_OMP
+  case "$FM_COMPOSER_SELECTED_KIND" in bare|pi) literal=1 ;; esac
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled" "$omp")
+    content=$(_fm_composer_row_content "$raw" "$styled" "$omp" "$literal")
     placeholder_position=0
     case "$FM_COMPOSER_SELECTED_KIND" in
       bare)
@@ -1869,7 +1883,7 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
   row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
   while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" 0 1)
     fm_composer_normalize_trim_var content
     if [ -n "$content" ]; then
       printf 'pending'

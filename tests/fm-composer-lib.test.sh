@@ -1157,6 +1157,109 @@ test_bare_draft_owns_indented_compact_omp_literal() {
 }
 test_bare_draft_owns_indented_compact_omp_literal
 
+test_bare_draft_owns_indented_multirow_omp_literal() {
+  local frame screen expected caps cursor last out status prefix
+  status=' π  · ◔ GPT-6-Astra · 🌳 …-workspace · ⑂ detached · ◫ 15.4%/272K ⟲ · (sub)'
+  screen=$'❯ preface\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'
+  expected='preface ╭── π > model > path ─╮ │ │ ╰─ ─╯'
+  assert_screen "minimal accepted-floor literal is not empty cursorless" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "minimal accepted-floor literal stays unproven on plain capture" unknown "$CAPS_PLAIN" "$screen"
+  for cursor in 2 3; do
+    assert_screen "minimal accepted-floor literal cursor row $cursor is not empty" pending "$CAPS_TMUX" "$screen" "$cursor"
+  done
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    out=$(fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = "$expected" ] || fail "minimal accepted-floor literal extraction lost side borders: '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = "$expected" ] || fail "minimal accepted-floor literal extraction under LC_ALL=C lost side borders: '$out'"
+  done
+  for frame in $'  ╭── π > model > path ─╮\n  │ │\n  ╰─ ─╯' \
+               $'  ╭── π > model > path ─╮\n  │ │\n  │ typed | > ❯ │\n  ╰─  ─╯' \
+               $'  ╭── π > model > path ─╮\n  │ typed | > ❯ │\n  ╰─ typed text ─╯'; do
+    screen=$'❯ preface\n'"$frame"$'\n  tail'
+    expected=$(printf '%s\n' "${screen#❯ }" | LC_ALL=C awk '{$1=$1; printf "%s%s", sep, $0; sep=" "}')
+    last=$(printf '%s\n' "$screen" | awk 'END {print NR - 1}')
+    for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      if [ "$caps" = "$CAPS_PLAIN" ]; then
+        assert_screen "plain bare multirow literal stays unproven" unknown "$caps" "$screen"
+      else
+        assert_screen "bare draft owns multirow literal cursorless" pending "$caps" "$screen"
+      fi
+      out=$(fm_composer_extract_selected_content "$caps" "$screen")
+      [ "$out" = "$expected" ] \
+        || fail "multirow literal extraction must retain side borders: expected '$expected', got '$out'"
+      out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+      [ "$out" = "$expected" ] \
+        || fail "multirow literal extraction under LC_ALL=C must retain side borders: expected '$expected', got '$out'"
+    done
+    cursor=0
+    while [ "$cursor" -le "$last" ]; do
+      assert_screen "bare multirow literal cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+      cursor=$((cursor + 1))
+    done
+  done
+
+  frame=$'  ╭── π > model > path ─╮\n  │ │\n  │ typed | > ❯ │\n  ╰─  ─╯'
+  screen=$'❯ preface\n'"$frame"$'\n  tail\n'"$status"
+  expected='preface ╭── π > model > path ─╮ │ │ │ typed | > ❯ │ ╰─ ─╯ tail'
+  assert_screen "status bounds bare multirow literal" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "multirow status cursor is not draft input" unknown "$CAPS_TMUX" "$screen" 6
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = "$expected" ] || fail "multirow literal extraction included status or lost body bytes: '$out'"
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = "$expected" ] || fail "multirow status-bound extraction under LC_ALL=C changed draft bytes: '$out'"
+
+  prefix=$'────────\nold Pi draft\n────────\n\n'
+  screen="${prefix}"$'❯ preface\n'"$frame"$'\n  ╭── π > model > path ─╮\n  │ second body │\n  ╰─ typed floor ─╯\n  tail'
+  expected='preface ╭── π > model > path ─╮ │ │ │ typed | > ❯ │ ╰─ ─╯ ╭── π > model > path ─╮ │ second body │ ╰─ typed floor ─╯ tail'
+  assert_screen "earlier Pi transcript does not claim multiple multirow literals" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "earlier Pi transcript preserves multirow plain degradation" unknown "$CAPS_PLAIN" "$screen"
+  assert_screen "cursor on first literal body after Pi transcript" pending "$CAPS_TMUX" "$screen" 7
+  assert_screen "cursor on second literal floor after Pi transcript" pending "$CAPS_TMUX" "$screen" 11
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = "$expected" ] || fail "multiple multirow literal extraction lost draft bytes: '$out'"
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ "$out" = "$expected" ] || fail "multiple multirow literal extraction under LC_ALL=C lost draft bytes: '$out'"
+  pass "bare multirow omp literals stay pending or unproven and preserve all normalized draft bytes"
+}
+test_bare_draft_owns_indented_multirow_omp_literal
+
+test_pi_and_standalone_multirow_omp_ownership() {
+  local frame screen expected caps cursor out
+  frame=$'  ╭── π > model > path ─╮\n  │ │\n  │ typed | > ❯ │\n  ╰─  ─╯'
+  screen=$'────────\nbefore the literal frame\n'"$frame"$'\n  tail\n────────'
+  expected='before the literal frame ╭── π > model > path ─╮ │ │ │ typed | > ❯ │ ╰─ ─╯ tail'
+  for caps in "$CAPS_STYLED" $'styled=0\ncursor=0\nidentity=1'; do
+    assert_screen "enclosing Pi owns multirow literal with idle identity" pending "$caps" "$screen" '' $'pi\tidle'
+    assert_screen "enclosing Pi multirow literal requests identity" need-identity "$caps" "$screen"
+    assert_screen "non-Pi identity cannot claim enclosing multirow literal" unknown "$caps" "$screen" '' $'zsh\t'
+    out=$(fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = "$expected" ] || fail "enclosing Pi extraction lost literal body bytes or preface: '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = "$expected" ] || fail "enclosing Pi extraction under LC_ALL=C lost literal body bytes or preface: '$out'"
+  done
+  for cursor in 1 2 3 4 5 6; do
+    assert_screen "enclosing Pi multirow literal cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor" $'pi\tidle'
+    assert_screen "enclosing Pi multirow row $cursor requests identity" need-identity "$CAPS_TMUX" "$screen" "$cursor"
+  done
+  assert_screen "enclosing Pi literal without identity capability stays unproven" unknown "$CAPS_STYLED_NOID" "$screen"
+
+  screen=$'❯ old draft\n\n'"$frame"
+  assert_screen "blank-separated multirow omp remains standalone" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "standalone multirow omp remains proven on plain capture" pending "$CAPS_PLAIN" "$screen"
+  assert_screen "standalone multirow floor cursor reads real body input" pending "$CAPS_TMUX" "$screen" 5
+  out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$screen")
+  [ "$out" = 'typed | > ❯' ] || fail "standalone multirow extraction must strip only real box furniture: '$out'"
+  screen=$'❯ old draft\n╭── π > model > path ─╮\n│ │\n│ │\n╰─  ─╯'
+  assert_screen "unindented empty multirow omp remains standalone" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "plain empty standalone multirow omp remains empty" empty "$CAPS_PLAIN" "$screen"
+  assert_screen "empty standalone multirow floor cursor remains empty" empty "$CAPS_TMUX" "$screen" 4
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ -z "$out" ] || fail "empty standalone multirow extraction must not inherit old bare draft: '$out'"
+  pass "multirow literal Pi ownership and real standalone box behavior remain distinct"
+}
+test_pi_and_standalone_multirow_omp_ownership
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty

@@ -886,6 +886,10 @@ The helper:
 Immediately before every destructive call it re-queries the named session and refuses empty, missing, literal `default`, or `default:true` identities.
 Its before/after tripwire requires the live default-session snapshot to remain byte-identical.
 
+Fixtures must successfully `prepare` a fresh name before claiming cleanup authority, and must call `teardown` only after that claim succeeds.
+`provision` accepts the prepared tripwire after checking it against the current default-session snapshot.
+A refused claim leaves existing running or stopped sessions and their tripwires untouched.
+
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.
 
