@@ -1,0 +1,13 @@
+ok - claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store
+ok - config/claude-permission-mode=auto replaces --dangerously-skip-permissions with --permission-mode auto
+ok - config/claude-permission-mode=auto reaches scout launches too
+ok - a chained raw launch commits through the AI-trailer strip in every step
+Commit object from executed compound launch:
+fix: chained raw launch
+
+Executed launch probe: config-dir
+Delivered value: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-spawn-dispatch-profile.lafakj/profile-claude-cfgdir/claude-work
+Executed launch probe: permissions
+Delivered value: --permission-mode auto
+Executed launch probe: permissions
+Delivered value: --permission-mode auto

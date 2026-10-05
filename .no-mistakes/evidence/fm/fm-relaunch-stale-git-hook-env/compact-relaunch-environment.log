@@ -1,0 +1,5 @@
+Executed environment probe: a relaunched agent with allowlist=absent must start with the compact adviser disabled, exactly as a fresh spawn does
+Delivered COMPACT_ADVISER_DISABLE=1
+Executed environment probe: a relaunched agent with allowlist=enabled must start with the compact adviser disabled, exactly as a fresh spawn does
+Delivered COMPACT_ADVISER_DISABLE=1
+ok - relaunch rebuilds the compact-adviser switch for the replacement agent in both allowlist postures

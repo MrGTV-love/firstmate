@@ -1,0 +1,16 @@
+
+[bash] worker Git scope (task=hooks-relaunch-bash-65912 pane=%1 endpoint=firstmate:fm-hooks-relaunch-bash-65912)
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.yc0ZlA/relaunch-bash/home/state/hooks-relaunch-bash-65912.git-hooks
+
+[bash] worker Git scope (task=hooks-relaunch-bash-65912 pane=%1 endpoint=firstmate:fm-hooks-relaunch-bash-65912)
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.yc0ZlA/relaunch-bash/home/state/hooks-relaunch-bash-65912.git-hooks
+
+[bash] observed assertion state
+observed: keep-ai-trailers relaunch retained the obsolete command-scope strip override
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.yc0ZlA/relaunch-bash/home/state/hooks-relaunch-bash-65912.git-hooks
+not ok - keep-ai-trailers relaunch retained the obsolete command-scope strip override (expected 'local	.project-hooks', got 'local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.yc0ZlA/relaunch-bash/home/state/hooks-relaunch-bash-65912.git-hooks')

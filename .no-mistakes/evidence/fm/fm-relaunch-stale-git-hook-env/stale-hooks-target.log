@@ -1,0 +1,260 @@
+
+[bash] worker Git scope (task=hooks-relaunch-bash-81485 pane=%1 endpoint=firstmate:fm-hooks-relaunch-bash-81485)
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/hooks-relaunch-bash-81485.git-hooks
+
+[bash] worker Git scope (task=hooks-relaunch-bash-81485 pane=%1 endpoint=firstmate:fm-hooks-relaunch-bash-81485)
+local	.project-hooks
+
+[bash] observed assertion state
+observed: keep-ai-trailers relaunch retained the obsolete command-scope strip override
+actual:
+local	.project-hooks
+
+[bash] observed assertion state
+observed: relaunch lost or evaluated unrelated numbered Git configuration
+actual:
+first value
+literal $(false); tail
+
+[bash] observed assertion state
+observed: relaunch lost explicit operator configuration
+actual:
+command	explicit
+
+[bash] observed assertion state
+observed: relaunch replaced the endpoint
+actual:
+firstmate:fm-hooks-relaunch-bash-81485
+
+[bash] observed assertion state
+observed: relaunch replaced the pane
+actual:
+%1
+
+[bash] observed assertion state
+observed: relaunch replaced the isolated copy
+actual:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/wt
+
+[bash] observed assertion state
+observed: strip launch lost operator routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/hooks-relaunch-bash-81485.git-hooks
+
+[bash] observed assertion state
+observed: strip launch lost unrelated configuration
+actual:
+operator
+
+[bash] observed assertion state
+observed: strip launch lost operator routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/hooks-relaunch-bash-81485.git-hooks
+
+[bash] observed assertion state
+observed: strip launch lost unrelated configuration
+actual:
+operator
+
+[bash] observed assertion state
+observed: allowlisted keep-ai-trailers worker selected a command-scope hook override
+actual:
+local	.project-hooks
+
+[bash] observed assertion state
+observed: allowlist leaked unrelated pane Git configuration
+actual:
+
+
+[bash] observed assertion state
+observed: allowlisted relaunch replaced the endpoint
+actual:
+firstmate:fm-hooks-relaunch-bash-81485
+
+[bash] observed assertion state
+observed: allowlisted relaunch replaced the pane
+actual:
+%1
+
+[bash] observed assertion state
+observed: allowlisted relaunch replaced the isolated copy
+actual:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/wt
+
+[bash] observed assertion state
+observed: persistent pane retained obsolete hooks or lost operator routing
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/other.git-hooks
+
+[bash] observed assertion state
+observed: persistent pane lost unrelated Git configuration
+actual:
+operator
+persistent pane numbered Git environment:
+GIT_CONFIG_VALUE_0=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/other.git-hooks
+GIT_CONFIG_VALUE_1=operator
+GIT_CONFIG_GLOBAL=/dev/null
+GIT_CONFIG_NOSYSTEM=1
+GIT_CONFIG_KEY_0=core.hooksPath
+GIT_CONFIG_KEY_1=fixture.preserved
+GIT_CONFIG_COUNT=2
+
+[bash] observed assertion state
+observed: allowlisted strip worker lost task hooks or inherited operator routing
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/hooks-relaunch-bash-81485.git-hooks
+
+[bash] observed assertion state
+observed: strip launch bypassed the environment filter
+actual:
+
+
+[bash] observed assertion state
+observed: allowlisted strip launch lost pane routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-bash/home/state/hooks-relaunch-bash-81485.git-hooks
+
+[bash] observed assertion state
+observed: allowlisted strip launch lost pane Git configuration
+actual:
+operator
+ok - supported same-task bash tmux relaunch reconciles generated hooks and preserves operator configuration
+
+[ksh] worker Git scope (task=hooks-relaunch-ksh-81485 pane=%1 endpoint=firstmate:fm-hooks-relaunch-ksh-81485)
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/hooks-relaunch-ksh-81485.git-hooks
+
+[ksh] worker Git scope (task=hooks-relaunch-ksh-81485 pane=%1 endpoint=firstmate:fm-hooks-relaunch-ksh-81485)
+local	.project-hooks
+
+[ksh] observed assertion state
+observed: keep-ai-trailers relaunch retained the obsolete command-scope strip override
+actual:
+local	.project-hooks
+
+[ksh] observed assertion state
+observed: relaunch lost or evaluated unrelated numbered Git configuration
+actual:
+first value
+literal $(false); tail
+
+[ksh] observed assertion state
+observed: relaunch lost explicit operator configuration
+actual:
+command	explicit
+
+[ksh] observed assertion state
+observed: relaunch replaced the endpoint
+actual:
+firstmate:fm-hooks-relaunch-ksh-81485
+
+[ksh] observed assertion state
+observed: relaunch replaced the pane
+actual:
+%1
+
+[ksh] observed assertion state
+observed: relaunch replaced the isolated copy
+actual:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/wt
+
+[ksh] observed assertion state
+observed: strip launch lost operator routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/hooks-relaunch-ksh-81485.git-hooks
+
+[ksh] observed assertion state
+observed: strip launch lost unrelated configuration
+actual:
+operator
+
+[ksh] observed assertion state
+observed: strip launch lost operator routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/hooks-relaunch-ksh-81485.git-hooks
+
+[ksh] observed assertion state
+observed: strip launch lost unrelated configuration
+actual:
+operator
+
+[ksh] observed assertion state
+observed: allowlisted keep-ai-trailers worker selected a command-scope hook override
+actual:
+local	.project-hooks
+
+[ksh] observed assertion state
+observed: allowlist leaked unrelated pane Git configuration
+actual:
+
+
+[ksh] observed assertion state
+observed: allowlisted relaunch replaced the endpoint
+actual:
+firstmate:fm-hooks-relaunch-ksh-81485
+
+[ksh] observed assertion state
+observed: allowlisted relaunch replaced the pane
+actual:
+%1
+
+[ksh] observed assertion state
+observed: allowlisted relaunch replaced the isolated copy
+actual:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/wt
+
+[ksh] observed assertion state
+observed: persistent pane retained obsolete hooks or lost operator routing
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/other.git-hooks
+
+[ksh] observed assertion state
+observed: persistent pane lost unrelated Git configuration
+actual:
+operator
+persistent pane numbered Git environment:
+GIT_CONFIG_COUNT=2
+GIT_CONFIG_GLOBAL=/dev/null
+GIT_CONFIG_KEY_0=core.hooksPath
+GIT_CONFIG_KEY_1=fixture.preserved
+GIT_CONFIG_NOSYSTEM=1
+GIT_CONFIG_VALUE_0=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/other.git-hooks
+GIT_CONFIG_VALUE_1=operator
+
+[ksh] observed assertion state
+observed: allowlisted strip worker lost task hooks or inherited operator routing
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/hooks-relaunch-ksh-81485.git-hooks
+
+[ksh] observed assertion state
+observed: strip launch bypassed the environment filter
+actual:
+
+
+[ksh] observed assertion state
+observed: allowlisted strip launch lost pane routing or accumulated generated entries
+actual:
+local	.project-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/other.git-hooks
+command	/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M45B303VFRE0SMS32M722XNX/.gate-live-validation/tmp/fm-git-strip-ai-trailers.HMTshf/relaunch-ksh/home/state/hooks-relaunch-ksh-81485.git-hooks
+
+[ksh] observed assertion state
+observed: allowlisted strip launch lost pane Git configuration
+actual:
+operator
+ok - supported same-task ksh tmux relaunch reconciles generated hooks and preserves operator configuration
