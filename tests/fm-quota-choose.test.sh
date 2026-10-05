@@ -58,6 +58,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$FAKEBIN"
+mkdir -p "$LAB/home/config"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 [ "$1" = usage ] || exit 2
@@ -172,7 +173,7 @@ QUOTA_AXI_CALLS="$CALLS" QUOTA_AXI_FIXTURE="$FIXTURE" "$FAKEBIN/quota-axi" --jso
 call_choose() {
   local output rc call_count
   output=$(QUOTA_AXI_CALLS="$CALLS" QUOTA_AXI_FIXTURE="$FIXTURE" \
-    PATH="$FAKEBIN:$PATH" "$BIN/fm-quota-choose.sh" "$@")
+    PATH="$FAKEBIN:$PATH" FM_HOME="$LAB/home" "$BIN/fm-quota-choose.sh" "$@")
   rc=$?
   call_count=$(wc -l < "$CALLS" | tr -d '[:space:]')
   [ "$call_count" = 1 ] || fail "helper took an additional quota snapshot"
@@ -342,6 +343,17 @@ ok "empty model candidate fails closed"
 out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude)
 [ "$out" = "claude default" ] || fail "bare harness: expected 'claude default', got '$out'"
 ok "bare harness maps to default model"
+
+for scope_file in claude-launcher claude-account; do
+  case "$scope_file" in
+    claude-launcher) printf 'teamclaude\n' > "$LAB/home/config/$scope_file" ;;
+    claude-account) printf 'different-account\n' > "$LAB/home/config/$scope_file" ;;
+  esac
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+  [ "$out" = "codex gpt-6.1-sol" ] || fail "unmapped Claude authentication used native account headroom: $out"
+  rm "$LAB/home/config/$scope_file"
+done
+ok "native Claude headroom cannot rank a proxy or different account pin"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi
