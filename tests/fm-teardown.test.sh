@@ -1515,9 +1515,10 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   local case_dir rc out
   case_dir=$(make_case windowless-retry)
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   add_failing_truncate_perl "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
 
   set +e
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
@@ -1527,8 +1528,7 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   [ "$(legacy_meta_gen_count "$case_dir")" = 1 ] \
     || fail "windowless-retry: the failed attempt did not leave its legacy stamp on the record"
 
-  rm -f "$case_dir/fakebin/perl"
-  sed -i.bak '/^pr=/d' "$case_dir/state/task-x1.meta" && rm -f "$case_dir/state/task-x1.meta.bak"
+  rm -f "$case_dir/fakebin/perl" "$case_dir/fakebin/mv"
   out=$(run_teardown "$case_dir") \
     || fail "windowless-retry: the flag-less retry refused the retained legacy stamp"
   printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
