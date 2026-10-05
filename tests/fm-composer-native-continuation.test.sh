@@ -47,7 +47,22 @@ test_native_prompt_continuations_own_literal_frames() {
         assert_screen "native '$continuation' literal frame cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
         cursor=$((cursor + 1))
       done
+      screen=$'❯ \n  '"$continuation"$'\n'"$frame"
+      for cursor in 0 1; do
+        assert_screen "empty native root with '$continuation' literal frame cursor row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+      done
+      assert_screen "plain empty native root with '$continuation' literal frame" unknown \
+        $'styled=0\ncursor=1\nidentity=0\nrows=20' "$screen" 0
     done
+  done
+  screen=$'❯ '
+  assert_screen "native root after removing the multiline draft" empty "$CAPS_TMUX" "$screen" 0
+  screen=$'  ❯ \n    → nested draft\n    ╭── π > model > path ─╮\n    │ │\n    ╰─ ─╯'
+  assert_screen "indented empty native root retains its owned draft" pending "$CAPS_TMUX" "$screen" 0
+  for continuation in '❯ nested draft' '› nested draft' '⟩ nested draft' '→ nested draft'; do
+    screen=$'❯ \n '"$continuation"$'\n╭── π > model > path ─╮\n│ │\n╰─  ─╯'
+    assert_screen "insufficient native gutter before '$continuation' does not claim the cursor" unknown "$CAPS_TMUX" "$screen" 0
+    assert_screen "insufficient native gutter before '$continuation' leaves standalone frame empty" empty "$CAPS_TMUX" "$screen" 4
   done
 
   screen=$'  ❯ preface\n      > quote\n    # heading\n    $ command\n    % command\n    ❯ nested draft\n    › nested draft\n    ⟩ nested draft\n    → nested draft\n    ╭── π > model > path ─╮\n    │ │\n    ╰─  ─╯'

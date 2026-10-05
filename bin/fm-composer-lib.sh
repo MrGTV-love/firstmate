@@ -1779,6 +1779,23 @@ EOF
         "$FM_COMPOSER_SCAN_LEFTBAR_START" "$FM_COMPOSER_SCAN_LEFTBAR_END"
       return 0
     fi
+    if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -ge "$FM_COMPOSER_SCAN_BARE_ROW" ] \
+       && [ "$FM_COMPOSER_SCAN_BARE_LITERAL_ROWS" != '|' ] \
+       && ! { [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+              && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+              && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; } \
+       && _fm_composer_wrap_region_ok "$plain" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"; then
+      local bare_last=$FM_COMPOSER_SCAN_BARE_ROW next=$((FM_COMPOSER_SCAN_BARE_ROW + 1)) owned=0
+      while _fm_composer_wrap_region_ok "$plain" "$((next - 1))" "$next"; do
+        bare_last=$next
+        if _fm_composer_row_is_bare_literal "$next"; then owned=1; fi
+        next=$((next + 1))
+      done
+      if [ "$owned" = 1 ] && [ "$cy" -le "$bare_last" ]; then
+        _fm_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$bare_last"
+        return 0
+      fi
+    fi
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$FM_COMPOSER_SCAN_BARE_ROW" ]; then
       if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
          && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
