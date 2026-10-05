@@ -45,6 +45,7 @@ relaunch_cleanup() {
   for d in "${TASK_TMPS[@]:-}"; do
     [ -n "$d" ] && rm -rf "$d"
   done
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
 }
 trap relaunch_cleanup EXIT
@@ -52,6 +53,40 @@ trap relaunch_cleanup EXIT
 # The same lifecycle-modelling tmux stub as tests/fm-control.test.sh: the
 # harness's exit command stops the agent, and a launch-brief literal starts the
 # harness named in `becomes`.
+make_process_table_stub() { # <case-dir>
+  cat > "$1/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+D=$FM_FAKE_DIR
+if [ "$*" = '-axww -o uid=,pid=,comm=' ]; then
+  mode=$(cat "$D/process-mode" 2>/dev/null || printf live)
+  uid=$(id -u)
+  case "$mode" in
+    broken) exit 1 ;;
+    empty) exit 0 ;;
+    malformed) printf 'not a process row\n'; exit 0 ;;
+    transient)
+      if [ -f "$D/process-read" ]; then mode=live; else : > "$D/process-read"; mode=none; fi
+      ;;
+  esac
+  if [ -s "$D/created-windows" ] || [ -s "$D/created-sessions" ]; then mode=live; fi
+  printf '%s 111 bash\n' "$uid"
+  case "$mode" in
+    live) printf '%s 222 /usr/local/bin/tmux: server\n' "$uid" ;;
+    foreign) printf '%s 222 tmux: server\n' "$((uid + 1))" ;;
+  esac
+  exit 0
+fi
+if [ -f "$D/herdr-agent-registration" ]; then
+  case "$*" in
+    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n'; exit 0 ;;
+    '-p 4242 -o args=') printf 'bash\n'; exit 0 ;;
+  esac
+fi
+exec /bin/ps "$@"
+SH
+  chmod +x "$1/fakebin/ps"
+}
+
 make_tmux_stub() {  # <dir>
   local fb="$1/fakebin"
   mkdir -p "$fb"
@@ -159,15 +194,21 @@ case "${1:-}" in
     # answering `missing`. Echo a stable window id the way the real -P -F does.
     shift
     name=
+    cwd=
+    ses=
     while [ $# -gt 0 ]; do
       case "$1" in
         -n) name=${2:-}; shift 2 ;;
-        -c|-t) shift 2 ;;
+        -c) cwd=${2:-}; shift 2 ;;
+        -t) ses=${2%:}; shift 2 ;;
         *) shift ;;
       esac
     done
     printf '%s\n' "$name" >> "$D/windows"
     printf '%s\n' "$name" >> "$D/created-windows"
+    printf '%s' "$cwd" > "$D/cwd"
+    printf '%s' "$ses" > "$D/session-name"
+    rm -f "$D/server-dead" "$D/session-missing"
     printf '@9\n'
     exit 0 ;;
 esac
@@ -180,6 +221,7 @@ SH
 exit 0
 SH
   chmod +x "$fb/sleep"
+  make_process_table_stub "$1"
 }
 
 # new_case <name> [id] -> echoes a case dir with a live claude ship task.
@@ -238,6 +280,7 @@ run_control() {  # <case-dir> <args...>
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HERDR_SESSION="${FM_FAKE_SESSION:-}" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -1879,12 +1922,8 @@ strand_endpoint() {  # <case-dir> <id>
   : > "$1/fake/windows"
 }
 
-# Every tmux `missing` refuses on BOTH verbs, whatever produced it. tmux is the
-# one verified backend whose absence cannot be proven from a task record: the
-# record carries no socket identity for the endpoint, and any inventory
-# describes only the server this process happens to address. So a window that
-# is merely on a server this seat cannot reach is indistinguishable from one
-# that was destroyed, and neither verb will guess.
+# A missing endpoint still refuses while ANY user-owned tmux process exists,
+# including a server on a foreign socket. Socket-local absence is not proof.
 assert_tmux_missing_refuses() {  # <case-dir> <id> <what-was-staged>
   local dir=$1 id=$2 what=$3 out rc brief_before
 
@@ -1940,6 +1979,117 @@ test_tmux_refuses_when_the_server_is_gone() {
   : > "$dir/fake/server-dead"
   assert_tmux_missing_refuses "$dir" rl62 "no tmux server on this socket"
   pass "tmux: a dead server on this socket refuses both verbs rather than proving absence"
+}
+
+test_tmux_process_read_uncertainty_refuses() {
+  local dir mode
+  for mode in broken empty malformed transient; do
+    dir=$(new_case "tmux-process-$mode" "rl80$mode")
+    add_ship_task "$dir" "rl80$mode"
+    : > "$dir/fake/server-dead"
+    printf '%s' "$mode" > "$dir/fake/process-mode"
+    assert_tmux_missing_refuses "$dir" "rl80$mode" "process read $mode"
+  done
+  pass "tmux: unreadable, empty, malformed and changing process snapshots refuse both verbs"
+}
+
+test_tmux_zero_processes_with_readable_inventory_refuses() {
+  local dir
+  dir=$(new_case tmux-contradiction rl81)
+  add_ship_task "$dir" rl81
+  strand_endpoint "$dir" rl81
+  printf none > "$dir/fake/process-mode"
+  assert_tmux_missing_refuses "$dir" rl81 "a server inventory contradicts the process snapshot"
+  pass "tmux: a readable server contradicting the process snapshot refuses"
+}
+
+test_tmux_no_server_reclaim_keeps_work_and_task() {
+  local dir second out rc head_before mode id wt first_id second_id first_endpoint
+  command -v jq >/dev/null 2>&1 || { echo 'skip - configured Herdr reclaim needs jq'; return; }
+  for mode in none foreign; do
+    first_id="rl82${mode}a"
+    second_id="rl82${mode}b"
+    dir=$(new_case "tmux-no-user-server-$mode" "$first_id")
+    second=$(new_case "tmux-second-$mode" "$second_id")
+    add_ship_task "$dir" "$first_id"
+    add_ship_task "$second" "$second_id"
+    cp "$second/home/state/$second_id.meta" "$dir/home/state/$second_id.meta"
+    mkdir -p "$dir/home/data/$second_id"
+    cp "$second/home/data/$second_id/brief.md" "$dir/home/data/$second_id/brief.md"
+    make_herdr_stub "$dir"
+    printf '%s' "$mode" > "$dir/fake/process-mode"
+    : > "$dir/fake/server-dead"
+    : > "$dir/fake/stale-socket"
+    printf '%%none' > "$dir/fake/herdr-pane"
+    : > "$dir/fake/herdr-log"
+    : > "$dir/fake/herdr-stopped"
+    mkdir -p "$dir/home/config"
+    printf herdr > "$dir/home/config/backend"
+    first_endpoint=
+    for id in "$first_id" "$second_id"; do
+      wt=$(meta_field "$dir" "$id" worktree)
+      head_before=$(git -C "$wt" rev-parse HEAD)
+      printf 'unlanded content\n' > "$wt/dirty.txt"
+      printf 'working: preserved history\n' > "$dir/home/state/$id.status"
+      printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/$id.check.sh"
+      chmod 0700 "$dir/home/state/$id.check.sh"
+      FM_HOME="$dir/home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "cannot arm reclaim check"
+      out=$(run_control "$dir" "$id" exit); rc=$?
+      expect_code 0 "$rc" "no user tmux server should prove exit for $id"$'\n'"$out"
+      assert_contains "$out" endpoint-gone "exit should report proven absence"
+      out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
+      expect_code 0 "$rc" "no user tmux server should permit Herdr reclaim for $id"$'\n'"$out"
+      [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr"
+      [ "$(meta_field "$dir" "$id" endpoint_task_id)" = "$id" ] || fail "reclaim changed task identity"
+      [ "$(meta_field "$dir" "$id" worktree)" = "$wt" ] || fail "reclaim changed the local copy"
+      [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] || fail "reclaim moved the branch head"
+      [ "$(git -C "$wt" symbolic-ref --short HEAD)" = "task-$id" ] || fail "reclaim switched branches"
+      [ "$(cat "$wt/dirty.txt")" = "unlanded content" ] || fail "reclaim lost uncommitted work"
+      assert_present "$dir/home/state/$id.check-trust" "reclaim broke armed poll registration"
+      assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "reclaim truncated status"
+      assert_contains "$(cat "$dir/home/data/$id/brief.md")" "resume after reboot" "reclaim omitted note"
+      assert_absent "$dir/fake/created-windows" "Herdr reclaim created a tmux endpoint"
+      assert_absent "$dir/fake/created-sessions" "Herdr reclaim started a tmux server"
+      if [ "$id" = "$first_id" ]; then
+        first_endpoint=$(meta_field "$dir" "$id" window)
+        [ "$first_endpoint" = 'fmlab:%9' ] || fail "first replacement has the wrong binding"
+      else
+        [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%10' ] || fail "second replacement has the wrong binding"
+      fi
+    done
+    [ "$(meta_field "$dir" "$first_id" window)" = "$first_endpoint" ] || fail "second reclaim rebound the first task"
+    [ "$(wc -l < "$dir/fake/herdr-created-tabs" | tr -d ' ')" = 2 ] || fail "reclaim did not create exactly two tabs"
+    for id in "$first_id" "$second_id"; do
+      out=$(run_control "$dir" "$id" interrupt); rc=$?
+      expect_code 0 "$rc" "both replacement agents must remain reachable and alive"$'\n'"$out"
+    done
+  done
+  pass "tmux: two missing tasks reclaim sequentially onto Herdr, preserving work, note and poll"
+}
+
+test_tmux_reclaim_refuses_other_configured_backends() {
+  local dir backend out rc before brief_before
+  for backend in tmux zellij cmux orca unknown; do
+    dir=$(new_case "tmux-reclaim-$backend" "rl84$backend")
+    add_ship_task "$dir" "rl84$backend"
+    printf none > "$dir/fake/process-mode"
+    : > "$dir/fake/server-dead"
+    mkdir -p "$dir/home/config"
+    printf '%s' "$backend" > "$dir/home/config/backend"
+    before=$(cat "$dir/home/state/rl84$backend.meta")
+    brief_before=$(cat "$dir/home/data/rl84$backend/brief.md")
+    out=$(run_spawn "$dir" "rl84$backend" --relaunch); rc=$?
+    expect_code 1 "$rc" "direct reclaim must refuse configured $backend"$'\n'"$out"
+    out=$(run_control "$dir" "rl84$backend" relaunch --note "resume"); rc=$?
+    expect_code 1 "$rc" "control reclaim must refuse configured $backend"$'\n'"$out"
+    [ "$(cat "$dir/home/state/rl84$backend.meta")" = "$before" ] || fail "refused reclaim changed binding"
+    assert_contains "$(cat "$dir/home/data/rl84$backend/brief.md")" "$brief_before" "refused reclaim lost prior instructions"
+    assert_absent "$dir/fake/created-windows" "refused reclaim created a tmux endpoint"
+    assert_absent "$dir/fake/created-sessions" "refused reclaim started a tmux server"
+    assert_absent "$dir/fake/herdr-created-tabs" "refused reclaim created a Herdr endpoint"
+    [ ! -s "$dir/fake/literal" ] || fail "refused reclaim delivered launch input"
+  done
+  pass "tmux: no-server reclaim refuses every configured backend other than Herdr"
 }
 
 test_reclaim_refuses_an_unreadable_endpoint() {
@@ -2002,7 +2152,10 @@ if [ -f "$D/herdr-stopped" ]; then
 fi
 case "${1:-} ${2:-}" in
   'pane get')
-    if [ "${3:-}" = "$(cat "$D/herdr-pane")" ]; then
+    if [ -f "$D/herdr-cwd-${3:-}" ]; then
+      printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
+        "${3:-}" "$(cat "$D/herdr-cwd-${3:-}")"
+    elif [ "${3:-}" = "$(cat "$D/herdr-pane")" ]; then
       printf '{"result":{"pane":{"pane_id":"%s","foreground_cwd":"%s"}}}\n' \
         "${3:-}" "$(cat "$D/cwd")"
     else
@@ -2014,7 +2167,7 @@ case "${1:-} ${2:-}" in
   'agent get')
     if [ -f "$D/herdr-agent-registration" ]; then
       cat "$D/herdr-agent-registration"
-    elif [ -f "$D/herdr-agent-live" ]; then
+    elif [ -f "$D/herdr-live-${3:-}" ] || { [ ! -f "$D/herdr-cwd-${3:-}" ] && [ -f "$D/herdr-agent-live" ]; }; then
       # The agent came back with its server. Nothing here is reclaimable.
       printf '{"result":{"agent":{"agent_status":"idle"}}}\n'
     else
@@ -2027,10 +2180,10 @@ case "${1:-} ${2:-}" in
     # whose Herdr status authority still belongs to its previous session.
     if [ -f "$D/herdr-agent-registration" ]; then
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[]}}}\n' \
-        "$(cat "$D/herdr-pane")"
+        "${4:-}"
     else
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
-        "$(cat "$D/herdr-pane")"
+        "${4:-}"
     fi
     exit 0 ;;
   'pane send-text')
@@ -2047,6 +2200,7 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
         printf '%s\n' "$payload" > "$D/launched-command"
+        : > "$D/herdr-live-${3:-}"
         : > "$D/herdr-agent-live" ;;
     esac
     exit 0 ;;
@@ -2067,27 +2221,24 @@ case "${1:-} ${2:-}" in
     # The re-created endpoint. Recording it lets a case prove the pane the
     # record ends up naming is the one this call minted.
     printf '%s\n' "$*" >> "$D/herdr-created-tabs"
-    printf '{"result":{"tab":{"tab_id":"tabnew"},"root_pane":{"pane_id":"%%9"}}}\n'
-    # From here on the new pane is the one that reads back.
-    printf '%s' '%9' > "$D/herdr-pane"
+    pane="%$((8 + $(wc -l < "$D/herdr-created-tabs")))"
+    cwd=
+    for ((i=3; i <= $#; i++)); do
+      if [ "${!i}" = --cwd ]; then
+        i=$((i + 1))
+        cwd=${!i}
+        break
+      fi
+    done
+    printf '%s' "$cwd" > "$D/herdr-cwd-$pane"
+    printf '{"result":{"tab":{"tab_id":"tab%s"},"root_pane":{"pane_id":"%s"}}}\n' "${pane#%}" "$pane"
+    printf '%s' "$pane" > "$D/herdr-pane"
     exit 0 ;;
 esac
 exit 0
 SH
   chmod +x "$fb/herdr"
-  cat > "$fb/ps" <<'SH'
-#!/usr/bin/env bash
-if [ -f "$FM_FAKE_DIR/herdr-agent-registration" ]; then
-  case "$*" in
-    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
-    '-p 4242 -o args=') printf 'bash\n' ;;
-    *) exec /bin/ps "$@" ;;
-  esac
-else
-  exec /bin/ps "$@"
-fi
-SH
-  chmod +x "$fb/ps"
+  make_process_table_stub "$1"
 }
 
 # add_herdr_ship_task <case-dir> <id> [session] [surviving-pane]: a ship task
@@ -2481,6 +2632,10 @@ test_spawn_relaunch_refuses_a_pane_outside_the_worktree
 test_tmux_refuses_a_window_missing_from_its_session
 test_tmux_refuses_a_session_that_cannot_be_found
 test_tmux_refuses_when_the_server_is_gone
+test_tmux_process_read_uncertainty_refuses
+test_tmux_zero_processes_with_readable_inventory_refuses
+test_tmux_no_server_reclaim_keeps_work_and_task
+test_tmux_reclaim_refuses_other_configured_backends
 test_reclaim_refuses_an_unreadable_endpoint
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server

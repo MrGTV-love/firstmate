@@ -131,6 +131,19 @@ zsh
 A persistent parent shell waiting for a child remained reported as the parent process, while a shell that directly execed a simple command changed identity with the process itself.
 Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-spawn.sh` launches.
 
+### Control-plane endpoint absence
+
+[Agent lifecycle control](../agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns the reclaim contract.
+Refresh its portable production-command verification with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
+```
+
+The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
+Its process seam also separates a current-user server on another socket from a server owned by another uid.
+The reclaim cases cover two missing tmux tasks in one home, recovered sequentially onto configured Herdr while preserving work, task identity, status, armed polls, and progress notes, plus refusal of every other configured backend.
+
 ### Agent liveness name sources
 
 The earlier record that every harness is observed under its own `#{pane_current_command}` no longer holds and has been replaced by the per-harness evidence below.

@@ -47,30 +47,20 @@
 #              `missing` is put through the control plane's per-backend absence
 #              proof (fm_control_endpoint_absence_verdict) before anything is
 #              claimed about it, because `missing` also covers an endpoint that
-#              is merely unreachable from this seat. That proof exists only on
-#              HERDR, whose reads are scoped to the session the record names:
-#              proven gone reports `endpoint-gone` rather than
-#              `already-stopped`, because the endpoint this verb normally
-#              preserves did not survive; a pane that turns out to be there and
-#              idle is the ordinary `already-stopped`; one whose agent is back
-#              takes the ordinary interrupt-then-exit path. A tmux `missing`
-#              always REFUSES: a task record carries no socket identity for its
-#              endpoint, so this verb cannot tell a destroyed window from one on
-#              a tmux server it cannot address, and it will not claim a stop it
-#              cannot see.
+#              is merely unreachable from this seat. Proven gone reports
+#              `endpoint-gone`; a surviving idle pane is `already-stopped`.
+#              A surviving agent takes the ordinary interrupt-then-exit path.
+#              fm_control_endpoint_absence_verdict owns the backend evidence,
+#              including the machine-wide no-tmux-server proof.
 #   relaunch   Transactionally replace the running agent with a new one, in the
 #              SAME worktree - and the same endpoint whenever that endpoint
 #              still exists - on the same or a newly chosen
 #              harness/model/effort - so switching harness is one ordinary use
 #              of this verb. When the recorded endpoint is instead proven gone -
-#              a Herdr pane or workspace destroyed in churn - the launch owner
-#              re-creates one in that worktree, in the herdr session the record
-#              names, and the task's record rebinds to it; that is how a task
-#              whose terminal was destroyed is reclaimed by the home that owns
-#              it, rather than being stranded with a parked approval nobody can
-#              answer. Reclaim is HERDR-ONLY for the reason `exit` gives above:
-#              a tmux `missing` cannot be proven absent from a task record, so
-#              it refuses.
+#              the launch owner republishes the endpoint binding in that worktree.
+#              Herdr keeps its recorded session; a proven-gone tmux endpoint
+#              may be replaced only with Herdr when the home's current configured
+#              backend resolves to herdr and passes spawn validation.
 #              An explicit `default` model or effort clears that
 #              axis for the replacement. With no explicit axis, a secondmate
 #              re-resolves its durable config/secondmate-harness pin (harness
@@ -1059,6 +1049,7 @@ do_relaunch() {
     if fm_backend_validate_task_endpoint "$META" "$ID" >/dev/null \
        && [ -n "$FM_BACKEND_VALIDATED_TARGET" ]; then
       T=$FM_BACKEND_VALIDATED_TARGET
+      BACKEND=$FM_BACKEND_VALIDATED_BACKEND
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi

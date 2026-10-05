@@ -138,9 +138,9 @@ Being present in the native agent inventory proves detection, but does not prove
 
 ### Moving an existing tmux fleet
 
-Changing backend configuration affects new spawns only.
-The control plane's [`relaunch`](agent-control.md#transactional-relaunch) preserves the task's recorded backend and worktree; it cannot convert a tmux endpoint into a Herdr endpoint.
-Use that control plane for supported agent relaunches, but do not present a relaunch as backend migration or edit endpoint metadata to simulate one.
+Changing backend configuration does not move existing live endpoints.
+For the control plane's narrow exception when a tmux endpoint is proven gone, see the [reclaim policy](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone).
+Use the control plane for supported agent relaunches; never edit endpoint metadata to simulate backend migration.
 
 The supported gradual transition is to select Herdr for future work, let existing tmux workers finish through their ordinary delivery path, and launch subsequent work on Herdr.
 Keep active worktrees, uncommitted changes, and task records intact throughout that transition.
@@ -196,8 +196,7 @@ Rename it manually before expecting new tasks or recovery to use it.
 ### Recovery and existing tasks
 
 Recovery and list-live still scan the first workspace matching the home label, because they address panes they already recorded rather than choosing where new work goes.
-The one recovery that does place new work is the control plane's reclaim of a destroyed endpoint.
-It mints a replacement tab through this section's ordinary placement rules while pinning the herdr session the task's record names ([`agent-control.md`](agent-control.md) "Reclaiming a task whose endpoint is gone").
+Control-plane reclaim places replacement tabs through this section's ordinary placement rules; the [reclaim policy](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns its backend and session constraints.
 
 Existing task operations use recorded endpoint ids and do not move a live task when labels change.
 The per-home workspace is reused while it has task tabs.
