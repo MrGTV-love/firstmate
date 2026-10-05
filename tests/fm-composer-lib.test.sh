@@ -1377,6 +1377,18 @@ test_blank_separated_indented_omp_frames_are_ambiguous() {
   out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
     || fail "later unindented standalone box extraction under LC_ALL=C refused"
   [ -z "$out" ] || fail "later unindented standalone box under LC_ALL=C inherited earlier ambiguous frames: '$out'"
+  screen=$'❯ preface\n  \n  > quote\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯\n  ❯ '
+  assert_screen "prompt transitions before and after a blank-separated frame stay ambiguous" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_extraction_refused "blank-separated frame with surrounding prompt transitions" "$CAPS_STYLED_NOID" "$screen"
+  for cursor in 0 2 5 6; do
+    assert_screen "blank-separated frame with surrounding prompt transitions cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+  done
+  screen="$screen"$'\n❯ '
+  assert_screen "independent margin agent prompt ends native-gutter ambiguity" empty "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "independent margin agent cursor keeps its own empty proof" empty "$CAPS_TMUX" "$screen" 7
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+    || fail "independent margin agent extraction refused"
+  [ -z "$out" ] || fail "independent margin agent inherited ambiguous draft: '$out'"
   screen=$'❯ first draft\n\n'"$frame"$'\n❯ \n\n'"$frame"
   for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1\nrows=20'; do
     for cursor in 0 4 9; do

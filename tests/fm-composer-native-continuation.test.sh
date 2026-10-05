@@ -88,7 +88,7 @@ test_native_prompt_continuations_own_literal_frames() {
         *) shell_row=1 ;;
       esac
       for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-        assert_screen "genuine '$glyph' shell after insufficient gutter or continuity boundary" unknown "$caps" "$screen"
+        assert_screen "'$glyph' shell after insufficient gutter or uncertain continuity" unknown "$caps" "$screen"
         status=0
         out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
         [ "$status" -ne 0 ] && [ -z "$out" ] || fail "genuine '$glyph' shell must refuse extraction, got status $status and '$out'"
@@ -98,12 +98,25 @@ test_native_prompt_continuations_own_literal_frames() {
       done
       assert_screen "genuine '$glyph' shell cursor is not native input" unknown "$CAPS_TMUX" "$screen" "$shell_row"
       screen="$screen"$'\n  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'
-      assert_screen "genuine '$glyph' shell boundary leaves frame independent" empty "$CAPS_STYLED_NOID" "$screen"
-      assert_screen "genuine '$glyph' shell boundary leaves frame floor independent" empty "$CAPS_TMUX" "$screen" "$((shell_row + 3))"
-      out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
-      [ -z "$out" ] || fail "independent frame after genuine '$glyph' shell inherited native draft: '$out'"
-      out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
-      [ -z "$out" ] || fail "independent frame after genuine '$glyph' shell under LC_ALL=C inherited native draft: '$out'"
+      case "$prefix" in
+        *$'\n\n'*)
+          assert_screen "blank-separated native '$glyph' cannot prove an independent frame" unknown "$CAPS_STYLED_NOID" "$screen"
+          assert_screen "blank-separated native '$glyph' frame floor stays ambiguous" unknown "$CAPS_TMUX" "$screen" "$((shell_row + 3))"
+          for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+            status=0
+            out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
+            [ "$status" -ne 0 ] && [ -z "$out" ] || fail "blank-separated native '$glyph' must refuse incomplete extraction"
+          done
+          ;;
+        *)
+          assert_screen "genuine '$glyph' shell boundary leaves frame independent" empty "$CAPS_STYLED_NOID" "$screen"
+          assert_screen "genuine '$glyph' shell boundary leaves frame floor independent" empty "$CAPS_TMUX" "$screen" "$((shell_row + 3))"
+          out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+          [ -z "$out" ] || fail "independent frame after genuine '$glyph' shell inherited native draft: '$out'"
+          out=$(LC_ALL=C fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+          [ -z "$out" ] || fail "independent frame after genuine '$glyph' shell under LC_ALL=C inherited native draft: '$out'"
+          ;;
+      esac
     done
   done
   pass "native gutter-backed prompt literals retain complete frames without claiming genuine shell boundaries"
@@ -185,3 +198,38 @@ test_separator_enclosed_native_prompt_continuations() {
 }
 
 test_separator_enclosed_native_prompt_continuations
+
+test_blank_boundary_prompt_transitions() {
+  local glyph frame transition screen last cursor caps out status
+  for glyph in '>' '$' '%' '#' '❯' '›' '⟩' '→' '❭'; do
+    for frame in $'  ╭── π > model > path ─╮\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  ╰─  ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'; do
+      case "$frame" in *'│ │'*) last=5 ;; *) last=4 ;; esac
+      for transition in before after; do
+        screen=$'❯ preface\n  \n'
+        if [ "$transition" = before ]; then
+          screen="$screen  $glyph quote"$'\n'"$frame"
+        else
+          screen="$screen$frame"$'\n'"  $glyph "
+        fi
+        for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "blank-boundary '$glyph' $transition frame remains ambiguous" unknown "$caps" "$screen"
+          status=0
+          out=$(fm_composer_extract_selected_content "$caps" "$screen") || status=$?
+          [ "$status" -ne 0 ] && [ -z "$out" ] || fail "blank-boundary '$glyph' $transition frame must refuse extraction, got $status '$out'"
+          status=0
+          out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") || status=$?
+          [ "$status" -ne 0 ] && [ -z "$out" ] || fail "blank-boundary '$glyph' $transition frame under LC_ALL=C must refuse extraction"
+        done
+        for cursor in 0 2 "$((last - 1))" "$last"; do
+          assert_screen "blank-boundary '$glyph' $transition frame cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        done
+      done
+    done
+  done
+  pass "blank-boundary prompt glyphs cannot reset native roots or escape frame ambiguity"
+}
+
+test_blank_boundary_prompt_transitions

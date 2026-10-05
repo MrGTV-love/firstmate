@@ -51,6 +51,7 @@ The clear is refused before anything is sent when the recorded backend cannot de
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 For a native editor's proven continuation region, an empty first line under the cursor does not establish an empty composer while owned continuation rows contain pending text, including when solid rules enclose that region. An indented omp-looking frame after a blank continuation cannot establish an independent composer: classification and extraction refuse that ambiguous boundary rather than discard or truncate the possible draft.
+After that blank boundary, native-gutter prompt-looking rows before or after the frame remain ambiguous too; shell or agent glyphs cannot reset the original root or establish fresh empty proof. Independent margin prompts and standalone boxes retain their own boundaries.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.

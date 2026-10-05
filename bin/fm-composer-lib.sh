@@ -819,6 +819,24 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     left_stripped="${line#"${line%%[![:space:]]*}"}"
     trimmed=$left_stripped
     fm_composer_normalize_trim_var trimmed
+    if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -ge 0 ] \
+       && [ "$row" -eq "$((FM_COMPOSER_SCAN_BARE_AMBIG_LAST + 1))" ]; then
+      bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" "$pane")
+      bare_indent=${bare_line%%[![:space:]]*}
+      case "${bare_line#"$bare_indent"}" in
+        '❯ '*)
+          case "$indent" in
+            "$bare_indent  "*)
+              if ! fm_composer_row_has_edge "$trimmed" \
+                 && ! _fm_composer_row_is_omp_status "$trimmed" \
+                 && ! _fm_composer_row_is_braille_furniture "$trimmed"; then
+                FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
+              fi
+              ;;
+          esac
+          ;;
+      esac
+    fi
     if [ "$top" -lt 0 ] && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] \
        && [ "$row" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
@@ -831,6 +849,13 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
             "$bare_indent  "*)
               if _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
                 FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${row}|"
+              elif _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$row" 1; then
+                if [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+                   || [ "$cy" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+                   || [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then
+                  FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$FM_COMPOSER_SCAN_BARE_ROW
+                  FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
+                fi
               fi
               ;;
           esac
@@ -981,7 +1006,10 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # shell glyphs are deliberately not candidates (dead-shell rule). Keep
     # lower shell prompts as staleness evidence for cursorless selection.
     # Pi's cost footer can open with `$0.000`; that is furniture, not a prompt.
-    if ! _fm_composer_row_is_bare_literal "$row"; then
+    if ! _fm_composer_row_is_bare_literal "$row" \
+       && { [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+            || [ "$row" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+            || [ "$row" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; }; then
       if [ "$top" -lt 0 ] && fm_composer_leading_shell_glyph_var glyph "$trimmed" \
          && ! _fm_composer_row_is_pi_status "$trimmed"; then
         FM_COMPOSER_SCAN_SHELL_ROW=$row
@@ -1372,6 +1400,11 @@ _fm_composer_row_is_bare_literal() {  # <row>
 # rather than unrelated screen content.
 _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
   local plain=$1 g=$2 cy=$3 allow_blank=${4:-0} row line trimmed glyph ambiguous=0
+  local root root_indent indent
+  if [ "$allow_blank" = 1 ]; then
+    root=$(_fm_composer_screen_row "$g" "$plain")
+    root_indent=${root%%[![:space:]]*}
+  fi
   row=$((g + 1))
   while [ "$row" -le "$cy" ]; do
     line=$(_fm_composer_screen_row "$row" "$plain")
@@ -1390,7 +1423,15 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
        && fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
-    if ! _fm_composer_row_is_bare_literal "$row" && fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
+    if ! _fm_composer_row_is_bare_literal "$row"; then
+      if fm_composer_leading_shell_glyph_var glyph "$trimmed" \
+         || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; then
+        [ "$allow_blank" = 1 ] || return 1
+        case "${root#"$root_indent"}" in '❯ '*) ;; *) return 1 ;; esac
+        indent=${line%%[![:space:]]*}
+        case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
+      fi
+    fi
     row=$((row + 1))
   done
   return 0
