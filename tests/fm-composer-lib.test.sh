@@ -619,6 +619,37 @@ test_matrix_pi_separated_needs_identity() {
   pass "matrix: pi's separated composer needs identity + structure; the blank row alone never proves it"
 }
 
+test_pi_literal_omp_floor_with_blank_continuation() {
+  local draft expected screen prefix caps styled cursor row out
+  for prefix in '' $'╭── π > model > path ─╮\n╰─  ─╯\n'; do
+    row=2
+    [ -z "$prefix" ] || row=4
+    for draft in '╰─ ─╯' '╰─  ─╯' '╰─ ⇧⇥ to change thinking effort ─╯'; do
+      expected=${draft//'  '/' '}
+      screen="${prefix}"$'────────\n'"$draft"$'\n\n────────'
+      for styled in 0 1; do
+        for cursor in 0 1; do
+          caps=$(printf 'styled=%s\ncursor=%s\nidentity=1' "$styled" "$cursor")
+          assert_screen "Pi literal omp floor, styled=$styled cursor=$cursor continuation=$row" \
+            pending "$caps" "$screen" "$row" $'pi\tidle'
+        done
+        out=$(fm_composer_extract_selected_content "styled=$styled" "$screen")
+        [ "$out" = "$expected" ] \
+          || fail "Pi extraction must preserve normalized literal omp floor '$expected', got '$out'"
+        out=$(LC_ALL=C fm_composer_extract_selected_content "styled=$styled" "$screen")
+        [ "$out" = "$expected" ] \
+          || fail "Pi extraction under LC_ALL=C must preserve normalized literal omp floor '$expected', got '$out'"
+      done
+    done
+  done
+  screen=$'────────\n╰─  ─╯\n\n────────\n╭────────────────────────╮\n│ clipped draft'
+  assert_screen "incomplete box below Pi still refuses injection" unknown "$CAPS_STYLED" "$screen" '' $'pi\tidle'
+  if out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$screen"); then
+    fail "an incomplete box below Pi must refuse extraction, got '$out'"
+  fi
+  pass "Pi floor-looking drafts stay pending on blank continuation rows and survive extraction"
+}
+
 test_matrix_pi_dollar_status_footer_is_empty() {
   # Pi's status row `$0.000 (sub) 5.4%/272k (auto)` at column 0 used to read
   # as a dead-shell prompt, so an idle separated composer classified unknown.
@@ -1037,6 +1068,7 @@ test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
+test_pi_literal_omp_floor_with_blank_continuation
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border

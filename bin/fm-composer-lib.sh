@@ -1146,7 +1146,7 @@ _fm_composer_screen_row() {  # <n> <screen>
 # ghost-strip when styled, plain otherwise, normalize-trim, and strip one
 # matching pair of side border glyphs.
 _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
-  local raw=$1 styled=$2 stripped
+  local raw=$1 styled=$2 omp=${3:-0} stripped
   if [ "$styled" = 1 ]; then
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
   else
@@ -1157,15 +1157,17 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
   # idle hint is removable: typing the same words in bright text stays pending.
   case "$stripped" in
     '╰─ '*' ─╯')
-      stripped=${stripped#'╰─ '}; stripped=${stripped%' ─╯'}
-      fm_composer_normalize_trim_var stripped
-      if [ "$styled" = 1 ] && [ "$stripped" = '⇧⇥' ]; then
-        local plain
-        plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
-        fm_composer_normalize_trim_var plain
-        plain=${plain#'╰─ '}; plain=${plain%' ─╯'}
-        fm_composer_normalize_trim_var plain
-        [ "$plain" != '⇧⇥ to change thinking effort' ] || stripped=
+      if [ "$omp" = 1 ]; then
+        stripped=${stripped#'╰─ '}; stripped=${stripped%' ─╯'}
+        fm_composer_normalize_trim_var stripped
+        if [ "$styled" = 1 ] && [ "$stripped" = '⇧⇥' ]; then
+          local plain
+          plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+          fm_composer_normalize_trim_var plain
+          plain=${plain#'╰─ '}; plain=${plain%' ─╯'}
+          fm_composer_normalize_trim_var plain
+          [ "$plain" != '⇧⇥ to change thinking effort' ] || stripped=
+        fi
       fi
       ;;
     '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
@@ -1187,8 +1189,8 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
   row=$first
   while [ "$row" -le "$last" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
-    plain=$(_fm_composer_row_content "$raw" 0)
+    content=$(_fm_composer_row_content "$raw" "$styled" "$literal")
+    plain=$(_fm_composer_row_content "$raw" 0 "$literal")
     if [ "$literal" = 1 ]; then
       if [ -n "$content" ]; then state=pending; else state=empty; fi
     else
@@ -1506,10 +1508,6 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_FIRST=$FM_COMPOSER_SCAN_LEFTBAR_START
     FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_LEFTBAR_END
   fi
-  if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
-    FM_COMPOSER_SELECTED_KIND=
-    return 1
-  fi
   if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
      && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
      && [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; then
@@ -1517,6 +1515,10 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_KIND=pi
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  fi
+  if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
+    FM_COMPOSER_SELECTED_KIND=
+    return 1
   fi
   if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 0 ] \
      && [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" -gt "$generic" ]; then
@@ -1581,7 +1583,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1591,10 +1593,11 @@ EOF
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   _fm_composer_scan_screen "$plain" '' 1
   _fm_composer_select_cursorless "$plain" || return 1
+  [ "$FM_COMPOSER_SELECTED_KIND" != box ] || omp=$FM_COMPOSER_SCAN_BOX_OMP
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" "$omp")
     placeholder_position=0
     case "$FM_COMPOSER_SELECTED_KIND" in
       bare)

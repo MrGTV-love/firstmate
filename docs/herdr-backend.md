@@ -678,6 +678,10 @@ That state defers instead of proving emptiness.
 A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
 Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
 
+Omp floor decoration is stripped only inside a proven omp box, never from Pi input.
+A literal floor-looking Pi draft followed by a blank continuation remains `pending`, even when the cursor is on that blank row.
+Selected-content extraction preserves the literal draft with its usual whitespace normalization; incomplete box structure below the Pi container still refuses extraction.
+
 ### Placeholder and ghost text
 
 ANSI capture preserves de-emphasized placeholder style.
