@@ -678,9 +678,7 @@ That state defers instead of proving emptiness.
 A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
 Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
 
-Omp floor decoration is stripped only inside a proven omp box, never from Pi input.
-A literal floor-looking Pi draft followed by a blank continuation remains `pending`, even when the cursor is on that blank row.
-Selected-content extraction preserves the literal draft with its usual whitespace normalization; incomplete box structure below the Pi container still refuses extraction.
+The [shared classifier](../bin/fm-composer-lib.sh) owns literal draft containment, including omp-looking floors inside Pi input; [runtime verification](verification/runtime-backends.md#bare-native-omp-restoration-and-managed-recovery) records the regression evidence.
 
 ### Placeholder and ghost text
 
@@ -726,12 +724,8 @@ Disabling `session.resume_agents_on_restore` would also disable restoration of u
 The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
 Changing a user's global configuration is therefore not the scoped repair.
 
-Instead, startup and bounded watcher recovery identify only this home's recorded unmanaged live agents and replace them through the normal control-plane relaunch.
-The same pane and local copy survive, with the recorded harness, model, effort, and all unlanded work.
-Viewer-delayed native restores are covered by the repeated scan.
-The [agent-control recovery contract](agent-control.md#recovering-a-bare-native-restore) owns commands, launch proof, legacy attribution, and refusal boundaries.
+Use the [agent-control recovery contract](agent-control.md#recovering-a-bare-native-restore) for startup and watcher recovery of this home's recorded fleet, including launch proof, legacy attribution, preserved work, and refusal boundaries.
 The [runtime verification record](verification/runtime-backends.md) records the real bare-resumed omp proof and captured bordered composers.
-
 
 ### Stale agent registrations
 
@@ -889,6 +883,10 @@ Its before/after tripwire requires the live default-session snapshot to remain b
 Fixtures must successfully `prepare` a fresh name before claiming cleanup authority, and must call `teardown` only after that claim succeeds.
 `provision` accepts the prepared tripwire after checking it against the current default-session snapshot.
 A refused claim leaves existing running or stopped sessions and their tripwires untouched.
+The reboot live fixture must retain its private home, worktree, resume file, and exclusively claimed staging namespaces until guarded teardown succeeds.
+On teardown refusal or failure it reports the named session and retained paths for manual cleanup and exits unsuccessfully.
+This also applies after provision fails following a fresh ownership claim; successful cleanup removes only owned resources and preserves the original exit status unless resource removal fails.
+[`tests/fm-omp-reboot-live-e2e.test.sh`](../tests/fm-omp-reboot-live-e2e.test.sh) implements that dependency-preserving cleanup order.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.

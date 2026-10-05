@@ -25,8 +25,9 @@
 # delete is available only through teardown.
 # Both paths perform a fresh refuse-default check immediately before each
 # destructive call.
-# Provision records the running default session as a fleet-state tripwire and
-# teardown requires that record to be identical afterward.
+# Prepare claims a fresh name and records the running default-session tripwire.
+# Provision reuses a prepared claim only after checking that tripwire; otherwise
+# it prepares the name itself. Teardown requires the tripwire to match afterward.
 # The viewer command attaches or detaches one real foreground Herdr client on
 # an owned lab session over a fixed 40-row by 120-column pty;
 # bin/fm-herdr-lab-viewer.py owns the pty mechanics.

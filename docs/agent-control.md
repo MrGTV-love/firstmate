@@ -50,8 +50,7 @@ muse is the one verified adapter that restores the cancelled prompt back into it
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
-For a native editor's proven continuation region, an empty first line under the cursor does not establish an empty composer while owned continuation rows contain pending text, including when solid rules enclose that region. An indented omp-looking frame after a blank continuation cannot establish an independent composer: classification and extraction refuse that ambiguous boundary rather than discard or truncate the possible draft.
-After that blank boundary, native-gutter prompt-looking rows before or after the frame remain ambiguous too; shell or agent glyphs cannot reset the original root or establish fresh empty proof. Independent margin prompts and standalone boxes retain their own boundaries.
+The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment and blank-boundary ambiguity; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -102,20 +101,26 @@ Herdr can resume a live omp harness after reboot without the Firstmate launch co
 For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and repairs only positively unmanaged recorded `omp` agents.
 Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live omp agent.
 `recover --one` bounds an automatic supervision tick to one repair attempt.
-Bounded scans atomically persist the last selected local Herdr record in `STATE/.reboot-recovery-cursor` before backend inspection. The next tick follows that record, including after interrupted inspections, skipped or failed probes, and refused repair attempts, so a slow probe or pending record cannot starve later recoveries. Unbounded scans do not read or change this cursor.
-Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities. The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and preserves all recovery diagnostics and repair results in its wake.
+The recovery script's [header and help](../bin/fm-reboot-recover.sh) own bounded-scan scheduling and its durable cursor.
+Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities.
+The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and emits the current sweep's diagnostics and repair results as a `check` wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
-Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row. Existing manual and no-backlog exemptions remain unchanged.
+Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row.
+Existing manual and no-backlog exemptions remain unchanged.
 Recovery also refuses while the task has a pending authoritative backlog close.
 The sweep never discovers other homes' panes or recursively enters a secondmate home.
 
 Each repair is the ordinary `bin/fm-control.sh <id> relaunch --recover-launch` transaction, not a second exit or spawn mechanism.
 The option is exclusive of profile overrides, notes, and debug options.
-Under the task's control lock it rechecks launch proof and requires a proven empty composer **before any interrupt**, checkpoint, or progress note. Retained busy metadata does not authorize Escape into a draft: omp clears idle Bash/Python execution-mode drafts on that key. Pending or unproven input refuses without changing the draft or task records. An empty composer proceeds with **all three recorded profile axes** pinned and the ordinary checkpoint-and-relaunch transaction.
+Under the task's control lock it rechecks launch proof and requires a proven empty composer **before any interrupt**, checkpoint, or progress note.
+Retained busy metadata does not authorize Escape into a draft: omp clears idle Bash/Python execution-mode drafts on that key.
+Pending or unproven input refuses without changing the draft or task records.
+An empty composer proceeds with **all three recorded profile axes** pinned and the ordinary checkpoint-and-relaunch transaction.
 For a local secondmate, recovery also holds the existing liveness lock through stop, replacement proof, and any rollback, so liveness recovery cannot concurrently replace its endpoint; contention refuses without touching the agent.
 Unlike an ordinary secondmate relaunch, it does not adopt a newly configured secondmate profile.
 It reuses the exact pane and local copy, preserves all unlanded work and secondmate child records, and never rewrites a standing charter.
-The replacement receives a progress note directing it to reconcile completed work and outstanding decisions before continuing.
+A ship or scout replacement receives a progress note directing it to reconcile completed work and outstanding decisions before continuing.
+For a local secondmate, the note remains parent-side audit evidence; its unchanged charter and home records supply startup reconciliation.
 An already managed agent is left alone, including on repeated sweeps.
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution.
@@ -126,7 +131,8 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
 Readable kernel environment with a matching incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses.
 A readable environment with a missing or mismatched incarnation proves unmanaged only for an exact recorded `harness=omp` whose foreground process is independently attributed to omp through the shared process and path identity helpers.
-Every other recorded harness remains unknown with missing or mismatched pins. Foreign Python, node, other harnesses, and unattributed foreground processes also remain unknown for recorded omp; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
+Every other recorded harness remains unknown with missing or mismatched pins.
+Foreign Python, node, other harnesses, and unattributed foreground processes also remain unknown for recorded omp; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
 Unreadable or ambiguous proof never licenses lifecycle action.
 For older records with no launch-proof field, only a recorded `omp` harness running an executable with basename `omp` and exactly `omp --resume=<ref>` argv with a nonempty reference proves unmanaged restoration.
 Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove legacy native restoration; no installed-CLI symlink reconstruction is used.

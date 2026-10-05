@@ -61,12 +61,16 @@
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
-#                A bare composer's WRAP region (typed input continuing on the
-#                rows beneath the glyph row) is bounded by blank rows, by
-#                structural edges, and by the FURNITURE rows a harness draws
-#                directly below its composer - omp's status row and
-#                braille-only animation rows (declared once below, next to
-#                the idle placeholders) - none of which is ever typed input.
+#                A bare composer's WRAP region is bounded by blanks, unowned
+#                structural edges, and harness furniture (omp's status row and
+#                braille-only animation rows). Proven literal continuation rows
+#                keep their prompt glyphs and omp-looking frame borders as input.
+#                Owned continuations below an empty root still prevent emptiness,
+#                including inside separator rules. Blanks end positive ownership:
+#                native two-space-gutter prompt rows and complete indented frames
+#                across that boundary carry ambiguity, never fresh empty proof or
+#                successful empty/truncated extraction. Independent margin prompts
+#                and standalone boxes retain their own boundaries.
 #   left-bar   - opencode: rows prefixed by a heavy left bar `┃` with no
 #                closing border, holding the idle hint, blank rows, and a
 #                mode/model footer line.
@@ -1249,10 +1253,10 @@ _fm_composer_screen_row() {  # <n> <screen>
   printf '%s\n' "$2" | sed -n "$(($1 + 1))p"
 }
 
-# _fm_composer_row_content: extract the classification content of one raw row:
-# ghost-strip when styled, plain otherwise, normalize-trim, and strip one
-# matching pair of side border glyphs.
-_fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
+# _fm_composer_row_content: extract classification content after styling and
+# whitespace normalization. Literal draft rows retain their border-looking bytes;
+# only a proven omp box permits removing its input-floor decoration.
+_fm_composer_row_content() {  # <raw-row> <styled> [omp-box] [literal] -> content
   local raw=$1 styled=$2 omp=${3:-0} literal=${4:-0} stripped
   if [ "$styled" = 1 ]; then
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
@@ -1290,11 +1294,10 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
   printf '%s' "$stripped"
 }
 
-# _fm_composer_classify_rows: shared multi-row container verdict for the box
-# and separated shapes: pending beats empty, an unreadable row is unknown, and
-# geometry ambiguity turns pending into pending-unproven and empty into
-# unknown (an ambiguous container is not positive proof).
-_fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <last-row>
+# _fm_composer_classify_rows: shared multi-row box verdict: pending beats empty,
+# unreadable input is unknown, and ambiguous geometry cannot prove emptiness.
+# Omp box input is literal after floor stripping, not an idle-placeholder match.
+_fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <last-row> [omp-box]
   local screen=$1 styled=$2 ambiguous=$3 first=$4 last=$5 literal=${6:-0}
   local row raw content plain state unknown_seen=0
   row=$first
@@ -1394,11 +1397,11 @@ _fm_composer_row_is_bare_literal() {  # <row>
   return 1
 }
 
-# _fm_composer_wrap_region_ok: 0 when every row STRICTLY BELOW <glyph-row>
-# through <cursor-row> is non-blank and carries no structural edge - the
-# contiguity proof that those rows are the bare composer's wrapped input
-# rather than unrelated screen content.
-_fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
+# _fm_composer_wrap_region_ok: contiguity proof below the root glyph, excluding
+# unowned edges, shell prompts, and harness furniture. allow-blank is only a
+# possible-continuation probe for conservative ambiguity; its success must never
+# establish ownership or authorize empty classification across a blank.
+_fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-blank]
   local plain=$1 g=$2 cy=$3 allow_blank=${4:-0} row line trimmed glyph ambiguous=0
   local root root_indent indent
   if [ "$allow_blank" = 1 ]; then
@@ -2028,7 +2031,7 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
   printf 'empty'
 }
 
-_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> <bare-row>
+_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> <bare-row> [last-row]
   local screen=$1 styled=$2 has_identity=$3 identity=$4 row=$5 last=${6:-$5} agent
   if [ "$has_identity" = 1 ] && [ -z "$identity" ]; then
     printf 'need-identity'

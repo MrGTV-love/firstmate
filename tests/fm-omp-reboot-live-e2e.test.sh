@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Real omp bare-native-resume recovery in a named Herdr lab. Submits one short
-# readiness prompt, so opt in with FM_OMP_REBOOT_LIVE=1 (or FM_LIVE=1).
+# Real omp bare-native-resume recovery in a named Herdr lab. Submits short task
+# and secondmate readiness prompts, so opt in with FM_OMP_REBOOT_LIVE=1 (or FM_LIVE=1).
 # Proves the pending-input refusal, normal relaunch, exact profile and endpoint
 # preservation, dirty-work preservation, managed proof, and idempotent rescan.
 set -euo pipefail
