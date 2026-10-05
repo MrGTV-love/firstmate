@@ -1,0 +1,486 @@
+Actual resolver CLI, controlled inputs via isolated FM_HOME. Quota and model answers are synthetic external inputs, not observed live-provider readings. Real curl communicates with a disposable localhost HTTP endpoint.
+
+=== report-case-six-percent-1800-established ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate codex:gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=established)]
+exit=0
+quota calls=['--version', '--json']
+
+=== established-3600-short ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate codex:gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+quota calls=['--version', '--json']
+
+=== single-low-confidence-early ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=early)]
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== single-low-confidence-None ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=unknown)]
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== single-exact-14400-boundary ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== single-covering-80796-established ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-low-confidence-early ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=early)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-low-confidence-None ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1800 projectionConfidence=unknown)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-exact-14400-boundary ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-covering-80796-established ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== configured-30-minute-horizon ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== configured-120-minute-horizon ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate codex:gpt-6-luna has established runway shorter than the 120-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+quota calls=['--version', '--json']
+
+=== invalid-zero-horizon ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46CWAPPBX74ZZNE5E6HQC1P/.runway-validation/home/config/crew-dispatch.json - task_horizon_minutes must be a positive number when present
+exit=2
+quota calls=[]
+
+=== exhausted-pool-unranked ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+exit=0
+quota calls=['--version', '--json']
+
+=== exhausted-pool-beside-measured ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  note: 1 eligible candidate(s) unranked (codex)
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+exit=0
+quota calls=['--version', '--json']
+
+=== short-pool-winner-no-same-rule-fallback ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+exit=0
+quota calls=['--version', '--json']
+
+=== healthy-pool-winner-control ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== outdated-quota-axi ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: error
+  reason: quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable
+dispatch-resolve: error (quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable)
+exit=0
+quota calls=['--version']
+
+=== pool-explicit-floor-safe ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=-  runway=through_reset  -> not eligible: profile floor all_models below 50%
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-explicit-floor-exhausted ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=-  runway=exhausted_now  -> not eligible: profile floor all_models below 50%
+exit=0
+quota calls=['--version', '--json']
+
+=== single-exhausted-veto ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models
+exit=0
+quota calls=['--version', '--json']
+
+=== single-zero-veto ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=0%  spendPriority=-  runway=through_reset  -> not eligible: 0% remaining at all_models
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-zero-unranked ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (0% remaining at all_models): disclosed uncertainty
+exit=0
+quota calls=['--version', '--json']
+
+=== short-pool-no-cross-rule-or-default-fallback ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 rule_2=0.015 default=0.015
+  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+exit=0
+quota calls=['--version', '--json']
+
+=== short-single-no-same-rule-fallback ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate codex:gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+exit=0
+quota calls=['--version', '--json']
+
+=== short-nonlimiting-model-bound ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  bounds=all_models:6%/through_reset,model:gpt-6-luna:50%/projected_exhaustion  -> eligible [warning: projected_exhaustion at model:gpt-6-luna (usableRunwaySeconds=600 projectionConfidence=established)]
+exit=0
+quota calls=['--version', '--json']
+
+=== openrouter-absent-alone ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter not in the quota snapshot: disclosed uncertainty
+exit=0
+quota calls=['--version', '--json']
+
+=== openrouter-absent-beside-measured ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  note: 1 eligible candidate(s) unranked (openrouter)
+  candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter not in the quota snapshot: disclosed uncertainty
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+exit=0
+quota calls=['--version', '--json']
+
+=== openrouter-credit-only-alone ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter unmeasured (unknown): disclosed uncertainty
+exit=0
+quota calls=['--version', '--json']
+
+=== openrouter-credit-only-beside-measured ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  note: 1 eligible candidate(s) unranked (openrouter)
+  candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter unmeasured (unknown): disclosed uncertainty
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+exit=0
+quota calls=['--version', '--json']
+
+=== missing-spend-priority-unranked ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=-  runway=through_reset  -> eligible, unranked: spendPriority missing or non-numeric at all_models: not rankable: disclosed uncertainty
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-unknown-warning ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=unknown  -> eligible [warning: unknown at all_models]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== pool-missing-seconds-warning ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=established)]
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']
+
+=== schema6-short-pool-winner ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible
+exit=0
+quota calls=['--version', '--json']
+
+=== schema6-exhausted-pool ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+exit=0
+quota calls=['--version', '--json']
+
+=== quota-version-unparseable ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: error
+  reason: quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable
+dispatch-resolve: error (quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable)
+exit=0
+quota calls=['--version']
+
+=== quota-version-failed-read ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: error
+  reason: quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable
+dispatch-resolve: error (quota-axi requires >= 0.1.51; installed version is older, unreadable, or unparseable)
+exit=0
+quota calls=['--version']
+
+=== minimum-quota-version-control ===
+$ bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-controlled-input   latency_ms: 0   tokens: -/-
+  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9
+  probabilities: rule_1=0.97 default=0.03
+  note: rule matched
+  candidate: codex:gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible
+  profile: --harness 'codex' --model 'gpt-6-luna'
+exit=0
+quota calls=['--version', '--json']

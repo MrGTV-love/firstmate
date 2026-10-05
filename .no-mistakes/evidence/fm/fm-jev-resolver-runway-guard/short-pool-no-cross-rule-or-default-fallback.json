@@ -1,0 +1,129 @@
+{
+  "name": "short-pool-no-cross-rule-or-default-fallback",
+  "result": "pass",
+  "evidence_type": "actual resolver CLI with controlled external quota and model-answer inputs; not fresh provider readings",
+  "command": "bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate",
+  "config": {
+    "rules": [
+      {
+        "when": "A simple bug fix with a stated root cause.",
+        "use": [
+          {
+            "harness": "omp",
+            "model": "openai-codex/gpt-6-luna",
+            "provider": "codex"
+          }
+        ]
+      },
+      {
+        "when": "Cheap chores.",
+        "use": {
+          "harness": "cursor",
+          "model": "cursor-grok-4.6-medium"
+        }
+      }
+    ],
+    "default": [
+      {
+        "harness": "cursor",
+        "model": "cursor-grok-4.6-high"
+      }
+    ]
+  },
+  "quota_input": {
+    "generatedAt": "2026-10-05T16:12:34.583147+00:00",
+    "schemaVersion": 5,
+    "providers": [
+      {
+        "provider": "codex",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 6,
+              "selection": {
+                "spendPriority": 0.9
+              },
+              "runway": {
+                "status": "projected_exhaustion",
+                "usableRunwaySeconds": 3600,
+                "projectionConfidence": "established"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "provider": "cursor",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 91,
+              "selection": {
+                "spendPriority": 0.7597
+              },
+              "runway": {
+                "status": "through_reset"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "quota_version": "0.1.51",
+  "model_answer_input": {
+    "model": "jev-controlled-input",
+    "answers": {
+      "rule": {
+        "type": "choice",
+        "choice": "rule_1",
+        "confidence": 0.9,
+        "probabilities": {
+          "rule_1": 0.97,
+          "rule_2": 0.015,
+          "default": 0.015
+        }
+      }
+    }
+  },
+  "request": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "firstmate",
+        "brief": "# Task\nFix the pager off-by-one with a stated root cause.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A simple bug fix with a stated root cause.",
+          "rule_2": "Cheap chores.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "exit_code": 0,
+  "stdout": "dispatch-resolve:\n  status: escalate\n  model: jev-controlled-input   latency_ms: 0   tokens: -/-\n  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9\n  probabilities: rule_1=0.97 rule_2=0.015 default=0.015\n  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon; completion is not proven\n  note: rule matched\n  candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]\n",
+  "stderr": "",
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "failures": []
+}

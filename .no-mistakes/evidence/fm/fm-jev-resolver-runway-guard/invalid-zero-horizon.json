@@ -1,0 +1,93 @@
+{
+  "name": "invalid-zero-horizon",
+  "result": "pass",
+  "evidence_type": "actual resolver CLI with controlled external quota and model-answer inputs; not fresh provider readings",
+  "command": "bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate",
+  "config": {
+    "rules": [
+      {
+        "when": "A simple bug fix with a stated root cause.",
+        "use": [
+          {
+            "harness": "codex",
+            "model": "gpt-6-luna"
+          }
+        ]
+      }
+    ],
+    "task_horizon_minutes": 0
+  },
+  "quota_input": {
+    "generatedAt": "2026-10-05T16:12:30.387157+00:00",
+    "schemaVersion": 5,
+    "providers": [
+      {
+        "provider": "codex",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 6,
+              "selection": {
+                "spendPriority": 0.9
+              },
+              "runway": {
+                "status": "projected_exhaustion",
+                "usableRunwaySeconds": 3600,
+                "projectionConfidence": "established"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "provider": "cursor",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 91,
+              "selection": {
+                "spendPriority": 0.7597
+              },
+              "runway": {
+                "status": "through_reset"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "quota_version": "0.1.51",
+  "model_answer_input": {
+    "model": "jev-controlled-input",
+    "answers": {
+      "rule": {
+        "type": "choice",
+        "choice": "rule_1",
+        "confidence": 0.9,
+        "probabilities": {
+          "rule_1": 0.97,
+          "default": 0.03
+        }
+      }
+    }
+  },
+  "request": null,
+  "exit_code": 2,
+  "stdout": "",
+  "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46CWAPPBX74ZZNE5E6HQC1P/.runway-validation/home/config/crew-dispatch.json - task_horizon_minutes must be a positive number when present\n",
+  "quota_calls": [],
+  "failures": []
+}

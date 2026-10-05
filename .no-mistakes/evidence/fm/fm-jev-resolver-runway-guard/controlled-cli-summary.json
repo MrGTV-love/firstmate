@@ -1,0 +1,196 @@
+{
+  "validation_time": "2026-10-05T16:12:40.421212+00:00",
+  "scope": "controlled product CLI scenarios; no fresh Jev or provider calls, no lifecycle activity",
+  "results": [
+    {
+      "name": "report-case-six-percent-1800-established",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "established-3600-short",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-low-confidence-early",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-low-confidence-None",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-exact-14400-boundary",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-covering-80796-established",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-low-confidence-early",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-low-confidence-None",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-exact-14400-boundary",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-covering-80796-established",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "configured-30-minute-horizon",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "configured-120-minute-horizon",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "invalid-zero-horizon",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "exhausted-pool-unranked",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "exhausted-pool-beside-measured",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "short-pool-winner-no-same-rule-fallback",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "healthy-pool-winner-control",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "outdated-quota-axi",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-explicit-floor-safe",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-explicit-floor-exhausted",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-exhausted-veto",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "single-zero-veto",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-zero-unranked",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "short-pool-no-cross-rule-or-default-fallback",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "short-single-no-same-rule-fallback",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "short-nonlimiting-model-bound",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "openrouter-absent-alone",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "openrouter-absent-beside-measured",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "openrouter-credit-only-alone",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "openrouter-credit-only-beside-measured",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "missing-spend-priority-unranked",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-unknown-warning",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "pool-missing-seconds-warning",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "schema6-short-pool-winner",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "schema6-exhausted-pool",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "quota-version-unparseable",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "quota-version-failed-read",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "name": "minimum-quota-version-control",
+      "result": "pass",
+      "failures": []
+    }
+  ]
+}

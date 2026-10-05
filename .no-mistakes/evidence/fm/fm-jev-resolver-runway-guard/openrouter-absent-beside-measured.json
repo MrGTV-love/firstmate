@@ -1,0 +1,116 @@
+{
+  "name": "openrouter-absent-beside-measured",
+  "result": "pass",
+  "evidence_type": "actual resolver CLI with controlled external quota and model-answer inputs; not fresh provider readings",
+  "command": "bin/fm-dispatch-resolve.sh .runway-validation/brief.md --project firstmate",
+  "config": {
+    "rules": [
+      {
+        "when": "A simple bug fix with a stated root cause.",
+        "use": [
+          {
+            "harness": "omp",
+            "model": "openrouter/provider/model",
+            "provider": "openrouter"
+          },
+          {
+            "harness": "cursor",
+            "model": "cursor-grok-4.6-medium"
+          }
+        ]
+      }
+    ]
+  },
+  "quota_input": {
+    "generatedAt": "2026-10-05T16:12:35.509362+00:00",
+    "schemaVersion": 5,
+    "providers": [
+      {
+        "provider": "codex",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 6,
+              "selection": {
+                "spendPriority": 0.9
+              },
+              "runway": {
+                "status": "through_reset"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "provider": "cursor",
+        "state": {
+          "status": "fresh"
+        },
+        "quotaSemantics": {
+          "status": "known",
+          "effectiveAvailability": [
+            {
+              "scope": "all_models",
+              "status": "known",
+              "effectivePercentRemaining": 91,
+              "selection": {
+                "spendPriority": 0.7597
+              },
+              "runway": {
+                "status": "through_reset"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "quota_version": "0.1.51",
+  "model_answer_input": {
+    "model": "jev-controlled-input",
+    "answers": {
+      "rule": {
+        "type": "choice",
+        "choice": "rule_1",
+        "confidence": 0.9,
+        "probabilities": {
+          "rule_1": 0.97,
+          "default": 0.03
+        }
+      }
+    }
+  },
+  "request": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "firstmate",
+        "brief": "# Task\nFix the pager off-by-one with a stated root cause.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A simple bug fix with a stated root cause.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "exit_code": 0,
+  "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-controlled-input   latency_ms: 0   tokens: -/-\n  rule: rule_1 (A simple bug fix with a stated root cause.)   confidence: 0.9\n  probabilities: rule_1=0.97 default=0.03\n  note: rule matched\n  note: 1 eligible candidate(s) unranked (openrouter)\n  candidate: omp:openrouter/provider/model  provider=openrouter  -> eligible, unranked: provider openrouter not in the quota snapshot: disclosed uncertainty\n  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=91%  spendPriority=0.7597  runway=through_reset  -> eligible\n  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'\n",
+  "stderr": "",
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "failures": []
+}

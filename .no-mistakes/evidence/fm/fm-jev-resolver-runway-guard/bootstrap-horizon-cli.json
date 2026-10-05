@@ -1,0 +1,105 @@
+{
+  "time": "2026-10-05T16:14:30.252176+00:00",
+  "results": [
+    {
+      "name": "positive-horizon-env-key",
+      "command": "FM_BOOTSTRAP_NETWORK=skip FM_BOOTSTRAP_DETECT_ONLY=1 FM_HOME=<isolated> FM_ROOT_OVERRIDE=<isolated> bin/fm-bootstrap.sh",
+      "config": {
+        "task_horizon_minutes": 90,
+        "rules": [
+          {
+            "when": "A simple bug fix with a stated root cause.",
+            "use": {
+              "harness": "codex",
+              "model": "gpt-6-luna"
+            }
+          }
+        ]
+      },
+      "optin": "env",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "dispatch_diagnostics": [],
+      "expected_dispatch_diagnostics": [],
+      "result": "pass"
+    },
+    {
+      "name": "zero-horizon-env-key",
+      "command": "FM_BOOTSTRAP_NETWORK=skip FM_BOOTSTRAP_DETECT_ONLY=1 FM_HOME=<isolated> FM_ROOT_OVERRIDE=<isolated> bin/fm-bootstrap.sh",
+      "config": {
+        "task_horizon_minutes": 0,
+        "rules": [
+          {
+            "when": "A simple bug fix with a stated root cause.",
+            "use": {
+              "harness": "codex",
+              "model": "gpt-6-luna"
+            }
+          }
+        ]
+      },
+      "optin": "env",
+      "exit_code": 0,
+      "stdout": "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present\n",
+      "stderr": "",
+      "dispatch_diagnostics": [
+        "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present"
+      ],
+      "expected_dispatch_diagnostics": [
+        "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present"
+      ],
+      "result": "pass"
+    },
+    {
+      "name": "zero-horizon-home-key",
+      "command": "FM_BOOTSTRAP_NETWORK=skip FM_BOOTSTRAP_DETECT_ONLY=1 FM_HOME=<isolated> FM_ROOT_OVERRIDE=<isolated> bin/fm-bootstrap.sh",
+      "config": {
+        "task_horizon_minutes": 0,
+        "rules": [
+          {
+            "when": "A simple bug fix with a stated root cause.",
+            "use": {
+              "harness": "codex",
+              "model": "gpt-6-luna"
+            }
+          }
+        ]
+      },
+      "optin": "file",
+      "exit_code": 0,
+      "stdout": "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present\n",
+      "stderr": "",
+      "dispatch_diagnostics": [
+        "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present"
+      ],
+      "expected_dispatch_diagnostics": [
+        "CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present"
+      ],
+      "result": "pass"
+    },
+    {
+      "name": "zero-horizon-without-optin",
+      "command": "FM_BOOTSTRAP_NETWORK=skip FM_BOOTSTRAP_DETECT_ONLY=1 FM_HOME=<isolated> FM_ROOT_OVERRIDE=<isolated> bin/fm-bootstrap.sh",
+      "config": {
+        "task_horizon_minutes": 0,
+        "rules": [
+          {
+            "when": "A simple bug fix with a stated root cause.",
+            "use": {
+              "harness": "codex",
+              "model": "gpt-6-luna"
+            }
+          }
+        ]
+      },
+      "optin": "absent",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "dispatch_diagnostics": [],
+      "expected_dispatch_diagnostics": [],
+      "result": "pass"
+    }
+  ]
+}
