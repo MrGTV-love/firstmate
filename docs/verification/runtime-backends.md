@@ -2158,7 +2158,7 @@ ok - real Pi SDK 0.84.4 immediately renders appendEntry in the active transcript
 The focused regression recreated the two 2026-08-31 incident shapes against the real store scripts: a delivered decision outcome whose processing turn returned an empty assistant message, and one whose turn repeated an unrelated prior answer.
 In both, the processed marker held, the same sequence was presented again at the run boundary and after a session replacement, the triggered-turn budget gave way to a next-prompt copy without duplicates, and only `fm_branch_processed` with the presented sequence closed the outcome; a routine outcome never entered the path.
 The migration result in the historical output above is superseded: the current absent-marker rule is owned by `bin/fm-branch-outcome.sh`, and `tests/fm-branch-supervision.test.sh` covers it.
-On this machine the globally installed npm package is 0.81.1, whose stock `ToolExecutionComponent` rendering differs from the 0.84 line and fails the suite's first rendering-consumer case before any delivery case runs, which is why `FM_PI_PACKAGE_DIR` points at the 0.84.4 install above.
+The Pi 0.81.1 rendering-consumer failure that originally required the isolated package for this run is historical; the [current renderer comparison](../calm-mode-feasibility.md#2026-09-30-pi-0990-renderer-and-export-dom-verification) owns the replacement behavior and verification baseline.
 
 ### 2026-09-02 historical post-construction provider-error fallback
 
@@ -2234,8 +2234,8 @@ skip: installed Pi 0.81.1 predates the stock renderer contract 0.84.4 this case 
 ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.81.1
 ```
 
-That skip is the renderer case declining to render a verdict on a Pi older than the contract it compares against: since 0.84.4 the stock renderer no longer supplies an implicit reset at multiline boundaries and the extension emits that reset itself, so an older installed Pi differs legitimately.
-It names the installed version and the floor rather than degrading quietly, and a package whose version cannot be read at all is still a failure.
+At that verification, the extension reconstructed Pi's fallback and emitted the multiline resets required by Pi 0.84.4, unlike the older renderer.
+That reconstruction is superseded by the [current stock-component delegation](../calm-mode-feasibility.md#firstmate-pi-tool-audit).
 
 The same guard against the pre-change extension in the same lab measured a 676.9 ms worst keystroke echo while delivering two outcomes and a 295.3 ms worst echo with nothing to deliver, against a 49.2 ms extension-free floor, and failed as designed.
 Measured through the same real `fm_branch_report` tool and real `bin/` scripts with a 1 ms interval timer, the largest single block of the JavaScript thread fell from 273 ms to 2.0 ms for a routine outcome, from 286 ms to 2.0 ms for a captain outcome, and from 134 ms to 1.9 ms for main's acknowledgement, against a 1.3-2.2 ms idle-loop floor.
