@@ -1,0 +1,57 @@
+{
+  "kind": "manual public composer API smoke; synthetic captures, NOT live omp evidence",
+  "command": ". bin/fm-composer-lib.sh\nscreen=$1\ncaps=$'styled=1\\ncursor=0\\nidentity=0\\nrows=20'\nfm_composer_classify_screen \"$caps\" \"$screen\"\nfm_composer_classify_screen $'styled=1\\ncursor=1\\nidentity=0\\nrows=0' \"$screen\" 0\nfm_composer_extract_selected_content \"$caps\" \"$screen\"\n",
+  "observations": [
+    {
+      "representation": "header",
+      "supplied_screen": "❯ \n  ╭── π > local-model > workspace · 22.6%/99K ─╮\n  ╰─ ─╯\n π · local-model · 0.0%/99K",
+      "cursorless": "pending",
+      "empty_root_cursor": "pending",
+      "extracted_draft": "╭── π > local-model > workspace · 22.6%/99K ─╮ ╰─ ─╯",
+      "expected_draft": "╭── π > local-model > workspace · 22.6%/99K ─╮ ╰─ ─╯",
+      "exit_status": 0,
+      "stderr": "",
+      "real_omp_surface": false,
+      "matches_expected": true,
+      "raw_stdout": "pendingpending╭── π > local-model > workspace · 22.6%/99K ─╮ ╰─ ─╯"
+    },
+    {
+      "representation": "body",
+      "supplied_screen": "❯ \n  ╭── π > local-model > workspace ─╮\n  │ retained draft · 22.6%/99K │\n  ╰─ ─╯\n π · local-model · 0.0%/99K",
+      "cursorless": "pending",
+      "empty_root_cursor": "pending",
+      "extracted_draft": "╭── π > local-model > workspace ─╮ │ retained draft · 22.6%/99K │ ╰─ ─╯",
+      "expected_draft": "╭── π > local-model > workspace ─╮ │ retained draft · 22.6%/99K │ ╰─ ─╯",
+      "exit_status": 0,
+      "stderr": "",
+      "real_omp_surface": false,
+      "matches_expected": true,
+      "raw_stdout": "pendingpending╭── π > local-model > workspace ─╮ │ retained draft · 22.6%/99K │ ╰─ ─╯"
+    },
+    {
+      "representation": "floor",
+      "supplied_screen": "❯ \n  ╭── π > local-model > workspace ─╮\n  ╰─ retained draft · 22.6%/99K ─╯\n π · local-model · 0.0%/99K",
+      "cursorless": "pending",
+      "empty_root_cursor": "pending",
+      "extracted_draft": "╭── π > local-model > workspace ─╮ ╰─ retained draft · 22.6%/99K ─╯",
+      "expected_draft": "╭── π > local-model > workspace ─╮ ╰─ retained draft · 22.6%/99K ─╯",
+      "exit_status": 0,
+      "stderr": "",
+      "real_omp_surface": false,
+      "matches_expected": true,
+      "raw_stdout": "pendingpending╭── π > local-model > workspace ─╮ ╰─ retained draft · 22.6%/99K ─╯"
+    },
+    {
+      "representation": "unowned-status-boundary",
+      "supplied_screen": "❯ \n π · local-model · 0.0%/99K",
+      "output": "emptyempty",
+      "exit_status": 0,
+      "matches_expected": true,
+      "real_omp_surface": false,
+      "cursorless": "empty",
+      "empty_root_cursor": "empty",
+      "extracted_draft": ""
+    }
+  ],
+  "driver_note": "Public functions emit no trailing newline; interpreted the already captured concatenated stdout without rerunning checks."
+}

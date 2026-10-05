@@ -1,0 +1,23 @@
+{
+  "phase": "Test",
+  "verdict": "no-go",
+  "provenance": "Completion resumed from this preserved run's live receipts. No cleared or failing scenario rerun.",
+  "live_results": "owned-frame-status-live-results.json",
+  "live_commands": "owned-frame-status-live-commands.json",
+  "rendered_terminal_evidence": "owned-frame-status-live-rendered.html",
+  "guarded_cleanup": "owned-frame-status-live-cleanup.json",
+  "preserved_cleanup_proofs": "authorized-cleanup-live-manifest.json",
+  "outcomes": {
+    "header": "pass",
+    "body": "pass",
+    "floor": "pass",
+    "genuine-empty-borderless": "fail"
+  },
+  "failure": "Real empty composer excludes its status footer but retains bright idle hint ⇧⇥: cursorless and root-cursor pending; extracted draft ⇧⇥.",
+  "decision_needed": "Idle-hint filtering is distinct from the authorized owned-frame status fix. No production or test-source edits.",
+  "cleanup": "Guarded teardown succeeded, owned omp processes stopped, fixture dependencies removed; no .gate-* paths remained.",
+  "completion_actions": [
+    "Reconciled existing live receipts without rerun.",
+    "Rendered actual ANSI captures into HTML preserving SGR colors and text."
+  ]
+}

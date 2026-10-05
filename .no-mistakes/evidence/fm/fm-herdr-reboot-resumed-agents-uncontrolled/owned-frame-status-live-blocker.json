@@ -1,0 +1,51 @@
+{
+  "target_commit": "7080a71689e75a85b5808bed1459ba0a459655ca",
+  "available_on_path": [
+    "omp",
+    "herdr",
+    "jq",
+    "tmux",
+    "python3"
+  ],
+  "admission_command": "/Users/charlesabrooker/firstmate/data/fleet-start-check.sh",
+  "attempts": [
+    {
+      "exit_status": 1,
+      "load1": 8,
+      "memory_free_percent": 38,
+      "swap_used_mb": 19780,
+      "swap_growth_10min_mb": 440,
+      "since_last_start_seconds": 656,
+      "result": "FAIL"
+    },
+    {
+      "wait_seconds": 60,
+      "exit_status": 1,
+      "load1": 20,
+      "memory_free_percent": 37,
+      "swap_used_mb": 19725,
+      "swap_growth_10min_mb": 598,
+      "since_last_start_seconds": 741,
+      "result": "FAIL"
+    }
+  ],
+  "resource_requirement": "swap growth <=256 MB; no start after FAIL",
+  "authority_conflict": "After PASS, Main requires date +%s written to /Users/charlesabrooker/firstmate/state/fleet-last-start. Current boundary permits intentional external writes only to the designated evidence directory. No timestamp was written.",
+  "workarounds_considered": "Named Herdr and private tmux lab routes require new actual omp starts, both subject to the same admission and external-stamp rule. Operator/foreign panes are forbidden; mocked renderer is not live. All required tools are on PATH; no install or credential changes needed.",
+  "verification": "Direct composer API smoke with synthetic header/body/floor status-substring drafts and unowned status boundary matched expected output. This is NOT live omp proof.",
+  "required_to_resume": "Admission must return PASS; explicitly authorize the single external fleet timestamp write or have an authorized executor perform it immediately before the lab starts. Do not bypass the resource guard.",
+  "visual_evidence_limit": "Actual UI not launched because admission refused; no screenshot or rendered UI artifact.",
+  "cleanup": {
+    "agent_started": false,
+    "session_mutated": false,
+    "worktree_files_changed": false,
+    "external_state_changed": false,
+    "disposable_resources_remaining": false
+  },
+  "preserved_live_receipts": [
+    "authorized-cleanup-refused-retention.json",
+    "authorized-cleanup-success.json",
+    "authorized-cleanup-provision-refusal.json",
+    "authorized-cleanup-running-order.json"
+  ]
+}

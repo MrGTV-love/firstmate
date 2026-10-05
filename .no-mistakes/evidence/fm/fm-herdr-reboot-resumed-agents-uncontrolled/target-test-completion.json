@@ -1,0 +1,46 @@
+{
+  "phase": "Test",
+  "target_commit": "77c4c5cd12f2e6af47607b456388e94609c45a02",
+  "verdict": "go",
+  "provenance": "Reconciled actual live receipts from this preserved run. Cleared scenarios were not rerun; no additional agent, suite, lint, or pipeline started in this completion turn.",
+  "retained_cleanup_scenarios": [
+    "authorized-cleanup-refused-retention.json",
+    "authorized-cleanup-success.json",
+    "authorized-cleanup-provision-refusal.json",
+    "authorized-cleanup-running-order.json",
+    "authorized-cleanup-stop-before-removal.json"
+  ],
+  "retained_owned_frame_scenarios": {
+    "receipt": "owned-frame-status-live-results.json",
+    "passing_observations": [
+      "header",
+      "body",
+      "floor"
+    ]
+  },
+  "fixed_empty_composer_scenario": {
+    "receipt": "native-idle-hint-fixed-live-results.json",
+    "cursorless": "empty",
+    "root_cursor": "empty",
+    "extracted_draft": "",
+    "real_omp_pid": 15067,
+    "model_input_submitted": false
+  },
+  "superseded_result": "The empty-unowned-status failure in owned-frame-status-live-results.json is superseded by the fixed live receipt; the earlier three passing observations remain retained.",
+  "guarded_cleanup_receipts": [
+    "authorized-cleanup-live-manifest.json",
+    "owned-frame-status-live-cleanup.json",
+    "native-idle-hint-fixed-live-cleanup.json"
+  ],
+  "rendered_evidence": [
+    "owned-frame-status-live-rendered.html",
+    "native-idle-hint-fixed-live-rendered.html"
+  ],
+  "completion_checks": [
+    "Inspected assigned commit and live command/process/classification receipts.",
+    "Confirmed no .gate-* fixture remnants in worktree.",
+    "Rendered the fresh actual ANSI capture as HTML preserving RGB and italic styling."
+  ],
+  "source_changes_in_completion_turn": false,
+  "findings": []
+}

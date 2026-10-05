@@ -1,0 +1,8 @@
+{
+  "session": "fm-lab-idle-hint-91536-30605",
+  "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "guarded_teardown_returncode": 0,
+  "dependencies_removed_after_success": true,
+  "dependency_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-idle-hint-8d497a45",
+  "model_input_submitted": false
+}

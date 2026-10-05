@@ -1,0 +1,172 @@
+{
+  "session": "fm-lab-idle-hint-91536-30605",
+  "pane": "w2:p1",
+  "root_row": 14,
+  "stdout": "cursorless=empty\nroot_cursor=empty\nextracted=\n",
+  "stderr": "",
+  "process_info": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 15067,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-idle-hint-8d497a45/empty-session.jsonl",
+              "--config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.omp/fm-worker-overlay.yml",
+              "--no-tools",
+              "--no-lsp",
+              "--no-extensions",
+              "--no-skills",
+              "--no-rules",
+              "--no-title"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-idle-hint-8d497a45/empty-session.jsonl --config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.omp/fm-worker-overlay.yml --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-idle-hint-8d497a45/wt",
+            "name": "omp",
+            "pid": 15067
+          }
+        ],
+        "pane_id": "w2:p1",
+        "shell_pid": 96822
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "model_input_submitted": false,
+  "regression_before": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "not ok - native empty hint cursorless: expected empty, got 'pending'\n"
+  },
+  "admission": [
+    {
+      "time": 1791220485.230798,
+      "returncode": 1,
+      "stdout": "load1=40 (<70) ok\nmemory_free=45% (>=35) ok\nswap_used=28291MB growth_10min=2275MB (<=256) FAIL\nsince_last_start=733s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220545.6788101,
+      "returncode": 1,
+      "stdout": "load1=34 (<70) ok\nmemory_free=47% (>=35) ok\nswap_used=28243MB growth_10min=2291MB (<=256) FAIL\nsince_last_start=793s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220605.8530052,
+      "returncode": 1,
+      "stdout": "load1=35 (<70) ok\nmemory_free=43% (>=35) ok\nswap_used=28227MB growth_10min=2180MB (<=256) FAIL\nsince_last_start=853s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220666.421397,
+      "returncode": 1,
+      "stdout": "load1=27 (<70) ok\nmemory_free=34% (>=35) FAIL\nswap_used=29037MB growth_10min=2616MB (<=256) FAIL\nsince_last_start=914s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220726.6691241,
+      "returncode": 1,
+      "stdout": "load1=26 (<70) ok\nmemory_free=55% (>=35) ok\nswap_used=29973MB growth_10min=2426MB (<=256) FAIL\nsince_last_start=974s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220787.3618839,
+      "returncode": 1,
+      "stdout": "load1=29 (<70) ok\nmemory_free=45% (>=35) ok\nswap_used=29853MB growth_10min=2020MB (<=256) FAIL\nsince_last_start=1034s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220848.0500128,
+      "returncode": 1,
+      "stdout": "load1=27 (<70) ok\nmemory_free=58% (>=35) ok\nswap_used=29839MB growth_10min=2070MB (<=256) FAIL\nsince_last_start=1095s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220908.299536,
+      "returncode": 1,
+      "stdout": "load1=28 (<70) ok\nmemory_free=36% (>=35) ok\nswap_used=29175MB growth_10min=1098MB (<=256) FAIL\nsince_last_start=1156s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791220968.701399,
+      "returncode": 1,
+      "stdout": "load1=25 (<70) ok\nmemory_free=47% (>=35) ok\nswap_used=29506MB growth_10min=1047MB (<=256) FAIL\nsince_last_start=1216s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221029.1777449,
+      "returncode": 1,
+      "stdout": "load1=27 (<70) ok\nmemory_free=35% (>=35) ok\nswap_used=30188MB growth_10min=1857MB (<=256) FAIL\nsince_last_start=1276s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221089.697631,
+      "returncode": 1,
+      "stdout": "load1=56 (<70) ok\nmemory_free=57% (>=35) ok\nswap_used=30565MB growth_10min=2290MB (<=256) FAIL\nsince_last_start=1337s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221149.9626188,
+      "returncode": 1,
+      "stdout": "load1=36 (<70) ok\nmemory_free=57% (>=35) ok\nswap_used=30533MB growth_10min=2290MB (<=256) FAIL\nsince_last_start=1397s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221210.218341,
+      "returncode": 1,
+      "stdout": "load1=25 (<70) ok\nmemory_free=50% (>=35) ok\nswap_used=30517MB growth_10min=2290MB (<=256) FAIL\nsince_last_start=1458s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221270.411102,
+      "returncode": 1,
+      "stdout": "load1=20 (<70) ok\nmemory_free=59% (>=35) ok\nswap_used=30485MB growth_10min=634MB (<=256) FAIL\nsince_last_start=1518s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221330.630338,
+      "returncode": 1,
+      "stdout": "load1=26 (<70) ok\nmemory_free=63% (>=35) ok\nswap_used=30437MB growth_10min=520MB (<=256) FAIL\nsince_last_start=1578s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221390.825202,
+      "returncode": 1,
+      "stdout": "load1=14 (<70) ok\nmemory_free=64% (>=35) ok\nswap_used=30421MB growth_10min=576MB (<=256) FAIL\nsince_last_start=1638s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221451.021564,
+      "returncode": 1,
+      "stdout": "load1=16 (<70) ok\nmemory_free=64% (>=35) ok\nswap_used=30373MB growth_10min=566MB (<=256) FAIL\nsince_last_start=1698s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221511.221637,
+      "returncode": 1,
+      "stdout": "load1=15 (<70) ok\nmemory_free=67% (>=35) ok\nswap_used=30125MB growth_10min=595MB (<=256) FAIL\nsince_last_start=1759s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221571.4101682,
+      "returncode": 1,
+      "stdout": "load1=10 (<70) ok\nmemory_free=68% (>=35) ok\nswap_used=30053MB growth_10min=563MB (<=256) FAIL\nsince_last_start=1819s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221631.6275752,
+      "returncode": 0,
+      "stdout": "load1=15 (<70) ok\nmemory_free=64% (>=35) ok\nswap_used=29046MB growth_10min=-1615MB (<=256) ok\nsince_last_start=1879s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791221730.041909,
+      "returncode": 0,
+      "stdout": "load1=25 (<70) ok\nmemory_free=56% (>=35) ok\nswap_used=28310MB growth_10min=-2215MB (<=256) ok\nsince_last_start=1977s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    }
+  ]
+}

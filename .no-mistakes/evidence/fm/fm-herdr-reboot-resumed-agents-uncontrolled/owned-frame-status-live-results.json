@@ -1,0 +1,295 @@
+{
+  "phase": "Test",
+  "verdict": "fail",
+  "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "session": "fm-lab-owned-status-35575-25941",
+  "scope": "Four outstanding actual-renderer composer scenarios only; prior cleanup receipts not repeated, no suite/lint/static analysis or source edits.",
+  "admission": [
+    {
+      "time": "2026-10-05T16:45:08.003639+00:00",
+      "returncode": 1,
+      "stdout": "load1=28 (<70) ok\nmemory_free=37% (>=35) ok\nswap_used=25691MB growth_10min=407MB (<=256) FAIL\nsince_last_start=460s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:46:08.191197+00:00",
+      "returncode": 1,
+      "stdout": "load1=25 (<70) ok\nmemory_free=36% (>=35) ok\nswap_used=25807MB growth_10min=531MB (<=256) FAIL\nsince_last_start=521s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:47:08.387964+00:00",
+      "returncode": 1,
+      "stdout": "load1=24 (<70) ok\nmemory_free=37% (>=35) ok\nswap_used=25777MB growth_10min=1040MB (<=256) FAIL\nsince_last_start=581s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:48:08.651822+00:00",
+      "returncode": 1,
+      "stdout": "load1=19 (<70) ok\nmemory_free=36% (>=35) ok\nswap_used=25742MB growth_10min=288MB (<=256) FAIL\nsince_last_start=641s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:49:09.021141+00:00",
+      "returncode": 1,
+      "stdout": "load1=17 (<70) ok\nmemory_free=35% (>=35) ok\nswap_used=25823MB growth_10min=433MB (<=256) FAIL\nsince_last_start=701s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:50:09.229644+00:00",
+      "returncode": 1,
+      "stdout": "load1=15 (<70) ok\nmemory_free=38% (>=35) ok\nswap_used=25898MB growth_10min=354MB (<=256) FAIL\nsince_last_start=762s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:51:09.401459+00:00",
+      "returncode": 1,
+      "stdout": "load1=23 (<70) ok\nmemory_free=36% (>=35) ok\nswap_used=25889MB growth_10min=403MB (<=256) FAIL\nsince_last_start=822s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:52:10.818077+00:00",
+      "returncode": 1,
+      "stdout": "load1=32 (<70) ok\nmemory_free=37% (>=35) ok\nswap_used=26288MB growth_10min=637MB (<=256) FAIL\nsince_last_start=882s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:53:11.162539+00:00",
+      "returncode": 1,
+      "stdout": "load1=32 (<70) ok\nmemory_free=37% (>=35) ok\nswap_used=26232MB growth_10min=511MB (<=256) FAIL\nsince_last_start=943s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:54:11.710159+00:00",
+      "returncode": 1,
+      "stdout": "load1=32 (<70) ok\nmemory_free=40% (>=35) ok\nswap_used=26320MB growth_10min=629MB (<=256) FAIL\nsince_last_start=1004s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:55:11.940683+00:00",
+      "returncode": 1,
+      "stdout": "load1=21 (<70) ok\nmemory_free=39% (>=35) ok\nswap_used=26304MB growth_10min=497MB (<=256) FAIL\nsince_last_start=1064s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:56:12.126887+00:00",
+      "returncode": 1,
+      "stdout": "load1=14 (<70) ok\nmemory_free=39% (>=35) ok\nswap_used=26272MB growth_10min=495MB (<=256) FAIL\nsince_last_start=1125s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:57:12.304789+00:00",
+      "returncode": 1,
+      "stdout": "load1=15 (<70) ok\nmemory_free=41% (>=35) ok\nswap_used=26256MB growth_10min=490MB (<=256) FAIL\nsince_last_start=1185s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:58:13.000355+00:00",
+      "returncode": 1,
+      "stdout": "load1=21 (<70) ok\nmemory_free=39% (>=35) ok\nswap_used=26184MB growth_10min=337MB (<=256) FAIL\nsince_last_start=1245s (>=120) not checked (--step)\nFAIL\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:59:13.279296+00:00",
+      "returncode": 0,
+      "stdout": "load1=21 (<70) ok\nmemory_free=42% (>=35) ok\nswap_used=26136MB growth_10min=238MB (<=256) ok\nsince_last_start=1306s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T16:59:42.120911+00:00",
+      "returncode": 0,
+      "stdout": "load1=28 (<70) ok\nmemory_free=39% (>=35) ok\nswap_used=26128MB growth_10min=230MB (<=256) ok\nsince_last_start=1335s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T17:00:15.205927+00:00",
+      "returncode": 0,
+      "stdout": "load1=27 (<70) ok\nmemory_free=36% (>=35) ok\nswap_used=26120MB growth_10min=231MB (<=256) ok\nsince_last_start=1368s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T17:03:33.056311+00:00",
+      "returncode": 0,
+      "stdout": "load1=15 (<70) ok\nmemory_free=40% (>=35) ok\nswap_used=26048MB growth_10min=-272MB (<=256) ok\nsince_last_start=60s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    },
+    {
+      "time": "2026-10-05T17:04:41.277914+00:00",
+      "returncode": 0,
+      "stdout": "load1=13 (<70) ok\nmemory_free=38% (>=35) ok\nswap_used=26016MB growth_10min=-296MB (<=256) ok\nsince_last_start=129s (>=120) not checked (--step)\nPASS\n",
+      "stderr": ""
+    }
+  ],
+  "launch": "env HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/agent OMP_SKIP_SETUP=1 XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home/.cache XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home/.config TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/tmp omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/empty-session.jsonl --config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.omp/fm-worker-overlay.yml --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title",
+  "native_empty_comparison_launch": "env HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/agent OMP_SKIP_SETUP=1 XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home/.cache XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/home/.config TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/tmp omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/native-empty-session.jsonl --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/box.yml",
+  "observations": [
+    {
+      "cursorless": "pending",
+      "root_cursor": "pending",
+      "extracted_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e \u2570\u2500 \u2500\u256f",
+      "root_row": 12,
+      "plain_capture": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    \n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.1\n\n                       Tip: Spaghetti code? Try complaining with /omfg\n\n Warning: No models available. Use /login or set an API key environment variable. Then use   \n /model to select a model.                                                                   \n\n\u276f                                                                                            \n  \u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e                                                       \n  \u2570\u2500 \u2500\u256f                                                                                      \n \u03c0 \u00b7 \u2b22 no-model \u00b7 \ud83c\udf33 32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20 \u00b7 \u2442 detached ?1 \u00b7 \u25eb 14K/? \u27f2 ",
+      "stderr": "",
+      "scenario": "header",
+      "live": true,
+      "expected_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e \u2570\u2500 \u2500\u256f",
+      "capture_file": "owned-frame-status-live-header.ansi",
+      "result": "pass"
+    },
+    {
+      "cursorless": "pending",
+      "root_cursor": "pending",
+      "extracted_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2502 text \u00b7 15.4%/272K \u2502 \u2570\u2500 \u2500\u256f",
+      "root_row": 12,
+      "plain_capture": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    \n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.1\n\n                       Tip: Spaghetti code? Try complaining with /omfg\n\n Warning: No models available. Use /login or set an API key environment variable. Then use   \n /model to select a model.                                                                   \n\n\u276f                                                                                            \n  \u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e                                                                    \n  \u2502 text \u00b7 15.4%/272K \u2502                                                                      \n  \u2570\u2500 \u2500\u256f                                                                                      \n \u03c0 \u00b7 \u2b22 no-model \u00b7 \ud83c\udf33 32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20 \u00b7 \u2442 detached ?1 \u00b7 \u25eb 14K/? \u27f2 ",
+      "stderr": "",
+      "scenario": "body",
+      "live": true,
+      "expected_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2502 text \u00b7 15.4%/272K \u2502 \u2570\u2500 \u2500\u256f",
+      "capture_file": "owned-frame-status-live-body.ansi",
+      "result": "pass"
+    },
+    {
+      "cursorless": "pending",
+      "root_cursor": "pending",
+      "extracted_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f",
+      "root_row": 12,
+      "plain_capture": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    \n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.1\n\n                       Tip: Spaghetti code? Try complaining with /omfg\n\n Warning: No models available. Use /login or set an API key environment variable. Then use   \n /model to select a model.                                                                   \n\n\u276f                                                                                            \n  \u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e                                                                    \n  \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f                                                                    \n \u03c0 \u00b7 \u2b22 no-model \u00b7 \ud83c\udf33 32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20 \u00b7 \u2442 detached ?1 \u00b7 \u25eb 14K/? \u27f2 ",
+      "stderr": "",
+      "scenario": "floor",
+      "live": true,
+      "expected_draft": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f",
+      "capture_file": "owned-frame-status-live-floor.ansi",
+      "result": "pass"
+    },
+    {
+      "cursorless": "pending",
+      "root_cursor": "pending",
+      "extracted_draft": "\u21e7\u21e5",
+      "root_row": 12,
+      "plain_capture": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588    \n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.1\n\n                       Tip: Spaghetti code? Try complaining with /omfg\n\n Warning: No models available. Use /login or set an API key environment variable. Then use   \n /model to select a model.                                                                   \n\n\u276f                                                                \u21e7\u21e5 to change thinking effort\n \u03c0 \u00b7 \u2b22 no-model \u00b7 \ud83c\udf33 32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20 \u00b7 \u2442 detached ?1 \u00b7 \u25eb 14K/? \u27f2 ",
+      "stderr": "",
+      "scenario": "empty-unowned-status",
+      "live": true,
+      "expected_verdict": "empty",
+      "expected_draft": "",
+      "capture_file": "owned-frame-status-live-borderless-idle-hint.ansi",
+      "result": "fail",
+      "status_footer_excluded": true,
+      "failure": "An actually empty borderless composer retains the bright idle hint \u21e7\u21e5; its unowned \u03c0 status footer is excluded. This is distinct from owned-frame status filtering and outside the selected fix scope."
+    }
+  ],
+  "process_info": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 94656,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/empty-session.jsonl",
+              "--config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.omp/fm-worker-overlay.yml",
+              "--no-tools",
+              "--no-lsp",
+              "--no-extensions",
+              "--no-skills",
+              "--no-rules",
+              "--no-title"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/empty-session.jsonl --config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.omp/fm-worker-overlay.yml --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/wt",
+            "name": "omp",
+            "pid": 94656
+          }
+        ],
+        "pane_id": "w2:p1",
+        "shell_pid": 39651
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "native_empty_process_info": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 18666,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/native-empty-session.jsonl",
+              "--no-tools",
+              "--no-lsp",
+              "--no-extensions",
+              "--no-skills",
+              "--no-rules",
+              "--no-title",
+              "--config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/box.yml"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/native-empty-session.jsonl --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --config=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/box.yml",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83/wt",
+            "name": "omp",
+            "pid": 18666
+          }
+        ],
+        "pane_id": "w3:p1",
+        "shell_pid": 13856
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "session_record_types": {
+    "empty-session.jsonl": [
+      "session",
+      "thinking_level_change"
+    ],
+    "native-empty-session.jsonl": [
+      "session",
+      "thinking_level_change"
+    ]
+  },
+  "model_input_submitted": false,
+  "finding": {
+    "id": "test-live-empty-borderless-hint",
+    "action": "ask-user",
+    "description": "The required genuine-empty live proof reveals an distinct idle-hint filtering failure: with the private default theme, omp v18.6.1 renders bright \u21e7\u21e5 beside dim to change thinking effort; the bare classifier and extractor retain \u21e7\u21e5. Status-furniture filtering correctly excludes the real unowned footer. No production changes made because the selected scope only authorizes owned-frame status filtering; a new scope decision is required to fix bare idle-hint filtering.",
+    "file": "bin/fm-composer-lib.sh",
+    "observed": {
+      "cursorless": "pending",
+      "empty_root_cursor": "pending",
+      "extracted_draft": "\u21e7\u21e5"
+    },
+    "expected": {
+      "cursorless": "empty",
+      "empty_root_cursor": "empty",
+      "extracted_draft": ""
+    }
+  },
+  "setup_notes": [
+    "Required external helper provision performs its own fresh prepare; explicit pre-prepare was refused, and that unused claim was guardedly torn down before claiming a fresh name.",
+    "The original long shell launch was not executed; replaced by a worktree-owned short launch script after observing the shell still foreground.",
+    "Native band and box were inspected as empty-surface setup variants; they integrate status into their header rather than provide the required unowned footer, so they are not substitutes for the failing empty borderless scenario."
+  ],
+  "cleanup": {
+    "session": "fm-lab-owned-status-35575-25941",
+    "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "",
+    "owned_pids": [
+      94656,
+      18666
+    ],
+    "dependency_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83",
+    "dependencies_removed": true,
+    "kernel_process_check": {
+      "returncode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "omp_processes_stopped": true
+  }
+}

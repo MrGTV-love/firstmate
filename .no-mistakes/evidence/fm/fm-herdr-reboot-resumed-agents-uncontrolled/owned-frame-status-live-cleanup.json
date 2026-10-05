@@ -1,0 +1,19 @@
+{
+  "session": "fm-lab-owned-status-35575-25941",
+  "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "owned_pids": [
+    94656,
+    18666
+  ],
+  "dependency_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-owned-frame-live-0280ce83",
+  "dependencies_removed": true,
+  "kernel_process_check": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "omp_processes_stopped": true
+}
