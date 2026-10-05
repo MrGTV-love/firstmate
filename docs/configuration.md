@@ -9,7 +9,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | --- | --- |
 | Firstmate's code, private files, or project location | [FM_HOME](#fm_home) and [operational home layout](#operational-home-layout-and-state) |
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
-| Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
+| Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -826,6 +826,30 @@ The file is a captain-wide safety preference, so it is inherited into secondmate
 
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the permission-mode observations and the distinct startup dialogs.
 
+## Claude launcher (config/claude-launcher)
+
+The optional local, gitignored `config/claude-launcher` routes every Claude worker launch through the local TeamClaude proxy: crewmates, scouts, Claude secondmates, and every relaunch, including `fm-control` relaunch, the session-end auto-relaunch, and secondmate restart, on every runtime backend.
+Its one accepted token is `teamclaude`, which starts Claude through [`bin/fm-teamclaude-launch.sh`](../bin/fm-teamclaude-launch.sh).
+An absent file launches the bare `claude` command.
+Any other value, or an unreadable file, refuses the launch before any worker, copy, or record exists.
+
+With `teamclaude`, the spawn first runs the launcher's `--check`, which refuses the launch when TeamClaude is not installed, is ambiguous, or its proxy does not answer `teamclaude status`.
+`fm-control` relaunch runs the same check before it stops the running agent, so a stopped proxy leaves that agent running.
+In the worker's pane, the launcher applies the client environment `teamclaude env` exports and then replaces itself with `claude`.
+That export must set `HTTPS_PROXY`, and TeamClaude also exports `NODE_EXTRA_CA_CERTS` so Claude trusts the proxy's certificate authority.
+The proxy therefore reaches Claude on tmux and Herdr alike, without depending on a shell alias in the pane.
+The launcher refuses again in the pane, rather than start Claude unproxied, if TeamClaude is missing there, the proxy stopped, or the export sets no `HTTPS_PROXY`.
+Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
+TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
+Firstmate requires any nonempty override to be an absolute path.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+No TeamClaude credential, account name, or quota state enters Firstmate configuration.
+The [Claude API key guard](#claude-api-key-guard) applies unchanged.
+A raw launch command whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
+The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
+`tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
+
 ## Worker account pin (config/claude-account, config/pi-account)
 
 A home that mixes accounts for one runner, such as a work login and a personal one, can pin the account its own Claude and Pi workers launch on.
@@ -930,7 +954,7 @@ SSH_AUTH_SOCK
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools.
+Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -992,7 +1016,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-A raw claude launch command (the unverified-adapter escape hatch) is also exempt from the guard.
+The same guard applies to raw launch commands whose harness resolves to `claude`.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.

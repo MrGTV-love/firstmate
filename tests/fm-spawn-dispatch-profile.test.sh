@@ -37,6 +37,7 @@ make_spawn_fakebin() {
   fakebin=$(fm_test_make_spawn_fakebin "$dir")
   cat > "$fakebin/timeout" <<'SH'
 #!/usr/bin/env bash
+[ "${1:-}" != -k ] || shift 2
 shift
 exec "$@"
 SH
@@ -95,7 +96,12 @@ run_spawn() {
   # explicitly (empty by default) instead of leaking the invoking shell's value,
   # which would make launch assertions depend on the developer's environment.
   # A test opts in to the set case via FM_TEST_CLAUDE_CONFIG_DIR.
+  # XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG are handed to a TeamClaude launch's
+  # own teamclaude calls, so they are pinned for the same reason.
   CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
+    XDG_CONFIG_HOME="${FM_TEST_XDG_CONFIG_HOME:-}" \
+    TEAMCLAUDE_CONFIG="${FM_TEST_TEAMCLAUDE_CONFIG:-}" \
+    FM_FAKE_TEAMCLAUDE_STATUS="${FM_TEST_TEAMCLAUDE_STATUS:-0}" \
     FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="${FM_TEST_PANE_LOG:-}" \
     FM_FAKE_PI_VERSION="${FM_TEST_PI_VERSION:-0.84.0}" \
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
@@ -1751,5 +1757,299 @@ test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
 test_keep_ai_trailers_reaches_secondmate_crew_launches
 test_claude_secondmate_launch_carries_the_attribution_policy
 test_active_dispatch_profile_does_not_block_secondmate_launch
+
+# --- config/claude-launcher -------------------------------------------------
+
+# make_teamclaude_case <name> <id> -> a claude case whose home selects TeamClaude.
+make_teamclaude_case() {
+  local rec
+  rec=$(make_spawn_case "$1" claude "$2")
+  read_case_record "$rec"
+  fm_test_fake_teamclaude "$FAKEBIN_DIR"
+  printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+  printf '%s\n' "$rec"
+}
+
+test_teamclaude_launcher_proxies_a_fresh_claude_spawn() {
+  local rec id out status
+  id=teamclaude-fresh-z40
+  rec=$(make_teamclaude_case teamclaude-fresh "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a TeamClaude claude spawn should succeed while the proxy answers"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "fresh ship spawn"
+  pass "config/claude-launcher=teamclaude: a fresh claude spawn reaches claude with the TeamClaude proxy"
+}
+
+# The counterfactual: with no launcher file the same fakes are present, yet the
+# launch is the bare claude word and claude receives no proxy setting.
+test_absent_claude_launcher_keeps_the_direct_launch() {
+  local rec id out status env_out
+  id=teamclaude-absent-z41
+  rec=$(make_teamclaude_case teamclaude-absent "$id")
+  read_case_record "$rec"
+  rm "$HOME_DIR/config/claude-launcher"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a claude spawn with no launcher file should succeed"$'\n'"$out"
+  assert_contains "$(cat "$LAUNCH_LOG")" "CLAUDE_CODE_SEND_FEEDBACK=0 claude " \
+    "an absent config/claude-launcher must keep the bare claude launch"
+  assert_not_contains "$(cat "$LAUNCH_LOG")" "fm-teamclaude-launch.sh" \
+    "an absent config/claude-launcher must not start the TeamClaude launcher"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the direct launch command failed"
+  [ -s "$env_out" ] || fail "the direct launch never started claude"
+  ! grep -q '^HTTPS_PROXY=' "$env_out" || fail "a direct launch must not route claude through a proxy"
+  pass "an absent config/claude-launcher keeps the direct claude launch with no proxy"
+}
+
+test_teamclaude_launcher_proxies_a_claude_secondmate_launch() {
+  local rec id sm out status
+  id=teamclaude-secondmate-z43
+  rec=$(make_teamclaude_case teamclaude-secondmate "$id")
+  read_case_record "$rec"
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$id"
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  expect_code 0 "$status" "a TeamClaude claude secondmate spawn should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "secondmate launch"
+  pass "config/claude-launcher=teamclaude: a claude secondmate launch reaches claude with the TeamClaude proxy"
+}
+
+test_teamclaude_launcher_refusals_leave_no_task() {
+  local rec id out status
+  id=teamclaude-refuse-z44
+  rec=$(make_teamclaude_case teamclaude-refuse "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_TEAMCLAUDE_STATUS=1 \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "a stopped TeamClaude proxy must refuse the spawn"
+  assert_contains "$out" "proxy is not running" "the refusal must name the stopped proxy"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a stopped TeamClaude proxy must not launch anything"
+  assert_absent "$HOME_DIR/state/$id.meta" "a stopped TeamClaude proxy must refuse before the task record"
+
+  printf 'proxy\n' > "$HOME_DIR/config/claude-launcher"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "an unknown launcher token must refuse the spawn"
+  assert_contains "$out" "the only accepted value is teamclaude" "the refusal must name the accepted launcher value"
+  assert_absent "$HOME_DIR/state/$id.meta" "an unknown launcher token must refuse before the task record"
+  pass "config/claude-launcher=teamclaude refuses a stopped proxy or an unknown token before any task exists"
+}
+
+# A raw launch command whose program is claude passes the same check and runs
+# word for word under the launcher, so claude gets the proxy and its own flags.
+test_teamclaude_launcher_proxies_a_raw_claude_launch() {
+  local rec id out status env_out
+  id=teamclaude-raw-z47
+  rec=$(make_teamclaude_case teamclaude-raw "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_TEAMCLAUDE_STATUS=1 \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 1 "$status" "a stopped TeamClaude proxy must refuse a raw claude launch"
+  assert_contains "$out" "proxy is not running" "the raw refusal must name the stopped proxy"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw claude launch must not launch anything"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused raw claude launch must leave no task record"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 0 "$status" "a raw claude launch should succeed while the proxy answers"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "raw claude launch"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the raw claude command must keep its own arguments: $(cat "$env_out.args" 2>/dev/null)"
+  pass "config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments"
+}
+
+test_teamclaude_config_paths_reach_only_teamclaude() {
+  local rec id out status env_out
+  id=teamclaude-paths-z45
+  rec=$(make_teamclaude_case teamclaude-paths "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_XDG_CONFIG_HOME="$CASE_DIR/xdg" FM_TEST_TEAMCLAUDE_CONFIG="$CASE_DIR/teamclaude.json" \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "absolute TeamClaude configuration paths should be accepted"$'\n'"$out"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/xdg" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the XDG_CONFIG_HOME the spawn checked"
+  grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/teamclaude.json" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the TEAMCLAUDE_CONFIG the spawn checked"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$env_out" \
+    || fail "claude must still receive HTTPS_PROXY from teamclaude"
+  ! grep -Eq '^(XDG_CONFIG_HOME|TEAMCLAUDE_CONFIG|FM_TC_[A-Z_]+)=' "$env_out" \
+    || fail "the TeamClaude configuration paths must not reach claude: $(cat "$env_out")"
+
+  id=teamclaude-relative-z46
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  out=$(FM_TEST_TEAMCLAUDE_CONFIG=teamclaude.json \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "a relative TEAMCLAUDE_CONFIG must refuse"
+  assert_contains "$out" "requires an absolute TEAMCLAUDE_CONFIG" "the refusal must name the relative path"
+  assert_absent "$HOME_DIR/state/$id.meta" "a relative TEAMCLAUDE_CONFIG must refuse before the task record"
+  pass "TeamClaude configuration paths reach only the worker's teamclaude calls, and a relative one refuses"
+}
+
+make_config_sensitive_teamclaude() {
+  local fakebin=$1
+  cat > "$fakebin/teamclaude" <<'SH'
+#!/usr/bin/env bash
+config=$FM_TEST_TC_DEFAULT
+if [ -n "${TEAMCLAUDE_CONFIG:-}" ]; then
+  config=$TEAMCLAUDE_CONFIG
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
+  config=$XDG_CONFIG_HOME/teamclaude.json
+fi
+{
+  IFS= read -r proxy
+  IFS= read -r ca
+} < "$config" || exit 1
+printf '%s|%s|%s|%s|%s|%s|%s\n' "${1:-}" "${XDG_CONFIG_HOME+set}" \
+  "${XDG_CONFIG_HOME-}" "${TEAMCLAUDE_CONFIG+set}" "${TEAMCLAUDE_CONFIG-}" \
+  "$proxy" "$ca" >> "$FM_FAKE_TEAMCLAUDE_ENV_LOG"
+case "${1:-}" in
+  status) exit 0 ;;
+  env)
+    printf "export HTTPS_PROXY='%s'\nexport NODE_EXTRA_CA_CERTS='%s'\n" "$proxy" "$ca"
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$fakebin/teamclaude"
+}
+
+test_teamclaude_snapshot_overrides_stale_pane_configuration() {
+  local scenario rec id out status xdg_presence xdg_value tc_presence tc_value
+  local selected proxy ca expected preflight pane_log env_out bash_dir launch_kind
+  local -a launch_args
+  for scenario in unset xdg teamclaude both empty xdg-empty teamclaude-empty; do
+    id="teamclaude-snapshot-$scenario"
+    rec=$(make_teamclaude_case "teamclaude-snapshot-$scenario" "$id")
+    read_case_record "$rec"
+    make_config_sensitive_teamclaude "$FAKEBIN_DIR"
+    mkdir -p "$CASE_DIR/caller xdg" "$CASE_DIR/pane-xdg"
+    printf '%s\n' http://caller-default:13456 "$CASE_DIR/default-ca.pem" > "$CASE_DIR/default-config"
+    printf '%s\n' http://caller-xdg:13456 "$CASE_DIR/xdg-ca.pem" > "$CASE_DIR/caller xdg/teamclaude.json"
+    printf '%s\n' http://caller-explicit:13456 "$CASE_DIR/explicit-ca.pem" > "$CASE_DIR/caller explicit.json"
+    printf '%s\n' http://stale-pane:13456 "$CASE_DIR/stale-ca.pem" > "$CASE_DIR/pane-config"
+    printf '%s\n' http://stale-xdg:13456 "$CASE_DIR/stale-xdg-ca.pem" > "$CASE_DIR/pane-xdg/teamclaude.json"
+    xdg_presence='' tc_presence='' xdg_value='' tc_value=''
+    selected="$CASE_DIR/default-config"
+    launch_kind=template
+    launch_args=("$id" "$PROJ_DIR")
+    case "$scenario" in
+      xdg) xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"; selected="$xdg_value/teamclaude.json" ;;
+      teamclaude)
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      both)
+        xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        ;;
+      empty)
+        xdg_presence='set'; tc_presence='set'
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      xdg-empty) xdg_presence='set' ;;
+      teamclaude-empty) tc_presence='set' ;;
+    esac
+    {
+      IFS= read -r proxy
+      IFS= read -r ca
+    } < "$selected"
+    expected="$xdg_presence|$xdg_value|$tc_presence|$tc_value|$proxy|$ca"
+    preflight="$CASE_DIR/preflight.log"
+    : > "$preflight"
+    : > "$LAUNCH_LOG"
+    out=$(
+      unset XDG_CONFIG_HOME TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
+      [ "$xdg_presence" != set ] || export XDG_CONFIG_HOME="$xdg_value"
+      [ "$tc_presence" != set ] || export TEAMCLAUDE_CONFIG="$tc_value"
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$preflight" \
+        FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+          "${launch_args[@]}" --mode no-mistakes --yolo off
+    )
+    status=$?
+    expect_code 0 "$status" "$scenario: $launch_kind spawn must use caller configuration"$'\n'"$out"
+    [ "$(cat "$preflight")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: preflight must read caller selector presence, values, proxy and CA: $(cat "$preflight")"
+    pane_log="$CASE_DIR/pane-teamclaude.log"
+    env_out="$CASE_DIR/pane-claude.env"
+    : > "$pane_log"
+    : > "$env_out"
+    bash_dir=$(fm_test_bash_only_dir "$CASE_DIR")
+    env -i HOME="$CASE_DIR/pane-home" PATH="$FAKEBIN_DIR:$bash_dir:/usr/bin:/bin" \
+      XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TC_CONFIG_SNAPSHOT=stale FM_TC_XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" \
+      FM_TC_TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$pane_log" \
+      FM_FAKE_CLAUDE_ENV_LOG="$env_out" \
+      /bin/sh -c "$(cat "$LAUNCH_LOG")" </dev/null > "$CASE_DIR/pane-output" 2>&1
+    status=$?
+    expect_code 0 "$status" "$scenario: recorded $launch_kind command must run in the stale pane"
+    [ "$(cat "$pane_log")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: launch must match caller configuration, not stale pane selectors: $(cat "$pane_log")"
+    grep -Fqx "HTTPS_PROXY=$proxy" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected proxy"
+    grep -Fqx "NODE_EXTRA_CA_CERTS=$ca" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected CA"
+    grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/pane-xdg" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's XDG_CONFIG_HOME"
+    grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/pane-config" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's TEAMCLAUDE_CONFIG"
+    ! grep -q '^FM_TC_' "$env_out" \
+      || fail "$scenario: private snapshot variables must not reach Claude"
+    if [ "$launch_kind" = raw ]; then
+      [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+        || fail "$scenario: the raw command must retain its Claude arguments"
+    fi
+  done
+  pass "TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration"
+}
+
+test_teamclaude_launcher_is_inherited_by_secondmates() {
+  local dir src dest status
+  dir="$TMP_ROOT/teamclaude-inherit"
+  src="$dir/home/config"
+  dest="$dir/secondmate"
+  mkdir -p "$src" "$dest"
+  printf 'teamclaude\n' > "$src/claude-launcher"
+  printf 'config/\n' > "$dest/.gitignore"
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$src" \
+    bash -c '. "$1/bin/fm-config-inherit-lib.sh"; propagate_inheritable_config "$2" "$3/config"' \
+    bash "$ROOT" "$src" "$dest" >/dev/null 2>&1
+  status=$?
+  expect_code 0 "$status" "TeamClaude launcher inheritance should succeed"
+  [ "$(cat "$dest/config/claude-launcher" 2>/dev/null)" = teamclaude ] \
+    || fail "a secondmate home did not inherit config/claude-launcher"
+  pass "config/claude-launcher is inherited by secondmate homes"
+}
+
+test_teamclaude_launcher_proxies_a_fresh_claude_spawn
+test_absent_claude_launcher_keeps_the_direct_launch
+test_teamclaude_launcher_proxies_a_claude_secondmate_launch
+test_teamclaude_launcher_refusals_leave_no_task
+test_teamclaude_config_paths_reach_only_teamclaude
+test_teamclaude_snapshot_overrides_stale_pane_configuration
+test_teamclaude_launcher_proxies_a_raw_claude_launch
+test_teamclaude_launcher_is_inherited_by_secondmates
 
 echo "# all fm-spawn-dispatch-profile tests passed"
