@@ -1,0 +1,5 @@
+lab teardown status=1; fixture and exact launch directories removed
+lab teardown status=1; fixture and exact launch directories removed
+lab teardown status=0; fixture and exact launch directories removed
+lab teardown status=0; fixture and exact launch directories removed
+lab teardown status=1; fixture and exact launch directories removed

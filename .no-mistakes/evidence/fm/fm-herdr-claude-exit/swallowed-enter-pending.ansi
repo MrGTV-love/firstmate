@@ -1,0 +1,40 @@
+
+[0m[38;2;215;119;87m ▐[0m[38;2;215;119;87m[48;2;0;0;0m▛███▛█   [0m[1mClaude Code [0m[38;2;102;102;102mv2.1.289[0m
+[0m[38;2;215;119;87m▝▜[0m[38;2;215;119;87m[48;2;0;0;0m█████[0m[38;2;215;119;87m█▀  [0m[38;2;102;102;102mOpus 5.5 (1M context) with high effort · Claude Max[0m
+[0m[38;2;215;119;87m ▝▝   ▝▝   [0m[38;2;102;102;102m~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1[0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  [0m[38;2;51;102;255m/[0m[1m[38;2;51;102;255mcompact[0m[38;2;51;102;255m                                 Free up context by summarizing the conversation so far[0m
+  [0m[38;2;102;102;102m/auto[0m[1mcompact[0m[38;2;102;102;102m                             Set how full the context gets before auto-summarizing[0m
+  [0m[38;2;102;102;102m/computer-use                            Read this skill before the first step of any request to do something in an[0m
+                                           [0m[38;2;102;102;102mapp on the person's own computer (Notes, Finder, System Settings, any desk…[0m
+[0m[38;2;138;138;138m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+❯ [0m[38;2;51;102;255m/compact[0m
+[0m[38;2;138;138;138m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+  [0m[38;2;102;102;102mOpus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:a042c9c2[0m
+  [0m[38;2;204;0;0m⏵⏵ bypass permissions on[0m[38;2;102;102;102m (shift+tab to cycle)[0m

@@ -1,0 +1,214 @@
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+status --json 
+pane run w1:p1 cd\ --\ \'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/wt\' 
+status --json 
+pane get w1:p1 
+pane get w2:p1 
+pane get w1:p1 
+status --json 
+pane read w2:p1 --source recent --lines 200 
+status --json 
+pane read w1:p1 --source recent --lines 200 
+status --json 
+pane read w1:p1 --source recent --lines 200 
+status --json 
+pane read w2:p1 --source recent --lines 200 
+status --json 
+agent get w2:p1 
+agent get w1:p1 
+status --json 
+pane run w1:p1 export\ GOTMPDIR=/tmp/fm-submitprod35276/gotmp 
+status --json 
+pane run w1:p1 export\ COMPACT_ADVISER_DISABLE=1 
+status --json 
+pane run w1:p1 export\ FM_TASK_ID=submitprod35276 
+status --json 
+pane send-text w1:p1 .\ \'/tmp/fm-submitprod35276+df39cb2f263ccadbb765c70c6e3bee70342616089f3ed6341b5950e3483400b2/launch.s1791165770.52666.30304.sh\' 
+status --json 
+pane send-keys w1:p1 enter 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane send-text w2:p1 /compact 
+pane get w2:p1 
+agent get w2:p1 
+pane process-info --pane w2:p1 
+status --json 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+pane get w2:p1 
+agent get w2:p1 
+pane process-info --pane w2:p1 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 ctrl+u 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 /compact 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 Reply\ with\ exactly\ FMHERDRPONG35276_4745\ and\ nothing\ else. 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 $'â\201£FIRSTMATE_OP: v1 away-supervisor: Reply with exactly FMHERDROPPONG35276_5820 and nothing else.' 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+pane get w2:p1 
+agent get w2:p1 
+pane process-info --pane w2:p1 
+status --json 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 /exit 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+pane get w2:p1 
+agent get w2:p1 
+pane get w2:p1 
+agent get w2:p1 

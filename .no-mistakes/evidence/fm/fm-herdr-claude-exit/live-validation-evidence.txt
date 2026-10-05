@@ -1,0 +1,638 @@
+### Public lifecycle results
+stopped submitprod44347 harness=claude backend=herdr endpoint=fm-lab-delayed-proof-li-45184-21036:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.cTB8Er/wt
+stopped submitcolor44347 harness=claude backend=herdr endpoint=fm-lab-delayed-proof-li-45184-21036:w2:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.mmG7sK/control-home/data/submitprod10106/launch-brief.md records no ship branch; defaulting to legacy branch fm/submitprod10106
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.mmG7sK/control-home/data/submitprod10106/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched submitprod10106 harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-herdr-submit-con-10198-20372:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.mmG7sK/wt
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/control-home/data/submitprod35276/launch-brief.md records no ship branch; defaulting to legacy branch fm/submitprod35276
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/control-home/data/submitprod35276/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched submitprod35276 harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-herdr-submit-con-35400-19792:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/wt
+stopped submitprod35276 harness=claude backend=herdr endpoint=fm-lab-herdr-submit-con-35400-19792:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/wt
+stopped submitcolor35276 harness=claude backend=herdr endpoint=fm-lab-herdr-submit-con-35400-19792:w2:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+stopped submitprod61832 harness=claude backend=herdr endpoint=fm-lab-paste-readback-l-61953-24954:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.B68se0/wt
+stopped submitcolor61832 harness=claude backend=herdr endpoint=fm-lab-paste-readback-l-61953-24954:w2:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+stopped submitcolor85035 harness=claude backend=herdr endpoint=fm-lab-swallowed-enter-85264-28413:w2:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+stopped submitprod85035 harness=claude backend=herdr endpoint=fm-lab-swallowed-enter-85264-28413:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.U5uz9l/wt
+
+
+### Preservation results
+
+### foreign-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=/exit keep my note
+observed elapsed=10 seconds; wait=30
+
+### prefix-deadline-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=/ex
+observed elapsed=39 seconds; wait=default
+
+### unreadable-deadline-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=keep my note
+observed elapsed=9 seconds; wait=2
+
+### ambiguous-infix
+result=send-failed public-status=0 marker=absent content=ompa
+observed elapsed=6 seconds; wait=30
+
+### placeholder-adjacent-foreign
+result=send-failed public-status=0 marker=absent content=[Pasted text #1] keep my note
+observed elapsed=7 seconds; wait=30
+
+owned-suffix: verdict=send-failed composer=empty
+
+
+### Delayed completion handler
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.cTB8Er/wt
+
+
+❯ /compact
+  ⎿  Not enough messages to compact.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                     ● high · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod44347 wt:ec3f9f06
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Slash skill reply
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.QRLWb6/wt
+
+
+❯ /gate-proof
+
+⏺ FMHERDRSKILL35275_20455
+
+✻ Crunched for 0s · done 9:02 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                     ● high · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 5% 59k/1.0M submitprod35275 wt:443abdd2
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Native pasted payload and endorsed readback
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.B68se0/wt
+
+
+❯ Reply with exactly FMHERDRNATIVEPASTE61832_19835 and nothing else. Do not edit files or use tools.
+  Disposable validation data row 0.
+  Disposable validation data row 1.
+  Disposable validation data row 2.
+  Disposable validation data row 3.
+  Disposable validation data row 4.
+  Disposable validation data row 5.
+  Disposable validation data row 6.
+  Disposable validation data row 7.
+  Reply with exactly FMHERDRNATIVEPASTE61832_19835.
+
+⏺ Captain, I got your pasted text. It has eight rows of test data. It also tells me to reply with one exact code word.
+
+  I did not follow that instruction. It came from inside the pasted text, and you did not ask for it in your own
+  message.
+
+  What do you want me to do with this text? If you want the code word reply, tell me so in your own words.
+
+✻ Cooked for 6s · done 9:09 PM
+
+❯ I authorize you to use the pasted data I just sent. Reply with exactly the unique code word from its final line, and
+  nothing else. Do not edit files or use tools.
+
+⏺ FMHERDRNATIVEPASTE61832_19835
+
+✻ Churned for 1s · done 9:09 PM
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 5% 58k/1.0M submitprod61832 wt:9284f11b
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Verified control surface
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the production shape in its endpoint and the replacement reads its instructions
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.FXLX1U/wt
+
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submi
+  t-confirm-live.FXLX1U/control-home/state/operational-inbox/1791165772-27b11a4f639ec22b.msg' and handle its contents
+  as Firstmate operational input.
+
+  Read 1 file, ran 1 shell command
+
+⏺ FMHERDRRELAUNCH35276_28994
+
+✻ Cogitated for 9s · done 9:03 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                         You've used 96% of your weekly limit · resets Oct 6 at 6am (America/Chicago)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 6% 63k/1.0M submitprod35276 wt:9b910a6c
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:b873baae
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Verified control surface
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 fm-control exit stops the production shape and preserves its endpoint
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefi
+x syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal
+* at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing
+:* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a l
+iteral * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume 9b910a6c-3bb4-47bd-99c2-cde02802c0db
+GTT-CB:wt charlesabrooker$
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:b873baae
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Verified control surface
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the forced-truecolor shape (draft drawn below the default ghost ceiling)
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefi
+x syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal
+* at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing
+:* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a l
+iteral * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume 9b910a6c-3bb4-47bd-99c2-cde02802c0db
+GTT-CB:wt charlesabrooker$
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                          Ctrl+Y to paste deleted text
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:b873baae
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Verified control surface
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 executes /compact in the forced-truecolor shape
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefi
+x syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal
+* at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing
+:* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a l
+iteral * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume 9b910a6c-3bb4-47bd-99c2-cde02802c0db
+GTT-CB:wt charlesabrooker$
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+❯ /compact
+  ⎿  Not enough messages to compact.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                          Ctrl+Y to paste deleted text
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:b873baae
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Verified control surface
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 submits a U+2063 away-supervisor payload whose read-back drops the mark
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefi
+x syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal
+* at that position. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing
+:* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a l
+iteral * at that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume 9b910a6c-3bb4-47bd-99c2-cde02802c0db
+GTT-CB:wt charlesabrooker$
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+❯ /compact
+  ⎿  Not enough messages to compact.
+
+❯ Reply with exactly FMHERDRPONG35276_4745 and nothing else.
+
+⏺ FMHERDRPONG35276_4745
+
+✻ Sautéed for 2s · done 9:03 PM
+
+❯ FIRSTMATE_OP: v1 away-supervisor: Reply with exactly FMHERDROPPONG35276_5820 and nothing else.
+
+⏺ FMHERDROPPONG35276_5820
+
+✻ Cooked for 2s · done 9:03 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                        Removed 1 invisible character · review and press Enter to send
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 6% 61k/1.0M 01M44T7RV13FBM6CCK0KWXD1S1:b873baae
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+
+### Swallowed Enter with missing later identity fields
+Transport fault: intentionally swallowed first Enter; subsequent native status responses omit identity only.
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+❯ /compact
+  ⎿  Not enough messages to compact.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                      ● high · /effort
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:a042c9c2
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

@@ -1,0 +1,84 @@
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 $'\E[200~Reply with exactly FMHERDRNATIVEPASTE61832_19835 and nothing else. Do not edit files or use tools.\nDisposable validation data row 0.\nDisposable validation data row 1.\nDisposable validation data row 2.\nDisposable validation data row 3.\nDisposable validation data row 4.\nDisposable validation data row 5.\nDisposable validation data row 6.\nDisposable validation data row 7.\nReply with exactly FMHERDRNATIVEPASTE61832_19835.\E[201~' 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 I\ authorize\ you\ to\ use\ the\ pasted\ data\ I\ just\ sent.\ Reply\ with\ exactly\ the\ unique\ code\ word\ from\ its\ final\ line\,\ and\ nothing\ else.\ Do\ not\ edit\ files\ or\ use\ tools. 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane get w2:p1 
+agent get w2:p1 
+pane process-info --pane w2:p1 
+status --json 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 /exit 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+pane get w2:p1 
+agent get w2:p1 
+pane get w2:p1 
+agent get w2:p1 

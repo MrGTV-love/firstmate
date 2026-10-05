@@ -1,0 +1,89 @@
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+status --json 
+pane run w1:p1 cd\ --\ \'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.mmG7sK/wt\' 
+status --json 
+pane get w1:p1 
+pane get w2:p1 
+pane get w1:p1 
+status --json 
+pane read w2:p1 --source recent --lines 200 
+status --json 
+pane read w1:p1 --source recent --lines 200 
+status --json 
+pane read w1:p1 --source recent --lines 200 
+status --json 
+pane read w2:p1 --source recent --lines 200 
+status --json 
+agent get w2:p1 
+agent get w1:p1 
+status --json 
+pane run w1:p1 export\ GOTMPDIR=/tmp/fm-submitprod10106/gotmp 
+status --json 
+pane run w1:p1 export\ COMPACT_ADVISER_DISABLE=1 
+status --json 
+pane run w1:p1 export\ FM_TASK_ID=submitprod10106 
+status --json 
+pane send-text w1:p1 .\ \'/tmp/fm-submitprod10106+a36a832b852f9b7981ace43ecce0657604a48ad0aa8b9d702e4e0bda58215fbc/launch.s1791165371.35652.30767.sh\' 
+status --json 
+pane send-keys w1:p1 enter 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 

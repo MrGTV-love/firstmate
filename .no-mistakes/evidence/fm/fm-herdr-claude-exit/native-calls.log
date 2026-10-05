@@ -1,0 +1,255 @@
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /compact 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /compact 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /compact 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-text w1:p1 /compact 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /compact 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 
+status --json 
+pane get w1:p1 
+status --json 
+pane run w1:p1 cd\ --\ \'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt\' 
+status --json 
+pane get w1:p1 

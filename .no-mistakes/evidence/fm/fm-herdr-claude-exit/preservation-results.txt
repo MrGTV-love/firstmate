@@ -1,0 +1,22 @@
+
+### foreign-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=/exit keep my note
+observed elapsed=10 seconds; wait=30
+
+### prefix-deadline-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=/ex
+observed elapsed=39 seconds; wait=default
+
+### unreadable-deadline-public-exit
+result=error: the exit command could not be sent to task submitprod25151 on herdr public-status=1 marker=absent content=keep my note
+observed elapsed=9 seconds; wait=2
+
+### ambiguous-infix
+result=send-failed public-status=0 marker=absent content=ompa
+observed elapsed=6 seconds; wait=30
+
+### placeholder-adjacent-foreign
+result=send-failed public-status=0 marker=absent content=[Pasted text #1] keep my note
+observed elapsed=7 seconds; wait=30
+
+owned-suffix: verdict=send-failed composer=empty

@@ -1,0 +1,216 @@
+
+### live payload proof awaits a prefix until the real composer finishes, then executes /compact
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.cTB8Er/wt
+
+
+❯ /compact
+  ⎿  Not enough messages to compact.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                     ● high · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod44347 wt:ec3f9f06
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:72d64912
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 fm-control exit stops the delayed-prefix shape and preserves its endpoint
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume ec3f9f06-2160-4bf0-b15f-e6513c0199bc
+GTT-CB:wt charlesabrooker$
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:72d64912
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+### live Herdr submit confirm: Claude Code (2.1.289 (Claude Code)) on herdr 0.9.1 fm-control exit stops the unused-color-fixture shape and preserves its endpoint
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+Resume this session with:
+claude --resume ec3f9f06-2160-4bf0-b15f-e6513c0199bc
+GTT-CB:wt charlesabrooker$
+Permission allow rule (../../../../.claude/settings.json): Bash(tmux capture-pane *:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Replace that * with the exact value you mean.
+Permission deny rule (../../../../.claude/settings.json): Bash(rm -rf /*:*) mixes * with the trailing :* prefix syntax,
+so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at that po
+sition. Use Bash(rm -rf /*) for wildcard matching.
+Permission deny rule (../../../../.claude/settings.json): Bash(rm -rf ~/*:*) mixes * with the trailing :* prefix syntax,
+ so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at that p
+osition. Use Bash(rm -rf ~/*) for wildcard matching.
+Permission deny rule (../../../../.claude/settings.json): Bash(dd if=* of=/dev/*:*) mixes * with the trailing :* prefix
+syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at
+ that position. Use Bash(dd if=* of=/dev/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(rm*/.claude/hooks/*:*) mixes * with the trailing :* prefix
+ syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * a
+t that position. Use Bash(rm*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(rm*/.claude/settings*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing :* prefix
+ syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * a
+t that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing :* prefix
+ syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * a
+t that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* pref
+ix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal *
+ at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+GTT-CB:01M44T7RV13FBM6CCK0KWXD1S1 charlesabrooker$

@@ -1,0 +1,25 @@
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /gate-proof 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 Reply\ with\ exactly\ NETWORKCHECK\ and\ nothing\ else. 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 

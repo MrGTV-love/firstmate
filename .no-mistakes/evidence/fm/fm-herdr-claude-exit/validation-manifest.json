@@ -1,0 +1,47 @@
+{
+  "runtime": {
+    "claude": "2.1.289",
+    "herdr": "0.9.1"
+  },
+  "baseline": [
+    "git diff --stat 6bec7da0431ca70b23e36af6e113fba13ede292c 3b8843701840a847cf5cfecfb569f2f6ad6e0dbc",
+    "command -v herdr claude jq bash python3 tmux"
+  ],
+  "focused_backend_selectors": [
+    "test_composer_state_claude_colored_slash_draft_is_pending",
+    "test_composer_state_claude_dim_colored_suggestion_is_empty",
+    "test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted",
+    "test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry",
+    "test_send_text_submit_claude_payload_rendered_late_is_still_proven",
+    "test_send_text_submit_claude_payload_prefix_growth_is_still_proven",
+    "test_send_text_submit_claude_unproven_timeout_refuses_without_clearing",
+    "test_send_text_submit_claude_truncated_suffix_refuses_without_waiting",
+    "test_send_text_submit_claude_foreign_text_refuses_without_clearing",
+    "test_send_text_submit_claude_ambiguous_text_refuses_without_clearing",
+    "test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload",
+    "test_send_text_submit_lone_paste_placeholder_submits_the_long_payload",
+    "test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload",
+    "test_send_text_submit_refuses_placeholder_followed_by_a_literal_remainder",
+    "test_send_text_submit_three_paste_placeholders_submit_the_long_payload"
+  ],
+  "focused_control_selectors": [
+    "test_herdr_exit_refuses_a_colored_claude_draft_before_typing",
+    "test_herdr_exit_foreign_text_during_proof_is_a_known_send_failure",
+    "test_herdr_exit_unproven_timeout_removes_marker_without_clearing"
+  ],
+  "fixture_issues_resolved": [
+    "Provision owns prepare; redundant explicit prepare was removed.",
+    "Fixture under the worktree inherits an external AGENTS.md import. Startup dialog was explicitly handled. Relaunch fixture approved only trusted in-worktree imports on a fresh project rather than changing an existing decline.",
+    "System roots alone did not trust the TeamClaude API. A CLI debug diagnostic identified its existing public CA; adding that public certificate to the workspace-only bundle resolved TLS without changing system trust or credentials.",
+    "The first foreign-refusal probe saw an uninitialized native-call log line-count assertion. Manual review of native-calls.log lines 1-21 confirms no product Enter or Ctrl+U on that path; persisted draft and marker checks passed.",
+    "An unbracketed 5KB burst produced a real owned truncated suffix, not a paste placeholder. It was safely refused and cleared. A sub-boundary bracketed terminal paste produced the genuine placeholder.",
+    "The imported memory policy treats pasted instructions as untrusted. An explicit user endorsement, without repeating the private token, made the readback probe validate delivery rather than unauthorized model compliance."
+  ],
+  "evidence_notes": [
+    "All live probes used real Claude, normal existing login and named non-default Herdr labs, with all Herdr calls routed through the repository lab helper.",
+    "Fault injection edited the actual composer or affected transport; it did not provide fake agent registrations or canned captures.",
+    "Rendering preserves actual terminal text/ANSI styles; this is not a GUI screenshot.",
+    "Cleanup records with exit status 1 reflect failed fixture probes; helper teardown completed without error. Final successful probe cleanup records show exit status 0.",
+    "No full repository suite, linter, formatter, static analysis, publication or other pipeline phase was run."
+  ]
+}

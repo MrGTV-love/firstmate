@@ -1,0 +1,81 @@
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing
+ :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a
+literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-
+ confirm-live.4nm9R4/wt
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_status":"blocked","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.4nm9R4/wt","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.4nm9R4/wt","pane_id":"w1:p1","revision":0,"state_change_seq":2,"tab_id":"w1:t1","terminal_id":"term_65d0e1966d37b1","workspace_id":"w1"},"type":"agent_info"}}
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                      ● high · /effort
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:af14f707
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"af14f707-3003-471b-a6a0-6d9144ca0df0"},"agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1","pane_id":"w2:p1","revision":1,"state_change_seq":1,"tab_id":"w2:t1","terminal_id":"term_65d0e196b78942","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w2"},"type":"agent_info"}}

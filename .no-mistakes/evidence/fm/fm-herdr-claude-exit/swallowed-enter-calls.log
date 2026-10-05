@@ -1,0 +1,88 @@
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 /compact 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+pane get w2:p1 
+agent get w2:p1 
+pane process-info --pane w2:p1 
+status --json 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+status --json 
+pane send-text w2:p1 /exit 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+agent get w2:p1 
+status --json 
+pane send-keys w2:p1 enter 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+agent get w2:p1 
+status --json 
+pane read w2:p1 --source visible --format ansi 
+pane get w2:p1 
+agent get w2:p1 
+pane get w2:p1 
+agent get w2:p1 
+pane get w1:p1 
+agent get w1:p1 
+pane process-info --pane w1:p1 
+status --json 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /exit 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+pane get w1:p1 
+agent get w1:p1 
+pane get w1:p1 
+agent get w1:p1 

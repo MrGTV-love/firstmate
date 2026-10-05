@@ -1,0 +1,39 @@
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 /gate-proof 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 $'This is disposable paste validation data. Reply with exactly FMHERDRPASTE35275_5694 and nothing else. Do not edit files or use tools.\nInert validation data row 0; continue reading to the final instruction.\nInert validation data row 1; continue reading to the final instruction.\nInert validation data row 2; continue reading to the final instruction.\nInert validation data row 3; continue reading to the final instruction.\nInert validation data row 4; continue reading to the final instruction.\nInert validation data row 5; continue reading to the final instruction.\nInert validation data row 6; continue reading to the final instruction.\nInert validation data row 7; continue reading to the final instruction.\nInert validation data row 8; continue reading to the final instruction.\nInert validation data row 9; continue reading to the final instruction.\nInert validation data row 10; continue reading to the final instruction.\nInert validation data row 11; continue reading to the final instruction.\nInert validation data row 12; continue reading to the final instruction.\nInert validation data row 13; continue reading to the final instruction.\nInert validation data row 14; continue reading to the final instruction.\nInert validation data row 15; continue reading to the final instruction.\nInert validation data row 16; continue reading to the final instruction.\nInert validation data row 17; continue reading to the final instruction.\nInert validation data row 18; continue reading to the final instruction.\nInert validation data row 19; continue reading to the final instruction.\nInert validation data row 20; continue reading to the final instruction.\nInert validation data row 21; continue reading to the final instruction.\nInert validation data row 22; continue reading to the final instruction.\nInert validation data row 23; continue reading to the final instruction.\nInert validation data row 24; continue reading to the final instruction.\nInert validation data row 25; continue reading to the final instruction.\nInert validation data row 26; continue reading to the final instruction.\nInert validation data row 27; continue reading to the final instruction.\nInert validation data row 28; continue reading to the final instruction.\nInert validation data row 29; continue reading to the final instruction.\nInert validation data row 30; continue reading to the final instruction.\nInert validation data row 31; continue reading to the final instruction.\nInert validation data row 32; continue reading to the final instruction.\nInert validation data row 33; continue reading to the final instruction.\nInert validation data row 34; continue reading to the final instruction.\nInert validation data row 35; continue reading to the final instruction.\nInert validation data row 36; continue reading to the final instruction.\nInert validation data row 37; continue reading to the final instruction.\nInert validation data row 38; continue reading to the final instruction.\nInert validation data row 39; continue reading to the final instruction.\nInert validation data row 40; continue reading to the final instruction.\nInert validation data row 41; continue reading to the final instruction.\nInert validation data row 42; continue reading to the final instruction.\nInert validation data row 43; continue reading to the final instruction.\nInert validation data row 44; continue reading to the final instruction.\nInert validation data row 45; continue reading to the final instruction.\nInert validation data row 46; continue reading to the final instruction.\nInert validation data row 47; continue reading to the final instruction.\nInert validation data row 48; continue reading to the final instruction.\nInert validation data row 49; continue reading to the final instruction.\nInert validation data row 50; continue reading to the final instruction.\nInert validation data row 51; continue reading to the final instruction.\nInert validation data row 52; continue reading to the final instruction.\nInert validation data row 53; continue reading to the final instruction.\nInert validation data row 54; continue reading to the final instruction.\nInert validation data row 55; continue reading to the final instruction.\nInert validation data row 56; continue reading to the final instruction.\nInert validation data row 57; continue reading to the final instruction.\nInert validation data row 58; continue reading to the final instruction.\nInert validation data row 59; continue reading to the final instruction.\nInert validation data row 60; continue reading to the final instruction.\nInert validation data row 61; continue reading to the final instruction.\nInert validation data row 62; continue reading to the final instruction.\nInert validation data row 63; continue reading to the final instruction.\nInert validation data row 64; continue reading to the final instruction.\nInert validation data row 65; continue reading to the final instruction.\nInert validation data row 66; continue reading to the final instruction.\nInert validation data row 67; continue reading to the final instruction.\nInert validation data row 68; continue reading to the final instruction.\nInert validation data row 69; continue reading to the final instruction.\nFinal instruction: reply with exactly FMHERDRPASTE35275_5694 and nothing else.' 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-keys w1:p1 ctrl+u 
+status --json 
+pane read w1:p1 --source visible --format ansi 

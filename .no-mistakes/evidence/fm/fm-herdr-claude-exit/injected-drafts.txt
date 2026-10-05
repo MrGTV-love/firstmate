@@ -1,0 +1,280 @@
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /exit keep my note
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /exit                                    Exit the CLI
+  /export                                  Export the current conversation to a file or clipboard
+  /excalidraw-diagram                      Create Excalidraw diagram JSON files that make visual arguments. Use when
+                                           the user wants to visualize workflows, architectures, or concepts. (user)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /ex
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.cTB8Er/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /copy                                    Copy Claude's last response to clipboard (or /copy N for the Nth-latest)
+  /codex                                   OpenAI Codex CLI wrapper — three modes. Code review: independent diff
+                                           review via codex review with pass/fail gate. Challenge: adversarial mode …
+  /color                                   Set the prompt bar color for this session
+  /config                                  Open settings
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /co
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod44347 wt:ec3f9f06
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ keep my note
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ ompa
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ [Pasted text #1] keep my note
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.WSFnrn/wt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ pact
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 submitprod25151 wt:cb4eecf0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

@@ -1,0 +1,77 @@
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing[0m
+[0m[38;5;3m :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a [0m
+[0m[38;5;3mliteral * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the traili[0m
+[0m[38;5;3mng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing [0m
+[0m[38;5;3ma literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the traili[0m
+[0m[38;5;3mng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing [0m
+[0m[38;5;3ma literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing[0m
+[0m[38;5;3m :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a [0m
+[0m[38;5;3mliteral * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the traili[0m
+[0m[38;5;3mng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing [0m
+[0m[38;5;3ma literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the traili[0m
+[0m[38;5;3mng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing [0m
+[0m[38;5;3ma literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the traili[0m
+[0m[38;5;3mng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing [0m
+[0m[38;5;3ma literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.[0m
+
+[0m[38;2;255;153;0m───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+  [0m[1m[38;2;255;153;0mAllow external CLAUDE.md file imports?[0m
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for
+  third-party repositories.
+
+  [0m[38;2;102;102;102mExternal imports:[0m
+  [0m[38;2;102;102;102m  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/AGENTS.md[0m
+
+  [0m[38;2;102;102;102mImportant: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks[0m
+  [0m[38;2;102;102;102mhttps://code.claude.com/docs/en/security[0m
+
+  [0m[38;2;51;102;255m❯ No, disable external imports[0m
+    Yes, allow external imports
+
+  [0m[3m[38;2;102;102;102mEnter to confirm · Esc to cancel[0m
+[0m[38;2;215;119;87m ▐[0m[38;2;215;119;87m[48;2;0;0;0m▛███▛█   [0m[1mClaude Code [0m[38;2;102;102;102mv2.1.289[0m
+[0m[38;2;215;119;87m▝▜[0m[38;2;215;119;87m[48;2;0;0;0m█████[0m[38;2;215;119;87m█▀  [0m[38;2;102;102;102mOpus 5.5 (1M context) with high effort · Claude Max[0m
+[0m[38;2;215;119;87m ▝▝   ▝▝   [0m[38;2;102;102;102m~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1[0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[0m[38;2;138;138;138m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+❯ 
+[0m[38;2;138;138;138m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+  [0m[38;2;102;102;102mOpus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:825729ce[0m
+  [0m[38;2;204;0;0m⏵⏵ bypass permissions on[0m[38;2;102;102;102m (shift+tab to cycle) · ← for agents[0m

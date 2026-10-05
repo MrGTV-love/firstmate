@@ -1,0 +1,84 @@
+
+FAIL: multiline paste refused
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.QRLWb6/wt
+
+
+❯ /gate-proof
+
+⏺ FMHERDRSKILL35275_20455
+
+✻ Crunched for 0s · done 9:02 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                         Ctrl+Y to paste deleted text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 5% 59k/1.0M submitprod35275 wt:443abdd2
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"443abdd2-2755-4054-b44f-466e066248ad"},"agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.QRLWb6/wt","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1/.gate-test-tmp/fm-herdr-submit-confirm-live.QRLWb6/wt","pane_id":"w1:p1","revision":1,"state_change_seq":4,"tab_id":"w1:t1","terminal_id":"term_65d0e46a48f8b1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},"type":"agent_info"}}
+
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 0% 0/0 01M44T7RV13FBM6CCK0KWXD1S1:f4e17bd8
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"f4e17bd8-9d6b-4689-a877-50d0969e08ad"},"agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44T7RV13FBM6CCK0KWXD1S1","pane_id":"w2:p1","revision":1,"state_change_seq":2,"tab_id":"w2:t1","terminal_id":"term_65d0e46a574662","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w2"},"type":"agent_info"}}

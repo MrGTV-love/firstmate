@@ -1,0 +1,1 @@
+Transport fault: intentionally swallowed first Enter; subsequent native status responses omit identity only.

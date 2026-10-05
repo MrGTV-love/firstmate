@@ -1,0 +1,1 @@
+lab teardown status=0; fixture and exact launch directories removed

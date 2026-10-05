@@ -1,0 +1,12 @@
+agent get w1:p1 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+status --json 
+pane send-text w1:p1 $'\E[200~Reply with exactly FMHERDRNATIVEPASTE73918_4252 and nothing else. Do not edit files or use tools.\nDisposable validation data row 0.\nDisposable validation data row 1.\nDisposable validation data row 2.\nDisposable validation data row 3.\nDisposable validation data row 4.\nDisposable validation data row 5.\nDisposable validation data row 6.\nDisposable validation data row 7.\nReply with exactly FMHERDRNATIVEPASTE73918_4252.\E[201~' 
+status --json 
+pane read w1:p1 --source visible --format ansi 
+agent get w1:p1 
+status --json 
+pane send-keys w1:p1 enter 
+agent get w1:p1 
+agent get w1:p1 
