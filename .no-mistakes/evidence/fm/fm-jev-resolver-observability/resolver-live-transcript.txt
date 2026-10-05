@@ -1,0 +1,590 @@
+Resolver live validation
+========================
+{
+  "surface": "Unmodified bin/fm-dispatch-resolve.sh CLI executed via stock /bin/bash",
+  "isolation": "Disposable FM_HOME, HOME, XDG config/cache, TMPDIR, quota snapshot, synthetic API key; all setup under worktree. No fleet/harness lifecycle or production credentials used.",
+  "api": "Loopback HTTPS server, certificate for api.typesafe.ai; PATH wrapper delegates to real /usr/bin/curl with --connect-to and --cacert, no request/response emulation inside curl. API protocol responses intentionally supplied by disposable service.",
+  "quota": "Installed real quota-axi --json --no-credential-refresh, QUOTA_AXI_SNAPSHOT cache-schema-3 synthetic Claude quota fixture. Wrapper adds controlled 0.35 s delay; failure uses invalid real CLI snapshot.",
+  "command": "/bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation",
+  "baseline": "git show 86f9f36f6b7a21a879c141271d581a4a95062aa6:bin/fm-dispatch-resolve.sh and :bin/fm-timing-lib.sh materialized only in disposable directory, shared libs linked from worktree; same CLI/API/quota driven.",
+  "limitations": "No paid production Jev request or model-quality evaluation; deterministic local service isolates the telemetry/privacy behavior being validated. No UI-facing change."
+}
+
+BASELINE: expected old privacy/timing failure reproduced
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0 SYNTHETIC-NOT-A-PRODUCTION-KEY-7351 PRIVATE-DISPOSABLE-BRIEF-2846   latency_ms: 0   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9046  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+
+
+
+SCENARIO: clear-timing-and-cost
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=1999
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 383   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9028  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=383 quota_ms=1006 local_ms=562 total_ms=1951
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+
+Real curl write-out: 200 0.383709
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Clear routing preserves selected legacy profile
+PASS: Subsecond API remains distinct from slower quota stage on stock Bash 3.2
+PASS: Cost charges only input at published numeric rate; returned numeric Jev model retained
+PASS: Exactly one quota snapshot
+
+SCENARIO: missing-usage-is-unknown
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=2425
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 374   tokens: -/-
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9035  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=374 quota_ms=1607 local_ms=315 total_ms=2296
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+
+Real curl write-out: 200 0.374061
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Missing usage/cost unknown, routing unchanged
+
+SCENARIO: zero-input-output-free
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=2550
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 393   tokens: 0/99999
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9035  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=393 quota_ms=1783 local_ms=308 total_ms=2484
+  usage: input_tokens=0 output_tokens=99999 jev_cost_usd=0 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+
+Real curl write-out: 200 0.393977
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: True zero inputs are zero cost even with many output tokens
+
+SCENARIO: quota-failure-retains-paid-call
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=2308
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: quota-axi --json failed
+  timings: api_ms=376 quota_ms=1245 local_ms=376 total_ms=1997
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+dispatch-resolve: error (quota-axi --json failed)
+
+Real curl write-out: 200 0.376528
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Real quota CLI rejects invalid snapshot; paid usage, API timing and model remain attributable
+
+SCENARIO: hostile-model-success-quota
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=4436
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 366   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9037  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=366 quota_ms=1251 local_ms=1789 total_ms=3406
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+
+Real curl write-out: 200 0.366513
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Successful quota path suppresses arbitrary model text without changing routing or usage
+
+SCENARIO: hostile-model-failed-quota
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=2382
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: quota-axi --json failed
+  timings: api_ms=448 quota_ms=793 local_ms=951 total_ms=2192
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (quota-axi --json failed)
+
+Real curl write-out: 200 0.448631
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Quota-error path also suppresses arbitrary model text while preserving paid usage
+
+SCENARIO: sensitive-http-429
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=690
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 368 ms
+  timings: api_ms=368 quota_ms=null local_ms=266 total_ms=634
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (http 429 after 368 ms)
+
+Real curl write-out: 429 0.368922
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: HTTP status/time visible, raw sensitive error body omitted, quota unattempted and cost unknown
+
+SCENARIO: sensitive-http-500
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=601
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: http 500 after 365 ms
+  timings: api_ms=365 quota_ms=null local_ms=191 total_ms=556
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (http 500 after 365 ms)
+
+Real curl write-out: 500 0.365004
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: HTTP status/time visible, raw sensitive error body omitted, quota unattempted and cost unknown
+
+SCENARIO: sensitive-malformed-response
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=615
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: response is not a rule Choice answer
+  timings: api_ms=362 quota_ms=null local_ms=204 total_ms=566
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (response is not a rule Choice answer)
+
+Real curl write-out: 200 0.362746
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Malformed API evidence emits safe structured error before quota with unknown usage
+
+SCENARIO: negative-fractional-usage
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=1613
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 369   tokens: -2/0.5
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9038  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=369 quota_ms=707 local_ms=487 total_ms=1563
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+
+Real curl write-out: 200 0.369299
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Invalid counts are unknown in additive cost telemetry without changing existing routing
+
+SCENARIO: opt-out-sends-nothing
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=17
+STDOUT:
+
+STDERR:
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.resolver-live-3jo73tqp/home/.env)
+
+Real curl write-out: 
+Child environment metadata: 
+Local API received (booleans only): []
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Absent opt-in remains inert, no API/quota/telemetry
+
+SCENARIO: never-send-sensitive-brief
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=136
+STDOUT:
+
+STDERR:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.resolver-live-3jo73tqp/home/config/dispatch-never-send line 1; nothing sent)
+
+Real curl write-out: 
+Child environment metadata: 
+Local API received (booleans only): []
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Existing never-send contract is off (not structured error): no network/quota/telemetry, reason only names list path/line, not matching text
+
+SCENARIO: api-timeout-real-curl
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=5541
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: http 000 after 5146 ms
+  timings: api_ms=5146 quota_ms=null local_ms=355 total_ms=5501
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (http 000 after 5146 ms)
+
+Real curl write-out: 000 5.146333
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Real curl timeout reports spent transfer time safely, leaves quota/cost unknown and intake unblocked
+
+SCENARIO: api-connection-refused
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=550
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: http 000 after 0 ms
+  timings: api_ms=0 quota_ms=null local_ms=346 total_ms=346
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (http 000 after 0 ms)
+
+Real curl write-out: 000 0.000497
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): []
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Real curl connection failure returns safe error and measured transfer time, never reaches API/quota
+
+SCENARIO: model-object
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=1289
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 369   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.905  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=369 quota_ms=687 local_ms=191 total_ms=1247
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+
+Real curl write-out: 200 0.369993
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Non-version or invalid-type/overlength model is unknown without changing routing or paid usage
+
+SCENARIO: model-number
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=1310
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 372   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=372 quota_ms=669 local_ms=233 total_ms=1274
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+
+Real curl write-out: 200 0.372439
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Non-version or invalid-type/overlength model is unknown without changing routing or paid usage
+
+SCENARIO: model-alias
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=2576
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 366   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=366 quota_ms=1528 local_ms=530 total_ms=2424
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+
+Real curl write-out: 200 0.366258
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Non-version or invalid-type/overlength model is unknown without changing routing or paid usage
+
+SCENARIO: model-overlength
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=3010
+STDOUT:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 443   tokens: 812/60
+  rule: rule_1 (A small bug fix.)   confidence: 0.95
+  probabilities: rule_1=0.95 default=0.05
+  note: rule matched
+  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'sonnet' --effort 'high'
+  timings: api_ms=443 quota_ms=1027 local_ms=1026 total_ms=2496
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+
+Real curl write-out: 200 0.443152
+Child environment metadata: curl env_key= env_private_key=
+quota env_key= env_private_key= args=--json
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: Non-version or invalid-type/overlength model is unknown without changing routing or paid usage
+
+SCENARIO: curl-unavailable-api-time-unknown
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=414
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: curl not installed
+  timings: api_ms=null quota_ms=null local_ms=258 total_ms=258
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+STDERR:
+dispatch-resolve: error (curl not installed)
+
+Real curl write-out: 
+Child environment metadata: 
+Local API received (booleans only): []
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: API + quota + local equals opted-in total
+PASS: Real unavailable curl leaves unattempted durations and cost null, exits 0
+
+SCENARIO: quota-unavailable-paid-call-preserved
+Command: /bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation
+Exit: 0; externally observed wall_ms=792
+STDOUT:
+dispatch-resolve:
+  status: error
+  reason: quota-axi not installed
+  timings: api_ms=379 quota_ms=null local_ms=366 total_ms=745
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+STDERR:
+dispatch-resolve: error (quota-axi not installed)
+
+Real curl write-out: 200 0.379226
+Child environment metadata: curl env_key= env_private_key=
+Local API received (booleans only): [{"path": "/v1/systemone", "auth_matches_synthetic_key": true, "requested_model": "jev-latest", "contains_private_task_marker": true, "omits_local_why": true, "omits_quota": true, "omits_use_profiles": true}]
+Observable checks:
+PASS: Resolver exits 0 for runtime outcomes
+PASS: Output excludes synthetic authorization key and private brief marker
+PASS: API key/private-key variables absent from curl and quota children
+PASS: Exactly one API request, or none when guarded
+PASS: Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service
+PASS: Private local rationale, quota and candidate configuration omitted from request
+PASS: API + quota + local equals opted-in total
+PASS: API milliseconds exactly floor real curl time_total; no helper startup skew
+PASS: API succeeds before missing quota executable: paid cost/model retained; unattempted quota remains null

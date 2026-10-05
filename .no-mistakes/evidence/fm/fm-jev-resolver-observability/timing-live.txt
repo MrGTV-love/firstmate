@@ -1,0 +1,238 @@
+LIVE_COMMAND=["/bin/bash","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/timing-driver.sh","stock","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/bin/fm-timing-lib.sh","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/bash-5.2.37/bash","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY"]
+LIVE_EXIT=0
+
+STDOUT:
+SOURCE_URL=https://ftp.gnu.org/gnu/bash/bash-5.2.37.tar.gz
+BUILD configure --without-bash-malloc --disable-nls exit=0; make -j4 exit=0
+EXACT_COMMAND: /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/timing-driver.sh stock /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/bin/fm-timing-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/bash-5.2.37/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY
+
+STOCK_SHELL BASH_VERSION=3.2.57(1)-release
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+Copyright (C) 2007 Free Software Foundation, Inc.
+shared_origin_ms=1791218956169
+epoch_stamp_ms=1791218956400 reference_epoch_seconds=1791218956 distance_seconds=0
+stock_start_ms=1791218956400 stock_finish_ms=1791218956757 stock_observed_delta_ms=357 expected_record_offset_ms=231 requested_sleep_seconds=0.175
+stock_Time_HiRes_execution_calls:
+stock-perl-call
+stock-perl-call
+stock-perl-call
+stock-perl-call
+
+NEWER_SHELL BASH_VERSION=5.2.37(1)-release
+GNU bash, version 5.2.37(1)-release (aarch64-apple-darwin25.5.0)
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+
+This is free software; you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+perl_interception=blocking_shell_function return=127
+builtin_EPOCHREALTIME_before=1791218956.969938 inherited_shared_origin_ms=1791218956169
+epoch_stamp_ms=1791218956970 reference_epoch_seconds=1791218956 distance_seconds=0
+builtin_EPOCHREALTIME_after=1791218957.369131
+newer_start_ms=1791218956970 newer_finish_ms=1791218957367 newer_observed_delta_ms=397 expected_record_offset_ms=801 requested_sleep_seconds=0.225
+newer_perl_calls=0 cross_process_offset_exact_match=yes
+
+RAW_PRODUCT_RECORDS:
+v1	stock	subsecond-delay	231	345	bash3.2
+v1	newer	subsecond-delay	801	384	bash5.2
+
+REAL_PRODUCT_RENDER:
+TIMINGS - where the deferred network checks spent their time (ms):
+  stock       subsecond-delay bash3.2                    start=+231     elapsed=345
+  newer       subsecond-delay bash5.2                    start=+801     elapsed=384
+  slowest: newer subsecond-delay bash5.2 384ms, stock subsecond-delay bash3.2 345ms
+checked_record scope=stock offset_ms=231 elapsed_ms=345 shared_origin_ms=1791218956169
+checked_record scope=newer offset_ms=801 elapsed_ms=384 shared_origin_ms=1791218956169
+
+STOCK_PERL_UNAVAILABLE:
+epoch_stamp_ms=1791218957000 reference_epoch_seconds=1791218957 distance_seconds=0
+fallback_start_ms=1791218957000 fallback_finish_ms=1791218957000 precision=whole-seconds helper_exit=0 record_exit=0
+blocked-stock-perl-invocation
+blocked-stock-perl-invocation
+blocked-stock-perl-invocation
+blocked-stock-perl-invocation
+v1	fallback	missing-highres	0	0	bash3.2
+TIMINGS - where the deferred network checks spent their time (ms):
+  fallback    missing-highres bash3.2                    start=+0       elapsed=0
+  slowest: fallback missing-highres bash3.2 0ms
+
+NORMAL_OFF_MODE:
+off-stock.stdout bytes=       0
+off-stock.stderr bytes=       0
+off-newer.stdout bytes=       0
+off-newer.stderr bytes=       0
+off_mode_record_start_render_exit=0 clock_calls=0 perl_calls=0 product_file_created=no
+
+ALL_LIVE_ASSERTIONS_PASSED
+
+STDERR:
+
+
+DISPOSABLE_DRIVER_USED (removed after run):
+#!/bin/bash
+set -eu
+mode=$1
+lib=$2
+newer=$3
+scratch=$4
+. "$lib"
+check_stamp() {
+  stamp=$1
+  reference=$(date +%s)
+  distance=$(( stamp / 1000 - reference ))
+  printf 'epoch_stamp_ms=%s reference_epoch_seconds=%s distance_seconds=%s\n' "$stamp" "$reference" "$distance"
+  [ "$distance" -ge -2 ] && [ "$distance" -le 2 ]
+}
+case "$mode" in
+  stock)
+    printf 'SOURCE_URL=https://ftp.gnu.org/gnu/bash/bash-5.2.37.tar.gz\nBUILD configure --without-bash-malloc --disable-nls exit=0; make -j4 exit=0\n'
+    printf 'EXACT_COMMAND: /bin/bash %s/timing-driver.sh stock %s %s %s\n' "$scratch" "$lib" "$newer" "$scratch"
+    printf '\nSTOCK_SHELL BASH_VERSION=%s\n' "$BASH_VERSION"
+    /bin/bash --version
+    perl() { printf 'stock-perl-call\n' >> "$scratch/stock-perl.calls"; /usr/bin/perl "$@"; }
+    fm_timing_start "$scratch/product.tsv"
+    printf 'shared_origin_ms=%s\n' "$FM_TIMING_EPOCH_MS"
+    sleep 0.060
+    started=$(fm_timing_now_ms)
+    check_stamp "$started"
+    stock_expected_offset=$(( started - FM_TIMING_EPOCH_MS ))
+    sleep 0.175
+    fm_timing_record stock subsecond-delay "$started" bash3.2
+    finished=$(fm_timing_now_ms)
+    delta=$(( finished - started ))
+    printf 'stock_start_ms=%s stock_finish_ms=%s stock_observed_delta_ms=%s expected_record_offset_ms=%s requested_sleep_seconds=0.175\n' "$started" "$finished" "$delta" "$stock_expected_offset"
+    [ "$delta" -gt 0 ]
+    [ "$(( delta % 1000 ))" -ne 0 ]
+    [ -s "$scratch/stock-perl.calls" ]
+    printf 'stock_Time_HiRes_execution_calls:\n'
+    cat "$scratch/stock-perl.calls"
+    "$newer" "$scratch/timing-driver.sh" newer "$lib" "$newer" "$scratch"
+    printf '\nRAW_PRODUCT_RECORDS:\n'
+    cat "$scratch/product.tsv"
+    printf '\nREAL_PRODUCT_RENDER:\n'
+    fm_timing_render "$scratch/product.tsv"
+    while IFS="$(printf '\t')" read -r version scope name offset elapsed detail; do
+      [ "$version" = v1 ]
+      [ "$offset" -gt 0 ]
+      [ "$elapsed" -gt 0 ]
+      [ "$(( elapsed % 1000 ))" -ne 0 ]
+      if [ "$scope" = stock ]; then [ "$offset" -eq "$stock_expected_offset" ]; fi
+      printf 'checked_record scope=%s offset_ms=%s elapsed_ms=%s shared_origin_ms=%s\n' "$scope" "$offset" "$elapsed" "$FM_TIMING_EPOCH_MS"
+    done < "$scratch/product.tsv"
+    printf '\nSTOCK_PERL_UNAVAILABLE:\n'
+    /bin/bash "$scratch/timing-driver.sh" fallback "$lib" "$newer" "$scratch"
+    printf '\nNORMAL_OFF_MODE:\n'
+    /bin/bash "$scratch/timing-driver.sh" off "$lib" "$newer" "$scratch" > "$scratch/off-stock.stdout" 2> "$scratch/off-stock.stderr"
+    "$newer" "$scratch/timing-driver.sh" off "$lib" "$newer" "$scratch" > "$scratch/off-newer.stdout" 2> "$scratch/off-newer.stderr"
+    for output in "$scratch/off-stock.stdout" "$scratch/off-stock.stderr" "$scratch/off-newer.stdout" "$scratch/off-newer.stderr"; do
+      [ ! -s "$output" ]
+      printf '%s bytes=' "${output##*/}"
+      wc -c < "$output"
+    done
+    [ ! -e "$scratch/off-clock.calls" ]
+    [ ! -e "$scratch/off-perl.calls" ]
+    [ ! -e "$scratch/off-product.tsv" ]
+    printf 'off_mode_record_start_render_exit=0 clock_calls=0 perl_calls=0 product_file_created=no\n'
+    printf '\nALL_LIVE_ASSERTIONS_PASSED\n'
+    ;;
+  newer)
+    printf '\nNEWER_SHELL BASH_VERSION=%s\n' "$BASH_VERSION"
+    "$newer" --version
+    [ "${BASH_VERSINFO[0]}" -ge 5 ]
+    perl() { printf 'blocked-perl-invocation\n' >> "$scratch/newer-perl.calls"; return 127; }
+    printf 'perl_interception=blocking_shell_function return=127\n'
+    printf 'builtin_EPOCHREALTIME_before=%s inherited_shared_origin_ms=%s\n' "$EPOCHREALTIME" "$FM_TIMING_EPOCH_MS"
+    started=$(fm_timing_now_ms)
+    check_stamp "$started"
+    expected_offset=$(( started - FM_TIMING_EPOCH_MS ))
+    [ "$expected_offset" -gt 0 ]
+    sleep 0.225
+    fm_timing_record newer subsecond-delay "$started" bash5.2
+    finished=$(fm_timing_now_ms)
+    delta=$(( finished - started ))
+    printf 'builtin_EPOCHREALTIME_after=%s\n' "$EPOCHREALTIME"
+    printf 'newer_start_ms=%s newer_finish_ms=%s newer_observed_delta_ms=%s expected_record_offset_ms=%s requested_sleep_seconds=0.225\n' "$started" "$finished" "$delta" "$expected_offset"
+    [ "$delta" -gt 0 ]
+    [ "$(( delta % 1000 ))" -ne 0 ]
+    [ ! -e "$scratch/newer-perl.calls" ]
+    matched=0
+    while IFS="$(printf '\t')" read -r version scope name offset elapsed detail; do
+      if [ "$scope" = newer ]; then
+        [ "$offset" -eq "$expected_offset" ]
+        matched=$(( matched + 1 ))
+      fi
+    done < "$FM_TIMING_LOG"
+    [ "$matched" -eq 1 ]
+    printf 'newer_perl_calls=0 cross_process_offset_exact_match=yes\n'
+    ;;
+  fallback)
+    perl() { printf 'blocked-stock-perl-invocation\n' >> "$scratch/fallback-perl.calls"; return 127; }
+    fm_timing_start "$scratch/fallback.tsv"
+    started=$(fm_timing_now_ms)
+    check_stamp "$started"
+    [ "$(( started % 1000 ))" -eq 0 ]
+    sleep 0.050
+    fm_timing_record fallback missing-highres "$started" bash3.2
+    finished=$(fm_timing_now_ms)
+    [ "$(( finished % 1000 ))" -eq 0 ]
+    [ -s "$scratch/fallback-perl.calls" ]
+    [ -s "$scratch/fallback.tsv" ]
+    printf 'fallback_start_ms=%s fallback_finish_ms=%s precision=whole-seconds helper_exit=0 record_exit=0\n' "$started" "$finished"
+    cat "$scratch/fallback-perl.calls"
+    cat "$scratch/fallback.tsv"
+    fm_timing_render "$scratch/fallback.tsv"
+    ;;
+  off)
+    unset FM_TIMING_LOG FM_TIMING_EPOCH_MS
+    fm_timing_now_ms() { printf 'unexpected-clock-call\n' >> "$scratch/off-clock.calls"; return 91; }
+    perl() { printf 'unexpected-perl-call\n' >> "$scratch/off-perl.calls"; return 92; }
+    fm_timing_start ''
+    fm_timing_record off ignored 123 detail
+    fm_timing_render "$scratch/off-product.tsv"
+    [ -z "${FM_TIMING_LOG:-}" ]
+    [ -z "${FM_TIMING_EPOCH_MS:-}" ]
+    ;;
+  *) exit 2 ;;
+esac
+
+
+REQUESTED ORIGINAL-DEFECT BASELINE:
+FETCH_COMMAND=["git","show","86f9f36f6b7a21a879c141271d581a4a95062aa6:bin/fm-timing-lib.sh"]
+FETCH_EXIT=0
+RUN_COMMAND=["/bin/bash","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/baseline-driver.sh","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/baseline-fm-timing-lib.sh","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.timing-live.x0hLhY/baseline.tsv"]
+RUN_EXIT=0
+STDOUT:
+BASELINE_COMMIT=86f9f36f6b7a21a879c141271d581a4a95062aa6
+BASELINE_STOCK_BASH_VERSION=3.2.57(1)-release
+baseline_start_ms=1791219030000 baseline_finish_ms=1791219030000 baseline_delta_ms=0 requested_sleep_seconds=0.175
+v1	baseline	subsecond-delay	0	0	bash3.2
+TIMINGS - where the deferred network checks spent their time (ms):
+  baseline    subsecond-delay bash3.2                    start=+0       elapsed=0
+  slowest: baseline subsecond-delay bash3.2 0ms
+BASELINE_WHOLE_SECOND_PRECISION_DEFECT_REPRODUCED
+
+STDERR:
+
+DISPOSABLE_BASELINE_DRIVER_USED (removed after run):
+#!/bin/bash
+set -eu
+. "$1"
+printf 'BASELINE_COMMIT=86f9f36f6b7a21a879c141271d581a4a95062aa6\nBASELINE_STOCK_BASH_VERSION=%s\n' "$BASH_VERSION"
+fm_timing_start "$2"
+started=$(fm_timing_now_ms)
+sleep 0.175
+finished=$(fm_timing_now_ms)
+fm_timing_record baseline subsecond-delay "$started" bash3.2
+delta=$(( finished - started ))
+printf 'baseline_start_ms=%s baseline_finish_ms=%s baseline_delta_ms=%s requested_sleep_seconds=0.175\n' "$started" "$finished" "$delta"
+[ "$(( started % 1000 ))" -eq 0 ]
+[ "$(( finished % 1000 ))" -eq 0 ]
+[ "$delta" -eq 0 ] || [ "$delta" -eq 1000 ]
+cat "$2"
+fm_timing_render "$2"
+printf 'BASELINE_WHOLE_SECOND_PRECISION_DEFECT_REPRODUCED\n'
+
+
+TEARDOWN_COMMAND=rm -rf .timing-live.x0hLhY && test ! -e .timing-live.x0hLhY
+TEARDOWN_EXIT=0
+Download, extracted GNU source, compiled Bash, build logs, both disposable drivers, copied baseline library, product records, interception markers and off-mode capture files removed. Repository source unchanged.

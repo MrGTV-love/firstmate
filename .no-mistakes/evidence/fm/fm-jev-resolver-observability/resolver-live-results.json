@@ -1,0 +1,1300 @@
+{
+  "methodology": {
+    "surface": "Unmodified bin/fm-dispatch-resolve.sh CLI executed via stock /bin/bash",
+    "isolation": "Disposable FM_HOME, HOME, XDG config/cache, TMPDIR, quota snapshot, synthetic API key; all setup under worktree. No fleet/harness lifecycle or production credentials used.",
+    "api": "Loopback HTTPS server, certificate for api.typesafe.ai; PATH wrapper delegates to real /usr/bin/curl with --connect-to and --cacert, no request/response emulation inside curl. API protocol responses intentionally supplied by disposable service.",
+    "quota": "Installed real quota-axi --json --no-credential-refresh, QUOTA_AXI_SNAPSHOT cache-schema-3 synthetic Claude quota fixture. Wrapper adds controlled 0.35 s delay; failure uses invalid real CLI snapshot.",
+    "command": "/bin/bash bin/fm-dispatch-resolve.sh <disposable brief.md> --project disposable-resolver-validation",
+    "baseline": "git show 86f9f36f6b7a21a879c141271d581a4a95062aa6:bin/fm-dispatch-resolve.sh and :bin/fm-timing-lib.sh materialized only in disposable directory, shared libs linked from worktree; same CLI/API/quota driven.",
+    "limitations": "No paid production Jev request or model-quality evaluation; deterministic local service isolates the telemetry/privacy behavior being validated. No UI-facing change."
+  },
+  "baseline": {
+    "exit": 0,
+    "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0 SYNTHETIC-NOT-A-PRODUCTION-KEY-7351 PRIVATE-DISPOSABLE-BRIEF-2846   latency_ms: 0   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9046  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n",
+    "stderr": "",
+    "wall_ms": 1303,
+    "expected_old_privacy_defect_reproduced": true
+  },
+  "runs": [
+    {
+      "name": "clear-timing-and-cost",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0   latency_ms: 383   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9028  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=383 quota_ms=1006 local_ms=562 total_ms=1951\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "",
+      "wall_ms": 1999,
+      "fields": {
+        "api_ms": "383",
+        "quota_ms": "1006",
+        "local_ms": "562",
+        "total_ms": "1951",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.383709",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Clear routing preserves selected legacy profile"
+        },
+        {
+          "pass": true,
+          "description": "Subsecond API remains distinct from slower quota stage on stock Bash 3.2"
+        },
+        {
+          "pass": true,
+          "description": "Cost charges only input at published numeric rate; returned numeric Jev model retained"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one quota snapshot"
+        }
+      ]
+    },
+    {
+      "name": "missing-usage-is-unknown",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0   latency_ms: 374   tokens: -/-\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9035  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=374 quota_ms=1607 local_ms=315 total_ms=2296\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "",
+      "wall_ms": 2425,
+      "fields": {
+        "api_ms": "374",
+        "quota_ms": "1607",
+        "local_ms": "315",
+        "total_ms": "2296",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.374061",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Missing usage/cost unknown, routing unchanged"
+        }
+      ]
+    },
+    {
+      "name": "zero-input-output-free",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0   latency_ms: 393   tokens: 0/99999\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9035  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=393 quota_ms=1783 local_ms=308 total_ms=2484\n  usage: input_tokens=0 output_tokens=99999 jev_cost_usd=0 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "",
+      "wall_ms": 2550,
+      "fields": {
+        "api_ms": "393",
+        "quota_ms": "1783",
+        "local_ms": "308",
+        "total_ms": "2484",
+        "input_tokens": "0",
+        "output_tokens": "99999",
+        "jev_cost_usd": "0",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.393977",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "True zero inputs are zero cost even with many output tokens"
+        }
+      ]
+    },
+    {
+      "name": "quota-failure-retains-paid-call",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: quota-axi --json failed\n  timings: api_ms=376 quota_ms=1245 local_ms=376 total_ms=1997\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "dispatch-resolve: error (quota-axi --json failed)\n",
+      "wall_ms": 2308,
+      "fields": {
+        "api_ms": "376",
+        "quota_ms": "1245",
+        "local_ms": "376",
+        "total_ms": "1997",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.376528",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Real quota CLI rejects invalid snapshot; paid usage, API timing and model remain attributable"
+        }
+      ]
+    },
+    {
+      "name": "hostile-model-success-quota",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: -   latency_ms: 366   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9037  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=366 quota_ms=1251 local_ms=1789 total_ms=3406\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "",
+      "wall_ms": 4436,
+      "fields": {
+        "api_ms": "366",
+        "quota_ms": "1251",
+        "local_ms": "1789",
+        "total_ms": "3406",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.366513",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Successful quota path suppresses arbitrary model text without changing routing or usage"
+        }
+      ]
+    },
+    {
+      "name": "hostile-model-failed-quota",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: quota-axi --json failed\n  timings: api_ms=448 quota_ms=793 local_ms=951 total_ms=2192\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (quota-axi --json failed)\n",
+      "wall_ms": 2382,
+      "fields": {
+        "api_ms": "448",
+        "quota_ms": "793",
+        "local_ms": "951",
+        "total_ms": "2192",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.448631",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Quota-error path also suppresses arbitrary model text while preserving paid usage"
+        }
+      ]
+    },
+    {
+      "name": "sensitive-http-429",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 368 ms\n  timings: api_ms=368 quota_ms=null local_ms=266 total_ms=634\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 368 ms)\n",
+      "wall_ms": 690,
+      "fields": {
+        "api_ms": "368",
+        "quota_ms": "null",
+        "local_ms": "266",
+        "total_ms": "634",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "429 0.368922",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "HTTP status/time visible, raw sensitive error body omitted, quota unattempted and cost unknown"
+        }
+      ]
+    },
+    {
+      "name": "sensitive-http-500",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 500 after 365 ms\n  timings: api_ms=365 quota_ms=null local_ms=191 total_ms=556\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 500 after 365 ms)\n",
+      "wall_ms": 601,
+      "fields": {
+        "api_ms": "365",
+        "quota_ms": "null",
+        "local_ms": "191",
+        "total_ms": "556",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "500 0.365004",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "HTTP status/time visible, raw sensitive error body omitted, quota unattempted and cost unknown"
+        }
+      ]
+    },
+    {
+      "name": "sensitive-malformed-response",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: response is not a rule Choice answer\n  timings: api_ms=362 quota_ms=null local_ms=204 total_ms=566\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (response is not a rule Choice answer)\n",
+      "wall_ms": 615,
+      "fields": {
+        "api_ms": "362",
+        "quota_ms": "null",
+        "local_ms": "204",
+        "total_ms": "566",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.362746",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Malformed API evidence emits safe structured error before quota with unknown usage"
+        }
+      ]
+    },
+    {
+      "name": "negative-fractional-usage",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0   latency_ms: 369   tokens: -2/0.5\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9038  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=369 quota_ms=707 local_ms=487 total_ms=1563\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "",
+      "wall_ms": 1613,
+      "fields": {
+        "api_ms": "369",
+        "quota_ms": "707",
+        "local_ms": "487",
+        "total_ms": "1563",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.369299",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Invalid counts are unknown in additive cost telemetry without changing existing routing"
+        }
+      ]
+    },
+    {
+      "name": "opt-out-sends-nothing",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.resolver-live-3jo73tqp/home/.env)\n",
+      "wall_ms": 17,
+      "fields": {},
+      "real_curl_write_out": "",
+      "child_environment": "",
+      "request": [],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Absent opt-in remains inert, no API/quota/telemetry"
+        }
+      ]
+    },
+    {
+      "name": "never-send-sensitive-brief",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.resolver-live-3jo73tqp/home/config/dispatch-never-send line 1; nothing sent)\n",
+      "wall_ms": 136,
+      "fields": {},
+      "real_curl_write_out": "",
+      "child_environment": "",
+      "request": [],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Existing never-send contract is off (not structured error): no network/quota/telemetry, reason only names list path/line, not matching text"
+        }
+      ]
+    },
+    {
+      "name": "api-timeout-real-curl",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 000 after 5146 ms\n  timings: api_ms=5146 quota_ms=null local_ms=355 total_ms=5501\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 000 after 5146 ms)\n",
+      "wall_ms": 5541,
+      "fields": {
+        "api_ms": "5146",
+        "quota_ms": "null",
+        "local_ms": "355",
+        "total_ms": "5501",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "000 5.146333",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Real curl timeout reports spent transfer time safely, leaves quota/cost unknown and intake unblocked"
+        }
+      ]
+    },
+    {
+      "name": "api-connection-refused",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 000 after 0 ms\n  timings: api_ms=0 quota_ms=null local_ms=346 total_ms=346\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 000 after 0 ms)\n",
+      "wall_ms": 550,
+      "fields": {
+        "api_ms": "0",
+        "quota_ms": "null",
+        "local_ms": "346",
+        "total_ms": "346",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "000 0.000497",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Real curl connection failure returns safe error and measured transfer time, never reaches API/quota"
+        }
+      ]
+    },
+    {
+      "name": "model-object",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: -   latency_ms: 369   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.905  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=369 quota_ms=687 local_ms=191 total_ms=1247\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "",
+      "wall_ms": 1289,
+      "fields": {
+        "api_ms": "369",
+        "quota_ms": "687",
+        "local_ms": "191",
+        "total_ms": "1247",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.369993",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Non-version or invalid-type/overlength model is unknown without changing routing or paid usage"
+        }
+      ]
+    },
+    {
+      "name": "model-number",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: -   latency_ms: 372   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=372 quota_ms=669 local_ms=233 total_ms=1274\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "",
+      "wall_ms": 1310,
+      "fields": {
+        "api_ms": "372",
+        "quota_ms": "669",
+        "local_ms": "233",
+        "total_ms": "1274",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.372439",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Non-version or invalid-type/overlength model is unknown without changing routing or paid usage"
+        }
+      ]
+    },
+    {
+      "name": "model-alias",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: -   latency_ms: 366   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=366 quota_ms=1528 local_ms=530 total_ms=2424\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "",
+      "wall_ms": 2576,
+      "fields": {
+        "api_ms": "366",
+        "quota_ms": "1528",
+        "local_ms": "530",
+        "total_ms": "2424",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.366258",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Non-version or invalid-type/overlength model is unknown without changing routing or paid usage"
+        }
+      ]
+    },
+    {
+      "name": "model-overlength",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: clear\n  model: -   latency_ms: 443   tokens: 812/60\n  rule: rule_1 (A small bug fix.)   confidence: 0.95\n  probabilities: rule_1=0.95 default=0.05\n  note: rule matched\n  candidate: claude:sonnet  provider=claude  scope=all_models  remaining=90%  spendPriority=0.9051  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'sonnet' --effort 'high'\n  timings: api_ms=443 quota_ms=1027 local_ms=1026 total_ms=2496\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "",
+      "wall_ms": 3010,
+      "fields": {
+        "api_ms": "443",
+        "quota_ms": "1027",
+        "local_ms": "1026",
+        "total_ms": "2496",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "200 0.443152",
+      "child_environment": "curl env_key= env_private_key=\nquota env_key= env_private_key= args=--json",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "Non-version or invalid-type/overlength model is unknown without changing routing or paid usage"
+        }
+      ]
+    },
+    {
+      "name": "curl-unavailable-api-time-unknown",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: curl not installed\n  timings: api_ms=null quota_ms=null local_ms=258 total_ms=258\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (curl not installed)\n",
+      "wall_ms": 414,
+      "fields": {
+        "api_ms": "null",
+        "quota_ms": "null",
+        "local_ms": "258",
+        "total_ms": "258",
+        "input_tokens": "null",
+        "output_tokens": "null",
+        "jev_cost_usd": "null",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "null"
+      },
+      "real_curl_write_out": "",
+      "child_environment": "",
+      "request": [],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "Real unavailable curl leaves unattempted durations and cost null, exits 0"
+        }
+      ]
+    },
+    {
+      "name": "quota-unavailable-paid-call-preserved",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: quota-axi not installed\n  timings: api_ms=379 quota_ms=null local_ms=366 total_ms=745\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+      "stderr": "dispatch-resolve: error (quota-axi not installed)\n",
+      "wall_ms": 792,
+      "fields": {
+        "api_ms": "379",
+        "quota_ms": "null",
+        "local_ms": "366",
+        "total_ms": "745",
+        "input_tokens": "812",
+        "output_tokens": "60",
+        "jev_cost_usd": "3.4104e-05",
+        "jev_input_usd_per_million": "0.042",
+        "returned_model": "jev-1.13.0"
+      },
+      "real_curl_write_out": "200 0.379226",
+      "child_environment": "curl env_key= env_private_key=",
+      "request": [
+        {
+          "path": "/v1/systemone",
+          "auth_matches_synthetic_key": true,
+          "requested_model": "jev-latest",
+          "contains_private_task_marker": true,
+          "omits_local_why": true,
+          "omits_quota": true,
+          "omits_use_profiles": true
+        }
+      ],
+      "checks": [
+        {
+          "pass": true,
+          "description": "Resolver exits 0 for runtime outcomes"
+        },
+        {
+          "pass": true,
+          "description": "Output excludes synthetic authorization key and private brief marker"
+        },
+        {
+          "pass": true,
+          "description": "API key/private-key variables absent from curl and quota children"
+        },
+        {
+          "pass": true,
+          "description": "Exactly one API request, or none when guarded"
+        },
+        {
+          "pass": true,
+          "description": "Fixed Jev model/path and fd-carried authorization arrive at local HTTPS service"
+        },
+        {
+          "pass": true,
+          "description": "Private local rationale, quota and candidate configuration omitted from request"
+        },
+        {
+          "pass": true,
+          "description": "API + quota + local equals opted-in total"
+        },
+        {
+          "pass": true,
+          "description": "API milliseconds exactly floor real curl time_total; no helper startup skew"
+        },
+        {
+          "pass": true,
+          "description": "API succeeds before missing quota executable: paid cost/model retained; unattempted quota remains null"
+        }
+      ]
+    }
+  ]
+}
