@@ -6,6 +6,27 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Launch-scoped Git hook selection
+
+Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+Observed transition result:
+
+```text
+ok - supported same-task tmux relaunch reconciles generated hooks and preserves operator configuration
+# all fm-git-strip-ai-trailers tests passed
+```
+
+The regression drives fresh launch and supported already-stopped-task relaunch through `fm-spawn.sh` on its own private tmux socket, retaining the same task, pane, and isolated copy.
+Git's effective local and command scopes prove the strip-to-keep transition, preservation of unrelated duplicate keys and literal values, preservation of an operator hooks-path override, and idempotent return to stripping.
+The executable replacing omp is a model-free Git probe, not live-harness evidence.
+The shared launch prefix applies before harness execution on each local backend; this record proves the actual tmux path, not other backends' lifecycle behavior.
+[`configuration.md`](../configuration.md#commit-attribution) owns the operator-facing posture and `fm-spawn.sh --help` owns reconciliation mechanics.
+
 ## Harness detection precedence
 
 Firstmate's own harness comes from two kinds of evidence, and `bin/fm-harness.sh` owns how they combine: an environment marker names its harness, and the nearest harness process in the parent chain proves who owns the process tree.

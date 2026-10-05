@@ -21,8 +21,8 @@
 #       would find this directory again and never run the repository's own
 #       hook - a skipped pre-push guard. A lookup that fails exits nonzero
 #       rather than skipping the repository's hook. Does not touch the
-#       project's git config; the caller prefixes the pane with
-#       GIT_CONFIG_COUNT / GIT_CONFIG_KEY_0 / GIT_CONFIG_VALUE_0.
+#       project's git config; fm-spawn selects it through pane-scoped numbered
+#       GIT_CONFIG key/value entries (its header owns launch reconciliation).
 #
 # WHY THIS EXISTS. Claude launches already carry attribution-off in their
 # per-launch --settings JSON. Cursor and other non-Claude runtimes inject a

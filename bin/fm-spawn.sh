@@ -438,7 +438,11 @@
 # runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
 # owns the identities, the hook install, and chaining the repository git is
 # actually running in so a project husky hook still runs. Author identity is
-# not rewritten.
+# not rewritten. Every launch reconciles only numbered core.hooksPath entries
+# equal to this task's generated directory before selecting the current posture,
+# so an opted-in relaunch does not inherit its old strip-layer override.
+# Unrelated entries and operator hooksPath overrides are retained in order;
+# stripping appends this task's override rather than replacing their config.
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -5241,15 +5245,46 @@ if [ "$KIND" = secondmate ]; then
   # injected carrier and this on/off snapshot are guaranteed to agree.
   LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
-# Pane-scoped override: git in this worker reads our commit-msg strip without
-# rewriting the project's core.hooksPath. GIT_CONFIG_* takes precedence over
-# config files and is inherited by child git processes. When the home opts in
-# to keeping trailers, leave core.hooksPath alone so the repository's hooks run
-# directly. An export statement inside the pane command carries the override
-# across every step of a compound raw launch while firstmate's own git is unchanged.
-if [ "$KEEP_AI_TRAILERS" = 0 ]; then
-  LAUNCH="export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=$(shell_quote "$GIT_HOOKS_DIR"); $LAUNCH"
-fi
+# Reconcile in the destination shell, not firstmate's environment: a supported
+# relaunch reuses the shell that exported the previous launch's hook override.
+# Match this task's exact generated key/value pair, never arbitrary hooks paths
+# or all GIT_CONFIG_* variables. Compact survivors in order and append the
+# current strip override only when selected. This prefix also runs inside the
+# allowlisted launch shell and before every step of a compound raw launch.
+# shellcheck disable=SC2016 # The destination shell expands this function.
+IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
+fm_launch_git_hooks() {
+  local fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  local fm_i=0 fm_out=0 fm_key fm_value
+  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+SH
+LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX
+fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset -f fm_launch_git_hooks; $LAUNCH"
 # Every agent this fleet launches - crewmate, scout, and secondmate, on a fresh
 # spawn and on a relaunch alike - runs with the compact-adviser kill switch on.
 # This is an export statement rather than a forwarded ambient name or a
