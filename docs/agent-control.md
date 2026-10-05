@@ -51,6 +51,7 @@ The clear is refused before anything is sent when the recorded backend cannot de
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment and blank-boundary ambiguity; lifecycle callers cannot treat a nested prompt or frame as independent empty proof. Proven literal frame headers, bodies, and floors remain draft content even when they contain status-shaped text; only unowned status rows bound continuation selection.
+The native omp empty-row thinking-effort hint is excluded only when styled capture proves its explanatory text is muted; bright typed shortcut or hint text remains draft content.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.

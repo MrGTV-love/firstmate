@@ -1264,6 +1264,24 @@ _fm_composer_row_content() {  # <raw-row> <styled> [omp-box] [literal] -> conten
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
   fi
   fm_composer_normalize_trim_var stripped
+  # omp's borderless empty row uses the same bright shortcut / muted explanation
+  # as its compact floor. Require the complete hint and its styling evidence;
+  # bright typed shortcuts, hint text, and any preceding draft remain content.
+  if [ "$styled" = 1 ]; then
+    case "$stripped" in
+      '❯ '*)
+        local native_hint=${stripped#❯} native_plain
+        fm_composer_normalize_trim_var native_hint
+        if [ "$native_hint" = '⇧⇥' ]; then
+          native_plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+          fm_composer_normalize_trim_var native_plain
+          native_plain=${native_plain#❯}
+          fm_composer_normalize_trim_var native_plain
+          [ "$native_plain" != '⇧⇥ to change thinking effort' ] || stripped=❯
+        fi
+        ;;
+    esac
+  fi
   if [ "$literal" = 1 ]; then
     printf '%s' "$stripped"
     return 0
