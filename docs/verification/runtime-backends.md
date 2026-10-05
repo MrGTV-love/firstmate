@@ -1187,11 +1187,9 @@ Claude draws a recognized slash command typed into its composer in normal-intens
 The live guard observed that shape both with forced truecolor and in a production-shape pane with the default color, launched unnamed as `fm-spawn` launches a worker.
 Under the default ceiling the command read as ghost text, so the payload proof read no payload and `fm-control exit` and `relaunch` refused before sending Enter.
 The pre-send guard read a human's colored draft under the same ceiling as an empty composer, so exit reported a generic send failure instead of the pending draft; the `tests/fm-control.test.sh` regression reproduces that against the previous adapter.
-`fm_backend_herdr_composer_ghost_luma` now keeps every normal-intensity truecolor run for every Herdr composer read of a pane whose native identity is Claude.
-SGR-2 suggestions remain ghost text, and other harnesses keep their placeholder behavior.
 At a load average near 90 the same Claude rendered a typed `/compact` 2.7 to 21 seconds after the literal send, while the payload proof read the composer once about 1.2 seconds after it; that single read refused and cleared the command, so `/compact` reported `send-failed` in the live guard.
-The proof now keeps reading, without retyping, for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds while the composer is empty or shows a prefix of the payload, and refuses a truncated suffix or foreign text on the read that shows it.
-`tests/fm-backend-herdr.test.sh` pins a payload that renders after the settle, a growing prefix, a truncated suffix refused and cleared at once, and foreign text, a strict infix of the payload, or a note beside a paste placeholder refused at once and left in place.
+The current color and payload-proof contract is owned by [Claude composer proof](../herdr-backend.md#claude-composer-proof).
+`tests/fm-backend-herdr.test.sh` covers late rendering, prefix growth, owned-suffix cleanup, foreign and ambiguous text preservation, and unproven deadlines with prefix, empty, or unreadable captures.
 In the live guard run below, the public relaunch replaced the production-shape worker in the same endpoint through `fm-spawn`'s own launch, and the replacement rendered a token that existed only in its instructions.
 
 Refresh the repeatable pending-draft refusal, `/compact`, relaunch, prompt, and verified-exit evidence for both shapes with:

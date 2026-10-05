@@ -3203,10 +3203,8 @@ fm_backend_herdr_composer_ghost_policy_matters() {  # <caps> <capture>
 # in, shared verdict out. The ANSI capture is preferred (styled=1 lets the
 # shared classifier strip ghost/placeholder text); when it fails on an older
 # herdr, the plain capture degrades the descriptor to styled=0 rather than
-# letting ghost text be misread as typed input. Identity is fetched lazily,
-# only when the classifier reports the verdict depends on it (a pi separator
-# pair below every other candidate), preserving this adapter's original
-# consult-only-when-needed behavior.
+# letting ghost text be misread as typed input. Identity is fetched lazily when
+# a Pi separator pair or the selected rows' ghost-colour policy needs it.
 # The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: an overlay
 # a harness renders between the composer and the pane bottom - Claude Code's
 # slash-command popup is the verified shape (2.1.283, ~19 menu rows) - pushes
@@ -3219,7 +3217,7 @@ fm_backend_herdr_composer_ghost_policy_matters() {  # <caps> <capture>
 # The ghost-colour policy (fm_backend_herdr_composer_ghost_luma) follows the
 # same lazy rule: a styled capture whose composer rows the two ceilings strip
 # differently depends on identity from the start, and no other capture does.
-fm_backend_herdr_composer_state() {  # <target> [expected-label] -> empty|pending|pending-unproven|unknown
+fm_backend_herdr_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
   fm_backend_herdr_composer_state_as "$1" ''
 }
 
@@ -3402,12 +3400,11 @@ fm_backend_herdr_proof_lines() {  # <text>
 }
 
 # fm_backend_herdr_composer_content: the selected composer's visible text.
-# The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: an overlay
-# rendered between the composer and the pane bottom - Claude Code's
-# slash-command popup is the verified shape (2.1.283) - pushes the composer
-# above a tail window, so the pre-Enter payload proof would read empty, judge
-# the typed command unsent, and clear it (the fm-control exit breakage). The
-# viewport is the one bound that always contains the composer.
+# The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: Claude's
+# slash-command popup can push the composer above a tail window, preventing
+# payload proof. The viewport is the one bound that always contains it.
+# Dated evidence: docs/verification/runtime-backends.md
+# "Claude exit behind the slash-command popup".
 # Styled capture is preferred. An empty or failed styled read falls through to
 # the plain capture so a missing ANSI format does not look like an empty draft.
 # <identity> is the native identity the caller already probed; it selects the
@@ -3431,7 +3428,7 @@ fm_backend_herdr_composer_content() {  # <target> <identity>
 #   rendering - empty, or a strict prefix of <text>: still being drawn.
 #   truncated - this send's own text with its head missing: a strict suffix
 #               of <text>, alone or after leading paste placeholders.
-#   foreign   - anything else, which this send did not type on its own. A
+#   foreign   - anything else, whose ownership this send cannot prove. A
 #               strict infix of <text>, or any other literal beside a
 #               placeholder, is ambiguous and stays foreign, so it is never
 #               cleared.
@@ -3485,13 +3482,13 @@ fm_backend_herdr_composer_payload_progress() {  # <text> <after>
 
 # fm_backend_herdr_composer_await_payload: 0 once the selected composer shows
 # <text>, 1 when it holds this send's own truncated suffix, and 2 when the
-# proof times out or it holds text this send did not type on its own. Only the
-# read repeats; the payload is typed once. A loaded host renders a typed payload
-# well after the submit's settle (measured 2026-09-30, load average near 90:
-# 2.7 to 21 seconds for `/compact` in Claude 2.1.285 on Herdr 0.9.1), so an
-# empty or partly drawn composer keeps being read for up to
+# proof times out or it holds text whose ownership this send cannot prove.
+# Only the read repeats; the payload is typed once. A loaded host renders a
+# typed payload well after the submit's settle; dated measurements are owned by
+# docs/verification/runtime-backends.md "Colored Claude slash commands".
+# Empty, partly drawn, or unreadable composer captures are retried for up to
 # FM_BACKEND_HERDR_PROOF_WAIT seconds (default 30). Truncated or foreign text
-# can never become the payload, so it is refused on the read that shows it.
+# is refused immediately rather than submitting partial or ambiguous input.
 fm_backend_herdr_composer_await_payload() {  # <target> <text> <identity>
   local target=$1 text=$2 identity=$3 content progress start=$SECONDS
   while :; do

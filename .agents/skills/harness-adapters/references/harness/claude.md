@@ -53,8 +53,8 @@ Completed turns can render dim predicted text inside an empty composer, indistin
 The spawn scopes `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` to every Claude worker and secondmate without changing global config.
 CLI `--prompt-suggestions` affects print or SDK mode only and did not suppress interactive ghost text on v2.1.186.
 
-As defense in depth, `fm_composer_strip_ghost` in `../../../bin/fm-composer-lib.sh` removes SGR-2 runs before pending classification on styled tmux, Herdr, and Zellij readers.
-`../../../docs/herdr-backend.md` owns dark-TRUECOLOR tradeoffs under "Composer and injection safety" and the Claude-pane exception that keeps dark truecolor text under "Claude composer proof"; `../../../docs/verification/runtime-backends.md` owns captures.
+Shared styled ghost extraction is owned by `bin/fm-composer-lib.sh`'s `fm_composer_strip_ghost`.
+See [Claude composer proof](../../../../../docs/herdr-backend.md#claude-composer-proof) for the Herdr-specific policy and [runtime backend verification](../../../../../docs/verification/runtime-backends.md#colored-claude-slash-commands) for captures.
 Styled capture stays internal to the boolean detector; `fm-peek` and model-facing captures remain plain, without escapes.
 
 ## Feedback drafts

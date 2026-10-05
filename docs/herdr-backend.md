@@ -584,26 +584,25 @@ When native `agent get` identity is Claude, the adapter types only into an empty
 A Claude composer that already holds text, or cannot be read, before the send is refused with nothing typed.
 Before that Enter, the adapter continues only when the selected composer shows the typed payload, or only Claude paste placeholders with no literal remainder.
 The payload is typed once.
-While the selected composer is empty or shows a prefix of the payload, the proof keeps reading it for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds (default 30), because a loaded host renders it well after the settle.
-A head-truncated suffix of the payload, alone or after leading paste placeholders, is refused and cleared on the read that shows it.
-Any other text is not this send's own, so it is refused on that read, never cleared, and reported `send-failed`, because Enter was never pressed.
+While the selected composer is empty, shows a strict prefix of the payload, or cannot be read, the proof keeps reading it for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds (default 30), because a loaded host renders it well after the settle.
+A strict prefix is treated as still rendering even when it also matches a suffix.
+If that wait expires without proof, the submit reports `send-failed` without Enter or clearing the composer.
+Only a proven head-truncated suffix of the payload, alone or after leading paste placeholders, authorizes immediate Ctrl+U cleanup.
+For that owned suffix, the adapter presses Ctrl+U until the shared classifier reads the composer as empty, then reports `send-failed` so a resend starts from a clean composer.
+If that clear cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
+For any other text, ownership is unproven, so it is refused on that read, never cleared, and reported `send-failed`, because Enter was never pressed.
 That includes a strict infix of the payload and any other literal beside a placeholder: either may be a human's typing, so the send leaves it in the composer rather than risk deleting it.
+Ctrl+C is not used for clearing, because Claude documents it as interrupting a running operation.
 Every Herdr composer read of a pane whose native identity is Claude retains normal-intensity truecolor text regardless of its luminance, because recognized slash commands can be dark blue or muted grey.
 The lifecycle pre-send guard, the payload proof, and post-Enter confirmation therefore agree about a colored draft, and the guard refuses it by name.
 Dim or faint suggestions are still removed, and other harnesses retain their existing placeholder policy.
 `fm_backend_herdr_composer_ghost_luma` owns that policy; a state read consults identity for it only when the two policies strip the selected composer rows differently.
 A submission reuses the identity it already probed for its post-Enter confirmation and clear reads, so a failed later probe cannot turn a swallowed colored command into a reported delivery; a Pi status is still read live, because only a live idle or done status proves its composer.
 Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
-Dated measurements: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup" and "Colored Claude slash commands".
+Dated measurements: [Claude exit behind the slash-command popup](verification/runtime-backends.md#claude-exit-behind-the-slash-command-popup) and [Colored Claude slash commands](verification/runtime-backends.md#colored-claude-slash-commands).
 
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
-
-Only a proven head-truncated suffix of the payload, alone or after leading paste placeholders, authorizes Ctrl+U; a strict infix or foreign or ambiguous placeholder-adjacent literal stays untouched.
-For that owned suffix, the adapter presses Ctrl+U until the shared classifier reads the composer as empty, then reports `send-failed` so a resend starts from a clean composer.
-If that clear cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
-If the proof wait expires while the composer shows a prefix of the payload, is empty, or cannot be read, the submit reports `send-failed` without Enter or clearing the composer.
-Ctrl+C is not used for clearing, because Claude documents it as interrupting a running operation.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
 They skip it because their paste placeholders and composer shapes are not live-verified.
@@ -684,7 +683,7 @@ Identity stays a lazy read, consulted only when a separator pair or a composer r
 
 ANSI capture preserves de-emphasized placeholder style.
 `bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
-A pane whose native identity is Claude keeps dark truecolor text, as "Claude composer proof" describes.
+For the Herdr-specific exception, see [Claude composer proof](#claude-composer-proof).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.
