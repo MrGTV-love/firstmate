@@ -284,12 +284,12 @@
 #     the project or a git-backed root's repository still registers there,
 #     even when its directory or .git is missing or prunable, or a linked
 #     worktree git discovers from the cwd; outer-worktree discovery never
-#     overrides a registration. A deleted cwd outside every registered lane
-#     is classified from its nearest existing directory and reaped when that
-#     is the task's own tree. A matched cwd under a git root whose worktree
-#     git cannot otherwise classify refuses the same way. A missing lsof
-#     refuses too: without the scan no target can be audited, so no
-#     unaudited process or process-group signal is ever sent.
+#     proves custody. Only a cwd exactly equal to a live recorded scan root is
+#     eligible for signalling. Every other descendant cwd, existing or deleted,
+#     refuses with its pid, birth identity, matched path and scan root, because
+#     a damaged sibling lane cannot be distinguished from an own-tree directory.
+#     A missing lsof refuses too: without the scan no target can be audited, so
+#     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
@@ -2128,11 +2128,10 @@ task_canonical_path() {  # <path>
   printf '%s%s\n' "${dir%/}" "$rest"
 }
 
-# Prints the nested worktree lane beneath <root> that holds <path>, or nothing
-# when <path> belongs to <root> itself. A lane in TASK_REGISTERED_LANES wins
-# even when its directory or .git is gone; otherwise git classifies the nearest
-# existing directory, so a linked worktree registered by any repository is
-# found. Fails when git cannot classify <path> under a git <root>.
+# Prints a discovered nested worktree lane beneath <root> that holds <path>.
+# A lane in TASK_REGISTERED_LANES wins even when its directory or .git is gone;
+# otherwise git classifies the nearest existing directory. Empty output is
+# not proof of custody. Fails when git cannot classify <path> under a git <root>.
 task_nested_lane_for_path() {  # <root> <path>
   local root=$1 path=$2 dir lane top git_dir common_dir
   [ -e "$path" ] || path=${path% (deleted)}
@@ -2240,6 +2239,13 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$lane
         TASK_PIDS_ERROR="registered nested worktree lane holds process $pid"
+        return 1
+      fi
+      if [ "$path" != "$dir" ]; then
+        identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        echo "REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$path
+        TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
         return 1
       fi
       TASK_SCAN_PIDS+=("$pid")

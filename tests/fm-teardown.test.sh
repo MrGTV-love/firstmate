@@ -3934,8 +3934,15 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
     "$name: refusal does not name the pid and its start identity"
   assert_grep "matched path $lane" "$case_dir/stderr" \
     "$name: refusal does not name the matched path"
-  assert_grep " inside registered nested worktree lane $lane," "$case_dir/stderr" \
-    "$name: refusal does not name the lane"
+  if [ "$registrar" = sibling ] && [ "$damage" != none ]; then
+    assert_grep "beneath scan root $(cd "$case_dir/wt" && pwd -P), whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling." "$case_dir/stderr" \
+      "$name: refusal does not explain unproven custody"
+    assert_not_contains "$(cat "$case_dir/stderr")" " inside registered nested worktree lane " \
+      "$name: refusal falsely claims a known lane"
+  else
+    assert_grep " inside registered nested worktree lane $lane," "$case_dir/stderr" \
+      "$name: refusal does not name the lane"
+  fi
   assert_absent "$case_dir/state/task-x1.teardown-processes" \
     "$name: other lane recorded as a signal target"
 }
@@ -3960,26 +3967,66 @@ test_deleted_registered_lane_process_is_not_reaped() {
   pass "a process inside a deleted but still-registered nested lane is never signalled"
 }
 
-test_own_deleted_cwd_process_is_reaped() {
-  local case_dir rc pid journal survived=0
-  case_dir=$(make_case own-deleted-cwd-reap)
+test_sibling_clone_missing_git_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-missing-git-lane-custody sibling no-git
+  pass "a sibling lane without its .git is preserved because its custody is unproven"
+}
+
+test_sibling_clone_deleted_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-deleted-lane-custody sibling deleted
+  pass "a deleted sibling lane process is preserved because its custody is unproven"
+}
+
+assert_unknown_descendant_process_is_not_reaped() {
+  local name=$1 location=$2 damage=$3 case_dir rc pid root matched identity survived=0
+  case_dir=$(make_case "$name")
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
-  journal="$case_dir/state/task-x1.teardown-processes"
-  mkdir -p "$case_dir/wt/dist"
-  teardown_fixture_start "$case_dir/wt/dist" KILL sleep 300
+  root="$case_dir/$location"
+  if [ "$location" = tasktmp ]; then
+    printf '%s\n' "tasktmp=$root" >> "$case_dir/state/task-x1.meta"
+  fi
+  mkdir -p "$root/dist"
+  root=$(cd "$root" && pwd -P)
+  matched="$root/dist"
+  teardown_fixture_start "$matched" KILL sleep 300
   pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
-  rm -rf "$case_dir/wt/dist"
+  [ "$damage" != deleted ] || rm -rf "$matched"
+  if [ -r "/proc/$pid/stat" ]; then
+    identity="starttime=$(sed 's/.*) //' "/proc/$pid/stat" | awk '{print $20}')"
+  else
+    identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
+  fi
   rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
   teardown_fixture_stop "$pid"
-  expect_code 0 "$rc" "own-deleted-cwd-reap: teardown should succeed"
-  [ "$survived" -eq 0 ] || fail "own-deleted-cwd-reap: leaked process in a deleted own directory survived"
-  assert_grep $'\tTERM\t'"$pid"$'\t' "$journal" \
-    "own-deleted-cwd-reap: TERM has no durable identity record"
-  pass "a leaked process whose own-tree cwd was deleted is audited and reaped"
+  expect_code 1 "$rc" "$name: teardown must refuse even with force"
+  [ "$survived" -eq 1 ] || fail "$name: unknown descendant process was killed"
+  assert_present "$root" "$name: scan root removed"
+  assert_present "$case_dir/state/task-x1.meta" "$name: task record removed"
+  [ "$damage" = deleted ] || assert_present "$matched" "$name: descendant removed"
+  assert_grep "REFUSED: process $pid ($identity) matched path $matched" "$case_dir/stderr" \
+    "$name: refusal does not identify the process and matched path"
+  assert_grep "beneath scan root $root, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling." "$case_dir/stderr" \
+    "$name: refusal does not explain unproven custody"
+  assert_not_contains "$(cat "$case_dir/stderr")" " inside registered nested worktree lane " \
+    "$name: refusal falsely claims a known lane"
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "$name: unknown descendant recorded as a signal target"
+}
+
+test_own_deleted_cwd_process_is_not_reaped() {
+  assert_unknown_descendant_process_is_not_reaped own-deleted-cwd-custody wt deleted
+  assert_unknown_descendant_process_is_not_reaped tasktmp-deleted-cwd-custody tasktmp deleted
+  pass "deleted descendants of worktree and non-Git tasktmp roots survive without a signal audit"
+}
+
+test_ordinary_descendant_process_is_not_reaped() {
+  assert_unknown_descendant_process_is_not_reaped ordinary-descendant-custody wt none
+  assert_unknown_descendant_process_is_not_reaped tasktmp-descendant-custody tasktmp none
+  pass "ordinary existing descendants of worktree and non-Git tasktmp roots require proven custody"
 }
 
 test_process_audit_failure_refuses_before_signal() {
@@ -4707,7 +4754,10 @@ test_nested_registered_worktree_process_is_not_reaped
 test_sibling_clone_nested_lane_process_is_not_reaped
 test_registered_lane_missing_git_process_is_not_reaped
 test_deleted_registered_lane_process_is_not_reaped
-test_own_deleted_cwd_process_is_reaped
+test_sibling_clone_missing_git_lane_process_is_not_reaped
+test_sibling_clone_deleted_lane_process_is_not_reaped
+test_own_deleted_cwd_process_is_not_reaped
+test_ordinary_descendant_process_is_not_reaped
 test_process_audit_failure_refuses_before_signal
 test_lsof_absent_refuses_without_signalling
 test_lsof_error_refuses_before_removal
