@@ -15,9 +15,11 @@
 # of five seconds each, no retries. Model: jev-1.13.0.
 # Existing required triggers run first; explicit IDs in the task and --required
 # remain required independent of every Jev result. Optional fits >=0.6 may be
-# suggested (at most three); fits >=0.3 form the shortlist. Need or fits <0.85
-# cause a recheck; a need <0.3 permits no-fit. These are advisory policy, not a
-# release bar or permission to skip agent judgment or safety skills.
+# suggested (at most three); fits >=0.3 form the shortlist. With need >=0.3
+# and a nonempty shortlist, recheck if need or any candidate fit is <0.85,
+# or more than three candidates qualify. Need <0.3 permits no-fit.
+# These are advisory policy, not a release bar or permission to skip agent
+# judgment or safety skills.
 # Key/never-send policy is shared with dispatch via fm-typesafe-lib.sh.
 # Missing key, unavailable dependencies, withheld text or malformed answers
 # return off/fallback with required IDs intact; no API text or secrets are echoed.

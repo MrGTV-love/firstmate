@@ -18,11 +18,7 @@ The inherited dispatch file applies the same best-fit profiles there.
 ## Skill advice at intake
 
 Apply every existing mandatory explicit/named and safety trigger before considering optional advice.
-At intake, put a minimal permitted summary and any explicit skill IDs under `# Skill selection input` outside the brief's `# Task`; do not copy transcripts, secrets, customer excerpts, or source reports there.
-Use the ordinary `bin/fm-skill-suggest.sh` tool for your own optional selection, then let the worker launch overlay supply the same advisory input to the worker.
-On a material intent change, invoke the tool with fresh minimal permitted text and send the additive advice through the existing steering path when useful.
-Keep the index and your judgment: a no-fit or unavailable answer never excuses a required skill load.
-[`docs/configuration.md`](../../../docs/configuration.md#advisory-skill-selection) owns setup, privacy, role coverage, and supported limits; the tool's help owns exact commands.
+Follow [advisory skill selection](../../../../../docs/configuration.md#advisory-skill-selection) at intake and on material intent changes; it owns permitted input, worker overlays, privacy, role coverage, and supported limits.
 
 
 ## Owners
