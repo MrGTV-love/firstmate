@@ -130,7 +130,7 @@ The snapshot's one Codex row read 60% remaining, `projected_exhaustion`, `usable
 | Frozen snapshot as generated (early projection, 80796 seconds) | 4 | 0 |
 | Same snapshot with an `established` projection of 3600 seconds | 0 | 4 |
 
-Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, since 22 hours exceeds the 240-minute horizon.
+Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, because early confidence is warning-only regardless of projected duration.
 Each escalation named the `omp` profile as the highest-ranked candidate with established runway shorter than the 240-minute task horizon and emitted no profile.
 
 A live run needs a key and is not part of the suite; rerun the live rule-match tables above by pointing the tool at a brief with the key injected for that one command.

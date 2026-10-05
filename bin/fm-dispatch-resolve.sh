@@ -24,16 +24,8 @@
 #   rule's declared `min_confidence` on that rule's probability, falling to the
 #   most probable other option that clears its own floor), the rule's declared
 #   `approval` and `floor`, each profile's declared `provider` and `floor`, the
-#   quota rows from ONE quota-axi --json snapshot after checking the shared
-#   compatibility floor in bin/fm-quota-axi-lib.sh (schema 5 or 6).
-#   Individual-account candidates bind through that library's quota_row join;
-#   an expanded provider with no matching row stays eligible but unranked, and
-#   omp's Codex pool ranks on its visible account as a lower bound, except that
-#   an exhausted reading leaves the pool unranked rather than vetoed. Ranking
-#   uses the spendPriority argmax over the matched
-#   rule's candidates; a winner whose established projected runway is shorter
-#   than the task horizon (top-level `task_horizon_minutes`, default 240)
-#   escalates, while early or unknown projections are disclosed warnings. The model never sees quota, catalogs, approvals,
+#   quota rows from ONE compatible quota-axi --json snapshot, and ranking under
+#   the operator contract below. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and

@@ -1068,6 +1068,7 @@ The rule's own probability in the answer must reach it, replacing the resolver's
 Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
 
 `task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
+The 240-minute default matches the 240-minute single-agent limit no-mistakes applies to one task's agent.
 
 **Rule quota floors**
 
@@ -1079,7 +1080,6 @@ Set it high when a wrong pick is costly and low when the rule is a safe runner-u
 **Provider identifiers and mappings**
 
 A profile `provider` optionally names the quota-axi provider family whose rows apply to that profile; when present, profile and rule-floor provider IDs must match the strict whole-string pattern `^[a-z0-9]+(-[a-z0-9]+)*\z`.
-Bootstrap validates resolver-only `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` values only while typed resolution is active; without the key those inert fields and the pre-existing verified-harness baseline preserve bootstrap behavior.
 
 Typed resolution additively recognizes `gemini` because AGENTS.md section 4 verifies it for crewmate and scout dispatch.
 
@@ -1188,8 +1188,8 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
 - omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
   The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
-  The pool is ranked on that account through the same task-horizon runway classification as any other candidate (see "Candidate eligibility and evidence" below): `through_reset`, an established projection covering the horizon, and an early or unknown projection disclosed as a warning all let it clear, and an established projection shorter than the horizon escalates when the pool is the highest-ranked candidate, exactly as for a single account.
-  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked with its runway warning, never vetoed, because another pooled account may still have headroom.
+  The pool is ranked on that account through the task-horizon runway classification in "Candidate eligibility and evidence" below.
+  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked, never vetoed, because another pooled account may still have headroom; any non-passing runway bound is disclosed as a warning.
   A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
   The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
@@ -1212,12 +1212,14 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 - A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
-  The horizon is the optional top-level `task_horizon_minutes` in `config/crew-dispatch.json`, a positive number defaulting to 240 minutes, which matches the 240-minute single-agent limit no-mistakes applies to one task's agent.
+  The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
   `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
   An `established` projection shorter than the horizon on any applicable bound of the highest-ranked candidate produces `escalate` with no `profile:`.
-  An `early` or absent `projectionConfidence`, an absent `usableRunwaySeconds`, or `unknown` runway is a disclosed warning, never a veto, because a young or unmeasured projection is not evidence of mid-task exhaustion.
-  Every bound that does not pass is named in a `[warning: ...]` suffix on its candidate line, with its `usableRunwaySeconds` and `projectionConfidence`.
-  A low percentage alone is never a veto; the resolver invents no generic percentage floor.
+  For an otherwise rankable candidate, a `projected_exhaustion` bound with `early`, unknown, or absent `projectionConfidence`, or absent or nonnumeric `usableRunwaySeconds`, is warning-only; `unknown` runway is also warning-only.
+  A young or unmeasured projection is not evidence of mid-task exhaustion.
+  Each non-passing bound on a rankable candidate is named in a `[warning: ...]` suffix on its candidate line.
+  Projected-exhaustion warnings include `usableRunwaySeconds` and `projectionConfidence`; other runway warnings name the status and scope.
+  A low positive percentage alone is not a veto unless it falls below a declared floor; the resolver invents no generic percentage floor.
 - Ranking stays inside the matched rule's own `use` array (or `default` when that was selected) and keeps its highest `spendPriority` choice: a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
 - Unranked alternatives do not prevent a measured winner from clearing; the clear result's unranked note names their providers.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
