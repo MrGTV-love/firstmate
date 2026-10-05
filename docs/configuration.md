@@ -1417,6 +1417,42 @@ Evaluation calls are not proof that a native hook loaded or that fleet sample vo
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
 
+## Advisory skill selection
+
+`bin/fm-skill-suggest.sh` uses Jev to suggest which optional skill bodies to inspect first, without replacing the full skill index, required trigger rules, or agent judgment.
+The existing TypeSafe key opt-in and dispatch-never-send policy also apply here through the shared `bin/fm-typesafe-lib.sh` boundary; see [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) for setup.
+The tool's header and help own exact flags, size limits, probability policy, deadlines, and output.
+
+Provide a minimal permitted task summary, not a transcript, secret, customer excerpt, or pasted source report.
+An explicitly supplied task file is the ordinary tool input for primary, secondmate, or worker agents at intake and when intent materially changes.
+For worker launch integration, the supervisor puts that same minimal summary and any explicitly named skill IDs in `# Skill selection input`, outside `# Task`, before spawning.
+`fm-spawn.sh` appends advice to its existing worker launch overlay when that section exists, including on relaunch; it never rewrites source intent or a secondmate charter.
+Absent input preserves ordinary selection and does not send the whole brief instead.
+
+All existing mandatory explicit/named and safety triggers run first and cannot be suppressed by this advisory result.
+Named IDs and caller-supplied required IDs are reported separately from optional suggestions; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
+Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
+
+Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
+Ambiguous shortlists receive a second evaluation using at most three bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
+Paths and whole-body hashes remain local; the judge does not receive the catalog's full instruction bodies.
+Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
+The versioned model and exact task, catalog, policy, and required-ID hashes bind the private single-entry result cache; changed input invalidates reuse.
+Each invocation validates and consumes one private snapshot, so a concurrent task's cache publication cannot substitute its advice after validation.
+This is advisory-result memoization, not cached authority or dynamic quota.
+
+Coverage is role- and input-specific:
+
+- Primary and secondmate agents have the ordinary task/turn tool path; there is no automatic every-turn native interception or transcript capture.
+- Firstmate-launched ship and scout workers receive additive advice through the supported launch-brief input, including Pi and omp's existing positional brief input; later advice can use the existing steering path.
+- No-mistakes vendor-managed reviewers, fixers, and other internal agents are not instrumented by this integration; no closed-source injection surface is assumed.
+- Other native harnesses retain their existing input mechanics and skill loaders; availability of the shared wrapper alone is not proof of a live suggestion or body load on each harness.
+
+[`tests/fm-skill-suggest.test.sh`](../tests/fm-skill-suggest.test.sh) exercises the advisory selection and recovery boundaries through the public tool.
+The TypeSafe [skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) is external design context, not validated performance evidence for this caller; published rates and earlier evaluation conclusions do not establish local recall, fewer failed tasks, reduced agent context, or completed-task cost savings.
+This integration retains the index, so any local context saving is limited to avoiding unnecessary optional body loads and is not guaranteed.
+
+
 ## Toolchain
 
 On session start the first mate detects what its required toolchain is missing or too old and lists each problem with either an exact install command or manual instructions.

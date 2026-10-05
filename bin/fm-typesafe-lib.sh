@@ -1,0 +1,60 @@
+# shellcheck shell=bash
+# Shared TypeSafe boundary for dispatch and advisory skill selection.
+# Usage: source this before launching children, then fm_typesafe_key <home>.
+# fm_typesafe_post <request-json> <response-file> uses the fixed endpoint and
+# five-second deadline, with no retries. Prints only the HTTP code (000 on a
+# transport failure). The private key is never exported or placed on argv.
+# fm_typesafe_permitted <request-json> <never-send-path> <scratch-file> checks
+# every request string against the existing dispatch-never-send policy.
+# A refusal sets FM_TYPESAFE_WITHHELD_REASON and returns 1, without echoing text.
+
+TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY_PRIVATE:-${TYPESAFE_API_KEY:-}}
+export -n TYPESAFE_API_KEY_PRIVATE 2>/dev/null || true
+unset TYPESAFE_API_KEY
+
+# shellcheck source=bin/fm-env-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-env-lib.sh"
+
+fm_typesafe_key() {
+  [ -n "$TYPESAFE_API_KEY_PRIVATE" ] || TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY "$1/.env")
+  [ -n "$TYPESAFE_API_KEY_PRIVATE" ]
+}
+
+fm_typesafe_post() {
+  local request=$1 response=$2 http
+  http=$(printf '%s' "$request" | curl -sS --max-time 5 -o "$response" -w '%{http_code}' \
+    -X POST https://api.typesafe.ai/v1/systemone -H 'Content-Type: application/json' \
+    -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
+    --data-binary @- 2>/dev/null) || http=000
+  printf '%s' "$http"
+}
+
+fm_typesafe_permitted() {
+  local request=$1 path=$2 scratch=$3 list value n=0 rc
+  FM_TYPESAFE_WITHHELD_REASON=
+  [ -e "$path" ] || [ -L "$path" ] || return 0
+  if ! { [ -f "$path" ] && [ -r "$path" ]; }; then
+    FM_TYPESAFE_WITHHELD_REASON="$path is not a readable regular file"
+    return 1
+  fi
+  if ! jq -r '.. | strings | gsub("\\s+"; " ")' <<<"$request" > "$scratch" 2>/dev/null; then
+    FM_TYPESAFE_WITHHELD_REASON="could not extract the request text to check"
+    return 1
+  fi
+  if ! list=$(jq -Rr 'gsub("\\s+"; " ")' "$path" 2>/dev/null); then
+    FM_TYPESAFE_WITHHELD_REASON="could not read $path"
+    return 1
+  fi
+  while IFS= read -r value; do
+    n=$((n + 1))
+    value=${value# }
+    value=${value% }
+    case "$value" in ''|'#'*) continue ;; esac
+    grep -qiF -e "$value" "$scratch" 2>/dev/null; rc=$?
+    case "$rc" in
+      0) FM_TYPESAFE_WITHHELD_REASON="brief text matches $path line $n"; return 1 ;;
+      1) ;;
+      *) FM_TYPESAFE_WITHHELD_REASON="could not check the request text against $path line $n"; return 1 ;;
+    esac
+  done <<<"$list"
+}

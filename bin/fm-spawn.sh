@@ -42,6 +42,10 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
+#   A # Skill selection input section opts a worker into Jev advisory suggestions
+#   from bin/fm-skill-suggest.sh in that same overlay; source intent and mandatory
+#   skill triggers remain unchanged. The section contains only permitted minimal
+#   task text, not transcripts or private excerpts.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -3146,6 +3150,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       printf '\n' &&
       { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
       cat "$SOURCE_BRIEF" &&
+      if fm_brief_heading_present "$SOURCE_BRIEF" "# Skill selection input"; then
+        FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+          bash "$SCRIPT_DIR/fm-skill-suggest.sh" --brief "$SOURCE_BRIEF" --format brief || true
+      fi &&
       if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
         fm_brief_intent_overlay "$CAPTAIN_INTENT"
       fi

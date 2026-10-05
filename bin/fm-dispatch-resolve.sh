@@ -84,9 +84,8 @@
 #   inspectable answer plus every candidate's evidence, in code.
 set -u
 
-TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY:-}
-export -n TYPESAFE_API_KEY_PRIVATE 2>/dev/null || true
-unset TYPESAFE_API_KEY
+# shellcheck source=bin/fm-typesafe-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-typesafe-lib.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -97,8 +96,6 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
-# shellcheck source=bin/fm-env-lib.sh
-. "$SCRIPT_DIR/fm-env-lib.sh"
 # shellcheck source=bin/fm-timing-lib.sh
 . "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-brief-heading-lib.sh
@@ -106,8 +103,6 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 
 CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
-TS_BASE=https://api.typesafe.ai
-TS_TIMEOUT=5
 TS_INPUT_USD_PER_MILLION=0.042
 DEFAULT_WHEN="No listed rule applies to this task."
 
@@ -136,10 +131,7 @@ while [ $# -gt 0 ]; do
 done
 
 # ---- opt-in gate ---------------------------------------------------------------
-if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
-  TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY "$FM_HOME/.env")
-fi
-if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
+if ! fm_typesafe_key "$FM_HOME"; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
   exit 0
 fi
@@ -423,17 +415,8 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
-  curl_rc=0
-  CURL_WRITE=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code} %{time_total}' \
-    -X POST "$TS_BASE/v1/systemone" -H 'Content-Type: application/json' \
-    -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
-    --data-binary @- 2>/dev/null) || curl_rc=$?
-  HTTP=${CURL_WRITE%% *}
-  [ "$curl_rc" -eq 0 ] || HTTP=000
-  LAT_MS=null
-  case "$CURL_WRITE" in
-    *' '*) LAT_MS=$(fm_timing_seconds_ms "${CURL_WRITE#* }") || LAT_MS=null ;;
-  esac
+  HTTP=$(fm_typesafe_post "$REQUEST" "$RESP_FILE" "$SEND_TEXT")
+  LAT_MS=$(fm_timing_seconds_ms "$(cat "$SEND_TEXT")") || LAT_MS=null
   [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
