@@ -201,6 +201,10 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-config-inherit-lib.sh
+. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
@@ -784,6 +788,8 @@ PRIOR_EFFORT=
 TARGET_HARNESS=$HARNESS
 TARGET_MODEL=
 TARGET_EFFORT=
+TARGET_DISPATCH_RULE=
+TARGET_DISPATCH_SWITCHED=false
 
 journal_write() {  # <phase> [extra-line]...
   local phase=$1
@@ -962,6 +968,28 @@ resolve_relaunch_profile() {
       fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
     TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
       "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+  fi
+  if [ "$KIND" != secondmate ]; then
+    local dispatch_set dispatch_profile dispatch_result config_dir
+    config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+    TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
+    if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
+      TARGET_DISPATCH_RULE=
+    fi
+    dispatch_set=$(fm_dispatch_fallbacks "$config_dir" "$TARGET_DISPATCH_RULE" \
+      "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
+    TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+    if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
+       || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
+      dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
+        --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
+      dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
+        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")") || return 1
+      TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
+      TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
+      TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
+      TARGET_EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
+    fi
   fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
@@ -1180,6 +1208,7 @@ do_relaunch() {
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
+  [ -z "$TARGET_DISPATCH_RULE" ] || spawn_args+=(--dispatch-rule "$TARGET_DISPATCH_RULE")
   if [ "$TARGET_API_KEY_ALLOW" = 1 ]; then
     spawn_args+=(--allow-api-key)
   fi
@@ -1218,6 +1247,9 @@ do_relaunch() {
 
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
+  if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
+    printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
 

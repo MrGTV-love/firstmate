@@ -4032,6 +4032,66 @@ if fm_tasks_axi_compatible; then
 else
   echo "skip - recovery admission fixtures require compatible tasks-axi"
 fi
+test_quota_exhaustion_relaunches_only_a_permitted_route() {
+  local dir model id meta out rc
+  for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
+    id=rl-pool
+    dir=$(new_case pooled-quota "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
+    meta=$(cat "$dir/home/state/$id.meta")
+    meta=${meta/model=default/model=$model}
+    meta=${meta/effort=default/effort=high}
+    printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    jq -n --arg model "$model" '{rules:[{when:"assigned work",
+      use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
+      fallback:(if $model=="openai-codex/gpt-6-luna" then
+        [{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
+    jq -n --argjson now "$(date +%s)" '{reports:[
+      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
+    ]}' > "$dir/usage.json"
+    cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  usage) cat "$FM_FAKE_DIR/../usage.json" ;;
+  models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$dir/fakebin/omp"
+    "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+    mkdir -p "$dir/user-home"
+    out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+      -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+      PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
+      HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
+      FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+      bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit; printf "%s\\n" "$FM_SESSION_END_WAKE"' _ "$ROOT")
+    rc=$?
+    expect_code 0 "$rc" "supervised quota recovery must reconcile the route: $out"
+    assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
+    if [ "$model" = openai-codex/gpt-6-luna ]; then
+      assert_contains "$out" 'auto-relaunched after quota exhaustion' "an idle live OMP session must recover automatically"
+      assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
+      assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
+    else
+      assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
+      assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
+      assert_equals openai-codex/gpt-6.1-sol "$(meta_field "$dir" "$id" model)" "the strongest model identity must remain unchanged"
+      assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the strongest replacement is unavailable"
+    fi
+  done
+  pass "supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work"
+}
+
+test_quota_exhaustion_relaunches_only_a_permitted_route
+
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

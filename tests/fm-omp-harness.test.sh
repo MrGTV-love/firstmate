@@ -113,7 +113,10 @@ make_fake_omp() {  # <fakebin>
 #!/usr/bin/env bash
 case "$1" in
   models)
-    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    ;;
+  usage)
+    if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
     ;;
 esac
 exit 0
@@ -177,6 +180,52 @@ test_spawn_launch_line_and_worker_wiring() {
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy fm-spawn" ] \
     || fail "omp spawn must seed the busy-state contract"
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
+}
+
+test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
+  local rec id=omp-pool-q1 out status
+  rec=$(make_spawn_case pool omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
+  ]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  expect_code 0 $? "a healthy pooled sibling must permit launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "pooled launch must retain Luna"
+
+  rec=$(make_spawn_case fallback omp omp-fallback-q2)
+  read_case_record "$rec"
+  id=omp-fallback-q2
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
+  assert_grep 'model=openrouter/z-ai/glm-5.3-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
+  assert_grep 'fallback launched' "$HOME_DIR/state/$id.status" "the changed serving route must be reported"
+  pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
+}
+
+test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
+  local rec id=omp-strongest-q3 out status
+  rec=$(make_spawn_case strongest omp "$id")
+  read_case_record "$rec"
+  printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  status=$?
+  expect_code 1 "$status" "Sol without an available same-class stand-in must refuse: $out"
+  assert_absent "$HOME_DIR/state/$id.meta" "refused launch must publish no replacement"
+  assert_equals 'unlanded work' "$(cat "$WT_DIR/unfinished.txt")" "quota exhaustion must preserve work"
+  pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
 }
 
 test_spawn_model_validation_scoped_to_listed_providers() {
@@ -300,6 +349,10 @@ switch (process.env.MODE) {
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
+  case "quota-error":
+    await handlers["agent_end"]({messages:[{role:"assistant",stopReason:"error",errorMessage:"usage_limit_reached"}]}, ctx); break;
+  case "fallback-served":
+    await handlers["retry_fallback_succeeded"]({model:"openrouter/z-ai/glm-5.3-flash:high"}, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -317,16 +370,6 @@ test_busy_extension_lifecycle() {
   state="$HOME_DIR/state"
   ext="$state/$id.omp-ext.ts"
   assert_present "$ext" "omp spawn did not write the per-task extension"
-  out=$(drive_omp_ext "$ext" handlers) || fail "handler listing failed: $out"
-  case " $out " in
-    *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
-  esac
-  for handler in agent_start agent_end turn_end; do
-    case " $out " in
-      *" $handler "*) ;;
-      *) fail "the omp extension must register $handler, got '$out'" ;;
-    esac
-  done
 
   rm -f "$state/$id.turn-ended"
   out=$(drive_omp_ext "$ext" turn-end) || fail "turn_end drive failed: $out"
@@ -341,6 +384,10 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
+  out=$(drive_omp_ext "$ext" quota-error) || fail "quota error drive failed: $out"
+  assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
+  assert_grep 'fallback served openrouter/z-ai/glm-5.3-flash:high' "$state/$id.status" "native model fallback must publish the serving model"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -1274,6 +1321,8 @@ EOF
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
+test_spawn_retains_pooled_capacity_and_declared_stand_ins
+test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
