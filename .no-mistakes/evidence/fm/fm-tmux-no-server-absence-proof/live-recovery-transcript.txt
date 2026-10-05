@@ -1,0 +1,508 @@
+Adversarial setup: a real tmux client connected to a disposable nonresponding Unix socket; no tmux server was started.
+$ ps -p 24073 -o uid=,pid=,comm=
+  501 24073 /opt/homebrew/bin/tmux
+
+Live recovery validation: real fm-control/fm-spawn, real ps, real tmux client/socket reads, real guarded Herdr lab, and real Codex.
+Setup notes: an overlong private Unix socket was replaced by a worktree-relative socket. Codex folder trust was confined to disposable CODEX_HOME/config.toml; no trust decision was persisted to user configuration. Both workers ultimately produced their expected brief response.
+
+$ bin/fm-herdr-lab.sh teardown fm-lab-reboot-reclaim-25556-21590
+exit=0
+
+$ bin/fm-control.sh live-reboot-a exit
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+error: task live-reboot-a's endpoint reads 'unreadable' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint
+
+$ bin/fm-control.sh live-reboot-a exit
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+endpoint-gone live-reboot-a harness=codex backend=tmux endpoint=reboot-lost:fm-live-reboot-a worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-spawn.sh live-refusal --relaunch
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: configured backend 'tmux' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+
+$ bin/fm-control.sh live-refusal relaunch --note Resume after reboot
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'tmux' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+error: the replacement agent for live-refusal could not be launched on codex
+error: live-refusal's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-refusal-worktree
+
+$ bin/fm-spawn.sh live-refusal --relaunch
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'zellij' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+
+$ bin/fm-control.sh live-refusal relaunch --note Resume after reboot
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'zellij' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+error: the replacement agent for live-refusal could not be launched on codex
+error: live-refusal's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-refusal-worktree
+
+$ bin/fm-spawn.sh live-refusal --relaunch
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'cmux' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+
+$ bin/fm-control.sh live-refusal relaunch --note Resume after reboot
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: configured backend 'cmux' is not herdr; refusing to replace task live-refusal's proven-gone tmux endpoint
+error: the replacement agent for live-refusal could not be launched on codex
+error: live-refusal's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-refusal-worktree
+
+$ bin/fm-control.sh live-reboot-a relaunch --note Resume after reboot; preserve the local branch and dirty work.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-a
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-a harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-control.sh live-reboot-b exit
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+endpoint-gone live-reboot-b harness=codex backend=tmux endpoint=reboot-lost:fm-live-reboot-b worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-control.sh live-reboot-b relaunch --note Resume second worker after reboot; preserve all local work.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-b
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-b harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 agent get w1:p2
+exit=0
+{"id":"cli:agent:get","result":{"agent":{"agent":"codex","agent_status":"blocked","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree","pane_id":"w1:p2","revision":0,"state_change_seq":1,"tab_id":"w1:t2","terminal_id":"term_65d10e2735d452","workspace_id":"w1"},"type":"agent_info"}}
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 agent get w1:p3
+exit=0
+{"id":"cli:agent:get","result":{"agent":{"agent":"codex","agent_status":"blocked","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree","pane_id":"w1:p3","revision":0,"state_change_seq":2,"tab_id":"w1:t3","terminal_id":"term_65d10e478bd8c3","workspace_id":"w1"},"type":"agent_info"}}
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p3 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-control.sh live-reboot-a relaunch --note Lab-only invocation trust set without changing user configuration; resume the bounded brief.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-a
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-a harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-control.sh live-reboot-b relaunch --note Lab-only invocation trust set without changing user configuration; resume the bounded brief.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-b
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-b harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p3 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-control.sh live-reboot-a relaunch --note Resume using invocation-local trust, without persisting a user trust decision.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-a
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-a harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-control.sh live-reboot-b relaunch --note Resume using invocation-local trust, without persisting a user trust decision.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-b
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-b harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-a-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p3 --source visible
+exit=0
+
+  Folder access
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-worktree
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r
+  eboot-b-project
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+
+$ bin/fm-control.sh live-reboot-a relaunch --note Resume bounded task using isolated Codex state and existing read-through login.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-a
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-a harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-control.sh live-reboot-b relaunch --note Resume bounded task using isolated Codex state and existing read-through login.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/live-reboot-b
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/data/live-reboot-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched live-reboot-b harness=codex from=codex model=default effort=default backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-control.sh live-refusal exit
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+error: task live-refusal's endpoint reboot-lost:fm-live-refusal reads 'missing', but the process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+
+$ bin/fm-control.sh live-refusal relaunch --note Must not duplicate an unreachable worker
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+error: task live-refusal's endpoint reboot-lost:fm-live-refusal reads 'missing', but the process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint; exit will not claim an agent stopped at an address it cannot trust, nor send lifecycle input to one
+error: relaunch of live-refusal failed while stopping the old agent and its state is 'missing', so it was not proven stopped; its original instructions were restored and the durable record was retained for recovery
+
+$ bin/fm-spawn.sh live-refusal --relaunch
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task live-refusal's recorded endpoint reboot-lost:fm-live-refusal reads 'missing', but the process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint. An endpoint that cannot be proven absent may still hold a live agent on this task's worktree; refusing rather than launching a second agent into it
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  ## Progress note (2026-10-05T05:14:29Z)
+
+  This task was relaunched. Continue from here; the local copy and every
+  uncommitted change are exactly as the previous worker left them.
+
+  First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/
+  worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act
+  on
+  each message in numeric order, then mv each handled file into
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/
+  state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.
+
+  Resume bounded task using isolated Codex state and existing read-through login.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications
+  actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested
+  subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never
+  include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+  specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any
+  report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Prove resumed task live-reboot-a is processing its brief.
+
+
+• RECOVERED-live-reboot-a
+
+  Worked for 5s • 12:14 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r…
+  ? for shortcuts
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p3 --source visible
+exit=0
+
+  ## Progress note (2026-10-05T05:14:43Z)
+
+  This task was relaunched. Continue from here; the local copy and every
+  uncommitted change are exactly as the previous worker left them.
+
+  First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/
+  worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act
+  on
+  each message in numeric order, then mv each handled file into
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/
+  state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.
+
+  Resume bounded task using isolated Codex state and existing read-through login.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications
+  actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested
+  subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never
+  include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+  specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any
+  report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Prove resumed task live-reboot-b is processing its brief.
+
+
+• RECOVERED-live-reboot-b
+
+  Worked for 5s • 12:15 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r…
+  ? for shortcuts
+
+$ bin/fm-control.sh live-refusal exit
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+endpoint-gone live-refusal harness=codex backend=tmux endpoint=reboot-lost:fm-live-refusal worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-refusal-worktree
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p2 --source visible
+exit=0
+
+  ## Progress note (2026-10-05T05:14:29Z)
+
+  This task was relaunched. Continue from here; the local copy and every
+  uncommitted change are exactly as the previous worker left them.
+
+  First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/
+  worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act
+  on
+  each message in numeric order, then mv each handled file into
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/
+  state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.
+
+  Resume bounded task using isolated Codex state and existing read-through login.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications
+  actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested
+  subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never
+  include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+  specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any
+  report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Prove resumed task live-reboot-a is processing its brief.
+
+
+• RECOVERED-live-reboot-a
+
+  Worked for 5s • 12:14 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r…
+  ? for shortcuts
+
+$ bin/fm-herdr-lab.sh run fm-lab-reboot-reclaim-25556-21590 pane read w1:p3 --source visible
+exit=0
+
+  ## Progress note (2026-10-05T05:14:43Z)
+
+  This task was relaunched. Continue from here; the local copy and every
+  uncommitted change are exactly as the previous worker left them.
+
+  First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/
+  worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act
+  on
+  each message in numeric order, then mv each handled file into
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/
+  state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.
+
+  Resume bounded task using isolated Codex state and existing read-through login.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications
+  actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested
+  subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never
+  include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+  specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any
+  report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Prove resumed task live-reboot-b is processing its brief.
+
+
+• RECOVERED-live-reboot-b
+
+  Worked for 5s • 12:15 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r…
+  ? for shortcuts
+
+$ bin/fm-control.sh live-refusal relaunch --note Should refuse absent local work
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+error: task live-refusal's recorded worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/never-existing-worktree is missing; refusing to relaunch and lose track of its work
+
+$ bin/fm-control.sh live-reboot-a exit
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+stopped live-reboot-a harness=codex backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree
+
+$ bin/fm-control.sh live-reboot-b exit
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home
+stopped live-reboot-b harness=codex backend=herdr endpoint=fm-lab-reboot-reclaim-25556-21590:w1:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree
+
+$ bin/fm-herdr-lab.sh teardown fm-lab-reboot-reclaim-25556-21590
+exit=0
+

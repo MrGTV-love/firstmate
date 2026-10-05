@@ -1,0 +1,60 @@
+{
+  "live-reboot-a": {
+    "metadata": {
+      "window": "fm-lab-reboot-reclaim-25556-21590:w1:p2",
+      "endpoint_task_id": "live-reboot-a",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-worktree",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-a-project",
+      "harness": "codex",
+      "kind": "ship",
+      "mode": "no-mistakes",
+      "yolo": "off",
+      "branch": "fm/live-reboot-a",
+      "tasktmp": "/tmp/fm-live-reboot-a",
+      "model": "default",
+      "effort": "default",
+      "spawn_gen": "s1791177273.8640.11303",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-reboot-reclaim-25556-21590",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t2",
+      "herdr_pane_id": "w1:p2",
+      "control_relaunch_tx": "7207.20261005T051430Z.28208"
+    },
+    "head": "aa1c9d17ff5ae9fde4a8fe8a49073cdc66853dcc",
+    "branch": "task-live-reboot-a",
+    "dirty_content": "Preserve uncommitted recovery work.\n",
+    "status": "working: preserved pre-reboot history\n",
+    "armed_poll_preserved": true,
+    "progress_note": "# Task\n## Captain's intent\nProve resumed task live-reboot-a is processing its brief.\n\n## Firstmate spec\nReply exactly RECOVERED-live-reboot-a and do nothing else. Never edit any file or invoke any tools.\n\n## Progress note (2026-10-05T05:09:12Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume after reboot; preserve the local branch and dirty work.\n\n## Progress note (2026-10-05T05:10:51Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.\n\nLab-only invocation trust set without changing user configuration; resume the bounded brief.\n\n## Progress note (2026-10-05T05:12:07Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume using invocation-local trust, without persisting a user trust decision.\n\n## Progress note (2026-10-05T05:14:29Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-a.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume bounded task using isolated Codex state and existing read-through login.\n"
+  },
+  "live-reboot-b": {
+    "metadata": {
+      "window": "fm-lab-reboot-reclaim-25556-21590:w1:p3",
+      "endpoint_task_id": "live-reboot-b",
+      "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-worktree",
+      "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-reboot-b-project",
+      "harness": "codex",
+      "kind": "ship",
+      "mode": "no-mistakes",
+      "yolo": "off",
+      "branch": "fm/live-reboot-b",
+      "tasktmp": "/tmp/fm-live-reboot-b",
+      "model": "default",
+      "effort": "default",
+      "spawn_gen": "s1791177286.31989.9974",
+      "backend": "herdr",
+      "herdr_session": "fm-lab-reboot-reclaim-25556-21590",
+      "herdr_workspace_id": "w1",
+      "herdr_tab_id": "w1:t3",
+      "herdr_pane_id": "w1:p3",
+      "control_relaunch_tx": "30445.20261005T051443Z.23605"
+    },
+    "head": "aa1c9d17ff5ae9fde4a8fe8a49073cdc66853dcc",
+    "branch": "task-live-reboot-b",
+    "dirty_content": "Preserve uncommitted recovery work.\n",
+    "status": "working: preserved pre-reboot history\n",
+    "armed_poll_preserved": true,
+    "progress_note": "# Task\n## Captain's intent\nProve resumed task live-reboot-b is processing its brief.\n\n## Firstmate spec\nReply exactly RECOVERED-live-reboot-b and do nothing else. Never edit any file or invoke any tools.\n\n## Progress note (2026-10-05T05:09:52Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume second worker after reboot; preserve all local work.\n\n## Progress note (2026-10-05T05:11:11Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.\n\nLab-only invocation trust set without changing user configuration; resume the bounded brief.\n\n## Progress note (2026-10-05T05:12:32Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume using invocation-local trust, without persisting a user trust decision.\n\n## Progress note (2026-10-05T05:14:43Z)\n\nThis task was relaunched. Continue from here; the local copy and every\nuncommitted change are exactly as the previous worker left them.\n\nFirst, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act on\neach message in numeric order, then mv each handled file into\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.\n\nResume bounded task using isolated Codex state and existing read-through login.\n"
+  }
+}

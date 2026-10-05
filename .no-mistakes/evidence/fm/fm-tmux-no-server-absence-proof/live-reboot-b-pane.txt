@@ -1,0 +1,40 @@
+
+  ## Progress note (2026-10-05T05:14:43Z)
+
+  This task was relaunched. Continue from here; the local copy and every
+  uncommitted change are exactly as the previous worker left them.
+
+  First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/
+  worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/state/live-reboot-b.inbox/*.msg, act
+  on
+  each message in numeric order, then mv each handled file into
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/home/
+  state/live-reboot-b.inbox/handled/. A steer sent before the relaunch survives there.
+
+  Resume bounded task using isolated Codex state and existing read-through login.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications
+  actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested
+  subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never
+  include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+  specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any
+  report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Prove resumed task live-reboot-b is processing its brief.
+
+
+• RECOVERED-live-reboot-b
+
+  Worked for 5s • 12:15 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/32d18ed9638d/01M454716J1P60DG5QD9TCWWRM/.live-recovery-xv4oi938/live-r…
+  ? for shortcuts
