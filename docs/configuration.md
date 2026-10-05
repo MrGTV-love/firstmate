@@ -1452,7 +1452,7 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes the selected profile to `fm-spawn.sh`.
+Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` when the rule has a fallback policy.
 
 **Spawn requirements**
 
@@ -1495,6 +1495,34 @@ This section is the single owner of the canonical schema and its per-field seman
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
+| Rule `fallback` and top-level `default_fallback` | Optional ordered arrays of explicit stand-ins; an empty or absent list permits none. |
+
+**Pooled OMP capacity and declared stand-ins**
+
+`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports every pooled account as `usable`, `exhausted`, or `unknown`, without account identities or credentials.
+OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
+A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
+Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
+The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
+
+Each fallback profile requires `harness`, `model`, and `effort`.
+An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+A bare `claude` executable or a shell alias is not proof of that route.
+For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
+The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
+Natural-language `why` text does not authorize an executable fallback.
+
+`fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
+Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
+Spawn and recovery validate fallback fields even when typed resolution is off.
+The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
+OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
+Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
+An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+Launch and successful replacement append the selected route to task status.
+No account pin, saved reset, or global reviewer configuration is changed.
+
 
 **Fields applied only by typed resolution**
 

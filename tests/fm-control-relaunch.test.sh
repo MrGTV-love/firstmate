@@ -4993,6 +4993,31 @@ SH
   pass "supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work"
 }
 
+test_retiring_omp_removes_only_its_generated_configuration() {
+  local dir out rc
+  dir=$(new_case omp-config-retirement rl-config)
+  add_ship_task "$dir" rl-config omp
+  printf 'dispatch_rule=rule_1\n' >> "$dir/home/state/rl-config.meta"
+  mkdir -p "$dir/home/config"
+  printf '{"rules":[{"when":"OMP work","use":{"harness":"omp"}}]}\n' > "$dir/home/config/crew-dispatch.json"
+  printf omp > "$dir/fake/command"
+  printf claude > "$dir/fake/becomes"
+  printf 'export default () => {};\n' > "$dir/home/state/rl-config.omp-ext.ts"
+  printf '{"retry":{"modelFallback":false}}\n' > "$dir/home/state/rl-config.omp-fallback.yml"
+  mkdir -p "$dir/wt/.omp"
+  printf 'user configuration\n' > "$dir/wt/.omp/config.yml"
+  out=$(run_control "$dir" rl-config relaunch --harness claude --note "replace the configured runtime explicitly"); rc=$?
+  expect_code 0 "$rc" "an explicit runtime replacement must complete: $out"
+  assert_absent "$dir/home/state/rl-config.omp-fallback.yml" "retired model policy must not survive replacement"
+  assert_absent "$dir/home/state/rl-config.omp-ext.ts" "retired callbacks must not survive replacement"
+  assert_equals 'user configuration' "$(cat "$dir/wt/.omp/config.yml")" "retirement must preserve user configuration"
+  out=$(run_control "$dir" rl-config relaunch --note "continue after the explicit runtime override"); rc=$?
+  expect_code 0 "$rc" "the retired rule must not block subsequent recovery: $out"
+  pass "OMP replacement retires generated policy without removing user configuration"
+}
+
+test_retiring_omp_removes_only_its_generated_configuration
+
 test_quota_exhaustion_relaunches_only_a_permitted_route
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint

@@ -22,13 +22,14 @@ The [worker helper](../../../bin/fm-quota-choose.sh) and [typed resolver](../../
 ## Worker-side quota helper
 
 The canonical shell helper for a worker that has already performed its model-selection reasoning and now needs to pick the first viable candidate is `bin/fm-quota-choose.sh`.
-Pass it the intake's already-captured default TOON or permitted JSON fallback through stdin or `--snapshot`; it never takes another quota snapshot, so it selects from the same quota state as the intake.
+Pass it the intake's already-captured default TOON or permitted JSON fallback through stdin or `--snapshot`; it never takes another quota-axi snapshot.
 Pass each candidate as `harness:model`, with earlier candidates preferred.
 The helper's header owns its provider mapping and quota selection mechanics.
 An `exhausted_now` runway vetoes the candidate.
-The helper selects a candidate only when its applicable quota has a known `effectivePercentRemaining` greater than zero.
+The helper selects a candidate only when its applicable quota has known positive headroom, except that OMP Codex uses its own native pooled serving evidence rather than the single-account Codex row.
 This is an optional narrow helper with a known limitation: it maps each harness to one primary provider family only, so a candidate whose established provider differs from that primary family is checked against the wrong quota row.
 omp has no primary family, so the helper keys an `omp:` candidate on its model prefix, mapping only `openai-codex/` and `claude-bridge/` and refusing every other prefix; the helper's header owns that mapping.
+For OMP `openai-codex/` candidates it reads one additional pooled OMP usage report, preserves native successful-response warnings at 0%, and never redeems saved resets.
 Authoritative multi-provider routing - including provider discovery from the harness catalog and quota matching by that explicit provider - stays owned by this skill's intake procedure above and AGENTS.md section 4, not by the helper.
 Use it only when the brief already fixed the candidate order and every candidate's provider is the harness's primary family.
 It does not replace the reasoning-class, runway-feasibility, or authentication gates above.
@@ -54,6 +55,14 @@ The fallback therefore has an explicit TOON-then-JSON call sequence; reuse its J
 Below-floor is rare: bootstrap enforces `FM_QUOTA_AXI_MIN` and normally reports `MISSING` before dispatch; if an intake somehow reaches an older build whose TOON lacks `spendPriority`, use the defensive `--json` fallback rather than treating the missing scalar as healthy.
 `--json` is a defensive belt, not a habit; never reach for it because it feels more complete.
 Read `quota-axi auth --json` only when a candidate's credential surface is in question.
+
+For an OMP `openai-codex/` candidate, also inspect `bin/fm-dispatch-capacity.sh --harness omp --model <selector>` before deciding that Codex is exhausted.
+It reads OMP's native account pool; quota-axi's single Codex account, account keys, and `exhausted_now` row cannot veto a usable OMP sibling.
+Unknown pooled accounts prevent a whole-pool exhaustion conclusion, and saved resets are not current headroom.
+OMP reports no pool `spendPriority` or completion runway, so disclose those unknowns and never synthesize a scalar, sum account percentages, or reuse the exhausted sibling's economics.
+The selected rule's machine-readable stand-ins and automatic recovery are owned by the crew-dispatch schema in `docs/configuration.md`; strongest-class work still cannot use an undeclared weaker stand-in.
+Provider-level quota notifications from `fm-procevent-quota.sh` are not proof that an OMP account pool is exhausted; reconcile the concrete OMP route before parking it.
+
 
 For each candidate, preserve explicit `harness`, `model`, and `provider`; `harness-adapters` owns identity, and model/provider never infer harness.
 
