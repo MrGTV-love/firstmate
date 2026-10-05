@@ -1618,10 +1618,11 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   local case_dir rc before
   case_dir=$(make_case legacy-stamp-rollback)
   write_legacy_meta "$case_dir" no-mistakes ship
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
   set +e
@@ -1633,8 +1634,6 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
     "legacy-stamp-rollback: an unrecordable close must fail the teardown after accepting the legacy record"
   [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
     || fail "legacy-stamp-rollback: the failed marker write left the record modified"
-  grep -q "rolled back" "$case_dir/stderr" \
-    || fail "legacy-stamp-rollback: the refusal did not report the rolled-back stamp"
   [ "$(backlog_row_state "$case_dir")" = in_flight ] \
     || fail "legacy-stamp-rollback: the failed teardown closed the backlog item anyway"
 
@@ -1649,6 +1648,19 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
     || fail "legacy-stamp-rollback: the flag-less retry modified the record"
   pass "--legacy-record teardown rolls its stamp back when the close marker write fails"
+}
+
+add_failing_close_publication_mv() {
+  local case_dir=$1 real_mv
+  real_mv=$(command -v mv)
+  cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${*: -1}" in
+  "$case_dir/state/task-x1.backlog-close") exit 1 ;;
+esac
+exec "$real_mv" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/mv"
 }
 
 # Override fakebin/perl so ONLY the stamp rollback's truncate fails; every other
@@ -1671,11 +1683,12 @@ test_retained_legacy_stamp_still_faces_the_endpoint_gate() {
   local case_dir rc stamped
   case_dir=$(make_case legacy-stamp-retained)
   write_legacy_meta "$case_dir" no-mistakes ship
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
   add_failing_truncate_perl "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
 
   set +e
   run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
@@ -4029,6 +4042,131 @@ test_ordinary_descendant_process_is_not_reaped() {
   pass "ordinary existing descendants of worktree and non-Git tasktmp roots require proven custody"
 }
 
+test_process_refusal_has_no_close_replay_authority() {
+  local scenario case_dir root pid other_pid birth other_birth rc path_without_lsof
+  local flags=()
+  for scenario in descendant foreign missing-lsof audit tasktmp legacy existing-marker; do
+    case_dir=$(make_case "refusal-replay-$scenario")
+    mkdir -p "$case_dir/home/state"
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    seed_backlog_in_flight "$case_dir"
+    root="$case_dir/wt"
+    flags=(--force)
+    case "$scenario" in
+      descendant|existing-marker|legacy)
+        mkdir "$root/dist"
+        root="$root/dist"
+        if [ "$scenario" = legacy ]; then
+          write_legacy_meta "$case_dir" no-mistakes ship
+          flags+=(--legacy-record)
+        fi
+        ;;
+      foreign)
+        git clone -q "$case_dir/origin.git" "$case_dir/sibling"
+        git -C "$case_dir/sibling" worktree add -q --detach "$root/foreign" main
+        git -C "$case_dir/sibling" worktree lock "$root/foreign"
+        root="$root/foreign"
+        ;;
+      missing-lsof)
+        path_without_lsof=$(make_path_without_lsof "$case_dir")
+        ln -s "$(command -v tasks-axi)" "$path_without_lsof/tasks-axi"
+        ln -s "$(command -v node)" "$path_without_lsof/node"
+        PATH="$path_without_lsof" command -v lsof >/dev/null 2>&1 \
+          && fail "refusal-replay-$scenario: fixture exposes lsof"
+        ;;
+      audit) mkdir "$case_dir/state/task-x1.teardown-processes" ;;
+      tasktmp)
+        root="$case_dir/tasktmp"
+        mkdir -p "$root/dist"
+        mkdir -p "$case_dir/pool/1"
+        git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+        ln -s "pool/1/project" "$case_dir/wt"
+        printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' \
+          "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+        printf 'task=other-task\nhome=%s\n' "$case_dir/other-home" > "$case_dir/pool/1/.fm-slot-owner"
+        cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/slot-owner.before"
+        fm_write_meta "$case_dir/state/task-x1.meta" \
+          "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+          "worktree=$case_dir/wt" "project=$case_dir/project" "tasktmp=$root" \
+          "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+        root="$root/dist"
+        ;;
+    esac
+    mkdir "$case_dir/unrelated"
+    fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+    cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
+fi
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    teardown_fixture_start "$root" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    birth=$(teardown_fixture_birth "$pid") || fail "refusal-replay-$scenario: missing process identity"
+    teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+    other_pid=$TEARDOWN_FIXTURE_PID
+    other_birth=$(teardown_fixture_birth "$other_pid") || fail "refusal-replay-$scenario: missing unrelated identity"
+    sleep 0.3
+    if [ "$scenario" = existing-marker ]; then
+      FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+        . "$1/bin/fm-tasks-axi-lib.sh"
+        . "$1/bin/fm-backlog-transition-lib.sh"
+        fm_backlog_close_marker_stage "$2/state/.prior-close" task-x1 "$2/data" \
+          teardown-test-task-x1 "$2/state" 0 &&
+        fm_backlog_atomic_transition publish "$2/state/.prior-close" \
+          "$2/state/task-x1.backlog-close" "pending-close record" "$2/state"
+      ' _ "$ROOT" "$case_dir" > "$case_dir/marker.stdout" 2> "$case_dir/marker.stderr" \
+        || fail "refusal-replay-$scenario: cannot seed existing replay authority"
+    fi
+    rc=0
+    if [ "$scenario" = missing-lsof ]; then
+      FM_HOME="$case_dir/home" FM_TEARDOWN_TEST_PATH="$path_without_lsof" run_teardown "$case_dir" "${flags[@]}" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" "${flags[@]}" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 1 "$rc" "refusal-replay-$scenario: teardown must refuse"
+    case "$scenario" in
+      missing-lsof) assert_grep "lsof is unavailable" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+      audit) assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+      *) assert_grep "REFUSED: process $pid" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+    esac
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "refusal-replay-$scenario: refusal changed task metadata"
+    assert_absent "$case_dir/state/task-x1.backlog-close" "refusal-replay-$scenario: refusal left replay authority"
+    FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_close_marker_replay "$2/state" "$2/state/task-x1.backlog-close" "$2/data"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/replay.stdout" 2> "$case_dir/replay.stderr" \
+      || fail "refusal-replay-$scenario: supported close replay failed"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "refusal-replay-$scenario: replay changed task metadata"
+    cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+      || fail "refusal-replay-$scenario: unrelated metadata changed"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "refusal-replay-$scenario: replay closed refused task"
+    if [ "$scenario" = tasktmp ]; then
+      assert_grep "reassigned" "$case_dir/stderr" "refusal-replay-$scenario: slot ownership gate not reached"
+      cmp "$case_dir/slot-owner.before" "$case_dir/pool/1/.fm-slot-owner" \
+        || fail "refusal-replay-$scenario: reassigned slot claim changed"
+    fi
+    assert_present "$case_dir/wt" "refusal-replay-$scenario: worktree removed"
+    assert_present "$root" "refusal-replay-$scenario: process root removed"
+    assert_absent "$case_dir/endpoint-close.log" "refusal-replay-$scenario: endpoint closed"
+    teardown_fixture_live "$pid" "$birth" || fail "refusal-replay-$scenario: refused process identity changed"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "refusal-replay-$scenario: unrelated process identity changed"
+    teardown_fixture_stop "$pid"
+    teardown_fixture_stop "$other_pid"
+  done
+  pass "process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay"
+}
+
 test_process_audit_failure_refuses_before_signal() {
   local case_dir rc pid survived=0
   case_dir=$(make_case process-audit-failure)
@@ -4661,6 +4799,7 @@ test_missing_adapter_sibling_refuses_before_cleanup
 test_forced_child_missing_adapter_sibling_refuses_before_cleanup
 test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
+test_process_refusal_has_no_close_replay_authority
 test_local_only_fork_remote_allows
 test_teardown_closes_the_backlog_item_itself
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator

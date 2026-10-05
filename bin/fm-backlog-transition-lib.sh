@@ -1067,17 +1067,6 @@ fm_backlog_close_marker_stage() {  # <temporary-path> <id> <data-dir> <spawn-gen
     || { rm -f "$tmp"; return 1; }
 }
 
-# Record the exact close a teardown is about to perform.
-fm_backlog_close_marker_write() {  # <state-dir> <id> <data-dir> <spawn-gen> [flag...]
-  local state=$1 id=$2 data=$3 spawn_gen=$4 marker tmp
-  fm_backlog_directory_present "$state" "state directory" || return 1
-  shift 4
-  marker=$(fm_backlog_close_marker_path "$state" "$id") || return 1
-  tmp="$state/.$id.backlog-close.${BASHPID:-$$}"
-  fm_backlog_close_marker_stage "$tmp" "$id" "$data" "$spawn_gen" "$state" 0 "$@" || return 1
-  fm_backlog_atomic_transition publish "$tmp" "$marker" "pending-close record" "$state" \
-    || { rm -f "$tmp"; return 1; }
-}
 
 fm_backlog_close_marker_mark_cleanup_incomplete() {  # <state-dir> <marker-path> <id> <data-dir> <spawn-gen> [flag...]
   local state=$1 marker=$2 id=$3 data=$4 spawn_gen=$5 tmp
