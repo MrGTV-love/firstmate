@@ -310,6 +310,54 @@ done
 cp "$TMP_ROOT/line-ending-task" "$TASK"
 pass "LF and CRLF catalogs preserve required identities, optional paths and wire metadata"
 
+cp "$CATALOG/alpha/SKILL.md" "$TMP_ROOT/paragraph-alpha-save.md"
+for indicator in '>' '>-' '|' '|-'; do
+  printf '%s\n' '---' 'name: alpha' "description: $indicator" \
+    '  Use for the first paragraph.' '' \
+    '  Invoke the workflow for deployment.' '  ' \
+    '  Retain the final safety guidance.' \
+    'metadata:' '  internal: true' '---' '# Alpha' \
+    'Opening instructions for alpha.' > "$TMP_ROOT/paragraph-alpha.md"
+  case "$indicator" in
+    '>'|'>-') expected='Use for the first paragraph.  Invoke the workflow for deployment.  Retain the final safety guidance.' ;;
+    *) expected=$(printf 'Use for the first paragraph.\n\nInvoke the workflow for deployment.\n\nRetain the final safety guidance.') ;;
+  esac
+  for endings in lf crlf; do
+    if [ "$endings" = crlf ]; then
+      awk '{ printf "%s\r\n", $0 }' "$TMP_ROOT/paragraph-alpha.md" > "$CATALOG/alpha/SKILL.md"
+    else
+      cp "$TMP_ROOT/paragraph-alpha.md" "$CATALOG/alpha/SKILL.md"
+    fi
+    reset
+    out=$(run --task-file "$TASK" --required safety --no-cache)
+    assert_contains "$out" 'suggestions[2]' "$indicator $endings supports ordinary optional selection"
+    assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$indicator $endings exercises rank and recheck"
+    for stage in rank recheck; do
+      jq -e --arg expected "$expected" '.state.catalog[] | select(.id == "alpha") | .description == $expected' "$LOG/$stage" >/dev/null || fail "$indicator $endings $stage must retain every description paragraph without unrelated metadata"
+    done
+  done
+done
+for scalar in 'Use for the first paragraph.' '"Use for the first paragraph."' "'Use for the first paragraph.'"; do
+  printf '%s\n' '---' 'name: alpha' "description: $scalar" '' \
+    '  Invoke the workflow for deployment.' '---' '# Alpha' > "$TMP_ROOT/paragraph-alpha.md"
+  for endings in lf crlf; do
+    if [ "$endings" = crlf ]; then
+      awk '{ printf "%s\r\n", $0 }' "$TMP_ROOT/paragraph-alpha.md" > "$CATALOG/alpha/SKILL.md"
+    else
+      cp "$TMP_ROOT/paragraph-alpha.md" "$CATALOG/alpha/SKILL.md"
+    fi
+    reset
+    out=$(run --task-file "$TASK" --required safety --required alpha --no-cache)
+    assert_contains "$out" 'unsupported skill metadata' "$endings unsupported scalar continuation cannot be silently shortened"
+    assert_contains "$out" "\"alpha\",\"$CATALOG/alpha/SKILL.md\"" "$endings identity-only parsing remains independent of descriptions"
+    assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "$endings rejected continuation preserves sibling requirements"
+    assert_contains "$out" 'suggestions[0]' "$endings rejected continuation withholds optional advice"
+    assert_absent "$LOG/calls" "$endings rejected continuation makes no request"
+  done
+done
+cp "$TMP_ROOT/paragraph-alpha-save.md" "$CATALOG/alpha/SKILL.md"
+pass "blank-separated description paragraphs survive both stages or fail closed without losing requirements"
+
 reset
 cat > "$BRIEF" <<'MD'
 # Task

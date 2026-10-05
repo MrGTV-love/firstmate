@@ -12,7 +12,7 @@ gsub("\r\n"; "\n")
   elif ($id | test("^[a-z0-9]+(-[a-z0-9]+)*$") | not) then error("invalid skill name")
   elif $ARGS.named.mode == "identity" then {id:$id,path:$path}
   else
-  ($file.meta + "\n" | capture("(?m)^description:[ \\t]*(?<value>[^\\r\\n]*)\\r?\\n(?<continuation>(?:[ \\t]+[^\\r\\n]*\\r?\\n)*)")) as $description
+  ($file.meta + "\n" | capture("(?m)^description:[ \\t]*(?<value>[^\\r\\n]*)\\r?\\n(?<continuation>(?:(?:[ \\t]*\\r?\\n)*[ \\t]+[^\\r\\n]*\\r?\\n)*)")) as $description
 | ($description.value | sub("[ \\t]+$"; "")) as $value
 | (if [">", ">-", "|", "|-"] | index($value) then
     $description.continuation | split("\n") | map(sub("^[ \\t]+"; "")) | join(if $value | startswith(">") then " " else "\n" end) | sub("\\s+$"; "")

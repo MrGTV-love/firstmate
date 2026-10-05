@@ -1435,6 +1435,7 @@ Agents read selected bodies through ordinary tools and may reject suggestions, a
 LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts; whole-body hashes still track the original file bytes.
 
 Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
+Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
 Ambiguous shortlists receive a second evaluation using at most three bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
 Paths and whole-body hashes remain local; the judge does not receive the catalog's full instruction bodies.
 TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
