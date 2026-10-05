@@ -1941,6 +1941,11 @@ Observed guarantees:
   Through `fm-control.sh` against a marked worktree-local lab home, exit and ordinary relaunch reached the not-proven-empty guard and preserved the rendered draft; interrupt preserved the idle draft and reported cancellation unconfirmed.
   Launch recovery refused because that surface was tmux, not Herdr; this does not establish live Herdr recovery transport.
   No draft was submitted.
+- Gutter-backed unowned edges, status-shaped text, and braille-only rows end positive bare-draft ownership without making a later indented omp-looking frame independent.
+  Focused composer regressions cover compact/multirow frames and native-gutter prompt continuations, cursor/cursorless classification, extraction refusal, both locales, and preserved independent margin boundaries.
+  A fresh guarded named Herdr lab ran three actual omp 18.6.1 panes with private HOME/cache/config/data directories and no models configured.
+  Each unsubmitted draft placed one blocker family before compact and multirow literal frames; its captured native two-space gutter returned `unknown` cursorlessly and with a floor cursor, while extraction refused with status 1 and no output in both locales.
+  No input was submitted. Every named-session and lifecycle command used the designated lab helper; guarded teardown succeeded with the default-session tripwire unchanged.
 - The normal control-plane transaction replaces the bare-resumed task in the same pane and local copy, preserving its branch, HEAD, dirty-file checksum, recorded `openai-codex/gpt-6.1-sol` model, and `low` effort.
 - A repeated recovery sweep leaves the managed incarnation unchanged.
 - A later bare resume in the same persistent shell does **not** inherit the previous managed incarnation.

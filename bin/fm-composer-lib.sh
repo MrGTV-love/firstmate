@@ -841,7 +841,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
           ;;
       esac
     fi
-    if [ "$top" -lt 0 ] && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] \
+    if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] \
        && [ "$row" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
             || fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; then
@@ -884,7 +884,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       kind=bottom
       family=omp
     fi
-    if [ "$kind" = top ] && [ "$family" = omp ] && [ "$top" -lt 0 ] \
+    if [ "$kind" = top ] && [ "$family" = omp ] \
        && [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ]; then
       bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
       bare_indent=${bare_line%%[![:space:]]*}
@@ -1422,18 +1422,17 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
     if [ "$allow_blank" = 1 ] && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
        && [ "$row" -ge "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
        && [ "$row" -le "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then ambiguous=1; fi
-    if [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
-       && fm_composer_row_has_edge "$trimmed"; then return 1; fi
-    if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
-    if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
-    if ! _fm_composer_row_is_bare_literal "$row"; then
-      if fm_composer_leading_shell_glyph_var glyph "$trimmed" \
-         || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; then
-        [ "$allow_blank" = 1 ] || return 1
-        case "${root#"$root_indent"}" in '❯ '*) ;; *) return 1 ;; esac
-        indent=${line%%[![:space:]]*}
-        case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
-      fi
+    if { [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
+         && fm_composer_row_has_edge "$trimmed"; } \
+       || _fm_composer_row_is_omp_status "$trimmed" \
+       || _fm_composer_row_is_braille_furniture "$trimmed" \
+       || { ! _fm_composer_row_is_bare_literal "$row" \
+            && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
+                 || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; }; }; then
+      [ "$allow_blank" = 1 ] || return 1
+      case "${root#"$root_indent"}" in '❯ '*) ;; *) return 1 ;; esac
+      indent=${line%%[![:space:]]*}
+      case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
     fi
     row=$((row + 1))
   done

@@ -1116,6 +1116,43 @@ assert_extraction_refused() {
     || fail "$label under LC_ALL=C: expected nonzero empty extraction, got status $status and '$out'"
 }
 
+test_gutter_blockers_preserve_omp_literal_ambiguity() {
+  local blocker frame screen caps cursor last out
+  for blocker in '│ │' '╭── stray ─╮' 'π · model' '⠂⠁'; do
+    for frame in $'  ╭── π > model > path ─╮\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  ╰─  ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯'; do
+      screen=$'❯ preface\n  '"$blocker"$'\n'"$frame"
+      last=$(printf '%s\n' "$screen" | awk 'END {print NR - 1}')
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "gutter blocker '$blocker' before literal '$frame' refuses cursorless" unknown "$caps" "$screen"
+        assert_extraction_refused "gutter blocker '$blocker' before literal '$frame'" "$caps" "$screen"
+      done
+      for cursor in 0 1 2 "$last"; do
+        assert_screen "gutter blocker '$blocker' literal cursor row $cursor refuses" unknown "$CAPS_TMUX" "$screen" "$cursor"
+      done
+      screen="$screen"$'\n  ❯ '
+      assert_screen "gutter prompt after '$blocker' and literal refuses" unknown "$CAPS_STYLED_NOID" "$screen"
+      assert_screen "gutter prompt cursor after '$blocker' and literal refuses" unknown "$CAPS_TMUX" "$screen" "$((last + 1))"
+      assert_extraction_refused "gutter prompt after '$blocker' and literal" "$CAPS_STYLED_NOID" "$screen"
+    done
+    screen=$'❯ preface\n  '"$blocker"$'\n  ❯ '
+    assert_screen "gutter prompt directly after '$blocker' refuses" unknown "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "gutter prompt cursor directly after '$blocker' refuses" unknown "$CAPS_TMUX" "$screen" 2
+    assert_extraction_refused "gutter prompt directly after '$blocker'" "$CAPS_STYLED_NOID" "$screen"
+  done
+  screen=$'❯ preface\n  │ │\n  π · model\n  ⠂⠁\n  ╭── π > model > path ─╮\n  ╰─  ─╯'
+  frame=$'  ╭── π > model > path ─╮\n  ╰─  ─╯'
+  for screen in "$screen"$'\n❯ ' "$screen"$'\n$ shell\n'"$frame"; do
+    assert_screen "independent margin boundary ends blocker ambiguity" empty "$CAPS_STYLED_NOID" "$screen"
+    out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+      || fail "independent margin boundary extraction refused"
+    [ -z "$out" ] || fail "independent margin boundary inherited ambiguous input: '$out'"
+  done
+  pass "native-gutter edge, status and braille blockers cannot promote later literal frames or prompts"
+}
+test_gutter_blockers_preserve_omp_literal_ambiguity
+
 test_bare_draft_owns_indented_compact_omp_literal() {
   local floor screen expected caps cursor out status
   status=' π  · ◔ GPT-6-Astra · 🌳 …-workspace · ⑂ detached · ◫ 15.4%/272K ⟲ · (sub)'
