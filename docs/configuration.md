@@ -1222,9 +1222,9 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps named values out of dispatch-resolution and advisory skill-selection requests, and marked brief regions out of Jev resolver requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution or advisory skill-selection requests, and keeps marked brief regions out of Jev resolver requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there apply the same privacy policy.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
 
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1261,8 +1261,7 @@ A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before each request is sent, every remaining string in it is checked for literal matches; for dispatch resolution, that includes the project name, the sanitized task text, each rule's `when`, and the fixed question text.
-Advisory skill-selection requests use the same literal policy through `bin/fm-typesafe-lib.sh`.
+Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection checks every request string through `bin/fm-typesafe-lib.sh`.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that is present but not a readable regular file, an invalid directive, or a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
