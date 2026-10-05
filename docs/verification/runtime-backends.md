@@ -1178,15 +1178,41 @@ ok - fm_backend_herdr_composer_state: a slash-command popup cannot hide a typed 
 ok - fm_backend_herdr_send_text_submit: a typed slash command hidden behind its popup is still proven and submitted
 ```
 
-Live guard (third scenario of the opt-in guard, verifying the agent actually exited):
+The live guard's public exit scenarios type `/exit` behind the same popup; its current command and observed output are under "Colored Claude slash commands" below.
+
+### Colored Claude slash commands
+
+Verified 2026-09-30 on macOS arm64 with Herdr 0.9.1 and Claude Code 2.1.285 in isolated `fm-lab-` sessions.
+Claude draws a recognized slash command typed into its composer in normal-intensity truecolor below the shared default ghost ceiling of 128; `/exit` measured RGB(51,102,255), luminance about 104.
+The live guard observed that shape both with forced truecolor and in a production-shape pane with the default color, launched unnamed as `fm-spawn` launches a worker.
+Under the default ceiling the command read as ghost text, so the payload proof read no payload and `fm-control exit` and `relaunch` refused before sending Enter.
+The pre-send guard read a human's colored draft under the same ceiling as an empty composer, so exit reported a generic send failure instead of the pending draft; the `tests/fm-control.test.sh` regression reproduces that against the previous adapter.
+At a load average near 90 the same Claude rendered a typed `/compact` 2.7 to 21 seconds after the literal send, while the payload proof read the composer once about 1.2 seconds after it; that single read refused and cleared the command, so `/compact` reported `send-failed` in the live guard.
+The current color and payload-proof contract is owned by [Claude composer proof](../herdr-backend.md#claude-composer-proof).
+`tests/fm-backend-herdr.test.sh` covers late rendering, prefix growth, owned-suffix cleanup, foreign and ambiguous text preservation, and unproven deadlines with prefix, empty, or unreadable captures.
+In the live guard run below, the public relaunch replaced the production-shape worker in the same endpoint through `fm-spawn`'s own launch, and the replacement rendered a token that existed only in its instructions.
+
+Refresh the repeatable pending-draft refusal, `/compact`, relaunch, prompt, and verified-exit evidence for both shapes with:
 
 ```sh
-FM_HERDR_SUBMIT_CONFIRM_LIVE=1 tests/fm-herdr-submit-confirm-live-e2e.test.sh
+HERDR_LAB_HELPER=bin/fm-herdr-lab.sh FM_HERDR_SUBMIT_CONFIRM_LIVE=1 \
+  bash bin/fm-test-run.sh tests/fm-herdr-submit-confirm-live-e2e.test.sh
 ```
 
 ```text
-ok - live Herdr submit confirm: Claude Code (2.1.283 (Claude Code)) on herdr 0.9.0 proves and submits a typed /exit behind its command popup
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the production shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes /compact in the production shape
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the production shape in its endpoint and the replacement reads its instructions
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the production shape and preserves its endpoint
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the forced-truecolor shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes /compact in the forced-truecolor shape
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 reports empty and renders the requested reply in isolated session fm-lab-herdr-submit-con-67549-4960
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 submits a U+2063 away-supervisor payload whose read-back drops the mark
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the forced-truecolor shape and preserves its endpoint
 ```
+
+`tests/fm-backend-herdr.test.sh` covers a colored skill command whose first Enter is swallowed while the native identity probe is unavailable, a colored draft that reads pending only on a Claude pane, and dim suggestions that stay ghost text.
+`tests/fm-control.test.sh` covers the public exit refusal of a colored Claude draft on Herdr, with no deliberate-exit marker and nothing typed.
 
 ### Prune and respawn
 

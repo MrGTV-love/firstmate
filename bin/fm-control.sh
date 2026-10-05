@@ -646,8 +646,9 @@ do_exit() {
   esac
   # The submit verdict is NOT the postcondition here: a successful exit command
   # destroys the composer the verdict is read from, so a post-exit read can
-  # legitimately report anything. Only a hard transport failure aborts; the
-  # authoritative proof is the agent-state wait below. The retried Enter still
+  # legitimately report anything. Known non-delivery (send-failed), including
+  # a refused pre-Enter proof, aborts; otherwise the authoritative proof is the
+  # agent-state wait below. The retried Enter still
   # matters, because a slash command opens a completion popup on some TUIs that
   # swallows the first Enter.
   # A deliberate exit verb records the busy generation before anything is typed.
