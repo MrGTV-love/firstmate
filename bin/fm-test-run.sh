@@ -328,6 +328,7 @@ family_for_basename() {
     fm-calm-claude-mod.test.sh|\
     fm-harness-adapter-references.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
+    fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
     fm-timeout-lib.test.sh|\
     fm-tmux-submit-busy.test.sh|fm-trace-context-lib.test.sh|\
@@ -1633,6 +1634,13 @@ families_for_changed_path() {
     bin/fm-bootstrap.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-brief.test.sh"
+      ;;
+    bin/fm-dispatch-capacity*)
+      printf '%s\n' "__script__:fm-dispatch-capacity.test.sh"
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-quota-choose.test.sh"
+      printf '%s\n' "__script__:fm-omp-harness.test.sh"
+      printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap

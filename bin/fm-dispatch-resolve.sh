@@ -101,6 +101,10 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+# shellcheck source=bin/fm-env-lib.sh
+. "$SCRIPT_DIR/fm-env-lib.sh"
 # shellcheck source=bin/fm-timing-lib.sh
 . "$SCRIPT_DIR/fm-timing-lib.sh"
 # shellcheck source=bin/fm-brief-heading-lib.sh
@@ -228,6 +232,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   else empty end
 ' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
 [ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
+fm_dispatch_fallbacks "$CONFIG" "" "" "" "" "$RULES" >/dev/null || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
 
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -395,9 +400,21 @@ QUOTA_MS=$(( Q1 - Q0 ))
 [ "$QUOTA_MS" -ge 0 ] || QUOTA_MS=0
 [ "$quota_rc" -eq 0 ] || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
+OMP_POOLS='{}'
+omp_models=$(jq -r '[(.rules[]?.use // []), (.default // [])] | .[] |
+  (if type == "array" then .[] else . end) |
+  select(.harness == "omp" and (.model // "" | startswith("openai-codex/"))) | .model' "$RULES" | sort -u)
+if [ -n "$omp_models" ]; then
+  omp_usage=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || omp_usage='{}'
+  while IFS= read -r omp_model; do
+    omp_capacity=$(fm_omp_codex_capacity "$omp_model" "$omp_usage")
+    OMP_POOLS=$(jq -cn --argjson pools "$OMP_POOLS" --arg m "$omp_model" --argjson capacity "$omp_capacity" '$pools + {($m): $capacity}')
+  done <<<"$omp_models"
+fi
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
+  --argjson omp_pools "$OMP_POOLS" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -439,7 +456,14 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       "projected_exhaustion at \($row.scope) (usableRunwaySeconds=\($row.runway.usableRunwaySeconds // "unknown") projectionConfidence=\($row.runway.projectionConfidence // "unknown"))"
     else "\($s) at \($row.scope)" end;
   def assess($c; $p; $lane):
-    if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
+    if $c.harness == "omp" and (($c.model // "") | startswith("openai-codex/")) then
+      ($omp_pools[$c.model] // {status: "unknown", accounts: []}) as $pool |
+      {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
+       exhausted: ($pool.status == "exhausted"), unranked: true,
+       reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}
+      + (if $c.floor != null then {unknown: true, reason: "OMP pool profile floor is unverifiable"}
+         elif $pool.status != "usable" then {unknown: true} else {} end)
+    elif $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
       {profile: $c, provider: $p, eligible: true, unranked: true,
        reason: (if any($q.providers[]; .provider == $p)
@@ -457,10 +481,10 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
       elif any($rows[]; (.runway.status // "") == "exhausted_now") then
         ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, exhausted: true, reason: "runway exhausted_now at \($bad.scope)"}
       elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
         ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, exhausted: true, reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}
@@ -489,11 +513,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     ($c.harness == "omp" and $p == "codex") as $pooled |
     ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
     any($rows[]; runway_class(.) == "short") as $short |
-    if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
-    elif $pooled and ($base.eligible | not) then
-      {profile: $c, provider: $p, eligible: true, unranked: true,
-       reason: "omp Codex account pool is only lower-bounded by its visible account (\($base.reason))"}
-      + (if ($risks | length) > 0 then {warning: ($risks | join("; "))} else {} end)
+    if $pooled then $base
     elif $ranked and ($risks | length) > 0 then
       $base + {warning: ($risks | join("; ")), short: $short}
     else $base end;
@@ -523,7 +543,9 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
    end) as $fb |
   (if $fb.to then $fb.to else $picked end) as $choice |
   (rule_at($choice)) as $rule |
-  (if $rule == null then "none" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
+  (if $rule == null then "none"
+   elif $rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))
+   then "unknown" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
   (if $choice != "default" and $rule == null then []
    elif $rule == null then profiles($cfg.default // null)
    else profiles($rule.use)
@@ -538,7 +560,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
-    rule: $picked,
+    rule: $picked, dispatch_rule: $sel.source,
     rule_when: when_of($picked),
     confidence: $a.confidence, probabilities: $a.probabilities
   }
@@ -555,8 +577,11 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   else
     ($sel.use | map(evaluate(.))) as $cands |
     ([$cands[] | select(.eligible and ((.unranked // false) | not))]) as $elig |
-    ([$cands[] | select(.unranked)]) as $unranked |
-    if ($elig | length) == 0 then $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
+    ([$cands[] | select(.eligible and .unranked)]) as $unranked |
+    if ([$cands[] | select(.eligible)] | length) == 1 and
+       any($cands[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
+    then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($cands[] | select(.eligible))}
+    elif ($elig | length) == 0 then $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
     else
       ($elig | max_by(.spendPriority)) as $best |
       ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
@@ -571,6 +596,23 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end
   end') || emit_error "resolution failed"
 
+# Only proven exhaustion activates a declared stand-in. Confidence, approval,
+# malformed configuration, unknown headroom, and floors retain their decisions.
+if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" and
+  (.candidates | length) > 0 and all(.candidates[]; .exhausted == true)' <<<"$RESULT" >/dev/null; then
+  dispatch_rule=$(jq -r .dispatch_rule <<<"$RESULT")
+  primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
+  fallbacks=$(fm_dispatch_fallbacks "$CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
+    "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
+  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' 2>/dev/null); then
+    if [ "$(jq -r .switched <<<"$selected")" = true ]; then
+      RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
+        .fallback = "primary capacity exhausted; declared model-matrix fallback" |
+        .chosen = {profile: $selected.profile, capacity: $selected.capacity, eligible: true} |
+        .candidates += [.chosen]' <<<"$RESULT")
+    fi
+  fi
+fi
 CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
 if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
   IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
@@ -601,12 +643,14 @@ TEXT=$(jq -r '
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
+      + (if .capacity then "  pool=" + (.capacity | tojson | flat) else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
-      + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
+      + "  -> " + (if .unranked and .eligible then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
       + (if .warning then " [warning: \(.warning | flat)]" else "" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
-      + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
+      + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end)
+      + (if .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
 emit_telemetry
 exit 0
