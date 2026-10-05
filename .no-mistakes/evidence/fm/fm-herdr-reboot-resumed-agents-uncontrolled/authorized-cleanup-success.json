@@ -1,0 +1,32 @@
+{
+  "scenario": "Successful fixture cleanup removes resources and preserves original status",
+  "session": "fm-lab-omp-reboot-18559-27386",
+  "original_exit_status": 73,
+  "observed_exit_status": 73,
+  "resources_after": {
+    "tmp": false,
+    "task": false,
+    "launch": false
+  },
+  "original_omp_process_after": "",
+  "session_list_after": {
+    "sessions": [
+      {
+        "default": true,
+        "name": "default",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-vernant-overview-81566-23025",
+        "running": false,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+      }
+    ]
+  },
+  "tripwire_verified_and_removed": true,
+  "instrumentation_note": "An optional DEBUG observer inside EXIT did not fire; cleanup itself completed normally. Before-removal timing is reserved for scenario 4."
+}

@@ -1,0 +1,7 @@
+Command: SMOKE_EXIT_STATUS=0 FM_OMP_REBOOT_LIVE=1 TMPDIR=<worktree> FM_HERDR_LAB_STATE_DIR=<worktree> BASH_ENV=<runtime checkpoint> bash tests/fm-omp-reboot-live-e2e.test.sh
+Actual executable EXIT trap; real guarded fresh-claim prepare and teardown; owned worktree-local dependencies; no server or agent provisioned.
+
+Actual executable output:
+actual-script cleanup checkpoint: mode=success-zero session=fm-lab-omp-reboot-85071-11660 private=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.uuzkR2 task=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/success-zero/task-namespace launch=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/success-zero/launch-namespace
+
+Observed cleanup: original successful status 0 preserved; private home/worktree/resume, task namespace, launch namespace, and owned tripwire all absent.

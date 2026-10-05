@@ -1,0 +1,35 @@
+Command: FM_OMP_REBOOT_LIVE=1 TMPDIR=<worktree> FM_HERDR_LAB_STATE_DIR=<worktree> BASH_ENV=<runtime checkpoint> bash tests/fm-omp-reboot-live-e2e.test.sh
+Actual executable EXIT trap with owned worktree-local dependencies and real bin/fm-herdr-lab.sh. Fresh real prepare succeeded; an intentionally invalid owned tripwire made real provision refuse before starting a server; the original tripwire was restored. It was then moved aside to force real guarded teardown refusal. No live agent was launched.
+
+Actual executable output:
+fm-herdr-lab: FLEET-STATE TRIPWIRE FAILED: default session changed during lab work
+fm-herdr-lab: before: {"controlled_invalid_tripwire":true}
+fm-herdr-lab: after:  {"name":"default","default":true,"running":true,"socket_path":"/Users/charlesabrooker/.config/herdr/herdr.sock"}
+actual guarded provision refusal status=1; owned fresh claim restored for cleanup
+actual-script cleanup checkpoint: mode=refusal-provision session=fm-lab-omp-reboot-99368-1096 private=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU task=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/task-namespace launch=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/launch-namespace
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-omp-reboot-99368-1096'; refusing destructive calls
+guarded teardown failed for session 'fm-lab-omp-reboot-99368-1096'; retained resources for manual cleanup:
+  private tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU
+  task namespace: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/task-namespace
+  launch namespace: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/launch-namespace
+
+Observed owned dependency state:
+{
+  "exit": 1,
+  "retained": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/resume.jsonl": "owned resume dependency\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/worktree/unlanded.txt": "owned unlanded work\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/home/state/sentinel": "owned home state\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/task-namespace/sentinel": "owned task staging\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/launch-namespace/sentinel": "owned launch staging\n"
+  },
+  "sha256": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/resume.jsonl": "44eabba8c20b5c72113f884ece29b43b71a2ac2f3b54957821be8a361d3365dd",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/worktree/unlanded.txt": "71a8c2045c853d715c1e3f2bc57ee0b4893640ff4edbecac5029ac72ed482451",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.2i7gBU/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/task-namespace/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-provision/launch-namespace/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  }
+}
+
+Final cleanup: restored only this owned tripwire; real bin/fm-herdr-lab.sh teardown fm-lab-omp-reboot-99368-1096 returned 0; then removed the retained owned dependencies. No server was ever provisioned.

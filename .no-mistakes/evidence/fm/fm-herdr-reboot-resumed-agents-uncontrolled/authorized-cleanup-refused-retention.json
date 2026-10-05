@@ -1,0 +1,47 @@
+{
+  "scenario": "Refused fixture teardown retains dependencies and names them for manual cleanup",
+  "session": "fm-lab-omp-reboot-18559-27386",
+  "controlled_refusal": "Actual helper teardown with an empty disposable lab-state directory; true owned tripwire remains intact.",
+  "cleanup_exit": 1,
+  "original_exit": 73,
+  "owned_dependencies_before": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/wt/unlanded.txt": "7ea3dcf8aadaf51482964c26361623d03850a585172c0561fd877013d1d80a2e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/empty-session.jsonl": "4cba787ae1ed4156f1b1590464bcd84616914bc8c438fa764e0a7a65c5cb9c78",
+    "/tmp/fm-reboot-fm-omp-reboot.Bb4too/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/tmp/fm-reboot-fm-omp-reboot.Bb4too+cc2a16674ee117634821d3bec2ee04caeb6b3413edefa71efb2f2f0bfea06acc/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  },
+  "owned_dependencies_after_refusal": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/wt/unlanded.txt": "7ea3dcf8aadaf51482964c26361623d03850a585172c0561fd877013d1d80a2e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/empty-session.jsonl": "4cba787ae1ed4156f1b1590464bcd84616914bc8c438fa764e0a7a65c5cb9c78",
+    "/tmp/fm-reboot-fm-omp-reboot.Bb4too/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/tmp/fm-reboot-fm-omp-reboot.Bb4too+cc2a16674ee117634821d3bec2ee04caeb6b3413edefa71efb2f2f0bfea06acc/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  },
+  "omp_pid_before_and_after": 32393,
+  "process_after_refusal": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 32393,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/empty-session.jsonl"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/empty-session.jsonl",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too/wt",
+            "name": "omp",
+            "pid": 32393
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 21670
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "retention_report": "fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-omp-reboot-18559-27386'; refusing destructive calls\nguarded teardown failed for session 'fm-lab-omp-reboot-18559-27386'; retained resources for manual cleanup:\n  private tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Bb4too\n  task namespace: /tmp/fm-reboot-fm-omp-reboot.Bb4too\n  launch namespace: /tmp/fm-reboot-fm-omp-reboot.Bb4too+cc2a16674ee117634821d3bec2ee04caeb6b3413edefa71efb2f2f0bfea06acc\nactual refused cleanup exit=1 (original status 73)"
+}

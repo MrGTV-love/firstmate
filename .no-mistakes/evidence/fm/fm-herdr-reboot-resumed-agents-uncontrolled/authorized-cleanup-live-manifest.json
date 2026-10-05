@@ -1,0 +1,59 @@
+{
+  "phase": "Test",
+  "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "scope": "Only four authorized fixture-cleanup scenarios; no recovery/composer retesting, broad suite, lint/static checks, credential or default-session changes.",
+  "fixture_command": [
+    "bash",
+    "tests/fm-omp-reboot-live-e2e.test.sh"
+  ],
+  "environment": {
+    "FM_OMP_REBOOT_LIVE": "1",
+    "FM_TEST_SKIP_ORPHAN_REAP": "1",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp",
+    "FM_HERDR_LAB_STATE_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/lab-state",
+    "HERDR_LAB_HELPER": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+    "BASH_ENV": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/checkpoint.sh",
+    "PROOF_REFUSAL_STATE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/refusal-state"
+  },
+  "runtime_checkpoint": "Paused actual fixture before normal prepare at line 42. The mandated helper provision itself executed fresh prepare; cleanup function and source were unchanged. Actual cleanup was invoked with controlled refusal and observed filesystem/kernel outcomes, not mocked lifecycle or source assertions.",
+  "live_sessions": [
+    {
+      "mode": "refused-retention",
+      "session": "fm-lab-omp-reboot-18559-27386",
+      "omp_pid": 32393,
+      "fixture_exit": 73
+    },
+    {
+      "mode": "running-order",
+      "session": "fm-lab-omp-reboot-3310-32710",
+      "omp_pid": 15020,
+      "fixture_exit": 73
+    },
+    {
+      "mode": "stop-before-removal",
+      "session": "fm-lab-omp-reboot-72531-7379",
+      "omp_pid": 93702,
+      "fixture_exit": 73
+    }
+  ],
+  "intentional_provision_refusal_session": "fm-lab-omp-reboot-15829-20811",
+  "evidence_receipts": [
+    "authorized-cleanup-refused-retention.json",
+    "authorized-cleanup-success.json",
+    "authorized-cleanup-provision-refusal.json",
+    "authorized-cleanup-running-order.json",
+    "authorized-cleanup-stop-before-removal.json"
+  ],
+  "instrumentation_adjustments": [
+    "First DEBUG observer did not run while already paused inside DEBUG. Missing temporal evidence obtained using independent kernel/filesystem monitor; no product failure.",
+    "Real omp appended startup model/thinking records to its resume file. Original header and all static dependencies remained intact; no user/model input was submitted."
+  ],
+  "cleanup": {
+    "all_owned_sessions_guardedly_deleted": true,
+    "all_owned_tripwires_verified_and_removed": true,
+    "all_three_dependency_roots_removed_for_every_fixture": true,
+    "owned_omp_processes_stopped": true,
+    "foreign_sessions_untouched": true,
+    "throwaway_driver_removed": true
+  }
+}

@@ -1,0 +1,18 @@
+Command: FM_OMP_REBOOT_LIVE=1 TMPDIR=<worktree> FM_HERDR_LAB_STATE_DIR=<worktree> BASH_ENV=<runtime checkpoint> bash tests/fm-omp-reboot-live-e2e.test.sh
+Actual executable EXIT trap with owned worktree-local dependencies and real bin/fm-herdr-lab.sh. Fresh real prepare succeeded; an intentionally invalid owned tripwire made real provision refuse before starting a server; the original tripwire was restored. Real guarded teardown then succeeded for the unprovisioned fresh claim. No live agent was launched.
+
+Actual executable output:
+fm-herdr-lab: FLEET-STATE TRIPWIRE FAILED: default session changed during lab work
+fm-herdr-lab: before: {"controlled_invalid_tripwire":true}
+fm-herdr-lab: after:  {"name":"default","default":true,"running":true,"socket_path":"/Users/charlesabrooker/.config/herdr/herdr.sock"}
+actual guarded provision refusal status=1; owned fresh claim restored for cleanup
+actual-script cleanup checkpoint: mode=success-provision session=fm-lab-omp-reboot-1146-25072 private=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.pmSaPs task=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/success-provision/task-namespace launch=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/success-provision/launch-namespace
+
+Observed owned dependency state:
+{
+  "exit": 1,
+  "owned_private_tree_exists": false,
+  "owned_task_namespace_exists": false,
+  "owned_launch_namespace_exists": false,
+  "owned_tripwire_exists": false
+}

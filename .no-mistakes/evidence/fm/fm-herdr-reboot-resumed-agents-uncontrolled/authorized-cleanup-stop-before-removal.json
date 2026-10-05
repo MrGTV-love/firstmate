@@ -1,0 +1,82 @@
+{
+  "session": "fm-lab-omp-reboot-72531-7379",
+  "genuine_omp_before": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 93702,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/empty-session.jsonl"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/empty-session.jsonl",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/wt",
+            "name": "omp",
+            "pid": 93702
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 78466
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "observed_exit_status": 73,
+  "independent_monitor": "Kernel ps and existence of all three deletion roots sampled during actual fixture EXIT cleanup; no wrapped stop/remove commands",
+  "first_stopped_process_with_dependencies_intact": {
+    "monotonic_ns": 45597475235875,
+    "omp_process": "",
+    "dependencies_exist": {
+      "tmp": true,
+      "task": true,
+      "launch": true
+    }
+  },
+  "last_stopped_process_with_dependencies_intact": {
+    "monotonic_ns": 45598256937416,
+    "omp_process": "",
+    "dependencies_exist": {
+      "tmp": true,
+      "task": true,
+      "launch": true
+    }
+  },
+  "first_all_resources_removed": {
+    "monotonic_ns": 45598378123125,
+    "omp_process": "",
+    "dependencies_exist": {
+      "tmp": false,
+      "task": false,
+      "launch": false
+    }
+  },
+  "observed_stop_to_removal_ms": 902.88725,
+  "session_list_after": {
+    "sessions": [
+      {
+        "default": true,
+        "name": "default",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-recovery-lock-52088-5179",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-52088-5179",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-52088-5179/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-vernant-overview-81566-23025",
+        "running": false,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+      }
+    ]
+  }
+}

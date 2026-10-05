@@ -1,0 +1,137 @@
++ [[ bash == */fm-herdr-lab.sh ]]
++ [[ bash == */fm-omp-reboot-live-e2e.test.sh ]]
++ set -euo pipefail
+++ dirname tests/fm-omp-reboot-live-e2e.test.sh
++ . tests/lib.sh
+++ '[' -n '' ']'
+++ FM_TEST_LIB_SOURCED=1
+++ umask 022
++++ dirname tests/lib.sh
+++ . tests/git-config-helpers.sh
++++ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++++ GIT_CONFIG_GLOBAL=/dev/null
++++ GIT_CONFIG_NOSYSTEM=1
+++ export FM_GATE_REFUSE_BYPASS=1
+++ FM_GATE_REFUSE_BYPASS=1
+++ export FM_TEST_SEAM=1
+++ FM_TEST_SEAM=1
+++ unset FM_TASK_ID
+++ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
+++++ dirname tests/lib.sh
++++ cd tests/..
++++ pwd
+++ ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20
+++ FM_TEST_CLEANUP_DIRS=()
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-cleanup.26997.XXXXXX
+++ FM_TEST_CLEANUP_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-cleanup.26997.wmb6ho
++++ fm_test_pid_identity 26997
++++ local pid=26997
++++ FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp
++++ bash -c '. "$1"; fm_pid_identity "$2"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/bin/fm-wake-lib.sh 26997
+++ FM_TEST_OWNER_IDENTITY='Mon Oct  5 00:25:41 2026     bash -x tests/fm-omp-reboot-live-e2e.test.sh'
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-procevent.26997.XXXXXX
+++ FM_TEST_PROCEVENT_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-procevent.26997.S6ika1
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-watcher.26997.XXXXXX
+++ FM_TEST_WATCHER_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/.fm-test-watcher.26997.VZJVK9
+++ FM_TEST_STUB_MAX_BLOCK_SECONDS=120
+++ export FM_TEST_STUB_MAX_BLOCK_SECONDS
+++ trap fm_test_cleanup EXIT
+++ trap 'fm_test_cleanup; exit 130' INT
+++ trap 'fm_test_cleanup; exit 143' TERM
+++ trap 'fm_test_cleanup; exit 129' HUP
+++ trap 'fm_test_cleanup; exit 131' QUIT
+++ FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
+++ '[' 1 '!=' 1 ']'
++ fm_live_gate opt-in FM_OMP_REBOOT_LIVE herdr omp jq python3
++ local policy=opt-in vars=FM_OMP_REBOOT_LIVE
++ shift 2
++ local var value rest primary requested=0 disabled_by= tool
++ var_list=()
++ local -a var_list
++ case "$policy" in
++ rest=FM_OMP_REBOOT_LIVE
++ '[' -n FM_OMP_REBOOT_LIVE ']'
++ var=FM_OMP_REBOOT_LIVE
++ '[' FM_OMP_REBOOT_LIVE = FM_OMP_REBOOT_LIVE ']'
++ rest=
++ '[' -n FM_OMP_REBOOT_LIVE ']'
++ var_list+=("$var")
++ '[' -n '' ']'
++ '[' 1 -gt 0 ']'
++ primary=FM_OMP_REBOOT_LIVE
++ for var in '"${var_list[@]}"'
++ value=1
++ case "$value" in
++ requested=1
++ '[' 1 -eq 0 ']'
++ for tool in '"$@"'
++ command -v herdr
++ continue
++ for tool in '"$@"'
++ command -v omp
++ continue
++ for tool in '"$@"'
++ command -v jq
++ continue
++ for tool in '"$@"'
++ command -v python3
++ continue
++ export DISABLE_AUTOUPDATER=1
++ DISABLE_AUTOUPDATER=1
++ return 0
++ HELPER=/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh
+++ /Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh name omp-reboot
++ SESSION=fm-lab-omp-reboot-27353-16006
+++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.XXXXXX
++ TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY
+++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY
+++ pwd -P
++ TMP=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY
++ TASK_ID=reboot-fm-omp-reboot.ASjFJY
++ REAL_PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources
++ OWNED_TASK_TMP=
++ OWNED_LAUNCH_DIR=
++ OWNED_SESSION=0
++ trap cleanup EXIT
++ export FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20 HERDR_SESSION=fm-lab-omp-reboot-27353-16006
++ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home
++ FM_ROOT_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20
++ HERDR_SESSION=fm-lab-omp-reboot-27353-16006
++ export FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/state FM_DATA_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/data
++ FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/state
++ FM_DATA_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/data
++ export FM_CONFIG_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/config FM_PROJECTS_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/projects
++ FM_CONFIG_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/config
++ FM_PROJECTS_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/projects
++ export FM_SPAWN_NO_GUARD=1
++ FM_SPAWN_NO_GUARD=1
++ unset HERDR_PANE_ID HERDR_SOCKET_PATH HERDR_ENV TMUX TMUX_PANE FM_SPAWN_GEN
++ /Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh prepare fm-lab-omp-reboot-27353-16006
++ OWNED_SESSION=1
++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/data/reboot-fm-omp-reboot.ASjFJY /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/projects /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/fakebin
+++ cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home
+++ pwd -P
++ HOME_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home
+++ printf %s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home
+++ shasum -a 256
++ HOME_HASH='dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400  -'
++ HOME_HASH=dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400
++ TASK_TMP=/tmp/fm-reboot-fm-omp-reboot.ASjFJY
++ OWNED_TASK_TMP=/tmp/fm-reboot-fm-omp-reboot.ASjFJY
++ LAUNCH_DIR=/tmp/fm-reboot-fm-omp-reboot.ASjFJY+dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400
++ OWNED_LAUNCH_DIR=/tmp/fm-reboot-fm-omp-reboot.ASjFJY+dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400
++ META=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY/home/state/reboot-fm-omp-reboot.ASjFJY.meta
++ /Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh provision fm-lab-omp-reboot-27353-16006
+fm-herdr-lab: tripwire already exists for 'fm-lab-omp-reboot-27353-16006'; refusing ambiguous ownership
++ cleanup
++ local status=1
++ '[' 1 = 1 ']'
++ PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources
++ /Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh teardown fm-lab-omp-reboot-27353-16006
++ '[' -n /tmp/fm-reboot-fm-omp-reboot.ASjFJY ']'
++ rm -rf -- /tmp/fm-reboot-fm-omp-reboot.ASjFJY
++ '[' -n /tmp/fm-reboot-fm-omp-reboot.ASjFJY+dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400 ']'
++ rm -rf -- /tmp/fm-reboot-fm-omp-reboot.ASjFJY+dfff21a7a4629f168e2c4504623333a552ff99b5b3af6df16fbf60b9af666400
++ chmod -R u+w /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY
++ rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-live-proof/tmp/fm-omp-reboot.ASjFJY
++ exit 1

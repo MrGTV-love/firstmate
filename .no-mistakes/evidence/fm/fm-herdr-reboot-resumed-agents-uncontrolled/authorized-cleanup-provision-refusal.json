@@ -1,0 +1,68 @@
+{
+  "scenario": "Fresh-claim provision refusal follows guarded teardown resource outcome",
+  "refused_session": "fm-lab-omp-reboot-15829-20811",
+  "running_lab_context": "fm-lab-omp-reboot-3310-32710",
+  "genuine_omp_process_in_context": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 15020,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/wt",
+            "name": "omp",
+            "pid": 15020
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 6912
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "actual_helper_refusal": "tripwire already exists; refusing ambiguous ownership",
+  "fixture_exit_status": 1,
+  "guarded_teardown": "succeeded; verified unchanged running-default tripwire and released fresh claim",
+  "owned_dependency_paths": {
+    "tmp": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.yJVM6v",
+    "task": "/tmp/fm-reboot-fm-omp-reboot.yJVM6v",
+    "launch": "/tmp/fm-reboot-fm-omp-reboot.yJVM6v+3ba572e28182946f8206cbb8a6b7741317f1a603d849219bfe09322220d723df",
+    "session": "fm-lab-omp-reboot-15829-20811"
+  },
+  "dependencies_after_cleanup": {
+    "tmp": false,
+    "task": false,
+    "launch": false
+  },
+  "session_list_after": {
+    "sessions": [
+      {
+        "default": true,
+        "name": "default",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-omp-reboot-3310-32710",
+        "running": true,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-3310-32710",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-3310-32710/herdr.sock"
+      },
+      {
+        "default": false,
+        "name": "fm-lab-vernant-overview-81566-23025",
+        "running": false,
+        "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+        "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+      }
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "scenario": "Running omp retains dependencies on refusal and stops before successful removal",
+  "session": "fm-lab-omp-reboot-3310-32710",
+  "original_omp_pid": 15020,
+  "actual_refused_cleanup_exit": 1,
+  "before_refusal": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/wt/unlanded.txt": "7ea3dcf8aadaf51482964c26361623d03850a585172c0561fd877013d1d80a2e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl": "99c47cd226077267d43a1c7d80bb02fa1d19095674bebf0351464742478e1901",
+    "/tmp/fm-reboot-fm-omp-reboot.Z9drIS/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/tmp/fm-reboot-fm-omp-reboot.Z9drIS+53b7d670f1e02b96ee9f6fa27abe6787c574b56d3cc0a01810a0565e1fd2e1d4/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  },
+  "after_refusal": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/wt/unlanded.txt": "7ea3dcf8aadaf51482964c26361623d03850a585172c0561fd877013d1d80a2e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl": "c01b59a032a721e345da20c174b40f3bc312693429d97008979e4fc067c7181d",
+    "/tmp/fm-reboot-fm-omp-reboot.Z9drIS/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/tmp/fm-reboot-fm-omp-reboot.Z9drIS+53b7d670f1e02b96ee9f6fa27abe6787c574b56d3cc0a01810a0565e1fd2e1d4/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  },
+  "resume_preservation": "Original session header retained; real omp appended only startup model_change and thinking_level_change records. No input submitted.",
+  "process_after_refusal": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 15020,
+        "foreground_processes": [
+          {
+            "argv": [
+              "omp",
+              "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl"
+            ],
+            "argv0": "omp",
+            "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/empty-session.jsonl",
+            "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.Z9drIS/wt",
+            "name": "omp",
+            "pid": 15020
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 6912
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "final_cleanup_exit_preserved": 73,
+  "resources_after": {
+    "tmp": false,
+    "task": false,
+    "launch": false
+  },
+  "ordering_proof": {
+    "session": "fm-lab-omp-reboot-72531-7379",
+    "genuine_omp_before": {
+      "id": "cli:pane:process_info",
+      "result": {
+        "process_info": {
+          "foreground_process_group_id": 93702,
+          "foreground_processes": [
+            {
+              "argv": [
+                "omp",
+                "--resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/empty-session.jsonl"
+              ],
+              "argv0": "omp",
+              "cmdline": "omp --resume=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/empty-session.jsonl",
+              "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-authorized-3adbd5a7/tmp/fm-omp-reboot.AFtOsR/wt",
+              "name": "omp",
+              "pid": 93702
+            }
+          ],
+          "pane_id": "w1:p1",
+          "shell_pid": 78466
+        },
+        "type": "pane_process_info"
+      }
+    },
+    "observed_exit_status": 73,
+    "independent_monitor": "Kernel ps and existence of all three deletion roots sampled during actual fixture EXIT cleanup; no wrapped stop/remove commands",
+    "first_stopped_process_with_dependencies_intact": {
+      "monotonic_ns": 45597475235875,
+      "omp_process": "",
+      "dependencies_exist": {
+        "tmp": true,
+        "task": true,
+        "launch": true
+      }
+    },
+    "last_stopped_process_with_dependencies_intact": {
+      "monotonic_ns": 45598256937416,
+      "omp_process": "",
+      "dependencies_exist": {
+        "tmp": true,
+        "task": true,
+        "launch": true
+      }
+    },
+    "first_all_resources_removed": {
+      "monotonic_ns": 45598378123125,
+      "omp_process": "",
+      "dependencies_exist": {
+        "tmp": false,
+        "task": false,
+        "launch": false
+      }
+    },
+    "observed_stop_to_removal_ms": 902.88725,
+    "session_list_after": {
+      "sessions": [
+        {
+          "default": true,
+          "name": "default",
+          "running": true,
+          "session_dir": "/Users/charlesabrooker/.config/herdr",
+          "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+        },
+        {
+          "default": false,
+          "name": "fm-lab-recovery-lock-52088-5179",
+          "running": true,
+          "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-52088-5179",
+          "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-52088-5179/herdr.sock"
+        },
+        {
+          "default": false,
+          "name": "fm-lab-vernant-overview-81566-23025",
+          "running": false,
+          "session_dir": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025",
+          "socket_path": "/Users/charlesabrooker/.config/herdr/sessions/fm-lab-vernant-overview-81566-23025/herdr.sock"
+        }
+      ]
+    }
+  },
+  "instrumentation_note": "The inline DEBUG timing probe was suppressed inside the debugger checkpoint; the missing ordering evidence was completed with an independent process/filesystem monitor on one additional fresh owned lab, without repeating refusal or prior recovery/composer checks."
+}

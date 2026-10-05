@@ -1,0 +1,32 @@
+Command: FM_OMP_REBOOT_LIVE=1 TMPDIR=<worktree> FM_HERDR_LAB_STATE_DIR=<worktree> BASH_ENV=<runtime checkpoint> bash tests/fm-omp-reboot-live-e2e.test.sh
+Instrumentation stopped before Herdr provisioning and /tmp staging, supplied owned worktree-local dependencies, and exited 73 through the unchanged actual script cleanup. No live agent was launched.
+Controlled refusal: removed only this fresh claim's local tripwire before EXIT, so the real bin/fm-herdr-lab.sh refused teardown.
+
+Actual executable output:
+actual-script cleanup checkpoint: mode=refusal-early session=fm-lab-omp-reboot-82862-9937 private=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd task=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/task-namespace launch=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/launch-namespace
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-omp-reboot-82862-9937'; refusing destructive calls
+guarded teardown failed for session 'fm-lab-omp-reboot-82862-9937'; retained resources for manual cleanup:
+  private tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd
+  task namespace: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/task-namespace
+  launch namespace: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/launch-namespace
+
+Observed owned dependency state:
+{
+  "exit": 1,
+  "retained": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/resume.jsonl": "owned resume dependency\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/worktree/unlanded.txt": "owned unlanded work\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/home/state/sentinel": "owned home state\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/task-namespace/sentinel": "owned task staging\n",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/launch-namespace/sentinel": "owned launch staging\n"
+  },
+  "sha256": {
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/resume.jsonl": "44eabba8c20b5c72113f884ece29b43b71a2ac2f3b54957821be8a361d3365dd",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/worktree/unlanded.txt": "71a8c2045c853d715c1e3f2bc57ee0b4893640ff4edbecac5029ac72ed482451",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/tmp/fm-omp-reboot.27rpRd/home/state/sentinel": "37cec7798141ea2260446077af1be83daaa52b8c3789552eef82236d766cb0ef",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/task-namespace/sentinel": "7faceffd84b76e62a44e6754712da30c09bd85dc346815fe93cef320fe304011",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M44ESVTCBP1PB6K4SFJRCZ20/.gate-cleanup-smoke/refusal-early/launch-namespace/sentinel": "eb9ad9a82b77c4a44ec1ccc9fcf0eda9b303dd3049485758686fec848071ae5f"
+  }
+}
+
+Final cleanup: restored only this owned tripwire; real bin/fm-herdr-lab.sh teardown fm-lab-omp-reboot-82862-9937 returned 0; then removed the retained owned dependencies. No server was ever provisioned.

@@ -1,0 +1,2 @@
+fm-herdr-lab: tripwire already exists for 'fm-lab-omp-reboot-15829-20811'; refusing ambiguous ownership
+actual fresh-claim provision refusal exit=1; running context=fm-lab-omp-reboot-3310-32710

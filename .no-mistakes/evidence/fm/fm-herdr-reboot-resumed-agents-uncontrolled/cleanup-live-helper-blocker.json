@@ -1,0 +1,37 @@
+{
+  "phase": "Test",
+  "result": "blocked",
+  "required_helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "command": "FM_OMP_REBOOT_LIVE=1 FM_TEST_SKIP_ORPHAN_REAP=1 TMPDIR=<owned-worktree-proof>/tmp FM_HERDR_LAB_STATE_DIR=<owned-worktree-proof>/lab-state HERDR_LAB_HELPER=/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh bash tests/fm-omp-reboot-live-e2e.test.sh",
+  "observed_exit": 1,
+  "observed_failure": "fm-herdr-lab: tripwire already exists for 'fm-lab-omp-reboot-23082-18574'; refusing ambiguous ownership",
+  "diagnosis": "Actual fixture fresh prepare succeeded; required external helper provision then refused the already-owned tripwire. Fixture EXIT cleanup subsequently completed guarded teardown and removed private tree and both reserved staging namespaces. No server or omp was started.",
+  "missing_prerequisite": "A mandated guarded helper compatible with provision after a fresh prepare claim, or explicit authorization for a different guarded procedure. The worktree helper implements that contract, but substituting it is not authorized.",
+  "scenarios": [
+    {
+      "name": "Refused cleanup retention and path reporting",
+      "result": "untested",
+      "live": false,
+      "reason": "Required helper refuses fresh prepared ownership claim before server startup"
+    },
+    {
+      "name": "Successful cleanup and original exit status",
+      "result": "untested",
+      "live": false,
+      "reason": "Required helper refuses fresh prepared ownership claim before server startup"
+    },
+    {
+      "name": "Fresh-claim provision refusal in running lab context",
+      "result": "untested",
+      "live": false,
+      "reason": "Required helper refuses fresh prepared ownership claim before server startup"
+    },
+    {
+      "name": "Running omp retention and stopped-before-removal cleanup",
+      "result": "untested",
+      "live": false,
+      "reason": "Required helper refuses fresh prepared ownership claim before server startup"
+    }
+  ],
+  "scope": "No source changes, suite runs, linters, formatters, static analysis, fleet lifecycle actions or external configuration changes. Fresh claims and staging were cleaned by actual fixture cleanup."
+}
