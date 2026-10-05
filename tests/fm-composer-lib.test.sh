@@ -650,6 +650,64 @@ test_pi_literal_omp_floor_with_blank_continuation() {
   pass "Pi floor-looking drafts stay pending on blank continuation rows and survive extraction"
 }
 
+test_pi_nested_omp_box_preserves_enclosing_draft() {
+  local frame screen expected prefix suffix caps styled cursor row last out
+  for frame in $'╭── π > model > path ─╮\n╰─  ─╯' \
+               $'╭── π > model > path ─╮\n╰─ ⇧⇥ to change thinking effort ─╯'; do
+    for prefix in '' $'before the literal frame\n'; do
+      suffix=''
+      [ -z "$prefix" ] || suffix=$'\nafter the literal frame'
+      screen=$'────────\n'"${prefix}${frame}${suffix}"$'\n\n────────'
+      last=$(printf '%s\n' "$screen" | awk 'END {print NR - 1}')
+      expected=$(printf '%s\n' "${prefix}${frame}${suffix}" | LC_ALL=C awk '{$1=$1; printf "%s%s", sep, $0; sep=" "}')
+      for styled in 0 1; do
+        for cursor in 0 1; do
+          caps=$(printf 'styled=%s\ncursor=%s\nidentity=1' "$styled" "$cursor")
+          row=1
+          while [ "$row" -lt "$last" ]; do
+            assert_screen "nested omp-looking Pi draft, styled=$styled cursor=$cursor row=$row" \
+              pending "$caps" "$screen" "$row" $'pi\tidle'
+            assert_screen "nested Pi draft requests identity, styled=$styled cursor=$cursor row=$row" \
+              need-identity "$caps" "$screen" "$row"
+            row=$((row + 1))
+          done
+          out=$(fm_composer_extract_selected_content "$caps" "$screen")
+          [ "$out" = "$expected" ] \
+            || fail "nested Pi extraction must preserve '$expected', got '$out'"
+          out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+          [ "$out" = "$expected" ] \
+            || fail "nested Pi extraction under LC_ALL=C must preserve '$expected', got '$out'"
+        done
+        caps=$(printf 'styled=%s\ncursor=0\nidentity=0' "$styled")
+        assert_screen "nested omp-looking box without Pi identity capability" unknown "$caps" "$screen"
+      done
+      assert_screen "real omp below a Pi draft still wins" empty "$CAPS_STYLED_NOID" \
+        "$screen"$'\n╭── π > model > path ─╮\n╰─  ─╯'
+      row=2
+      [ -z "$prefix" ] || row=3
+      assert_screen "later Pi pair cannot restore an earlier nested omp proof" unknown "$CAPS_TMUX" \
+        "$screen"$'\n\n────────' "$row" $'pi\tidle'
+      assert_screen "later empty Pi pair remains the cursorless composer" empty "$CAPS_STYLED" \
+        "$screen"$'\n\n────────' '' $'pi\tidle'
+      out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$screen"$'\n\n────────')
+      [ -z "$out" ] || fail "later empty Pi composer must not extract an earlier draft, got '$out'"
+    done
+  done
+  screen=$'────────\n╭── π > model > path ─╮\n╰─ ─╯\n\n────────'
+  assert_screen "one-space nested floor remains a cursorless Pi draft" pending \
+    "$CAPS_STYLED" "$screen" '' $'pi\tidle'
+  for caps in "$CAPS_TMUX" $'styled=0\ncursor=1\nidentity=1'; do
+    out=$(fm_composer_classify_screen "$caps" "$screen" 2 $'pi\tidle')
+    [ "$out" != empty ] || fail "cursor on an unproven nested floor must never authorize injection"
+    out=$(LC_ALL=C fm_composer_classify_screen "$caps" "$screen" 2 $'pi\tidle')
+    [ "$out" != empty ] || fail "cursor on an unproven nested floor must never authorize injection under LC_ALL=C"
+    out=$(fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = '╭── π > model > path ─╮ ╰─ ─╯' ] \
+      || fail "one-space nested floor extraction lost the enclosing Pi draft: '$out'"
+  done
+  pass "nested omp-looking boxes remain Pi drafts for cursor, cursorless and extraction consumers"
+}
+
 test_matrix_pi_dollar_status_footer_is_empty() {
   # Pi's status row `$0.000 (sub) 5.4%/272k (auto)` at column 0 used to read
   # as a dead-shell prompt, so an idle separated composer classified unknown.
@@ -1069,6 +1127,7 @@ test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_pi_literal_omp_floor_with_blank_continuation
+test_pi_nested_omp_box_preserves_enclosing_draft
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border

@@ -1917,10 +1917,15 @@ All Herdr calls, including production-adapter calls through the test's session-p
 The helper's default-session tripwire remains unchanged through cleanup.
 Both replacement agents visibly answer their instructions before the test stops them.
 
+The fixture pins `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, `FM_CONFIG_OVERRIDE`, and `FM_PROJECTS_OVERRIDE` to its private home before lifecycle calls and profile setup.
+It uses an invocation-unique task identifier and exclusively reserves the task-temp and home-hashed launch namespaces; cleanup removes only successfully reserved namespaces.
+A focused live rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
+
 Observed guarantees:
 
 - The complete compact bordered composer reads empty, while real typed input reads pending.
 - Recovery refuses a pending draft without clearing or submitting it; unknown and incomplete geometry also refuse in captured-frame regressions.
+- Complete omp-looking boxes nested inside Pi composer rules remain enclosing Pi draft content, not independent proof of an empty omp composer. The focused parser regression fails before the shared ownership correction and passes afterward, covering cursor and cursorless classification, lazy identity probing, content extraction, later separator pairs, and both UTF-8 and `LC_ALL=C`.
 - The normal control-plane transaction replaces the bare-resumed task in the same pane and local copy, preserving its branch, HEAD, dirty-file checksum, recorded `openai-codex/gpt-6.1-sol` model, and `low` effort.
 - A repeated recovery sweep leaves the managed incarnation unchanged.
 - A later bare resume in the same persistent shell does **not** inherit the previous managed incarnation.

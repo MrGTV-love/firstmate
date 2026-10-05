@@ -868,6 +868,16 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         fi
         FM_COMPOSER_SCAN_PI_GLYPH_ROW=$pi_glyph_row
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
+        if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 1 ] \
+           && [ "$pi_open" -lt "$FM_COMPOSER_SCAN_BOX_TOP" ] \
+           && [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -lt "$row" ]; then
+          FM_COMPOSER_SCAN_BOX_TOP=-1
+          FM_COMPOSER_SCAN_BOX_BOTTOM=-1
+          FM_COMPOSER_SCAN_BOX_AMBIG=0
+          FM_COMPOSER_SCAN_BOX_GLYPH_ROW=-1
+          FM_COMPOSER_SCAN_BOX_GLYPH=
+          FM_COMPOSER_SCAN_BOX_OMP=0
+        fi
       fi
       pi_open=$row
       pi_lines=0
