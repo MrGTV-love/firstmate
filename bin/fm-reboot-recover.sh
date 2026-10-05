@@ -12,9 +12,9 @@
 # settings its native resume drops. Unknown proof is reported, never acted on.
 # Failed recovery is surfaced; an unbounded sweep continues inspecting records.
 # --one stops after one repair attempt. Bounded recover scans rotate after the
-# previous attempt, including a refusal, so pending input cannot starve others.
-# STATE/.reboot-recovery-cursor holds the last attempted id. It advances
-# atomically before repair, including when the caller times out during repair.
+# last selected local Herdr record, including interrupted inspections and refusals.
+# STATE/.reboot-recovery-cursor holds that id. It advances atomically before
+# backend inspection, so the next tick follows it even if inspection is interrupted.
 # Unbounded recover does not read or change that scheduling cursor.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,6 +74,14 @@ for ((offset=0; offset<count; offset++)); do
   [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
   id=${meta##*/}; id=${id%.meta}
   case "$(fm_meta_get "$meta" kind)" in ship|scout|secondmate|'') ;; *) continue ;; esac
+  if [ "$ONE" = 1 ]; then
+    tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
+    if ! printf '%s\n' "$id" > "$tmp" || ! mv -f -- "$tmp" "$cursor"; then
+      rm -f -- "$tmp"
+      echo "error: recovery scheduling cursor could not advance: $cursor" >&2
+      exit 1
+    fi
+  fi
   if ! fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null; then
     result=1
     continue
@@ -92,14 +100,6 @@ for ((offset=0; offset<count; offset++)); do
     unmanaged) ;;
     *) result=1; continue ;;
   esac
-  if [ "$ONE" = 1 ]; then
-    tmp=$(umask 077; mktemp "$STATE/.reboot-recovery-cursor.XXXXXX") || exit 1
-    if ! printf '%s\n' "$id" > "$tmp" || ! mv -f -- "$tmp" "$cursor"; then
-      rm -f -- "$tmp"
-      echo "error: recovery scheduling cursor could not advance: $cursor" >&2
-      exit 1
-    fi
-  fi
   # fm-control rechecks proof under its per-task lock and pins every recorded
   # profile axis itself, including secondmates whose current config changed.
   if out=$("$SCRIPT_DIR/fm-control.sh" "$id" relaunch --recover-launch 2>&1); then

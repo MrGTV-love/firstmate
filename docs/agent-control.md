@@ -100,7 +100,7 @@ Herdr can resume a live omp harness after reboot without the Firstmate launch co
 For this case, `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and repairs only positively unmanaged recorded `omp` agents.
 Use an explicit `FM_HOME` with `recover` to repair every eligible positively unmanaged live omp agent.
 `recover --one` bounds an automatic supervision tick to one repair attempt.
-Bounded scans advance after refused attempts, so a pending record cannot starve later recoveries.
+Bounded scans atomically persist the last selected local Herdr record in `STATE/.reboot-recovery-cursor` before backend inspection. The next tick follows that record, including after interrupted inspections, skipped or failed probes, and refused repair attempts, so a slow probe or pending record cannot starve later recoveries. Unbounded scans do not read or change this cursor.
 Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities. The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and preserves all recovery diagnostics and repair results in its wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
 Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row. Existing manual and no-backlog exemptions remain unchanged.

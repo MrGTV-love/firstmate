@@ -2289,6 +2289,11 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'agent get')
+    if [ -f "$D/recovery-inspection-interrupt" ]; then
+      : > "$D/recovery-inspection-entered"
+      kill -TERM "$(cat "$D/recovery-inspection-interrupt")"
+      exit 1
+    fi
     if [ -f "$D/herdr-agent-registration" ]; then
       cat "$D/herdr-agent-registration"
     elif [ -f "$D/herdr-live-${3:-}" ] || { [ ! -f "$D/herdr-cwd-${3:-}" ] && [ -f "$D/herdr-agent-live" ]; }; then
@@ -3436,8 +3441,73 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   pass 'bounded reboot ticks advance past pending a to recover b, preserve both copies, and wrap without replacing managed b'
 }
 
+test_bounded_reboot_recovery_advances_after_interrupted_inspection() {
+  local a b c dir id out rc before_a before_b head_b
+  local CONTROL
+  herdr_case_or_skip reboot-interrupted-a a fmlab-a || return 0
+  a=$HERDR_CASE_DIR
+  herdr_case_or_skip reboot-interrupted-b b fmlab-b || return 0
+  b=$HERDR_CASE_DIR
+  herdr_case_or_skip reboot-interrupted-c c fmlab-c || return 0
+  c=$HERDR_CASE_DIR
+  prepare_herdr_recovery "$a" a ship
+  prepare_herdr_recovery "$b" b ship
+  prepare_herdr_recovery "$c" c ship
+  mkdir -p "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
+  for id in a c; do
+    dir=$a
+    [ "$id" != c ] || dir=$c
+    [ "$id" != a ] || printf 2000000001 > "$dir/fake/recovery-pid"
+    [ "$id" != c ] || printf 2000000002 > "$dir/fake/recovery-pid"
+    cp "$dir/home/state/$id.meta" "$b/home/state/$id.meta"
+    mkdir -p "$b/home/data/$id"
+    cp "$dir/home/data/$id/brief.md" "$b/home/data/$id/brief.md"
+    printf '%s\n' "$dir/fake" > "$b/fake/herdr-sessions/fmlab-$id"
+    printf '%s\n' "$dir/fake" > "$b/fake/herdr-pids/$(cat "$dir/fake/recovery-pid")"
+  done
+  before_a=$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")
+  before_b=$(shasum -a 256 "$b/wt/unlanded.txt")
+  head_b=$(git -C "$b/wt" rev-parse HEAD)
+  cat > "$b/fakebin/interrupt-recovery" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$\$" > "$a/fake/recovery-inspection-interrupt"
+exec "$ROOT/bin/fm-reboot-recover.sh" "\$@"
+SH
+  chmod +x "$b/fakebin/interrupt-recovery"
+  CONTROL="$b/fakebin/interrupt-recovery"
+  rc=0
+  out=$(run_control "$b" recover --one) || rc=$?
+  expect_code 143 "$rc" "the first bounded tick must be interrupted at its early agent-state probe"$'\n'"$out"
+  assert_present "$a/fake/recovery-inspection-entered" "interruption never reached the early probe"
+  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = a ] || fail 'interrupted inspection did not persist a'
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")" ] \
+    || fail 'interrupted inspection changed a or its work'
+  assert_present "$a/fake/herdr-agent-live" "interrupted inspection stopped a"
+  assert_absent "$b/home/state/a.control-relaunch" "interrupted inspection began a repair"
+  assert_absent "$a/fake/launched-command" "interrupted inspection replaced a"
+  assert_not_contains "$(cat "$a/fake/herdr-log")" "pane send-" "interrupted inspection sent lifecycle input"
+  [ "$(meta_field "$b" b spawn_gen)" = old ] || fail 'interrupted tick repaired b'
+  CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+  rc=0
+  out=$(run_control "$b" recover --one) || rc=$?
+  expect_code 0 "$rc" "the next bounded tick must recover b without reentering a"$'\n'"$out"
+  [ "$(journal_field "$b" b phase)" = complete ] || fail 'later bare omp b was not repaired'
+  [ "$(meta_field "$b" b spawn_gen)" != old ] || fail 'b retained its bare incarnation'
+  [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = b ] || fail 'the second tick advanced beyond its one repair'
+  [ "$(meta_field "$b" c spawn_gen)" = old ] || fail 'one bounded tick repaired c too'
+  assert_absent "$b/home/state/c.control-relaunch" "one bounded tick attempted c too"
+  [ "$before_a" = "$(shasum -a 256 "$b/home/state/a.meta" "$b/home/data/a/brief.md" "$a/wt/unlanded.txt")" ] \
+    || fail 'the next tick changed interrupted a'
+  [ "$(meta_field "$b" b window)" = 'fmlab-b:%7' ] || fail 'b repair moved its endpoint'
+  [ "$(meta_field "$b" b worktree)" = "$b/wt" ] || fail 'b repair moved its local copy'
+  [ "$(git -C "$b/wt" rev-parse HEAD)" = "$head_b" ] \
+    && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b repair changed preserved work'
+  pass 'bounded recovery persists early inspection progress before interruption and repairs only the later bare omp next tick'
+}
+
 
 test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal
+test_bounded_reboot_recovery_advances_after_interrupted_inspection
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

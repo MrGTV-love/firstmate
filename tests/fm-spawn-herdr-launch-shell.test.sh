@@ -7,7 +7,7 @@ TMP_ROOT=$(fm_test_tmproot fm-spawn-herdr-shell)
 SPAWN_TMP_DIRS=()
 cleanup() {
   local dir
-  for dir in "${SPAWN_TMP_DIRS[@]}"; do rm -rf -- "$dir"; done
+  for dir in ${SPAWN_TMP_DIRS[@]+"${SPAWN_TMP_DIRS[@]}"}; do rm -rf -- "$dir"; done
   fm_test_cleanup
 }
 trap cleanup EXIT
@@ -18,14 +18,29 @@ PYTHON_BIN=$(command -v python3)
 ZSH_BIN=$(command -v zsh || true)
 
 make_case() {
-  local name=$1 kind=$2
+  local name=$1 kind=$2 task_tmp home_root home_hash launch_dir
   CASE_DIR="$TMP_ROOT/$name"
   HOME_DIR="$CASE_DIR/home"
   PROJ_DIR="$CASE_DIR/project"
   WT_DIR="$CASE_DIR/wt"
   ID="shell-$name-$$"
+  task_tmp="/tmp/fm-$ID"
+  if (umask 077 && mkdir "$task_tmp") 2>/dev/null; then
+    SPAWN_TMP_DIRS+=("$task_tmp")
+  else
+    fail "refusing preexisting or unavailable task temp namespace $task_tmp"
+  fi
   FAKEBIN=$(fm_test_make_spawn_fakebin "$CASE_DIR/fake" gh gh-axi)
   fm_test_spawn_home "$HOME_DIR" codex
+  home_root=$(cd "$HOME_DIR" && pwd -P)
+  home_hash=$(printf '%s' "$home_root" | shasum -a 256)
+  home_hash=${home_hash%% *}
+  launch_dir="/tmp/fm-$ID+$home_hash"
+  if (umask 077 && mkdir "$launch_dir") 2>/dev/null; then
+    SPAWN_TMP_DIRS+=("$launch_dir")
+  else
+    fail "refusing preexisting or unavailable launch namespace $launch_dir"
+  fi
   printf 'off\n' > "$HOME_DIR/config/herdr-presentation-spaces"
   fm_git_worktree "$PROJ_DIR" "$WT_DIR" "task-$name"
   fm_test_spawn_brief "$HOME_DIR" "$ID"
@@ -56,8 +71,6 @@ case "${1:-} ${2:-}" in
     printf '%s\n' "${4:-}" >> "$D/pane-input.sh"
     case "${4:-}" in
       ". '"*"'")
-        staged=${4#". '"}; staged=${staged%"'"}
-        printf '%s\n' "$staged" >> "$D/staged-paths"
         printf '%s\n' "${4:-}" >> "$D/source-lines" ;;
     esac ;;
   *) : ;;
@@ -89,7 +102,6 @@ PY
 run_spawn() {
   local kind=$1 raw=$2 out status=0
   shift 2
-  SPAWN_TMP_DIRS+=("/tmp/fm-$ID")
   if [ "$kind" = secondmate ]; then
     mkdir -p "$HOME_DIR/user-home"
     out=$(FM_FAKE_DIR="$CASE_DIR" FM_ROOT_OVERRIDE="$PROJ_DIR" \
@@ -108,10 +120,6 @@ run_spawn() {
   else
     out=$(FM_FAKE_DIR="$CASE_DIR" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" \
       "$ID" "$PROJ_DIR" --mode local-only --yolo off --backend herdr --harness "$raw" "$@") || status=$?
-  fi
-  if [ -f "$CASE_DIR/staged-paths" ]; then
-    local staged
-    while IFS= read -r staged; do SPAWN_TMP_DIRS+=("${staged%/*}"); done < "$CASE_DIR/staged-paths"
   fi
   expect_code 0 "$status" "$kind spawn should succeed: $out"
   [ -s "$CASE_DIR/source-lines" ] || fail "$kind must deliver a staged source line"
