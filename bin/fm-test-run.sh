@@ -1509,6 +1509,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-omp-harness.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)

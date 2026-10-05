@@ -68,6 +68,10 @@ fm_dispatch_capacity() {
     omp:openai-codex/*) fm_omp_codex_capacity "$model"; return ;;
     claude:*)
       config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
+      if [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; then
+        printf '%s\n' '{"status":"unknown","reason":"TeamClaude proxy quota has no established default-account mapping"}'
+        return
+      fi
       if [ -e "$config/claude-account" ]; then
         printf '%s\n' '{"status":"unknown","reason":"Claude account pin has no established quota mapping"}'
         return

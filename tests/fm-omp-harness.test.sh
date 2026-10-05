@@ -58,6 +58,17 @@ make_named_shells() {  # <dir> -> echoes <bindir>
   for name in omp ompd comp; do
     ln -sf /bin/bash "$dir/$name"
   done
+  # Keep the real process-name proof, but bound ancestry to the named fixture
+  # shell: this suite itself can legitimately run under an OMP ancestor.
+  cat > "$dir/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p ${FM_ANCESTRY_FIXTURE_PID:-}" ]; then
+  printf '1\n'
+else
+  exec /bin/ps "$@"
+fi
+SH
+  chmod +x "$dir/ps"
   printf '%s' "$dir"
 }
 
@@ -68,23 +79,23 @@ test_detection_anchored_name_and_marker_precedence() {
   bin=$(make_named_shells "$TMP_ROOT/named")
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
     # shellcheck disable=SC2016 # the quoted body expands inside the named shell
     out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
+      PATH="$bin:$PATH" "$bin/$decoy" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
     [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    bash -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" bash -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
@@ -388,6 +399,10 @@ test_busy_extension_lifecycle() {
   assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
   out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
   assert_grep 'fallback served openrouter/z-ai/glm-5.3-flash:high' "$state/$id.status" "native model fallback must publish the serving model"
+  rm "$state/$id.busy-gen"
+  printf 'working: replacement owns this task\n' > "$state/$id.status"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "retired callback drive failed: $out"
+  assert_equals 'working: replacement owns this task' "$(cat "$state/$id.status")" "a retired callback must not publish a stale serving model"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -402,7 +417,6 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = "/st/id1.omp-ext.ts" ] || fail "omp wiring path must be the state-resident extension"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"

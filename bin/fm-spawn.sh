@@ -230,6 +230,10 @@
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
+#   Crewmates and scouts also receive eager native account rotation without
+#   waiting for usage resets and a task-owned --config overlay permitting only
+#   declared OMP model fallbacks, with an empty default chain so ambient role
+#   chains cannot weaken the assigned model.
 #   A non-index-entry literal <provider>/<id> is validated against
 #   `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
@@ -415,7 +419,7 @@
 #                  turn-end extension, written by this script; outside the worktree so
 #                  omp's cwd-only auto-discovery cannot load it a second time)
 #     __OMPSESSIONCFG__ absolute path to the tracked .omp/fm-session-overlay.yml posture overlay
-#     __OMPWORKERCFG__ absolute path to the tracked .omp/fm-worker-overlay.yml memory overlay
+#     __OMPWORKERCFG__ quoted --config arguments for worker memory and task-owned model policy
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
 #     __BRIEFDOORBELL__ quoted printable doorbell naming the launch-brief record this
 #                  script published into the receiving home's operational inbox
@@ -4954,10 +4958,12 @@ EOF
     jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$DISPATCH_FALLBACK" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
       ([$fallback[] | select(.harness == "omp" and .model != $model) | effort_key(.model; .effort)]) as $chain |
-      {retry: {modelFallback: (($chain | length) > 0), fallbackChains:
+      {retry: {modelFallback: ($model | contains("/")), fallbackChains:
         (reduce ([{model:$model, effort:$effort}] + [$fallback[] | select(.harness == "omp")])[] as $p
-          ({default: []}; .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [])
-         | .[$model] = $chain | .[effort_key($model; $effort)] = $chain)}}}
+          ({default: []}; if ($p.model | contains("/")) then
+            .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
+         | if ($model | contains("/")) then
+             .[$model] = $chain | .[effort_key($model; $effort)] = $chain else . end)}}
     ' > "$STATE/$ID.omp-fallback.yml" || exit 1
     chmod 600 "$STATE/$ID.omp-fallback.yml" || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
@@ -4994,7 +5000,12 @@ export default function (pi: any) {
   });
   pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
   pi.on("retry_fallback_succeeded", (event: any) => {
-    if (readFileSync("$STATE_REAL/$ID.busy-gen", "utf8").trim() !== "$BUSY_GEN") return;
+    try {
+      if (readFileSync("$STATE_REAL/$ID.busy-gen", "utf8").trim() !== "$BUSY_GEN") return;
+    } catch (error: any) {
+      if (error?.code === "ENOENT") return;
+      throw error;
+    }
     const model = String(event.model ?? "").replace(/[\\r\\n\\t]/g, " ");
     appendFileSync("$STATE_REAL/$ID.status",
       "working [at=" + Math.floor(Date.now() / 1000) + "]: model-matrix fallback served " + model + "\\n");
@@ -5210,7 +5221,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort dispatch_rule account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
