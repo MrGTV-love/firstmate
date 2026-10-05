@@ -171,7 +171,11 @@ case "${1:-}" in
         *pane_current_path*)
           if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ] && [ ! -e "$FM_FAKE_CWD_RACE_READY" ]; then
             : > "$FM_FAKE_CWD_RACE_READY"
-            /bin/sleep 1
+            deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+            while [ ! -e "$FM_FAKE_CWD_RACE_RELEASE" ]; do
+              [ "$SECONDS" -lt "$deadline" ] || exit 1
+              /bin/sleep 0.05
+            done
           fi
           cat "$D/cwd"; printf '\n'; exit 0 ;;
       esac
@@ -1774,26 +1778,29 @@ test_launch_failure_keeps_the_prior_record_and_reports_it() {
 }
 
 test_prepublication_failure_keeps_concurrent_durable_metadata() {
-  local dir control_pid link_out rc i=0
+  local dir control_pid link_out rc deadline
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
   FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
+    FM_FAKE_CWD_RACE_RELEASE="$dir/cwd-race-release" \
     run_control "$dir" rl30 relaunch --harness codex --note "preserve concurrent metadata" \
       > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$dir/cwd-race-ready" ] && [ "$i" -lt 200 ]; do
-    /bin/sleep 0.01
-    i=$((i + 1))
+  deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while [ ! -e "$dir/cwd-race-ready" ] && [ "$SECONDS" -lt "$deadline" ] && kill -0 "$control_pid" 2>/dev/null; do
+    /bin/sleep 0.05
   done
   [ -e "$dir/cwd-race-ready" ] || {
+    : > "$dir/cwd-race-release"
     kill "$control_pid" 2>/dev/null || true
     wait "$control_pid" 2>/dev/null || true
-    fail "relaunch did not reach its pre-publication endpoint check"
+    fail "relaunch did not reach its pre-publication endpoint check: $(cat "$dir/control.out")"
   }
   link_out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 2>&1); rc=$?
+  : > "$dir/cwd-race-release"
   expect_code 0 "$rc" "concurrent durable metadata publication should succeed"$'\n'"$link_out"
   wait "$control_pid"; rc=$?
   expect_code 1 "$rc" "the staged pre-publication launch failure should fail closed"
