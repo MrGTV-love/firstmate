@@ -107,18 +107,43 @@ fi
 HOME_CATALOG="$FM_HOME/.agents/skills"
 [ ! -d "$HOME_CATALOG" ] || HOME_CATALOG=$(cd "$HOME_CATALOG" && pwd -P) || fallback fallback "home catalog unavailable"
 : > "$WORK/identities"
-for file in "$CATALOG"/*/SKILL.md "$HOME_CATALOG"/*/SKILL.md; do
-  [ -f "$file" ] || continue
-  dd if="$file" bs=524288 count=1 2>/dev/null |
-    awk 'NR == 1 { if ($0 !~ /^---\r?$/) exit; print; next } { print; if ($0 ~ /^---\r?$/) exit }' |
-    jq -eRsc --arg mode identity --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" >> "$WORK/identities" 2>/dev/null || :
+: > "$WORK/public-paths"
+DISCOVERY_FAILED=false
+DISCOVERY_ROOTS=("$CATALOG")
+[ "$HOME_CATALOG" = "$CATALOG" ] || DISCOVERY_ROOTS+=("$HOME_CATALOG")
+for root in "${DISCOVERY_ROOTS[@]}"; do
+  for file in "$root"/*/SKILL.md; do
+    [ -f "$file" ] || continue
+    public=false
+    if [ ! -L "$file" ] && git --literal-pathspecs -C "$root" ls-files --error-unmatch -- "${file#"$root"/}" >/dev/null 2>&1; then
+      public=true
+      jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
+    fi
+    dd if="$file" bs=524288 count=1 2>/dev/null |
+      awk 'NR == 1 { if ($0 !~ /^---\r?$/) exit; print; next } { print; if ($0 ~ /^---\r?$/) exit }' |
+      jq -eRsc --arg mode identity --arg path "$file" --arg root "$root" --argjson public "$public" -f "$SCRIPT_DIR/fm-skill-catalog.jq" >> "$WORK/identities" 2>/dev/null || DISCOVERY_FAILED=true
+  done
 done
-jq -sc 'unique_by(.path) | group_by(.id) | map({id:.[0].id,path:(if length == 1 then .[0].path else null end)})' "$WORK/identities" > "$WORK/names"
+jq -sc --arg catalog "$CATALOG" '
+  group_by(.id)[] |
+  if length == 1 then {id:.[0].id,path:.[0].path}
+  elif all(.[]; .public) and (map(.root) | length == (unique | length)) then
+    sort_by(.root != $catalog) | {id:.[0].id,path:.[0].path,copy:.[1].path}
+  else {id:.[0].id,path:null} end' "$WORK/identities" > "$WORK/name-candidates"
+jq -sc 'map(del(.copy))' "$WORK/name-candidates" > "$WORK/names"
+while IFS= read -r name; do
+  path=$(jq -r '.path' <<<"$name")
+  copy=$(jq -r '.copy' <<<"$name")
+  if ! cmp -s "$path" "$copy"; then
+    jq --arg path "$path" 'map(if .path == $path then .path=null else . end)' "$WORK/names" > "$WORK/resolved-names"
+    mv "$WORK/resolved-names" "$WORK/names"
+  fi
+done < <(jq -c 'select(has("copy"))' "$WORK/name-candidates")
 REQ_IDS=$(jq -c --rawfile task "$WORK/task" --argjson required "$REQ_IDS" '$required + [.[] | .id as $id | select($task | test("(^|[^A-Za-z0-9_-])" + $id + "([^A-Za-z0-9_-]|$)")) | .id] | unique' "$WORK/names")
 RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{status:"fallback",reason:"ordinary selection",uncertain:true,required:[$required[] | . as $id | {id:$id,path:([$names[0][] | select(.id == $id) | .path][0] // null)}],suggestions:[]}')
+[ "$DISCOVERY_FAILED" = false ] || fallback fallback "unsupported skill metadata"
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 : > "$WORK/rows"
-: > "$WORK/public-paths"
 COUNT=0
 for file in "$CATALOG"/*/SKILL.md; do
   [ -f "$file" ] || continue
@@ -128,9 +153,6 @@ for file in "$CATALOG"/*/SKILL.md; do
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
   jq -eRsc --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
-  if [ ! -L "$file" ] && git --literal-pathspecs -C "$CATALOG" ls-files --error-unmatch -- "${file#"$CATALOG"/}" >/dev/null 2>&1; then
-    jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
-  fi
 done
 [ "$COUNT" -gt 0 ] || fallback fallback "empty catalog"
 jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"

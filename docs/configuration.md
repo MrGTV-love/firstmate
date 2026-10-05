@@ -1433,6 +1433,7 @@ All existing mandatory explicit/named and safety triggers run first and cannot b
 Caller-supplied required IDs and locally resolvable named IDs are reported separately from optional suggestions and survive invalid or unavailable catalogs, with unresolved paths left for ordinary skill-index lookup; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
 Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
 LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts.
+Supported name scalars ignore surrounding syntax spaces and tabs without altering quoted contents.
 
 Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
 Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
@@ -1440,6 +1441,9 @@ Ambiguous shortlists receive a second evaluation using at most three bounded ope
 Paths remain local; the judge does not receive the catalog's full instruction bodies.
 TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
 Local discovery and required-trigger handling include private skills from both the selected catalog and the active Firstmate home, even when that home differs from the code root; if the task summary names one, the request is withheld rather than rewriting that summary.
+Incomplete local identity discovery withholds requests while preserving caller-required IDs and other recognized named requirements.
+Git-tracked, non-symlink home entries are classified as public independently of the selected remote catalog; home-only entries do not enlarge that catalog.
+Byte-identical public copies across the selected catalog and a distinct active home resolve to the selected catalog's path, while differing or private copies remain ambiguous.
 Catalogs without verifiable Git tracking remain local.
 Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
 Each invocation evaluates the current task and public catalog with live, bounded requests; advice is not persisted or reused.

@@ -7,10 +7,10 @@ def scalar:
   else error("unsupported frontmatter scalar") end;
 gsub("\r\n"; "\n")
 | capture("\\A---\\r?\\n(?<meta>[\\s\\S]*?)\\r?\\n---\\r?\\n(?<body>[\\s\\S]*)\\z") as $file
-| ($file.meta | [scan("(?m)^name:[ \\t]*([^\\r\\n]+)$")] | if length == 1 then .[0][0] | scalar else error("ambiguous skill name") end) as $id
+| ($file.meta | [scan("(?m)^name:[ \\t]*([^\\r\\n]+)$")] | if length == 1 then .[0][0] | sub("[ \\t]+$"; "") | scalar else error("ambiguous skill name") end) as $id
 | if ($id | type) != "string" then error("invalid skill name")
   elif ($id | test("^[a-z0-9]+(-[a-z0-9]+)*$") | not) then error("invalid skill name")
-  elif $ARGS.named.mode == "identity" then {id:$id,path:$path}
+  elif $ARGS.named.mode == "identity" then {id:$id,path:$path,root:$ARGS.named.root,public:$ARGS.named.public}
   else
   ($file.meta + "\n" | capture("(?m)^description:[ \\t]*(?<value>[^\\r\\n]*)\\r?\\n(?<continuation>(?:(?:[ \\t]*\\r?\\n)*[ \\t]+[^\\r\\n]*\\r?\\n)*)")) as $description
 | ($description.value | sub("[ \\t]+$"; "")) as $value
