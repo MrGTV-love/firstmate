@@ -5323,9 +5323,8 @@ if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
 fi
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
 if [ "$BACKEND" = herdr ]; then
-  # Keep the incarnation out of the persistent pane shell. Set it at exec,
-  # where kernel environment readers can also prove an interpreter launcher.
-  LAUNCH="/usr/bin/env FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN") /bin/sh -c $(shell_quote "$LAUNCH")"
+  LAUNCH="(export FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN"); $LAUNCH
+)"
 fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's

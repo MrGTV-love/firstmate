@@ -118,6 +118,9 @@ An already managed agent is left alone, including on repeated sweeps.
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
+The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
+An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
+`tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
 Readable kernel environment with a matching incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses.
 A readable environment with a missing or mismatched incarnation proves unmanaged only for an exact recorded `harness=omp` whose foreground process is independently attributed to omp through the shared process and path identity helpers.
