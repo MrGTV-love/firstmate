@@ -1,0 +1,344 @@
+{
+  "generatedAt": "2026-10-05T17:13:37.333Z",
+  "schemaVersion": 5,
+  "providers": [
+    {
+      "provider": "claude",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "codex",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "cursor",
+      "windows": [
+        {
+          "id": "included_usage",
+          "label": "Monthly",
+          "kind": "monthly",
+          "percentRemaining": 90,
+          "resetsAt": "2026-11-02T17:12:25.528070+00:00",
+          "pace": {
+            "status": "ahead",
+            "reservePercentPoints": -3.3306,
+            "burnMultiple": 1.4994
+          }
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-05T17:12:25.528070+00:00",
+        "reused": true
+      },
+      "quotaSemantics": {
+        "status": "known",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 90,
+            "boundedBy": [
+              "included_usage"
+            ],
+            "limitingWindowIds": [
+              "included_usage"
+            ],
+            "pace": {
+              "status": "ahead",
+              "aheadWindowIds": [
+                "included_usage"
+              ],
+              "worstReservePercentPoints": -3.3306,
+              "worstReserveWindowId": "included_usage"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 1555846,
+              "projectedExhaustedAt": "2026-10-23T17:24:23.578Z",
+              "limitingWindowId": "included_usage",
+              "projectionConfidence": "early"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": -0.5351
+            }
+          }
+        ]
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "copilot",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "grok",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "kimi",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "zai",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "agy",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "alibaba",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "opencode-go",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "commandcode",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "minimax",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "mimo",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "deepseek",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "openrouter",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "elevenlabs",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "devin",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "muse",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "not_in_snapshot"
+      },
+      "quotaSemantics": {
+        "status": "unknown",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    }
+  ]
+}

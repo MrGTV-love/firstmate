@@ -1,0 +1,802 @@
+LIVE RESOLVER VALIDATION
+
+{
+  "product": "Unmodified bin/fm-dispatch-resolve.sh at target worktree; real Bash 3.2 and disposable source-built Bash 5.3",
+  "transport": "Real /usr/bin/curl sends the unchanged HTTPS endpoint through --connect-to to a trusted local TLS fixture; adapter preserves fd 3. API responses are disposable test data, not live Jev inference.",
+  "quota": "Real installed quota-axi consumes its supported QUOTA_AXI_SNAPSHOT cache-format fixture; snapshot mode never falls through to vendor credentials. Adapter adds 650ms only before non-version reads.",
+  "synthetic_private_data": "Only synthetic key/private brief sentinels; actual operator state and credentials were not read.",
+  "setup_corrections": [
+    "Initial Python transport adapter did not preserve inherited fd 3; fixed pass_fds=(3,) before successful live drive.",
+    "Cost assertion changed to numeric comparison because real CLI emits scientific notation.",
+    "Perl execution detector checked by byte size, with a Bash 3.2 positive control."
+  ],
+  "assertions": "All recorded successful drives checked exit 0, secret omission, actual curl time_total/API-ms identity and latency alias, additive nonnegative stage accounting where both stages ran, and clean child environments."
+}
+
+=== bash32-success-timing-cost ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=2708
+stdout:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 365   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.534  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1556834 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=365 quota_ms=1058 local_ms=1086 total_ms=2509
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.365457",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== missing-usage-remains-unknown ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3289
+stdout:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 363   tokens: -/-
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5337  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557149 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=363 quota_ms=1742 local_ms=1034 total_ms=3139
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.363991",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== invalid-numeric-usage-not-priced ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=2629
+stdout:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 363   tokens: -1/2.5
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5337  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557172 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=363 quota_ms=1250 local_ms=847 total_ms=2460
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.363077",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-success-1 ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=4067
+stdout:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 420   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5337  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557210 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=420 quota_ms=1464 local_ms=2001 total_ms=3885
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.420113",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-success-2 ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3757
+stdout:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 380   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5336  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557242 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=380 quota_ms=1892 local_ms=1385 total_ms=3657
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.380281",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-success-3 ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3464
+stdout:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 370   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5336  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557272 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=370 quota_ms=1524 local_ms=1386 total_ms=3280
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.370169",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-success-4 ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3637
+stdout:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 376   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5336  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557308 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=376 quota_ms=1073 local_ms=2007 total_ms=3456
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.376655",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-success-5 ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=1847
+stdout:
+dispatch-resolve:
+  status: clear
+  model: -   latency_ms: 362   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5336  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557325 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=362 quota_ms=1032 local_ms=416 total_ms=1810
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.362276",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== paid-call-retains-cost-on-real-quota-error ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=2207
+stdout:
+dispatch-resolve:
+  status: error
+  reason: quota-axi --json failed
+  timings: api_ms=367 quota_ms=1327 local_ms=451 total_ms=2145
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+dispatch-resolve: error (quota-axi --json failed)
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.367784",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== untrusted-model-quota-error ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3536
+stdout:
+dispatch-resolve:
+  status: error
+  reason: quota-axi --json failed
+  timings: api_ms=360 quota_ms=1642 local_ms=1391 total_ms=3393
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (quota-axi --json failed)
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.360420",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== http-error-redacts-raw-secret-body ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=854
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 503 after 361 ms
+  timings: api_ms=361 quota_ms=null local_ms=411 total_ms=772
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 503 after 361 ms)
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "503 0.361707",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== malformed-success-response-redacts-sensitive-text ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=1047
+stdout:
+dispatch-resolve:
+  status: error
+  reason: response is not a rule Choice answer
+  timings: api_ms=365 quota_ms=null local_ms=628 total_ms=993
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (response is not a rule Choice answer)
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.365867",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== actual-curl-timeout-keeps-intake-nonblocking ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=6113
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 000 after 5173 ms
+  timings: api_ms=5173 quota_ms=null local_ms=717 total_ms=5890
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 000 after 5173 ms)
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "000 5.173300",
+      "rc": 28,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== low-confidence-keeps-ambiguous-routing-with-telemetry ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=5275
+stdout:
+dispatch-resolve:
+  status: ambiguous
+  model: jev-1.13.0   latency_ms: 397   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.5
+  probabilities: rule_1=0.96 default=0.04
+  reason: confidence 0.5 below floor 0.6
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5331  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557848 projectionConfidence=early)]
+  timings: api_ms=397 quota_ms=1908 local_ms=2094 total_ms=4399
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.397248",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== captain-approval-keeps-escalation-with-telemetry ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=2823
+stdout:
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 352   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  reason: rule requires the captain's explicit approval before dispatch
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.533  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1557873 projectionConfidence=early)]
+  timings: api_ms=352 quota_ms=1661 local_ms=744 total_ms=2757
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.352007",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== absent-key-is-silent-and-makes-no-calls ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=42
+stdout:
+
+stderr:
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/home/.env)
+
+Actual curl/real quota observations:
+{
+  "curl": [],
+  "quota_calls": [],
+  "server_requests": []
+}
+
+=== never-send-still-blocks-before-network ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=370
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/home/config/dispatch-never-send line 1; nothing sent)
+
+Actual curl/real quota observations:
+{
+  "curl": [],
+  "quota_calls": [],
+  "server_requests": []
+}
+
+=== no-rules-keeps-minimal-output-without-telemetry ===
+$ /bin/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=157
+stdout:
+dispatch-resolve:
+  status: escalate
+  reason: no rules to match
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [],
+  "quota_calls": [],
+  "server_requests": []
+}
+
+=== bash53-resolver-uses-no-perl ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/bash-5.3/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=2326
+stdout:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 379   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5323  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1558642 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=379 quota_ms=1305 local_ms=614 total_ms=2298
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.379660",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== bash53-full-resolver-no-perl-byte-proof ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/bash-5.3/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation
+exit=0 wall_ms=3277
+stdout:
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 369   tokens: 812/60
+  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9
+  probabilities: rule_1=0.96 default=0.04
+  note: rule matched
+  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5319  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1558935 projectionConfidence=early)]
+  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'
+  timings: api_ms=369 quota_ms=1490 local_ms=1356 total_ms=3215
+  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+
+stderr:
+
+Actual curl/real quota observations:
+{
+  "curl": [
+    {
+      "write_out": "200 0.369312",
+      "rc": 0,
+      "key_on_argv": false,
+      "secret_exported": false
+    }
+  ],
+  "quota_calls": [
+    "--version",
+    "--json"
+  ],
+  "server_requests": [
+    {
+      "path": "/v1/systemone",
+      "model": "jev-latest",
+      "choices": [
+        "default",
+        "rule_1"
+      ],
+      "synthetic_authorization_received": true,
+      "private_task_received": true
+    }
+  ]
+}
+
+=== Corrected fixture setup (not a product failure) ===
+[
+  "Initial Python transport adapter did not preserve inherited fd 3; fixed pass_fds=(3,) before successful live drive.",
+  "Cost assertion changed to numeric comparison because real CLI emits scientific notation.",
+  "Perl execution detector checked by byte size, with a Bash 3.2 positive control."
+]

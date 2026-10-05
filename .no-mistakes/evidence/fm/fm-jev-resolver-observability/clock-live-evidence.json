@@ -1,0 +1,74 @@
+{
+  "clock_runs": [
+    {
+      "shell": "/bin/bash",
+      "rc": 0,
+      "stdout": "bash=3.2.57(1)-release builtin_epoch=absent\nstart_ms=1791220724329 end_ms=1791220724627 elapsed_ms=298\nconvert_dot=211\nconvert_comma=211\nTIMINGS - where the deferred network checks spent their time (ms):\n  resolver    clock live                                 start=+16      elapsed=217\n  slowest: resolver clock live 217ms\n",
+      "stderr": ""
+    },
+    {
+      "shell": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/bash-5.3/bash",
+      "rc": 0,
+      "stdout": "bash=5.3.0(1)-release builtin_epoch=1791220725.119055\nstart_ms=1791220725120 end_ms=1791220725402 elapsed_ms=282\nconvert_dot=211\nconvert_comma=211\nTIMINGS - where the deferred network checks spent their time (ms):\n  resolver    clock live                                 start=+2       elapsed=204\n  slowest: resolver clock live 204ms\n",
+      "stderr": ""
+    }
+  ],
+  "cross_shell": {
+    "origin_ms": "1791220725640",
+    "stdout": "TIMINGS - where the deferred network checks spent their time (ms):\n  resolver    cross-shell propagated                     start=+31      elapsed=231\n  slowest: resolver cross-shell propagated 231ms\n",
+    "record": [
+      "v1",
+      "resolver",
+      "cross-shell",
+      "31",
+      "231",
+      "propagated"
+    ],
+    "rc": 0
+  },
+  "perl_execution_detector": {
+    "bash53": {
+      "stdout": "bash=5.3.0(1)-release builtin_epoch=1791220757.464710\n1791220757464\n1791220757464\n1791220757464\n",
+      "rc": 0,
+      "perl_log_bytes_before": 49,
+      "perl_log_bytes_after": 49
+    },
+    "bash32_stamp": "1791220760858",
+    "bytes_before_bash32": 49,
+    "bytes_after_bash32": 56
+  },
+  "bash53_full_resolver": {
+    "name": "bash53-full-resolver-no-perl-byte-proof",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M46EVPM60MRF5S8QWSEQD1ME/.live-resolver-2fqrwxc4/bash-5.3/bash bin/fm-dispatch-resolve.sh <disposable brief> --project isolated-live-validation",
+    "rc": 0,
+    "wall_ms": 3277,
+    "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1.13.0   latency_ms: 369   tokens: 812/60\n  rule: rule_1 (Routine bug fix with known root cause)   confidence: 0.9\n  probabilities: rule_1=0.96 default=0.04\n  note: rule matched\n  candidate: cursor:cursor-grok-4.6-medium  provider=cursor  scope=all_models  remaining=90%  spendPriority=-0.5319  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=1558935 projectionConfidence=early)]\n  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'\n  timings: api_ms=369 quota_ms=1490 local_ms=1356 total_ms=3215\n  usage: input_tokens=812 output_tokens=60 jev_cost_usd=3.4104e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0\n",
+    "stderr": "",
+    "curl": [
+      {
+        "write_out": "200 0.369312",
+        "rc": 0,
+        "key_on_argv": false,
+        "secret_exported": false
+      }
+    ],
+    "quota_calls": [
+      "--version",
+      "--json"
+    ],
+    "server_requests": [
+      {
+        "path": "/v1/systemone",
+        "model": "jev-latest",
+        "choices": [
+          "default",
+          "rule_1"
+        ],
+        "synthetic_authorization_received": true,
+        "private_task_received": true
+      }
+    ],
+    "perl_log_bytes_before": 49,
+    "perl_log_bytes_after": 49
+  }
+}
