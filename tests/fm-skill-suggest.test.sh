@@ -191,6 +191,51 @@ done
 MODE=multiple
 pass "no-fit at either stage and every transport/schema failure preserve ordinary selection"
 
+cp "$TASK" "$TMP_ROOT/line-ending-task"
+for id in alpha beta gamma delta safety; do
+  cp "$CATALOG/$id/SKILL.md" "$TMP_ROOT/lf-$id.md"
+done
+printf 'Perform gamma work.\n' > "$TASK"
+for endings in lf crlf; do
+  if [ "$endings" = crlf ]; then
+    for id in alpha beta gamma delta safety; do
+      awk '{ printf "%s\r\n", $0 }' "$TMP_ROOT/lf-$id.md" > "$CATALOG/$id/SKILL.md"
+    done
+  fi
+  for format in toon brief; do
+    reset
+    out=$(run --task-file "$TASK" --required safety --format "$format" --no-cache)
+    if [ "$format" = toon ]; then
+      assert_contains "$out" 'status: suggested' "$endings catalog supports optional selection"
+      assert_contains "$out" "\"gamma\",\"$CATALOG/gamma/SKILL.md\"" "$endings resolves task-named requirement"
+      assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "$endings resolves supplied requirement"
+      for id in alpha beta; do
+        assert_contains "$out" "\"$id\",\"$CATALOG/$id/SKILL.md\",0." "$endings resolves optional skill path"
+      done
+    else
+      for id in gamma safety; do
+        assert_contains "$out" "Required named skill: $id - read $CATALOG/$id/SKILL.md." "$endings brief resolves requirement"
+      done
+      for id in alpha beta; do
+        assert_contains "$out" "Optional suggestion: $id - read $CATALOG/$id/SKILL.md;" "$endings brief resolves suggestion"
+      done
+    fi
+    jq -e '.state.catalog | map(.id) == ["alpha","beta","delta"] and all(.[]; .description == ("Use for " + .id + " work, with its complete description retained."))' "$LOG/rank" >/dev/null || fail "$endings must preserve folded descriptions and exclude required skills from ranking"
+    for stage in rank recheck; do
+      if [ "$endings" = lf ]; then
+        cp "$LOG/$stage" "$TMP_ROOT/lf-$format-$stage.json"
+      else
+        jq -e --slurpfile expected "$TMP_ROOT/lf-$format-$stage.json" '.state.catalog == $expected[0].state.catalog' "$LOG/$stage" >/dev/null || fail "CRLF must preserve $stage metadata and excerpts"
+      fi
+    done
+  done
+done
+for id in alpha beta gamma delta safety; do
+  cp "$TMP_ROOT/lf-$id.md" "$CATALOG/$id/SKILL.md"
+done
+cp "$TMP_ROOT/line-ending-task" "$TASK"
+pass "LF and CRLF catalogs preserve required identities, optional paths and wire metadata"
+
 reset
 cat > "$BRIEF" <<'MD'
 # Task

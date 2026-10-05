@@ -5,7 +5,8 @@ def scalar:
   elif startswith("'") and endswith("'") then .[1:-1] | gsub("''"; "'")
   elif test("^[^\\[\\]{}&*!|>]+$") then .
   else error("unsupported frontmatter scalar") end;
-capture("\\A---\\r?\\n(?<meta>[\\s\\S]*?)\\r?\\n---\\r?\\n(?<body>[\\s\\S]*)\\z") as $file
+gsub("\r\n"; "\n")
+| capture("\\A---\\r?\\n(?<meta>[\\s\\S]*?)\\r?\\n---\\r?\\n(?<body>[\\s\\S]*)\\z") as $file
 | ($file.meta | [scan("(?m)^name:[ \\t]*([^\\r\\n]+)$")] | if length == 1 then .[0][0] | scalar else error("ambiguous skill name") end) as $id
 | if ($id | type) != "string" then error("invalid skill name")
   elif ($id | test("^[a-z0-9]+(-[a-z0-9]+)*$") | not) then error("invalid skill name")
