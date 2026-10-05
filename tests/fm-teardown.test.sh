@@ -69,6 +69,125 @@ export REAL_PS_FOR_TEST
 REAL_LSOF_FOR_TEST=$(command -v lsof)
 export REAL_LSOF_FOR_TEST
 
+TEARDOWN_FIXTURE_PROCESSES="$TMP_ROOT/fixture-processes"
+FM_TEARDOWN_FIXTURE_HELPERS="$TMP_ROOT/fixture-process.pl"
+export TEARDOWN_FIXTURE_PROCESSES FM_TEARDOWN_FIXTURE_HELPERS
+mkdir "$TEARDOWN_FIXTURE_PROCESSES"
+
+teardown_fixture_birth() {
+  local pid=$1 stat_line start
+  local -a fields
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  if [ -r "/proc/$pid/stat" ]; then
+    IFS= read -r stat_line < "/proc/$pid/stat" || return 1
+    read -r -a fields <<< "${stat_line##*)}"
+    [ "${#fields[@]}" -ge 20 ] || return 1
+    [ "${fields[0]}" != Z ] || return 1
+    printf 'starttime=%s\n' "${fields[19]}"
+  else
+    start=$(LC_ALL=C "$REAL_PS_FOR_TEST" -p "$pid" -o lstart=) || return 1
+    start=${start#"${start%%[![:space:]]*}"}
+    start=${start%"${start##*[![:space:]]}"}
+    [ -n "$start" ] || return 1
+    printf 'lstart=%s\n' "$start"
+  fi
+}
+
+teardown_fixture_live() {
+  local pid=$1 birth=$2 current state
+  current=$(teardown_fixture_birth "$pid") || return 1
+  [ "$current" = "$birth" ] || return 1
+  state=$("$REAL_PS_FOR_TEST" -p "$pid" -o stat=) || return 1
+  case "$state" in *Z*|'') return 1 ;; esac
+}
+
+teardown_fixture_track() {
+  local pid=$1 signal=${2:-KILL} birth
+  birth=$(teardown_fixture_birth "$pid") || fail "cannot register fixture process $pid"
+  printf '%s\t%s\n' "$signal" "$birth" > "$TEARDOWN_FIXTURE_PROCESSES/$pid"
+}
+
+teardown_fixture_start() {
+  local cwd=$1 signal=$2 interrupted=0
+  shift 2
+  trap 'interrupted=130' INT
+  trap 'interrupted=143' TERM
+  trap 'interrupted=129' HUP
+  trap 'interrupted=131' QUIT
+  (cd "$cwd" && exec "$@") &
+  TEARDOWN_FIXTURE_PID=$!
+  teardown_fixture_track "$TEARDOWN_FIXTURE_PID" "$signal"
+  [ "$signal" != KILL ] || disown "$TEARDOWN_FIXTURE_PID"
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  trap 'exit 131' QUIT
+  [ "$interrupted" -eq 0 ] || exit "$interrupted"
+}
+
+teardown_fixture_stop() {
+  local pid=$1 signal birth
+  [ -f "$TEARDOWN_FIXTURE_PROCESSES/$pid" ] || return 0
+  IFS=$'\t' read -r signal birth < "$TEARDOWN_FIXTURE_PROCESSES/$pid" || return 0
+  teardown_fixture_live "$pid" "$birth" || return 0
+  kill "-$signal" "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  while teardown_fixture_live "$pid" "$birth"; do sleep 0.01; done
+}
+
+teardown_fixture_cleanup() {
+  local record signal birth
+  trap '' INT TERM HUP QUIT
+  for record in "$TEARDOWN_FIXTURE_PROCESSES"/*; do
+    [ -f "$record" ] || continue
+    IFS=$'\t' read -r signal birth < "$record" || continue
+    case "$signal" in TERM|HUP) teardown_fixture_stop "${record##*/}" ;; esac
+  done
+  for record in "$TEARDOWN_FIXTURE_PROCESSES"/*; do
+    [ -f "$record" ] && teardown_fixture_stop "${record##*/}"
+  done
+  fm_test_cleanup
+}
+trap teardown_fixture_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+trap 'exit 131' QUIT
+export -f teardown_fixture_birth teardown_fixture_live
+
+cat > "$FM_TEARDOWN_FIXTURE_HELPERS" <<'PERL'
+sub fixture_birth {
+  my ($pid) = @_;
+  if (open my $stat, "<", "/proc/$pid/stat") {
+    my $line = <$stat>;
+    close $stat;
+    $line =~ s/.*\)\s*//;
+    my @fields = split /\s+/, $line;
+    die "missing birth identity" unless @fields >= 20;
+    return "starttime=$fields[19]";
+  }
+  local $ENV{LC_ALL} = "C";
+  open my $ps, "-|", $ENV{REAL_PS_FOR_TEST}, "-p", $pid, "-o", "lstart=" or die "ps";
+  my $start = <$ps>;
+  close $ps or die "ps failed";
+  defined $start or die "missing birth identity";
+  $start =~ s/^\s+|\s+$//g;
+  length $start or die "empty birth identity";
+  return "lstart=$start";
+}
+sub fixture_track {
+  my ($pid) = @_;
+  my $birth = fixture_birth($pid);
+  my $record = "$ENV{TEARDOWN_FIXTURE_PROCESSES}/$pid";
+  open my $fh, ">", "$record.$$" or die "register fixture";
+  print {$fh} "KILL\t$birth\n";
+  close $fh or die "close fixture registration";
+  rename "$record.$$", $record or die "publish fixture registration";
+  return $birth;
+}
+1;
+PERL
+
 # Build a fresh sandbox for one test case. Sets up:
 #   $CASE/state/        - firstmate state dir (with a fresh watcher beacon)
 #   $CASE/fakebin/      - mocks for treehouse, tmux (PATH-prepended by caller)
@@ -3699,9 +3818,8 @@ test_leaked_worktree_process_is_reaped() {
   # worktree - the same shape the observed incident's leaked `go test`
   # binaries took (reparented to init, no live task meta to attribute them
   # to once an unpatched teardown had already run).
-  ( cd "$case_dir/wt" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "leaked-process-reap: setup sleeper did not start"
 
@@ -3710,7 +3828,7 @@ test_leaked_worktree_process_is_reaped() {
 
   expect_code 0 "$rc" "leaked-process-reap: teardown should still succeed"
   if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
     fail "leaked-process-reap: leaked worktree process survived teardown"
   fi
   assert_grep "reaping leaked worktree process" "$case_dir/stderr" \
@@ -3726,7 +3844,7 @@ test_process_identity_is_recorded_before_term_and_kill() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   journal="$case_dir/state/task-x1.teardown-processes"
-  (cd "$case_dir/wt" && exec perl -e '
+  teardown_fixture_start "$case_dir/wt" KILL perl -e '
     my ($journal, $seen, $ready) = @ARGV;
     $SIG{TERM} = sub {
       open my $in, "<", $journal or die "signal arrived without audit";
@@ -3736,18 +3854,17 @@ test_process_identity_is_recorded_before_term_and_kill() {
     };
     open my $ready_file, ">", $ready or die "ready"; close $ready_file;
     while (1) { sleep 300; }
-  ' "$journal" "$case_dir/term-observed" "$case_dir/ready") &
-  pid=$!
-  disown
+  ' "$journal" "$case_dir/term-observed" "$case_dir/ready"
+  pid=$TEARDOWN_FIXTURE_PID
   local i=0
   while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  [ -e "$case_dir/ready" ] || { kill -KILL "$pid"; fail "durable-process-identity: process not ready"; }
+  [ -e "$case_dir/ready" ] || { teardown_fixture_stop "$pid"; fail "durable-process-identity: process not ready"; }
   expected_start=$(LC_ALL=C ps -p "$pid" -o lstart=)
   expected_cwd=$(cd "$case_dir/wt" && pwd -P)
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
     fail "durable-process-identity: leaked process survived"
   fi
   expect_code 0 "$rc" "durable-process-identity: teardown should succeed"
@@ -3785,12 +3902,10 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
   fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
   before=$(cat "$case_dir/state/unrelated.meta")
   mkdir -p "$case_dir/unrelated"
-  (cd "$nested" && exec sleep 300) &
-  pid=$!
-  disown
-  (cd "$case_dir/unrelated" && exec sleep 300) &
-  other_pid=$!
-  disown
+  teardown_fixture_start "$nested" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+  other_pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   case "$damage" in
     no-git) rm -f "$nested/.git" ;;
@@ -3806,7 +3921,8 @@ assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|
   local survived=0 other_survived=0
   kill -0 "$pid" 2>/dev/null && survived=1
   kill -0 "$other_pid" 2>/dev/null && other_survived=1
-  kill -KILL "$pid" "$other_pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
+  teardown_fixture_stop "$other_pid"
   expect_code 1 "$rc" "$name: teardown must refuse even with force"
   [ "$survived" -eq 1 ] || fail "$name: other lane process was killed"
   [ "$other_survived" -eq 1 ] || fail "$name: unrelated process was killed"
@@ -3851,15 +3967,14 @@ test_own_deleted_cwd_process_is_reaped() {
   land_shippable_commit "$case_dir"
   journal="$case_dir/state/task-x1.teardown-processes"
   mkdir -p "$case_dir/wt/dist"
-  (cd "$case_dir/wt/dist" && exec sleep 300) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt/dist" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   rm -rf "$case_dir/wt/dist"
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
-  kill -KILL "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
   expect_code 0 "$rc" "own-deleted-cwd-reap: teardown should succeed"
   [ "$survived" -eq 0 ] || fail "own-deleted-cwd-reap: leaked process in a deleted own directory survived"
   assert_grep $'\tTERM\t'"$pid"$'\t' "$journal" \
@@ -3873,14 +3988,13 @@ test_process_audit_failure_refuses_before_signal() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   mkdir "$case_dir/state/task-x1.teardown-processes"
-  (cd "$case_dir/wt" && exec sleep 300) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
-  kill -KILL "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
   expect_code 1 "$rc" "process-audit-failure: teardown must refuse"
   [ "$survived" -eq 1 ] || fail "process-audit-failure: signal sent without durable audit"
   assert_present "$case_dir/state/task-x1.meta" "process-audit-failure: task record removed"
@@ -3897,9 +4011,8 @@ test_leaked_tasktmp_process_is_reaped() {
   mkdir -p "$case_dir/tasktmp"
   land_shippable_commit "$case_dir"
 
-  ( cd "$case_dir/tasktmp" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/tasktmp" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "leaked-tasktmp-reap: setup sleeper did not start"
 
@@ -3908,7 +4021,7 @@ test_leaked_tasktmp_process_is_reaped() {
 
   expect_code 0 "$rc" "leaked-tasktmp-reap: teardown should still succeed"
   if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
     fail "leaked-tasktmp-reap: leaked tasktmp process survived teardown"
   fi
   assert_grep "reaping leaked worktree process" "$case_dir/stderr" \
@@ -3925,9 +4038,8 @@ test_lsof_absent_refuses_without_signalling() {
   PATH="$path_without_lsof" command -v lsof >/dev/null 2>&1 \
     && fail "lsof-absent-refusal: fixture path unexpectedly exposes lsof"
 
-  perl -e 'setpgrp(0, 0); chdir shift or die; exec "sleep", "300"' "$case_dir/wt" &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL perl -e 'setpgrp(0, 0); exec "sleep", "300"'
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "lsof-absent-refusal: setup sleeper did not start"
   cat > "$case_dir/fakebin/tmux" <<EOF
@@ -3943,7 +4055,7 @@ EOF
   FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill -0 "$pid" 2>/dev/null && survived=1
-  kill -KILL "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
 
   expect_code 1 "$rc" "lsof-absent-refusal: teardown should refuse even with force"
   [ "$survived" -eq 1 ] || fail "lsof-absent-refusal: an unaudited signal reached the pane process group"
@@ -3989,9 +4101,8 @@ test_reused_pid_identity_is_not_force_killed() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
 
-  perl -e '$SIG{TERM} = "IGNORE"; sleep 300' &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir" KILL perl -e '$SIG{TERM} = "IGNORE"; sleep 300'
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/lsof" <<EOF
 #!/usr/bin/env bash
@@ -4026,7 +4137,7 @@ SH
   if ! kill -0 "$pid" 2>/dev/null; then
     fail "reused-pid-identity: teardown force-killed a process whose start time changed"
   fi
-  kill -KILL "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
   assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
     "reused-pid-identity: the original identity was not sent TERM before the grace period"
   assert_no_grep $'\tKILL\t' "$case_dir/state/task-x1.teardown-processes" \
@@ -4042,15 +4153,14 @@ test_exec_changed_process_is_still_reaped() {
   marker="$case_dir/exec-now"
   done_flag="$case_dir/exec-done"
 
-  ( cd "$case_dir/wt" && exec perl -e '
+  teardown_fixture_start "$case_dir/wt" KILL perl -e '
       my ($marker, $done) = @ARGV;
       until (-e $marker) { select undef, undef, undef, 0.01; }
       open my $fh, ">", $done or die "open";
       close $fh;
       exec "perl", "-e", '\''$SIG{TERM} = "IGNORE"; sleep 300'\'';
-    ' "$marker" "$done_flag" ) &
-  pid=$!
-  disown
+    ' "$marker" "$done_flag"
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
@@ -4089,7 +4199,7 @@ SH
 
   if kill -0 "$pid" 2>/dev/null; then
     survived=1
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
   fi
   expect_code 0 "$rc" "exec-changed-process: teardown should succeed"
   [ "$survived" -eq 0 ] || fail "exec-changed-process: exec-changed leaked process survived teardown"
@@ -4103,22 +4213,47 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
   land_shippable_commit "$case_dir"
   child_file="$case_dir/child.pid"
 
-  ( cd "$case_dir/wt" && exec perl -e '
-      my $file = shift;
-      $SIG{TERM} = sub {
-        my $child = fork();
-        die "fork" unless defined $child;
-        if (!$child) { exec "sleep", "300"; }
-        open my $fh, ">", $file or die "open";
-        print {$fh} "$child\n";
-        close $fh;
+  teardown_fixture_start "$case_dir/wt" HUP perl -e '
+      use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGHUP SIGINT SIGQUIT);
+      require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
+      my ($file, $ready) = @ARGV;
+      my ($child, $leave_child);
+      END {
+        if (defined $child && $child > 0 && !$leave_child) {
+          kill "KILL", $child;
+          waitpid($child, 0);
+        }
+      }
+      $SIG{HUP} = sub {
         exit 0;
       };
+      $SIG{TERM} = sub {
+        return if defined $child;
+        my $old = POSIX::SigSet->new;
+        my $blocked = POSIX::SigSet->new(SIGTERM, SIGHUP, SIGINT, SIGQUIT);
+        POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+        $child = fork();
+        die "fork" unless defined $child;
+        if (!$child) {
+          $SIG{TERM} = $SIG{HUP} = $SIG{INT} = $SIG{QUIT} = "DEFAULT";
+          POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+          exec "sleep", "300"; die "exec";
+        }
+        fixture_track($child);
+        open my $fh, ">", $file or die "open";
+        print {$fh} "$child\n";
+        close $fh or die "close";
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        $leave_child = 1;
+        exit 0;
+      };
+      open my $fh, ">", $ready or die "ready"; close $fh;
       sleep 300;
-    ' "$child_file" ) &
-  pid=$!
-  disown
-  sleep 0.2
+    ' "$child_file" "$case_dir/ready"
+  pid=$TEARDOWN_FIXTURE_PID
+  local i=0
+  while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case_dir/ready" ] || fail "grace-spawn-convergence: parent not ready"
 
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -4126,11 +4261,11 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
   if [ -f "$child_file" ]; then child_pid=$(cat "$child_file"); fi
   if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
     child_survived=1
-    kill -KILL "$child_pid" 2>/dev/null || true
+    teardown_fixture_stop "$child_pid"
   fi
   if kill -0 "$pid" 2>/dev/null; then
     parent_survived=1
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
   fi
   expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge"
   assert_present "$child_file" "grace-spawn-convergence: TERM handler did not spawn a child"
@@ -4146,24 +4281,68 @@ test_persistent_scan_refuses_after_bounded_retries() {
   land_shippable_commit "$case_dir"
   # A real parent outside the task roots immediately replenishes leaked children.
   # Each killed child has a distinct kernel birth identity and a real cwd.
-  (cd "$case_dir" && exec perl -e '
+  teardown_fixture_start "$case_dir" TERM perl -e '
+    use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGINT SIGHUP SIGQUIT WNOHANG);
+    require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
     my ($root, $ready) = @ARGV;
-    my $child;
-    $SIG{TERM} = sub { kill "KILL", $child if $child; waitpid($child, 0) if $child; exit 0; };
-    while (1) {
-      $child = fork(); defined $child or die "fork";
-      if (!$child) { chdir $root or die "chdir"; exec "sleep", "300"; die "exec"; }
-      open my $fh, ">", $ready or die "ready"; print {$fh} "$child\n"; close $fh;
-      waitpid($child, 0);
+    my ($child, $stopping);
+    my $owner = $$;
+    my $blocked = POSIX::SigSet->new(SIGTERM, SIGINT, SIGHUP, SIGQUIT);
+    $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = sub { $stopping = 1; };
+    END {
+      if ($owner == $$) {
+        kill "KILL", $child if defined $child;
+        waitpid($child, 0) if defined $child;
+        unlink $ready;
+      }
     }
-  ' "$case_dir/wt" "$case_dir/child-ready") &
-  spawner=$!
-  disown
+    while (!$stopping) {
+      my $old = POSIX::SigSet->new;
+      POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+      $child = fork(); defined $child or die "fork";
+      if (!$child) {
+        $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = "DEFAULT";
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        chdir $root or die "chdir";
+        my $birth = fixture_track($$);
+        open my $fh, ">", "$ready.$$" or die "ready";
+        print {$fh} "$$\t$birth\n";
+        close $fh or die "close readiness";
+        rename "$ready.$$", $ready or die "publish readiness";
+        exec "sleep", "300"; die "exec";
+      }
+      fixture_track($child);
+      POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+      while (!$stopping && defined $child) {
+        POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+        my $exited = waitpid($child, WNOHANG);
+        undef $child if $exited != 0;
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        select undef, undef, undef, 0.01 if defined $child && !$stopping;
+      }
+      unlink $ready;
+    }
+  ' "$case_dir/wt" "$case_dir/child-ready"
+  spawner=$TEARDOWN_FIXTURE_PID
+  cat > "$case_dir/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+for ((i=0; i<1000; i++)); do
+  if IFS=$'\t' read -r pid birth < "$FM_FAKE_CHILD_READY" 2>/dev/null \
+     && teardown_fixture_live "$pid" "$birth"; then
+    exec "$REAL_LSOF_FOR_TEST" "$@"
+  fi
+  sleep 0.01
+done
+printf 'fixture child never became ready\n' >&2
+exit 2
+SH
+  chmod +x "$case_dir/fakebin/lsof"
   while [ ! -s "$case_dir/child-ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  [ -s "$case_dir/child-ready" ] || { kill -TERM "$spawner"; fail "persistent-reap-refusal: parent not ready"; }
+  [ -s "$case_dir/child-ready" ] || fail "persistent-reap-refusal: child not ready"
   rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  kill -TERM "$spawner" 2>/dev/null || true
+  FM_FAKE_CHILD_READY="$case_dir/child-ready" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  teardown_fixture_stop "$spawner"
 
   expect_code 1 "$rc" "persistent-reap-refusal: teardown should refuse"
   assert_grep "remain after 3 reap attempts" "$case_dir/stderr" \
@@ -4222,9 +4401,8 @@ test_run_abort_precedes_process_reap_precedes_worktree_removal() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
   abort_log="$case_dir/nm-abort.log"
 
-  ( cd "$case_dir/wt" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "abort-then-reap-then-remove-order: setup sleeper did not start"
 
@@ -4245,7 +4423,7 @@ EOF
   FM_FAKE_NM_ABORT_LOG="$abort_log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "abort-then-reap-then-remove-order: teardown should still succeed"
-  kill -0 "$pid" 2>/dev/null && { kill -KILL "$pid" 2>/dev/null || true; }
+  teardown_fixture_stop "$pid"
 
   assert_present "$case_dir/order.log" \
     "abort-then-reap-then-remove-order: the destructive worktree return was never invoked"
