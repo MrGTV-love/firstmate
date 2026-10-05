@@ -3215,6 +3215,7 @@ test_reboot_recovery_completes_from_bounded_managed_observation() {
 
 recovery_liveness_episode() {  # <case-dir> <id>
   local dir=$1 id=$2
+  # shellcheck disable=SC2016 # The child shell must expand this liveness code.
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
     FM_ROOT="$ROOT" STATE="$dir/home/state" bash -c '
       . "$1/bin/fm-secondmate-liveness-lib.sh"
@@ -3376,7 +3377,7 @@ test_reboot_recovery_refuses_ineligible_backlog_without_stopping_workers() {
         seed_backlog "$dir" "$id" in_flight
       fi
       case "$scenario" in
-        closed) tasks-axi done "$id" --file "$file" >/dev/null || fail "could not close recovery fixture" ;;
+        closed) tasks-axi 'done' "$id" --file "$file" >/dev/null || fail "could not close recovery fixture" ;;
         held) tasks-axi hold "$id" --kind captain --reason "captain decision pending" --file "$file" >/dev/null \
           || fail "could not hold recovery fixture" ;;
         blocked) tasks-axi add "$id" "blocked recovery fixture" --kind "$kind" --blocked-by blocker --file "$file" >/dev/null \
@@ -3429,7 +3430,11 @@ test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows() {
   local dir id scenario kind out rc before
   for scenario in no-backlog manual queued in_flight; do
     case "$scenario" in
-      queued|in_flight) command -v tasks-axi >/dev/null 2>&1 && fm_tasks_axi_compatible || continue ;;
+      queued|in_flight)
+        if ! command -v tasks-axi >/dev/null 2>&1 || ! fm_tasks_axi_compatible; then
+          continue
+        fi
+        ;;
     esac
     id="reboot-eligible-$scenario"
     kind=ship

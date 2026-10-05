@@ -137,6 +137,7 @@ SH
   mkdir -p "$CASE_DIR/pane-home"
   local shell_args=(-f)
   [ "$shell" != "$BASH_BIN" ] || shell_args=(--noprofile --norc)
+  # shellcheck disable=SC2016 # The destination shell must expand this code.
   env -i HOME="$CASE_DIR/pane-home" PATH="$FAKEBIN:$PATH" TERM=xterm \
     TMPDIR="${TMPDIR:-$TMP_ROOT}" PANE_AMBIENT=ambient PANE_LISTED=listed \
     "$shell" "${shell_args[@]}" -c '
@@ -175,10 +176,12 @@ PY
 
 if [ -n "$ZSH_BIN" ]; then
   make_case zsh-ship ship
+  # shellcheck disable=SC2016 # The destination zsh must expand this launch command.
   run_spawn ship 'omp --config "${${HOME}:A}/worker.yml"'
   execute_pane "$ZSH_BIN" no omp "$CASE_DIR/pane-home/worker.yml" ''
 
   make_case zsh-scout scout
+  # shellcheck disable=SC2016 # The destination zsh must expand this launch command.
   run_spawn scout 'omp --config "${${HOME}:A}/worker.yml"; export COMPOUND_VALUE=compound'
   execute_pane "$ZSH_BIN" no omp "$CASE_DIR/pane-home/worker.yml" ''
   [ ! -s "$CASE_DIR/probe-error" ] || fail 'compound zsh launch must not emit errors'
@@ -187,18 +190,21 @@ else
 fi
 
 make_case bash-generic ship
+# shellcheck disable=SC2016 # The destination shell must expand this launch command.
 run_spawn ship 'codex --config "${HOME}/worker.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/worker.yml" ''
 
 : > "$CASE_DIR/pane-input.sh"
 : > "$CASE_DIR/source-lines"
 old_gen=$(grep '^spawn_gen=' "$HOME_DIR/state/$ID.meta" | cut -d= -f2-)
+# shellcheck disable=SC2016 # The destination shell must expand this launch command.
 run_spawn relaunch 'codex --config "${HOME}/replacement.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/replacement.yml" ''
 new_gen=$(grep '^spawn_gen=' "$HOME_DIR/state/$ID.meta" | cut -d= -f2-)
 [ "$old_gen" != "$new_gen" ] || fail 'relaunch must record a new incarnation'
 
 make_case bash-secondmate secondmate
+# shellcheck disable=SC2016 # The destination shell must expand this launch command.
 run_spawn secondmate 'codex --config "${HOME}/supervisor.yml"'
 execute_pane "$BASH_BIN" no codex "$CASE_DIR/pane-home/supervisor.yml" ''
 
@@ -207,6 +213,7 @@ for shell in "$BASH_BIN" ${ZSH_BIN:+"$ZSH_BIN"}; do
   [ "$shell" != "$ZSH_BIN" ] || name=zsh
   make_case "$name-filtered" scout
   printf 'PANE_LISTED\n' > "$HOME_DIR/config/launch-env-allowlist"
+  # shellcheck disable=SC2016 # The destination shell must expand this launch command.
   run_spawn scout 'COMPOUND_VALUE=posix; export COMPOUND_VALUE; omp --config "${ZSH_VERSION-posix}/worker.yml"'
   execute_pane "$shell" yes omp 'posix/worker.yml' posix
 done
