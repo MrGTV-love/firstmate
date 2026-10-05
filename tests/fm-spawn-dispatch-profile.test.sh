@@ -2068,26 +2068,26 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
     printf '%s\n' http://caller-explicit:13456 "$CASE_DIR/explicit-ca.pem" > "$CASE_DIR/caller explicit.json"
     printf '%s\n' http://stale-pane:13456 "$CASE_DIR/stale-ca.pem" > "$CASE_DIR/pane-config"
     printf '%s\n' http://stale-xdg:13456 "$CASE_DIR/stale-xdg-ca.pem" > "$CASE_DIR/pane-xdg/teamclaude.json"
-    xdg_presence= tc_presence= xdg_value= tc_value=
+    xdg_presence='' tc_presence='' xdg_value='' tc_value=''
     selected="$CASE_DIR/default-config"
     launch_kind=template
     launch_args=("$id" "$PROJ_DIR")
     case "$scenario" in
-      xdg) xdg_presence=set; xdg_value="$CASE_DIR/caller xdg"; selected="$xdg_value/teamclaude.json" ;;
+      xdg) xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"; selected="$xdg_value/teamclaude.json" ;;
       teamclaude)
-        tc_presence=set; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
         launch_kind=raw; launch_args+=('claude --model opus')
         ;;
       both)
-        xdg_presence=set; xdg_value="$CASE_DIR/caller xdg"
-        tc_presence=set; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
         ;;
       empty)
-        xdg_presence=set; tc_presence=set
+        xdg_presence='set'; tc_presence='set'
         launch_kind=raw; launch_args+=('claude --model opus')
         ;;
-      xdg-empty) xdg_presence=set ;;
-      teamclaude-empty) tc_presence=set ;;
+      xdg-empty) xdg_presence='set' ;;
+      teamclaude-empty) tc_presence='set' ;;
     esac
     {
       IFS= read -r proxy
