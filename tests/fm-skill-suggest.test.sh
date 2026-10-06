@@ -166,6 +166,55 @@ assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "withheld task ne
 rm "$HOME_DIR/config/dispatch-never-send"
 pass "privacy rules keep required identities local and withhold matching task text"
 
+printf '# Skill selection input\nPerform a combined task.\n' > "$BRIEF"
+for directive in \
+  '#dispatch-never-send marked-sections' \
+  '# Dispatch-Never-Send marked-sections' \
+  '# dispatch-never-send MARKED-SECTIONS' \
+  '# dispatch-never-send marked sections' \
+  '# dispatch-never-send unknown'; do
+  printf '%s\n' '# Ordinary policy comment' "$directive" > "$HOME_DIR/config/dispatch-never-send"
+  for input in --task-file --brief; do
+    if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+    for format in toon brief; do
+      reset
+      out=$(run "$input" "$input_path" --required safety --format "$format")
+      if [ "$format" = toon ]; then
+        assert_contains "$out" 'status: off' "$directive withholds malformed policy"
+        assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "$directive retains caller-required skill"
+      else
+        assert_contains "$out" 'No optional suggestion (off:' "$directive withholds malformed policy in brief advice"
+        assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "$directive retains caller-required skill in brief advice"
+      fi
+      assert_contains "$out" 'text withheld by dispatch-never-send policy' "$directive reports policy refusal"
+      assert_absent "$LOG/calls" "$directive $input $format makes no live request"
+    done
+  done
+done
+for directive in \
+  '# dispatch-never-send marked-sections' \
+  $' \t# \tdispatch-never-send \t marked-sections \t' \
+  '# Perform a combined task.'; do
+  printf '%s\n' "$directive" > "$HOME_DIR/config/dispatch-never-send"
+  for input in --task-file --brief; do
+    if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+    for format in toon brief; do
+      reset
+      out=$(run "$input" "$input_path" --required safety --format "$format")
+      if [ "$format" = toon ]; then
+        assert_contains "$out" 'suggestions[2]' "$directive retains normal optional advice"
+        assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "$directive retains caller-required skill"
+      else
+        assert_contains "$out" 'Optional suggestion: alpha' "$directive retains normal brief advice"
+        assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "$directive retains caller-required skill in brief advice"
+      fi
+      assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$directive $input $format exercises both normal advice stages"
+    done
+  done
+done
+rm "$HOME_DIR/config/dispatch-never-send"
+pass "reserved policy directives fail closed while normalized directives and ordinary comments retain advice"
+
 reset
 BASE_CATALOG=$CATALOG
 CATALOG="$TMP_ROOT/private-catalog"
@@ -357,16 +406,24 @@ for metadata in missing-frontmatter missing-name invalid-name ambiguous-name; do
 done
 printf '%s\n' '---' 'name: acme-private' 'description: HOME-PRIVATE-DESCRIPTION' \
   '---' 'HOME-PRIVATE-OPENING' > "$PRIVATE_SKILL"
+mkdir -p "$HOME_SKILLS/home-known"
+printf '%s\n' '---' 'name: home-known' 'description: HOME-KNOWN-DESCRIPTION' \
+  '---' 'HOME-KNOWN-OPENING' > "$HOME_SKILLS/home-known/SKILL.md"
+printf 'Use acme-private, home-known and gamma for this task.\n' > "$TASK"
+printf '# Skill selection input\nUse acme-private, home-known and gamma for this task.\n' > "$BRIEF"
 for discovery_root in home selected; do
   if [ "$discovery_root" = home ]; then
     discovery_dir=$HOME_SKILLS
+    discovery_ancestor="$HOME_DIR/.agents"
     discovery_child="$HOME_SKILLS/acme-private"
   else
     discovery_dir="$SPLIT_CODE/.agents/skills"
+    discovery_ancestor="$SPLIT_CODE/.agents"
     discovery_child="$discovery_dir/delta"
   fi
-  for access in root-enumeration root-search child-enumeration child-search body-read; do
+  for access in ancestor-search root-enumeration root-search child-enumeration child-search body-read; do
     case "$access" in
+      ancestor-search) denied=$discovery_ancestor; permissions=400 ;;
       root-enumeration) denied=$discovery_dir; permissions=100 ;;
       root-search) denied=$discovery_dir; permissions=400 ;;
       child-enumeration) denied=$discovery_child; permissions=100 ;;
@@ -378,10 +435,11 @@ for discovery_root in home selected; do
       for format in toon brief; do
         reset
         chmod "$permissions" "$denied"
+        fixture_denied=0
         case "$access" in
-          *enumeration) [ ! -r "$denied" ] || fail "fixture must deny enumeration" ;;
-          *search) [ ! -x "$denied" ] || fail "fixture must deny search" ;;
-          body-read) [ ! -r "$denied" ] || fail "fixture must deny body reads" ;;
+          *enumeration) if [ ! -r "$denied" ]; then fixture_denied=1; fi ;;
+          *search) if [ ! -x "$denied" ]; then fixture_denied=1; fi ;;
+          body-read) if [ ! -r "$denied" ]; then fixture_denied=1; fi ;;
         esac
         out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
           bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" "$input" "$input_path" \
@@ -390,23 +448,30 @@ for discovery_root in home selected; do
             fail "$discovery_root $access must return ordinary selection"
           }
         chmod 700 "$denied"
+        [ "$fixture_denied" -eq 1 ] || fail "fixture must deny $discovery_root $access"
         if [ "$format" = toon ]; then
           assert_contains "$out" 'status: fallback' "$discovery_root $access withholds advice"
           assert_contains "$out" '"acme-private",' "$discovery_root $access retains caller-required identity"
           assert_contains "$out" '"safety",' "$discovery_root $access retains caller-required safety"
-          if [ "$discovery_root" = home ] || [[ "$access" != root-* ]]; then
+          if [ "$discovery_root" = home ] || { [[ "$access" != root-* ]] && [ "$access" != ancestor-search ]; }; then
             assert_contains "$out" "\"gamma\",\"$SPLIT_CODE/.agents/skills/gamma/SKILL.md\"" "$discovery_root $access retains recognized task requirement"
           else
             assert_contains "$out" "\"acme-private\",\"$PRIVATE_SKILL\"" "$discovery_root $access retains accessible home requirement"
+          fi
+          if [ "$discovery_root" = selected ]; then
+            assert_contains "$out" "\"home-known\",\"$HOME_SKILLS/home-known/SKILL.md\"" "$access retains recognized sibling-root identity"
           fi
         else
           assert_contains "$out" 'No optional suggestion (fallback:' "$discovery_root $access restores ordinary selection"
           assert_contains "$out" 'Required named skill: acme-private -' "$discovery_root $access preserves caller identity in brief advice"
           assert_contains "$out" 'Required named skill: safety -' "$discovery_root $access preserves caller safety in brief advice"
-          if [ "$discovery_root" = home ] || [[ "$access" != root-* ]]; then
+          if [ "$discovery_root" = home ] || { [[ "$access" != root-* ]] && [ "$access" != ancestor-search ]; }; then
             assert_contains "$out" "Required named skill: gamma - read $SPLIT_CODE/.agents/skills/gamma/SKILL.md." "$discovery_root $access preserves recognized requirements in brief advice"
           else
             assert_contains "$out" "Required named skill: acme-private - read $PRIVATE_SKILL." "$discovery_root $access preserves accessible home requirement in brief advice"
+          fi
+          if [ "$discovery_root" = selected ]; then
+            assert_contains "$out" "Required named skill: home-known - read $HOME_SKILLS/home-known/SKILL.md." "$access preserves recognized sibling-root identity in brief advice"
           fi
         fi
         assert_absent "$LOG/calls" "$discovery_root $access $input $format never sends undiscovered private names"
@@ -415,7 +480,7 @@ for discovery_root in home selected; do
   done
 done
 pass "filesystem discovery failures withhold both stages while retaining accessible requirements"
-rm -rf "$HOME_SKILLS/acme-private"
+rm -rf "$HOME_SKILLS/acme-private" "$HOME_SKILLS/home-known"
 cp "$TMP_ROOT/split-task-save" "$TASK"
 pass "split-home private identities stay required and local across all public input and output paths"
 

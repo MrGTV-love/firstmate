@@ -59,7 +59,16 @@ fm_typesafe_permitted() {
     n=$((n + 1))
     value=${value# }
     value=${value% }
-    case "$value" in ''|'#'*) continue ;; esac
+    case "$value" in
+      ''|'# dispatch-never-send marked-sections') continue ;;
+      '#'*)
+        case "$(printf '%s' "${value#'#'}" | tr '[:upper:]' '[:lower:]')" in
+          dispatch-never-send*|' dispatch-never-send'*)
+            FM_TYPESAFE_WITHHELD_REASON="invalid privacy directive in $path line $n"
+            return 1 ;;
+        esac
+        continue ;;
+    esac
     grep -qiF -e "$value" "$scratch" 2>/dev/null; rc=$?
     case "$rc" in
       0) FM_TYPESAFE_WITHHELD_REASON="brief text matches $path line $n"; return 1 ;;

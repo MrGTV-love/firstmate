@@ -115,6 +115,19 @@ HOME_CATALOG="$FM_HOME/.agents/skills"
 DISCOVERY_ROOTS=("$CATALOG")
 [ "$HOME_CATALOG" = "$CATALOG" ] || DISCOVERY_ROOTS+=("$HOME_CATALOG")
 for root in "${DISCOVERY_ROOTS[@]}"; do
+  ancestor=$root
+  while :; do
+    if [ -d "$ancestor" ]; then
+      [ -x "$ancestor" ] || DISCOVERY_FAILED=true
+    elif [ -e "$ancestor" ] || [ -L "$ancestor" ]; then
+      DISCOVERY_FAILED=true
+    fi
+    case "$ancestor" in
+      /|.) break ;;
+      */*) ancestor=${ancestor%/*}; [ -n "$ancestor" ] || ancestor=/ ;;
+      *) ancestor=. ;;
+    esac
+  done
   [ -d "$root" ] || continue
   if [ ! -r "$root" ] || [ ! -x "$root" ]; then
     DISCOVERY_FAILED=true
