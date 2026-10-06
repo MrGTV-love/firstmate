@@ -35,7 +35,7 @@ fm_git_identity fmtest fmtest@example.com
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-restart)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
-trap 'rm -rf -- "$TMP_ROOT"' EXIT
+trap 'chmod -R u+w "$TMP_ROOT"; rm -rf -- "$TMP_ROOT"' EXIT
 
 # A session-provider stub that models the two things this pass depends on: the
 # harness exit command stops the agent, a launch brief starts the replacement,
@@ -246,6 +246,7 @@ arm_answer() {
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CONFIG_OVERRIDE="$dir/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
     FM_SECONDMATE_PERSIST_WAIT="${FM_TEST_PERSIST_WAIT:-30}" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
@@ -531,6 +532,27 @@ test_remote_mate_restarts_over_the_transport_hop() {
      -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
     || fail "the remote mate was restarted before it was asked to persist"$'\n'"$(cat "$dir/ssh.log")"
   pass "T6 a remote mate restarts through the host-local control plane over the fm-on hop"
+}
+
+test_remote_fleet_restart_obeys_initiating_policy() {
+  local dir out rc
+  dir=$(new_case remote-policy)
+  setup_remote_case "$dir" sm2 ok
+  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  printf 'codex explicit-model high\n' > "$dir/home/config/secondmate-harness"
+  printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy"
+  cp "$dir/home/state/sm2.meta" "$dir/meta-before"
+
+  out=$(run_restart "$dir" sm2); rc=$?
+  unset FM_FAKE_ANSWER_STATUS
+
+  expect_code 3 "$rc" "fleet restart misreported a refused remote profile"$'\n'"$out"
+  assert_contains "$out" "summary: 0 of 1 restarted, 0 nudged, 1 unreached" "fleet restart claimed a refused replacement succeeded"
+  assert_contains "$out" "config/session-launch-policy" "fleet restart lost the initiating policy reason"
+  assert_no_grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" \
+    "fleet restart transported a forbidden replacement"
+  cmp -s "$dir/meta-before" "$dir/home/state/sm2.meta" || fail "fleet refusal changed route metadata"
+  pass "remote fleet restart retains its route without transporting a forbidden replacement"
 }
 
 # --- T7: an unreachable host is unknown, never a claimed reload --------------
@@ -878,6 +900,7 @@ test_refused_restart_falls_back_without_claiming_a_reload
 test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
+test_remote_fleet_restart_obeys_initiating_policy
 test_unreachable_host_is_reported_unknown
 test_concurrent_reply_cannot_release_persist_gate
 test_persist_waits_are_polled_together

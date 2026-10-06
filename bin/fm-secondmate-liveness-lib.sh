@@ -58,6 +58,8 @@ FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$FM_SM_LIVE_LIB_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$FM_SM_LIVE_LIB_DIR/fm-session-launch-policy-lib.sh"
 
 # Per-task probe+kill+relaunch serialization. A busy lock means another
 # supervisor (the other sweep, or a racing tick) is mid-episode on this mate;
@@ -267,6 +269,22 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
+  local policy_error
+  if ! policy_error=$(
+    {
+      config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+      enabled=$(fm_session_launch_policy_enabled "$config") || exit 1
+      [ "$enabled" = 1 ] || exit 0
+      harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || exit 1
+      fm_session_launch_policy_check "$config" "$harness"
+    } 2>&1
+  ); then
+    FM_SM_LIVE_STATUS=skipped
+    FM_SM_LIVE_OUT=$policy_error
+    FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$policy_error")
+    FM_SM_LIVE_RC=1
+    return 1
+  fi
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
     FM_SM_LIVE_STATUS=skipped
     FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $FM_SM_LIVE_STATE"

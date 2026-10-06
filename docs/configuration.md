@@ -783,7 +783,9 @@ Those inherited values are defaults and rules only; explicit runtimes remain sub
 ### Session launch policy (config/session-launch-policy)
 
 The optional local, gitignored `config/session-launch-policy` contains exactly `omp-or-tc`, with an optional single trailing newline.
-Absence preserves existing launch behavior; an unreadable or malformed present file refuses new sessions instead of disabling the restriction.
+The shared template leaves this restriction off by default: absence preserves existing launch behavior, including standalone Codex launches.
+Enabling it in each captain home is the operator's responsibility; Main owns that activation for the captain's fleet.
+An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract.
 
 This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
@@ -794,8 +796,10 @@ The `openai-codex` provider inside omp remains allowed; the restriction excludes
 
 Fresh ship, scout, batch, and secondmate spawns check the selected runtime before launch resources or remote inheritance change.
 Manual recovery checks the resolved replacement before checkpointing or stopping the old agent, and automatic session-end recovery uses that same control-plane check.
+Remote secondmate replacement checks the initiating home's policy before transport and the destination home's policy before stopping the old agent.
+Automatic secondmate recovery and host-local remote launch check the selected replacement before removing an existing endpoint; a refused automatic recovery records no attempt.
 The supervision host also refuses a disallowed engine before activation can stop its predecessor or retire its custody, and direct or resumed engine turns repeat the same check.
-Its policy refusal is an actionable close to the primary, not an ownership stand-down, so Claude's Stop hook and Cursor's park deliver it instead of silently assuming another host took over.
+Its policy refusal is a terminal actionable close, not an ownership stand-down: Claude's Stop hook and Cursor's park deliver it, while omp and OpenCode restore ordinary watcher monitoring without retrying the denied host.
 Currently its only verified engine starts standalone Claude, so this opt-in prevents host activation even under an omp primary; use ordinary primary supervision until a permitted native engine is verified.
 A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
 Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.

@@ -352,6 +352,7 @@ add_sm_home() {
 run_bootstrap() {  # <fakebin> <home> <pane-cmd> <call-log> [extra env...] -> stdout
   local fb=$1 home=$2 cmd=$3 log=$4; shift 4
   PATH="$fb:$BASE_PATH" TMUX='' FM_BACKEND=tmux FM_HOME="$home" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_TEST_PANE_CMD="$cmd" FM_TMUX_CALL_LOG="$log" \
     env "$@" "$ROOT/bin/fm-bootstrap.sh" 2>&1
 }
@@ -430,6 +431,70 @@ test_sweep_refuses_relaunch_on_ledger_errors() {
     [ ! -s "$ledger" ] || fail "a mode-$mode ledger gained rows: $(cat "$ledger")"
   done
   pass "sweep: an unreadable or unwritable relaunch ledger refuses to kill or spawn"
+}
+
+test_sweep_launch_policy_preserves_endpoint_and_records() {
+  local w fb tmuxfb log out mode pin ledger config
+  for mode in zsh missing; do
+    for pin in codex fallback malformed override; do
+      w=$(new_world "sweep-policy-$mode-$pin")
+      add_sm_home "$w" sm1 firstmate:fm-sm1 omp
+      printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
+      config="$w/home/config"
+      case "$pin" in
+        codex) printf 'codex explicit-model high\n' > "$w/home/config/secondmate-harness" ;;
+        fallback) printf 'default\n' > "$w/home/config/secondmate-harness" ;;
+        malformed) printf 'invalid\n' > "$w/home/config/session-launch-policy" ;;
+        override)
+          printf 'omp\n' > "$w/home/config/secondmate-harness"
+          config="$w/override-config"
+          mkdir -p "$config"
+          printf 'omp-or-tc\n' > "$config/session-launch-policy"
+          printf 'codex explicit-model high\n' > "$config/secondmate-harness" ;;
+      esac
+      ledger="$w/home/state/.secondmate-relaunch-sm1"
+      printf '1\tattempt\n1\tfailed\n' > "$ledger"
+      cp "$ledger" "$w/ledger-before"
+      cp "$w/home/state/sm1.meta" "$w/meta-before"
+      cp "$w/sm1/data/charter.md" "$w/charter-before"
+      printf 'unpublished work\n' > "$w/sm1/unpublished"
+      fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
+      log="$w/calls.log"; : > "$log"
+
+      out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" "$mode" "$log" FM_CONFIG_OVERRIDE="$config")
+
+      assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: error: config/session-launch-policy" \
+        "restricted $mode recovery did not report the policy refusal"
+      [ ! -s "$log" ] || fail "restricted recovery killed or spawned: $(cat "$log")"
+      cmp -s "$w/meta-before" "$w/home/state/sm1.meta" || fail "policy refusal rewrote endpoint metadata"
+      cmp -s "$w/ledger-before" "$ledger" || fail "policy refusal consumed a recovery attempt"
+      cmp -s "$w/charter-before" "$w/sm1/data/charter.md" || fail "policy refusal rewrote instructions"
+      [ "$(cat "$w/sm1/unpublished")" = 'unpublished work' ] || fail "policy refusal lost unpublished work"
+    done
+  done
+  pass "sweep: policy checks the configured replacement before kill, spawn, or attempt records"
+}
+
+test_sweep_launch_policy_allows_configured_omp_replacement() {
+  local w fb tmuxfb log out
+  w=$(new_world sweep-policy-allowed)
+  add_sm_home "$w" sm1 firstmate:fm-sm1 codex
+  printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
+  printf 'omp openai-codex/gpt-6.1-sol high\n' > "$w/home/config/secondmate-harness"
+  fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
+  fm_fake_exit0 "$fb" omp
+  log="$w/calls.log"; : > "$log"
+
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
+
+  assert_not_contains "$out" "SECONDMATE_LIVENESS:" "allowed replacement failed recovery"
+  assert_contains "$(cat "$log")" "kill-window" "allowed replacement did not remove the dead endpoint"
+  assert_contains "$(cat "$log")" "new-window" "allowed replacement did not allocate its endpoint"
+  assert_grep 'harness=omp' "$w/home/state/sm1.meta" "recovery ignored the configured replacement harness"
+  assert_grep 'model=openai-codex/gpt-6.1-sol' "$w/home/state/sm1.meta" "recovery lost the configured model"
+  assert_grep 'effort=high' "$w/home/state/sm1.meta" "recovery lost the configured effort"
+  assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-sm1" "allowed replacement outcome was not ledgered"
+  pass "sweep: policy accepts the configured omp profile rather than the previous harness"
 }
 
 test_sweep_leaves_alive_secondmate_untouched() {
@@ -719,6 +784,8 @@ test_sweep_skipped_under_detect_only
 test_sweep_noop_with_no_secondmate_meta
 test_sweep_skips_mate_whose_liveness_lock_is_held
 test_sweep_refuses_relaunch_on_ledger_errors
+test_sweep_launch_policy_preserves_endpoint_and_records
+test_sweep_launch_policy_allows_configured_omp_replacement
 test_remote_poll_probe_maps_states
 test_remote_poll_probe_unreachable_preserves_route
 

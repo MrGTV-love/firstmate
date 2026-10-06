@@ -34,6 +34,8 @@
 # (OpenCode, omp).
 # A launch-policy refusal returns 1 with an actionable "supervision-host:"
 # close and a recovery episode; it never implies ownership transferred.
+# Both refusal closes are terminal for the unchanged configuration: the owner
+# restores the ordinary watcher arm instead of retrying the denied host.
 #
 # THE LOOP. It owns watcher cycles through bin/fm-watch-arm.sh. The posture is
 # the away-posture record state/.afk-contract, read at every close and again
@@ -599,10 +601,10 @@ stand_down() {  # <why>
 refuse_launch_policy() {  # <why>
   log_line "policy-refusal	$1"
   if ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime; then
-    emit "supervision-host: launch policy refused: $1; could not record the hand-back; repair supervision before ending this turn"
+    emit "supervision-host: launch policy refused: $1; could not record the hand-back; restore ordinary primary supervision without retrying this host before configuration changes"
     exit 1
   fi
-  emit "supervision-host: launch policy refused: $1; predecessor custody is unchanged; use ordinary primary supervision before ending this turn"
+  emit "supervision-host: launch policy refused: $1; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes"
   exit 1
 }
 

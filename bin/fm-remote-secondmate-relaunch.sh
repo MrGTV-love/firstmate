@@ -31,6 +31,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-compact-adviser-lib.sh
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -47,6 +49,8 @@ META="$STATE/$ID.meta"
 REMOTE_HOST=$(fm_meta_get "$META" remote_host)
 [ -n "$REMOTE_HOST" ] \
   || die "task $ID is not a remotely placed secondmate; use bin/fm-control.sh $ID relaunch instead"
+
+fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$HARNESS" || exit 1
 
 RELAUNCH_ARGS=("$ID" "$HARNESS" "$MODEL" "$EFFORT")
 if [ "$(fm_compact_adviser_force_off)" = 1 ]; then

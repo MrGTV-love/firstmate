@@ -201,6 +201,7 @@ const armRetired = new WeakSet<ChildProcess>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
 const armHostMode = new WeakMap<ChildProcess, boolean>();
+let refusedHostConfiguration: string | null = null;
 
 function positiveInteger(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -254,6 +255,26 @@ function actionableLine(output: string): string {
 function completedActionableLine(output: string): string {
   const newline = output.lastIndexOf("\n");
   return newline < 0 ? "" : actionableLine(output.slice(0, newline + 1));
+}
+
+function hostConfigurationKey(): string {
+  return JSON.stringify(["supervision-host", "session-launch-policy"].map((name) => {
+    try {
+      return { content: readFileSync(`${config}/${name}`, "utf8") };
+    } catch (error) {
+      return { error: nodeErrorCode(error) || "unreadable" };
+    }
+  }));
+}
+
+function hostLaunchRefused(message: string): boolean {
+  return /^supervision-host: launch policy refused:/m.test(message);
+}
+
+function rememberPendingHostRefusal(pending: PendingActionableClose[]): void {
+  if (refusedHostConfiguration === null && pending.some((item) => hostLaunchRefused(item.message))) {
+    refusedHostConfiguration = hostConfigurationKey();
+  }
 }
 
 // The host-mode wake message: every "supervision-host:" line in order, wake
@@ -745,6 +766,7 @@ export default function (pi: ExtensionAPI) {
           }
         };
         try {
+          rememberPendingHostRefusal([pending]);
           // A new restoration supersedes whatever became of the previous
           // successor; only a failure during this delivery is retried after it.
           owner.deferredClose = null;
@@ -937,7 +959,8 @@ export default function (pi: ExtensionAPI) {
       };
     }
     const id = ++owner.seq;
-    const hostMode = existsSync(`${config}/supervision-host`);
+    const hostConfiguration = hostConfigurationKey();
+    const hostMode = existsSync(`${config}/supervision-host`) && refusedHostConfiguration !== hostConfiguration;
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       FM_HOME: fmHome,
@@ -1009,6 +1032,9 @@ export default function (pi: ExtensionAPI) {
       settleReadiness(false);
       releaseChild();
       const classification = classifyClose(hostMode, stdout, stderr, code, signal);
+      if (hostMode && hostLaunchRefused(classification.message)) {
+        refusedHostConfiguration = hostConfiguration;
+      }
       const predecessor = String(armChild.pid ?? "");
       if (classification.kind === "actionable") {
         const pending = armPendingActionable.get(armChild) ?? createPendingActionable(classification.message, predecessor);
@@ -1064,6 +1090,7 @@ export default function (pi: ExtensionAPI) {
       enqueuePendingActionable(owner, actionable);
     }
     if (owner.pendingActionables.length > 0) {
+      rememberPendingHostRefusal(owner.pendingActionables);
       if (loadFailure) surfaceFailure(owner, loadFailure);
       const armResult = startArm(owner, owner.pendingActionables[0].predecessorArmPid);
       if (!armResult.ok) {
