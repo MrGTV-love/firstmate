@@ -15,6 +15,7 @@ import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 let parser;
+let ShadowLexer;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const home = process.env.FM_HOME || root;
@@ -24,7 +25,7 @@ const privateKey = process.env.TYPESAFE_API_KEY || '';
 delete process.env.TYPESAFE_API_KEY;
 delete process.env.TYPESAFE_API_KEY_PRIVATE;
 const model = 'jev-1.13.0';
-const policyVersion = 6;
+const policyVersion = 7;
 const clock = () => performance.now();
 const elapsed = start => Math.round((clock() - start) * 1000) / 1000;
 const secretPath = value => /(?:^|[/\\])(?:\.env(?:[.\w-]*)?|\.ssh|\.aws|\.gnupg|credentials(?:[.\w-]*)?|secrets?(?:[.\w-]*)?|id_(?:rsa|ed25519)|[^/]*\.(?:pem|key))(?:$|[/\\])/i.test(value);
@@ -142,7 +143,8 @@ function cloudOperations(name, args) {
   if (name === 'kubectl') {
     if (verb === 'delete') operations.push('delete');
     if (verb === 'apply') operations.push('deploy');
-    if (['get', 'describe'].includes(verb) && words.slice(1).some(value => value.split(',').some(resource => /^(?:secrets?)(?:\/|$)/.test(resource)))) operations.push('secret_read');
+    const resources = words[1]?.includes('/') ? words.slice(1).flatMap(value => value.split(',')).filter(value => value.includes('/')) : (words[1] || '').split(',');
+    if (['get', 'describe'].includes(verb) && resources.some(resource => /^(?:secrets?)(?:\/|$)/.test(resource))) operations.push('secret_read');
   } else if (name === 'helm') {
     if (['uninstall', 'delete'].includes(verb)) operations.push('delete');
     if (['install', 'upgrade'].includes(verb)) operations.push('deploy');
@@ -205,6 +207,14 @@ function secretUpload(name, args) {
       const equals = option.indexOf('=');
       value = option.slice(equals + 1);
       option = option.slice(0, equals);
+    } else if (name === 'curl' && /^-[^-]/.test(option)) {
+      for (let offset = 1; offset < option.length; offset++) {
+        const short = `-${option[offset]}`;
+        if (![files, paths, ignored, headers].some(set => set.has(short))) continue;
+        value = option.slice(offset + 1) || undefined;
+        option = short;
+        break;
+      }
     } else if (/^-[^-].+/.test(option) && [files, paths, ignored, headers].some(set => set.has(option.slice(0, 2)))) {
       value = option.slice(2);
       option = option.slice(0, 2);
@@ -232,13 +242,401 @@ function secretUpload(name, args) {
   return false;
 }
 
+function extractBalanced(source, start, open, close) {
+  let depth = 1;
+  let quote = '';
+  let escaped = false;
+  for (let i = start; i < source.length; i++) {
+    const char = source[i];
+    if (escaped) { escaped = false; continue; }
+    if (quote === "'") {
+      if (char === "'") quote = '';
+      continue;
+    }
+    if (quote === '"') {
+      if (char === '\\') escaped = true;
+      else if (char === '"') quote = '';
+      continue;
+    }
+    if (char === '\\') { escaped = true; continue; }
+    if (char === "'" || char === '"') { quote = char; continue; }
+    if (char === open) depth++;
+    if (char === close && --depth === 0) return { content: source.slice(start, i), next: i + 1 };
+  }
+  return null;
+}
+
+function extractBackticks(source, start) {
+  let escaped = false;
+  for (let i = start; i < source.length; i++) {
+    if (escaped) { escaped = false; continue; }
+    if (source[i] === '\\') { escaped = true; continue; }
+    if (source[i] === '`') return { content: source.slice(start, i), next: i + 1 };
+  }
+  return null;
+}
+
+function createShadowLexer(Lexer) {
+  return class extends Lexer {
+    readRedirection() {
+      const match = this.source.slice(this.index).match(/^(\d+)?(<<<|<<-|<<|>>|<>|>&|<&|>|<)/);
+      if (!match) return '';
+      this.index += match[0].length;
+      const duplication = ['<&', '>&'].includes(match[2])
+        ? this.source.slice(this.index).match(/^(\d+-?|-)(?=$|[\s;&|<>()])/)
+        : null;
+      if (duplication) this.index += duplication[0].length;
+      const fd = match[1] === undefined ? (match[2].startsWith('<') ? 0 : 1) : Number(match[1]);
+      if (duplication) {
+        this.duplicationTargets ||= new Map();
+        this.duplicationTargets.set(this.tokens.length, duplication[0]);
+      }
+      return { value: match[2], inlineTarget: Boolean(duplication), fd };
+    }
+
+    tokenize() {
+      const result = super.tokenize();
+      for (const [index, target] of this.duplicationTargets || []) result.tokens[index].duplicationTarget = target;
+      return result;
+    }
+
+    readWord() {
+      const start = this.index;
+      if (!this.expectHeredoc) {
+        const word = super.readWord();
+        if (word && !word.quoted) {
+          for (let i = start; i < this.index; i++) {
+            const sub = this.source.startsWith('$(', i) ? extractBalanced(this.source, i + 2, '(', ')')
+              : this.source[i] === '`' ? extractBackticks(this.source, i + 1) : null;
+            if (sub) { i = sub.next - 1; continue; }
+            if (this.source[i] === '\\' && this.source[i + 1] !== '\n') { word.quoted = true; break; }
+          }
+        }
+        return word;
+      }
+      const word = { type: 'word', value: '', literal: true, subs: [], quoted: false, unquotedExpansion: false };
+      while (this.index < this.source.length) {
+        const char = this.source[this.index];
+        if (/\s/.test(char) || ';&|<>()'.includes(char) || char === '#' && this.index === start) break;
+        if (this.source.startsWith("$'", this.index)) {
+          let end = this.index + 2;
+          while (end < this.source.length && this.source[end] !== "'") {
+            if (this.source[end] === '\\') end++;
+            end++;
+          }
+          const fragment = new Lexer(this.source.slice(this.index, end + 1));
+          const decoded = fragment.readWord();
+          if (!decoded) { this.error = fragment.error; return null; }
+          word.value += decoded.value;
+          word.quoted = true;
+          this.index = end + 1;
+          continue;
+        }
+        if (char === "'") {
+          const end = this.source.indexOf("'", this.index + 1);
+          if (end === -1) { this.error = 'unclosed single quote'; return null; }
+          word.value += this.source.slice(this.index + 1, end);
+          word.quoted = true;
+          this.index = end + 1;
+          continue;
+        }
+        if (char === '"' || this.source.startsWith('$"', this.index)) {
+          word.quoted = true;
+          if (char === '$') this.index++;
+          if (!this.readDoubleQuoted(word)) return null;
+          continue;
+        }
+        if (char === '\\') {
+          if (this.index + 1 >= this.source.length) { this.error = 'trailing escape'; return null; }
+          if (this.source[this.index + 1] !== '\n') {
+            word.value += this.source[this.index + 1];
+            word.quoted = true;
+          }
+          this.index += 2;
+          continue;
+        }
+        const sub = this.source.startsWith('$(', this.index) ? extractBalanced(this.source, this.index + 2, '(', ')')
+          : char === '`' ? extractBackticks(this.source, this.index + 1) : null;
+        if (this.source.startsWith('$(', this.index) || char === '`') {
+          if (!sub) { this.error = char === '`' ? 'unclosed backtick substitution' : 'unclosed command substitution'; return null; }
+          word.value += this.source.slice(this.index, sub.next);
+          this.index = sub.next;
+          continue;
+        }
+        if ('*?[]{}'.includes(char)) word.unquotedExpansion = true;
+        word.value += char;
+        this.index++;
+      }
+      this.expectHeredoc.token.heredocQuoted = word.quoted;
+      return this.index > start ? word : null;
+    }
+
+    readDoubleQuoted(word) {
+      this.index++;
+      while (this.index < this.source.length) {
+        const char = this.source[this.index];
+        if (char === '"') { this.index++; return true; }
+        if (char === '\\') {
+          if (this.index + 1 >= this.source.length) break;
+          const escaped = this.source[this.index + 1];
+          if (escaped !== '\n') word.value += /[$`"\\]/.test(escaped) ? escaped : `\\${escaped}`;
+          this.index += 2;
+          continue;
+        }
+        const sub = this.source.startsWith('$(', this.index) ? extractBalanced(this.source, this.index + 2, '(', ')')
+          : char === '`' ? extractBackticks(this.source, this.index + 1) : null;
+        if (this.source.startsWith('$(', this.index) || char === '`') {
+          if (!sub) break;
+          if (this.expectHeredoc) word.value += this.source.slice(this.index, sub.next);
+          else {
+            word.subs.push({ kind: 'command', content: sub.content });
+            word.literal = false;
+          }
+          this.index = sub.next;
+          continue;
+        }
+        if (char === '$' && !this.expectHeredoc) word.literal = false;
+        word.value += char;
+        this.index++;
+      }
+      this.error = 'unclosed double quote';
+      return false;
+    }
+
+    skipHeredocBodies() {
+      const heredocs = this.pendingHeredocs;
+      super.skipHeredocBodies();
+      for (const { token } of heredocs) {
+        if (typeof token.heredoc !== 'string') continue;
+        token.subs = [];
+        if (token.heredocQuoted) continue;
+        const body = token.heredoc;
+        for (let i = 0; i < body.length; i++) {
+          if (body[i] === '\\' && /[$`\\\n]/.test(body[i + 1] || '')) { i++; continue; }
+          const sub = body.startsWith('$(', i) ? extractBalanced(body, i + 2, '(', ')')
+            : body[i] === '`' ? extractBackticks(body, i + 1) : null;
+          if (sub) {
+            token.subs.push({ kind: 'command', content: sub.content });
+            i = sub.next - 1;
+          }
+        }
+      }
+    }
+  };
+}
+
+const wrapperOptions = {
+  command: { noArgument: new Set(['p', 'v', 'V']), takesArgument: new Set() },
+  env: { noArgument: new Set(['0', 'i', 'v']), takesArgument: new Set(['a', 'C', 'P', 'S', 'u']) },
+  exec: { noArgument: new Set(['c', 'l']), takesArgument: new Set(['a']) },
+  nohup: { noArgument: new Set(), takesArgument: new Set() },
+  sudo: { noArgument: new Set(['A', 'B', 'b', 'E', 'e', 'H', 'i', 'K', 'k', 'l', 'N', 'n', 'P', 'S', 's', 'v', 'V']), takesArgument: new Set(['C', 'D', 'g', 'h', 'p', 'r', 'R', 't', 'T', 'u', 'U']) },
+  timeout: { noArgument: new Set(['f', 'p', 'v']), takesArgument: new Set(['k', 's']) },
+};
+const wrapperLongOptions = {
+  command: { noArgument: new Set(['help', 'version']), takesArgument: new Set() },
+  env: { noArgument: new Set(['ignore-environment', 'null', 'help', 'version']), takesArgument: new Set(['argv0', 'block-signal', 'chdir', 'default-signal', 'ignore-signal', 'split-string', 'unset']) },
+  exec: { noArgument: new Set(), takesArgument: new Set() },
+  nohup: { noArgument: new Set(['help', 'version']), takesArgument: new Set() },
+  sudo: { noArgument: new Set(['askpass', 'background', 'bell', 'edit', 'help', 'login', 'non-interactive', 'preserve-env', 'preserve-groups', 'remove-timestamp', 'reset-timestamp', 'set-home', 'shell', 'stdin', 'validate', 'version']), takesArgument: new Set(['chdir', 'chroot', 'close-from', 'command-timeout', 'group', 'host', 'other-user', 'prompt', 'role', 'type', 'user']) },
+  timeout: { noArgument: new Set(['foreground', 'preserve-status', 'verbose', 'help', 'version']), takesArgument: new Set(['kill-after', 'signal']) },
+};
+const controlPrefixes = new Set(['if', 'then', 'else', 'elif', 'while', 'until', 'do', 'time', 'coproc', '!']);
+const controlStatements = new Set(['for', 'case', 'fi', 'esac', 'done', 'function']);
+const isAssignment = value => /^[A-Za-z_][A-Za-z0-9_]*=/.test(value);
+
+function splitEnvLiteral(source) {
+  const words = [];
+  let value = '';
+  let started = false;
+  let quote = '';
+  const finish = () => {
+    if (started) words.push({ type: 'word', value, literal: true, subs: [], quoted: false, unquotedExpansion: false });
+    value = '';
+    started = false;
+  };
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if ((char === "'" || char === '"') && (!quote || quote === char)) {
+      quote = quote ? '' : char;
+      started = true;
+      continue;
+    }
+    if (!quote && /[ \t\n\v\f\r]/.test(char)) { finish(); continue; }
+    if (char === '#' && !started) break;
+    if (char === '$' && quote !== "'") return null;
+    if (char === '\\' && (quote !== "'" || source[i + 1] === '\\' || source[i + 1] === "'")) {
+      const escape = source[++i];
+      if (escape === undefined) return null;
+      if (escape === '_') {
+        if (quote === '"') value += ' ';
+        else { finish(); continue; }
+      } else if (escape === 'c') {
+        if (quote) return null;
+        finish();
+        return words;
+      } else {
+        const escapes = { f: '\f', n: '\n', r: '\r', t: '\t', v: '\v', '"': '"', '#': '#', '$': '$', "'": "'", '\\': '\\' };
+        if (!Object.hasOwn(escapes, escape)) return null;
+        value += escapes[escape];
+      }
+    } else value += char;
+    started = true;
+  }
+  if (quote) return null;
+  finish();
+  return words;
+}
+
+function consumeShadowWrapperOptions(name, words, index) {
+  const owner = name === 'gtimeout' ? 'timeout' : name;
+  const short = wrapperOptions[owner];
+  const long = wrapperLongOptions[owner];
+  let next = index;
+  const split = (source, count) => {
+    const payload = source.literal && source.subs.length === 0 ? splitEnvLiteral(source.value) : null;
+    if (!payload) return { index: next, unresolved: true };
+    words.splice(next, count, ...payload);
+    return consumeShadowWrapperOptions(name, words, next);
+  };
+  while (words[next]) {
+    const value = words[next].value;
+    if (value === '--') return { index: next + 1, unresolved: false };
+    if (!value.startsWith('-') || value === '-') return { index: next, unresolved: false };
+    if (value.startsWith('--')) {
+      const equals = value.indexOf('=');
+      const option = value.slice(2, equals === -1 ? undefined : equals);
+      if (long.noArgument.has(option)) { next++; continue; }
+      if (!long.takesArgument.has(option)) return { index: next, unresolved: true };
+      if (equals !== -1) {
+        if (name === 'env' && option === 'split-string') return split({ ...words[next], value: value.slice(equals + 1) }, 1);
+        next++;
+        continue;
+      }
+      if (!words[next + 1]) return { index: next, unresolved: true };
+      if (name === 'env' && option === 'split-string') return split(words[next + 1], 2);
+      next += 2;
+      continue;
+    }
+    let consumedArgument = false;
+    for (let offset = 1; offset < value.length; offset++) {
+      const option = value[offset];
+      if (short.noArgument.has(option)) continue;
+      if (!short.takesArgument.has(option)) return { index: next, unresolved: true };
+      if (offset + 1 === value.length) {
+        if (!words[next + 1]) return { index: next, unresolved: true };
+        if (name === 'env' && option === 'S') return split(words[next + 1], 2);
+        next += 2;
+      } else {
+        if (name === 'env' && option === 'S') return split({ ...words[next], value: value.slice(offset + 1) }, 1);
+        next++;
+      }
+      consumedArgument = true;
+      break;
+    }
+    if (!consumedArgument) next++;
+  }
+  return { index: next, unresolved: false };
+}
+
+function shadowCommandPosition(tokens) {
+  const shared = parser.commandPosition(tokens);
+  const words = shared.words;
+  const first = words[0];
+  if ((!first || first.quoted || !controlPrefixes.has(first.value) && !controlStatements.has(first.value)) &&
+      !shared.wrappers.some(name => name === 'env' || name === 'command')) return shared;
+  let index = 0;
+  let unsupportedControl = false;
+  while (words[index] && !words[index].quoted && controlPrefixes.has(words[index].value)) {
+    unsupportedControl = true;
+    const prefix = words[index++].value;
+    if (prefix === 'time' && words[index]?.value === '-p') index++;
+  }
+  if (words[index] && !words[index].quoted && controlStatements.has(words[index].value)) unsupportedControl = true;
+  const assignmentStart = index;
+  while (words[index] && isAssignment(words[index].value)) index++;
+  const prefixAssignments = index - assignmentStart;
+  const wrappers = [];
+  let unresolvedWrapperOption = false;
+  let commandLookup = false;
+  let command = words[index];
+  while (command) {
+    const name = basename(command.value);
+    if (!Object.hasOwn(wrapperOptions, name) && name !== 'gtimeout') break;
+    wrappers.push(name);
+    const options = consumeShadowWrapperOptions(name, words, index + 1);
+    if (name === 'command') commandLookup ||= words.slice(index + 1, options.index).some(word => /^-[^-]*[vV]/.test(word.value));
+    if (commandLookup) { command = undefined; break; }
+    unresolvedWrapperOption ||= options.unresolved;
+    index = options.index;
+    if (name === 'env') while (words[index] && isAssignment(words[index].value)) index++;
+    if (name === 'timeout' || name === 'gtimeout') {
+      if (!words[index]) { unresolvedWrapperOption = true; command = undefined; break; }
+      index++;
+      if (!words[index]) unresolvedWrapperOption = true;
+    }
+    command = words[index];
+  }
+  return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, unsupportedControl, commandLookup };
+}
+
+function shadowShellInvocation(position) {
+  if (!position.command || position.commandLookup) return null;
+  if (!['sh', 'bash', 'zsh', 'dash', 'ksh'].includes(basename(position.command.value))) return null;
+  const words = position.words;
+  let readsStdin = false;
+  let optionsEnded = false;
+  for (let i = position.index + 1; i < words.length; i++) {
+    const option = words[i];
+    if (!optionsEnded && /^-[A-Za-z]*c[A-Za-z]*$/.test(option.value)) {
+      let payloadIndex = i + 1;
+      if (words[payloadIndex]?.value === '--') payloadIndex++;
+      return { kind: 'command', payload: words[payloadIndex] || null };
+    }
+    if (!optionsEnded && /^[-+][oO]$/.test(option.value)) { i++; continue; }
+    if (!optionsEnded && /^-[A-Za-z]*s[A-Za-z]*$/.test(option.value)) readsStdin = true;
+    if (option.value === '--') {
+      if (readsStdin) return { kind: 'stdin', payload: null, operand: words[i + 1] || null };
+      optionsEnded = true;
+    }
+    if (option.value === '--' || !optionsEnded && /^[-+]/.test(option.value)) continue;
+    if (readsStdin) return { kind: 'stdin', payload: null, operand: option };
+    return { kind: 'script', payload: option };
+  }
+  return { kind: 'stdin', payload: null };
+}
+
+function shadowShellStdinPayload(tokens, position) {
+  if (shadowShellInvocation(position)?.kind !== 'stdin') return null;
+  const descriptors = new Map();
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type !== 'redir') continue;
+    const target = token.inlineTarget ? null : tokens[i + 1];
+    if (token.value === '<&' || token.value === '>&') {
+      const duplication = token.inlineTarget ? token.duplicationTarget
+        : target?.type === 'word' && target.literal && target.subs.length === 0 && !target.unquotedExpansion ? target.value : null;
+      if (duplication !== null && /^\d+-?$/.test(duplication)) {
+        const source = Number(duplication.replace(/-$/, ''));
+        descriptors.set(token.fd, descriptors.get(source) ?? null);
+        if (duplication.endsWith('-')) descriptors.set(source, null);
+      } else descriptors.set(token.fd, null);
+      continue;
+    }
+    let payload = typeof token.heredoc === 'string' ? token.heredoc : null;
+    if (token.value === '<<<' && target?.type === 'word' && target.literal && target.subs.length === 0) payload = target.value;
+    descriptors.set(token.fd, payload);
+  }
+  return descriptors.get(0) ?? null;
+}
+
 // Only closed enums and booleans survive. Arbitrary tokens are NEVER redacted
 // into a best-effort string: they are discarded, including URLs and heredoc data.
 function describe(command, depth = 0) {
   const features = [];
   let unsupported = false;
   if (depth > 8 || command.length > 65536) return { features: [{ operation: 'opaque_execution', scope: 'unknown', recursive: false, force: false }], unsupported: true };
-  const parsed = new parser.Lexer(command).tokenize();
+  const parsed = new ShadowLexer(command).tokenize();
   if (parsed.error) unsupported = true;
   const add = (operation, args, extra = {}) => features.push({ operation, scope: targetScope(args), recursive: false, force: false, ...extra });
   const descend = text => {
@@ -252,7 +650,7 @@ function describe(command, depth = 0) {
       for (const sub of token.subs || []) descend(sub.content);
     }
     for (let i = 0; i < node.length - 1; i++) if (node[i].type === 'redir' && ['<', '<>'].includes(node[i].value) && secretPath(node[i + 1].value || '')) add('secret_read', [], { scope: 'secret' });
-    const position = parser.commandPosition(node);
+    const position = shadowCommandPosition(node);
     unsupported ||= position.unsupportedControl || position.unresolvedWrapperOption;
     if (position.commandLookup) continue;
     if (position.unsupportedControl && position.index === 0 &&
@@ -266,10 +664,10 @@ function describe(command, depth = 0) {
     }
     const name = basename(position.command.value);
     const args = position.words.slice(position.index + 1).map(w => w.value);
-    const shell = parser.shellInvocation(position);
+    const shell = shadowShellInvocation(position);
     if (shell) {
       if (shell.kind === 'command' && shell.payload) descend(shell.payload.value);
-      const stdin = parser.shellStdinPayload(node, position);
+      const stdin = shadowShellStdinPayload(node, position);
       if (stdin !== null) descend(stdin);
     } else if (name === 'eval') descend(args.join(' '));
     else if (name === 'ssh') {
@@ -489,7 +887,10 @@ async function main() {
     options[args[i]] = args[i + 1];
   }
   const log = options['--log'] || defaultLog;
-  if (['hook', 'evaluate'].includes(command)) parser = await import('./fm-arm-command-policy.mjs');
+  if (['hook', 'evaluate'].includes(command)) {
+    parser = await import('./fm-arm-command-policy.mjs');
+    ShadowLexer = createShadowLexer(parser.Lexer);
+  }
   if (process.argv.length === 2) toon({ bin: fileURLToPath(import.meta.url), description: 'Measure risky operations without changing command authority.' });
   if (command === 'metrics') return toon(metrics(log));
   if (command === 'hook') {

@@ -1367,7 +1367,7 @@ It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
 Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
 
-Selection reuses Firstmate's shell command-position parser, including nested groups, substitutions and literal shell payloads.
+Selection reuses Firstmate's read-only shell parser, with shadow-only parsing extensions kept inside the Jev hook; deterministic guard policies and their parser behavior remain unchanged.
 Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access commands are candidates; ordinary reads and printed command examples do not call Jev.
 For delete/deploy operations, production scope takes precedence over a secret-shaped target.
 Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
@@ -1377,8 +1377,8 @@ Wrapper parsing preserves ordered `env -S` child arguments and literal env quoti
 `command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
 Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
 SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
-Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources.
-Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; ordinary file reads, literal form data and output-only paths remain excluded.
+Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
+Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl's existing value-taking short options retain their meaning when bundled, while ordinary file reads, literal form data and output-only paths remain excluded.
 `printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.

@@ -56,6 +56,18 @@ function hasPathQualifiedCommandPrefix(position) {
     .some((word) => word.value.includes("/") && word.value.split("/").at(-1) === "command");
 }
 
+function hasCommandQueryPrefix(position) {
+  let commandPrefix = false;
+  for (const word of position.words.slice(position.prefixAssignments, position.index)) {
+    if (word.value === "command") {
+      commandPrefix = true;
+      continue;
+    }
+    if (commandPrefix && /^-[^-]*[vV]/.test(word.value)) return true;
+  }
+  return false;
+}
+
 function decision(command) {
   const lexed = new Lexer(command).tokenize();
   // Fail open on syntax this classifier cannot tokenize. The cd-guard's threat
@@ -71,9 +83,8 @@ function decision(command) {
     // substitutions (they contribute no top-level command word), and skips
     // leading assignments and wrappers to find the executed command word.
     const position = commandPosition(nodes[index]);
-    if (position.unsupportedControl) continue;
     if (hasPathQualifiedCommandPrefix(position)) continue;
-    if (position.commandLookup) continue;
+    if (hasCommandQueryPrefix(position)) continue;
     let command = position.command;
     let wordIndex = position.index;
     while (command && (command.value === "builtin" || command.value === "command")) {

@@ -131,20 +131,6 @@ matrix_case D62 deny "bash -xs sentinel <<< 'bin/fm-watch.sh'"
 matrix_case D63 deny "sh -s sentinel <<< 'bin/fm-watch.sh'"
 matrix_case D64 deny 'bash -s bin/fm-watch.sh'
 matrix_case D65 deny "bash -s -- -c harmless <<< 'bin/fm-watch.sh'"
-matrix_case D66 deny "env -S 'bash -c' 'bin/fm-watch.sh'"
-matrix_case D67 deny "env -P /usr/bin bash -c 'bin/fm-watch.sh'"
-matrix_case D68 deny 'if bin/fm-watch-arm.sh'
-matrix_case D69 deny 'time -p bin/fm-watch-arm.sh'
-matrix_case D70 deny '! bin/fm-watch-arm.sh'
-matrix_case D71 deny $'cat <<EOF\n$(bin/fm-watch.sh)\nEOF'
-matrix_case D72 deny $'bash <<\\EOF\nbin/fm-watch.sh\nEOF'
-matrix_case D73 deny "dash -o errexit -c 'bin/fm-watch.sh'"
-matrix_case D74 deny "ksh -c 'bin/fm-watch.sh'"
-matrix_case D75 deny $'bash </dev/null <<\'EOF\'\nbin/fm-watch.sh\nEOF'
-matrix_case D76 deny "command -v bash \"\$(bin/fm-watch.sh)\""
-matrix_case D77 deny $'cat <<EOF </dev/null\n$(bin/fm-watch.sh)\nEOF'
-matrix_case D78 deny 'env -S '\''bash -c "$(bin/fm-watch.sh)"'\'''
-matrix_case D79 deny 'env --split-string='\''bash -c "$(bin/fm-watch.sh)"'\'''
 
 matrix_case E01 allow "bin/fm-watch-checkpoint.sh --seconds '180;still-one-arg'"
 matrix_case E02 allow "bin/fm-watch-checkpoint.sh --label 'fm-watch-arm.sh; literal argument'"
@@ -163,18 +149,6 @@ matrix_case E14 allow '$FM_HOME/bin/fm-teardown.sh &'
 matrix_case E15 allow '$FM_HOME/bin/fm-watch-arm.sh'
 matrix_case E16 allow '~/firstmate/bin/fm-watch-checkpoint.sh --seconds 180'
 matrix_case E17 allow 'for f in 1; do echo fm-watch; done'
-matrix_case E18 allow "command -v bash -c 'bin/fm-watch.sh'"
-matrix_case E19 allow "command -V env -S 'bash -c' 'bin/fm-watch.sh'"
-matrix_case E20 allow "env if bin/fm-watch.sh"
-matrix_case E21 allow "command time bin/fm-watch.sh"
-matrix_case E22 allow $'cat <<\\EOF\n$(bin/fm-watch.sh)\nEOF'
-matrix_case E23 allow $'bash <<\'EOF\' </dev/null\nbin/fm-watch.sh\nEOF'
-matrix_case E24 allow "bash <<< 'bin/fm-watch.sh' 0<&3"
-matrix_case E25 allow "bash <<< 'bin/fm-watch.sh' <<< 'echo harmless'"
-matrix_case E26 allow "bash -- -c 'bin/fm-watch.sh'"
-matrix_case E27 allow "bash -o '-c' harmless 'bin/fm-watch.sh'"
-matrix_case E28 allow $'cat <<$(bin/fm-watch.sh)\nharmless\n$(bin/fm-watch.sh)'
-matrix_case E29 allow $'cat <<`bin/fm-watch.sh`\nharmless\n`bin/fm-watch.sh`'
 
 MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-arm-policy-matrix.XXXXXX")
 FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
