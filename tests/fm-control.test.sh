@@ -784,6 +784,119 @@ test_failed_exit_send_leaves_no_deliberate_exit_marker() {
   pass "fm-control exit: a failed exit send leaves no deliberate-exit marker"
 }
 
+# A live Claude pane on Herdr, answered by command rather than by call order
+# so the whole public exit path (agent state, busy read, composer guard) runs.
+make_herdr_claude_stub() {  # <case-dir>
+  local fb="$1/herdrbin"
+  mkdir -p "$fb"
+  cat > "$fb/herdr" <<'SH'
+#!/usr/bin/env bash
+set -u
+D=$FM_FAKE_DIR
+case "${1:-} ${2:-}" in
+  'status --json') printf '{"client":{"version":"0.7.1","protocol":14},"server":{"running":true}}\n' ;;
+  'pane get') printf '{"result":{"pane":{"pane_id":"%s"}}}\n' "$3" ;;
+  'agent get') printf '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}\n' ;;
+  'pane process-info')
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"claude","argv0":"claude","cmdline":"claude"}]}}}\n' "$4" ;;
+  'pane read')
+    printf '%s\n' "$*" >> "$D/reads"
+    [ ! -e "$D/unreadable" ] || exit 1
+    case " $* " in
+      *' --format ansi '*) cat "$D/screen" ;;
+      *) LC_ALL=C sed $'s/\033\\[[0-9;]*m//g' "$D/screen" ;;
+    esac ;;
+  'pane send-text'|'pane send-keys'|'pane run')
+    printf '%s\n' "$*" >> "$D/typed"
+    [ ! -f "$D/screen-after-send" ] || mv "$D/screen-after-send" "$D/screen"
+    [ ! -f "$D/unreadable-after-send" ] || mv "$D/unreadable-after-send" "$D/unreadable" ;;
+esac
+exit 0
+SH
+  chmod +x "$fb/herdr"
+}
+
+# Real Claude 2.1.285 draws a recognized slash command a human left typed in
+# RGB(51,102,255). The pre-send guard must see that draft and refuse by name;
+# reading it as ghost text let exit reach the submit path and fail there with
+# the generic transport error.
+test_herdr_exit_refuses_a_colored_claude_draft_before_typing() {
+  local dir out rc rule='────────────────────────'
+  dir=$(new_case herdr-colored-draft)
+  add_task "$dir" t1 claude ship herdr fmlab:w1:p2
+  printf 'herdr_session=fmlab\nherdr_workspace_id=w1\nherdr_tab_id=w1:t2\nherdr_pane_id=w1:p2\n' \
+    >> "$dir/home/state/t1.meta"
+  make_herdr_claude_stub "$dir"
+  printf '%s\n\xe2\x9d\xaf \033[38;2;51;102;255m/compact\033[0m\n%s\n' "$rule" "$rule" > "$dir/fake/screen"
+  out=$(env PATH="$dir/herdrbin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 "$CONTROL" t1 exit 2>&1); rc=$?
+  expect_code 1 "$rc" "an exit into a colored Claude draft should refuse: $out"
+  assert_contains "$out" "composer visibly holds pending text" \
+    "the refusal should name the pending draft, not a transport failure"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "a refused exit left a deliberate-exit marker: $(cat "$dir/home/state/t1.control-exit")"
+  [ ! -s "$dir/fake/typed" ] \
+    || fail "a refused exit typed into the pane: $(cat "$dir/fake/typed")"
+  pass "fm-control exit on herdr: a colored Claude draft refuses by name with no marker and nothing typed"
+}
+
+# A human types into an empty Claude composer while the typed /exit is being
+# proven. Enter is never pressed, so the exit is known not to have been sent:
+# it refuses at once, drops the deliberate-exit marker, and leaves the
+# human's text alone.
+test_herdr_exit_foreign_text_during_proof_is_a_known_send_failure() {
+  local dir out rc reads rule='────────────────────────'
+  dir=$(new_case herdr-foreign-proof)
+  add_task "$dir" t1 claude ship herdr fmlab:w1:p2
+  printf 'herdr_session=fmlab\nherdr_workspace_id=w1\nherdr_tab_id=w1:t2\nherdr_pane_id=w1:p2\n' \
+    >> "$dir/home/state/t1.meta"
+  make_herdr_claude_stub "$dir"
+  printf '%s\n\xe2\x9d\xaf\xc2\xa0\n%s\n' "$rule" "$rule" > "$dir/fake/screen"
+  printf '%s\n\xe2\x9d\xaf /exit keep my note\n%s\n' "$rule" "$rule" > "$dir/fake/screen-after-send"
+  out=$(env PATH="$dir/herdrbin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 "$CONTROL" t1 exit 2>&1); rc=$?
+  expect_code 1 "$rc" "an exit whose proof met foreign text should fail: $out"
+  assert_contains "$out" "could not be sent" "the refusal should say the exit command was not sent"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "a known send failure left a deliberate-exit marker: $(cat "$dir/home/state/t1.control-exit")"
+  assert_no_grep 'enter' "$dir/fake/typed" "foreign text in the composer must not be submitted"
+  assert_no_grep 'ctrl+u' "$dir/fake/typed" "a human's text must never be cleared"
+  reads=$(grep -c -- '--format ansi' "$dir/fake/reads")
+  [ "$reads" -eq 3 ] || fail "foreign text is refused on the first proof read (guard, pre-send, proof); saw $reads styled reads"
+  pass "fm-control exit on herdr: foreign text during the payload proof is a known send failure with no marker, Enter or clear"
+}
+
+test_herdr_exit_unproven_timeout_removes_marker_without_clearing() {
+  local dir out rc kind draft rule='────────────────────────'
+  for kind in prefix unreadable; do
+    dir=$(new_case "herdr-timeout-$kind")
+    add_task "$dir" t1 claude ship herdr fmlab:w1:p2
+    printf 'herdr_session=fmlab\nherdr_workspace_id=w1\nherdr_tab_id=w1:t2\nherdr_pane_id=w1:p2\n' \
+      >> "$dir/home/state/t1.meta"
+    make_herdr_claude_stub "$dir"
+    printf '%s\n\xe2\x9d\xaf\xc2\xa0\n%s\n' "$rule" "$rule" > "$dir/fake/screen"
+    draft=/ex
+    if [ "$kind" = unreadable ]; then
+      draft='keep my note'
+      : > "$dir/fake/unreadable-after-send"
+    fi
+    printf '%s\n\xe2\x9d\xaf %s\n%s\n' "$rule" "$draft" "$rule" > "$dir/fake/screen-after-send"
+    cp "$dir/fake/screen-after-send" "$dir/fake/expected-screen"
+    out=$(env PATH="$dir/herdrbin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      FM_BACKEND_HERDR_PROOF_WAIT=0 FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+      "$CONTROL" t1 exit 2>&1); rc=$?
+    expect_code 1 "$rc" "an exit with an unproven $kind timeout should fail: $out"
+    assert_contains "$out" "could not be sent" "the $kind timeout must report known non-delivery"
+    [ ! -e "$dir/home/state/t1.control-exit" ] \
+      || fail "the $kind timeout left a deliberate-exit marker"
+    assert_no_grep 'send-keys' "$dir/fake/typed" "the $kind timeout must not clear or submit text"
+    assert_grep ' /exit ' "$dir/fake/typed" "the exit must reach payload proof from an empty composer"
+    cmp -s "$dir/fake/screen" "$dir/fake/expected-screen" \
+      || fail "the $kind timeout changed the unproven draft"
+  done
+  pass "fm-control exit on herdr: unproven prefix and unreadable timeouts remove the marker and preserve text without keys"
+}
+
 test_already_stopped_exit_is_idempotent() {
   local dir out rc
   dir=$(new_case idempotent)
@@ -1113,6 +1226,9 @@ test_verb_allowlist_is_closed
 test_resume_is_refused_with_its_reason
 test_relaunch_only_flags_are_rejected_on_other_verbs
 test_already_stopped_exit_is_idempotent
+test_herdr_exit_refuses_a_colored_claude_draft_before_typing
+test_herdr_exit_foreign_text_during_proof_is_a_known_send_failure
+test_herdr_exit_unproven_timeout_removes_marker_without_clearing
 test_failed_exit_send_leaves_no_deliberate_exit_marker
 test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop
 test_interrupt_refuses_when_no_agent_runs

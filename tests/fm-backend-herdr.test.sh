@@ -34,6 +34,9 @@ TMP_ROOT=$(fm_test_tmproot fm-backend-herdr-tests)
 mkdir -p "$TMP_ROOT/ambient-home"
 export FM_HOME="$TMP_ROOT/ambient-home"
 export FM_BACKEND_HERDR_SUBMIT_MIN_SLEEP=0
+# One payload-proof read per submit keeps the call-numbered fixtures in step;
+# the late-render case sets its own wait.
+export FM_BACKEND_HERDR_PROOF_WAIT=0
 
 # make_herdr_fakebin: a `herdr` stub that logs every invocation (one line,
 # unit-separated args, to $FM_HERDR_LOG) and returns the canned response for
@@ -4179,6 +4182,39 @@ test_composer_state_grok_bright_truecolor_real_text_is_pending() {
   pass "fm_backend_herdr_composer_state: grok's real bright typed input still reads pending"
 }
 
+# Real Claude 2.1.285 draws a recognized slash command in RGB(51,102,255),
+# luminance ~104, under the ceiling that removes Grok's dark placeholder. The
+# state read every guard shares must keep it on a native Claude pane, or a
+# lifecycle command is typed onto a human's draft. The same bytes on a pane
+# with another identity keep the placeholder policy.
+test_composer_state_claude_colored_slash_draft_is_pending() {
+  local dir log resp fb out agent want
+  for agent in claude grok; do
+    dir="$TMP_ROOT/composer-colored-slash-$agent"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    printf '\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n\xe2\x9d\xaf \x1b[38;2;51;102;255m/compact\x1b[0m\n\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n' > "$resp/1.out"
+    printf '{"result":{"agent":{"agent":"%s","agent_status":"idle"}}}\n' "$agent" > "$resp/2.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+    want=empty
+    [ "$agent" != claude ] || want=pending
+    [ "$out" = "$want" ] || fail "a dark-truecolor slash draft on a $agent pane must read $want, got '$out'"
+  done
+  pass "fm_backend_herdr_composer_state: a colored slash draft is pending on a Claude pane and the placeholder policy holds elsewhere"
+}
+
+test_composer_state_claude_dim_colored_suggestion_is_empty() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/composer-dim-colored-suggestion"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n\xe2\x9d\xaf \x1b[2;38;2;51;102;255m/compact\x1b[0m\n\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}\n' > "$resp/2.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = empty ] || fail "an SGR-2 dim suggestion on a Claude pane must stay ghost text, got '$out'"
+  pass "fm_backend_herdr_composer_state: a dim colored suggestion on a Claude pane still reads empty"
+}
+
 test_composer_state_codex_bare_prompt_glyph_is_empty() {
   local dir log resp fb out
   dir="$TMP_ROOT/composer-codex-bare"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -4761,8 +4797,8 @@ test_send_text_submit_unknown_on_composer_capture_failure() {
 
 # On a Claude pane, a long payload the selected composer still holds is
 # submitted whole. A composer that kept only a suffix, a stale transcript head
-# above that suffix, or a paste placeholder plus a literal remainder does not
-# receive Enter, is cleared back to empty, and is not reported delivered.
+# above that suffix, or a paste placeholder followed by an owned suffix does
+# not receive Enter, is cleared back to empty, and is not reported delivered.
 herdr_long_payload() {  # <middle-length>
   awk -v n="$1" 'BEGIN { printf "HEAD"; for (i = 0; i < n; i++) printf "m"; printf "TAIL" }'
 }
@@ -5039,6 +5075,176 @@ test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted(
     || fail "the payload proof must use the visible viewport"
   [ "$(grep -c $'\x1f''--lines' "$log")" -eq 0 ] || fail "no composer read may be a bounded --lines tail"
   pass "fm_backend_herdr_send_text_submit: a typed slash command hidden behind its popup is still proven and submitted"
+}
+
+# Real Claude 2.1.285 uses blue RGB(51,102,255) for recognized slash commands
+# in a light theme. Use a skill command here; the live guard covers exit/compact.
+test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry() {
+  local text=/no-mistakes dir log resp fb out enter_count
+  dir="$TMP_ROOT/submit-colored-skill"
+  mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" "$text"
+  printf '❯ \033[38;2;51;102;255m%s\033[0m\n' "$text" > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/5.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/7.out"
+  # First Enter fills the popup without submitting. The colored command
+  # must still read pending so the second Enter, and only it, lands. That
+  # state read keeps the identity the submit already proved: the native probe
+  # is unavailable by then (call 9 answers any re-probe with an error), and a
+  # re-probe would strip the command and report a false delivery.
+  cp "$resp/4.out" "$resp/8.out"
+  printf '{"error":{"code":"timeout","message":"agent get timed out"}}\n' > "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
+  [ "$out" = empty ] || fail "colored $text must survive proof and submit, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "colored $text must retry swallowed Enter, sent $enter_count"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "colored $text must not be cleared"
+  pass "Claude colored slash commands survive payload proof and a swallowed first Enter while the native probe is unavailable"
+}
+
+# A loaded host rendered a typed /compact seconds after the settle. The proof
+# must keep reading until it appears, type nothing more, and then submit.
+test_send_text_submit_claude_payload_rendered_late_is_still_proven() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-late-render"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  mv "$resp/4.out" "$resp/5.out"
+  printf '  \xe2\x9d\xaf\n' > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a payload rendered after the settle must still be proven and submitted, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] || fail "the late-render wait must not retype the payload"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 1 ] \
+    || fail "a late-rendered payload is submitted with one Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a late-rendered payload must not be cleared"
+  pass "fm_backend_herdr_send_text_submit: a Claude payload rendered after the settle is still proven and submitted"
+}
+
+# The payload draws left to right, so a prefix is still arriving: keep reading.
+test_send_text_submit_claude_payload_prefix_growth_is_still_proven() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-prefix-growth"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  mv "$resp/4.out" "$resp/5.out"
+  printf '  \xe2\x9d\xaf /com\n' > "$resp/4.out"
+  printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/6.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/8.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = empty ] || fail "a payload still drawing its tail must be waited for and submitted, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] || fail "waiting for the tail must not retype the payload"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 1 ] \
+    || fail "a payload proven after it finished drawing is submitted with one Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a payload that finished drawing must not be cleared"
+  pass "fm_backend_herdr_send_text_submit: a Claude payload drawn as a growing prefix is still proven and submitted"
+}
+
+test_send_text_submit_claude_unproven_timeout_refuses_without_clearing() {
+  local dir log resp fb out kind
+  for kind in prefix empty unreadable; do
+    dir="$TMP_ROOT/submit-timeout-$kind"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    herdr_submit_claude_prefix "$resp" /compact
+    case "$kind" in
+      prefix) printf '  \xe2\x9d\xaf /co\n' > "$resp/4.out" ;;
+      empty) printf '  \xe2\x9d\xaf\n' > "$resp/4.out" ;;
+      unreadable) printf '1\n' > "$resp/4.exit"; printf '1\n' > "$resp/5.exit" ;;
+    esac
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_PROOF_WAIT=0 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+    [ "$out" = send-failed ] || fail "an unproven $kind timeout must report known non-delivery, got '$out'"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-text'$'\x1f' "$log")" -eq 1 ] \
+      || fail "the $kind timeout must type the payload only once"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f' "$log")" -eq 0 ] \
+      || fail "the $kind timeout must neither clear nor submit unproven composer text"
+    if [ "$kind" = unreadable ]; then
+      [ "$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")" -eq 3 ] \
+        || fail "unreadable proof must try both styled and plain capture before refusing at the deadline"
+    fi
+  done
+  pass "fm_backend_herdr_send_text_submit: prefix, empty and unreadable proof timeouts refuse without clear or Enter"
+}
+
+# A head-truncated suffix can never grow into the payload, so it is refused and
+# cleared on the read that shows it, however long the wait bound is.
+test_send_text_submit_claude_truncated_suffix_refuses_without_waiting() {
+  local dir log resp fb out text reads
+  dir="$TMP_ROOT/submit-suffix-fast"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  text=$(herdr_long_payload 1492)
+  herdr_submit_claude_prefix "$resp" "$text"
+  printf '  \xe2\x9d\xaf %s\n' "${text: -480}" > "$resp/4.out"
+  printf '  \xe2\x9d\xaf\n' > "$resp/6.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
+  [ "$out" = send-failed ] || fail "a truncated suffix should be refused and cleared, got '$out'"
+  reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+  [ "$reads" -eq 3 ] || fail "a truncated suffix is refused on the first proof read, then one clear check; saw $reads composer reads"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 1 ] || fail "this send's own truncated text should be cleared"
+  pass "fm_backend_herdr_send_text_submit: a truncated Claude suffix is refused on the read that shows it"
+}
+
+# Text this send did not type on its own belongs to someone else: refuse on
+# the read that shows it and leave it in place.
+test_send_text_submit_claude_foreign_text_refuses_without_clearing() {
+  local dir log resp fb out reads
+  dir="$TMP_ROOT/submit-foreign-text"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /compact
+  printf '  \xe2\x9d\xaf please keep my note\n' > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+  [ "$out" = send-failed ] || fail "foreign composer text was never submitted, so the send must report send-failed, got '$out'"
+  reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+  [ "$reads" -eq 2 ] || fail "foreign text is refused on the first proof read; saw $reads composer reads"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a human's text must never be cleared"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+    || fail "foreign text must not be submitted"
+  pass "fm_backend_herdr_send_text_submit: foreign Claude composer text is refused at once and never cleared"
+}
+
+# Ambiguous composer text that this send cannot prove it owns is left in place:
+# a strict infix of the payload, or a note beside a paste placeholder.
+test_send_text_submit_claude_ambiguous_text_refuses_without_clearing() {
+  local dir log resp fb out reads shown label
+  for shown in 'ompa' '[Pasted text #1] keep my note'; do
+    label=${shown// /-}
+    dir="$TMP_ROOT/submit-ambiguous-$label"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+    herdr_submit_claude_prefix "$resp" /compact
+    printf '  \xe2\x9d\xaf %s\n' "$shown" > "$resp/4.out"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_PROOF_WAIT=60 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /compact 3 0.01 0.01' "$ROOT" )
+    [ "$out" = send-failed ] || fail "ambiguous composer text '$shown' was never submitted, so the send must report send-failed, got '$out'"
+    reads=$(grep -c $'\x1f''pane'$'\x1f''read'$'\x1f' "$log")
+    [ "$reads" -eq 2 ] || fail "ambiguous text '$shown' is refused on the first proof read; saw $reads composer reads"
+    [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "ambiguous text '$shown' may be a human's and must never be cleared"
+    [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+      || fail "ambiguous text '$shown' must not be submitted"
+  done
+  pass "fm_backend_herdr_send_text_submit: a strict infix or a note beside a paste placeholder is refused at once and never cleared"
+}
+
+test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/submit-dim-slash"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_submit_claude_prefix "$resp" /exit
+  printf '❯ \033[2;38;2;51;102;255m/exit\033[0m\n' > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 /exit 3 0.01 0.01' "$ROOT" )
+  [ "$out" = send-failed ] || fail "dim suggestion must not prove /exit, got '$out'"
+  [ "$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")" -eq 0 ] \
+    || fail "a dim suggestion must not authorize Enter"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a dim suggestion timeout must not authorize clearing"
+  pass "Claude payload proof still refuses dim suggestions"
 }
 
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload() {
@@ -5903,6 +6109,8 @@ test_composer_state_claude_dim_prompt_suggestion_ghost_is_empty
 test_composer_state_claude_dim_ghost_row_with_real_text_is_pending
 test_composer_state_grok_dark_truecolor_placeholder_is_empty
 test_composer_state_grok_bright_truecolor_real_text_is_pending
+test_composer_state_claude_colored_slash_draft_is_pending
+test_composer_state_claude_dim_colored_suggestion_is_empty
 test_composer_state_codex_bare_prompt_glyph_is_empty
 test_composer_state_codex_faint_suggestion_is_empty
 test_composer_state_codex_non_faint_same_text_is_pending
@@ -5945,6 +6153,14 @@ test_send_text_submit_accepts_marked_payloads_whose_read_back_drops_u2063
 test_send_text_submit_refuses_marked_digest_missing_its_head
 test_composer_state_claude_slash_popup_pushes_composer_above_tail_window
 test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
+test_send_text_submit_claude_colored_commands_survive_proof_and_popup_retry
+test_send_text_submit_claude_payload_rendered_late_is_still_proven
+test_send_text_submit_claude_payload_prefix_growth_is_still_proven
+test_send_text_submit_claude_unproven_timeout_refuses_without_clearing
+test_send_text_submit_claude_truncated_suffix_refuses_without_waiting
+test_send_text_submit_claude_foreign_text_refuses_without_clearing
+test_send_text_submit_claude_ambiguous_text_refuses_without_clearing
+test_send_text_submit_claude_dim_suggestion_cannot_prove_the_payload
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload
 test_send_text_submit_refuses_placeholder_followed_by_a_literal_remainder

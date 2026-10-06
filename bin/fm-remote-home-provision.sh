@@ -10,8 +10,10 @@
 # from it and re-validates it through bin/fm-project-origin-lib.sh instead of
 # trusting the sender. The remote code root is cloned into a private staging
 # directory beside the absent home and installed by rename once complete, so
-# cleanup of the public home cannot remove a live clone's destination. Project
-# origins are cloned on this host, the project registry and charter are
+# cleanup of the public home cannot remove a live clone's destination.
+# The home clone uses Git transport even for the host-local code root, avoiding
+# loose-object copying that can race the source repository's automatic repack.
+# Project origins are cloned on this host, the project registry and charter are
 # published, the durable .fm-secondmate-parent record names this home's route to its parent as
 # "remote" - read by bin/fm-teardown.sh's cleanup gate so a delegated public
 # reply promise, which the subsystem can only carry on the parent's own
@@ -184,7 +186,7 @@ else
   # inside it instead of publishing, so rollback must remove only that stage.
   STAGE_HOME=$(mktemp -d "$HOME_PARENT/.fm-home-provisioning.XXXXXX") \
     || die "cannot create remote home staging directory"
-  git clone --quiet -- "$FM_ROOT" "$STAGE_HOME" || die "could not clone the remote Firstmate home"
+  git clone --quiet --no-local -- "$FM_ROOT" "$STAGE_HOME" || die "could not clone the remote Firstmate home"
   STAGE_SENTINEL="${STAGE_HOME##*/}.owner"
   : > "$STAGE_HOME/$STAGE_SENTINEL" || die "cannot mark the remote home staging directory"
   mv -- "$STAGE_HOME" "$FM_HOME" || die "cannot install the remote home"

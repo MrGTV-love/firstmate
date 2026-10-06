@@ -400,8 +400,10 @@ sleep 0.2
 [ "$(grep -cF clone "$TMP_ROOT/provision-clones")" -eq 1 ] \
   || fail "overlapping provisioning reached home classification concurrently"
 touch "$TMP_ROOT/provision.release"
-wait "$provision_one" || fail "first serialized provisioning attempt failed"
-wait "$provision_two" || fail "reconciled provisioning attempt failed"
+wait "$provision_one" \
+  || { cat "$TMP_ROOT/provision-one.out"; fail "first serialized provisioning attempt failed"; }
+wait "$provision_two" \
+  || { cat "$TMP_ROOT/provision-two.out"; fail "reconciled provisioning attempt failed"; }
 [ "$(cat "$TMP_ROOT/concurrent-home/.fm-secondmate-home")" = ios ] \
   || fail "serialized provisioning lost the published home"
 [ "$(grep -cF clone "$TMP_ROOT/provision-clones")" -eq 1 ] \
@@ -477,6 +479,67 @@ if find "$TMP_ROOT" -maxdepth 1 -name '.fm-home-provisioning.*' -print -quit | g
   fail "appeared-home provisioning left staging litter beside the home"
 fi
 pass "a home that appears mid-provision makes the provision die without touching it"
+
+# Repack after the real clone has negotiated its refs but before upload-pack
+# starts pack-objects. This executable boundary is portable and does not run
+# for Git's local object-copying shortcut; neither clone results nor objects
+# are mocked.
+REPACK_ROOT="$TMP_ROOT/repack-root"
+"$REAL_GIT" clone --quiet --no-local -- "$REMOTE_ROOT" "$REPACK_ROOT" \
+  || fail "cannot create the independent repack source"
+"$REAL_GIT" -C "$REPACK_ROOT" config user.email test@example.com
+"$REAL_GIT" -C "$REPACK_ROOT" config user.name Test
+"$REAL_GIT" -C "$REPACK_ROOT" config maintenance.auto false
+printf 'Source repack preserves this tracked content.\n' > "$REPACK_ROOT/repack-content"
+"$REAL_GIT" -C "$REPACK_ROOT" add repack-content
+"$REAL_GIT" -C "$REPACK_ROOT" commit -qm 'source-repack fixture' \
+  || fail "cannot commit the source-repack fixture"
+REPACK_HEAD=$("$REAL_GIT" -C "$REPACK_ROOT" rev-parse HEAD)
+REPACK_BLOB=$("$REAL_GIT" -C "$REPACK_ROOT" rev-parse HEAD:repack-content)
+REPACK_OBJECT="$REPACK_ROOT/.git/objects/${REPACK_BLOB:0:2}/${REPACK_BLOB:2}"
+[ -f "$REPACK_OBJECT" ] || fail "source-repack fixture did not start loose"
+cat > "$TMP_ROOT/repack-pack-objects" <<SH
+#!/usr/bin/env bash
+set -eu
+(
+  unset GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+  '$REAL_GIT' -C '$REPACK_ROOT' repack -ad
+) </dev/null >/dev/null
+[ ! -e '$REPACK_OBJECT' ]
+printf 'pack-objects\n' > '$TMP_ROOT/repack.completed'
+# upload-pack passes the original command, starting with git pack-objects.
+shift
+exec '$REAL_GIT' "\$@"
+SH
+# Host-local transport clears -c parameters, but inherits this private trusted
+# global config without loading any of the account's Git preferences.
+"$REAL_GIT" config --file "$TMP_ROOT/repack.config" uploadpack.packObjectsHook \
+  "'$TMP_ROOT/repack-pack-objects'" \
+  || fail "cannot configure the source-repack fixture"
+chmod +x "$TMP_ROOT/repack-pack-objects"
+GIT_CONFIG_GLOBAL="$TMP_ROOT/repack.config" FM_HOME="$TMP_ROOT/repacked-home" \
+  FM_ROOT_OVERRIDE="$REPACK_ROOT" \
+  bash "$REPACK_ROOT/bin/fm-remote-home-provision.sh" < "$TMP_ROOT/race.manifest" \
+  > "$TMP_ROOT/repack-provision.out" 2>&1 \
+  || { cat "$TMP_ROOT/repack-provision.out"; fail "source repack interrupted remote home provisioning"; }
+[ -s "$TMP_ROOT/repack.completed" ] && [ ! -e "$REPACK_OBJECT" ] \
+  || fail "source-repack regression never removed the selected loose object"
+"$REAL_GIT" -C "$REPACK_ROOT" cat-file -e "$REPACK_BLOB" \
+  || fail "source repack lost the selected object instead of packing it"
+[ "$("$REAL_GIT" -C "$TMP_ROOT/repacked-home" rev-parse HEAD)" = "$REPACK_HEAD" ] \
+  && "$REAL_GIT" -C "$TMP_ROOT/repacked-home" fsck --full --no-progress \
+    > "$TMP_ROOT/repack-fsck.out" 2>&1 \
+  && cmp -s "$REPACK_ROOT/repack-content" "$TMP_ROOT/repacked-home/repack-content" \
+  && [ "$(cat "$TMP_ROOT/repacked-home/.fm-secondmate-home")" = race ] \
+  || fail "source repack published an incomplete remote home"
+[ ! -s "$TMP_ROOT/repacked-home/.git/objects/info/alternates" ] \
+  || fail "source repack left the remote home borrowing objects"
+rm -rf -- "$REPACK_ROOT/.git/objects"
+"$REAL_GIT" -C "$TMP_ROOT/repacked-home" fsck --full --no-progress \
+  > "$TMP_ROOT/repack-independent-fsck.out" 2>&1 \
+  || fail "source repack left the remote home dependent on source objects"
+pass "source repack during cloning preserves a complete home with independent objects"
+
 if [ "${FM_TEST_PROVISION_ONLY:-0}" = 1 ]; then
   echo "ALL TESTS PASSED"
   exit 0
@@ -969,9 +1032,11 @@ spawn_inherit_wait=0
 # Earlier inherited files traverse the worker before captain-shared.md, so give
 # a loaded portable runner 30 seconds to reach this deliberately blocked write.
 while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
-  kill -0 "$spawn_concurrent" 2>/dev/null || fail "remote spawn exited before its blocked inheritance write"
+  kill -0 "$spawn_concurrent" 2>/dev/null \
+    || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn exited before its blocked inheritance write"; }
   spawn_inherit_wait=$((spawn_inherit_wait + 1))
-  [ "$spawn_inherit_wait" -le 1500 ] || fail "remote spawn never reached its blocked inheritance write"
+  [ "$spawn_inherit_wait" -le 1500 ] \
+    || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn never reached its blocked inheritance write"; }
   sleep 0.02
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
