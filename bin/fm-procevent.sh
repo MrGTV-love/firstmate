@@ -49,7 +49,7 @@
 #            Starts one when nothing live is in the way, and returns only after
 #            that generation's live claim or its launch stamp says it started.
 #            Polls within the reconcile confirm window, then refreshes evidence
-#            once at its boundary, waiting out a claim already in progress.
+#            once at its boundary without waiting for a still-unproved claim.
 #            No proof is a nonzero result. Exit 3 means a
 #            live listener from another registration generation still held the
 #            source when the window ended, so this generation cannot start until
@@ -1904,7 +1904,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # Every launch shares ONE window rather than taking a window each, so a whole
 # fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state current_identity final_read=0
+  local deadline window entry id rest identity before state current_identity claim final_read=0
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1924,8 +1924,15 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       identity=${rest%%$'\t'*}
       before=${rest#*$'\t'}
       ! launch_stamp_advanced "$id" "$identity" "$before" || continue
+      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
+        continue
+      fi
       state=1
-      if source_lock_for_read "$id" "$final_read"; then
+      # An absent record cannot prove readiness. Do not take the publisher's
+      # lock just to confirm absence and delay the runner trying to claim.
+      if claim=$(fm_procevent_claim_path "$id") \
+        && { [ -e "$claim" ] || [ -L "$claim" ]; } \
+        && fm_procevent_source_lock_try_acquire "$id"; then
         fm_procevent_claim_state_locked "$id"
         state=$?
         if [ "$state" -eq 0 ] && [ -n "$identity" ] \
@@ -1938,9 +1945,6 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
         fm_procevent_source_lock_release "$id"
       fi
       if [ "$state" -eq 0 ]; then
-        continue
-      fi
-      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
         continue
       fi
       remaining+=("$entry")
@@ -1970,23 +1974,15 @@ launch_stamp_advanced() {  # <source-id> <registration-identity> <stamp-before>
   [ -n "$mark" ] && [ "$mark" != "$3" ]
 }
 
-# Take the source lock for a launch-confirmation read. Polling reads never wait
-# on it. The final read does: a runner holds this lock for its whole claim, which
-# on a loaded host can outlast the confirm window, and a read that skipped a held
-# lock would report that claiming runner absent the moment before it is owned.
-source_lock_for_read() {  # <source-id> <final-read>
-  if [ "$2" -eq 1 ]; then
-    fm_procevent_source_lock_acquire "$1"
-  else
-    fm_procevent_source_lock_try_acquire "$1"
-  fi
-}
-
 # 0 when this registration generation holds a live claim, 3 when another
-# generation does, 1 otherwise. <final-read> 1 waits for the source lock.
-generation_is_listening() {  # <source-id> <registration-identity> <final-read>
-  local id=$1 identity=$2 state result=1
-  source_lock_for_read "$id" "$3" || return 1
+# generation does, 1 otherwise. A held lock is unproved, not permission to wait.
+generation_is_listening() {  # <source-id> <registration-identity>
+  local id=$1 identity=$2 state result=1 claim
+  # Avoid contending with startup while there is no ownership to validate.
+  # Presence is only a hint: every readiness verdict still uses the locked read.
+  claim=$(fm_procevent_claim_path "$id") || return 1
+  [ -e "$claim" ] || [ -L "$claim" ] || return 1
+  fm_procevent_source_lock_try_acquire "$id" || return 1
   fm_procevent_claim_state_locked "$id"
   state=$?
   if [ "$state" -eq 0 ]; then
@@ -2032,13 +2028,13 @@ cmd_ensure_listening() {
   deadline=$((SECONDS + 10#$window + 1))
   while :; do
     ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
-    listening=0
-    generation_is_listening "$id" "$identity" "$final_read" || listening=$?
-    [ "$listening" -ne 0 ] || return 0
     if [ "$final_read" -eq 1 ]; then
       ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
-      break
     fi
+    listening=0
+    generation_is_listening "$id" "$identity" || listening=$?
+    [ "$listening" -ne 0 ] || return 0
+    [ "$final_read" -eq 0 ] || break
     if [ "$started_once" -eq 0 ] && generation_can_launch "$id"; then
       detach_runner "$id"
       started_once=1
