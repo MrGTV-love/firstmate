@@ -1,0 +1,52 @@
+$ /bin/bash tests/.gate-policy-routing.sh
+$ fm-control.sh launch-policy-5303-26372-explicit-omp relaunch --harness omp --model openai-codex/gpt-6.1-sol --effort high --note explicit-replacement
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/explicit-omp/home/data/launch-policy-5303-26372-explicit-omp/launch-brief.md records no ship branch; defaulting to legacy branch fm/launch-policy-5303-26372-explicit-omp
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/explicit-omp/home/data/launch-policy-5303-26372-explicit-omp/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched launch-policy-5303-26372-explicit-omp harness=omp from=claude model=openai-codex/gpt-6.1-sol effort=high backend=tmux endpoint=firstmate:fm-launch-policy-5303-26372-explicit-omp worktree=/Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/explicit-omp/wt
+
+External fixture dispatch observations (not real model sessions):
+stop
+launch:omp
+launch:omp
+
+Product-persisted task metadata:
+window=firstmate:fm-launch-policy-5303-26372-explicit-omp
+endpoint_task_id=launch-policy-5303-26372-explicit-omp
+worktree=/Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/explicit-omp/wt
+project=/Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/explicit-omp/project
+harness=omp
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/launch-policy-5303-26372-explicit-omp
+tasktmp=/tmp/fm-launch-policy-5303-26372-explicit-omp
+model=openai-codex/gpt-6.1-sol
+effort=high
+busy_gen=g1791309835.33103.27205
+spawn_gen=s1791309836.16628.28954
+control_relaunch_tx=8126.20261006T180352Z.31381
+
+Unpublished work:
+unpublished work
+
+$ fm-spawn.sh launch-policy-5303-26372-compatibility-codex /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-codex/project --mode no-mistakes --yolo off (policy absent, external codex executable fixture)
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-codex/home/data/launch-policy-5303-26372-compatibility-codex/launch-brief.md records no ship branch; defaulting to legacy branch fm/launch-policy-5303-26372-compatibility-codex
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-codex/home/data/launch-policy-5303-26372-compatibility-codex/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned launch-policy-5303-26372-compatibility-codex harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-launch-policy-5303-26372-compatibility-codex worktree=/Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-codex/wt
+new-window
+launch:codex
+
+$ fm-spawn.sh launch-policy-5303-26372-compatibility-claude /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-claude/project --mode no-mistakes --yolo off (policy absent, external claude executable fixture)
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-claude/home/data/launch-policy-5303-26372-compatibility-claude/launch-brief.md records no ship branch; defaulting to legacy branch fm/launch-policy-5303-26372-compatibility-claude
+warning: /Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-claude/home/data/launch-policy-5303-26372-compatibility-claude/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned launch-policy-5303-26372-compatibility-claude harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-launch-policy-5303-26372-compatibility-claude worktree=/Users/charlesabrooker/tmp/fm-session-launch-policy.AIC54V/compatibility-claude/wt
+new-window
+launch:claude
+
+Descendant public configuration:
+omp-or-tc
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+descendant spawn exit=1
+
+exit=0

@@ -1,0 +1,54 @@
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home
+exit=0
+
+$ bash bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home
+/tmp/fml.XfFnmR
+exit=0
+
+$ tmux -L fm-lab new-session -d -s firstmate -n fm-sm1 -x 120 -y 40 /bin/zsh -f
+exit=0
+
+$ tmux -L fm-lab display-message -p -t firstmate:fm-sm1 #{pane_id} #{pane_pid} #{pane_current_command}
+%0 51849 zsh
+exit=0
+
+$ bash bin/fm-bootstrap.sh
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+SECONDMATE_LIVENESS: secondmate sm1: skipped: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+SECONDMATE_SYNC: secondmate sm1: skipped: primary default-branch commit cannot be resolved
+exit=0
+
+$ tmux -L fm-lab display-message -p -t firstmate:fm-sm1 #{pane_id} #{pane_pid} #{pane_current_command}
+%0 51849 zsh
+exit=0
+
+OBSERVED automatic bootstrap recovery: real empty zsh endpoint unchanged; metadata, attempt ledger, charter and unpublished work unchanged.
+{
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home/state/sm1.meta": "c0c7ac7d38ad20413bb9ad060c09dbe7e48091bc96fab5574cafd4684f199ea3",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home/state/.secondmate-relaunch-sm1": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home/sm1/data/charter.md": "121400232b748e5a3d8e7a0b6202db90a7e93d87753df52a6bd93dcccbedb0e3",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home/sm1/unpublished": "d92f9adeaad8c2dfb37d546c12f2897fbaa19d3059ec1c22090dfcc694e76690"
+}
+
+$ bash bin/fm-remote-secondmate-relaunch.sh remote-sm codex default default
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED parent policy denied remote replacement before any SSH transport; parent route unchanged.
+
+$ bash bin/fm-remote-secondmate-control.sh launch remote-sm codex explicit-model high herdr
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED destination policy denied host-local launch before backend access or endpoint removal; both route records unchanged. No Herdr session was accessed.
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/recovery/home
+exit=0
+
+Private tmux server and all disposable recovery fixtures removed.

@@ -1,0 +1,183 @@
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+exit=0
+
+$ bash bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+/tmp/fml.ffGKrL
+exit=0
+
+$ git init -q /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -n fm-prior -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J /bin/zsh -f
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary:fm-prior #{pane_id} #{pane_pid} #{window_width}x#{window_height} #{socket_path}
+%0 48605 120x40 /private/tmp/fml.ffGKrL/tmux-501/fm-lab
+exit=0
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED ship default: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-scout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED scout default: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-secondmate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --secondmate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED secondmate default: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED batch default: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness claude --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED explicit claude: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness pi --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'pi'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED explicit pi: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness env codex --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'env codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED explicit env codex: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --model arbitrary --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'omp --model arbitrary'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED explicit omp --model arbitrary: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness claude --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED TeamClaude proxy is not native tc run: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-control.sh prior relaunch --note continue preserved work
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED manual recorded Codex recovery: policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh prior --relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+
+OBSERVED direct recorded Codex recovery: policy refusal; forbidden executables not invoked
+
+$ tmux -L fm-lab display-message -p -t primary:fm-prior #{pane_id} #{pane_pid} #{pane_current_command}
+%0 48605 zsh
+exit=0
+
+OBSERVED prior endpoint and process remain alive; work, brief, metadata and validation SHA-256 unchanged:
+{
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home/state/prior.meta": "f33a950749d547f7f1307c599a5667e70fd85eedab3d4da04ad410cc7b1d8c31",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home/state/prior.validation": "130c4ae7b97ab8aa9b246f3f3c39b70407c1235561f2c299bdcda2c481d904a6",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home/data/prior/brief.md": "2cc53ea6b0c6f26643836fd858fa104d100625de975e3c1f3c1e0d8aaa1fb213",
+  "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project/work.txt": "6c60acb8a3e659209ba1698ea54e303725b412870e8b9895998e5bf56cfc80dd"
+}
+
+$ bash bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home/state prior --state idle --source claude-hook --event launch-brief
+g1791310431.58637.3446
+exit=0
+
+$ bash bin/fm-busy-event.sh apply /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home/state prior idle --gen g1791310431.58637.3446 --source claude-hook --event session-end
+exit=0
+
+Lab control shim clears only the redundant stock FM_STATE_OVERRIDE inserted by automatic recovery; actual fm-control.sh owns the replacement, with no gate bypass.
+
+$ bash bin/fm-watch.sh
+check: prior auto-relaunch failed after session-end: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-h
+exit=0
+
+ACTUAL automatic fm-control.sh output (watcher caps its reason at the first line):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+OBSERVED real watcher processed a session-end event, refused automatic replacement, and preserved endpoint, work, metadata and validation custody.
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+exit=1
+
+OBSERVED malformed opt-in '': policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+exit=1
+
+OBSERVED malformed opt-in 'unknown': policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+exit=1
+
+OBSERVED malformed opt-in 'omp-or-tc\n\n': policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+exit=1
+
+OBSERVED malformed opt-in 'omp-or-tc ': policy refusal; forbidden executables not invoked
+
+$ bash bin/fm-spawn.sh fresh-ship /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/project --harness omp --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+error: config/session-launch-policy must be a readable regular file containing omp-or-tc
+exit=1
+
+OBSERVED dangling opt-in: policy refusal; forbidden executables not invoked
+
+All driven CLI refusal scenarios passed against the tracked product and real private tmux endpoint. No model CLI was launched.
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/live-home
+exit=0
+
+Disposable home, project, and private tmux server removed.

@@ -1,0 +1,765 @@
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home
+exit=0
+
+$ bash bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home
+/tmp/fml.TNA2nX
+exit=0
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home printf "%s\n" "$$" > "$FM_HOME/state/.lock"; exec omp acp
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary -l {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": 1, "clientCapabilities": {"fs": {"readTextFile": false, "writeTextFile": false}, "terminal": false}, "clientInfo": {"name": "fm-gate-live", "version": "1"}}}
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary Enter
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -S -300 -t primary
+omp acp: ACP server speaking JSON-RPC over stdio.
+This command is meant to be spawned by an ACP client (e.g. Zed's "agent_servers" config), not run directly.
+Waiting for protocol frames on stdin; logs: ~/.omp/logs/
+{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": 1, "clientCapabilities": {"fs": {"read
+TextFile": false, "writeTextFile": false}, "terminal": false}, "clientInfo": {"name": "fm-gate-live", "version": "1"}}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"omp","title":"omp","version":"18.6.3"},"authM
+ethods":[{"id":"agent","name":"Use existing local credentials","description":"Authenticate via the provider keys/OAuth s
+tate already configured under ~/.omp."}],"agentCapabilities":{"loadSession":true,"mcpCapabilities":{"http":true,"sse":tr
+ue},"promptCapabilities":{"embeddedContext":true,"image":true},"sessionCapabilities":{"list":{},"fork":{},"resume":{},"c
+lose":{}}}}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary -l {"jsonrpc": "2.0", "id": 2, "method": "session/new", "params": {"cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home", "mcpServers": []}}
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary Enter
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -S -300 -t primary
+wen3 30B A3B","description":"openrouter/qwen/qwen3-30b-a3b"},{"value":"openrouter/qwen/qwen3-30b-a3b-instruct-2507","nam
+e":"Qwen3 30B A3B Instruct 2507","description":"openrouter/qwen/qwen3-30b-a3b-instruct-2507"},{"value":"openrouter/qwen/
+qwen3-30b-a3b-thinking-2507","name":"Qwen3 30B A3B Thinking 2507","description":"openrouter/qwen/qwen3-30b-a3b-thinking-
+2507"},{"value":"openrouter/qwen/qwen3-32b","name":"Qwen3 32B","description":"openrouter/qwen/qwen3-32b"},{"value":"open
+router/qwen/qwen3-4b","name":"Qwen3 4B","description":"openrouter/qwen/qwen3-4b"},{"value":"openrouter/qwen/qwen3-4b:fre
+e","name":"Qwen3 4B (free)","description":"openrouter/qwen/qwen3-4b:free"},{"value":"openrouter/qwen/qwen3-8b","name":"Q
+wen3 8B","description":"openrouter/qwen/qwen3-8b"},{"value":"openrouter/qwen/qwen3-coder","name":"Qwen3 Coder 480B A35B"
+,"description":"openrouter/qwen/qwen3-coder"},{"value":"openrouter/qwen/qwen3-coder-30b-a3b-instruct","name":"Qwen3 Code
+r 30B A3B Instruct","description":"openrouter/qwen/qwen3-coder-30b-a3b-instruct"},{"value":"openrouter/qwen/qwen3-coder-
+flash","name":"Qwen3 Coder Flash","description":"openrouter/qwen/qwen3-coder-flash"},{"value":"openrouter/qwen/qwen3-cod
+er-next","name":"Qwen3 Coder Next","description":"openrouter/qwen/qwen3-coder-next"},{"value":"openrouter/qwen/qwen3-cod
+er-plus","name":"Qwen3 Coder Plus","description":"openrouter/qwen/qwen3-coder-plus"},{"value":"openrouter/qwen/qwen3-cod
+er:exacto","name":"Qwen3 Coder 480B A35B (exacto)","description":"openrouter/qwen/qwen3-coder:exacto"},{"value":"openrou
+ter/qwen/qwen3-coder:free","name":"Qwen3 Coder 480B A35B (free)","description":"openrouter/qwen/qwen3-coder:free"},{"val
+ue":"openrouter/qwen/qwen3-max","name":"Qwen3 Max","description":"openrouter/qwen/qwen3-max"},{"value":"openrouter/qwen/
+qwen3-max-thinking","name":"Qwen3 Max Thinking","description":"openrouter/qwen/qwen3-max-thinking"},{"value":"openrouter
+/qwen/qwen3-next-80b-a3b-instruct","name":"Qwen3 Next 80B A3B Instruct","description":"openrouter/qwen/qwen3-next-80b-a3
+b-instruct"},{"value":"openrouter/qwen/qwen3-next-80b-a3b-instruct:free","name":"Qwen3 Next 80B A3B Instruct (free)","de
+scription":"openrouter/qwen/qwen3-next-80b-a3b-instruct:free"},{"value":"openrouter/qwen/qwen3-next-80b-a3b-thinking","n
+ame":"Qwen3 Next 80B A3B Thinking","description":"openrouter/qwen/qwen3-next-80b-a3b-thinking"},{"value":"openrouter/qwe
+n/qwen3-vl-235b-a22b-instruct","name":"Qwen3 VL 235B A22B Instruct","description":"openrouter/qwen/qwen3-vl-235b-a22b-in
+struct"},{"value":"openrouter/qwen/qwen3-vl-235b-a22b-thinking","name":"Qwen3 VL 235B A22B Thinking","description":"open
+router/qwen/qwen3-vl-235b-a22b-thinking"},{"value":"openrouter/qwen/qwen3-vl-30b-a3b-instruct","name":"Qwen3 VL 30B A3B
+Instruct","description":"openrouter/qwen/qwen3-vl-30b-a3b-instruct"},{"value":"openrouter/qwen/qwen3-vl-30b-a3b-thinking
+","name":"Qwen3 VL 30B A3B Thinking","description":"openrouter/qwen/qwen3-vl-30b-a3b-thinking"},{"value":"openrouter/qwe
+n/qwen3-vl-32b-instruct","name":"Qwen3 VL 32B Instruct","description":"openrouter/qwen/qwen3-vl-32b-instruct"},{"value":
+"openrouter/qwen/qwen3-vl-8b-instruct","name":"Qwen3 VL 8B Instruct","description":"openrouter/qwen/qwen3-vl-8b-instruct
+"},{"value":"openrouter/qwen/qwen3-vl-8b-thinking","name":"Qwen3 VL 8B Thinking","description":"openrouter/qwen/qwen3-vl
+-8b-thinking"},{"value":"openrouter/qwen/qwen3.5-122b-a10b","name":"Qwen3.5-122B-A10B","description":"openrouter/qwen/qw
+en3.5-122b-a10b"},{"value":"openrouter/qwen/qwen3.5-27b","name":"Qwen3.5-27B","description":"openrouter/qwen/qwen3.5-27b
+"},{"value":"openrouter/qwen/qwen3.5-35b-a3b","name":"Qwen3.5-35B-A3B","description":"openrouter/qwen/qwen3.5-35b-a3b"},
+{"value":"openrouter/qwen/qwen3.5-397b-a17b","name":"Qwen3.5 397B A17B","description":"openrouter/qwen/qwen3.5-397b-a17b
+"},{"value":"openrouter/qwen/qwen3.5-9b","name":"Qwen3.5-9B","description":"openrouter/qwen/qwen3.5-9b"},{"value":"openr
+outer/qwen/qwen3.5-9b:batch","name":"Qwen3.5-9B (batch)","description":"openrouter/qwen/qwen3.5-9b:batch"},{"value":"ope
+nrouter/qwen/qwen3.5-flash-02-23","name":"Qwen3.5-Flash","description":"openrouter/qwen/qwen3.5-flash-02-23"},{"value":"
+openrouter/qwen/qwen3.5-plus-02-15","name":"Qwen3.5 Plus 2026-02-15","description":"openrouter/qwen/qwen3.5-plus-02-15"}
+,{"value":"openrouter/qwen/qwen3.5-plus-20260420","name":"Qwen3.5 Plus 2026-04-20","description":"openrouter/qwen/qwen3.
+5-plus-20260420"},{"value":"openrouter/qwen/qwen3.6-27b","name":"Qwen3.6 27B","description":"openrouter/qwen/qwen3.6-27b
+"},{"value":"openrouter/qwen/qwen3.6-35b-a3b","name":"Qwen3.6 35B A3B","description":"openrouter/qwen/qwen3.6-35b-a3b"},
+{"value":"openrouter/qwen/qwen3.6-flash","name":"Qwen3.6 Flash","description":"openrouter/qwen/qwen3.6-flash"},{"value":
+"openrouter/qwen/qwen3.6-max-preview","name":"Qwen3.6 Max Preview","description":"openrouter/qwen/qwen3.6-max-preview"},
+{"value":"openrouter/qwen/qwen3.6-plus","name":"Qwen3.6 Plus","description":"openrouter/qwen/qwen3.6-plus"},{"value":"op
+enrouter/qwen/qwen3.6-plus-preview:free","name":"Qwen3.6 Plus Preview (free)","description":"openrouter/qwen/qwen3.6-plu
+s-preview:free"},{"value":"openrouter/qwen/qwen3.6-plus:free","name":"Qwen3.6 Plus (free)","description":"openrouter/qwe
+n/qwen3.6-plus:free"},{"value":"openrouter/qwen/qwen3.7-flash","name":"Qwen3.7 Flash","description":"openrouter/qwen/qwe
+n3.7-flash"},{"value":"openrouter/qwen/qwen3.7-max","name":"Qwen3.7 Max","description":"openrouter/qwen/qwen3.7-max"},{"
+value":"openrouter/qwen/qwen3.7-plus","name":"Qwen3.7 Plus","description":"openrouter/qwen/qwen3.7-plus"},{"value":"open
+router/qwen/qwen3.8-2.4t-a95b","name":"Qwen3.8 2.4T A95B","description":"openrouter/qwen/qwen3.8-2.4t-a95b"},{"value":"o
+penrouter/qwen/qwen3.8-2.4t-a95b:batch","name":"Qwen3.8 2.4T A95B (batch)","description":"openrouter/qwen/qwen3.8-2.4t-a
+95b:batch"},{"value":"openrouter/qwen/qwen3.8-27b","name":"Qwen3.8 27B","description":"openrouter/qwen/qwen3.8-27b"},{"v
+alue":"openrouter/qwen/qwen3.8-27b:free","name":"Qwen3.8 27B (free)","description":"openrouter/qwen/qwen3.8-27b:free"},{
+"value":"openrouter/qwen/qwen3.8-flash","name":"Qwen3.8 Flash","description":"openrouter/qwen/qwen3.8-flash"},{"value":"
+openrouter/qwen/qwen3.8-max","name":"Qwen3.8 Max","description":"openrouter/qwen/qwen3.8-max"},{"value":"openrouter/qwen
+/qwen3.8-max-0902","name":"Qwen3.8 Max (0902)","description":"openrouter/qwen/qwen3.8-max-0902"},{"value":"openrouter/qw
+en/qwen3.8-max-prime","name":"Qwen3.8 Max Prime","description":"openrouter/qwen/qwen3.8-max-prime"},{"value":"openrouter
+/qwen/qwen3.8-omni-flash","name":"Qwen3.8 Omni Flash","description":"openrouter/qwen/qwen3.8-omni-flash"},{"value":"open
+router/qwen/qwq-32b","name":"QwQ 32B","description":"openrouter/qwen/qwq-32b"},{"value":"openrouter/reka/reka-edge","nam
+e":"Reka Edge","description":"openrouter/reka/reka-edge"},{"value":"openrouter/rekaai/reka-edge","name":"Reka Edge","des
+cription":"openrouter/rekaai/reka-edge"},{"value":"openrouter/relace/relace-search","name":"Relace Search","description"
+:"openrouter/relace/relace-search"},{"value":"openrouter/sakana/fugu-max","name":"Fugu Max","description":"openrouter/sa
+kana/fugu-max"},{"value":"openrouter/sakana/fugu-ultra","name":"Fugu Ultra","description":"openrouter/sakana/fugu-ultra"
+},{"value":"openrouter/sakana/fugu-ultra-v2","name":"Fugu Ultra v2","description":"openrouter/sakana/fugu-ultra-v2"},{"v
+alue":"openrouter/sakana/sakana-namazu","name":"Sakana Namazu","description":"openrouter/sakana/sakana-namazu"},{"value"
+:"openrouter/sao10k/l3-euryale-70b","name":"Llama 3 Euryale 70B v2.1","description":"openrouter/sao10k/l3-euryale-70b"},
+{"value":"openrouter/sao10k/l3.1-euryale-70b","name":"Llama 3.1 Euryale 70B v2.2","description":"openrouter/sao10k/l3.1-
+euryale-70b"},{"value":"openrouter/stealth/ox-alpha","name":"Ox Alpha","description":"openrouter/stealth/ox-alpha"},{"va
+lue":"openrouter/stealth/space-bunny-alpha","name":"Space Bunny Alpha","description":"openrouter/stealth/space-bunny-alp
+ha"},{"value":"openrouter/stepfun/step-3.5-flash","name":"Step 3.5 Flash","description":"openrouter/stepfun/step-3.5-fla
+sh"},{"value":"openrouter/stepfun/step-3.5-flash:free","name":"Step 3.5 Flash (free)","description":"openrouter/stepfun/
+step-3.5-flash:free"},{"value":"openrouter/stepfun/step-3.7-flash","name":"Step 3.7 Flash","description":"openrouter/ste
+pfun/step-3.7-flash"},{"value":"openrouter/tencent/hy3","name":"Hy3","description":"openrouter/tencent/hy3"},{"value":"o
+penrouter/tencent/hy3-preview","name":"Hy3 preview","description":"openrouter/tencent/hy3-preview"},{"value":"openrouter
+/tencent/hy3-preview:free","name":"Hy3 preview (free)","description":"openrouter/tencent/hy3-preview:free"},{"value":"op
+enrouter/tencent/hy3:free","name":"Hy3 (free)","description":"openrouter/tencent/hy3:free"},{"value":"openrouter/tencent
+/hy4-preview","name":"Hy4 preview","description":"openrouter/tencent/hy4-preview"},{"value":"openrouter/thedrummer/rocin
+ante-12b","name":"Rocinante 12B","description":"openrouter/thedrummer/rocinante-12b"},{"value":"openrouter/thedrummer/un
+slopnemo-12b","name":"UnslopNemo 12B","description":"openrouter/thedrummer/unslopnemo-12b"},{"value":"openrouter/thinkin
+gmachines/inkling","name":"Inkling","description":"openrouter/thinkingmachines/inkling"},{"value":"openrouter/thinkingma
+chines/inkling-small","name":"Inkling Small","description":"openrouter/thinkingmachines/inkling-small"},{"value":"openro
+uter/thinkingmachines/inkling-small:batch","name":"Inkling Small (batch)","description":"openrouter/thinkingmachines/ink
+ling-small:batch"},{"value":"openrouter/thinkingmachines/inkling-small:free","name":"Inkling Small (free)","description"
+:"openrouter/thinkingmachines/inkling-small:free"},{"value":"openrouter/thinkingmachines/inkling:batch","name":"Inkling
+(batch)","description":"openrouter/thinkingmachines/inkling:batch"},{"value":"openrouter/thinkingmachines/inkling:free",
+"name":"Inkling (free)","description":"openrouter/thinkingmachines/inkling:free"},{"value":"openrouter/tngtech/deepseek-
+r1t2-chimera","name":"DeepSeek R1T2 Chimera","description":"openrouter/tngtech/deepseek-r1t2-chimera"},{"value":"openrou
+ter/tngtech/tng-r1t-chimera","name":"R1T Chimera","description":"openrouter/tngtech/tng-r1t-chimera"},{"value":"openrout
+er/unbiased/pareto","name":"Pareto","description":"openrouter/unbiased/pareto"},{"value":"openrouter/unbiased/pareto-26.
+10-preview","name":"Pareto 26.10 Preview","description":"openrouter/unbiased/pareto-26.10-preview"},{"value":"openrouter
+/upstage/solar-mini4","name":"Solar Mini 4","description":"openrouter/upstage/solar-mini4"},{"value":"openrouter/upstage
+/solar-pro-3","name":"Solar Pro 3","description":"openrouter/upstage/solar-pro-3"},{"value":"openrouter/upstage/solar-pr
+o-3:free","name":"Solar Pro 3 (free)","description":"openrouter/upstage/solar-pro-3:free"},{"value":"openrouter/upstage/
+solar-pro4","name":"Solar Pro 4","description":"openrouter/upstage/solar-pro4"},{"value":"openrouter/x-ai/grok-3","name"
+:"Grok 3","description":"openrouter/x-ai/grok-3"},{"value":"openrouter/x-ai/grok-3-beta","name":"Grok 3 Beta","descripti
+on":"openrouter/x-ai/grok-3-beta"},{"value":"openrouter/x-ai/grok-3-mini","name":"Grok 3 Mini","description":"openrouter
+/x-ai/grok-3-mini"},{"value":"openrouter/x-ai/grok-3-mini-beta","name":"Grok 3 Mini Beta","description":"openrouter/x-ai
+/grok-3-mini-beta"},{"value":"openrouter/x-ai/grok-4","name":"Grok 4","description":"openrouter/x-ai/grok-4"},{"value":"
+openrouter/x-ai/grok-4-fast","name":"Grok 4 Fast","description":"openrouter/x-ai/grok-4-fast"},{"value":"openrouter/x-ai
+/grok-4.1-fast","name":"Grok 4.1 Fast","description":"openrouter/x-ai/grok-4.1-fast"},{"value":"openrouter/x-ai/grok-4.2
+0","name":"Grok 4.20","description":"openrouter/x-ai/grok-4.20"},{"value":"openrouter/x-ai/grok-4.20-beta","name":"Grok
+4.20 Beta","description":"openrouter/x-ai/grok-4.20-beta"},{"value":"openrouter/x-ai/grok-4.3","name":"Grok 4.3","descri
+ption":"openrouter/x-ai/grok-4.3"},{"value":"openrouter/x-ai/grok-4.3:batch","name":"Grok 4.3 (batch)","description":"op
+enrouter/x-ai/grok-4.3:batch"},{"value":"openrouter/x-ai/grok-4.5","name":"Grok 4.5","description":"openrouter/x-ai/grok
+-4.5"},{"value":"openrouter/x-ai/grok-4.6","name":"Grok 4.6","description":"openrouter/x-ai/grok-4.6"},{"value":"openrou
+ter/x-ai/grok-4.7","name":"Grok 4.7","description":"openrouter/x-ai/grok-4.7"},{"value":"openrouter/x-ai/grok-build-0.1"
+,"name":"Grok Build 0.1","description":"openrouter/x-ai/grok-build-0.1"},{"value":"openrouter/x-ai/grok-code-fast-1","na
+me":"Grok Code Fast 1","description":"openrouter/x-ai/grok-code-fast-1"},{"value":"openrouter/xiaomi/mimo-v2-flash","nam
+e":"MiMo-V2-Flash","description":"openrouter/xiaomi/mimo-v2-flash"},{"value":"openrouter/xiaomi/mimo-v2-omni","name":"Mi
+Mo V2 Omni","description":"openrouter/xiaomi/mimo-v2-omni"},{"value":"openrouter/xiaomi/mimo-v2-pro","name":"MiMo V2 Pro
+","description":"openrouter/xiaomi/mimo-v2-pro"},{"value":"openrouter/xiaomi/mimo-v2.5","name":"MiMo-V2.5","description"
+:"openrouter/xiaomi/mimo-v2.5"},{"value":"openrouter/xiaomi/mimo-v2.5-pro","name":"MiMo-V2.5-Pro","description":"openrou
+ter/xiaomi/mimo-v2.5-pro"},{"value":"openrouter/xiaomi/mimo-v2.6-flash","name":"MiMo-V2.6-Flash","description":"openrout
+er/xiaomi/mimo-v2.6-flash"},{"value":"openrouter/xiaomi/mimo-v2.6-pro","name":"MiMo-V2.6-Pro","description":"openrouter/
+xiaomi/mimo-v2.6-pro"},{"value":"openrouter/xiaomi/mimo-v2.6-pro-ultraspeed","name":"MiMo-V2.6-Pro-UltraSpeed","descript
+ion":"openrouter/xiaomi/mimo-v2.6-pro-ultraspeed"},{"value":"openrouter/z-ai/glm-4-32b","name":"GLM 4 32B","description"
+:"openrouter/z-ai/glm-4-32b"},{"value":"openrouter/z-ai/glm-4.5","name":"GLM 4.5","description":"openrouter/z-ai/glm-4.5
+"},{"value":"openrouter/z-ai/glm-4.5-air","name":"GLM 4.5 Air","description":"openrouter/z-ai/glm-4.5-air"},{"value":"op
+enrouter/z-ai/glm-4.5-air:free","name":"GLM 4.5 Air (free)","description":"openrouter/z-ai/glm-4.5-air:free"},{"value":"
+openrouter/z-ai/glm-4.5v","name":"GLM 4.5V","description":"openrouter/z-ai/glm-4.5v"},{"value":"openrouter/z-ai/glm-4.6"
+,"name":"GLM 4.6","description":"openrouter/z-ai/glm-4.6"},{"value":"openrouter/z-ai/glm-4.6:exacto","name":"GLM 4.6 (ex
+acto)","description":"openrouter/z-ai/glm-4.6:exacto"},{"value":"openrouter/z-ai/glm-4.6v","name":"GLM 4.6V","descriptio
+n":"openrouter/z-ai/glm-4.6v"},{"value":"openrouter/z-ai/glm-4.7","name":"GLM 4.7","description":"openrouter/z-ai/glm-4.
+7"},{"value":"openrouter/z-ai/glm-4.7-flash","name":"GLM 4.7 Flash","description":"openrouter/z-ai/glm-4.7-flash"},{"val
+ue":"openrouter/z-ai/glm-5","name":"GLM 5","description":"openrouter/z-ai/glm-5"},{"value":"openrouter/z-ai/glm-5-turbo"
+,"name":"GLM 5 Turbo","description":"openrouter/z-ai/glm-5-turbo"},{"value":"openrouter/z-ai/glm-5.1","name":"GLM 5.1","
+description":"openrouter/z-ai/glm-5.1"},{"value":"openrouter/z-ai/glm-5.2","name":"GLM 5.2","description":"openrouter/z-
+ai/glm-5.2"},{"value":"openrouter/z-ai/glm-5.2:batch","name":"GLM 5.2 (batch)","description":"openrouter/z-ai/glm-5.2:ba
+tch"},{"value":"openrouter/z-ai/glm-5.2:free","name":"GLM 5.2 (free)","description":"openrouter/z-ai/glm-5.2:free"},{"va
+lue":"openrouter/z-ai/glm-5.3","name":"GLM 5.3","description":"openrouter/z-ai/glm-5.3"},{"value":"openrouter/z-ai/glm-5
+.3-flash","name":"GLM 5.3 Flash","description":"openrouter/z-ai/glm-5.3-flash"},{"value":"openrouter/z-ai/glm-5.3-flash:
+batch","name":"GLM 5.3 Flash (batch)","description":"openrouter/z-ai/glm-5.3-flash:batch"},{"value":"openrouter/z-ai/glm
+-5.3-flashx","name":"GLM 5.3 FlashX","description":"openrouter/z-ai/glm-5.3-flashx"},{"value":"openrouter/z-ai/glm-5.3-p
+rime","name":"GLM 5.3 Prime","description":"openrouter/z-ai/glm-5.3-prime"},{"value":"openrouter/z-ai/glm-5.3:batch","na
+me":"GLM 5.3 (batch)","description":"openrouter/z-ai/glm-5.3:batch"},{"value":"openrouter/z-ai/glm-5v-turbo","name":"GLM
+ 5V Turbo","description":"openrouter/z-ai/glm-5v-turbo"},{"value":"openrouter/mistralai/mistral-large-4-0","name":"Mistr
+al Large 4","description":"openrouter/mistralai/mistral-large-4-0"},{"value":"zai/glm-4.5","name":"GLM-4.5","description
+":"zai/glm-4.5"},{"value":"zai/glm-4.5-air","name":"GLM-4.5-Air","description":"zai/glm-4.5-air"},{"value":"zai/glm-4.5-
+flash","name":"GLM-4.5-Flash","description":"zai/glm-4.5-flash"},{"value":"zai/glm-4.5v","name":"GLM-4.5V","description"
+:"zai/glm-4.5v"},{"value":"zai/glm-4.6","name":"GLM-4.6","description":"zai/glm-4.6"},{"value":"zai/glm-4.6v","name":"GL
+M-4.6V","description":"zai/glm-4.6v"},{"value":"zai/glm-4.6v-flash","name":"GLM-4.6V-Flash","description":"zai/glm-4.6v-
+flash"},{"value":"zai/glm-4.7","name":"GLM-4.7","description":"zai/glm-4.7"},{"value":"zai/glm-4.7-flash","name":"GLM-4.
+7-Flash","description":"zai/glm-4.7-flash"},{"value":"zai/glm-4.7-flashx","name":"GLM-4.7-FlashX","description":"zai/glm
+-4.7-flashx"},{"value":"zai/glm-5","name":"GLM-5","description":"zai/glm-5"},{"value":"zai/glm-5-turbo","name":"GLM-5-Tu
+rbo","description":"zai/glm-5-turbo"},{"value":"zai/glm-5.1","name":"GLM-5.1","description":"zai/glm-5.1"},{"value":"zai
+/glm-5.2","name":"GLM-5.2","description":"zai/glm-5.2"},{"value":"zai/glm-5.3","name":"GLM-5.3","description":"zai/glm-5
+.3"},{"value":"zai/glm-5.3-flash","name":"GLM-5.3-Flash","description":"zai/glm-5.3-flash"},{"value":"zai/glm-5.3-flashx
+","name":"GLM-5.3-FlashX","description":"zai/glm-5.3-flashx"},{"value":"zai/glm-5v-turbo","name":"GLM-5V-Turbo","descrip
+tion":"zai/glm-5v-turbo"},{"value":"apple/on-device","name":"Apple AFM 3 Core Advanced","description":"apple/on-device"}
+]},{"id":"thinking","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"valu
+e":"off","name":"Off"},{"value":"auto","name":"Auto","description":"Auto-detect per prompt"},{"value":"minimal","name":"
+minimal"},{"value":"low","name":"low"},{"value":"medium","name":"medium"},{"value":"high","name":"high"}]}],"modes":{"av
+ailableModes":[{"id":"default","name":"Default","description":"Standard ACP headless mode"},{"id":"plan","name":"Plan","
+description":"Read-only planning mode that drafts a plan to a markdown file before any code changes"}],"currentModeId":"
+default"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"01a1125b-c22d-7183-94f3-9f876c7ebeb2","update":{"sessi
+onUpdate":"available_commands_update","availableCommands":[{"name":"security","description":"Plan, run, inspect, import,
+ and compare OMP-native security scans","input":{"hint":"<plan|scan|status|cancel|scans|show|import|export|validate|comp
+are|disposition>"}},{"name":"model","description":"Show current model selection"},{"name":"switch","description":"Switch
+ model for this session only","input":{"hint":"[model]"}},{"name":"fast","description":"Toggle fast mode","input":{"hint
+":"[on|ultra|off|status]"}},{"name":"slow","description":"Toggle slow mode","input":{"hint":"[on|off|status]"}},{"name":
+"skillful","description":"Toggle skill listing","input":{"hint":"[on|off|status]"}},{"name":"extended-context","descript
+ion":"Toggle extended context","input":{"hint":"[on|off|status]"}},{"name":"computer","description":"Toggle computer use
+","input":{"hint":"[on|off|status]"}},{"name":"ratchet","description":"Build (or reuse) an eval for an LLM flow, then hi
+llclimb it unattended","input":{"hint":"[flow and goal]"}},{"name":"prewalk","description":"Arm or restart prewalk","inp
+ut":{"hint":"[restart]"}},{"name":"modelpreset","description":"Manage model presets","input":{"hint":"[list|save|switch|
+delete] [name]"}},{"name":"effort","description":"Set or show reasoning effort (thinking level, intelligence)","input":{
+"hint":"[level]"}},{"name":"advisor","description":"Toggle advisor","input":{"hint":"[on|off|status|dump [raw]|configure
+]"}},{"name":"export","description":"Export session to HTML file","input":{"hint":"[--themes] [path]"}},{"name":"trace",
+"description":"Open this session's trace in the stats dashboard"},{"name":"dump","description":"Return full transcript a
+s plain text, with LLM request JSON path","input":{"hint":"[all]"}},{"name":"share","description":"Share session via an
+encrypted link (share server or secret gist)"},{"name":"browser","description":"Toggle browser eval-prelude headless vs
+visible mode","input":{"hint":"[headless|visible]"}},{"name":"todo","description":"Manage todos","input":{"hint":"<subco
+mmand>"}},{"name":"session","description":"Show or configure the current session","input":{"hint":"[info|delete|pin [acc
+ount]]"}},{"name":"jobs","description":"Show background jobs","input":{"hint":"[full]"}},{"name":"usage","description":"
+Show token usage","input":{"hint":"[show|reset [provider/credential-id|provider/active]]"}},{"name":"stats","description
+":"Launch the local stats dashboard","input":{"hint":"[--port <port>] [--host <host>]"}},{"name":"changelog","descriptio
+n":"Show changelog","input":{"hint":"[full|last [N]]"}},{"name":"tools","description":"Show available tools"},{"name":"c
+ontext","description":"Show context usage"},{"name":"mcp","description":"Manage MCP servers","input":{"hint":"<subcomman
+d>"}},{"name":"ssh","description":"Manage SSH connections","input":{"hint":"<subcommand>"}},{"name":"fresh","description
+":"Reset provider stream state without changing the local transcript"},{"name":"compact","description":"Compact the conv
+ersation","input":{"hint":"[soft|remote|snapcompact] [focus]"}},{"name":"shake","description":"Shake heavy content out o
+f the conversation context","input":{"hint":"[elide|images|thinking]"}},{"name":"handoff","description":"Summarize the s
+ession into a handoff document and compact in place","input":{"hint":"[focus instructions]"}},{"name":"pin","description
+":"Pin or unpin a session at the top of the resume list","input":{"hint":"[session id]"}},{"name":"retry","description":
+"Retry the last failed agent turn"},{"name":"memory","description":"Manage memory","input":{"hint":"<subcommand>"}},{"na
+me":"rename","description":"Rename the current session (omit title to generate)","input":{"hint":"[title]"}},{"name":"mo
+ve","description":"Move the current session to a different directory","input":{"hint":"[<path>]"}},{"name":"wt","descrip
+tion":"Move this session into a new worktree, changes included","input":{"hint":"[<branch>]"}},{"name":"add-dir","descri
+ption":"Add a workspace directory to this session","input":{"hint":"<path>"}},{"name":"remove-dir","description":"Remove
+ a workspace directory from this session","input":{"hint":"<path>"}},{"name":"dirs","description":"List this session's w
+orkspace directories"},{"name":"marketplace","description":"Manage plugins from marketplaces","input":{"hint":"<subcomma
+nd>"}},{"name":"plugins","description":"Manage plugins","input":{"hint":"[list|enable|disable]"}},{"name":"reload-plugin
+s","description":"Reload all plugins"},{"name":"force","description":"Force next turn to use a specific tool","input":{"
+hint":"<tool-name> [prompt]"}},{"name":"skill:afk","description":"Enter the away posture when the captain invokes /afk,
+says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`,
+ or any `state/.subsuper-*` marker is involved. It writes the durable away-posture record with the captain's away words
+verbatim as the whole mandate in the same turn as /afk, before any other work and without waiting for a further go, read
+s the words back in plain sentences after entry, announces hold-for-return only at entry, keeps the one supervision sess
+ion running in the away posture (on Pi the supervision branch acts on the words by its own judgment and takes every safe
+ actionable wake with main parked, as the supervision host does on a non-Pi home that opted into it; the daemon still de
+livers batched digests elsewhere for now), and on the first unmarked message renders the return brief from durable recor
+ds before ordinary work resumes.","input":{"hint":"arguments"}},{"name":"skill:agent-browser","description":"Browser aut
+omation CLI for AI agents — navigate, fill forms, click, screenshot, scrape, test web apps, or automate any browser task
+. Triggers: \"open a website\", \"fill out a form\", \"click a button\", \"take a screenshot\", \"scrape data from a pag
+e\", \"test this web app\", \"login to a site\", \"automate browser actions\". Also covers exploratory testing/dogfoodin
+g/QA/bug hunts, Electron app automation (VS Code, Slack, Discord, Figma, Notion, Spotify), Slack messaging/search, Verce
+l Sandbox microVMs, and AWS Bedrock AgentCore browsers. Prefer over built-in browser tools.","input":{"hint":"arguments"
+}},{"name":"skill:agent-skill-trigger-index","description":"Load only when auditing or maintaining the complete agent-on
+ly skill trigger index.","input":{"hint":"arguments"}},{"name":"skill:ahoy","description":"Recap visible session events
+and guide the captain through visibly unanswered decisions when the captain explicitly invokes /ahoy, with a Bearings fa
+llback when /ahoy is the session's first real captain message.","input":{"hint":"arguments"}},{"name":"skill:ask-user-au
+thority","description":"Agent-only decision procedure for ask-user findings. Use before deciding any ask-user finding. T
+his skill is the single owner of finding-decision policy: firstmate always applies judgment, decides findings that are u
+nambiguous toward accepted intent, and escalates only genuinely ambiguous, expanding, or destructive ones. Finding autho
+rity is this skill's criteria, not the project's yolo posture.","input":{"hint":"arguments"}},{"name":"skill:ast-grep","
+description":"Guide for writing ast-grep rules for structural code search via Abstract Syntax Tree (AST) patterns. Use t
+o search codebases by language construct, structural pattern, or complex queries beyond simple text search.","input":{"h
+int":"arguments"}},{"name":"skill:away-quiet-supervision","description":"Load whenever /afk or /quiet is invoked, an awa
+y or quiet record exists, or a marked away-supervisor message arrives.","input":{"hint":"arguments"}},{"name":"skill:axi
+","description":"Agent eXperience Interface (AXI) — ergonomic standards for building CLI tools that agents use via shell
+ execution. Use when building, modifying, or reviewing any agent-facing CLI.\n","input":{"hint":"arguments"}},{"name":"s
+kill:bearings","description":"Generate a \"pick up where I left off\" fleet digest from firstmate's live fleet state. Us
+e when the captain invokes /bearings or asks for a bearings report, morning brief, status report, catch-up, \"where did
+I leave off\", or \"what's in the works\". Plain /bearings is chat-only by default, /bearings file explicitly writes the
+ dated data/status-report-<YYYY-MM-DD>.md artifact, and /bearings lavish additionally builds and arms the interactive fl
+eet board; live PR enrichment remains opt-in and composes with the other modes. Also use on a contributions check wake o
+r when filing work linked to an upstream issue. Also load this skill's board-wake handling when a procevent lavish wake'
+s source id matches the canonical source id of the stable bearings board path.","input":{"hint":"arguments"}},{"name":"s
+kill:bootstrap-diagnostics","description":"Agent-only handling playbook for session-start bootstrap diagnostics. Use whe
+never the session-start digest's bootstrap or network-checks section prints an actionable diagnostic line - MISSING, MIS
+SING_MANUAL, PRESENTATION_UNAVAILABLE, BACKEND_INVALID, NEEDS_GH_AUTH, TANGLE, STARTUP_MEMORY_BUDGET, CREW_DISPATCH inva
+lid, FLEET_SYNC, NETWORK_CHECKS, HOME_SUMMARY, BACKLOG_RECONCILE, SECONDMATE_SYNC, SECONDMATE_LIVENESS, SECONDMATE_HANDO
+FF, NUDGE_SECONDMATES, or FMX - or reports that an interrupted backlog cleanup may have left an endpoint or local copy,
+or when a standalone bin/fm-bootstrap.sh or bin/fm-startup-network.sh run prints one of those lines. A silent bootstrap
+section, or any other BOOTSTRAP_INFO fact, means no skill load.","input":{"hint":"arguments"}},{"name":"skill:captain-ho
+ld-lifecycle","description":"Agent-only policy for completing investigations and visual reviews without losing unresolve
+d captain calls, and for closing what the captain owns with his actual words. Load before treating an investigation, sco
+ut report, structured review, or Lavish review as complete, before ending a visual review that exposed a captain decisio
+n, when recording or routing the captain's answer, and on any RECORD DIVERGENCE line the wake drain prints.","input":{"h
+int":"arguments"}},{"name":"skill:decision-hold-lifecycle","description":"Renamed pointer kept for in-flight briefs: the
+ decisions concept collapsed into \"a task held for the captain\". Load captain-hold-lifecycle instead; this stub only r
+edirects and will be removed one release after the collapse.","input":{"hint":"arguments"}},{"name":"skill:diagnostic-re
+asoning","description":"Agent-only procedure for diagnosing reported bugs. Use before scoping a reported bug and before
+acting on a diagnostic report. Owns end-user-aligned reproduction, causal separation, divergent-path and history inspect
+ion, counterfactual testing, and disconfirming evidence.","input":{"hint":"arguments"}},{"name":"skill:find-skills","des
+cription":"Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill
+for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when
+ the user is looking for functionality that might exist as an installable skill.","input":{"hint":"arguments"}},{"name":
+"skill:firstmate-codexapp","description":"Agent-only playbook for coordinating visible Codex Desktop threads alongside F
+irstmate without pretending they are a selectable shell backend. Use before creating, reading, steering, archiving, debu
+gging, or reviewing a Codex App visible thread for Firstmate work, and before responding to requests to make Codex App n
+ative to Firstmate.","input":{"hint":"arguments"}},{"name":"skill:firstmate-coding-guidelines","description":"Agent-only
+ reference for changing firstmate's shared, tracked material per AGENTS.md section 1. Use before editing any of that mat
+erial, whether working as firstmate directly or as a crewmate briefed on a firstmate-repo task. Covers the knowledge-pla
+cement decision tree, the one-owner rule for contracts, the inline-stub pattern for content moved into a skill, AGENTS.m
+d size discipline, trigger hygiene for new skills, and repo style rules (one sentence per line, plain dash, no agent co-
+author, shellcheck-clean bin scripts, colocated tests, and maintainer-verification evidence).","input":{"hint":"argument
+s"}},{"name":"skill:firstmate-orca","description":"Agent-only operator checklist for Firstmate's Orca runtime backend. U
+se when switching to Orca, spawning or supervising Orca-backed work, smoke-testing Orca backend behavior, debugging Orca
+ task state, or reconciling Orca-backed task metadata.","input":{"hint":"arguments"}},{"name":"skill:fmx-respond","descr
+iption":"Agent-only playbook for handling Relay mentions and follow-ups. Use on an \"x-mention <request_id>\" check wake
+ to read the stashed mention, classify it, act autonomously on eligible requests, reply or dismiss, and link spawned wor
+k. Also use on an \"x-mode-error ...\" check wake to report the Relay configuration blocker instead of answering a menti
+on. Also use on milestone and terminal wakes for a Relay-linked task before posting completion follow-ups, using typed p
+romised-final reconciliation when registered and --final otherwise. Also use on a \"public-followup ...\" check wake, an
+d whenever a promised final public reply must be created, reconciled, or delivered. Loaded only when Relay is enabled.",
+"input":{"hint":"arguments"}},{"name":"skill:harness-adapters","description":"Agent-only reference for firstmate harness
+ operations. Use before spawning or recovering a crewmate or secondmate, handling a trust dialog, sending a harness-spec
+ific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter. C
+ontains verified facts for claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, gemini, muse, rovo, omp, agy, and
+ devin.","input":{"hint":"arguments"}},{"name":"skill:kun","description":"Summon Kun to solve your problems. Use on /kun
+ or when asked how Kun thinks, builds, or solves problems.\n","input":{"hint":"arguments"}},{"name":"skill:lavish","desc
+ription":"Turn complex or visual agent responses into rich, reviewable HTML artifacts the user can annotate and send fee
+dback on, using the lavish-axi CLI. Use when about to give a plan, comparison, diagram, table, code diff, report, or any
+thing easier to grasp visually than as prose.","input":{"hint":"arguments"}},{"name":"skill:no-mistakes","description":"
+Validate your code changes through the no-mistakes pipeline - automated code review, tests, lint, docs, push, PR, and CI
+ - before they reach the configured push target. Use when the user asks to run no-mistakes, gate or ship or validate the
+ir changes, push safely, asks you to do a task and then validate it, or invokes /no-mistakes.","input":{"hint":"argument
+s"}},{"name":"skill:operational-home-layout","description":"Load when locating, interpreting, or changing Firstmate home
+, config, data, state, project, or generated runtime paths.","input":{"hint":"arguments"}},{"name":"skill:process-event-
+sources","description":"Agent-only procedure for registered process-to-event sources and their wakes. Use before arming
+a long-polling source firstmate owns, before registering a deterministic condition->action watch, on any `procevent <ada
+pter> <source-id> <sequence>` check wake, and on any `process-event source stranded` or `process-event source failed to
+start` check wake. Owns the arming commands, the condition->action eligibility boundary, the durable result read, which
+wakes must be routed to their adapter instead of acknowledged generically, the handled acknowledgement contract, the one
+-owner rule, the precise durability boundary, and the Lavish adapter's loss limitation.","input":{"hint":"arguments"}},{
+"name":"skill:project-management","description":"Agent-only procedure for Firstmate project management. Use before addin
+g, creating, removing, or initializing a project. Cloning or registering a project is add intake and uses the same trigg
+er. Owns project add, create, clone, remove, initialization, registry, delivery-mode, autonomy, and outward-consent deci
+sions.","input":{"hint":"arguments"}},{"name":"skill:quiet","description":"Enter quiet supervision mode when the captain
+ invokes /quiet or asks for quiet mode, quiet-while-present, or fewer routine wake turns while they stay in the session.
+ Where Pi's supervision branch or an attended supervision host already keeps routine wakes off the conversation, it ente
+rs nothing and says so. Elsewhere it sets the same durable away/quiet-mode flag as /afk, in `quiet` mode, so the sub-sup
+ervisor daemon self-handles routine wakes and escalates captain-relevant events exactly as away mode does, but ordinary
+captain chat does NOT exit it - only an explicit `/quiet off` does.","input":{"hint":"arguments"}},{"name":"skill:quota-
+array-dispatch","description":"Agent-only decision procedure for resolving a matched crew-dispatch profile array from qu
+ota-axi's default TOON, ranking by spendPriority after three orthogonal gates. Load when a dispatch rule or default reso
+lves to more than one profile candidate.","input":{"hint":"arguments"}},{"name":"skill:quota-axi","description":"Report
+local Claude, Codex, Cursor, GitHub Copilot, Grok, Kimi, Z.AI, Alibaba, OpenCode Go, and Antigravity quota windows via t
+he quota-axi CLI - remaining effective usable runway, percentages, reset times, cycle-average pace vs the reset clock, a
+ per-scope selection signal, and provider status read from local auth sources, with no routing, no credential minting, a
+nd no default ordering preference. Use before deciding whether it is safe to keep spending a provider's quota, when the
+user asks about usage, rate limits, pace, or remaining quota, or when comparing local provider headroom.","input":{"hint
+":"arguments"}},{"name":"skill:scout-completion","description":"Load when a scout reports completion, presents a visual
+artifact for iteration, or is being considered for promotion to implementation.","input":{"hint":"arguments"}},{"name":"
+skill:secondmate-provisioning","description":"Agent-only reference for persistent secondmate setup and retirement. Use w
+hen creating, seeding, validating, launching, recovering, handing backlog to, pushing inherited local material into, or
+retiring a secondmate home, or when editing data/secondmates.md. Covers local leases, whole-home remote routes, transact
+ional seeding, record intake for an existing or inherited domain, project clone restrictions, secondmate harness pins, i
+nherited local-material push, idle charter, handoff helper, and teardown safety.","input":{"hint":"arguments"}},{"name":
+"skill:session-start-recovery","description":"Load when the session-start digest reports unfinished checks, actionable d
+iagnostics, recovery inputs, or output requiring interpretation.","input":{"hint":"arguments"}},{"name":"skill:ship-land
+ing","description":"Load when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task
+cleanup.","input":{"hint":"arguments"}},{"name":"skill:stow","description":"Sweep the current session for uncaptured dur
+able knowledge, file it to disk, persist the open work records this session knows are unfiled or now wrong, and curate t
+he home's tiered, decaying startup memory before a context reset. Use when the captain invokes /stow (e.g. \"/stow\", \"
+stow what you've learned\"), before a session reset or context compaction, or periodically to keep operational memory cu
+rrent.","input":{"hint":"arguments"}},{"name":"skill:stuck-crewmate-recovery","description":"Agent-only playbook for stu
+ck or missing ordinary Firstmate direct reports. Use when the session-start digest reports an ordinary direct report's e
+ndpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brie
+f question, an unresponsive crewmate, or a failed steer. Also use on the inverse case: a live crewmate reporting the no-
+mistakes pipeline dead, unreachable, or timed out. Reconciles recorded work before escalating from targeted inspection t
+hrough safe relaunch or failure.","input":{"hint":"arguments"}},{"name":"skill:updatefirstmate","description":"Self-upda
+te a running firstmate and its secondmates to the latest from origin. Use when the captain invokes /updatefirstmate (e.g
+. \"/updatefirstmate\", \"update firstmate\", \"pull the latest firstmate\"). Updates this firstmate repo's default bran
+ch and every local or remote secondmate through its guarded convergence path (never forced, never disruptive), then re-r
+eads AGENTS.md and restarts every live second mate through the persist-gated restart, with a fallback re-read nudge only
+ where a restart cannot be proven.","input":{"hint":"arguments"}},{"name":"skill:validation-supervision","description":"
+Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or f
+inding, and before deciding or answering any ask-user finding.","input":{"hint":"arguments"}},{"name":"skill:vernant-git
+-authorization-lanes","description":"Escape routes for Vernant's git kernel gates: trusted_commit for protected paths, b
+are push with fresh preflight marker, fsmonitor-off for hangs","input":{"hint":"arguments"}},{"name":"fm-watch-arm-omp",
+"description":"Arm firstmate watcher supervision through the omp extension instead of foreground bash.","input":{"hint":
+"arguments"}},{"name":"autoresearch","description":"Toggle builtin autoresearch mode, or pass off / clear, or a goal mes
+sage.","input":{"hint":"arguments"}},{"name":"green","description":"Generate a prompt to iterate on CI failures until th
+e branch is green","input":{"hint":"arguments"}},{"name":"review","description":"Launch interactive code review","input"
+:{"hint":"arguments"}},{"name":"annotate","description":"Annotate a diff or text from a file, prompt, latest reply, or s
+ession","input":{"hint":"arguments"}},{"name":"init","description":"Generate AGENTS.md for current codebase"}]}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"01a1125b-c22d-7183-94f3-9f876c7ebeb2","update":{"sessi
+onUpdate":"session_info_update","updatedAt":"2026-10-06T17:56:05.805Z"}}}
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -S -300 -t primary
+wen3 30B A3B","description":"openrouter/qwen/qwen3-30b-a3b"},{"value":"openrouter/qwen/qwen3-30b-a3b-instruct-2507","nam
+e":"Qwen3 30B A3B Instruct 2507","description":"openrouter/qwen/qwen3-30b-a3b-instruct-2507"},{"value":"openrouter/qwen/
+qwen3-30b-a3b-thinking-2507","name":"Qwen3 30B A3B Thinking 2507","description":"openrouter/qwen/qwen3-30b-a3b-thinking-
+2507"},{"value":"openrouter/qwen/qwen3-32b","name":"Qwen3 32B","description":"openrouter/qwen/qwen3-32b"},{"value":"open
+router/qwen/qwen3-4b","name":"Qwen3 4B","description":"openrouter/qwen/qwen3-4b"},{"value":"openrouter/qwen/qwen3-4b:fre
+e","name":"Qwen3 4B (free)","description":"openrouter/qwen/qwen3-4b:free"},{"value":"openrouter/qwen/qwen3-8b","name":"Q
+wen3 8B","description":"openrouter/qwen/qwen3-8b"},{"value":"openrouter/qwen/qwen3-coder","name":"Qwen3 Coder 480B A35B"
+,"description":"openrouter/qwen/qwen3-coder"},{"value":"openrouter/qwen/qwen3-coder-30b-a3b-instruct","name":"Qwen3 Code
+r 30B A3B Instruct","description":"openrouter/qwen/qwen3-coder-30b-a3b-instruct"},{"value":"openrouter/qwen/qwen3-coder-
+flash","name":"Qwen3 Coder Flash","description":"openrouter/qwen/qwen3-coder-flash"},{"value":"openrouter/qwen/qwen3-cod
+er-next","name":"Qwen3 Coder Next","description":"openrouter/qwen/qwen3-coder-next"},{"value":"openrouter/qwen/qwen3-cod
+er-plus","name":"Qwen3 Coder Plus","description":"openrouter/qwen/qwen3-coder-plus"},{"value":"openrouter/qwen/qwen3-cod
+er:exacto","name":"Qwen3 Coder 480B A35B (exacto)","description":"openrouter/qwen/qwen3-coder:exacto"},{"value":"openrou
+ter/qwen/qwen3-coder:free","name":"Qwen3 Coder 480B A35B (free)","description":"openrouter/qwen/qwen3-coder:free"},{"val
+ue":"openrouter/qwen/qwen3-max","name":"Qwen3 Max","description":"openrouter/qwen/qwen3-max"},{"value":"openrouter/qwen/
+qwen3-max-thinking","name":"Qwen3 Max Thinking","description":"openrouter/qwen/qwen3-max-thinking"},{"value":"openrouter
+/qwen/qwen3-next-80b-a3b-instruct","name":"Qwen3 Next 80B A3B Instruct","description":"openrouter/qwen/qwen3-next-80b-a3
+b-instruct"},{"value":"openrouter/qwen/qwen3-next-80b-a3b-instruct:free","name":"Qwen3 Next 80B A3B Instruct (free)","de
+scription":"openrouter/qwen/qwen3-next-80b-a3b-instruct:free"},{"value":"openrouter/qwen/qwen3-next-80b-a3b-thinking","n
+ame":"Qwen3 Next 80B A3B Thinking","description":"openrouter/qwen/qwen3-next-80b-a3b-thinking"},{"value":"openrouter/qwe
+n/qwen3-vl-235b-a22b-instruct","name":"Qwen3 VL 235B A22B Instruct","description":"openrouter/qwen/qwen3-vl-235b-a22b-in
+struct"},{"value":"openrouter/qwen/qwen3-vl-235b-a22b-thinking","name":"Qwen3 VL 235B A22B Thinking","description":"open
+router/qwen/qwen3-vl-235b-a22b-thinking"},{"value":"openrouter/qwen/qwen3-vl-30b-a3b-instruct","name":"Qwen3 VL 30B A3B
+Instruct","description":"openrouter/qwen/qwen3-vl-30b-a3b-instruct"},{"value":"openrouter/qwen/qwen3-vl-30b-a3b-thinking
+","name":"Qwen3 VL 30B A3B Thinking","description":"openrouter/qwen/qwen3-vl-30b-a3b-thinking"},{"value":"openrouter/qwe
+n/qwen3-vl-32b-instruct","name":"Qwen3 VL 32B Instruct","description":"openrouter/qwen/qwen3-vl-32b-instruct"},{"value":
+"openrouter/qwen/qwen3-vl-8b-instruct","name":"Qwen3 VL 8B Instruct","description":"openrouter/qwen/qwen3-vl-8b-instruct
+"},{"value":"openrouter/qwen/qwen3-vl-8b-thinking","name":"Qwen3 VL 8B Thinking","description":"openrouter/qwen/qwen3-vl
+-8b-thinking"},{"value":"openrouter/qwen/qwen3.5-122b-a10b","name":"Qwen3.5-122B-A10B","description":"openrouter/qwen/qw
+en3.5-122b-a10b"},{"value":"openrouter/qwen/qwen3.5-27b","name":"Qwen3.5-27B","description":"openrouter/qwen/qwen3.5-27b
+"},{"value":"openrouter/qwen/qwen3.5-35b-a3b","name":"Qwen3.5-35B-A3B","description":"openrouter/qwen/qwen3.5-35b-a3b"},
+{"value":"openrouter/qwen/qwen3.5-397b-a17b","name":"Qwen3.5 397B A17B","description":"openrouter/qwen/qwen3.5-397b-a17b
+"},{"value":"openrouter/qwen/qwen3.5-9b","name":"Qwen3.5-9B","description":"openrouter/qwen/qwen3.5-9b"},{"value":"openr
+outer/qwen/qwen3.5-9b:batch","name":"Qwen3.5-9B (batch)","description":"openrouter/qwen/qwen3.5-9b:batch"},{"value":"ope
+nrouter/qwen/qwen3.5-flash-02-23","name":"Qwen3.5-Flash","description":"openrouter/qwen/qwen3.5-flash-02-23"},{"value":"
+openrouter/qwen/qwen3.5-plus-02-15","name":"Qwen3.5 Plus 2026-02-15","description":"openrouter/qwen/qwen3.5-plus-02-15"}
+,{"value":"openrouter/qwen/qwen3.5-plus-20260420","name":"Qwen3.5 Plus 2026-04-20","description":"openrouter/qwen/qwen3.
+5-plus-20260420"},{"value":"openrouter/qwen/qwen3.6-27b","name":"Qwen3.6 27B","description":"openrouter/qwen/qwen3.6-27b
+"},{"value":"openrouter/qwen/qwen3.6-35b-a3b","name":"Qwen3.6 35B A3B","description":"openrouter/qwen/qwen3.6-35b-a3b"},
+{"value":"openrouter/qwen/qwen3.6-flash","name":"Qwen3.6 Flash","description":"openrouter/qwen/qwen3.6-flash"},{"value":
+"openrouter/qwen/qwen3.6-max-preview","name":"Qwen3.6 Max Preview","description":"openrouter/qwen/qwen3.6-max-preview"},
+{"value":"openrouter/qwen/qwen3.6-plus","name":"Qwen3.6 Plus","description":"openrouter/qwen/qwen3.6-plus"},{"value":"op
+enrouter/qwen/qwen3.6-plus-preview:free","name":"Qwen3.6 Plus Preview (free)","description":"openrouter/qwen/qwen3.6-plu
+s-preview:free"},{"value":"openrouter/qwen/qwen3.6-plus:free","name":"Qwen3.6 Plus (free)","description":"openrouter/qwe
+n/qwen3.6-plus:free"},{"value":"openrouter/qwen/qwen3.7-flash","name":"Qwen3.7 Flash","description":"openrouter/qwen/qwe
+n3.7-flash"},{"value":"openrouter/qwen/qwen3.7-max","name":"Qwen3.7 Max","description":"openrouter/qwen/qwen3.7-max"},{"
+value":"openrouter/qwen/qwen3.7-plus","name":"Qwen3.7 Plus","description":"openrouter/qwen/qwen3.7-plus"},{"value":"open
+router/qwen/qwen3.8-2.4t-a95b","name":"Qwen3.8 2.4T A95B","description":"openrouter/qwen/qwen3.8-2.4t-a95b"},{"value":"o
+penrouter/qwen/qwen3.8-2.4t-a95b:batch","name":"Qwen3.8 2.4T A95B (batch)","description":"openrouter/qwen/qwen3.8-2.4t-a
+95b:batch"},{"value":"openrouter/qwen/qwen3.8-27b","name":"Qwen3.8 27B","description":"openrouter/qwen/qwen3.8-27b"},{"v
+alue":"openrouter/qwen/qwen3.8-27b:free","name":"Qwen3.8 27B (free)","description":"openrouter/qwen/qwen3.8-27b:free"},{
+"value":"openrouter/qwen/qwen3.8-flash","name":"Qwen3.8 Flash","description":"openrouter/qwen/qwen3.8-flash"},{"value":"
+openrouter/qwen/qwen3.8-max","name":"Qwen3.8 Max","description":"openrouter/qwen/qwen3.8-max"},{"value":"openrouter/qwen
+/qwen3.8-max-0902","name":"Qwen3.8 Max (0902)","description":"openrouter/qwen/qwen3.8-max-0902"},{"value":"openrouter/qw
+en/qwen3.8-max-prime","name":"Qwen3.8 Max Prime","description":"openrouter/qwen/qwen3.8-max-prime"},{"value":"openrouter
+/qwen/qwen3.8-omni-flash","name":"Qwen3.8 Omni Flash","description":"openrouter/qwen/qwen3.8-omni-flash"},{"value":"open
+router/qwen/qwq-32b","name":"QwQ 32B","description":"openrouter/qwen/qwq-32b"},{"value":"openrouter/reka/reka-edge","nam
+e":"Reka Edge","description":"openrouter/reka/reka-edge"},{"value":"openrouter/rekaai/reka-edge","name":"Reka Edge","des
+cription":"openrouter/rekaai/reka-edge"},{"value":"openrouter/relace/relace-search","name":"Relace Search","description"
+:"openrouter/relace/relace-search"},{"value":"openrouter/sakana/fugu-max","name":"Fugu Max","description":"openrouter/sa
+kana/fugu-max"},{"value":"openrouter/sakana/fugu-ultra","name":"Fugu Ultra","description":"openrouter/sakana/fugu-ultra"
+},{"value":"openrouter/sakana/fugu-ultra-v2","name":"Fugu Ultra v2","description":"openrouter/sakana/fugu-ultra-v2"},{"v
+alue":"openrouter/sakana/sakana-namazu","name":"Sakana Namazu","description":"openrouter/sakana/sakana-namazu"},{"value"
+:"openrouter/sao10k/l3-euryale-70b","name":"Llama 3 Euryale 70B v2.1","description":"openrouter/sao10k/l3-euryale-70b"},
+{"value":"openrouter/sao10k/l3.1-euryale-70b","name":"Llama 3.1 Euryale 70B v2.2","description":"openrouter/sao10k/l3.1-
+euryale-70b"},{"value":"openrouter/stealth/ox-alpha","name":"Ox Alpha","description":"openrouter/stealth/ox-alpha"},{"va
+lue":"openrouter/stealth/space-bunny-alpha","name":"Space Bunny Alpha","description":"openrouter/stealth/space-bunny-alp
+ha"},{"value":"openrouter/stepfun/step-3.5-flash","name":"Step 3.5 Flash","description":"openrouter/stepfun/step-3.5-fla
+sh"},{"value":"openrouter/stepfun/step-3.5-flash:free","name":"Step 3.5 Flash (free)","description":"openrouter/stepfun/
+step-3.5-flash:free"},{"value":"openrouter/stepfun/step-3.7-flash","name":"Step 3.7 Flash","description":"openrouter/ste
+pfun/step-3.7-flash"},{"value":"openrouter/tencent/hy3","name":"Hy3","description":"openrouter/tencent/hy3"},{"value":"o
+penrouter/tencent/hy3-preview","name":"Hy3 preview","description":"openrouter/tencent/hy3-preview"},{"value":"openrouter
+/tencent/hy3-preview:free","name":"Hy3 preview (free)","description":"openrouter/tencent/hy3-preview:free"},{"value":"op
+enrouter/tencent/hy3:free","name":"Hy3 (free)","description":"openrouter/tencent/hy3:free"},{"value":"openrouter/tencent
+/hy4-preview","name":"Hy4 preview","description":"openrouter/tencent/hy4-preview"},{"value":"openrouter/thedrummer/rocin
+ante-12b","name":"Rocinante 12B","description":"openrouter/thedrummer/rocinante-12b"},{"value":"openrouter/thedrummer/un
+slopnemo-12b","name":"UnslopNemo 12B","description":"openrouter/thedrummer/unslopnemo-12b"},{"value":"openrouter/thinkin
+gmachines/inkling","name":"Inkling","description":"openrouter/thinkingmachines/inkling"},{"value":"openrouter/thinkingma
+chines/inkling-small","name":"Inkling Small","description":"openrouter/thinkingmachines/inkling-small"},{"value":"openro
+uter/thinkingmachines/inkling-small:batch","name":"Inkling Small (batch)","description":"openrouter/thinkingmachines/ink
+ling-small:batch"},{"value":"openrouter/thinkingmachines/inkling-small:free","name":"Inkling Small (free)","description"
+:"openrouter/thinkingmachines/inkling-small:free"},{"value":"openrouter/thinkingmachines/inkling:batch","name":"Inkling
+(batch)","description":"openrouter/thinkingmachines/inkling:batch"},{"value":"openrouter/thinkingmachines/inkling:free",
+"name":"Inkling (free)","description":"openrouter/thinkingmachines/inkling:free"},{"value":"openrouter/tngtech/deepseek-
+r1t2-chimera","name":"DeepSeek R1T2 Chimera","description":"openrouter/tngtech/deepseek-r1t2-chimera"},{"value":"openrou
+ter/tngtech/tng-r1t-chimera","name":"R1T Chimera","description":"openrouter/tngtech/tng-r1t-chimera"},{"value":"openrout
+er/unbiased/pareto","name":"Pareto","description":"openrouter/unbiased/pareto"},{"value":"openrouter/unbiased/pareto-26.
+10-preview","name":"Pareto 26.10 Preview","description":"openrouter/unbiased/pareto-26.10-preview"},{"value":"openrouter
+/upstage/solar-mini4","name":"Solar Mini 4","description":"openrouter/upstage/solar-mini4"},{"value":"openrouter/upstage
+/solar-pro-3","name":"Solar Pro 3","description":"openrouter/upstage/solar-pro-3"},{"value":"openrouter/upstage/solar-pr
+o-3:free","name":"Solar Pro 3 (free)","description":"openrouter/upstage/solar-pro-3:free"},{"value":"openrouter/upstage/
+solar-pro4","name":"Solar Pro 4","description":"openrouter/upstage/solar-pro4"},{"value":"openrouter/x-ai/grok-3","name"
+:"Grok 3","description":"openrouter/x-ai/grok-3"},{"value":"openrouter/x-ai/grok-3-beta","name":"Grok 3 Beta","descripti
+on":"openrouter/x-ai/grok-3-beta"},{"value":"openrouter/x-ai/grok-3-mini","name":"Grok 3 Mini","description":"openrouter
+/x-ai/grok-3-mini"},{"value":"openrouter/x-ai/grok-3-mini-beta","name":"Grok 3 Mini Beta","description":"openrouter/x-ai
+/grok-3-mini-beta"},{"value":"openrouter/x-ai/grok-4","name":"Grok 4","description":"openrouter/x-ai/grok-4"},{"value":"
+openrouter/x-ai/grok-4-fast","name":"Grok 4 Fast","description":"openrouter/x-ai/grok-4-fast"},{"value":"openrouter/x-ai
+/grok-4.1-fast","name":"Grok 4.1 Fast","description":"openrouter/x-ai/grok-4.1-fast"},{"value":"openrouter/x-ai/grok-4.2
+0","name":"Grok 4.20","description":"openrouter/x-ai/grok-4.20"},{"value":"openrouter/x-ai/grok-4.20-beta","name":"Grok
+4.20 Beta","description":"openrouter/x-ai/grok-4.20-beta"},{"value":"openrouter/x-ai/grok-4.3","name":"Grok 4.3","descri
+ption":"openrouter/x-ai/grok-4.3"},{"value":"openrouter/x-ai/grok-4.3:batch","name":"Grok 4.3 (batch)","description":"op
+enrouter/x-ai/grok-4.3:batch"},{"value":"openrouter/x-ai/grok-4.5","name":"Grok 4.5","description":"openrouter/x-ai/grok
+-4.5"},{"value":"openrouter/x-ai/grok-4.6","name":"Grok 4.6","description":"openrouter/x-ai/grok-4.6"},{"value":"openrou
+ter/x-ai/grok-4.7","name":"Grok 4.7","description":"openrouter/x-ai/grok-4.7"},{"value":"openrouter/x-ai/grok-build-0.1"
+,"name":"Grok Build 0.1","description":"openrouter/x-ai/grok-build-0.1"},{"value":"openrouter/x-ai/grok-code-fast-1","na
+me":"Grok Code Fast 1","description":"openrouter/x-ai/grok-code-fast-1"},{"value":"openrouter/xiaomi/mimo-v2-flash","nam
+e":"MiMo-V2-Flash","description":"openrouter/xiaomi/mimo-v2-flash"},{"value":"openrouter/xiaomi/mimo-v2-omni","name":"Mi
+Mo V2 Omni","description":"openrouter/xiaomi/mimo-v2-omni"},{"value":"openrouter/xiaomi/mimo-v2-pro","name":"MiMo V2 Pro
+","description":"openrouter/xiaomi/mimo-v2-pro"},{"value":"openrouter/xiaomi/mimo-v2.5","name":"MiMo-V2.5","description"
+:"openrouter/xiaomi/mimo-v2.5"},{"value":"openrouter/xiaomi/mimo-v2.5-pro","name":"MiMo-V2.5-Pro","description":"openrou
+ter/xiaomi/mimo-v2.5-pro"},{"value":"openrouter/xiaomi/mimo-v2.6-flash","name":"MiMo-V2.6-Flash","description":"openrout
+er/xiaomi/mimo-v2.6-flash"},{"value":"openrouter/xiaomi/mimo-v2.6-pro","name":"MiMo-V2.6-Pro","description":"openrouter/
+xiaomi/mimo-v2.6-pro"},{"value":"openrouter/xiaomi/mimo-v2.6-pro-ultraspeed","name":"MiMo-V2.6-Pro-UltraSpeed","descript
+ion":"openrouter/xiaomi/mimo-v2.6-pro-ultraspeed"},{"value":"openrouter/z-ai/glm-4-32b","name":"GLM 4 32B","description"
+:"openrouter/z-ai/glm-4-32b"},{"value":"openrouter/z-ai/glm-4.5","name":"GLM 4.5","description":"openrouter/z-ai/glm-4.5
+"},{"value":"openrouter/z-ai/glm-4.5-air","name":"GLM 4.5 Air","description":"openrouter/z-ai/glm-4.5-air"},{"value":"op
+enrouter/z-ai/glm-4.5-air:free","name":"GLM 4.5 Air (free)","description":"openrouter/z-ai/glm-4.5-air:free"},{"value":"
+openrouter/z-ai/glm-4.5v","name":"GLM 4.5V","description":"openrouter/z-ai/glm-4.5v"},{"value":"openrouter/z-ai/glm-4.6"
+,"name":"GLM 4.6","description":"openrouter/z-ai/glm-4.6"},{"value":"openrouter/z-ai/glm-4.6:exacto","name":"GLM 4.6 (ex
+acto)","description":"openrouter/z-ai/glm-4.6:exacto"},{"value":"openrouter/z-ai/glm-4.6v","name":"GLM 4.6V","descriptio
+n":"openrouter/z-ai/glm-4.6v"},{"value":"openrouter/z-ai/glm-4.7","name":"GLM 4.7","description":"openrouter/z-ai/glm-4.
+7"},{"value":"openrouter/z-ai/glm-4.7-flash","name":"GLM 4.7 Flash","description":"openrouter/z-ai/glm-4.7-flash"},{"val
+ue":"openrouter/z-ai/glm-5","name":"GLM 5","description":"openrouter/z-ai/glm-5"},{"value":"openrouter/z-ai/glm-5-turbo"
+,"name":"GLM 5 Turbo","description":"openrouter/z-ai/glm-5-turbo"},{"value":"openrouter/z-ai/glm-5.1","name":"GLM 5.1","
+description":"openrouter/z-ai/glm-5.1"},{"value":"openrouter/z-ai/glm-5.2","name":"GLM 5.2","description":"openrouter/z-
+ai/glm-5.2"},{"value":"openrouter/z-ai/glm-5.2:batch","name":"GLM 5.2 (batch)","description":"openrouter/z-ai/glm-5.2:ba
+tch"},{"value":"openrouter/z-ai/glm-5.2:free","name":"GLM 5.2 (free)","description":"openrouter/z-ai/glm-5.2:free"},{"va
+lue":"openrouter/z-ai/glm-5.3","name":"GLM 5.3","description":"openrouter/z-ai/glm-5.3"},{"value":"openrouter/z-ai/glm-5
+.3-flash","name":"GLM 5.3 Flash","description":"openrouter/z-ai/glm-5.3-flash"},{"value":"openrouter/z-ai/glm-5.3-flash:
+batch","name":"GLM 5.3 Flash (batch)","description":"openrouter/z-ai/glm-5.3-flash:batch"},{"value":"openrouter/z-ai/glm
+-5.3-flashx","name":"GLM 5.3 FlashX","description":"openrouter/z-ai/glm-5.3-flashx"},{"value":"openrouter/z-ai/glm-5.3-p
+rime","name":"GLM 5.3 Prime","description":"openrouter/z-ai/glm-5.3-prime"},{"value":"openrouter/z-ai/glm-5.3:batch","na
+me":"GLM 5.3 (batch)","description":"openrouter/z-ai/glm-5.3:batch"},{"value":"openrouter/z-ai/glm-5v-turbo","name":"GLM
+ 5V Turbo","description":"openrouter/z-ai/glm-5v-turbo"},{"value":"openrouter/mistralai/mistral-large-4-0","name":"Mistr
+al Large 4","description":"openrouter/mistralai/mistral-large-4-0"},{"value":"zai/glm-4.5","name":"GLM-4.5","description
+":"zai/glm-4.5"},{"value":"zai/glm-4.5-air","name":"GLM-4.5-Air","description":"zai/glm-4.5-air"},{"value":"zai/glm-4.5-
+flash","name":"GLM-4.5-Flash","description":"zai/glm-4.5-flash"},{"value":"zai/glm-4.5v","name":"GLM-4.5V","description"
+:"zai/glm-4.5v"},{"value":"zai/glm-4.6","name":"GLM-4.6","description":"zai/glm-4.6"},{"value":"zai/glm-4.6v","name":"GL
+M-4.6V","description":"zai/glm-4.6v"},{"value":"zai/glm-4.6v-flash","name":"GLM-4.6V-Flash","description":"zai/glm-4.6v-
+flash"},{"value":"zai/glm-4.7","name":"GLM-4.7","description":"zai/glm-4.7"},{"value":"zai/glm-4.7-flash","name":"GLM-4.
+7-Flash","description":"zai/glm-4.7-flash"},{"value":"zai/glm-4.7-flashx","name":"GLM-4.7-FlashX","description":"zai/glm
+-4.7-flashx"},{"value":"zai/glm-5","name":"GLM-5","description":"zai/glm-5"},{"value":"zai/glm-5-turbo","name":"GLM-5-Tu
+rbo","description":"zai/glm-5-turbo"},{"value":"zai/glm-5.1","name":"GLM-5.1","description":"zai/glm-5.1"},{"value":"zai
+/glm-5.2","name":"GLM-5.2","description":"zai/glm-5.2"},{"value":"zai/glm-5.3","name":"GLM-5.3","description":"zai/glm-5
+.3"},{"value":"zai/glm-5.3-flash","name":"GLM-5.3-Flash","description":"zai/glm-5.3-flash"},{"value":"zai/glm-5.3-flashx
+","name":"GLM-5.3-FlashX","description":"zai/glm-5.3-flashx"},{"value":"zai/glm-5v-turbo","name":"GLM-5V-Turbo","descrip
+tion":"zai/glm-5v-turbo"},{"value":"apple/on-device","name":"Apple AFM 3 Core Advanced","description":"apple/on-device"}
+]},{"id":"thinking","name":"Thinking","category":"thought_level","type":"select","currentValue":"high","options":[{"valu
+e":"off","name":"Off"},{"value":"auto","name":"Auto","description":"Auto-detect per prompt"},{"value":"minimal","name":"
+minimal"},{"value":"low","name":"low"},{"value":"medium","name":"medium"},{"value":"high","name":"high"}]}],"modes":{"av
+ailableModes":[{"id":"default","name":"Default","description":"Standard ACP headless mode"},{"id":"plan","name":"Plan","
+description":"Read-only planning mode that drafts a plan to a markdown file before any code changes"}],"currentModeId":"
+default"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"01a1125b-c22d-7183-94f3-9f876c7ebeb2","update":{"sessi
+onUpdate":"available_commands_update","availableCommands":[{"name":"security","description":"Plan, run, inspect, import,
+ and compare OMP-native security scans","input":{"hint":"<plan|scan|status|cancel|scans|show|import|export|validate|comp
+are|disposition>"}},{"name":"model","description":"Show current model selection"},{"name":"switch","description":"Switch
+ model for this session only","input":{"hint":"[model]"}},{"name":"fast","description":"Toggle fast mode","input":{"hint
+":"[on|ultra|off|status]"}},{"name":"slow","description":"Toggle slow mode","input":{"hint":"[on|off|status]"}},{"name":
+"skillful","description":"Toggle skill listing","input":{"hint":"[on|off|status]"}},{"name":"extended-context","descript
+ion":"Toggle extended context","input":{"hint":"[on|off|status]"}},{"name":"computer","description":"Toggle computer use
+","input":{"hint":"[on|off|status]"}},{"name":"ratchet","description":"Build (or reuse) an eval for an LLM flow, then hi
+llclimb it unattended","input":{"hint":"[flow and goal]"}},{"name":"prewalk","description":"Arm or restart prewalk","inp
+ut":{"hint":"[restart]"}},{"name":"modelpreset","description":"Manage model presets","input":{"hint":"[list|save|switch|
+delete] [name]"}},{"name":"effort","description":"Set or show reasoning effort (thinking level, intelligence)","input":{
+"hint":"[level]"}},{"name":"advisor","description":"Toggle advisor","input":{"hint":"[on|off|status|dump [raw]|configure
+]"}},{"name":"export","description":"Export session to HTML file","input":{"hint":"[--themes] [path]"}},{"name":"trace",
+"description":"Open this session's trace in the stats dashboard"},{"name":"dump","description":"Return full transcript a
+s plain text, with LLM request JSON path","input":{"hint":"[all]"}},{"name":"share","description":"Share session via an
+encrypted link (share server or secret gist)"},{"name":"browser","description":"Toggle browser eval-prelude headless vs
+visible mode","input":{"hint":"[headless|visible]"}},{"name":"todo","description":"Manage todos","input":{"hint":"<subco
+mmand>"}},{"name":"session","description":"Show or configure the current session","input":{"hint":"[info|delete|pin [acc
+ount]]"}},{"name":"jobs","description":"Show background jobs","input":{"hint":"[full]"}},{"name":"usage","description":"
+Show token usage","input":{"hint":"[show|reset [provider/credential-id|provider/active]]"}},{"name":"stats","description
+":"Launch the local stats dashboard","input":{"hint":"[--port <port>] [--host <host>]"}},{"name":"changelog","descriptio
+n":"Show changelog","input":{"hint":"[full|last [N]]"}},{"name":"tools","description":"Show available tools"},{"name":"c
+ontext","description":"Show context usage"},{"name":"mcp","description":"Manage MCP servers","input":{"hint":"<subcomman
+d>"}},{"name":"ssh","description":"Manage SSH connections","input":{"hint":"<subcommand>"}},{"name":"fresh","description
+":"Reset provider stream state without changing the local transcript"},{"name":"compact","description":"Compact the conv
+ersation","input":{"hint":"[soft|remote|snapcompact] [focus]"}},{"name":"shake","description":"Shake heavy content out o
+f the conversation context","input":{"hint":"[elide|images|thinking]"}},{"name":"handoff","description":"Summarize the s
+ession into a handoff document and compact in place","input":{"hint":"[focus instructions]"}},{"name":"pin","description
+":"Pin or unpin a session at the top of the resume list","input":{"hint":"[session id]"}},{"name":"retry","description":
+"Retry the last failed agent turn"},{"name":"memory","description":"Manage memory","input":{"hint":"<subcommand>"}},{"na
+me":"rename","description":"Rename the current session (omit title to generate)","input":{"hint":"[title]"}},{"name":"mo
+ve","description":"Move the current session to a different directory","input":{"hint":"[<path>]"}},{"name":"wt","descrip
+tion":"Move this session into a new worktree, changes included","input":{"hint":"[<branch>]"}},{"name":"add-dir","descri
+ption":"Add a workspace directory to this session","input":{"hint":"<path>"}},{"name":"remove-dir","description":"Remove
+ a workspace directory from this session","input":{"hint":"<path>"}},{"name":"dirs","description":"List this session's w
+orkspace directories"},{"name":"marketplace","description":"Manage plugins from marketplaces","input":{"hint":"<subcomma
+nd>"}},{"name":"plugins","description":"Manage plugins","input":{"hint":"[list|enable|disable]"}},{"name":"reload-plugin
+s","description":"Reload all plugins"},{"name":"force","description":"Force next turn to use a specific tool","input":{"
+hint":"<tool-name> [prompt]"}},{"name":"skill:afk","description":"Enter the away posture when the captain invokes /afk,
+says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`,
+ or any `state/.subsuper-*` marker is involved. It writes the durable away-posture record with the captain's away words
+verbatim as the whole mandate in the same turn as /afk, before any other work and without waiting for a further go, read
+s the words back in plain sentences after entry, announces hold-for-return only at entry, keeps the one supervision sess
+ion running in the away posture (on Pi the supervision branch acts on the words by its own judgment and takes every safe
+ actionable wake with main parked, as the supervision host does on a non-Pi home that opted into it; the daemon still de
+livers batched digests elsewhere for now), and on the first unmarked message renders the return brief from durable recor
+ds before ordinary work resumes.","input":{"hint":"arguments"}},{"name":"skill:agent-browser","description":"Browser aut
+omation CLI for AI agents — navigate, fill forms, click, screenshot, scrape, test web apps, or automate any browser task
+. Triggers: \"open a website\", \"fill out a form\", \"click a button\", \"take a screenshot\", \"scrape data from a pag
+e\", \"test this web app\", \"login to a site\", \"automate browser actions\". Also covers exploratory testing/dogfoodin
+g/QA/bug hunts, Electron app automation (VS Code, Slack, Discord, Figma, Notion, Spotify), Slack messaging/search, Verce
+l Sandbox microVMs, and AWS Bedrock AgentCore browsers. Prefer over built-in browser tools.","input":{"hint":"arguments"
+}},{"name":"skill:agent-skill-trigger-index","description":"Load only when auditing or maintaining the complete agent-on
+ly skill trigger index.","input":{"hint":"arguments"}},{"name":"skill:ahoy","description":"Recap visible session events
+and guide the captain through visibly unanswered decisions when the captain explicitly invokes /ahoy, with a Bearings fa
+llback when /ahoy is the session's first real captain message.","input":{"hint":"arguments"}},{"name":"skill:ask-user-au
+thority","description":"Agent-only decision procedure for ask-user findings. Use before deciding any ask-user finding. T
+his skill is the single owner of finding-decision policy: firstmate always applies judgment, decides findings that are u
+nambiguous toward accepted intent, and escalates only genuinely ambiguous, expanding, or destructive ones. Finding autho
+rity is this skill's criteria, not the project's yolo posture.","input":{"hint":"arguments"}},{"name":"skill:ast-grep","
+description":"Guide for writing ast-grep rules for structural code search via Abstract Syntax Tree (AST) patterns. Use t
+o search codebases by language construct, structural pattern, or complex queries beyond simple text search.","input":{"h
+int":"arguments"}},{"name":"skill:away-quiet-supervision","description":"Load whenever /afk or /quiet is invoked, an awa
+y or quiet record exists, or a marked away-supervisor message arrives.","input":{"hint":"arguments"}},{"name":"skill:axi
+","description":"Agent eXperience Interface (AXI) — ergonomic standards for building CLI tools that agents use via shell
+ execution. Use when building, modifying, or reviewing any agent-facing CLI.\n","input":{"hint":"arguments"}},{"name":"s
+kill:bearings","description":"Generate a \"pick up where I left off\" fleet digest from firstmate's live fleet state. Us
+e when the captain invokes /bearings or asks for a bearings report, morning brief, status report, catch-up, \"where did
+I leave off\", or \"what's in the works\". Plain /bearings is chat-only by default, /bearings file explicitly writes the
+ dated data/status-report-<YYYY-MM-DD>.md artifact, and /bearings lavish additionally builds and arms the interactive fl
+eet board; live PR enrichment remains opt-in and composes with the other modes. Also use on a contributions check wake o
+r when filing work linked to an upstream issue. Also load this skill's board-wake handling when a procevent lavish wake'
+s source id matches the canonical source id of the stable bearings board path.","input":{"hint":"arguments"}},{"name":"s
+kill:bootstrap-diagnostics","description":"Agent-only handling playbook for session-start bootstrap diagnostics. Use whe
+never the session-start digest's bootstrap or network-checks section prints an actionable diagnostic line - MISSING, MIS
+SING_MANUAL, PRESENTATION_UNAVAILABLE, BACKEND_INVALID, NEEDS_GH_AUTH, TANGLE, STARTUP_MEMORY_BUDGET, CREW_DISPATCH inva
+lid, FLEET_SYNC, NETWORK_CHECKS, HOME_SUMMARY, BACKLOG_RECONCILE, SECONDMATE_SYNC, SECONDMATE_LIVENESS, SECONDMATE_HANDO
+FF, NUDGE_SECONDMATES, or FMX - or reports that an interrupted backlog cleanup may have left an endpoint or local copy,
+or when a standalone bin/fm-bootstrap.sh or bin/fm-startup-network.sh run prints one of those lines. A silent bootstrap
+section, or any other BOOTSTRAP_INFO fact, means no skill load.","input":{"hint":"arguments"}},{"name":"skill:captain-ho
+ld-lifecycle","description":"Agent-only policy for completing investigations and visual reviews without losing unresolve
+d captain calls, and for closing what the captain owns with his actual words. Load before treating an investigation, sco
+ut report, structured review, or Lavish review as complete, before ending a visual review that exposed a captain decisio
+n, when recording or routing the captain's answer, and on any RECORD DIVERGENCE line the wake drain prints.","input":{"h
+int":"arguments"}},{"name":"skill:decision-hold-lifecycle","description":"Renamed pointer kept for in-flight briefs: the
+ decisions concept collapsed into \"a task held for the captain\". Load captain-hold-lifecycle instead; this stub only r
+edirects and will be removed one release after the collapse.","input":{"hint":"arguments"}},{"name":"skill:diagnostic-re
+asoning","description":"Agent-only procedure for diagnosing reported bugs. Use before scoping a reported bug and before
+acting on a diagnostic report. Owns end-user-aligned reproduction, causal separation, divergent-path and history inspect
+ion, counterfactual testing, and disconfirming evidence.","input":{"hint":"arguments"}},{"name":"skill:find-skills","des
+cription":"Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill
+for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when
+ the user is looking for functionality that might exist as an installable skill.","input":{"hint":"arguments"}},{"name":
+"skill:firstmate-codexapp","description":"Agent-only playbook for coordinating visible Codex Desktop threads alongside F
+irstmate without pretending they are a selectable shell backend. Use before creating, reading, steering, archiving, debu
+gging, or reviewing a Codex App visible thread for Firstmate work, and before responding to requests to make Codex App n
+ative to Firstmate.","input":{"hint":"arguments"}},{"name":"skill:firstmate-coding-guidelines","description":"Agent-only
+ reference for changing firstmate's shared, tracked material per AGENTS.md section 1. Use before editing any of that mat
+erial, whether working as firstmate directly or as a crewmate briefed on a firstmate-repo task. Covers the knowledge-pla
+cement decision tree, the one-owner rule for contracts, the inline-stub pattern for content moved into a skill, AGENTS.m
+d size discipline, trigger hygiene for new skills, and repo style rules (one sentence per line, plain dash, no agent co-
+author, shellcheck-clean bin scripts, colocated tests, and maintainer-verification evidence).","input":{"hint":"argument
+s"}},{"name":"skill:firstmate-orca","description":"Agent-only operator checklist for Firstmate's Orca runtime backend. U
+se when switching to Orca, spawning or supervising Orca-backed work, smoke-testing Orca backend behavior, debugging Orca
+ task state, or reconciling Orca-backed task metadata.","input":{"hint":"arguments"}},{"name":"skill:fmx-respond","descr
+iption":"Agent-only playbook for handling Relay mentions and follow-ups. Use on an \"x-mention <request_id>\" check wake
+ to read the stashed mention, classify it, act autonomously on eligible requests, reply or dismiss, and link spawned wor
+k. Also use on an \"x-mode-error ...\" check wake to report the Relay configuration blocker instead of answering a menti
+on. Also use on milestone and terminal wakes for a Relay-linked task before posting completion follow-ups, using typed p
+romised-final reconciliation when registered and --final otherwise. Also use on a \"public-followup ...\" check wake, an
+d whenever a promised final public reply must be created, reconciled, or delivered. Loaded only when Relay is enabled.",
+"input":{"hint":"arguments"}},{"name":"skill:harness-adapters","description":"Agent-only reference for firstmate harness
+ operations. Use before spawning or recovering a crewmate or secondmate, handling a trust dialog, sending a harness-spec
+ific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter. C
+ontains verified facts for claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, gemini, muse, rovo, omp, agy, and
+ devin.","input":{"hint":"arguments"}},{"name":"skill:kun","description":"Summon Kun to solve your problems. Use on /kun
+ or when asked how Kun thinks, builds, or solves problems.\n","input":{"hint":"arguments"}},{"name":"skill:lavish","desc
+ription":"Turn complex or visual agent responses into rich, reviewable HTML artifacts the user can annotate and send fee
+dback on, using the lavish-axi CLI. Use when about to give a plan, comparison, diagram, table, code diff, report, or any
+thing easier to grasp visually than as prose.","input":{"hint":"arguments"}},{"name":"skill:no-mistakes","description":"
+Validate your code changes through the no-mistakes pipeline - automated code review, tests, lint, docs, push, PR, and CI
+ - before they reach the configured push target. Use when the user asks to run no-mistakes, gate or ship or validate the
+ir changes, push safely, asks you to do a task and then validate it, or invokes /no-mistakes.","input":{"hint":"argument
+s"}},{"name":"skill:operational-home-layout","description":"Load when locating, interpreting, or changing Firstmate home
+, config, data, state, project, or generated runtime paths.","input":{"hint":"arguments"}},{"name":"skill:process-event-
+sources","description":"Agent-only procedure for registered process-to-event sources and their wakes. Use before arming
+a long-polling source firstmate owns, before registering a deterministic condition->action watch, on any `procevent <ada
+pter> <source-id> <sequence>` check wake, and on any `process-event source stranded` or `process-event source failed to
+start` check wake. Owns the arming commands, the condition->action eligibility boundary, the durable result read, which
+wakes must be routed to their adapter instead of acknowledged generically, the handled acknowledgement contract, the one
+-owner rule, the precise durability boundary, and the Lavish adapter's loss limitation.","input":{"hint":"arguments"}},{
+"name":"skill:project-management","description":"Agent-only procedure for Firstmate project management. Use before addin
+g, creating, removing, or initializing a project. Cloning or registering a project is add intake and uses the same trigg
+er. Owns project add, create, clone, remove, initialization, registry, delivery-mode, autonomy, and outward-consent deci
+sions.","input":{"hint":"arguments"}},{"name":"skill:quiet","description":"Enter quiet supervision mode when the captain
+ invokes /quiet or asks for quiet mode, quiet-while-present, or fewer routine wake turns while they stay in the session.
+ Where Pi's supervision branch or an attended supervision host already keeps routine wakes off the conversation, it ente
+rs nothing and says so. Elsewhere it sets the same durable away/quiet-mode flag as /afk, in `quiet` mode, so the sub-sup
+ervisor daemon self-handles routine wakes and escalates captain-relevant events exactly as away mode does, but ordinary
+captain chat does NOT exit it - only an explicit `/quiet off` does.","input":{"hint":"arguments"}},{"name":"skill:quota-
+array-dispatch","description":"Agent-only decision procedure for resolving a matched crew-dispatch profile array from qu
+ota-axi's default TOON, ranking by spendPriority after three orthogonal gates. Load when a dispatch rule or default reso
+lves to more than one profile candidate.","input":{"hint":"arguments"}},{"name":"skill:quota-axi","description":"Report
+local Claude, Codex, Cursor, GitHub Copilot, Grok, Kimi, Z.AI, Alibaba, OpenCode Go, and Antigravity quota windows via t
+he quota-axi CLI - remaining effective usable runway, percentages, reset times, cycle-average pace vs the reset clock, a
+ per-scope selection signal, and provider status read from local auth sources, with no routing, no credential minting, a
+nd no default ordering preference. Use before deciding whether it is safe to keep spending a provider's quota, when the
+user asks about usage, rate limits, pace, or remaining quota, or when comparing local provider headroom.","input":{"hint
+":"arguments"}},{"name":"skill:scout-completion","description":"Load when a scout reports completion, presents a visual
+artifact for iteration, or is being considered for promotion to implementation.","input":{"hint":"arguments"}},{"name":"
+skill:secondmate-provisioning","description":"Agent-only reference for persistent secondmate setup and retirement. Use w
+hen creating, seeding, validating, launching, recovering, handing backlog to, pushing inherited local material into, or
+retiring a secondmate home, or when editing data/secondmates.md. Covers local leases, whole-home remote routes, transact
+ional seeding, record intake for an existing or inherited domain, project clone restrictions, secondmate harness pins, i
+nherited local-material push, idle charter, handoff helper, and teardown safety.","input":{"hint":"arguments"}},{"name":
+"skill:session-start-recovery","description":"Load when the session-start digest reports unfinished checks, actionable d
+iagnostics, recovery inputs, or output requiring interpretation.","input":{"hint":"arguments"}},{"name":"skill:ship-land
+ing","description":"Load when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task
+cleanup.","input":{"hint":"arguments"}},{"name":"skill:stow","description":"Sweep the current session for uncaptured dur
+able knowledge, file it to disk, persist the open work records this session knows are unfiled or now wrong, and curate t
+he home's tiered, decaying startup memory before a context reset. Use when the captain invokes /stow (e.g. \"/stow\", \"
+stow what you've learned\"), before a session reset or context compaction, or periodically to keep operational memory cu
+rrent.","input":{"hint":"arguments"}},{"name":"skill:stuck-crewmate-recovery","description":"Agent-only playbook for stu
+ck or missing ordinary Firstmate direct reports. Use when the session-start digest reports an ordinary direct report's e
+ndpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brie
+f question, an unresponsive crewmate, or a failed steer. Also use on the inverse case: a live crewmate reporting the no-
+mistakes pipeline dead, unreachable, or timed out. Reconciles recorded work before escalating from targeted inspection t
+hrough safe relaunch or failure.","input":{"hint":"arguments"}},{"name":"skill:updatefirstmate","description":"Self-upda
+te a running firstmate and its secondmates to the latest from origin. Use when the captain invokes /updatefirstmate (e.g
+. \"/updatefirstmate\", \"update firstmate\", \"pull the latest firstmate\"). Updates this firstmate repo's default bran
+ch and every local or remote secondmate through its guarded convergence path (never forced, never disruptive), then re-r
+eads AGENTS.md and restarts every live second mate through the persist-gated restart, with a fallback re-read nudge only
+ where a restart cannot be proven.","input":{"hint":"arguments"}},{"name":"skill:validation-supervision","description":"
+Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or f
+inding, and before deciding or answering any ask-user finding.","input":{"hint":"arguments"}},{"name":"skill:vernant-git
+-authorization-lanes","description":"Escape routes for Vernant's git kernel gates: trusted_commit for protected paths, b
+are push with fresh preflight marker, fsmonitor-off for hangs","input":{"hint":"arguments"}},{"name":"fm-watch-arm-omp",
+"description":"Arm firstmate watcher supervision through the omp extension instead of foreground bash.","input":{"hint":
+"arguments"}},{"name":"autoresearch","description":"Toggle builtin autoresearch mode, or pass off / clear, or a goal mes
+sage.","input":{"hint":"arguments"}},{"name":"green","description":"Generate a prompt to iterate on CI failures until th
+e branch is green","input":{"hint":"arguments"}},{"name":"review","description":"Launch interactive code review","input"
+:{"hint":"arguments"}},{"name":"annotate","description":"Annotate a diff or text from a file, prompt, latest reply, or s
+ession","input":{"hint":"arguments"}},{"name":"init","description":"Generate AGENTS.md for current codebase"}]}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"01a1125b-c22d-7183-94f3-9f876c7ebeb2","update":{"sessi
+onUpdate":"session_info_update","updatedAt":"2026-10-06T17:56:05.805Z"}}}
+
+exit=0
+
+actual watch extension loaded marker=sha256:4aaca27e0129dde669326657488581e53fe2e5bc3129a4a8815653c34de971c2
+61318
+
+
+state files=["state/.omp-watch-extension-loaded", "state/.lock", "state/.fm-lab-tmux-dir", "state/.watcher-down", "state/.supervision-host.log"]
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.gate-test-runtime/acp-home
+exit=0
+
+Private ACP primary, socket, and lab home removed. No model prompt submitted.

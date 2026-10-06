@@ -1,0 +1,4 @@
+$ /bin/bash tests/.gate-restart-concurrency.sh
+ok - T12 relaunch waits do not block fleet persistence polling
+
+exit=0

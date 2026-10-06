@@ -1,0 +1,13 @@
+$ Two concurrent /bin/bash tests/.gate-restart-policy-and-concurrency.sh invocations
+[
+  {
+    "run": 1,
+    "exit": 0,
+    "output": "ok - remote fleet restart retains its route without transporting a forbidden replacement\nok - T12 relaunch waits do not block fleet persistence polling\n"
+  },
+  {
+    "run": 2,
+    "exit": 0,
+    "output": "ok - remote fleet restart retains its route without transporting a forbidden replacement\nok - T12 relaunch waits do not block fleet persistence polling\n"
+  }
+]
