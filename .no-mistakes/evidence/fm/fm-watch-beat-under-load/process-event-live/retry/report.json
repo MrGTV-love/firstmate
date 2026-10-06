@@ -1,0 +1,72 @@
+{
+  "status": "failed",
+  "failure": {
+    "type": "AssertionError",
+    "message": "not-autohandled: process-event-live (left for the handler; still unacknowledged)\ncaptured: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/home-foreign/state/procevent-inbox/process-event-live.1.result\n",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/validate.py\", line 305, in <module>\n    assert rc == 0 and 'captured: process-event-live 1' in output, output\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: not-autohandled: process-event-live (left for the handler; still unacknowledged)\ncaptured: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/home-foreign/state/procevent-inbox/process-event-live.1.result\n\n"
+  },
+  "scenarios": [
+    {
+      "scenario": "slow real reconciliation stays detached from watcher progress",
+      "status": "passed",
+      "pending_seconds_observed": 8.184927750000497,
+      "watcher_pid": 96867,
+      "same_reconcile_pid": 1352,
+      "max_direct_reconcile_children": 1,
+      "beacon_versions": 8,
+      "completed_main_cycle_trace_entries": 6,
+      "poll_seconds": 1,
+      "guard_grace_seconds": 6,
+      "confirmation_window_seconds": 12,
+      "trace_changes_timing": true
+    },
+    {
+      "scenario": "four concurrent real reconcilers announce one failure episode",
+      "status": "passed",
+      "reconcilers": 4,
+      "failure_wakes": 1,
+      "keys": [
+        "procevent:process-event-live:launch-failed:16777232-30441842-943824647"
+      ],
+      "registration_identity": "16777232:30441842"
+    },
+    {
+      "scenario": "two-home live ownership closes same-registration local episode",
+      "status": "passed",
+      "reconcile_output": "reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0",
+      "foreign_owner": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/home-foreign",
+      "local_marker_present": false,
+      "local_failure_wakes": 1,
+      "registration_identity": "16777232:30441842"
+    }
+  ],
+  "cleanup": {
+    "home-local": {
+      "returncode": 0,
+      "output": "retired: process-event-live\nswept: attempted=1"
+    },
+    "home-foreign": {
+      "returncode": 0,
+      "output": "retired: process-event-live\nswept: attempted=1"
+    },
+    "remaining_claims": [],
+    "remaining_registrations": [],
+    "remaining_runner_records": [],
+    "unfinished_started_commands": [],
+    "recorded_runner_pid_inspection": {
+      "pids": [
+        68662
+      ],
+      "returncode": 1,
+      "output": ""
+    },
+    "exact_home_sweeps_successful": true,
+    "fixture_subtree_removed": true
+  },
+  "limitations": [
+    "Live orchestration uses public commands and real Bash/sleep inputs without product mocks or timing seams.",
+    "The live foreign-owner recovery is naturally timed and not instrumented to distinguish every internal observation instruction.",
+    "Exact final-revalidation, stale replaced-registration, delayed historical-success, and failed-append rollback races are covered by the supplemental targeted regression timing hooks only.",
+    "No live Lavish editor/backend, operator home, tmux default server, Herdr endpoint, credentials, full suite, CI, lint, format, or build was touched; tmux clients are isolated to an empty socket directory under the fixture."
+  ]
+}

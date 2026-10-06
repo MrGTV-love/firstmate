@@ -1,0 +1,7 @@
+{
+  "disposable_worktree_fixture_root_removed": true,
+  "permanent_source_or_test_changes": false,
+  "real_ssh_server_and_remote_worker_cleanup": "remote/runner-cleanup.json and remote/worker-cleanup.json",
+  "process_event_owned_home_cleanup": "process-event-live/final/report.json cleanup",
+  "parent_watchers_and_lock_holders": "Owned subprocesses terminated or completed and reaped before deleting homes."
+}

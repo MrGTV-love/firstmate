@@ -1,0 +1,12 @@
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=95
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=2707ae46adb363dbd7a10a29d572d28df2117d79b48ea8d397d391bc0f2003f6
+payload_sha256=2707ae46adb363dbd7a10a29d572d28df2117d79b48ea8d397d391bc0f2003f6
+payload_bytes=95
+reason=
+
+needs-decision [key=replay-decision] [corr=88deaab1133de5ca]: pick report=data/reply/replay.md

@@ -1,0 +1,9 @@
+{
+  "policy_all_passed": true,
+  "timeout_all_passed": true,
+  "slow_check_progress_healthy": true,
+  "stopped_main_stale": true,
+  "state_gone_exit_diagnostic": true,
+  "blocked_stage_stale": true,
+  "targeted_regressions_passed": true
+}

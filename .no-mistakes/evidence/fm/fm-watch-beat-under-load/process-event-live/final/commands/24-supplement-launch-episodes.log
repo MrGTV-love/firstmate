@@ -1,0 +1,8 @@
+ok - a launch that cannot confirm is announced once per failure episode
+ok - concurrent failure append and rollback keep one durable episode
+not-autohandled: episode-src (left for the handler; still unacknowledged)
+ok - late durable startup evidence suppresses an obsolete failure
+ok - late live ownership suppresses an obsolete failure
+ok - obsolete registrations and uncertain claims reject stale launch failures
+ok - delayed historical success cannot erase a newer failure episode
+ok - foreign live recovery closes only the current registration's local episode

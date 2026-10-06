@@ -1,0 +1,19 @@
+{
+  "held_archive_tick_seconds": 1.078621207998367,
+  "archive_count": 500,
+  "both_holders_alive_when_tick_returned": [
+    true,
+    true
+  ],
+  "archive_sha256_unchanged": true,
+  "open_reply_resolved": true,
+  "current_archive_only_seconds": [
+    0.23840704100439325,
+    0.24899449999793433
+  ],
+  "base_archive_only_seconds": [
+    102.7871794169987,
+    156.64506137499848
+  ],
+  "archive_sha256_unchanged_after_comparison": true
+}

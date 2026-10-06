@@ -1,0 +1,92 @@
+[
+  {
+    "elapsed_seconds": 0.42308479199709836,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306975574176000,
+    "beacon_age_seconds": 0.013487100601196289,
+    "scoped_child_ps": " 1266 96867 S    (bash)\n 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n"
+  },
+  {
+    "elapsed_seconds": 1.317345416995522,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306975574176000,
+    "beacon_age_seconds": 0.9077608585357666,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n 3101 96867 S    sleep 1\n"
+  },
+  {
+    "elapsed_seconds": 2.3988608340005158,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306977195940000,
+    "beacon_age_seconds": 0.3675050735473633,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n 6504 96867 S    (bash)\n"
+  },
+  {
+    "elapsed_seconds": 3.259618042000511,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306978228316000,
+    "beacon_age_seconds": 0.19589495658874512,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n 7272 96867 S    (sleep)\n"
+  },
+  {
+    "elapsed_seconds": 4.1865616669965675,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306978741664000,
+    "beacon_age_seconds": 0.609489917755127,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n11368 96867 S    sleep 1\n"
+  },
+  {
+    "elapsed_seconds": 5.02815041699796,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306979823919000,
+    "beacon_age_seconds": 0.36883091926574707,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n"
+  },
+  {
+    "elapsed_seconds": 6.452663541997026,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306981414865000,
+    "beacon_age_seconds": 0.20242691040039062,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n15646 96867 S    (sleep)\n"
+  },
+  {
+    "elapsed_seconds": 7.588302249998378,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306982256307000,
+    "beacon_age_seconds": 0.4966132640838623,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n"
+  },
+  {
+    "elapsed_seconds": 8.608012541997596,
+    "watcher_pid": 96867,
+    "reconcile_pids": [
+      1352
+    ],
+    "beacon_mtime_ns": 1791306983348767000,
+    "beacon_age_seconds": 0.4238619804382324,
+    "scoped_child_ps": " 1352 96867 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh reconcile\n23594 96867 S    (sleep)\n"
+  }
+]

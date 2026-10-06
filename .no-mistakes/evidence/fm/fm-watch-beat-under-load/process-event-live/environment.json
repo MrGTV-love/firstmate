@@ -1,0 +1,12 @@
+{
+  "scrubbed_variable_names": [
+    "FM_GUARD_GRACE"
+  ],
+  "isolated_variables": {
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/operator-home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/tmp",
+    "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/claims"
+  },
+  "live_test_seams": false
+}

@@ -1,0 +1,7 @@
+FM_TEST_BEGIN 2026-10-06T17:12:34Z tests/fm-watch-triage.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - a stuck pane capture goes stale; TERM stops its watcher and runs cleanup
+FM_TEST_END 2026-10-06T17:13:29Z tests/fm-watch-triage.test.sh exit=0 duration_ms=55281 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=55473
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=55281 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-triage.test.sh duration_ms=55281
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M48YDAJ274FP0KSXR35TAEYY/test_term_stops_a_watcher_blocked_inside_a_poll.timing.json

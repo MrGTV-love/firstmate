@@ -1,0 +1,20 @@
+{
+  "rc": 0,
+  "stdout": "retired: remote-reply-ios (adapter classified the captured result terminal)\ncaptured: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent/state/procevent-inbox/remote-reply-ios.1.result\n",
+  "stderr": "not-autohandled: remote-reply-ios (left for the handler; still unacknowledged)\n",
+  "command": {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh",
+      "start",
+      "remote-reply-ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/failbin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  }
+}

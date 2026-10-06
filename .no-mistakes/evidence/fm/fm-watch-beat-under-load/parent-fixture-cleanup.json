@@ -1,0 +1,22 @@
+{
+  "removed_owned_fixture_directories": [
+    "policy",
+    "watcher",
+    "state-gone",
+    "blocked-stage",
+    "lab-teardown-boundary",
+    "timeout-0-08-0.5-0",
+    "timeout-0-010-9.2-0",
+    "timeout-0-2-1-4",
+    "timeout-0-2-4-0",
+    "timeout-0-2-0.15-0",
+    "timeout-1-08-0.5-0",
+    "timeout-1-010-9.2-0",
+    "timeout-1-2-1-4",
+    "timeout-1-2-4-0",
+    "timeout-1-2-0.15-0"
+  ],
+  "default_grace_home_removed_by_driver": true,
+  "all_parent_watcher_processes_reaped": true,
+  "source_and_permanent_tests_modified": false
+}

@@ -1,0 +1,39 @@
+{
+  "steps": [
+    {
+      "command": [
+        "bash",
+        "bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/lab-teardown-boundary"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/lab-teardown-boundary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/lab-teardown-boundary"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/lab-teardown-boundary"
+      ],
+      "recorded_directory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/lab-teardown-boundary/socket",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-lab-home: invalid recorded tmux directory\n"
+    }
+  ],
+  "limitation": "The helper accepts socket ownership records only for /tmp/fml.XXXXXX, and tmux-dir creates that out-of-worktree directory explicitly. Workspace-local socket ownership is rejected before the tmux probe. No external directory was minted or tmux server touched."
+}

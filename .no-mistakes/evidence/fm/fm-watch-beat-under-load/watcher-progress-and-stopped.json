@@ -1,0 +1,96 @@
+[
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 1,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 0.691,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 2,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 1.732,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 3,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 0.901,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 4,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 1.965,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 5,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 1.032,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 6,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 0.111,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 7,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 1.179,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 8,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 0.214,
+    "finished": false
+  },
+  {
+    "stage": "slow-bounded-check",
+    "elapsed": 9,
+    "pid": 25721,
+    "alive": true,
+    "beacon_age": 1.287,
+    "finished": false
+  },
+  {
+    "stage": "progress-health-predicate",
+    "exit": 0
+  },
+  {
+    "stage": "stopped-main-with-live-check",
+    "watcher_alive": true,
+    "check_finished": false,
+    "beacon_unchanged": true,
+    "beacon_age": 9.831,
+    "health_exit": 1,
+    "duplicate_exit": 1,
+    "duplicate_stdout": "",
+    "duplicate_stderr": "watcher: lock held by live pid 25721 but heartbeat is stale for 9s (>6s); inspect or stop that watcher before re-arming.\n"
+  },
+  {
+    "stage": "resumed-check",
+    "watcher_exit": 0,
+    "check_finished": true,
+    "stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/watcher/state/slow.check.sh: slow-check-completed\n",
+    "queue": "1791306306\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/watcher/state/slow.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/watcher/state/slow.check.sh: slow-check-completed\n"
+  }
+]

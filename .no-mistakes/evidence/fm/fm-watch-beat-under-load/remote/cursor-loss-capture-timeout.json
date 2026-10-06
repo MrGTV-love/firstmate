@@ -1,0 +1,9 @@
+{
+  "command": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh",
+    "start",
+    "remote-reply-ios"
+  ],
+  "subprocess_timeout_seconds": 120,
+  "note": "Foreground subprocess capture timed out because the auto-rearmed live runner retained output pipes. Its owned _start runner continued; generation 2 result and handled marker prove cursor-loss ingestion; generation 3 handled proves subsequent final answer capture. Owned runner then swept and remote worker tree stopped."
+}

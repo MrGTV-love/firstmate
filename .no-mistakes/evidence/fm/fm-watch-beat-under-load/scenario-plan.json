@@ -1,0 +1,46 @@
+[
+  {
+    "name": "A slow authenticated check keeps the working watcher fresh beyond grace",
+    "expected": "Main-loop progress beats remain within unchanged configured grace; check result reaches wake queue."
+  },
+  {
+    "name": "Stopping the watcher main loop makes supervision stale despite a live child",
+    "expected": "No independent timer touches beacon; duplicate arm reports stale live holder; resume finishes check."
+  },
+  {
+    "name": "Zero-prefixed timeouts and delayed setup preserve the actual execution allowance",
+    "expected": "08 and 010 are decimal in native and Perl paths; pre-launch setup does not consume allowance; overdue checks are stopped."
+  },
+  {
+    "name": "Deleting disposable state reports state-gone and exits the watcher",
+    "expected": "Exit 1 with state-gone diagnostic, no orphan watcher."
+  },
+  {
+    "name": "Slow process-event launch confirmation does not block watcher progress",
+    "expected": "Reconcile is detached single-flight while watcher advances and beats."
+  },
+  {
+    "name": "Concurrent and cross-home process-event recovery reports each failure episode once",
+    "expected": "Source-locked notification/clear transitions preserve registration identity, clear real live recovery, and allow a new subsequent failure."
+  },
+  {
+    "name": "The executable policy allows the home-lock exact PID diagnostic stop",
+    "expected": "Literal single-PID plain and multiline diagnostics allowed."
+  },
+  {
+    "name": "The executable policy refuses broad, derived, redirected, and protected compound bypasses",
+    "expected": "No proof exception for alternate PID, pattern, substitution, heredoc, opaque interpreter, nested keywords or protected arm wrapping."
+  },
+  {
+    "name": "Retained completed replies skip unnecessary locking without losing owed escalation closes",
+    "expected": "Completed archive tick is cheap; open owed close converges exactly once; current record under lock stays authoritative."
+  },
+  {
+    "name": "Current remote reply replay identity converges to correct pending reply state",
+    "expected": "Real executable transport/reconciliation preserves replay identity and final pending state."
+  },
+  {
+    "name": "Lab teardown refusal reports the real tmux probe diagnostics",
+    "expected": "Live server refusal preserves ownership and includes probe exit/stderr; isolated stopped lab cleanup succeeds."
+  }
+]

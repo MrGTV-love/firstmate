@@ -1,0 +1,9 @@
+adapter=lavish
+argc=6
+argv:
+/bin/bash
+-c
+printf "%s\n" "$$" > "$1"; while [ ! -e "$2" ] && [ "$SECONDS" -lt 45 ]; do /bin/sleep 0.05; done; [ -e "$2" ] || exit 75; printf "real foreign-home completion\n"
+_
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/foreign-source.started
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/foreign-source.release

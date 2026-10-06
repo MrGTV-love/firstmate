@@ -1,0 +1,13 @@
+{
+  "live_ssh_probe": true,
+  "failure_mirrored_once": true,
+  "failure_unacknowledged": true,
+  "failure_cursor_absent": true,
+  "retry_document_equal": true,
+  "replay_original_once": true,
+  "replay_no_rewritten_decision": true,
+  "replay_handled": true,
+  "decision_closed": true,
+  "pending_resolved": true,
+  "final_answer_captured": true
+}

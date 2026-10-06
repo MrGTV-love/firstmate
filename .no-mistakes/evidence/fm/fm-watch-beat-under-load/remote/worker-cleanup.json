@@ -1,0 +1,23 @@
+{
+  "rc": 0,
+  "stdout": "",
+  "stderr": "",
+  "command": {
+    "argv": [
+      "bash",
+      "-c",
+      ". \"$1/bin/fm-remote-job-lib.sh\"; if [ -f \"$2/worker.pid\" ]; then fm_remote_job_stop_worker_tree \"$(cat \"$2/worker.pid\")\"; fi",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/jobs"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  }
+}

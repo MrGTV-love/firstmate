@@ -1,0 +1,532 @@
+[
+  {
+    "interface": "policy",
+    "command": "kill -TERM 424242",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "kill -TERM 424242",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424242; fi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424242; fi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then\n kill -TERM 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then\n kill -TERM 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh\nthen\n command kill -s TERM -- 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh\nthen\n command kill -s TERM -- 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ! ps -p 424242 -o command= | grep -q fm-watch.sh; then :; else\n /bin/kill 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ! ps -p 424242 -o command= | grep -q fm-watch.sh; then :; else\n /bin/kill 424242\nfi",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "while ps -p 424242 -o command= | grep -q fm-watch.sh; do\n kill -TERM 424242\ndone",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "allow\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "while ps -p 424242 -o command= | grep -q fm-watch.sh; do\n kill -TERM 424242\ndone",
+    "expected": "allow",
+    "actual": "allow",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "pkill -f fm-watch.sh",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "pkill -f fm-watch.sh",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424243; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424243; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill 424242 424243; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill 424242 424243; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill \"$PID\"; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill \"$PID\"; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "kill \"$(pgrep -f fm-watch.sh)\"",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "kill \"$(pgrep -f fm-watch.sh)\"",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ! pkill -f fm-watch; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ! pkill -f fm-watch; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "while ! pkill -f fm-watch.sh; do kill 424242; done",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "while ! pkill -f fm-watch.sh; do kill 424242; done",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if true; then if pkill -f fm-watch; then kill 424242; fi; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if true; then if pkill -f fm-watch; then kill 424242; fi; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if true; then if bin/fm-watch.sh; then kill 424242; fi; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if true; then if bin/fm-watch.sh; then kill 424242; fi; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ! bin/fm-watch.sh; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ! bin/fm-watch.sh; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if true; then then bin/fm-watch.sh; kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if true; then then bin/fm-watch.sh; kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if true; then kill 424242 <<EOF\n$(bin/fm-watch.sh)\nEOF\nfi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if true; then kill 424242 <<EOF\n$(bin/fm-watch.sh)\nEOF\nfi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if true <<EOF\n$(bin/fm-watch.sh)\nEOF\nthen kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if true <<EOF\n$(bin/fm-watch.sh)\nEOF\nthen kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if builtin source bin/fm-watch.sh; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if builtin source bin/fm-watch.sh; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if python3 -c 'import os; os.system(\"bin/fm-watch.sh\")'; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if python3 -c 'import os; os.system(\"bin/fm-watch.sh\")'; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if bin/fm-watch.sh*; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if bin/fm-watch.sh*; then kill 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill 424242 >/dev/null; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill 424242 >/dev/null; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "bin/fm-watch-arm.sh &",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\twatcher-background\ta protected watcher command cannot run in an asynchronous shell list or through nohup/disown\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "bin/fm-watch-arm.sh &",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or through nohup/disown\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or through nohup/disown\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "bin/fm-watch.sh",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\twatcher-direct\tbin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "bin/fm-watch.sh",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy",
+    "command": "bin/fm-watch-checkpoint.sh --seconds 180 | cat",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\twatcher-pipeline\ta protected watcher command must not participate in a pipeline\n",
+    "stderr": "",
+    "passed": true
+  },
+  {
+    "interface": "transport",
+    "command": "bin/fm-watch-checkpoint.sh --seconds 180 | cat",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 2,
+    "stdout": "{\"decision\":\"deny\",\"reason\":\"[watcher-pipeline] a protected watcher command must not participate in a pipeline\"}\n",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-pipeline] a protected watcher command must not participate in a pipeline\"}\n",
+    "passed": true
+  },
+  {
+    "interface": "policy-no-lock",
+    "command": "if ps -p 424242 -o command= | grep -q fm-watch.sh; then kill -TERM 424242; fi",
+    "expected": "deny",
+    "actual": "deny",
+    "exit": 0,
+    "stdout": "deny\tbroad-watcher-kill\ta broad process kill targeting the firstmate watcher is forbidden\n",
+    "stderr": "",
+    "passed": true
+  }
+]

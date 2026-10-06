@@ -1,0 +1,21 @@
+{
+  "claims": {},
+  "homes": {
+    "home-local": {
+      "source_identity": "16777232:30394269",
+      "launch_failed_marker": null,
+      "launch_failed_keys": [],
+      "wake_queue": null,
+      "results": {},
+      "launch_stamps": {}
+    },
+    "home-foreign": {
+      "source_identity": "16777232:30394469",
+      "launch_failed_marker": null,
+      "launch_failed_keys": [],
+      "wake_queue": null,
+      "results": {},
+      "launch_stamps": {}
+    }
+  }
+}

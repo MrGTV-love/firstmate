@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/usr/bin/ssh",
+    "-p",
+    "65101",
+    "-i",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/user",
+    "-o",
+    "IdentitiesOnly=yes",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/known_hosts",
+    "charlesabrooker@127.0.0.1",
+    "true"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": "Warning: Permanently added '[127.0.0.1]:65101' (ED25519) to the list of known hosts.\ndebug2: do_setup_env: set TMPDIR\n"
+}

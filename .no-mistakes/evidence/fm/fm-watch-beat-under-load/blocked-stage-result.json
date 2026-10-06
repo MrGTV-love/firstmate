@@ -1,0 +1,14 @@
+{
+  "stage": "real-correlation-lock-blocks-poll",
+  "watcher_pid": 9054,
+  "watcher_alive": true,
+  "holder_alive": true,
+  "beacon_unchanged": true,
+  "beacon_age": 9.324,
+  "health_exit": 1,
+  "archive_record": "schema=fm-pending-reply.v1\ncorr_id=e782cf212d5a3cd8\ntask_id=mate\nparent_home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/blocked-stage\nparent_status=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/blocked-stage/state/mate.status\nparent_status_scan_signature=\nrequest_summary=owed close stalled behind real lock\ncreated_epoch=1791306621\ndelivered_epoch=\nturn_seen_busy=0\nrequest_turn_completed_epoch=\nrecovery_attempted_epoch=\nrecovery_sender_pid=\nrecovery_sender_identity=\nrecovery_sent_epoch=\nrecovery_delivery_outcome=\nrecovery_turn_seen_busy=0\nrecovery_turn_completed_epoch=\nresolved_epoch=\nresolved_via=\nwrong_home_hits=0\nwrong_home_first_sighting=\nwrong_home_sightings=\nwrong_home_scan_signature=\ngrace_secs=120\nphase=resolved\nescalated_epoch=10000\n",
+  "released_watcher_exit": -15,
+  "stdout": "",
+  "status_after_release": "blocked [key=pending-reply-e782cf212d5a3cd8]: pending-reply-missed: task=mate pending-reply-id=e782cf212d5a3cd8\n",
+  "beacon_advanced_after_release": true
+}

@@ -1,0 +1,21 @@
+{
+  "concurrent_tick_seconds": 3.591940040998452,
+  "exit_codes": [
+    0,
+    0
+  ],
+  "close_count": 1,
+  "followup_no_status_change": true,
+  "waiting_record_byte_identical": true,
+  "unrelated_release_remains_open": true,
+  "stdout_stderr": [
+    [
+      "",
+      ""
+    ],
+    [
+      "",
+      ""
+    ]
+  ]
+}

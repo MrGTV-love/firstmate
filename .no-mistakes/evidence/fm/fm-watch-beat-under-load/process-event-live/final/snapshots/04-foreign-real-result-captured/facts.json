@@ -1,0 +1,27 @@
+{
+  "claims": {},
+  "homes": {
+    "home-local": {
+      "source_identity": "16777232:30537218",
+      "launch_failed_marker": null,
+      "launch_failed_keys": [
+        "procevent:process-event-live:launch-failed:16777232-30537218-235629393"
+      ],
+      "wake_queue": "1791307078\t1\tcheck\tprocevent:process-event-live:launch-failed:16777232-30537218-235629393\tcheck: process-event source process-event-live is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start process-event-live to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.\n",
+      "results": {},
+      "launch_stamps": {}
+    },
+    "home-foreign": {
+      "source_identity": "16777232:30539503",
+      "launch_failed_marker": null,
+      "launch_failed_keys": [],
+      "wake_queue": "1791307113\t1\tcheck\tprocevent:process-event-live:1\tcheck: procevent lavish process-event-live 1\n",
+      "results": {
+        "state/procevent-inbox/process-event-live.1.result": "real foreign-home completion\n"
+      },
+      "launch_stamps": {
+        "process-event-live.16777232-30539503.last-launch": "44844.486481\n"
+      }
+    }
+  }
+}

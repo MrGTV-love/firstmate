@@ -1,0 +1,162 @@
+[
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent-remote-reply.sh",
+      "source-id",
+      "ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent-remote-reply.sh",
+      "arm",
+      "ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "bash",
+      "-c",
+      ". \"$1/bin/fm-pending-reply-lib.sh\"; c=$(fm_pending_reply_create \"$2\" \"$2/state\" ios \"remote replay correlation\"); fm_pending_reply_mark_delivered \"$2/state\" \"$c\"; printf \"%s\\n\" \"$c\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh",
+      "start",
+      "remote-reply-ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/failbin:/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent-remote-reply.sh",
+      "handle",
+      "ios",
+      "1",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent/state/procevent-inbox/remote-reply-ios.1.result"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent-remote-reply.sh",
+      "arm",
+      "ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh",
+      "start",
+      "remote-reply-ios"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "bash",
+      "-c",
+      ". \"$1/bin/fm-classify-lib.sh\"; status_open_decisions \"$2\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent/state/ios.status"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-procevent.sh",
+      "sweep-home"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  },
+  {
+    "argv": [
+      "bash",
+      "-c",
+      ". \"$1/bin/fm-remote-job-lib.sh\"; if [ -f \"$2/worker.pid\" ]; then fm_remote_job_stop_worker_tree \"$(cat \"$2/worker.pid\")\"; fi",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/jobs"
+    ],
+    "overrides": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/parent",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+      "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/claims",
+      "FM_SSH_BIN": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/remote/ssh-forward",
+      "FM_REMOTE_REPLY_WAIT_SECONDS": "2"
+    },
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources"
+  }
+]

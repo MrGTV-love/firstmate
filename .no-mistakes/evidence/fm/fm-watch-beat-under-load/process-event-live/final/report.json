@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "failure": null,
+  "scenarios": [
+    {
+      "scenario": "four concurrent real reconcilers announce one failure episode",
+      "status": "passed",
+      "reconcilers": 4,
+      "failure_wakes": 1,
+      "keys": [
+        "procevent:process-event-live:launch-failed:16777232-30537218-235629393"
+      ],
+      "registration_identity": "16777232:30537218"
+    },
+    {
+      "scenario": "two-home live ownership closes same-registration local episode",
+      "status": "passed",
+      "reconcile_output": "reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0",
+      "foreign_owner": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/home-foreign",
+      "local_marker_present": false,
+      "local_failure_wakes": 1,
+      "registration_identity": "16777232:30537218"
+    },
+    {
+      "scenario": "foreign command completes with durable real result and check wake",
+      "status": "passed",
+      "result": "real foreign-home completion\n",
+      "capture_output": "not-autohandled: process-event-live (left for the handler; still unacknowledged)\ncaptured: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/ProcessEventLive/home-foreign/state/procevent-inbox/process-event-live.1.result"
+    },
+    {
+      "scenario": "new genuine failure after foreign recovery announces a distinct episode once",
+      "status": "passed",
+      "attached_refusal": "error: registration argv is unreadable: process-event-live",
+      "reconcilers": 4,
+      "failure_wakes": 2,
+      "keys": [
+        "procevent:process-event-live:launch-failed:16777232-30537218-235629393",
+        "procevent:process-event-live:launch-failed:16777232-30537218-2892728396"
+      ],
+      "registration_identity": "16777232:30537218"
+    },
+    {
+      "scenario": "existing historical success stamp does not hide or duplicate a newer failure",
+      "status": "passed",
+      "failure_wakes": 3,
+      "keys": [
+        "procevent:process-event-live:launch-failed:16777232-30537218-235629393",
+        "procevent:process-event-live:launch-failed:16777232-30537218-2892728396",
+        "procevent:process-event-live:launch-failed:16777232-30537218-999315599"
+      ],
+      "newer_marker_preserved": true,
+      "registration_identity": "16777232:30537218"
+    },
+    {
+      "scenario": "supplemental existing launch-episodes regression",
+      "status": "passed",
+      "selector": "FM_TEST_ONLY=launch-episodes",
+      "returncode": 0,
+      "output": "ok - a launch that cannot confirm is announced once per failure episode\nok - concurrent failure append and rollback keep one durable episode\nnot-autohandled: episode-src (left for the handler; still unacknowledged)\nok - late durable startup evidence suppresses an obsolete failure\nok - late live ownership suppresses an obsolete failure\nok - obsolete registrations and uncertain claims reject stale launch failures\nok - delayed historical success cannot erase a newer failure episode\nok - foreign live recovery closes only the current registration's local episode",
+      "note": "Existing test-only timing hooks are supplemental, not live proof."
+    }
+  ],
+  "cleanup": {
+    "home-local": {
+      "returncode": 0,
+      "output": "retired: process-event-live\nswept: attempted=1"
+    },
+    "home-foreign": {
+      "returncode": 0,
+      "output": "retired: process-event-live\nswept: attempted=1"
+    },
+    "remaining_claims": [],
+    "remaining_registrations": [],
+    "remaining_runner_records": [],
+    "unfinished_started_commands": [],
+    "recorded_runner_pid_inspection": {
+      "pids": [
+        71476
+      ],
+      "returncode": 1,
+      "output": ""
+    },
+    "exact_home_sweeps_successful": true,
+    "fixture_subtree_removed": true
+  },
+  "limitations": [
+    "Live orchestration uses public commands and real Bash/sleep inputs without product mocks or timing seams.",
+    "The live foreign-owner recovery is naturally timed and not instrumented to distinguish every internal observation instruction.",
+    "Exact final-revalidation, stale replaced-registration, delayed historical-success, and failed-append rollback races are covered by the supplemental targeted regression timing hooks only.",
+    "No live Lavish editor/backend, operator home, tmux default server, Herdr endpoint, credentials, full suite, CI, lint, format, or build was touched; tmux clients are isolated to an empty socket directory under the fixture."
+  ]
+}

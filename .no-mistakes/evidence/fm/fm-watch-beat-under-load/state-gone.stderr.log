@@ -1,0 +1,6 @@
+touch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state/.last-check: No such file or directory
+touch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state/.last-heartbeat: No such file or directory
+bin/fm-watch.sh: line 3309: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state/.heartbeat-streak: No such file or directory
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-push-transition-lib.sh: line 82: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state/.watch-triage.log: No such file or directory
+touch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state/.last-watcher-beat: No such file or directory
+watcher: exiting - state directory no longer exists: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/state-gone/state

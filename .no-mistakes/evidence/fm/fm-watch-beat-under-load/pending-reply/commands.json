@@ -1,0 +1,95 @@
+{
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY",
+  "setup": [
+    "bash",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/setup.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/archive-home"
+  ],
+  "base_extract": [
+    "git",
+    "show",
+    "13f00a597029189f5f6594c3952a47b41fb9a21b:bin/fm-pending-reply-lib.sh"
+  ],
+  "lock_holders": [
+    [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/hold-lock.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/archive-home/state/.pending-reply-f1180ef26ee938cc.lock"
+    ],
+    [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/hold-lock.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/archive-home/state/.pending-reply-0ca278c93b0a1ef7.lock"
+    ]
+  ],
+  "tick": [
+    "bash",
+    "-c",
+    ". \"$1\"; fm_pending_reply_tick \"$2\"",
+    "_",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/archive-home/state"
+  ],
+  "base_tick": [
+    "bash",
+    "-c",
+    ". \"$1\"; fm_pending_reply_tick \"$2\"",
+    "_",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/base-bin/fm-pending-reply-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/archive-home/state"
+  ],
+  "owed_setup": [
+    "bash",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-setup.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-home"
+  ],
+  "concurrent_owed_ticks": [
+    [
+      "bash",
+      "-c",
+      ". \"$1\"; fm_pending_reply_tick \"$2\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-home/state"
+    ],
+    [
+      "bash",
+      "-c",
+      ". \"$1\"; fm_pending_reply_tick \"$2\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-home/state"
+    ]
+  ],
+  "followup_owed_tick": [
+    "bash",
+    "-c",
+    ". \"$1\"; fm_pending_reply_tick \"$2\"",
+    "_",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-pending-reply-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-home/state"
+  ],
+  "decision_fold": [
+    "bash",
+    "-c",
+    ". \"$1\"; status_open_decisions \"$2\"",
+    "_",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/bin/fm-classify-lib.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/owed-home/state/hibit.status"
+  ],
+  "environment_scrub": [
+    "FM_*",
+    "TASKS_AXI_*"
+  ],
+  "environment_explicit": {
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/tmp",
+    "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YDAJ274FP0KSXR35TAEYY/.live-validation/pending-reply/claims",
+    "FM_PENDING_REPLY_NOW": "10060",
+    "FM_HOME": "scenario home",
+    "FM_STATE_OVERRIDE": "scenario home/state"
+  }
+}
