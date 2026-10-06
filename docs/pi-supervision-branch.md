@@ -250,7 +250,8 @@ The guards are wired into these scripts:
 
 | Scripts | Guard behavior |
 | --- | --- |
-| `fm-send.sh`, `fm-control.sh`, and `fm-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
+| `fm-send.sh`, the runtime lifecycle verbs of `fm-control.sh`, and `fm-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
+| `fm-control.sh authorize-continuation` | Follows the main-only [instruction-owner recovery policy](agent-control.md#recovering-an-exited-instruction-owner) in every posture. |
 | `fm-pr-merge.sh`, `fm-merge-local.sh`, `fm-spawn.sh`, `fm-send.sh --resolve-key` for a decision key, and `fm-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
 
 A relaunch through `fm-control` stays branch-legal recovery in both postures.
