@@ -56,9 +56,9 @@
 #            it is retired.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for pending results. It then
-#            releases the claim, unless the adapter's `relisten` command says
-#            to poll again in this same runner. It blocks for as long as the
-#            source blocks and is meant
+#            drains its owned process group before releasing the claim, unless
+#            the adapter's `relisten` command says to poll again in this same
+#            runner. It blocks for as long as the source blocks and is meant
 #            to run as a supervised background process, never in a conversational
 #            turn. After publishing, it asks the source's own adapter whether the
 #            captured result ends the source and normally retires the registration
@@ -1000,7 +1000,7 @@ cmd_start_public() {
 }
 
 cmd_start() {
-  local id=${1-} adapter out rc claimed bound_rc published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
+  local id=${1-} adapter out rc claimed bound_rc bound_pid published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
   local extension_owner=0 extension_load_state extension_sequence='' extension_request_id=''
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   require_runner_group
@@ -1082,6 +1082,7 @@ cmd_start() {
   CLAIM_ID=$id
   CLAIM_HOME=$FM_HOME
   CLAIM_PID=$$
+  CLAIM_IDENTITY=$(fm_pid_identity "$$" 2>/dev/null) || die "cannot identify the claimed runner: $id"
   CLAIM_TOKEN=$FM_PROCEVENT_CLAIM_TOKEN
   CLAIM_REG_IDENTITY=$FM_PROCEVENT_CLAIM_REG_IDENTITY
   CLAIM_STATE_DEVICE=$FM_PROCEVENT_CLAIM_STATE_DEVICE
@@ -1092,8 +1093,32 @@ cmd_start() {
   # broken only by KILL. On contention, leave the generation-bound claim for
   # the stopper or subsequent reconciliation to reclaim.
   release_start_claim() {
+    # Keep the identity-matched leader alive until its children are gone. An
+    # EXIT caused by TERM to this pid alone must not orphan the native poll and
+    # advertise a free source while that poll still owns its listener.
+    trap '' INT TERM HUP
     extension_lifecycle_lock_release 2>/dev/null || true
     [ -z "$STAGED_OUTPUT" ] || rm -f -- "$STAGED_OUTPUT"
+    runner_group_children_gone "$CLAIM_PID" 0
+    case "$?" in
+      0) ;;
+      1)
+        runner_group_signal TERM "$CLAIM_PID" "$CLAIM_IDENTITY" || return 0
+        runner_group_children_gone "$CLAIM_PID" 2
+        case "$?" in
+          0) ;;
+          1)
+            # This escalation retains the live-leader proof from our TERM.
+            # KILL ends us too, leaving the claim for reconciliation only once
+            # the whole generation is gone; never release ahead of the kill.
+            runner_group_signal KILL "$CLAIM_PID" "$CLAIM_IDENTITY" proved
+            return 0
+            ;;
+          *) return 0 ;;
+        esac
+        ;;
+      *) return 0 ;;
+    esac
     fm_procevent_source_lock_try_acquire "$CLAIM_ID" 2>/dev/null || return 0
     if fm_procevent_claim_load_locked "$CLAIM_ID" 2>/dev/null \
       && [ "$FM_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
@@ -1107,6 +1132,9 @@ cmd_start() {
     fm_procevent_source_lock_release "$CLAIM_ID" 2>/dev/null || true
   }
   trap release_start_claim EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   # 0 when this runner should poll again. The adapter's relisten command is the
   # only adapter-specific signal; a replacement registration is adopted only
   # when this claim still owns it and the registered command is unchanged.
@@ -1325,7 +1353,11 @@ EOF
         $truncated = 1 if $take < $count;
       }
       exit($truncated ? 3 : 0);
-    ' "$MAX_OUTPUT_BYTES" <&4 > "$out"
+    ' "$MAX_OUTPUT_BYTES" <&4 > "$out" &
+    bound_pid=$!
+    # A trapped signal interrupts wait immediately. A foreground drain would
+    # defer the TERM trap for as long as the native poll keeps stdout open.
+    wait "$bound_pid"
     bound_rc=$?
     exec 4<&-
     wait "$launch_pid"
@@ -1396,7 +1428,6 @@ EOF
     elif fm_procevent_is_handled "$STATE" "$id" "$(fm_procevent_result_sequence "$durable")"; then
       handled_capture=1
     fi
-    publish_pending "$durable" >/dev/null
   fi
   [ "$extension_owner" -eq 1 ] || rm -f -- "$runner"
   if [ "$self_announcing" -eq 1 ]; then
@@ -1412,7 +1443,6 @@ EOF
     if publish_result "$durable"; then
       published_capture=1
     fi
-    publish_pending "$durable" >/dev/null
   elif [ "$handled_capture" -eq 1 ]; then
     :
   elif [ "$extension_owner" -eq 0 ] \
@@ -2063,12 +2093,40 @@ cmd_ensure_listening() {
 # assumes: an unresolved question has to be marked unresolved where the decision
 # is made, because a reader who does not know it is open will read a bare refusal
 # as settled design and eventually relax it.
+# Exit cleanup holds its own leader alive, so group quiescence here means no
+# member other than that leader. The inspector moves to a separate group before
+# invoking ps: neither it nor its ps child can look like a surviving source.
+# Return 0 when drained, 1 while children remain, 2 when inspection is uncertain.
+runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
+  perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
+    use strict;
+    use warnings;
+    my ($pid, $wait) = @ARGV;
+    setpgrp(0, 0) or exit 2;
+    my $deadline = clock_gettime(CLOCK_MONOTONIC) + $wait;
+    while (1) {
+      open my $ps, "-|", "ps", "-axo", "pid=,pgid=" or exit 2;
+      my ($leader, $children) = (0, 0);
+      while (my $line = <$ps>) {
+        $line =~ /\A\s*(\d+)\s+(\d+)\s*\z/ or exit 2;
+        next unless $2 == $pid;
+        $1 == $pid ? $leader++ : $children++;
+      }
+      close $ps or exit 2;
+      exit 2 unless $leader;
+      exit 0 unless $children;
+      exit 1 if clock_gettime(CLOCK_MONOTONIC) >= $deadline;
+      sleep 0.1;
+    }
+  ' "$1" "$2"
+}
+
 runner_group_signal() {  # <signal> <pid> <identity> [proved]
   local signal=$1 pid=$2 identity=$3 proved=${4-} state pgid
   if [ -n "$proved" ]; then
-    # This stop proved ownership before TERM; only its own escalation may reuse
-    # that same proof within the same stop_runner_pid call. Re-reading the leader
-    # as our signal ends it would discard that proof, not disprove ownership.
+    # This shutdown proved ownership before TERM; only its own escalation may
+    # reuse that proof in the same shutdown. Re-reading the leader as our signal
+    # ends it would discard that proof, not disprove ownership.
     # A group encountered without proof remains refused by the unproved path.
     fm_procevent_group_alive "$pid" || return 1
   else
