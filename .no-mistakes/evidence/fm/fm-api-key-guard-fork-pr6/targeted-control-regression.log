@@ -1,0 +1,7 @@
+ok - fm-control relaunch refuses a credential before stopping the original worker
+ok - fm-control checks the replacement harness rather than the previous harness
+ok - fm-control honors the replacement account pin's credential shed
+ok - fm-control honors the replacement launch allowlist
+ok - fm-control checks tmux environment before stopping the original worker
+ok - fm-control relaunch: a recorded api_key=allow opt-in is carried to the replacement launch
+ok - fm-spawn --relaunch: a replacement that does not opt in drops the recorded api_key line

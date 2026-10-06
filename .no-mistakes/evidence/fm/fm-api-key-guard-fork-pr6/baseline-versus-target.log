@@ -1,0 +1,14 @@
+Base commit: 13f00a597029189f5f6594c3952a47b41fb9a21b
+Base fm-spawn.sh executed via bash -c with SCRIPT_DIR pointing at this worktree bin; all live pane/product inputs identical.
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+first: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel
+second: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel
+
+Target commit: 47206a405e2780e91940b322d8caf60f9c65019b
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+first: API_KEY=unset AUTH_TOKEN=unset
+second: API_KEY=unset AUTH_TOKEN=unset

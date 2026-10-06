@@ -1,0 +1,176 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ export ANTHROPIC_API_KEY=stale-pane-sentinel ANTHROPIC_AUTH_TOKEN=stale-token-sentinel
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306909.9
+2596.4537.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306935.7
+8905.27335.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306942.9
+0809.32350.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306948.1
+4529.23428.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306951.3
+2425.8782.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791306956.4
+3773.31933.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; claude
+Welcome to Claude Code v2.1.291
+Welcome to Claude Code v2.1.291
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Let's get started.
+
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+
+     Auto (match terminal)
+ ❯ ✔ Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307092.7
+2603.17606.sh'
+codex-cli 0.160.0
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307128.2
+2985.17946.sh'
+Welcome to Claude Code v2.1.291
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    *                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+ *                                 ░░░░
+                                 ░░░░░░░░
+                               ░░░░░░░░░░░░░░░░
+       █████████                                        *
+      ██▄█████▄██                        *
+       █████████      *
+.......█ █   █ █..........................................
+
+ Let's get started.
+
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+
+     Auto (match terminal)
+ ❯ ✔ Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307207.8
+7341.19249.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307211.9
+7389.17384.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ export ANTHROPIC_API_KEY=stale-pane-sentinel ANTHROPIC_AUTH_TOKEN=stale-token-sentinel
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307261.6
+0812.1306.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w'
+bash-3.2$ export GOTMPDIR=/tmp/fm-guard-live-01/gotmp
+bash-3.2$ export COMPACT_ADVISER_DISABLE=1
+bash-3.2$ export FM_TASK_ID=guard-live-01
+bash-3.2$ . '/tmp/fm-guard-live-01+c5ca15a875bf6afb57b5c37bc0ef23b8a0e93884a61f39851c2602a8e774f89a/launch.s1791307266.7
+7673.8667.sh'
+2.1.291 (Claude Code)
+2.1.291 (Claude Code)
+bash-3.2$

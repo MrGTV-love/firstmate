@@ -1,0 +1,19 @@
+ambient
+first: API_KEY=unset AUTH_TOKEN=unset
+second: API_KEY=unset AUTH_TOKEN=unset
+
+allowlist-retains
+first: API_KEY=unset AUTH_TOKEN=unset
+second: API_KEY=unset AUTH_TOKEN=unset
+
+allowlist-filters
+first: API_KEY=unset AUTH_TOKEN=unset
+second: API_KEY=unset AUTH_TOKEN=unset
+
+opt-in
+first: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel
+second: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel
+
+opt-in-allowlist
+first: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel
+second: API_KEY=stale-pane-sentinel AUTH_TOKEN=stale-token-sentinel

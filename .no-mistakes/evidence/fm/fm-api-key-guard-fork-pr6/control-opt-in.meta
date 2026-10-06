@@ -1,0 +1,13 @@
+window=primary:fm-guard-live-01
+endpoint_task_id=guard-live-01
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/p
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-guard-live-01
+model=default
+effort=default
+api_key=allow
+busy_gen=g1791307127.28701.8351
+spawn_gen=s1791307128.22985.17946
+control_relaunch_tx=21218.20261006T171846Z.32124

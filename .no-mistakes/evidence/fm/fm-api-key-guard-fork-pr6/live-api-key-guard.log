@@ -1,0 +1,244 @@
+## Refuse ANTHROPIC_API_KEY managed
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse ANTHROPIC_API_KEY raw
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse ANTHROPIC_AUTH_TOKEN managed
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse ANTHROPIC_AUTH_TOKEN raw
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse tmux session credential
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t primary -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse tmux global credential
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse allowlisted ANTHROPIC_API_KEY
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Refuse allowlisted ANTHROPIC_AUTH_TOKEN
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness claude
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through config/launch-env-allowlist; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Compound raw Claude launch in stale-credential pane
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## allowlist-retains compound raw Claude
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-allowlist-retains.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-allowlist-retains.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## allowlist-filters compound raw Claude
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-allowlist-filters.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-allowlist-filters.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## opt-in compound raw Claude
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-opt-in.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-opt-in.txt' --allow-api-key
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## opt-in-allowlist compound raw Claude
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-opt-in-allowlist.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-opt-in-allowlist.txt' --allow-api-key
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Direct relaunch drops opt-in
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Control relaunch ambient refusal ANTHROPIC_API_KEY
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Control relaunch ambient refusal ANTHROPIC_AUTH_TOKEN
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Control relaunch tmux session refusal
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t primary -u ANTHROPIC_API_KEY) or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Control relaunch tmux global refusal
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u ANTHROPIC_AUTH_TOKEN) or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Running real Claude survives ANTHROPIC_API_KEY refusal
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Running real Claude survives ANTHROPIC_AUTH_TOKEN refusal
+$ bin/fm-control.sh guard-live-01 relaunch --note 'Live pre-stop guard validation'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+error: refused before stopping guard-live-01: an Anthropic credential would reach the replacement worker
+error: relaunch of guard-live-01 was refused before its agent was touched; nothing changed
+
+
+## Non-Claude replacement ignores Anthropic key
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'codex --version'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: task guard-live-01's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh guard-live-01 exit)
+
+
+## Non-Claude actual Codex version launch
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'codex --version'
+exit=0
+spawned guard-live-01 harness=codex kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Control carries recorded explicit opt-in
+$ bin/fm-control.sh guard-live-01 relaunch --harness claude --note 'Keep deliberately opted-in API billing'
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: task guard-live-01's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'relaunch'
+error: relaunch of guard-live-01 failed while stopping the old agent, which is still running; its original instructions were restored
+
+
+## Control recorded opt-in after version command completes
+$ bin/fm-control.sh guard-live-01 relaunch --harness claude --note 'Keep deliberately opted-in API billing'
+exit=0
+relaunched guard-live-01 harness=claude from=codex model=default effort=default backend=tmux endpoint=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Attempt real account pin ordinary
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version' --allow-api-key
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: task guard-live-01's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh guard-live-01 exit)
+
+
+## Attempt real account pin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/account
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version' --allow-api-key
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: task guard-live-01's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh guard-live-01 exit)
+
+
+## Real isolated account-pin authentication ordinary
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version' --allow-api-key
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: config/claude-account pins Claude workers to the ordinary account, which is not signed in (claude auth status); sign in with env -u CLAUDE_CONFIG_DIR claude, then /login, or change the pin
+
+
+## Real isolated account-pin authentication /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/account
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && claude --version' --allow-api-key
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: config/claude-account pins Claude workers to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/account, which is not signed in (claude auth status); sign in with CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/account claude, then /login, or change the pin
+
+
+## Session removed override suppresses global credential
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Session empty override suppresses global credential
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-ambient.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Target after baseline compound escape reproduction
+$ bin/fm-spawn.sh guard-live-01 --relaunch --harness 'claude --version && printf '"'"'first: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-corrected.txt && claude --version && printf '"'"'second: API_KEY=%s AUTH_TOKEN=%s\n'"'"' "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" >> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/observed-corrected.txt'
+exit=0
+spawned guard-live-01 harness=claude kind=scout window=primary:fm-guard-live-01 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/w
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+
+
+## Fresh spawn refusal before provisioning ANTHROPIC_API_KEY
+$ bin/fm-spawn.sh guard-fresh-02 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/p --scout --harness claude --backend tmux
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
+
+## Fresh spawn refusal before provisioning ANTHROPIC_AUTH_TOKEN
+$ bin/fm-spawn.sh guard-fresh-02 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l/p --scout --harness claude --backend tmux
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919A9AR43ZS1JWZBR2HBT7/l
+error: ANTHROPIC_AUTH_TOKEN is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+
