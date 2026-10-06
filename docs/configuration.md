@@ -1167,6 +1167,7 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state and asks one Choice question whose options are every rule's `when` plus the fixed neutral option for no matching rule; the model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
+Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
 A ship brief's delivery mode is deliberately not sent, because in live runs naming it pushed a routine ship brief toward the hardest tier (see [the verification record](verification/dispatch-resolve.md)).
@@ -1175,22 +1176,50 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps values you name from ever leaving the machine in a resolver request.
-It has no default entries, and an absent file changes nothing.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver withholds the same values.
+The optional local, gitignored `config/dispatch-never-send` keeps named values and marked brief regions out of Jev resolver requests.
+It has no default entries, and an absent file sends unmarked briefs exactly as before.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver applies the same privacy policy.
 
-Each non-blank line not beginning with `#` is one literal value, matched case-insensitively.
+Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
+Ordinary `#` comments remain ignored.
+The one supported directive is `# dispatch-never-send marked-sections`, compared after trimming surrounding whitespace and collapsing whitespace runs to one space.
+Its spelling and case must match exactly, and the space after `#` is required.
+Any other comment that starts with `dispatch-never-send` after the `#` and optional whitespace, compared case-insensitively (for example `#dispatch-never-send marked-sections` or `# Dispatch-Never-Send marked-sections`), is an invalid directive and stops every request.
 
 ```text
-# Client names
+# Literal values still stop the whole request
 Example Client Ltd
+# Remove explicitly marked regions from briefs
+# dispatch-never-send marked-sections
 ```
 
-Before the request is sent, every string in it is checked: the project name, the task text, each rule's `when`, and the fixed question text.
-A match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
-A list that is present but not a readable regular file also stops the request the same way rather than sending unchecked text.
+Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
+
+```markdown
+<!-- dispatch-never-send:start -->
+### Private context
+Synthetic private details kept only in the local brief.
+<!-- dispatch-never-send:end -->
+```
+
+With `# dispatch-never-send marked-sections` present, the resolver removes both marker lines and everything between them from the original brief, before task-section extraction or whole-brief fallback.
+Place the opening marker before the heading when the heading itself is sensitive.
+Surrounding whitespace on marker lines is allowed, markers apply even inside Markdown code fences, and multiple disjoint regions are supported.
+The local brief and other brief consumers remain unchanged.
+
+Markers never send silently.
+A brief containing `<!--` followed by optional whitespace and the reserved `dispatch-never-send` prefix, compared case-insensitively on the same line, stops the entire request when the directive is absent, whether the list file is missing or only holds literals.
+With the directive present, every such line must be exactly one of the two canonical markers above after trimming surrounding whitespace: nested, unmatched, inline, malformed suffixes (`<!-- dispatch-never-send:star -->`), unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
+A brief without such text is sent as before.
+This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
+Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
+
+Before the request is sent, every remaining string in it is checked for literal matches: the project name, the sanitized task text, each rule's `when`, and the fixed question text.
+A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
+A list that is present but not a readable regular file, an invalid directive, or a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
+The offline behavior coverage in `tests/fm-dispatch-resolve.test.sh` captures outgoing request bodies using only synthetic data.
 
 **Missing or invalid rules**
 

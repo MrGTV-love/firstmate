@@ -31,15 +31,13 @@
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
-# Never-send check: when the optional $FM_HOME/config/dispatch-never-send list
-#   exists, every string value of the built request is checked against it
-#   before the POST. Each non-blank, non-# line is a literal matched
-#   case-insensitively, with surrounding whitespace trimmed and every run of
-#   whitespace, on both sides, treated as one space. A match, or a list that
-#   is not a readable regular file, prints one
-#   "dispatch-resolve: off (...; nothing sent)" line on stderr naming at most
-#   the list line number, never its value, prints nothing on stdout, and exits
-#   0 with no network or quota call, exactly like the absent-key off path.
+# Never-send: docs/configuration.md owns the opt-in list and section markers
+#   in $FM_HOME/config/dispatch-never-send. Enabled marked regions are removed
+#   from the brief before task extraction; markers without that opt-in stop the
+#   whole request. Then every request string is checked for literals.
+#   A match, unreadable list, or invalid privacy directive/marker prints one
+#   "dispatch-resolve: off (...; nothing sent)" line on stderr without private
+#   text, prints nothing on stdout, and exits 0 with no network or quota call.
 #
 # Output (stdout, TOON-style block):
 #   dispatch-resolve:
@@ -301,19 +299,72 @@ never_send_off() {
   exit 0
 }
 
-# Checks every string the request carries, so no text reaches the network
-# unchecked. grep's own stderr is discarded because it can echo the pattern.
-never_send_check() {
-  local list value n=0 rc
+# Snapshot and validate privacy policy before reading any outgoing brief text.
+NEVER_SEND_LIST='' MARKED_SECTIONS=0
+never_send_load() {
+  local value n=0
   [ -e "$NEVER_SEND_PATH" ] || [ -L "$NEVER_SEND_PATH" ] || return 0
   { [ -f "$NEVER_SEND_PATH" ] && [ -r "$NEVER_SEND_PATH" ]; } \
     || never_send_off "$NEVER_SEND_PATH is not a readable regular file"
-  # Collapse whitespace runs on both sides so a value the brief wraps across
-  # lines or spaces differently still matches
+  NEVER_SEND_LIST=$(jq -Rr 'gsub("\\s+"; " ")' "$NEVER_SEND_PATH" 2>/dev/null) \
+    || never_send_off "could not read $NEVER_SEND_PATH"
+  while IFS= read -r value; do
+    n=$((n + 1))
+    value=${value# }
+    value=${value% }
+    case "$value" in
+      '# dispatch-never-send marked-sections') MARKED_SECTIONS=1 ;;
+      '#'*)
+        case "$(printf '%s' "${value#'#'}" | tr '[:upper:]' '[:lower:]')" in
+          dispatch-never-send*|' dispatch-never-send'*)
+            never_send_off "invalid privacy directive in $NEVER_SEND_PATH line $n" ;;
+        esac
+        ;;
+    esac
+  done <<<"$NEVER_SEND_LIST"
+}
+
+# Markers are interpreted on the original brief, even inside Markdown fences,
+# so protected headings cannot change extraction or cause a whole-brief fallback.
+never_send_brief() {
+  local rc=0
+  grep -qiE -e '<!--[[:space:]]*dispatch-never-send' "$BRIEF" 2>/dev/null || rc=$?
+  case "$rc" in
+    0) [ "$MARKED_SECTIONS" -eq 1 ] \
+         || never_send_off "never-send markers need the marked-sections directive" ;;
+    1) cp "$BRIEF" "$SEND_TEXT" || never_send_off "could not read the brief"
+       return ;;
+    *) never_send_off "could not read the brief" ;;
+  esac
+  awk '
+    {
+      marker = $0
+      sub(/^[[:space:]]+/, "", marker)
+      sub(/[[:space:]]+$/, "", marker)
+      if (marker == "<!-- dispatch-never-send:start -->") {
+        if (hidden) exit 1
+        hidden = 1
+        next
+      }
+      if (marker == "<!-- dispatch-never-send:end -->") {
+        if (!hidden) exit 1
+        hidden = 0
+        next
+      }
+      if (tolower($0) ~ /<!--[[:space:]]*dispatch-never-send/) exit 1
+      if (!hidden) print
+    }
+    END { if (hidden) exit 1 }
+  ' "$BRIEF" > "$SEND_TEXT" 2>/dev/null \
+    || never_send_off "invalid never-send markers or unreadable brief"
+}
+
+# Checks every string the request carries. grep stderr can echo the pattern.
+never_send_check() {
+  local value n=0 rc
+  [ -n "$NEVER_SEND_LIST" ] || return 0
   jq -r '.. | strings | gsub("\\s+"; " ")' <<<"$REQUEST" > "$SEND_TEXT" 2>/dev/null \
     || never_send_off "could not extract the request text to check"
-  list=$(jq -Rr 'gsub("\\s+"; " ")' "$NEVER_SEND_PATH" 2>/dev/null) \
-    || never_send_off "could not read $NEVER_SEND_PATH"
   while IFS= read -r value; do
     n=$((n + 1))
     value=${value# }
@@ -327,7 +378,7 @@ never_send_check() {
       1) ;;
       *) never_send_off "could not check the request text against $NEVER_SEND_PATH line $n" ;;
     esac
-  done <<<"$list"
+  done <<<"$NEVER_SEND_LIST"
 }
 
 # Send Jev only the task-specific sections bin/fm-brief.sh scaffolds, plus a
@@ -336,22 +387,24 @@ never_send_check() {
 # A brief with neither section goes whole. Ship delivery mode is deliberately
 # not sent: live runs showed it pushing routine ship briefs to the top tier.
 brief_kind() {
-  if grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$BRIEF"; then
+  if grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$SEND_TEXT"; then
     printf 'Brief kind: scout (report only)\n\n'
   fi
 }
 task_sections() {
   local heading
   for heading in "## Captain's intent" "## Firstmate spec"; do
-    fm_brief_task_heading_present "$BRIEF" "$heading" || continue
-    printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$BRIEF" "$heading")"
+    fm_brief_task_heading_present "$SEND_TEXT" "$heading" || continue
+    printf '%s\n%s\n\n' "$heading" "$(fm_brief_task_heading_body "$SEND_TEXT" "$heading")"
   done
 }
+never_send_load
+never_send_brief
 SECTIONS=$(task_sections)
 if [ -n "$SECTIONS" ]; then
   { brief_kind; printf '%s\n' "$SECTIONS"; } > "$TASK_TEXT" || die "could not read brief: $BRIEF"
 else
-  cp "$BRIEF" "$TASK_TEXT" || die "could not read brief: $BRIEF"
+  cp "$SEND_TEXT" "$TASK_TEXT" || die "could not read brief: $BRIEF"
 fi
 command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
