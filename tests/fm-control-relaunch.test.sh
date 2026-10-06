@@ -42,6 +42,7 @@ TMP_ROOT=$(fm_test_tmproot fm-control-relaunch)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 TASK_TMPS=()
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
 
 relaunch_cleanup() {
   local d
@@ -120,6 +121,16 @@ make_tmux_stub() {  # <dir>
 set -u
 D=$FM_FAKE_DIR
 case "${1:-}" in
+  show-environment)
+    if [ "${2:-}" = -t ]; then
+      printf '%s\n' "${3:-}" >> "$D/env-sessions"
+      cat "$D/tmux-env-${3:-}-${4:-}" 2>/dev/null
+    elif [ "${2:-}" = -g ]; then
+      cat "$D/tmux-env-global-${3:-}" 2>/dev/null
+    else
+      exit 1
+    fi
+    exit $? ;;
   send-keys)
     shift
     literal=0
@@ -634,6 +645,127 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
   assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
+}
+
+test_no_dispatch_non_omp_relaunch_does_not_require_jq() {
+  local dir id=rl-no-json-tool out rc
+  dir=$(new_case no-json-tool "$id")
+  add_ship_task "$dir" "$id" codex
+  printf codex > "$dir/fake/command"
+  printf codex > "$dir/fake/becomes"
+  [ ! -e "$dir/home/config/crew-dispatch.json" ] || fail "the no-jq relaunch case must not have dispatch configuration"
+  cat > "$dir/fakebin/jq" <<'SH'
+#!/usr/bin/env bash
+exit 127
+SH
+  chmod +x "$dir/fakebin/jq"
+
+  out=$(run_control "$dir" "$id" relaunch --note "continue the task"); rc=$?
+  expect_code 0 "$rc" "ordinary codex relaunch without dispatch must not require jq: $out"
+  assert_contains "$out" "relaunched $id harness=codex from=codex" "ordinary relaunch did not succeed"
+  assert_equals codex "$(meta_field "$dir" "$id" harness)" "ordinary relaunch changed the durable harness"
+  assert_equals default "$(meta_field "$dir" "$id" model)" "ordinary relaunch corrupted the durable model"
+  assert_equals default "$(meta_field "$dir" "$id" effort)" "ordinary relaunch corrupted the durable effort"
+  assert_equals complete "$(journal_field "$dir" "$id" phase)" "ordinary relaunch did not complete its transaction"
+  assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "ordinary relaunch changed the worktree"
+  pass "an ordinary non-OMP relaunch without crew-dispatch.json succeeds without required jq and preserves its durable profile"
+}
+
+enable_exhausted_claude_dispatch() {
+  local dir=$1
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
+    > "$dir/home/config/crew-dispatch.json"
+  cat > "$dir/fakebin/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0,"runway":{"status":"exhausted_now"}}]}}]}'
+SH
+  cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
+  *) printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env" ;;
+esac
+SH
+  cat > "$dir/fakebin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env"
+SH
+  chmod +x "$dir/fakebin/quota-axi" "$dir/fakebin/omp" "$dir/fakebin/claude"
+}
+
+test_claude_relaunch_binds_only_forwarded_api_credentials() {
+  local dir id credential policy out rc expected_harness expected_model expected_effort launch
+  local -a pane_env
+  for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    for policy in ambient retained filtered flag-only target-session; do
+      id="rl-auth-$credential-$policy"
+      dir=$(new_case "$id" "$id")
+      add_ship_task "$dir" "$id" claude
+      enable_exhausted_claude_dispatch "$dir"
+      printf 'dispatch_rule=rule_1\n' >> "$dir/home/state/$id.meta"
+      case "$policy" in
+        ambient|flag-only|target-session) printf 'api_key=allow\n' >> "$dir/home/state/$id.meta" ;;
+        retained)
+          printf '%s\n' PATH "$credential" > "$dir/home/config/launch-env-allowlist"
+          printf 'api_key=allow\n' >> "$dir/home/state/$id.meta"
+          ;;
+        filtered) printf 'PATH\n' > "$dir/home/config/launch-env-allowlist" ;;
+      esac
+      expected_harness=claude expected_model=default expected_effort=default
+      case "$policy" in
+        filtered|flag-only)
+          expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
+          ;;
+        target-session)
+          printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
+          ;;
+      esac
+      printf '%s' "$expected_harness" > "$dir/fake/becomes"
+      out=$(
+        unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+        if [ "$policy" != flag-only ] && [ "$policy" != target-session ]; then
+          export "$credential=synthetic-launch-credential"
+        fi
+        TMUX=supervisor,1,0 run_control "$dir" "$id" relaunch --note "continue with the selected authentication"
+      )
+      rc=$?
+      expect_code 0 "$rc" "$credential $policy relaunch must succeed: $out"
+      assert_contains "$out" "relaunched $id harness=$expected_harness from=claude" "$credential $policy relaunched the wrong harness"
+      assert_equals "$expected_harness" "$(meta_field "$dir" "$id" harness)" "$credential $policy recorded the wrong harness"
+      assert_equals "$expected_model" "$(meta_field "$dir" "$id" model)" "$credential $policy recorded the wrong model"
+      assert_equals "$expected_effort" "$(meta_field "$dir" "$id" effort)" "$credential $policy recorded the wrong effort"
+      assert_equals rule_1 "$(meta_field "$dir" "$id" dispatch_rule)" "$credential $policy lost dispatch identity"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "$credential $policy did not complete its transaction"
+      if [ "$expected_harness" = omp ]; then
+        assert_grep "fallback" "$dir/home/state/$id.status" "$credential $policy did not disclose the permitted fallback"
+      else
+        assert_equals allow "$(meta_field "$dir" "$id" api_key)" "$credential $policy lost the deliberate billing opt-in"
+      fi
+      if [ "$policy" = target-session ]; then
+        grep -Fxq fmses "$dir/fake/env-sessions" || fail "relaunch did not inspect the recorded endpoint's tmux environment"
+        if grep -Fxq fakepane "$dir/fake/env-sessions"; then
+          fail "relaunch inspected the supervising pane instead of its recorded endpoint"
+        fi
+      fi
+      launch=$(cat "$dir/fake/launch")
+      pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
+        -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+        -u CLAUDE_CONFIG_DIR HOME="$dir/user-home")
+      [ "$policy" = flag-only ] || pane_env+=("$credential=synthetic-launch-credential")
+      fm_eval_launch "$launch" "$dir/wt" "$dir/fakebin" "${pane_env[@]}" \
+        > "$dir/worker.out" 2>&1 || fail "$credential $policy staged replacement could not be consumed"
+      case "$policy" in
+        ambient|retained|target-session)
+          grep -Fxq "$credential=synthetic-launch-credential" "$dir/fakebin/worker.env" || fail "$credential did not reach the Claude replacement"
+          ;;
+        *)
+          grep -Fxq "$credential=" "$dir/fakebin/worker.env" || fail "$credential reached the fallback despite absent or filtered authentication"
+          ;;
+      esac
+    done
+  done
+  pass "Claude relaunch retains forwarded API auth including its recorded tmux session, while filtered or absent credentials permit native exhaustion fallback"
 }
 
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text() {
@@ -4150,6 +4282,8 @@ test_retiring_omp_removes_only_its_generated_configuration
 test_quota_exhaustion_relaunches_only_a_permitted_route
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
+test_no_dispatch_non_omp_relaunch_does_not_require_jq
+test_claude_relaunch_binds_only_forwarded_api_credentials
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree

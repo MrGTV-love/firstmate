@@ -2524,12 +2524,20 @@ fi
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
-  dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
-  DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
-  DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
+  dispatch_tmux_session=
+  if [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 1 ]; then
+    dispatch_tmux_session=${RELAUNCH_TARGET%%:*}
+  fi
+  if [ -f "$CONFIG/crew-dispatch.json" ]; then
+    dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
+    DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+    DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
+  else
+    DISPATCH_RULE=
+  fi
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
     dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK") || exit 1
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$dispatch_tmux_session") || exit 1
     DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
     if [ "$DISPATCH_SWITCHED" = true ]; then
       HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
@@ -2689,9 +2697,66 @@ fi
 # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
 # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
 # refuse when a pin is active: the key cannot reach the worker.
-if ! fm_api_key_guard "$HARNESS" "$ALLOW_API_KEY" "$WORKER_ACCOUNT" \
-  "$LAUNCH_ENV_ENABLED" "$LAUNCH_ENV_NAMES" "$BACKEND"; then
-  exit 1
+if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
+  if [ -z "$WORKER_ACCOUNT" ]; then
+    # No pin shed: determine whether each variable would reach the worker.
+    if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+      route_text=' through config/launch-env-allowlist'
+    else
+      route_text=' through ambient environment inheritance'
+    fi
+    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+      would_reach=1
+      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+        *$'\n'"$check_var"$'\n'*) ;;
+        *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
+        esac
+      fi
+      if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
+        echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+      fi
+    done
+  fi
+  # Also check the environment a new tmux window gives the worker. The window
+  # inherits the tmux session environment layered over the tmux global
+  # environment, which can hold a key the spawning process no longer has (the
+  # server started while the shell exported it). A session entry wins, and a
+  # session removal marker (-NAME) means unset; otherwise the global value
+  # applies. The global environment is checked even before the target session
+  # exists, because a session created later inherits it. The pin shed
+  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
+  # Pane rc files and direnv .envrc exports are not detected by this check.
+  if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
+    tmux_session=
+    if [ "$RELAUNCH" -eq 1 ]; then
+      tmux_session=${RELAUNCH_TARGET%%:*}
+    elif [ -n "${TMUX:-}" ]; then
+      tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
+    elif tmux has-session -t firstmate 2>/dev/null; then
+      tmux_session=firstmate
+    fi
+    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+        *$'\n'"$check_var"$'\n'*) ;;
+        *) continue ;;  # Allowlist filters it out at launch time
+        esac
+      fi
+      tmux_env_scope=$(fm_worker_account_tmux_env_scope "$check_var" "$tmux_session")
+      case "$tmux_env_scope" in
+      session)
+        echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+        ;;
+      global)
+        echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+        exit 1
+        ;;
+      esac
+    done
+  fi
 fi
 
 secondmate_registry_value() {

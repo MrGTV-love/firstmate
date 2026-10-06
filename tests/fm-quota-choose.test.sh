@@ -2,7 +2,7 @@
 # Unit tests for bin/fm-quota-choose.sh.
 # Drives the public argv interface with a mocked quota-axi JSON source.
 set -u
-unset CLAUDE_CONFIG_DIR
+unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -368,6 +368,38 @@ out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
 [ "$out" = "claude default" ] || fail "empty ambient config directory discarded native default headroom: $out"
 unset CLAUDE_CONFIG_DIR
 ok "ambient alternate Claude authentication has no native default quota mapping"
+
+# Unknown alternate auth is not positive quota; stripped auth uses native quota.
+CLAUDE_EXHAUSTED="$LAB/claude-exhausted.json"
+jq '(.providers[] | select(.provider == "claude").quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$LAB/captured.json" > "$CLAUDE_EXHAUSTED"
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+  export "$credential=synthetic-alternate-auth"
+  for policy in inherited retained stripped; do
+    case "$policy" in
+      inherited) rm -f "$LAB/home/config/launch-env-allowlist" ;;
+      retained) printf '%s\n' "$credential" > "$LAB/home/config/launch-env-allowlist" ;;
+      stripped) printf 'PATH\n' > "$LAB/home/config/launch-env-allowlist" ;;
+    esac
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+    if [ "$policy" = stripped ]; then
+      [ "$out" = "claude default" ] || fail "$credential stripped: native headroom was hidden: $out"
+    else
+      [ "$out" = "codex gpt-6.1-sol" ] || fail "$credential $policy: alternate auth inherited native headroom: $out"
+    fi
+    out=$(call_choose --snapshot "$CLAUDE_EXHAUSTED" --candidate claude:default --candidate codex:gpt-6.1-sol)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$credential $policy: exhausted or unrankable Claude displaced the fallback: $out"
+    if [ "$policy" = stripped ]; then
+      if out=$(call_choose --snapshot "$CLAUDE_EXHAUSTED" --candidate claude:default 2>/dev/null); then
+        fail "$credential stripped: exhausted native default unexpectedly selected: $out"
+      fi
+      [ "$out" = none ] || fail "$credential stripped: exhausted native default returned: $out"
+    fi
+    ok "$credential $policy uses only quota mapped to the launch environment"
+  done
+  unset "$credential"
+done
+rm "$LAB/home/config/launch-env-allowlist"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi

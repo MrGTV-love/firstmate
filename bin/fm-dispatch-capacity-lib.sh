@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # fm-dispatch-capacity-lib.sh - pooled OMP capacity and declared fallback selection.
 # Sourced by routing, spawn, and recovery; docs/configuration.md owns the matrix
-# schema. Never reads tokens, changes account pins, redeems saved resets, or
+# schema. Never reads stored tokens, changes account pins, redeems saved resets, or
 # ranks accounts by a fabricated spendPriority. OMP owns credential rotation.
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
-# fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
+# fm_dispatch_capacity <harness> <model> [config-dir] [tmux-session] prints evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
 # prints {rule, fallback}; without a rule, identical matching lists are safe,
 # but different lists require the explicit rule chosen at intake.
-# fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
+# fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array> [evidence] [tmux-session]
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
 
@@ -17,6 +17,10 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-quota-axi-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
+# shellcheck source=bin/fm-config-inherit-lib.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-worker-account-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -64,18 +68,36 @@ fm_omp_codex_capacity() {
 
 fm_dispatch_claude_quota_unbound() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  [ -n "${CLAUDE_CONFIG_DIR:-}" ] ||
+  local name names present scope session=${2:-}
+  if [ -n "${CLAUDE_CONFIG_DIR:-}" ] ||
     [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
-    { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }
+    { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }; then
+    return 0
+  fi
+  present=$(fm_config_source_present "$config/launch-env-allowlist") || return 0
+  if [ "$present" = 1 ]; then
+    names=$(fm_config_launch_env_names "$config") || return 0
+  fi
+  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    if [ "$present" = 1 ]; then
+      case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac
+    fi
+    [ -z "${!name:-}" ] || return 0
+    if [ "${BACKEND:-}" = tmux ]; then
+      scope=$(fm_worker_account_tmux_env_scope "$name" "$session")
+      [ -z "$scope" ] || return 0
+    fi
+  done
+  return 1
 }
 
 fm_dispatch_capacity() {
-  local harness=$1 model=$2 quota config
+  local harness=$1 model=$2 quota config session=${4:-}
   case "$harness:$model" in
     omp:openai-codex/*) fm_omp_codex_capacity "$model"; return ;;
     claude:*)
       config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
-      if fm_dispatch_claude_quota_unbound "$config"; then
+      if fm_dispatch_claude_quota_unbound "$config" "$session"; then
         printf '%s\n' '{"status":"unknown","reason":"selected Claude authentication has no established native default-account quota mapping"}'
         return
       fi
@@ -151,9 +173,9 @@ fm_dispatch_fallback_supported() {
 }
 
 fm_dispatch_select() {
-  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} candidate state
+  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} session=${6:-} candidate state
   if [ -z "$evidence" ]; then
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config")
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config" "$session")
   fi
   state=$(jq -r .status <<<"$evidence")
   if [ "$state" != exhausted ]; then
@@ -164,7 +186,7 @@ fm_dispatch_select() {
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
     fm_dispatch_fallback_supported "$config" "$candidate" || continue
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config")
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \
       '{profile: $profile, capacity: $capacity, rule: $rule, switched: true}'

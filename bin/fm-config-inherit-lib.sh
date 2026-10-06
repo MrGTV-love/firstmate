@@ -119,6 +119,22 @@ fm_config_source_present() {
   ' -- "$1"
 }
 
+fm_config_launch_env_names() {
+  local file="$1/launch-env-allowlist"
+  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+    echo "error: config/launch-env-allowlist must be a readable regular file" >&2
+    return 1
+  fi
+  jq -Rrs '
+    split("\n") | map(select(. != "" and (startswith("#") | not))) |
+    if all(.[]; test("^[A-Za-z_][A-Za-z0-9_]*$")) then .[]
+    else error("expected environment names only") end
+  ' "$file" 2>/dev/null || {
+    echo "error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments" >&2
+    return 1
+  }
+}
+
 fm_inherit_file_mode() {
   if [ "$(uname)" = Darwin ]; then
     /usr/bin/stat -f %Lp "$1" 2>/dev/null

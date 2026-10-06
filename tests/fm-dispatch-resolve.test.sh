@@ -8,6 +8,7 @@
 # network, and the absent-key case proves the tool makes no call
 # at all.
 set -u
+unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -1053,6 +1054,36 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRI
 assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=0%' "the exhausted account-wide bound is the candidate evidence"
 assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "a healthy exact row cannot bypass an exhausted account-wide bound"
 pass "provider-wide and exact quota rows combine into one limiting candidate"
+
+# --- alternate credentials bind only when forwarded to the Claude launch -------
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+  export "$credential=synthetic-alternate-auth"
+  for policy in inherited retained stripped; do
+    case "$policy" in
+      inherited) rm -f "$HOME_DIR/config/launch-env-allowlist" ;;
+      retained) printf '%s\n' "$credential" > "$HOME_DIR/config/launch-env-allowlist" ;;
+      stripped) printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+    esac
+    reset_log
+    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRIEF"
+    expect_code 0 "$code" "$credential $policy resolves with exhausted native default"
+    assert_contains "$out" '  status: clear' "$credential $policy keeps the measured alternative available"
+    assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$credential $policy selects the measured alternative"
+    if [ "$policy" = stripped ]; then
+      assert_contains "$out" 'candidate: claude:sonnet  provider=claude  scope=all_models  remaining=0%' "$credential stripped preserves native default exhaustion evidence"
+      assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "$credential stripped does not hide native default exhaustion"
+      assert_contains "$out" '  note: 1 eligible candidate(s) unranked (kimi)' "$credential stripped excludes exhausted Claude from uncertainty"
+    else
+      claude_candidate=$(printf '%s\n' "$out" | grep 'candidate: claude:sonnet ')
+      assert_contains "$claude_candidate" '"status":"unknown"' "$credential $policy leaves Claude capacity unknown"
+      assert_contains "$claude_candidate" 'eligible, unranked:' "$credential $policy keeps alternate authentication eligible without default-account quota ranking"
+      assert_contains "$out" '  note: 2 eligible candidate(s) unranked (claude, kimi)' "$credential $policy discloses alternate auth as uncertainty"
+    fi
+    pass "$credential $policy resolves against the effective Claude launch credentials"
+  done
+  unset "$credential"
+done
+rm "$HOME_DIR/config/launch-env-allowlist"
 
 # --- default choice ------------------------------------------------------------
 reset_log

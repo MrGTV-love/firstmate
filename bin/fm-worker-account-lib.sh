@@ -319,3 +319,19 @@ fm_worker_account_claude_shed() {
   done
   printf '%s\n' "$shed"
 }
+
+fm_worker_account_tmux_env_scope() {
+  local name=$1 session=${2:-} entry
+  if [ -z "$session" ]; then
+    if [ -n "${TMUX:-}" ]; then
+      session=$(tmux display-message -p '#S' 2>/dev/null) || session=
+    elif tmux has-session -t firstmate 2>/dev/null; then
+      session=firstmate
+    fi
+  fi
+  if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then
+    case "$entry" in "$name"=?*) printf 'session\n' ;; esac
+  elif entry=$(tmux show-environment -g "$name" 2>/dev/null); then
+    case "$entry" in "$name"=?*) printf 'global\n' ;; esac
+  fi
+}

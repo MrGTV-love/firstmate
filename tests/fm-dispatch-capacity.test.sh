@@ -10,7 +10,7 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 mkdir -p "$TMP_ROOT/config"
 export FM_HOME="$TMP_ROOT" FM_CONFIG_OVERRIDE="$TMP_ROOT/config"
 export OMP_USAGE_FIXTURE="$TMP_ROOT/usage.json" QUOTA_FIXTURE="$TMP_ROOT/quota.json"
-unset CLAUDE_CONFIG_DIR
+unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN BACKEND TMUX
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
@@ -177,6 +177,74 @@ export CLAUDE_CONFIG_DIR=''
 out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
 assert_equals exhausted "$(jq -r .status <<<"$out")" "an empty forwarded auth directory is still native default authentication"
 unset CLAUDE_CONFIG_DIR
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+  export "$credential=retained-routing-fixture"
+  for forwarding in ambient allowlisted; do
+    if [ "$forwarding" = allowlisted ]; then
+      printf '%s\n' "$credential" > "$TMP_ROOT/config/launch-env-allowlist"
+    fi
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "$forwarding $credential must not inherit subscription exhaustion"
+    out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+    assert_equals false "$(jq -r .switched <<<"$out")" "$forwarding $credential must retain the original route"
+    assert_equals "$native_primary" "$(jq -c .profile <<<"$out")" "$forwarding $credential must not substitute a model"
+  done
+  printf '# no alternate API authentication\n' > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "filtered $credential must not conceal real subscription exhaustion"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals true "$(jq -r .switched <<<"$out")" "filtered $credential permits the declared exhaustion fallback"
+  printf '%s\n' "$credential" > "$TMP_ROOT/config/launch-env-allowlist"
+  export "$credential="
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "an empty $credential is not alternate authentication"
+  unset "$credential"
+  rm "$TMP_ROOT/config/launch-env-allowlist"
+done
+pass "capacity and selection bind API authentication only when actually retained"
+
+cat > "$FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  has-session) exit 0 ;;
+  show-environment)
+    if [ "$2" = -t ]; then
+      file="$FM_HOME/tmux-session-env"
+      [ "$3" != recorded ] || file="$FM_HOME/tmux-recorded-env"
+      [ -f "$file" ] || exit 1
+      cat "$file"
+    else
+      [ -f "$FM_HOME/tmux-global-env" ] || exit 1
+      cat "$FM_HOME/tmux-global-env"
+    fi ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$FAKEBIN/tmux"
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+  printf '%s=global-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-global-env"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals false "$(jq -r .switched <<<"$out")" "destination global $credential must not inherit subscription exhaustion"
+  printf '%s=session-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-session-env"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "destination session $credential is alternate authentication"
+  printf -- '-%s\n' "$credential" > "$TMP_ROOT/tmux-recorded-env"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" "" recorded)
+  assert_equals true "$(jq -r .switched <<<"$out")" "the explicit recorded session must override the current session's $credential"
+  rm "$TMP_ROOT/tmux-recorded-env"
+  printf -- '-%s\n' "$credential" > "$TMP_ROOT/tmux-session-env"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals true "$(jq -r .switched <<<"$out")" "session removal of $credential must suppress the global credential"
+  printf '%s=\n' "$credential" > "$TMP_ROOT/tmux-session-env"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals true "$(jq -r .switched <<<"$out")" "empty session $credential must override the global credential"
+  printf '%s=session-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-session-env"
+  printf '# filter destination credentials\n' > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  assert_equals true "$(jq -r .switched <<<"$out")" "the allowlist must strip destination $credential"
+  rm "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
+done
+pass "destination tmux credential layering respects removal, emptiness, and filtering"
 printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
 out=$(fm_dispatch_capacity claude claude-opus-5-5)
 assert_equals unknown "$(jq -r .status <<<"$out")" "native Claude's exhausted account is not the TeamClaude proxy's quota"

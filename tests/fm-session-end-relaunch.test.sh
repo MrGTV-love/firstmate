@@ -70,6 +70,12 @@ if [ -n "${FM_SESSION_END_BEACON_REF:-}" ]; then
   fi
 fi
 [ -z "${FM_SESSION_END_CONTROL_SLEEP:-}" ] || sleep "$FM_SESSION_END_CONTROL_SLEEP"
+if [ "${1:-}" = "${FM_SESSION_END_CONTROL_FAIL_ID:-}" ]; then
+  [ -z "${FM_SESSION_END_CONTROL_FAIL_CLOCK:-}" ] \
+    || printf '%s\n' "${FM_SESSION_END_CONTROL_FAIL_TIME:?}" > "$FM_SESSION_END_CONTROL_FAIL_CLOCK"
+  printf 'no supported equal route for %s\n' "$1" >&2
+  exit 1
+fi
 exit "${FM_SESSION_END_CONTROL_RC:-0}"
 SH
   chmod +x "$bin/fm-control.sh"
@@ -317,6 +323,99 @@ test_quota_recovery_ignores_daily_cap_and_capped_handling() {
   pass "quota recovery bypasses recent and daily caps and their same-identity handled markers"
 }
 
+test_failed_quota_recovery_does_not_starve_later_tasks() {
+  local dir="$TMP_ROOT/quota-starvation" state id gen first_identity luna_identity scan
+  state="$dir/state"
+  for id in a-sol b-luna c-luna; do
+    add_lane "$dir" "$id" omp
+    if [ "$id" = a-sol ]; then
+      printf 'model=openai-codex/gpt-6.1-sol\neffort=high\n' >> "$state/$id.meta"
+    else
+      printf 'model=openai-codex/gpt-6-luna\n' >> "$state/$id.meta"
+    fi
+    gen=$(cat "$state/$id.busy-gen")
+    "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" idle --gen "$gen" \
+      --source omp-ext --event quota-exhausted >/dev/null \
+      || fail "quota exhaustion was not recorded for $id"
+  done
+  first_identity=$(fm_session_end_identity "$state" a-sol) || fail "Sol identity was lost"
+  luna_identity=$(fm_session_end_identity "$state" b-luna) || fail "Luna identity was lost"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
+    || fail "multi-task quota scan failed"
+  [ "$(cut -d' ' -f1 "$dir/control.log")" = $'a-sol\nb-luna' ] \
+    || fail "a failed Sol recovery starved Luna or allowed a second success: $(cat "$dir/control.log")"
+  [ "$FM_SESSION_END_WAKE" = "check: a-sol auto-relaunch failed after quota exhaustion: no supported equal route for a-sol" ] \
+    || fail "the scan did not preserve the first failure wake: ${FM_SESSION_END_WAKE:-<empty>}"
+  [ "$(cat "$state/.session-end-handled-a-sol")" = "$(printf '%s\t%s\tfailed' "${first_identity%% *}" "${first_identity#* }")" ] \
+    || fail "failed Sol did not retain its retryable identity"
+  [ "$(cat "$state/.session-end-handled-b-luna")" = "$(printf '%s\t%s\trelaunched' "${luna_identity%% *}" "${luna_identity#* }")" ] \
+    || fail "successful Luna was not marked handled for its generation and sequence"
+  [ ! -e "$state/.session-end-relaunch-c-luna" ] \
+    || fail "the scan attempted a second successful relaunch"
+
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
+    || fail "second multi-task quota scan failed"
+  [ "$(cut -d' ' -f1 "$dir/control.log")" = $'a-sol\nc-luna' ] \
+    || fail "failed Sol did not retry, handled Luna duplicated, or the third task starved: $(cat "$dir/control.log")"
+  for scan in 3 4; do
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
+      || fail "multi-task quota scan $scan failed"
+    [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
+      || fail "scan $scan capped Sol retries or duplicated a successful generation: $(cat "$dir/control.log")"
+  done
+  [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-a-sol" | wc -l | tr -d ' ')" = 4 ] \
+    || fail "the failed quota task did not remain retryable beyond the daily attempt cap"
+  for id in b-luna c-luna; do
+    [ "$(awk -F '\t' '$2 == "relaunched"' "$state/.session-end-relaunch-$id" | wc -l | tr -d ' ')" = 1 ] \
+      || fail "$id's successful quota generation was not deduplicated"
+  done
+  [ "$(FM_WAKE_QUEUE="$state/.wake-queue" fm_wake_queued_keys check | wc -l | tr -d ' ')" = 3 ] \
+    || fail "the durable queue lost a later success or duplicated Sol's failure wake"
+  pass "failed quota recovery advances to later tasks, retries without caps, and deduplicates successful generations"
+}
+
+test_failed_recovery_shares_the_scan_time_bound() {
+  local dir state id gen remaining
+  for remaining in 30 1; do
+    dir="$TMP_ROOT/quota-budget-$remaining"
+    state="$dir/state"
+    for id in a-sol b-luna; do
+      add_lane "$dir" "$id" omp
+      gen=$(cat "$state/$id.busy-gen")
+      "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" idle --gen "$gen" \
+        --source omp-ext --event quota-exhausted >/dev/null \
+        || fail "quota exhaustion was not recorded for $id"
+    done
+    printf '100000\n' > "$dir/clock"
+    mkdir -p "$dir/fakebin"
+    cat > "$dir/fakebin/date" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = +%s ] || exit 1
+cat "${FM_SESSION_END_CONTROL_FAIL_CLOCK:?}"
+SH
+    chmod +x "$dir/fakebin/date"
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol \
+      FM_SESSION_END_CONTROL_FAIL_CLOCK="$dir/clock" \
+      FM_SESSION_END_CONTROL_FAIL_TIME="$((100060 - remaining))" \
+      FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" 120 \
+      || fail "remaining-budget scan failed"
+    [ "$FM_SESSION_END_TIMEOUT" = 60 ] && [ "$FM_SESSION_END_LAUNCH_WAIT" = 30 ] \
+      || fail "a scan changed its published grace-derived bounds"
+    if [ "$remaining" = 30 ]; then
+      [ "$(cut -d' ' -f1 "$dir/control.log")" = $'a-sol\nb-luna' ] \
+        || fail "a failure with time remaining starved the next task: $(cat "$dir/control.log")"
+      grep -Fx 'FM_CONTROL_LAUNCH_WAIT=15' "$dir/control-env.log" >/dev/null \
+        || fail "the later relaunch did not halve the remaining shared budget: $(cat "$dir/control-env.log")"
+    else
+      [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
+        || fail "an exhausted scan budget still attempted another task: $(cat "$dir/control.log")"
+      [ ! -e "$state/.session-end-relaunch-b-luna" ] \
+        || fail "an exhausted scan budget ledgered an unattempted task"
+    fi
+  done
+  pass "failed attempts share one scan budget and leave a half-budget launch wait for later recovery"
+}
+
 test_deliberate_exit_and_waits_are_skipped() {
   local dir gen
   dir=$(make_lane deliberate)
@@ -513,6 +612,8 @@ test_relaunch_bound_stays_inside_the_watcher_grace
 test_cap_holds_and_wakes_once
 test_quota_recovery_retries_after_recent_relaunch_and_failure
 test_quota_recovery_ignores_daily_cap_and_capped_handling
+test_failed_quota_recovery_does_not_starve_later_tasks
+test_failed_recovery_shares_the_scan_time_bound
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches
 test_one_relaunch_per_scan

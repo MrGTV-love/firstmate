@@ -13,6 +13,7 @@ set -u
 SPAWN="$ROOT/bin/fm-spawn.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-dispatch-profile)
 unset LAVISH_AXI_HOST
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
 
 make_spawn_pi_probe() {
   local fakebin=$1 tool=$2
@@ -140,6 +141,107 @@ test_no_profile_keeps_claude_profile_defaults() {
   assert_contains "$out" "spawned $id harness=claude" "spawn did not report claude"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
   pass "no --model/--effort records the default profile"
+}
+
+test_no_dispatch_non_omp_spawn_does_not_require_jq() {
+  local rec id=profile-no-json-tool out status
+  rec=$(make_spawn_case profile-no-json-tool codex "$id")
+  read_case_record "$rec"
+  [ ! -e "$HOME_DIR/config/crew-dispatch.json" ] || fail "the no-jq case must not have dispatch configuration"
+  cat > "$FAKEBIN_DIR/jq" <<'SH'
+#!/usr/bin/env bash
+exit 127
+SH
+  chmod +x "$FAKEBIN_DIR/jq"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --model gpt-5 --effort high)
+  status=$?
+  expect_code 0 "$status" "ordinary codex spawn without dispatch must not require jq: $out"
+  assert_contains "$out" "spawned $id harness=codex" "the ordinary launch did not succeed"
+  [ -s "$LAUNCH_LOG" ] || fail "ordinary spawn sent no launch command"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
+  pass "an ordinary non-OMP spawn without crew-dispatch.json succeeds without required jq and preserves its durable profile"
+}
+
+enable_exhausted_claude_dispatch() {
+  local home=$1 fakebin=$2
+  printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
+    > "$home/config/crew-dispatch.json"
+  cat > "$fakebin/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0,"runway":{"status":"exhausted_now"}}]}}]}'
+SH
+  cat > "$fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
+  *) printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env" ;;
+esac
+SH
+  cat > "$fakebin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env"
+SH
+  chmod +x "$fakebin/quota-axi" "$fakebin/omp" "$fakebin/claude"
+}
+
+test_claude_dispatch_binds_only_forwarded_api_credentials() {
+  local rec id credential policy out status expected_harness expected_model expected_effort launch
+  local -a args pane_env
+  for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    for policy in ambient retained filtered flag-only; do
+      id="profile-auth-$credential-$policy"
+      rec=$(make_spawn_case "$id" claude "$id")
+      read_case_record "$rec"
+      enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
+      args=("$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
+      case "$policy" in
+        ambient) args+=(--allow-api-key) ;;
+        retained)
+          printf '%s\n' PATH "$credential" > "$HOME_DIR/config/launch-env-allowlist"
+          args+=(--allow-api-key)
+          ;;
+        filtered) printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+        flag-only) args+=(--allow-api-key) ;;
+      esac
+      out=$(
+        unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+        if [ "$policy" != flag-only ]; then export "$credential=synthetic-launch-credential"; fi
+        run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "${args[@]}"
+      )
+      status=$?
+      expect_code 0 "$status" "$credential $policy dispatch spawn must succeed: $out"
+      expected_harness=claude expected_model=default expected_effort=default
+      case "$policy" in
+        filtered|flag-only)
+          expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
+          assert_grep "fallback launched omp" "$HOME_DIR/state/$id.status" "$credential $policy did not disclose the permitted fallback"
+          ;;
+      esac
+      assert_contains "$out" "spawned $id harness=$expected_harness" "$credential $policy launched the wrong harness"
+      assert_meta_profile "$HOME_DIR/state/$id.meta" "$expected_harness" "$expected_model" "$expected_effort"
+      grep -Fxq 'dispatch_rule=rule_1' "$HOME_DIR/state/$id.meta" || fail "$credential $policy lost dispatch identity"
+      launch=$(cat "$LAUNCH_LOG")
+      [ -n "$launch" ] || fail "$credential $policy sent no launch"
+      pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
+        -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+        -u CLAUDE_CONFIG_DIR HOME="$HOME_DIR/user-home")
+      [ "$policy" = flag-only ] || pane_env+=("$credential=synthetic-launch-credential")
+      fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
+        > "$CASE_DIR/worker.out" 2>&1 || fail "$credential $policy staged launch could not be consumed"
+      case "$policy" in
+        ambient|retained)
+          grep -Fxq "$credential=synthetic-launch-credential" "$FAKEBIN_DIR/worker.env" || fail "$credential did not reach the Claude worker"
+          grep -Fxq 'api_key=allow' "$HOME_DIR/state/$id.meta" || fail "$credential lost the deliberate billing opt-in"
+          ;;
+        *)
+          grep -Fxq "$credential=" "$FAKEBIN_DIR/worker.env" || fail "$credential reached the fallback despite absent or filtered authentication"
+          ;;
+      esac
+    done
+  done
+  pass "Claude spawn retains forwarded API auth, filters excluded credentials, and treats an allow flag alone as native authentication"
 }
 
 # Claude Code strips U+2063 from the launch-prompt argument, so a claude launch
@@ -1819,6 +1921,8 @@ test_model_index_resolves_launch_and_refuses_retired_literals
 test_secondmate_model_pin_resolves_through_the_model_index
 test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
+test_no_dispatch_non_omp_spawn_does_not_require_jq
+test_claude_dispatch_binds_only_forwarded_api_credentials
 test_claude_launch_brief_publishes_record_doorbell
 test_claude_secondmate_launch_brief_publishes_into_its_own_home
 test_claude_spawn_refuses_when_the_brief_record_cannot_publish

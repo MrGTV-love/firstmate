@@ -35,18 +35,18 @@
 # Past either cap the tick does not relaunch and wakes once for that
 # session-end generation. Omp quota recovery bypasses these caps and failed
 # or capped handling; a successfully handled generation/sequence is not retried.
-# One fm-control call is bounded to the watcher's stale grace minus
-# FM_SESSION_END_MARGIN seconds, and the watcher beacon is touched just
-# before that call, so a live watcher blocked in a relaunch never reads as
-# down. fm-control's launch wait is half that bound, at most 90 seconds, so
-# a slow start ends through fm-control's own rollback rather than the bound.
-# A grace too short to leave that margin runs no relaunch.
+# Relaunch calls share the watcher's stale grace minus FM_SESSION_END_MARGIN
+# seconds, and the watcher beacon is touched just before each call, so a live
+# watcher blocked in a relaunch never reads as down. fm-control's launch wait
+# is half the remaining bound, at most 90 seconds, so a slow start ends
+# through fm-control's own rollback rather than the bound. A grace too short
+# to leave that margin runs no relaunch.
 #
 # fm_session_end_relaunch_scan <state-dir> [<watcher-grace-secs>] sets FM_SESSION_END_WAKE to the first check
 # line that should be printed, or empty when this pass has nothing to say.
-# It also appends each check row to the durable wake queue. It stops after
-# the first relaunch attempt, so one watcher cycle runs at most one bounded
-# fm-control call; the next cycle takes the next lane.
+# It also appends each check row to the durable wake queue. Failed attempts
+# advance to later lanes within the shared bound. It stops after the first
+# successful relaunch, so one watcher cycle replaces at most one worker.
 #
 # FM_SESSION_END_CONTROL overrides the control binary only when FM_TEST_SEAM=1.
 set -u
@@ -180,12 +180,13 @@ fm_session_end_queue_wake() {  # <key> <reason>
 # relaunch, failed, capped, or skip, and FM_SESSION_END_REASON to a check
 # line or empty. Returns 0 for a completed decision, 1 when a required
 # ledger or wake row could not be written.
-fm_session_end_relaunch_consider() {  # <state-dir> <id>
+fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   local state=$1 id=$2 meta kind wt backend window agent harness policy_error config
   local identity gen seq last verb hold_rc marker marker_gen
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
   local bin out rc=0 reason key which quota_event busy_record
+  local timeout=$FM_SESSION_END_TIMEOUT launch_wait=$FM_SESSION_END_LAUNCH_WAIT
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -307,12 +308,19 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     FM_SESSION_END_REASON=$reason
     return 0
   fi
+  if [ -n "${3:-}" ]; then
+    timeout=$(( $3 - $(date +%s) ))
+    launch_wait=$((timeout / 2))
+    [ "$launch_wait" -le "$FM_SESSION_END_LAUNCH_WAIT_MAX" ] \
+      || launch_wait=$FM_SESSION_END_LAUNCH_WAIT_MAX
+    [ "$launch_wait" -ge 1 ] || return 0
+  fi
   fm_session_end_ledger_add "$state" "$id" attempt || return 1
   bin=$(fm_session_end_control_bin)
   rc=0
   touch "$state/.last-watcher-beat" 2>/dev/null || true
-  out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
-    FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
+  out=$(fm_run_timed "$timeout" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
+    FM_CONTROL_LAUNCH_WAIT="$launch_wait" \
     "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions using the permitted matrix fallback.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1
@@ -342,16 +350,18 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
 # supervisor-visible line, or empty. Returns non-zero only when a required
 # write failed.
 fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
-  local state=$1 meta id reason first=
+  local state=$1 meta id reason first= deadline
   FM_SESSION_END_WAKE=
   [ -d "$state" ] || return 0
   fm_session_end_bounds "${2:-}" || return 0
+  deadline=$(( $(date +%s) + FM_SESSION_END_TIMEOUT ))
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$state/.wake-queue"
   for meta in "$state"/*.meta; do
     [ -e "$meta" ] || continue
+    [ "$((deadline - $(date +%s)))" -ge 2 ] || break
     id=${meta##*/}
     id=${id%.meta}
-    if ! fm_session_end_relaunch_consider "$state" "$id"; then
+    if ! fm_session_end_relaunch_consider "$state" "$id" "$deadline"; then
       return 1
     fi
     reason=$FM_SESSION_END_REASON
@@ -359,7 +369,7 @@ fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
       first=$reason
     fi
     case "$FM_SESSION_END_ACTION" in
-      relaunch|failed) break ;;
+      relaunch) break ;;
     esac
   done
   FM_SESSION_END_WAKE=$first

@@ -970,21 +970,26 @@ resolve_relaunch_profile() {
       "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
   fi
   if [ "$KIND" != secondmate ]; then
-    local dispatch_set dispatch_profile dispatch_result config_dir
+    local dispatch_set dispatch_profile dispatch_result dispatch_fallback='[]' config_dir
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
     TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
     if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
       TARGET_DISPATCH_RULE=
     fi
-    dispatch_set=$(fm_dispatch_fallbacks "$config_dir" "$TARGET_DISPATCH_RULE" \
-      "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
-    TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+    if [ -f "$config_dir/crew-dispatch.json" ]; then
+      dispatch_set=$(fm_dispatch_fallbacks "$config_dir" "$TARGET_DISPATCH_RULE" \
+        "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
+      TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+      dispatch_fallback=$(jq -c .fallback <<<"$dispatch_set")
+    else
+      TARGET_DISPATCH_RULE=
+    fi
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
-       || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
+       || [ "$dispatch_fallback" != '[]' ]; then
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")") || return 1
+        "$dispatch_profile" "$dispatch_fallback" "" "${T%%:*}") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
