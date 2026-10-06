@@ -1393,7 +1393,8 @@ This is a bounded screen, not a complete shell interpreter or an authorization s
 Only closed structural operation/scope enums and booleans enter Jev state.
 Arbitrary arguments, paths, URLs, command text, customer content, environment values, file bodies and tool-result bodies are never sent or logged.
 The existing `config/dispatch-never-send` list additionally withholds matching native inputs locally; unreadable or non-regular lists withhold rather than send.
-The key is removed from child environments and passed to `curl` through a header pipe, not argv.
+The key is removed from child environments and passed to `curl` through its stdin header pipe (`-H @-`), not argv or a reopened `/dev/fd` path.
+Only the closed structural JSON request body is passed in `--data-binary` argv; this transport works with Node's socket-backed stdio on Linux as well as macOS.
 
 The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
 An interrupted attempt or unavailable usage remains unknown, not zero.
