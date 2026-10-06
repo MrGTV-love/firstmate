@@ -2276,8 +2276,8 @@ Results already queued are still delivered on every cycle.
 A source that can never start is reported as `failed=` with a non-zero exit on every `reconcile`, rather than counted as `started` and retried silently as though it were healthy, so a wedged source stays visible instead of presenting as armed.
 The `failed=` count reaches only the command's caller because `bin/fm-watch.sh` discards `reconcile` output and exit status.
 For that reason, `reconcile` also publishes a durable `check` wake once per failure episode, with key `procevent:<id>:launch-failed:<registration-identity>-<episode-nonce>`.
-Later cycles stay silent for that episode until successful claim acquisition or observation of a live owner ends it.
-Failure commits recheck the registration identity, claim and launch stamp under the source lock, which also serializes episode markers, wake append and failed-append rollback.
+Later cycles stay silent for that episode until successful claim acquisition or a source-locked observation of a live owner, including another home's, ends it for the current registration.
+Failure commits recheck the registration identity, claim and launch stamp under the source lock, which also serializes episode markers, live-owner recovery, wake append and failed-append rollback.
 A later fresh failure gets a fresh key, because the watcher never re-surfaces a key it has already surfaced.
 
 - The announcement changes nothing about the launch: `reconcile` keeps relaunching the source every cycle exactly as before, and nothing is retried differently, throttled, or recovered from that signal.

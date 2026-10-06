@@ -315,6 +315,9 @@ ep_install_hooks() {
   eval "${definition/confirm_launched_runners/ep_original_confirm}"
   confirm_launched_runners() {
     local result rc=0
+    if [ -n "${EP_CONFIRM_GATE:-}" ]; then
+      ep_gate_wait "$EP_CONFIRM_GATE" || return 1
+    fi
     result=$(ep_original_confirm "$@") || rc=$?
     ep_gate_wait "$EP_GATE" || return 1
     [ -z "$result" ] || printf '%s\n' "$result"
@@ -346,10 +349,11 @@ ep_new() {
 ep_pause() {
   ep_gate="$TMP_ROOT/$1"
   EP_GATE="$ep_gate" EP_APPEND_GATE="${2:-}" EP_FAIL_APPEND="${3:-0}" \
+    EP_CONFIRM_GATE="${EP_CONFIRM_GATE:-}" \
     BASH_ENV="$EP_HOOK" FM_HOME="$HEP" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
     "$ROOT/bin/fm-procevent.sh" reconcile > "$ep_gate.out" 2>&1 &
   ep_pid=$!
-  wait_for "$ep_gate.ready" || fail "reconcile did not reach the decision barrier: $(cat "$ep_gate.out")"
+  wait_for "${EP_CONFIRM_GATE:-$ep_gate}.ready" || fail "reconcile did not reach the decision barrier: $(cat "$ep_gate.out")"
 }
 ep_finish() {
   local pid=$1 gate=$2 expected=$3 rc=0
@@ -499,6 +503,62 @@ ep_reconcile "failed=1" 1 "a newer failure stopped retrying after historical suc
   || fail "historical success made the newer episode announce twice"
 pe "$HEP" retire episode-src >/dev/null
 pass "delayed historical success cannot erase a newer failure episode"
+
+for ep_observation in confirmation final replaced; do
+  ep_new "foreign-$ep_observation"
+  ep_damage
+  ep_reconcile "failed=1" 1 "initial failure did not establish a local episode"
+  ep_foreign_home="$TMP_ROOT/foreign-owner-$ep_observation"; new_home "$ep_foreign_home"
+  ep_foreign_trigger="$TMP_ROOT/foreign-$ep_observation.trigger"
+  ep_foreign_started="$TMP_ROOT/foreign-$ep_observation.started"
+  pe_register "$ep_foreign_home" lavish episode-src -- \
+    "$STARTED_BLOCKER" "$ep_foreign_started" "$BLOCKER" "$ep_foreign_trigger" "foreign recovery" >/dev/null
+  ep_confirm_gate=
+  if [ "$ep_observation" != final ]; then
+    ep_confirm_gate="$TMP_ROOT/foreign-$ep_observation.confirm"
+  fi
+  EP_CONFIRM_GATE="$ep_confirm_gate" ep_pause "episode-foreign-$ep_observation"
+  if [ "$ep_observation" = replaced ]; then
+    pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
+    ep_damage
+    ep_reconcile "failed=1" 1 "replacement did not establish its own failure episode"
+  fi
+  ep_local_marker=$(cat "$HEP/state/procevent/.episode-src.launch-failed")
+  pe "$ep_foreign_home" start episode-src > "$TMP_ROOT/foreign-$ep_observation.out" 2>&1 &
+  ep_foreign_pid=$!
+  wait_for "$ep_foreign_started" || fail "foreign recovery did not start its source"
+  [ "$(cat "$HEP/state/procevent/.episode-src.launch-failed")" = "$ep_local_marker" ] \
+    || fail "foreign acquisition changed an unobserved local failure episode"
+  if [ -n "$ep_confirm_gate" ]; then
+    : > "$ep_confirm_gate.release"
+    wait_for "$ep_gate.ready" || fail "foreign ownership was not confirmed"
+    if [ "$ep_observation" = confirmation ]; then
+      [ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+        || fail "confirmation of a foreign owner left the local failure episode open"
+    else
+      [ "$(cat "$HEP/state/procevent/.episode-src.launch-failed")" = "$ep_local_marker" ] \
+        || fail "obsolete confirmation erased the replacement's failure episode"
+    fi
+  fi
+  ep_finish "$ep_pid" "$ep_gate" 0
+  if [ "$ep_observation" = replaced ]; then
+    assert_contains "$(cat "$ep_gate.out")" "uncertain=1" "obsolete live confirmation was not uncertain"
+    [ "$(cat "$HEP/state/procevent/.episode-src.launch-failed")" = "$ep_local_marker" ] \
+      || fail "obsolete final revalidation erased the replacement's failure episode"
+  else
+    assert_contains "$(cat "$ep_gate.out")" "started=1" "foreign recovery was not counted started"
+    [ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+      || fail "final observation of a foreign owner left the local failure episode open"
+  fi
+  : > "$ep_foreign_trigger"
+  wait "$ep_foreign_pid" || fail "foreign recovery did not finish"
+  pe "$ep_foreign_home" retire episode-src >/dev/null
+  ep_reconcile "failed=1" 1 "a genuine failure after foreign recovery was suppressed"
+  [ "$(launch_failed_wake_count "$HEP" episode-src)" = 2 ] \
+    || fail "foreign $ep_observation observation lost or duplicated a failure announcement"
+  pe "$HEP" retire episode-src >/dev/null
+done
+pass "foreign live recovery closes only the current registration's local episode"
 }
 
 if [ "${FM_TEST_ONLY:-}" = launch-episodes ]; then

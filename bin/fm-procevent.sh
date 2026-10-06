@@ -1821,15 +1821,17 @@ cmd_reconcile() {
         fm_procevent_source_lock_release "$id"
         continue
       fi
-      if launch_entry_listed "$entry" "$unconfirmed"; then
-        fm_procevent_claim_state_locked "$id"
-        claim_state=$?
+      fm_procevent_claim_state_locked "$id"
+      claim_state=$?
+      if [ "$claim_state" -eq 0 ]; then
+        rm -f -- "$(launch_failed_file "$id")"
+        started=$((started + 1))
+      elif launch_entry_listed "$entry" "$unconfirmed"; then
         current_mark=
         if launch_stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$launch_identity"); then
           current_mark=$(cat -- "$launch_stamp" 2>/dev/null || true)
         fi
-        if [ "$claim_state" -eq 0 ] \
-          || { [ -n "$current_mark" ] && [ "$current_mark" != "$launch_mark" ]; }; then
+        if [ -n "$current_mark" ] && [ "$current_mark" != "$launch_mark" ]; then
           started=$((started + 1))
         elif [ "$claim_state" -ne 1 ] || fm_procevent_claim_undisplaceable_locked "$id"; then
           uncertain=$((uncertain + 1))
@@ -1879,7 +1881,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # Every launch shares ONE window rather than taking a window each, so a whole
 # fleet of failing sources costs a watcher cycle the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state stamp mark
+  local deadline window entry id rest identity before state stamp mark current_identity
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1902,6 +1904,13 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if fm_procevent_source_lock_try_acquire "$id"; then
         fm_procevent_claim_state_locked "$id"
         state=$?
+        if [ "$state" -eq 0 ] && [ -n "$identity" ] \
+          && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+          current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+          if [ "$current_identity" = "$identity" ]; then
+            rm -f -- "$(launch_failed_file "$id")"
+          fi
+        fi
         fm_procevent_source_lock_release "$id"
       fi
       if [ "$state" -eq 0 ]; then
