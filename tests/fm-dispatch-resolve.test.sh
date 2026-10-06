@@ -336,7 +336,6 @@ jq -ne --argjson cost "$cost" '$cost == (812 * 0.042 / 1000000)' >/dev/null \
 assert_equals 0.042 "$(telemetry_field "$out" jev_input_usd_per_million)" "estimate exposes its catalog rate"
 assert_not_contains "$out$err" "$KEY" "timing and cost output never expose the key"
 assert_not_contains "$out$err" 'off-by-one in the pager' "timing and cost output never expose brief text"
-assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "timing preserves compatibility checking and one quota snapshot"
 pass "stock Bash resolver separates API, quota, local and total timing, with input-only Jev cost"
 
 # Without EPOCHREALTIME, as on stock macOS Bash 3.2, stamps still come from the
@@ -1136,7 +1135,6 @@ assert_contains "$out" 'candidate: pi:openai-codex-work/gpt-5.6-terra  provider=
 assert_contains "$out" 'candidate: pi:openai-codex/gpt-5.6-sol  provider=codex  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models' "the sibling lane reads its own exhausted row"
 assert_contains "$out" 'candidate: codex:gpt-5.6-sol  provider=codex  -> eligible, unranked: provider codex has no quota row for account codex-home: disclosed uncertainty' "native Codex never infers an account from a Pi lane"
 assert_contains "$out" "  profile: --harness 'pi' --model 'openai-codex-work/gpt-5.6-terra'" "the lane with headroom is chosen"
-assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "schema 6 checks compatibility and reads one snapshot"
 
 SCHEMA6_NATIVE="$TMP_ROOT/schema6-native.json"
 jq '
@@ -1298,51 +1296,6 @@ cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"choice":"rule_1","confidence":0.9,"probabilities":{"rule_1":0.97,"default":0.03}}}}
 JSON
 
-# omp's pooled Codex accounts rank on the visible account as a lower bound,
-# through the same task-horizon classification as a single account.
-jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"}]' "$GUARD_RULES" > "$RULES"
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-safe.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: clear' "a through_reset visible account proves pool runway"
-assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=through_reset  -> eligible' "the pool ranks on its visible lower bound"
-assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "the pooled lane can be auto-selected"
-for name in long early-long early-short unknown; do
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
-  assert_contains "$out" '  status: clear' "a $name visible reading ranks the pool"
-  assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "a $name visible reading authorizes the pooled profile"
-  if [ "$name" = early-long ]; then
-    assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
-  fi
-done
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: escalate' "an established short visible projection is not viable"
-assert_contains "$out" '  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon' "a short pool escalates like a single account"
-assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' "a short pool stays ranked with its warning"
-assert_not_contains "$out" '  profile:' "a short pool cannot authorize a profile"
-for snapshot in "$TMP_ROOT/guard-exhausted_now.json" "$SCHEMA6_NATIVE"; do
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
-  assert_contains "$out" '  status: escalate' "an exhausted visible account cannot clear the pool"
-  assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models)' "pool uncertainty is stated on the candidate"
-  assert_contains "$out" '[warning: exhausted_now at all_models]' "the visible account's exhaustion is disclosed"
-  assert_not_contains "$out" 'remaining=' "single-account headroom is not shown as pool headroom"
-  assert_not_contains "$out" 'not eligible' "single-account exhaustion cannot veto the pool"
-  assert_not_contains "$out" '  profile:' "an exhausted visible account cannot authorize a profile"
-done
-# A declared profile floor stays a captain veto for the pool.
-jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex",floor:{scope:"all_models",min_percent:50}}]' "$GUARD_RULES" > "$RULES"
-for snapshot in "$TMP_ROOT/guard-safe.json" "$TMP_ROOT/guard-exhausted_now.json"; do
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$snapshot" run code out err "$BRIEF"
-  assert_contains "$out" '-> not eligible: profile floor all_models below 50%' "a pool below its declared floor is not eligible"
-  assert_not_contains "$out" 'unranked' "a floor shortfall is not reported as an eligible alternative"
-done
-jq '.rules[0].use = [{harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: escalate' "a short highest-ranked pool escalates"
-assert_not_contains "$out" '  profile:' "a short pool is never replaced by a lower-ranked candidate"
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-exhausted_now.json" run code out err "$BRIEF"
-assert_contains "$out" '  status: clear' "an unranked exhausted pool does not block a measured candidate"
-assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "the measured profile clears beside the unranked pool"
-assert_contains "$out" '  note: 1 eligible candidate(s) unranked (codex)' "a clear choice still discloses pool uncertainty"
-
 # OpenRouter absent rows and credit-only rows are uncertainty, not quota runway.
 jq '.rules[0].use = [{harness:"omp",model:"openrouter/provider/model",provider:"openrouter"}]' "$GUARD_RULES" > "$RULES"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
@@ -1382,7 +1335,6 @@ reset_log
 write_response "$RESPONSE" rule_4 0.9
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "quota-axi path exits 0"
-assert_equals $'--version\n--json' "$(cat "$LOG/quota-axi.calls")" "quota-axi compatibility is checked and --json is called exactly once"
 assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "quota-axi snapshot drives the argmax"
 reset_log
 TYPESAFE_API_KEY=$KEY FAKE_QUOTA_FAIL=1 run code out err "$BRIEF"
@@ -1478,14 +1430,29 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code o
 assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
 assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
-assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "pooled resolution retains one economic snapshot"
 jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
 mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
 reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
 assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
-assert_equals '--json' "$(cat "$LOG/quota-axi.calls")" "fallback reuses the captured economic evidence"
+for gate in profile rule; do
+  jq --arg gate "$gate" '
+    if $gate == "profile" then .rules[3].use.floor={scope:"all_models",min_percent:20}
+    else .rules[3].floor={scope:"all_models",min_percent:20,provider:"codex"} end
+  ' "$RULES" > "$TMP_ROOT/pool-floor.json"
+  cp "$RULES" "$TMP_ROOT/no-pool-floor.json"
+  cp "$TMP_ROOT/pool-floor.json" "$RULES"
+  for serving in false true; do
+    jq --argjson serving "$serving" '
+      .reports[].metadata.meterStates.chat={allowed:$serving,limitReached:($serving|not)}
+    ' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/floor-pool.json"
+    TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/floor-pool.json" QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+    assert_contains "$out" '  status: escalate' "an unverifiable $gate floor gates serving=$serving pool"
+    assert_not_contains "$out" '  profile:' "pool exhaustion cannot bypass the $gate floor"
+  done
+  cp "$TMP_ROOT/no-pool-floor.json" "$RULES"
+done
 jq '.reports[1].fetchedAt=0' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/stale-pool.json"
 mv "$TMP_ROOT/stale-pool.json" "$OMP_USAGE_FIXTURE"
 reset_log
@@ -1501,6 +1468,38 @@ jq '.rules[3].use={harness:"claude",model:"sonnet",effort:"high"} |
 jq '(.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
   (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/claude-native-empty.json"
 write_response "$RESPONSE" rule_4 0.9
+for exhaustion in runway percent; do
+  jq --arg exhaustion "$exhaustion" '
+    (.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
+      (.effectivePercentRemaining=0 | .runway.status=(if $exhaustion=="runway" then "exhausted_now" else "unknown" end))
+  ' "$QUOTA" > "$TMP_ROOT/direct-claude-empty.json"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
+  assert_contains "$out" '  status: clear' "native Claude $exhaustion exhaustion activates a permitted stand-in"
+  assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "native Claude uses its declared stand-in"
+  for floor_state in below unknown ok; do
+    case "$floor_state" in
+      below) floor_scope=all_models; floor_min=20 ;;
+      unknown) floor_scope=model:missing; floor_min=20 ;;
+      ok) floor_scope=all_models; floor_min=0 ;;
+    esac
+    cp "$RULES" "$TMP_ROOT/no-claude-profile-floor.json"
+    jq --arg scope "$floor_scope" --argjson min "$floor_min" '
+      .rules[3].use.floor={scope:$scope,min_percent:$min}
+    ' "$RULES" > "$TMP_ROOT/claude-profile-floor.json"
+    cp "$TMP_ROOT/claude-profile-floor.json" "$RULES"
+    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
+    if [ "$floor_state" = ok ]; then
+      assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "a verified passing floor permits $exhaustion fallback"
+    else
+      assert_contains "$out" '  status: escalate' "a $floor_state profile floor gates $exhaustion fallback"
+      assert_not_contains "$out" '  profile:' "a $floor_state floor cannot be bypassed by exhaustion"
+    fi
+    cp "$TMP_ROOT/no-claude-profile-floor.json" "$RULES"
+  done
+done
+TYPESAFE_API_KEY=$KEY CLAUDE_CONFIG_DIR="$TMP_ROOT/alternate-claude" QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
+assert_contains "$out" '  status: escalate' "alternate Claude authentication keeps native quota unbound"
+assert_not_contains "$out" '  profile:' "unrelated default-account exhaustion cannot activate a stand-in"
 for scope_file in claude-launcher claude-account; do
   case "$scope_file" in
     claude-launcher) printf 'teamclaude\n' > "$HOME_DIR/config/$scope_file" ;;

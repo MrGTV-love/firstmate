@@ -4060,11 +4060,14 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
     printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
     meta=$(cat "$dir/home/state/$id.meta")
     meta=${meta/model=default/model=$model}
-    meta=${meta/effort=default/effort=high}
+    if [ "$model" = openai-codex/gpt-6.1-sol ]; then
+      meta=${meta/effort=default/effort=high}
+    fi
     printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
     mkdir -p "$dir/home/config"
     jq -n --arg model "$model" '{rules:[{when:"assigned work",
-      use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
+      use:({harness:"omp",model:$model,provider:"codex"} +
+        (if $model=="openai-codex/gpt-6.1-sol" then {effort:"high"} else {} end)),
       fallback:(if $model=="openai-codex/gpt-6-luna" then
         [{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
     jq -n --argjson now "$(date +%s)" '{reports:[
@@ -4088,8 +4091,16 @@ SH
       FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
       HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
-      bash -s -- "$ROOT" <<'SH'
+      bash -s -- "$ROOT" "$id" <<'SH'
 . "$1/bin/fm-session-end-relaunch-lib.sh"
+identity=$(fm_session_end_identity "$FM_HOME/state" "$2") || exit 1
+gen=${identity%% *}
+seq=${identity#* }
+now=$(date +%s)
+printf '%s\tattempt\n%s\trelaunched\n%s\tattempt\n%s\tattempt\n%s\tattempt\n%s\tfailed\n' \
+  "$((now - 60))" "$((now - 60))" "$((now - 1900))" "$((now - 4000))" "$((now - 30))" "$((now - 30))" \
+  > "$FM_HOME/state/.session-end-relaunch-$2"
+printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$FM_HOME/state/.session-end-handled-$2"
 fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit
 printf "%s\n" "$FM_SESSION_END_WAKE"
 SH
@@ -4098,8 +4109,9 @@ SH
     expect_code 0 "$rc" "supervised quota recovery must reconcile the route: $out"
     assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
     if [ "$model" = openai-codex/gpt-6-luna ]; then
-      assert_contains "$out" 'auto-relaunched after quota exhaustion' "an idle live OMP session must recover automatically"
+      assert_contains "$out" 'auto-relaunched after quota exhaustion' "a live OMP session must recover despite recent session-end relaunch history, a failed same-identity quota attempt, and the daily cap"
       assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
+      assert_equals high "$(meta_field "$dir" "$id" effort)" "an omitted primary effort must permit the explicitly configured fallback effort"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
       assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
     else
@@ -4109,7 +4121,7 @@ SH
       assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the strongest replacement is unavailable"
     fi
   done
-  pass "supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work"
+  pass "supervised OMP quota recovery ignores attempt caps and failed handling while using only the declared route and preserving work"
 }
 
 test_retiring_omp_removes_only_its_generated_configuration() {
@@ -4122,17 +4134,15 @@ test_retiring_omp_removes_only_its_generated_configuration() {
   printf omp > "$dir/fake/command"
   printf claude > "$dir/fake/becomes"
   printf 'export default () => {};\n' > "$dir/home/state/rl-config.omp-ext.ts"
-  printf '{"retry":{"modelFallback":false}}\n' > "$dir/home/state/rl-config.omp-fallback.yml"
   mkdir -p "$dir/wt/.omp"
   printf 'user configuration\n' > "$dir/wt/.omp/config.yml"
   out=$(run_control "$dir" rl-config relaunch --harness claude --note "replace the configured runtime explicitly"); rc=$?
   expect_code 0 "$rc" "an explicit runtime replacement must complete: $out"
-  assert_absent "$dir/home/state/rl-config.omp-fallback.yml" "retired model policy must not survive replacement"
   assert_absent "$dir/home/state/rl-config.omp-ext.ts" "retired callbacks must not survive replacement"
   assert_equals 'user configuration' "$(cat "$dir/wt/.omp/config.yml")" "retirement must preserve user configuration"
   out=$(run_control "$dir" rl-config relaunch --note "continue after the explicit runtime override"); rc=$?
   expect_code 0 "$rc" "the retired rule must not block subsequent recovery: $out"
-  pass "OMP replacement retires generated policy without removing user configuration"
+  pass "OMP replacement retires generated callbacks without removing user configuration"
 }
 
 test_retiring_omp_removes_only_its_generated_configuration

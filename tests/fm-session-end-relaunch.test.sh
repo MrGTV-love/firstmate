@@ -78,11 +78,11 @@ SH
 
 # <dir> <id>. One ship in <dir>/state, session-end recorded, worktree present.
 add_lane() {
-  local dir=$1 id=$2 state wt gen
+  local dir=$1 id=$2 harness=${3:-claude} state wt gen
   state="$dir/state"
   wt="$dir/wt-$id"
   mkdir -p "$state" "$wt" "$dir/data"
-  printf 'window=firstmate:fm-lane\nkind=ship\nharness=claude\nbackend=tmux\nworktree=%s\n' "$wt" > "$state/$id.meta"
+  printf 'window=firstmate:fm-lane\nkind=ship\nharness=%s\nbackend=tmux\nworktree=%s\n' "$harness" "$wt" > "$state/$id.meta"
   "$ROOT/bin/fm-busy-event.sh" arm "$state" "$id" --state idle --source claude-hook --event launch-brief >/dev/null
   gen=$(cat "$state/$id.busy-gen")
   "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" idle --gen "$gen" --source claude-hook --event session-end >/dev/null
@@ -91,7 +91,7 @@ add_lane() {
 # <name> -> dir. One ship named lane.
 make_lane() {
   local dir="$TMP_ROOT/$1"
-  add_lane "$dir" lane
+  add_lane "$dir" lane "${2:-claude}"
   printf '%s\n' "$dir"
 }
 
@@ -242,6 +242,79 @@ test_cap_holds_and_wakes_once() {
   grep -F 'auto-relaunch paused after 3 attempts in 86400s' <<<"$FM_SESSION_END_WAKE" >/dev/null \
     || fail "the daily cap did not wake: ${FM_SESSION_END_WAKE:-<empty>}"
   pass "the daily cap holds and wakes once"
+}
+
+test_quota_recovery_retries_after_recent_relaunch_and_failure() {
+  local dir state gen identity seq
+  dir=$(make_lane quota-retry omp)
+  state="$dir/state"
+  scan_lane "$dir" || fail "initial session-end relaunch failed"
+  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after session-end" ] \
+    || fail "the quota fixture did not first relaunch after session-end"
+  gen=$(cat "$state/lane.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null \
+    || fail "quota exhaustion was not recorded"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_RC=1 scan_lane "$dir" \
+    || fail "failed quota-recovery scan failed"
+  [ "$FM_SESSION_END_ACTION" = failed ] \
+    || fail "recent session-end history suppressed the first quota attempt: $FM_SESSION_END_ACTION"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "quota recovery did not invoke control after a recent relaunch"
+  grep -F 'auto-relaunch failed after quota exhaustion' <<<"$FM_SESSION_END_WAKE" >/dev/null \
+    || fail "the failed quota attempt did not report quota exhaustion: ${FM_SESSION_END_WAKE:-<empty>}"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "quota retry scan failed"
+  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+    || fail "a previous failed quota attempt suppressed recovery: ${FM_SESSION_END_WAKE:-<empty>}"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "quota retry did not invoke control exactly once"
+  grep -F 'permitted matrix fallback' "$dir/control.log" >/dev/null \
+    || fail "quota retry did not pass the fallback recovery note"
+  [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-lane" | wc -l | tr -d ' ')" = 3 ] \
+    || fail "the original relaunch, failed quota attempt, and successful retry were not ledgered"
+  printf '%s\tattempt\n' $(( $(date +%s) - 90000 )) > "$state/.session-end-relaunch-lane"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "handled quota scan failed"
+  [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] && [ ! -s "$dir/tmux.log" ] \
+    || fail "a successful quota recovery duplicated after its attempt history expired"
+  identity=$(fm_session_end_identity "$state" lane) || fail "quota identity was lost"
+  seq=${identity#* }
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null \
+    || fail "a later quota exhaustion was not recorded"
+  [ "$(fm_session_end_identity "$state" lane)" != "$gen $seq" ] \
+    || fail "a later quota event did not advance its identity"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "later quota recovery scan failed"
+  [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+    || fail "successful handling of an older sequence suppressed a new quota event"
+  pass "quota recovery ignores recent relaunches and failed attempts but deduplicates successful identities"
+}
+
+test_quota_recovery_ignores_daily_cap_and_capped_handling() {
+  local dir state now identity gen seq which
+  for which in min day; do
+    dir=$(make_lane "quota-capped-$which" omp)
+    state="$dir/state"
+    now=$(date +%s)
+    if [ "$which" = min ]; then
+      printf '%s\tattempt\n' "$now" > "$state/.session-end-relaunch-lane"
+    else
+      printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' $((now - 1900)) $((now - 4000)) $((now - 8000)) \
+        > "$state/.session-end-relaunch-lane"
+    fi
+    gen=$(cat "$state/lane.busy-gen")
+    "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+      --source omp-ext --event quota-exhausted >/dev/null \
+      || fail "quota exhaustion was not recorded for $which cap"
+    identity=$(fm_session_end_identity "$state" lane) || fail "quota identity could not be read"
+    seq=${identity#* }
+    printf '%s\t%s\tcapped-%s\n' "$gen" "$seq" "$which" > "$state/.session-end-handled-lane"
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "$which-capped quota scan failed"
+    [ "$FM_SESSION_END_WAKE" = "check: lane auto-relaunched after quota exhaustion" ] \
+      || fail "$which cap or its handled marker suppressed quota recovery: ${FM_SESSION_END_WAKE:-<empty>}"
+    [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+      || fail "$which-capped quota recovery did not invoke control exactly once"
+  done
+  pass "quota recovery bypasses recent and daily caps and their same-identity handled markers"
 }
 
 test_deliberate_exit_and_waits_are_skipped() {
@@ -438,6 +511,8 @@ test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
 test_relaunch_bound_stays_inside_the_watcher_grace
 test_cap_holds_and_wakes_once
+test_quota_recovery_retries_after_recent_relaunch_and_failure
+test_quota_recovery_ignores_daily_cap_and_capped_handling
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches
 test_one_relaunch_per_scan

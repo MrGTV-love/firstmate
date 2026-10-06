@@ -528,7 +528,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     if $c.harness == "omp" and ($p == "codex" or (($c.model // "") | startswith("openai-codex/"))) then
       ($omp_pools[$c.model] // {status: "unknown", accounts: []}) as $pool |
       {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
-       exhausted: ($pool.status == "exhausted"), unranked: true,
+       exhausted: ($pool.status == "exhausted" and $c.floor == null), unranked: true,
        reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}
       + (if $c.floor != null then {unknown: true, reason: "OMP pool profile floor is unverifiable"}
          elif $pool.status != "usable" then {unknown: true} else {} end)
@@ -554,10 +554,10 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
       elif any($rows[]; (.runway.status // "") == "exhausted_now") then
         ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, exhausted: ($profile_floor_state == "none" or $profile_floor_state == "ok"), reason: "runway exhausted_now at \($bad.scope)"}
       elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
         ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, exhausted: ($profile_floor_state == "none" or $profile_floor_state == "ok"), reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}

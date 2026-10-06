@@ -64,7 +64,8 @@ fm_omp_codex_capacity() {
 
 fm_dispatch_claude_quota_unbound() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
+  [ -n "${CLAUDE_CONFIG_DIR:-}" ] ||
+    [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
     { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }
 }
 
@@ -99,6 +100,10 @@ fm_dispatch_fallbacks() {
   [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
   result=$(jq -ce --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
     def profiles: if type == "array" then . else [.] end;
+    def default_axis: if . == null or . == "" or . == "default" then "" else . end;
+    def matches:
+      .harness == $h and (.model | default_axis) == ($m | default_axis) and
+      (.effort | default_axis) == ($e | default_axis);
     def valid_fallback:
       type == "array" and all(.[];
         type == "object" and (.harness == "omp" or .harness == "claude") and
@@ -111,8 +116,7 @@ fm_dispatch_fallbacks() {
     ([((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: (.value.fallback // [])})] +
      [{rule: "default", use: (.default // []), fallback: (.default_fallback // [])}]) as $rules |
     [$rules[] | select($rule == "" or .rule == $rule) |
-      select(any((.use | profiles)[]; .harness == $h and (.model // "") == $m and (.effort // "") == $e) or
-             any(.fallback[]; .harness == $h and .model == $m and .effort == $e))] as $matches |
+      select(any((.use | profiles)[]; matches) or any(.fallback[]; matches))] as $matches |
     if ($matches | length) == 0 then
       if $rule != "" then error("dispatch rule does not contain the requested profile")
       else {rule: "", fallback: []} end

@@ -13,12 +13,12 @@
 #   - kind is ship or scout (a secondmate keeps its own liveness path)
 #   - state/<id>.meta and the recorded worktree still exist, and
 #     state/<id>.backlog-close is absent
-#   - the current busy record is event=session-end
+#   - the current busy record is event=session-end, or quota-exhausted for omp
 #   - the latest status verb is not done or failed
 #   - no declared pause or captain-held status line
-#   - fm_backend_agent_state is dead (pane at a shell, no agent); a missing
-#     endpoint is left to the supervisor, because fm-control relaunch cannot
-#     prove it gone on every backend
+#   - fm_backend_agent_state is dead for session-end, or alive for quota
+#     recovery; a missing endpoint is left to the supervisor, because
+#     fm-control relaunch cannot prove it gone on every backend
 #   - fm-captain-hold.sh open reports no open captain call (exit 1); an open
 #     call or an answer it cannot establish skips the lane
 #   - state/<id>.control-exit does not name this busy generation
@@ -30,10 +30,11 @@
 # exit never retired the record, and its later session-end is still
 # deliberate.
 #
-# Caps count attempt rows in state/.session-end-relaunch-<id>: at most one
-# attempt per task in 30 minutes, and at most 3 per task in a day.
+# Ordinary session-end caps count attempt rows in state/.session-end-relaunch-<id>:
+# at most one attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
-# session-end generation. A later generation is a new episode.
+# session-end generation. Omp quota recovery bypasses these caps and failed
+# or capped handling; a successfully handled generation/sequence is not retried.
 # One fm-control call is bounded to the watcher's stale grace minus
 # FM_SESSION_END_MARGIN seconds, and the watcher beacon is touched just
 # before that call, so a live watcher blocked in a relaunch never reads as
@@ -215,27 +216,36 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
     [ "$marker_gen" != "$gen" ] || return 0
   fi
-  recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
-  day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
+  recent=0 day=0
+  if [ "$quota_event" = 0 ]; then
+    recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
+    day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
+  fi
   handled=$(fm_session_end_handled_path "$state" "$id")
   handled_gen='' handled_seq='' handled_outcome=''
   if [ -f "$handled" ] && [ ! -L "$handled" ]; then
     IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$handled" || true
   fi
-  if [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] \
-     && { [ "$handled_outcome" = relaunched ] || [ "$handled_outcome" = failed ]; } \
-     && [ "$recent" -ge 1 ]; then
-    return 0
+  if [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ]; then
+    if [ "$handled_outcome" = relaunched ] \
+       && { [ "$quota_event" = 1 ] || [ "$recent" -ge 1 ]; }; then
+      return 0
+    fi
+    if [ "$quota_event" = 0 ] && [ "$handled_outcome" = failed ] && [ "$recent" -ge 1 ]; then
+      return 0
+    fi
   fi
   which=
-  if [ "$recent" -ge 1 ]; then
-    which=min
-  elif [ "$day" -ge "$FM_SESSION_END_DAY_MAX" ]; then
-    which=day
-  fi
-  if [ -n "$which" ] && [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] \
-     && [ "$handled_outcome" = "capped-$which" ]; then
-    return 0
+  if [ "$quota_event" = 0 ]; then
+    if [ "$recent" -ge 1 ]; then
+      which=min
+    elif [ "$day" -ge "$FM_SESSION_END_DAY_MAX" ]; then
+      which=day
+    fi
+    if [ -n "$which" ] && [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ] \
+       && [ "$handled_outcome" = "capped-$which" ]; then
+      return 0
+    fi
   fi
   last=$(last_status_line "$state/$id.status" 2>/dev/null || true)
   verb=$(status_line_verb "$last" 2>/dev/null || true)

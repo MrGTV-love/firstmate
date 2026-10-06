@@ -355,15 +355,12 @@ mod.default({ on: (name, fn) => { handlers[name] = fn; } });
 // must go idle on a plain agent_end regardless of it.
 const ctx = { isIdle: () => false };
 switch (process.env.MODE) {
-  case "handlers": console.log(Object.keys(handlers).sort().join(" ")); break;
   case "agent-start": await handlers["agent_start"]({ type: "agent_start" }, ctx); break;
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
   case "quota-error":
     await handlers["agent_end"]({messages:[{role:"assistant",stopReason:"error",errorMessage:"usage_limit_reached"}]}, ctx); break;
-  case "fallback-served":
-    await handlers["retry_fallback_succeeded"]({model:"openrouter/z-ai/glm-5.3-flash:high"}, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -397,12 +394,6 @@ test_busy_extension_lifecycle() {
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
   out=$(drive_omp_ext "$ext" quota-error) || fail "quota error drive failed: $out"
   assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
-  out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
-  assert_grep 'fallback served openrouter/z-ai/glm-5.3-flash:high' "$state/$id.status" "native model fallback must publish the serving model"
-  rm "$state/$id.busy-gen"
-  printf 'working: replacement owns this task\n' > "$state/$id.status"
-  out=$(drive_omp_ext "$ext" fallback-served) || fail "retired callback drive failed: $out"
-  assert_equals 'working: replacement owns this task' "$(cat "$state/$id.status")" "a retired callback must not publish a stale serving model"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"

@@ -230,10 +230,7 @@
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
-#   Crewmates and scouts also receive eager native account rotation without
-#   waiting for usage resets and a task-owned --config overlay permitting only
-#   declared OMP model fallbacks, with an empty default chain so ambient role
-#   chains cannot weaken the assigned model.
+#   Crewmates and scouts also receive eager native account rotation.
 #   A non-index-entry literal <provider>/<id> is validated against
 #   `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
@@ -4953,19 +4950,6 @@ EOF
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
       '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
-    # Exact model and effort keys override ambient default or provider chains.
-    # This per-task overlay travels to all local backends through --config.
-    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$DISPATCH_FALLBACK" '
-      def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
-      ([$fallback[] | select(.harness == "omp" and .model != $model) | effort_key(.model; .effort)]) as $chain |
-      {retry: {modelFallback: ($model | contains("/")), fallbackChains:
-        (reduce ([{model:$model, effort:$effort}] + [$fallback[] | select(.harness == "omp")])[] as $p
-          ({default: []}; if ($p.model | contains("/")) then
-            .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
-         | if ($model | contains("/")) then
-             .[$model] = $chain | .[effort_key($model; $effort)] = $chain else . end)}}
-    ' > "$STATE/$ID.omp-fallback.yml" || exit 1
-    chmod 600 "$STATE/$ID.omp-fallback.yml" || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -4980,7 +4964,6 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
-import { appendFileSync, readFileSync } from "node:fs";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -4999,17 +4982,6 @@ export default function (pi: any) {
     return busyEvent("idle", exhausted ? "quota-exhausted" : "agent-end");
   });
   pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
-  pi.on("retry_fallback_succeeded", (event: any) => {
-    try {
-      if (readFileSync("$STATE_REAL/$ID.busy-gen", "utf8").trim() !== "$BUSY_GEN") return;
-    } catch (error: any) {
-      if (error?.code === "ENOENT") return;
-      throw error;
-    }
-    const model = String(event.model ?? "").replace(/[\\r\\n\\t]/g, " ");
-    appendFileSync("$STATE_REAL/$ID.status",
-      "working [at=" + Math.floor(Date.now() / 1000) + "]: model-matrix fallback served " + model + "\\n");
-  });
 }
 EOF
     ;;
@@ -5393,9 +5365,6 @@ sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
 sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
 sq_ompsessioncfg=$(shell_quote "${OMP_SESSION_CFG:-$FM_ROOT/.omp/fm-session-overlay.yml}")
-if [ "$HARNESS" = omp ] && [ "$KIND" != secondmate ]; then
-  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml")"
-fi
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")

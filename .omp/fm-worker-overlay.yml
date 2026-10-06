@@ -15,7 +15,3 @@ retry:
   usageReservePolicy: auto
   waitForUsageReset: false
   modelFallback: false
-  # Unattended workers may use only the selected matrix rule's fallback chain,
-  # supplied by fm-spawn as a later per-task overlay, never an ambient chain.
-  fallbackChains:
-    default: []

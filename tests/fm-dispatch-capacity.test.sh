@@ -10,6 +10,7 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 mkdir -p "$TMP_ROOT/config"
 export FM_HOME="$TMP_ROOT" FM_CONFIG_OVERRIDE="$TMP_ROOT/config"
 export OMP_USAGE_FIXTURE="$TMP_ROOT/usage.json" QUOTA_FIXTURE="$TMP_ROOT/quota.json"
+unset CLAUDE_CONFIG_DIR
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
@@ -96,6 +97,57 @@ if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna h
 fi
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
+for container in scalar array; do
+  for use in '{"harness":"claude"}' '{"harness":"claude","model":"","effort":""}' '{"harness":"claude","model":"default","effort":"default"}'; do
+    jq -n --argjson use "$use" --arg container "$container" --argjson fallback "$allowed" '
+      (if $container == "array" then [$use] else $use end) as $profiles |
+      {rules:[{when:"default axes",use:$profiles,fallback:$fallback}],
+       default:$profiles,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
+    for rule in rule_1 default; do
+      for model in '' default; do
+        for effort in '' default; do
+          set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" claude "$model" "$effort") ||
+            fail "default axes must match $rule $container use"
+          assert_equals "$rule" "$(jq -r .rule <<<"$set")" "default matching retains explicit rule identity"
+          assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "default matching retains declared fallback"
+          profile=$(jq -cn --arg model "$model" --arg effort "$effort" '{harness:"claude",model:$model,effort:$effort}')
+          out=$(fm_dispatch_select "$TMP_ROOT/config" "$rule" "$profile" "$(jq -c .fallback <<<"$set")" '{"status":"unknown"}') ||
+            fail "a matched default profile with unknown capacity must remain launchable"
+          assert_equals false "$(jq -r .switched <<<"$out")" "unknown capacity must retain default profile"
+          assert_equals "$profile" "$(jq -c .profile <<<"$out")" "matching must not rewrite launch profile"
+        done
+      done
+    done
+    set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' claude default '') ||
+      fail "identical fallback lists must match normalized implicit defaults"
+    assert_equals '' "$(jq -r .rule <<<"$set")" "identical rule/default lists do not invent a rule"
+  done
+done
+if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 claude sonnet default > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "a nondefault model must not match an omitted model"
+fi
+assert_contains "$(cat "$TMP_ROOT/error")" 'dispatch rule does not contain the requested profile' "unmatched profile remains a rule-membership failure"
+jq -n --argjson fallback "$allowed" '
+  {rules:[{use:{harness:"claude"},fallback:$fallback}],default:{harness:"claude"},default_fallback:[]}' > "$TMP_ROOT/config/crew-dispatch.json"
+if fm_dispatch_fallbacks "$TMP_ROOT/config" '' claude default default > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "normalization must not conceal conflicting fallback permissions"
+fi
+assert_contains "$(cat "$TMP_ROOT/error")" 'different fallback lists match this profile' "normalized implicit ambiguity still requires a rule"
+jq -n '{rules:[{use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+  fallback:[{harness:"omp",model:"default",effort:"high"}]}]}' > "$TMP_ROOT/config/crew-dispatch.json"
+for model in '' default; do
+  set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp "$model" high) ||
+    fail "fallback comparisons must normalize default model representations"
+  assert_equals rule_1 "$(jq -r .rule <<<"$set")" "a default fallback remains a member of its rule"
+done
+jq '.rules[0].fallback[0].effort="default"' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/bad-default.json"
+mv "$TMP_ROOT/bad-default.json" "$TMP_ROOT/config/crew-dispatch.json"
+if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp default default > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "normalization must not turn invalid fallback effort into a valid profile"
+fi
+assert_contains "$(cat "$TMP_ROOT/error")" 'fallback must be an array of explicit OMP profiles' "invalid fallback differs from an unmatched valid profile"
+pass "shared matching normalizes default axes without weakening fallback validation"
+
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[
  {"provider":"claude","accountKey":"other","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0}]}},
@@ -110,6 +162,21 @@ assert_equals unknown "$(jq -r .status <<<"$out")" "a pin without established qu
 rm "$TMP_ROOT/config/claude-account"
 jq '(.providers[] | select(.accountKey=="default").quotaSemantics.effectiveAvailability[0].effectivePercentRemaining)=0' "$QUOTA_FIXTURE" > "$TMP_ROOT/native-claude-zero.json"
 mv "$TMP_ROOT/native-claude-zero.json" "$QUOTA_FIXTURE"
+native_primary='{"harness":"claude","model":"claude-sonnet-5-5","effort":"high"}'
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals exhausted "$(jq -r .status <<<"$out")" "native default exhaustion remains measured without alternate auth"
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+assert_equals true "$(jq -r .switched <<<"$out")" "native default exhaustion authorizes a permitted fallback"
+export CLAUDE_CONFIG_DIR="$TMP_ROOT/alternate-claude"
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals unknown "$(jq -r .status <<<"$out")" "ambient alternate authentication must not inherit default exhaustion"
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+assert_equals false "$(jq -r .switched <<<"$out")" "ambient alternate authentication must not switch on unrelated default exhaustion"
+assert_equals "$native_primary" "$(jq -c .profile <<<"$out")" "alternate-auth uncertainty retains the original profile"
+export CLAUDE_CONFIG_DIR=''
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals exhausted "$(jq -r .status <<<"$out")" "an empty forwarded auth directory is still native default authentication"
+unset CLAUDE_CONFIG_DIR
 printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
 out=$(fm_dispatch_capacity claude claude-opus-5-5)
 assert_equals unknown "$(jq -r .status <<<"$out")" "native Claude's exhausted account is not the TeamClaude proxy's quota"

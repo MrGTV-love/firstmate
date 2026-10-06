@@ -2,6 +2,7 @@
 # Unit tests for bin/fm-quota-choose.sh.
 # Drives the public argv interface with a mocked quota-axi JSON source.
 set -u
+unset CLAUDE_CONFIG_DIR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -354,6 +355,19 @@ for scope_file in claude-launcher claude-account; do
   rm "$LAB/home/config/$scope_file"
 done
 ok "native Claude headroom cannot rank a proxy or different account pin"
+
+export CLAUDE_CONFIG_DIR="$LAB/alternate-claude"
+out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+[ "$out" = "codex gpt-6.1-sol" ] || fail "ambient alternate Claude authentication used native headroom: $out"
+if out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default 2>/dev/null); then
+  fail "ambient alternate Claude authentication unexpectedly ranked native quota"
+fi
+[ "$out" = none ] || fail "unmapped ambient Claude authentication returned: $out"
+export CLAUDE_CONFIG_DIR=''
+out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+[ "$out" = "claude default" ] || fail "empty ambient config directory discarded native default headroom: $out"
+unset CLAUDE_CONFIG_DIR
+ok "ambient alternate Claude authentication has no native default quota mapping"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi

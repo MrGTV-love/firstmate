@@ -1386,7 +1386,7 @@ A fresh usable sibling keeps the model available; an unmeasured sibling prevents
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
-Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a differently pinned account's capacity.
+Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a differently pinned account's capacity or an alternate store forwarded through `CLAUDE_CONFIG_DIR`.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
 
 Each fallback profile requires `harness`, `model`, and `effort`.
@@ -1400,9 +1400,10 @@ Natural-language `why` text does not authorize an executable fallback.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
 Spawn and recovery validate fallback fields even when typed resolution is off.
 The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
-OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
-Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
-An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+Omitted model and effort fields match their persisted `default` metadata values during recovery, without granting permission for a different explicit profile.
+OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
+An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
 Launch and successful replacement append the selected route to task status.
 No account pin, saved reset, or global reviewer configuration is changed.
 
@@ -1570,12 +1571,11 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
-- omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
-  The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
-  The pool is ranked on that account through the task-horizon runway classification in "Candidate eligibility and evidence" below.
-  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked, never vetoed, because another pooled account may still have headroom; any non-passing runway bound is disclosed as a warning.
-  A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
-  The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
+- OMP Codex profiles use native pooled capacity, independently of quota-axi's individual-account rows.
+  A fresh usable account keeps the pool usable; exhaustion requires every measured account to be exhausted with no unmeasured siblings.
+  Unknown capacity stays eligible but unranked, and exhausted capacity is ineligible.
+  The pool has no synthesized spendPriority or completion runway, and its profile and rule floors remain unverifiable.
+  See "Pooled OMP capacity and declared stand-ins" above for exhaustion-only fallback and authentication-scope rules.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
@@ -1593,7 +1593,8 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 **Candidate eligibility and evidence**
 
-- A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
+- For non-pooled routes, a known profile-floor shortfall makes a candidate ineligible, as does any applicable `exhausted_now` row or known zero bound, before unrelated quota uncertainty is considered.
+  Exhaustion activates a declared stand-in only when the profile floor is absent or verified passing.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
   The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
