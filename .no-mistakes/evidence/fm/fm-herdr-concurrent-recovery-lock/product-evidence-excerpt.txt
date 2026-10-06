@@ -1,0 +1,164 @@
+Guarded Herdr recovery product evidence
+Session: fm-lab-recovery-lock-84846-18890
+
+CLI launch results:
+--- primary.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-primary harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:w2:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-primary
+--- bravo.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-bravo harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:w8:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-bravo
+--- late.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-late harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:wA:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-late
+--- recover-conclude.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-recover-conclude harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:wB:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-recover-conclude
+--- recover-reap.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-recover-reap harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:wC:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-recover-reap
+--- recover-forced.out ---
+spawned fm-lab-recovery-lock-84846-18890-recovery-recover-forced harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-recovery-lock-84846-18890:wF:p3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4913S80MMVKXMFCGGWAHF0M/.fm-herdr-recovery-lock.qJVBh4/copy-recover-forced
+
+Session-custody acquisition probes (phase / held lifecycle PID / independent acquiring PID):
+conclude	51990	81807
+conclude	51990	81807
+conclude	51990	81807
+conclude	51990	81807
+reap	74009	81807
+reap	74009	81807
+reap	74009	81807
+reap	74009	81807
+return	92087	81807
+return	92087	81807
+return	92087	81807
+return	92087	81807
+conclude	86722	81807
+reap	43399	81807
+
+Owned conclusion records:
+owned-conclude
+wrong-conclude
+Bounded status-query elapsed seconds:
+query-seconds-owned-conclude: 1
+query-seconds-wrong-conclude: 1
+
+Native offline reaper output:
+teardown: reaping leaked worktree process(es) for offline-owned: 23020
+
+Exact old versus reclaimed endpoint/generation:
+bravo before: {"herdr_workspace_id": "w8", "herdr_tab_id": "w8:t2", "herdr_pane_id": "w8:p2", "spawn_gen": "old-bravo"}
+bravo after: {"herdr_workspace_id": "w8", "herdr_tab_id": "w8:t3", "herdr_pane_id": "w8:p3", "spawn_gen": "s1791307641.63957.20897"}
+late before: {"herdr_workspace_id": "wA", "herdr_tab_id": "wA:t2", "herdr_pane_id": "wA:p2", "spawn_gen": "old-late"}
+late after: {"herdr_workspace_id": "wA", "herdr_tab_id": "wA:t3", "herdr_pane_id": "wA:p3", "spawn_gen": "s1791307726.93290.16545"}
+recover-conclude before: {"herdr_workspace_id": "wB", "herdr_tab_id": "wB:t2", "herdr_pane_id": "wB:p2", "spawn_gen": "old-recover-conclude"}
+recover-conclude after: {"herdr_workspace_id": "wB", "herdr_tab_id": "wB:t3", "herdr_pane_id": "wB:p3", "spawn_gen": "s1791307826.64033.20695"}
+recover-reap before: {"herdr_workspace_id": "wC", "herdr_tab_id": "wC:t2", "herdr_pane_id": "wC:p2", "spawn_gen": "old-recover-reap"}
+recover-reap after: {"herdr_workspace_id": "wC", "herdr_tab_id": "wC:t3", "herdr_pane_id": "wC:p3", "spawn_gen": "s1791307916.82524.30488"}
+recover-forced before: {"herdr_workspace_id": "wF", "herdr_tab_id": "wF:t2", "herdr_pane_id": "wF:p2", "spawn_gen": "old-recover-forced"}
+recover-forced after: {"herdr_workspace_id": "wF", "herdr_tab_id": "wF:t3", "herdr_pane_id": "wF:p3", "spawn_gen": "s1791308146.55855.13052"}
+
+Observed focused workspace/tab after lab restart:
+[["w7", "w7:t1"]]
+
+Representative structured pane-removal responses:
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w2:p2
+{"error":{"code":"pane_not_found","message":"pane w2:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w8:p2
+{"error":{"code":"pane_not_found","message":"pane w8:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w9:p2
+{"error":{"code":"pane_not_found","message":"pane w9:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wH:p1
+{"error":{"code":"pane_not_found","message":"pane wH:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w9:p3
+{"error":{"code":"pane_not_found","message":"pane w9:p3 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wA:p2
+{"error":{"code":"pane_not_found","message":"pane wA:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane read wD:p2 --source recent --lines 200
+{"error":{"code":"pane_not_found","message":"pane wD:p2 not found"},"id":"cli:pane:read"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wJ:p1
+{"error":{"code":"pane_not_found","message":"pane wJ:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w2:p3
+{"error":{"code":"pane_not_found","message":"pane w2:p3 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wJ:p2
+{"error":{"code":"pane_not_found","message":"pane wJ:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wB:p2
+{"error":{"code":"pane_not_found","message":"pane wB:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wD:p2
+{"error":{"code":"pane_not_found","message":"pane wD:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wD:p3
+{"error":{"code":"pane_not_found","message":"pane wD:p3 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wK:p1
+{"error":{"code":"pane_not_found","message":"pane wK:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wK:p2
+{"error":{"code":"pane_not_found","message":"pane wK:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w3:p2
+{"error":{"code":"pane_not_found","message":"pane w3:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wC:p2
+{"error":{"code":"pane_not_found","message":"pane wC:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wE:p2
+{"error":{"code":"pane_not_found","message":"pane wE:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wE:p3
+{"error":{"code":"pane_not_found","message":"pane wE:p3 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wM:p1
+{"error":{"code":"pane_not_found","message":"pane wM:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wM:p2
+{"error":{"code":"pane_not_found","message":"pane wM:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w4:p2
+{"error":{"code":"pane_not_found","message":"pane w4:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wP:p1
+{"error":{"code":"pane_not_found","message":"pane wP:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wQ:p1
+{"error":{"code":"pane_not_found","message":"pane wQ:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wF:p2
+{"error":{"code":"pane_not_found","message":"pane wF:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wG:p2
+{"error":{"code":"pane_not_found","message":"pane wG:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wG:p3
+{"error":{"code":"pane_not_found","message":"pane wG:p3 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wR:p1
+{"error":{"code":"pane_not_found","message":"pane wR:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wR:p2
+{"error":{"code":"pane_not_found","message":"pane wR:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get wN:p1
+{"error":{"code":"pane_not_found","message":"pane wN:p1 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w5:p2
+{"error":{"code":"pane_not_found","message":"pane w5:p2 not found"},"id":"cli:pane:get"}
+$ bin/fm-herdr-lab.sh run fm-lab-recovery-lock-84846-18890 pane get w6:p2
+{"error":{"code":"pane_not_found","message":"pane w6:p2 not found"},"id":"cli:pane:get"}
+
+Lifecycle exclusion response:
+error: another lifecycle action is already running for task fm-lab-recovery-lock-84846-18890-recovery-owned-reap; nothing was changed
+
+Actual startup replay output:
+--- wrong-conclude-replay.out ---
+BOOTSTRAP_INFO: closed the backlog item for fm-lab-recovery-lock-84846-18890-recovery-wrong-conclude that an interrupted cleanup left open
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+--- wrong-reap-replay.out ---
+BOOTSTRAP_INFO: kept the captain call for fm-lab-recovery-lock-84846-18890-recovery-wrong-reap open with its deliverable recorded after an interrupted cleanup
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+
+Persisted backlog after actual bootstrap replay:
+# Backlog
+
+## In flight
+## Queued
+- [ ] fm-lab-recovery-lock-84846-18890-recovery-wrong-reap - Owned cleanup refusal fixture https://github.com/example/fixture/pull/1 (kind: ship) (since 2026-10-06) (hold: Captain must choose the retained result) (hold-kind: captain)
+  Deliverable of the finished work: PR https://github.com/example/fixture/pull/1
+## Done
+- [x] fm-lab-recovery-lock-84846-18890-recovery-wrong-conclude - Owned cleanup refusal fixture https://github.com/example/fixture/pull/1 (kind: ship) (merged 2026-10-06)
+
+Guarded stop/restart/delete results:
+$ bin/fm-herdr-lab.sh provision fm-lab-recovery-lock-84846-18890
+exit=0
+
+
+$ bin/fm-herdr-lab.sh stop fm-lab-recovery-lock-84846-18890
+exit=0
+{"session":{"default":false,"name":"fm-lab-recovery-lock-84846-18890","running":false,"session_dir":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-84846-18890","socket_path":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-recovery-lock-84846-18890/herdr.sock"},"stopped":true}
+
+$ bin/fm-herdr-lab.sh provision fm-lab-recovery-lock-84846-18890
+exit=0
+
+
+$ bin/fm-herdr-lab.sh teardown fm-lab-recovery-lock-84846-18890
+exit=0
+
+
