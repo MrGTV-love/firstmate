@@ -1651,6 +1651,7 @@ async function assertStockHtmlRendering(command, submitData) {
   terminalInputHandler(submitData);
   const htmlRenderer = createToolHtmlRenderer({
     getToolDefinition: (name) => tools.find((tool) => tool.name === name),
+    getToolRenderers: (name) => tools.find((tool) => tool.name === name),
     theme,
     cwd: process.cwd(),
   });
@@ -1682,6 +1683,7 @@ editorText = "/export remapped.html";
 terminalInputHandler("\r");
 const unmatchedRenderer = createToolHtmlRenderer({
   getToolDefinition: (name) => tools.find((tool) => tool.name === name),
+  getToolRenderers: (name) => tools.find((tool) => tool.name === name),
   theme,
   cwd: process.cwd(),
 });
@@ -2802,21 +2804,6 @@ TS
     return 1
   }
 
-  wait_for_geometry_transition() {
-    local file=$1 transient_text=$2 final_text=$3 attempt=0 saw_transient=0
-    while [ "$attempt" -lt 600 ]; do
-      capture_geometry_viewport "$file" || true
-      if grep -Fq "$transient_text" "$file" 2>/dev/null; then
-        saw_transient=1
-      elif [ "$saw_transient" -eq 1 ] && grep -Fq "$final_text" "$file" 2>/dev/null; then
-        return 0
-      fi
-      sleep 0.01
-      attempt=$((attempt + 1))
-    done
-    return 1
-  }
-
   assert_geometry_gap() {
     local file=$1 label=$2
     skill_line=$(grep -n -m1 '\[skill\] ahoy' "$file" | cut -d: -f1)
@@ -2863,10 +2850,11 @@ TS
 
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l '/reload'
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" Enter
-  wait_for_geometry_transition \
+  # The completed status persists; the progress banner can disappear between
+  # viewport samples even when reload succeeds.
+  wait_for_geometry_text \
     "$snapshot" \
-    "Reloading keybindings, extensions, skills, prompts, themes, and context files..." \
-    "CALM_GEOMETRY_FINAL" \
+    "Reloaded keybindings, extensions, skills, prompts, themes, and context files" \
     || fail "Pi Calm hidden-block geometry E2E did not complete the /reload viewport transition"
   assert_geometry_gap "$snapshot" "reloaded native Calm transcript"
 
@@ -4152,7 +4140,9 @@ export default function (pi: ExtensionAPI): void {
 }
 TS
   printf '%s\n' '{"tui.input.submit":"alt+s"}' >"$config/keybindings.json"
-  printf '%s\n' '{"hideThinkingBlock":true}' >"$config/settings.json"
+  # This replay asserts terminal scrollback, not Pi's app-owned fullscreen history.
+  # Select the documented regular fixture mode without changing the product default.
+  printf '%s\n' '{"hideThinkingBlock":true,"tuiMode":"regular"}' >"$config/settings.json"
   now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
   cat >"$session_file" <<JSON
 {"type":"session","version":3,"id":"11111111-1111-4111-8111-111111111111","timestamp":"$now","cwd":"$project"}
@@ -4361,8 +4351,11 @@ JS
 
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l "/export $export_file"
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" M-s
-  wait_for_text "$export_snapshot" "Session exported to: $export_file" \
+  # Absolute fixture paths can wrap in Pi's terminal confirmation. Match its
+  # notification separately from the requested file, whose contents are checked below.
+  wait_for_text "$export_snapshot" "Session exported to:" \
     || fail "/export did not complete while calm mode was on"
+  [ -s "$export_file" ] || fail "/export did not create the requested HTML file"
   node - "$export_file" <<'JS' || fail "calm-mode HTML export lost tool data or persisted synthetic provenance"
 const html = require("node:fs").readFileSync(process.argv[2], "utf8");
 const match = html.match(/<script id="session-data" type="application\/json">([^<]+)<\/script>/);
@@ -4380,21 +4373,64 @@ if (!synthetic || synthetic.display) process.exit(1);
 JS
   chrome=$(find_chrome) \
     || fail "Chrome or Chromium is required for rendered export DOM assertions; set FM_CHROME_BIN to one"
-  chrome_report=$(render_export_dom "$chrome" "$export_file" "$export_dom" "$version") \
+  # Pi 0.99 keeps display:false entries in the DOM behind a hidden-message
+  # toggle. Assert browser visibility, not absence from serialized markup.
+  node - "$export_file" "$TMP_ROOT/export-dom-probe.html" <<'JS'
+const fs = require("node:fs");
+const probe = `<script>
+window.addEventListener("load", () => {
+  const result = document.createElement("output");
+  result.id = "calm-boundary-result";
+  try {
+    const messages = document.getElementById("messages");
+    const tree = document.getElementById("tree-container");
+    const visible = (element) => element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility !== "hidden";
+    const require = (condition, reason) => { if (!condition) throw new Error(reason); };
+    require(messages && tree, "conversation or tree missing");
+    for (const [selector, text] of [
+      [".user-message", "Show a deterministic tool example."],
+      [".assistant-message", "The deterministic tool example is complete."],
+    ]) {
+      require([...messages.querySelectorAll(selector)].some((row) =>
+        visible(row) && row.innerText.includes(text)), "genuine conversation missing: " + text);
+    }
+    require(![...messages.querySelectorAll(".hook-message")].some(visible),
+      "hidden custom entry is visible in the default conversation");
+    require(!messages.innerText.includes("[firstmate-synthetic-input]"),
+      "synthetic provenance leaked into the visible conversation");
+    for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_FIRSTMATE_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
+      require(messages.innerText.includes(current), "stock operational user row missing: " + current);
+    }
+    require(tree.textContent.includes("firstmate-synthetic-input") &&
+      tree.textContent.includes("/tmp/probe.status"), "synthetic history missing from tree");
+    const toggle = document.querySelector('[data-action="toggle-hidden-messages"]');
+    if (toggle) {
+      toggle.click();
+      require(messages.innerText.includes("[firstmate-synthetic-input]"),
+        "explicit hidden-message toggle lost synthetic history");
+      toggle.click();
+      require(!messages.innerText.includes("[firstmate-synthetic-input]"),
+        "hidden-message toggle did not restore the conversation boundary");
+    }
+    result.textContent = "passed";
+  } catch (error) {
+    result.textContent = error.message;
+  }
+  document.body.append(result);
+});
+</script>`;
+fs.writeFileSync(process.argv[3], fs.readFileSync(process.argv[2], "utf8").replace("</body>", probe + "</body>"));
+JS
+  chrome_report=$(render_export_dom "$chrome" "$TMP_ROOT/export-dom-probe.html" "$export_dom" "$version") \
     || fail "could not render calm-mode HTML export DOM: $chrome_report"
   node - "$export_dom" <<'JS' || fail "rendered export DOM violated the Calm conversation boundary"
 const dom = require("node:fs").readFileSync(process.argv[2], "utf8");
-const messages = dom.match(/<div id="messages">([\s\S]*?)<\/main>/)?.[1];
-const tree = dom.match(/<div[^>]*id="tree-container"[^>]*>([\s\S]*?)<div[^>]*id="tree-status"/)?.[1];
-if (!messages || !tree) process.exit(1);
-if (!/<div class="user-message"[^>]*>[\s\S]*Show a deterministic tool example\./.test(messages)) process.exit(1);
-if (!/<div class="assistant-message"[^>]*>[\s\S]*The deterministic tool example is complete\./.test(messages)) process.exit(1);
-if (messages.includes('<div class="hook-message"')) process.exit(1);
-if (messages.includes("[firstmate-synthetic-input]")) process.exit(1);
-for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_FIRSTMATE_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
-  if (!messages.includes(current)) process.exit(1);
+const result = dom.match(/<output id="calm-boundary-result">([^<]*)<\/output>/)?.[1];
+if (result !== "passed") {
+  console.error(result ?? "browser did not evaluate the conversation boundary");
+  process.exit(1);
 }
-if (!tree.includes("firstmate-synthetic-input") || !tree.includes("/tmp/probe.status")) process.exit(1);
 JS
   # Calm returns the transcript to its own presentation once the export has been
   # rendered. That repaint runs on the macrotask right after Pi prints the export
@@ -4402,8 +4438,9 @@ JS
   # their export landed. The export-data assertions above take seconds of real time,
   # so this snapshot is taken well after that repaint has settled rather than racing it.
   tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" -S -600 >"$export_settled_snapshot"
-  assert_contains "$(cat "$export_settled_snapshot")" "Session exported to: $export_file" \
+  assert_contains "$(cat "$export_settled_snapshot")" "Session exported to:" \
     "Calm's post-export repaint overwrote Pi's export confirmation"
+  [ -s "$export_file" ] || fail "the requested HTML export disappeared after Calm's repaint"
   assert_not_contains "$(cat "$export_settled_snapshot")" "fm_watch_arm_pi" \
     "/export left the Firstmate watcher tool call shell in the Calm transcript"
   assert_not_contains "$(cat "$export_settled_snapshot")" "watcher: started Pi extension arm child" \

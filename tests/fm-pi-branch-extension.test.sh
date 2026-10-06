@@ -792,64 +792,6 @@ if (outcomeScript(["unread"]) !== "") throw new Error("merged outcomes were not 
 // renderer.
 const outcomesTool = mainTools.find((tool) => tool.name === "fm_branch_outcomes");
 if (!outcomesTool) throw new Error("fm_branch_outcomes was not registered on main");
-const renderTheme = {
-  fg(_color, text) { return text; },
-  bg(_color, text) { return text; },
-  bold(text) { return text; },
-};
-const renderContext = { state: {}, isError: false, isPartial: false };
-const stockResult = { content: [{ type: "text", text: "OUTCOME_DUMP" }] };
-const calmOffCall = outcomesTool.renderCall({}, renderTheme, renderContext);
-const calmOffResult = outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-if (calmOffCall.constructor.name !== "Box" || calmOffCall.paddingX !== 1 || calmOffCall.paddingY !== 1) {
-  throw new Error("fm_branch_outcomes changed its ordinary shell rendering");
-}
-if (calmOffResult.constructor.name !== "Container" || calmOffCall.children[0]?.text !== "fm_branch_outcomes" || calmOffCall.children[1]?.text !== "OUTCOME_DUMP") {
-  throw new Error("fm_branch_outcomes changed its ordinary call or result rendering");
-}
-const legacyStockResult = {
-  content: [{
-    type: "text",
-    text: Array.from({ length: 12 }, (_, index) => `LEGACY_OUTCOME_${String(index + 1).padStart(2, "0")}`).join("\n"),
-  }],
-};
-const legacyRenderContext = { state: {}, isError: false, isPartial: false };
-const legacyCall = outcomesTool.renderCall({}, renderTheme, legacyRenderContext);
-outcomesTool.renderResult(legacyStockResult, { expanded: false, isPartial: false }, renderTheme, legacyRenderContext);
-const collapsedLegacyText = legacyCall.children[1]?.text;
-if (!collapsedLegacyText?.includes("LEGACY_OUTCOME_12") || collapsedLegacyText.includes("more lines")) {
-  throw new Error("legacy all-line stock capability did not preserve collapsed Calm-off output");
-}
-outcomesTool.renderResult(legacyStockResult, { expanded: true, isPartial: false }, renderTheme, legacyRenderContext);
-if (legacyCall.children[1]?.text !== collapsedLegacyText) {
-  throw new Error("legacy all-line stock capability changed expanded Calm-off output");
-}
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: false });
-const calmOnCall = outcomesTool.renderCall({}, renderTheme, renderContext);
-const calmOnResult = outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-if (calmOnCall.constructor.name !== "Container" || calmOnCall.render(100).length !== 0 || calmOnResult.constructor.name !== "Container" || calmOnResult.render(100).length !== 0) {
-  throw new Error("fm_branch_outcomes remained visible while Calm was on");
-}
-pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
-if (outcomesTool.renderCall({}, renderTheme, renderContext).constructor.name !== "Box" || outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext).constructor.name !== "Container") {
-  throw new Error("fm_branch_outcomes did not restore ordinary rendering when Calm was turned off");
-}
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
-let exportCallFellBack = false;
-let exportResultFellBack = false;
-try {
-  outcomesTool.renderCall({}, renderTheme, renderContext);
-} catch {
-  exportCallFellBack = true;
-}
-try {
-  outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-} catch {
-  exportResultFellBack = true;
-}
-if (!exportCallFellBack || !exportResultFellBack) {
-  throw new Error("fm_branch_outcomes replaced Pi stock export rendering");
-}
 const listed = await outcomesTool.execute("call-4", { recent: 2 }, undefined, undefined, {});
 const listedText = listed.content[0].text;
 if (listedText.split("\n").length !== 2 || !listedText.includes("checks green")) {
@@ -889,6 +831,11 @@ const assertRenderedNote = (note, glyph) => {
   }
 };
 assertRenderedNote(sentToMain[0].message.content, "⛵");
+const renderTheme = {
+  fg(_color, text) { return text; },
+  bg(_color, text) { return text; },
+  bold(text) { return text; },
+};
 const captainRendered = entryRenderers.get("fm-branch-visible-outcome")(
   captainEntries[0],
   { expanded: false },
@@ -5004,14 +4951,9 @@ test_outcomes_tool_uses_stock_execution_and_export_consumers() {
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
     return
   fi
-  # This case compares the extension's own renderers against Pi's stock
-  # rendering, so its verdict is only meaningful against the vendor contract
-  # those renderers target: since Pi 0.84.4 the stock renderer no longer
-  # supplies an implicit reset at multiline boundaries, and the extension
-  # emits that reset itself. An older installed Pi still supplies it, so the
-  # two legitimately differ there and a comparison would report a defect that
-  # is really a version skew. Name the version and skip rather than degrade
-  # quietly; a package whose version cannot be read at all is still a failure.
+  # Compare the installed vendor's own fallback, rather than pinning the
+  # spelling or geometry of one Pi release. The supported baseline starts
+  # with the stock renderer contract introduced in Pi 0.84.4.
   package_version=$(node -p 'require(process.argv[1]).version || ""' "$package_dir/package.json" 2>/dev/null || printf '')
   [ -n "$package_version" ] \
     || fail "installed @earendil-works/pi-coding-agent has no readable version at $package_dir"
@@ -5130,10 +5072,58 @@ actualRow.invalidate();
 if (JSON.stringify(actualRow.render(100)) !== JSON.stringify(stockRow.render(100))) {
   throw new Error("ToolExecutionComponent rendering did not restore after live toggle");
 }
+for (const name of ["fm_branch_outcomes", "fm_branch_processed"]) {
+  const actual = tools.find((tool) => tool.name === name);
+  const stock = { ...actual };
+  delete stock.renderShell;
+  delete stock.renderCall;
+  delete stock.renderResult;
+  const rows = [stock, actual].map((definition) =>
+    new ToolExecutionComponent(name, name, {}, { showImages: false }, definition, ui, process.cwd()));
+  const equivalent = (phase) => {
+    for (const width of [24, 100]) {
+      if (JSON.stringify(rows[0].render(width)) !== JSON.stringify(rows[1].render(width))) {
+        throw new Error(name + " differs from stock during " + phase + " at width " + width);
+      }
+    }
+  };
+  equivalent("pending call");
+  for (const row of rows) {
+    row.updateArgs(name === "fm_branch_outcomes" ? { recent: 987654321 } : { through: 987654321 });
+    row.markExecutionStarted();
+    row.setArgsComplete();
+    row.updateResult(result, true);
+  }
+  equivalent("partial result with updated arguments");
+  for (const row of rows) row.updateResult({ ...result, isError: true });
+  equivalent("error result");
+  for (const row of rows) row.setExpanded(true);
+  equivalent("expanded error");
+  pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: false });
+  rows[1].invalidate();
+  if (rows[1].render(100).length !== 0) throw new Error(name + " exposed an error result in Calm");
+  for (const row of rows) row.updateResult({ content: [{ type: "text", text: "UPDATED_WHILE_HIDDEN" }] });
+  pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
+  rows[1].invalidate();
+  equivalent("restored result updated while hidden");
+}
 
+const stockHtml = createToolHtmlRenderer({
+  getToolDefinition: () => stockDefinition,
+  getToolRenderers: () => stockDefinition,
+  theme,
+  cwd: process.cwd(),
+});
+const actualHtml = createToolHtmlRenderer({
+  getToolDefinition: () => actualDefinition,
+  getToolRenderers: () => actualDefinition,
+  theme,
+  cwd: process.cwd(),
+});
+if (!actualHtml.renderCall("ordinary-html", "fm_branch_outcomes", args)?.includes("fm_branch_outcomes")) {
+  throw new Error("ordinary HTML rendering did not reach the registered tool renderer");
+}
 pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
-const stockHtml = createToolHtmlRenderer({ getToolDefinition: () => stockDefinition, theme, cwd: process.cwd() });
-const actualHtml = createToolHtmlRenderer({ getToolDefinition: () => actualDefinition, theme, cwd: process.cwd() });
 const stockCall = stockHtml.renderCall("stock-html", "fm_branch_outcomes", args);
 const actualCall = actualHtml.renderCall("actual-html", "fm_branch_outcomes", args);
 const stockResult = stockHtml.renderResult("stock-html", "fm_branch_outcomes", result.content, result.details, false);

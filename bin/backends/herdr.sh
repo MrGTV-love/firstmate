@@ -3174,14 +3174,37 @@ fm_backend_herdr_composer_identity() {  # <target> -> "<agent>\t<status>"
   fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE"
 }
 
+# fm_backend_herdr_composer_ghost_luma: the truecolor ghost ceiling every herdr
+# composer read applies for a native identity - the ONE owner of that policy.
+# Claude draws recognized slash commands in theme-dependent normal-intensity
+# truecolor (dark blue RGB(51,102,255), luminance ~104, and muted grey), so on
+# a Claude pane only SGR-2 dim runs are ghost text and the ceiling is 0. Every
+# other identity, including an absent probe, keeps the shared default that
+# removes Grok's dark placeholders.
+fm_backend_herdr_composer_ghost_luma() {  # <identity> -> luminance ceiling
+  case "${1%%$'\t'*}" in
+    claude) printf '0' ;;
+    *) printf '%s' "${FM_COMPOSER_GHOST_LUMA_MAX:-128}" ;;
+  esac
+}
+
+# fm_backend_herdr_composer_ghost_policy_matters: 0 when the ghost ceiling
+# changes what the selected composer holds. Row selection reads plain text, so
+# a truecolor run outside the composer rows never changes a verdict; the
+# whole-capture comparison only spares the row scan on captures with none.
+fm_backend_herdr_composer_ghost_policy_matters() {  # <caps> <capture>
+  [ "$(printf '%s\n' "$2" | fm_composer_strip_ghost)" \
+    != "$(printf '%s\n' "$2" | FM_COMPOSER_GHOST_LUMA_MAX=0 fm_composer_strip_ghost)" ] || return 1
+  [ "$(fm_composer_extract_selected_content "$1" "$2")" \
+    != "$(FM_COMPOSER_GHOST_LUMA_MAX=0 fm_composer_extract_selected_content "$1" "$2")" ]
+}
+
 # fm_backend_herdr_composer_state: thin adapter - capture plus capabilities
 # in, shared verdict out. The ANSI capture is preferred (styled=1 lets the
 # shared classifier strip ghost/placeholder text); when it fails on an older
 # herdr, the plain capture degrades the descriptor to styled=0 rather than
-# letting ghost text be misread as typed input. Identity is fetched lazily,
-# only when the classifier reports the verdict depends on it (a pi separator
-# pair below every other candidate), preserving this adapter's original
-# consult-only-when-needed behavior.
+# letting ghost text be misread as typed input. Identity is fetched lazily when
+# a Pi separator pair or the selected rows' ghost-colour policy needs it.
 # The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: an overlay
 # a harness renders between the composer and the pane bottom - Claude Code's
 # slash-command popup is the verified shape (2.1.283, ~19 menu rows) - pushes
@@ -3191,23 +3214,42 @@ fm_backend_herdr_composer_identity() {  # <target> -> "<agent>\t<status>"
 # equally defeat this state read's pre-submit concat guard. The composer is
 # by definition inside the viewport, and `--source visible` needs none of the
 # small-N --lines workaround.
+# The ghost-colour policy (fm_backend_herdr_composer_ghost_luma) follows the
+# same lazy rule: a styled capture whose composer rows the two ceilings strip
+# differently depends on identity from the start, and no other capture does.
 fm_backend_herdr_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
-  local target=$1 cap caps verdict identity
+  fm_backend_herdr_composer_state_as "$1" ''
+}
+
+# fm_backend_herdr_composer_state_as: the same read for a caller that already
+# probed the pane's native identity. A non-empty <identity> is used for the
+# ghost-colour policy and the classifier without a fresh probe, so a later
+# probe failure cannot change which policy a Claude submission confirms under.
+# Pi's separated composer is proven only by a live idle or done status, so a
+# Pi identity is still probed afresh when the verdict needs it.
+fm_backend_herdr_composer_state_as() {  # <target> <identity>
+  local target=$1 identity=$2 cap caps verdict=need-identity
+  case "$identity" in pi$'\t'*) identity= ;; esac
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   if cap=$(fm_backend_herdr_visible_capture_ansi "$target" 2>/dev/null); then
     caps=$(printf 'styled=1\ncursor=0\nidentity=1')
+    if [ -n "$identity" ] || ! fm_backend_herdr_composer_ghost_policy_matters "$caps" "$cap"; then
+      verdict=$(FM_COMPOSER_GHOST_LUMA_MAX=$(fm_backend_herdr_composer_ghost_luma "$identity") \
+        fm_composer_classify_screen "$caps" "$cap" '' "$identity")
+    fi
   elif cap=$(fm_backend_herdr_visible_capture "$target"); then
     caps=$(printf 'styled=0\ncursor=0\nidentity=1')
+    verdict=$(fm_composer_classify_screen "$caps" "$cap" '' "$identity")
   else
     printf 'unknown'
     return 0
   fi
-  verdict=$(fm_composer_classify_screen "$caps" "$cap")
   if [ "$verdict" = need-identity ]; then
     if ! identity=$(fm_backend_herdr_composer_identity "$target" 2>/dev/null) || [ -z "$identity" ]; then
       identity='probe-absent'
     fi
-    verdict=$(fm_composer_classify_screen "$caps" "$cap" '' "$identity")
+    verdict=$(FM_COMPOSER_GHOST_LUMA_MAX=$(fm_backend_herdr_composer_ghost_luma "$identity") \
+      fm_composer_classify_screen "$caps" "$cap" '' "$identity")
     [ "$verdict" != need-identity ] || verdict=unknown
   fi
   printf '%s' "$verdict"
@@ -3239,11 +3281,14 @@ fm_backend_herdr_rendered_busy_state() {  # <target> [harness] -> busy|idle|unkn
 # (Enter only, never retyped) until native agent-state, a cleared composer, or
 # fm_composer_queued_enter_verdict confirms delivery. When native identity is
 # Claude, text is typed only into an empty composer and Enter is sent only
-# after the composer shows the payload (fm_backend_herdr_composer_payload_shown).
-# A missing read, a shorter suffix, or a paste placeholder followed by a
-# literal remainder does not press Enter: the composer is cleared back to
-# empty and the verdict is send-failed, or unknown when the clear cannot be
-# verified. Other harnesses skip this proof. Verified hazard
+# after the composer shows the payload (fm_backend_herdr_composer_await_payload,
+# judged by fm_backend_herdr_composer_payload_progress). An empty or partly
+# drawn composer is read again until the payload shows or the bound runs out.
+# This send's own truncated suffix does not press Enter: the composer is
+# cleared back to empty and the verdict is send-failed, or unknown when the
+# clear cannot be verified. An unproven timeout or text the send did not type
+# on its own does not press Enter either; it is never cleared, and the verdict
+# is send-failed. Other harnesses skip this proof. Verified hazard
 # (herdr-verification-p2.md "slash/$ autocomplete popup"): a `/`- or
 # `$`-prefixed send opens a completion popup within ~0.1s, exactly like tmux's
 # claude/codex popups, so the caller's <settle> before the first Enter matters
@@ -3355,16 +3400,17 @@ fm_backend_herdr_proof_lines() {  # <text>
 }
 
 # fm_backend_herdr_composer_content: the selected composer's visible text.
-# The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: an overlay
-# rendered between the composer and the pane bottom - Claude Code's
-# slash-command popup is the verified shape (2.1.283) - pushes the composer
-# above a tail window, so the pre-Enter payload proof would read empty, judge
-# the typed command unsent, and clear it (the fm-control exit breakage). The
-# viewport is the one bound that always contains the composer.
+# The capture is the FULL VISIBLE VIEWPORT, never a bounded tail: Claude's
+# slash-command popup can push the composer above a tail window, preventing
+# payload proof. The viewport is the one bound that always contains it.
+# Dated evidence: docs/verification/runtime-backends.md
+# "Claude exit behind the slash-command popup".
 # Styled capture is preferred. An empty or failed styled read falls through to
 # the plain capture so a missing ANSI format does not look like an empty draft.
-fm_backend_herdr_composer_content() {  # <target>
-  local target=$1 cap caps
+# <identity> is the native identity the caller already probed; it selects the
+# ghost-colour policy (fm_backend_herdr_composer_ghost_luma).
+fm_backend_herdr_composer_content() {  # <target> <identity>
+  local target=$1 identity=$2 cap caps
   if cap=$(fm_backend_herdr_visible_capture_ansi "$target" 2>/dev/null) && [ -n "$cap" ]; then
     caps=$(printf 'styled=1\ncursor=0\nidentity=0')
   elif cap=$(fm_backend_herdr_visible_capture "$target") && [ -n "$cap" ]; then
@@ -3372,60 +3418,117 @@ fm_backend_herdr_composer_content() {  # <target>
   else
     return 1
   fi
-  fm_composer_extract_selected_content "$caps" "$cap"
+  FM_COMPOSER_GHOST_LUMA_MAX=$(fm_backend_herdr_composer_ghost_luma "$identity") \
+    fm_composer_extract_selected_content "$caps" "$cap"
 }
 
-# fm_backend_herdr_composer_payload_shown: 0 when <after>, read from a
-# composer that was empty before the send, shows <text>.
-# Literal equality ignores whitespace, the same comparison zellij uses, so a
+# fm_backend_herdr_composer_payload_progress: how far <after>, read from a
+# composer that was empty before the send, has got toward showing <text>:
+#   shown     - <text> itself, or only Claude paste placeholders.
+#   rendering - empty, or a strict prefix of <text>: still being drawn.
+#   truncated - this send's own text with its head missing: a strict suffix
+#               of <text>, alone or after leading paste placeholders.
+#   foreign   - anything else, whose ownership this send cannot prove. A
+#               strict infix of <text>, or any other literal beside a
+#               placeholder, is ambiguous and stays foreign, so it is never
+#               cleared.
+# Literal comparison ignores whitespace, the same comparison zellij uses, so a
 # wrapped payload still matches. It also ignores U+2063, the invisible mark
 # that starts operational inputs and separates the from-firstmate label:
 # Claude's composer read-back on Herdr never shows it (verified live), and it
 # carries no instruction text of its own. A composer that holds only
 # `[Pasted text #N]` or `[Pasted text #N +M lines]` placeholders (the
-# multi-line form, verified live on Claude 2.1.278), with no literal remainder,
-# is the same proof for one fast burst: Claude collapses that burst into the
-# placeholder and expands it on submit. A shorter literal suffix, or a placeholder followed by a literal
-# remainder, is the head-truncation shape and is not proof.
-fm_backend_herdr_composer_payload_shown() {  # <text> <after>
-  local text=$1 after=$2 literal
+# multi-line form, verified live on Claude 2.1.278) is shown for one fast
+# burst: Claude collapses that burst into the placeholder and expands it on
+# submit.
+fm_backend_herdr_composer_payload_progress() {  # <text> <after>
+  local text=$1 after=$2 literal lead
   fm_composer_normalize_spaces_var text
   fm_composer_normalize_spaces_var after
   text=${text//[$' \t\r\n\v\f']/}
   text=${text//$'\xE2\x81\xA3'/}
   after=${after//[$' \t\r\n\v\f']/}
   after=${after//$'\xE2\x81\xA3'/}
-  [ -n "$text" ] && [ -n "$after" ] || return 1
-  [ "$after" = "$text" ] && return 0
+  if [ -z "$after" ]; then
+    printf 'rendering'
+    return 0
+  fi
+  if [ "$after" = "$text" ]; then
+    printf 'shown'
+    return 0
+  fi
   literal=$after
   while [[ $literal =~ \[Pastedtext#[0-9]+(\+[0-9]+lines?)?\] ]]; do
     literal=${literal/"${BASH_REMATCH[0]}"/}
   done
-  [ -z "$literal" ]
+  if [ "$literal" != "$after" ]; then
+    [ -n "$literal" ] || { printf 'shown'; return 0; }
+    lead=$after
+    while [[ $lead =~ ^\[Pastedtext#[0-9]+(\+[0-9]+lines?)?\] ]]; do
+      lead=${lead#"${BASH_REMATCH[0]}"}
+    done
+    if [ "$lead" = "$literal" ] && [ "$literal" != "$text" ]; then
+      case "$text" in *"$literal") printf 'truncated'; return 0 ;; esac
+    fi
+    printf 'foreign'
+    return 0
+  fi
+  case "$text" in
+    "$after"*) printf 'rendering' ;;
+    *"$after") printf 'truncated' ;;
+    *) printf 'foreign' ;;
+  esac
 }
 
-# fm_backend_herdr_composer_clear: after a refused proof, press Ctrl+U until
-# the shared classifier reads the composer as empty. Claude documents Ctrl+U
+# fm_backend_herdr_composer_await_payload: 0 once the selected composer shows
+# <text>, 1 when it holds this send's own truncated suffix, and 2 when the
+# proof times out or it holds text whose ownership this send cannot prove.
+# Only the read repeats; the payload is typed once. A loaded host renders a
+# typed payload well after the submit's settle; dated measurements are owned by
+# docs/verification/runtime-backends.md "Colored Claude slash commands".
+# Empty, partly drawn, or unreadable composer captures are retried for up to
+# FM_BACKEND_HERDR_PROOF_WAIT seconds (default 30). Truncated or foreign text
+# is refused immediately rather than submitting partial or ambiguous input.
+fm_backend_herdr_composer_await_payload() {  # <target> <text> <identity>
+  local target=$1 text=$2 identity=$3 content progress start=$SECONDS
+  while :; do
+    progress=rendering
+    if content=$(fm_backend_herdr_composer_content "$target" "$identity"); then
+      progress=$(fm_backend_herdr_composer_payload_progress "$text" "$content")
+    fi
+    case "$progress" in
+      shown) return 0 ;;
+      truncated) return 1 ;;
+      foreign) return 2 ;;
+    esac
+    [ $((SECONDS - start)) -lt "${FM_BACKEND_HERDR_PROOF_WAIT:-30}" ] || return 2
+    sleep 0.5
+  done
+}
+
+# fm_backend_herdr_composer_clear: after an owned-suffix refusal, press Ctrl+U
+# until the shared classifier reads the composer as empty. Claude documents Ctrl+U
 # as delete-to-line-start, repeated across lines of a multiline draft; Ctrl+C
 # is not used because it interrupts a running turn. Live Claude deletes one
 # wrapped screen row per press, so a single-line leftover can need several
 # presses. The press count comes from fm_backend_herdr_proof_lines, which
 # sizes it from the payload length, not from the viewport read.
+# <identity> is the native identity the caller already probed.
 # 0 only when the composer is verified empty again.
-fm_backend_herdr_composer_clear() {  # <target> <text>
-  local target=$1 text=$2 presses i=0
+fm_backend_herdr_composer_clear() {  # <target> <text> <identity>
+  local target=$1 text=$2 identity=$3 presses i=0
   presses=$(fm_backend_herdr_proof_lines "$text")
   while [ "$i" -lt "$presses" ]; do
     fm_backend_herdr_send_key "$target" C-u || return 1
     i=$((i + 1))
-    [ "$(fm_backend_herdr_composer_state "$target")" = empty ] && return 0
+    [ "$(fm_backend_herdr_composer_state_as "$target" "$identity")" = empty ] && return 0
   done
   return 1
 }
 
 fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep> <settle>
   local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 i=0 verdict baseline confirm_sleep
-  local raw_status footer_baseline='' allow_rendered=0 enter_sent=0 identity proof=0 content
+  local raw_status footer_baseline='' allow_rendered=0 enter_sent=0 identity proof=0 content awaited=0
   fm_backend_herdr_parse_target "$target" || { printf 'unknown'; return 0; }
   # Claude on Herdr is the live-verified truncation shape: Enter is withheld
   # unless the composer, empty before the send, shows this payload. A suffix
@@ -3434,22 +3537,28 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
   identity=$(fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || identity=
   if [ "${identity%%$'\t'*}" = claude ]; then
     proof=1
-    content=$(fm_backend_herdr_composer_content "$target") \
+    content=$(fm_backend_herdr_composer_content "$target" "$identity") \
       || { printf 'send-failed'; return 0; }
     [ -z "${content//[$' \t\r\n\v\f']/}" ] || { printf 'send-failed'; return 0; }
   fi
   fm_backend_herdr_send_literal "$target" "$text" || { printf 'send-failed'; return 0; }
   sleep "$settle"
   if [ "$proof" = 1 ]; then
-    if ! content=$(fm_backend_herdr_composer_content "$target") \
-      || ! fm_backend_herdr_composer_payload_shown "$text" "$content"; then
-      if fm_backend_herdr_composer_clear "$target" "$text"; then
+    fm_backend_herdr_composer_await_payload "$target" "$text" "$identity" || awaited=$?
+    case "$awaited" in
+      1)
+        if fm_backend_herdr_composer_clear "$target" "$text" "$identity"; then
+          printf 'send-failed'
+        else
+          printf 'unknown'
+        fi
+        return 0
+        ;;
+      2)
         printf 'send-failed'
-      else
-        printf 'unknown'
-      fi
-      return 0
-    fi
+        return 0
+        ;;
+    esac
   fi
   raw_status=$(fm_backend_herdr_agent_status_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE")
   baseline=$(fm_backend_herdr_classify_submit_agent_status "$raw_status")
@@ -3482,7 +3591,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       esac
       # Native stayed idle. Composer empty is positive delivery (a landed
       # Claude turn that never flipped agent_status). Proven pending retries.
-      verdict=$(fm_backend_herdr_composer_state "$target")
+      verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
       case "$verdict" in
         empty) printf 'empty'; return 0 ;;
         pending|pending-unproven) ;;
@@ -3490,7 +3599,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       esac
     else
       sleep "$sleep_s"
-      verdict=$(fm_backend_herdr_composer_state "$target")
+      verdict=$(fm_backend_herdr_composer_state_as "$target" "$identity")
       if [ "$verdict" = pending ] && [ "$raw_status" != working ] \
         && [ "$footer_baseline" = idle ] \
         && [ "$(fm_backend_herdr_rendered_busy_state "$target")" = busy ]; then

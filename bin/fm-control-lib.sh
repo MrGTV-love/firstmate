@@ -331,23 +331,57 @@ fm_control_backend_state_verified() {  # <backend>
 #     passes `--session <session>`, so the recheck starts and reads the session
 #     the RECORD names, through that session's own socket. The answer is about
 #     the task's endpoint and nothing else.
-#   tmux CANNOT. `list-windows -a` describes only the server the CURRENT
-#     process addresses (its TMUX_TMPDIR/socket), and a task's record does not
-#     carry the endpoint's socket identity - so a different but running server
-#     would answer "not anywhere" about a window it was never able to see.
-#     There is no read available here that closes that gap, so tmux always
-#     returns `unproven` and both verbs refuse. tmux is left exactly as
-#     deadlocked as it was before this change - no worse - but deliberately.
+#   tmux CAN prove the machine-wide no-server case only. Its record has no
+#     socket identity, so any tmux process owned by the current uid prevents
+#     proof, even on another socket. Two readable full process snapshots must
+#     contain none, and the addressed socket must independently report no
+#     server on each pass. Empty, malformed, failed, or contradictory reads
+#     refuse. Counting clients too is intentionally conservative.
 #
 # Both control-plane callers share this one implementation so the proof cannot
 # drift into two answers for the same endpoint.
 fm_control_endpoint_absence_verdict() {  # <backend> <target>
-  local backend=${1-} target=${2-}
+  local backend=${1-} target=${2-} uid snapshot inventory pass=0
   fm_backend_source "$backend" \
     || { printf 'unproven\tbackend %s could not be loaded to prove anything about that endpoint' "'$backend'"; return 0; }
   case "$backend" in
     tmux)
-      printf 'unproven\ttmux absence cannot be proven from a task record: the record does not carry the endpoint'"'"'s socket identity, and a server-wide window inventory only describes the tmux server this process addresses, so a window absent from it may still be alive on another'
+      uid=$(id -u) || uid=
+      case "$uid" in
+        ''|*[!0-9]*) printf 'unproven\tthe current uid could not be read'; return 0 ;;
+      esac
+      while [ "$pass" -lt 2 ]; do
+        pass=$((pass + 1))
+        snapshot=$(LC_ALL=C ps -axww -o uid=,pid=,comm= 2>/dev/null) || {
+          printf 'unproven\tthe machine process table could not be read'
+          return 0
+        }
+        if ! printf '%s\n' "$snapshot" | LC_ALL=C awk -v uid="$uid" '
+          NF < 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ { invalid = 1 }
+          $1 == uid {
+            seen = 1
+            comm = $0
+            sub(/^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/, "", comm)
+            sub(/^.*\//, "", comm)
+            if (comm ~ /^tmux($|[ :])/) live = 1
+          }
+          END { exit (invalid || !seen || live) ? 1 : 0 }
+        '; then
+          printf 'unproven\tthe process table does not positively show zero tmux processes owned by the current uid; a server on another socket may still hold the endpoint'
+          return 0
+        fi
+        # A readable server inventory contradicts the zero-process snapshot,
+        # even if it omits this window. A transient error is not absence.
+        if inventory=$(LC_ALL=C tmux list-windows -t "=${target%%:*}" -F '#{window_name}' 2>&1); then
+          printf 'unproven\ttmux answered from a server despite the zero-process snapshot'
+          return 0
+        fi
+        case "$inventory" in
+          *"no server running on "*|*"error connecting to "*" (No such file or directory)"|*"error connecting to "*" (Connection refused)") ;;
+          *) printf 'unproven\ttmux did not corroborate the no-server process snapshot'; return 0 ;;
+        esac
+      done
+      printf 'gone\t'
       ;;
     herdr)
       # Start the RECORDED session's server (only the server - nothing is

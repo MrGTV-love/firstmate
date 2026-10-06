@@ -1,15 +1,18 @@
-# Jev guard framework
+# Host guard framework
 
-A Jev guard is a bounded, read-only host diagnostic that turns one class of resource or state pressure into a machine-readable audit record and a one-line verdict.
+A host guard is a bounded, read-only local diagnostic that turns one class of resource or state pressure into a machine-readable audit record and a one-line verdict.
 Guards exist so a supervision loop can distinguish a genuinely wedged worker from a host condition that merely looks like one, without granting any guard the power to change the system it measures.
 This document owns the framework contract every guard family follows; each family's own script header owns its measured signals and thresholds.
 
 ## Shape
 
 Each family ships as a pair plus its tests.
-`bin/fm-jev-<name>-guard.sh` is a thin wrapper that resolves its own directory and `exec`s the family engine with `python3`.
-`bin/fm-jev-<name>-guard.py` is the engine: it measures, classifies, and prints.
-`tests/fm-jev-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
+`bin/fm-<name>-guard.sh` is a thin wrapper that resolves its own directory and `exec`s the family engine with `python3`.
+`bin/fm-<name>-guard.py` is the engine: it measures, classifies, and prints.
+`tests/fm-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
+
+The memory family is `fm-mem-guard`; its engine header owns Linux/macOS sources, metric interpretation, and command budget.
+It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name has been removed rather than kept as an alias.
 
 ## Engine contract
 

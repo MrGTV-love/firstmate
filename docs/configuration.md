@@ -9,7 +9,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | --- | --- |
 | Firstmate's code, private files, or project location | [FM_HOME](#fm_home) and [operational home layout](#operational-home-layout-and-state) |
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
-| Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
+| Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -826,6 +826,30 @@ The file is a captain-wide safety preference, so it is inherited into secondmate
 
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the permission-mode observations and the distinct startup dialogs.
 
+## Claude launcher (config/claude-launcher)
+
+The optional local, gitignored `config/claude-launcher` routes every Claude worker launch through the local TeamClaude proxy: crewmates, scouts, Claude secondmates, and every relaunch, including `fm-control` relaunch, the session-end auto-relaunch, and secondmate restart, on every runtime backend.
+Its one accepted token is `teamclaude`, which starts Claude through [`bin/fm-teamclaude-launch.sh`](../bin/fm-teamclaude-launch.sh).
+An absent file launches the bare `claude` command.
+Any other value, or an unreadable file, refuses the launch before any worker, copy, or record exists.
+
+With `teamclaude`, the spawn first runs the launcher's `--check`, which refuses the launch when TeamClaude is not installed, is ambiguous, or its proxy does not answer `teamclaude status`.
+`fm-control` relaunch runs the same check before it stops the running agent, so a stopped proxy leaves that agent running.
+In the worker's pane, the launcher applies the client environment `teamclaude env` exports and then replaces itself with `claude`.
+That export must set `HTTPS_PROXY`, and TeamClaude also exports `NODE_EXTRA_CA_CERTS` so Claude trusts the proxy's certificate authority.
+The proxy therefore reaches Claude on tmux and Herdr alike, without depending on a shell alias in the pane.
+The launcher refuses again in the pane, rather than start Claude unproxied, if TeamClaude is missing there, the proxy stopped, or the export sets no `HTTPS_PROXY`.
+Each host resolves its own TeamClaude executable from `PATH`, or from exactly one Node-version installation beneath `~/.nvm/versions/node/`, whose `node` the launcher puts on `PATH` for TeamClaude.
+TeamClaude reads `TEAMCLAUDE_CONFIG` first, otherwise `$XDG_CONFIG_HOME/teamclaude.json`, then `~/.config/teamclaude.json`.
+Firstmate requires any nonempty override to be an absolute path.
+The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
+No TeamClaude credential, account name, or quota state enters Firstmate configuration.
+The [Claude API key guard](#claude-api-key-guard) applies unchanged.
+A raw launch command whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
+The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
+`tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
+
 ## Worker account pin (config/claude-account, config/pi-account)
 
 A home that mixes accounts for one runner, such as a work login and a personal one, can pin the account its own Claude and Pi workers launch on.
@@ -930,7 +954,7 @@ SSH_AUTH_SOCK
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
 
-Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools.
+Other ambient names must be listed explicitly, including custom credential-store locations, proxy settings, and certificate overrides when required by the selected tools; the [Claude launcher](#claude-launcher-configclaude-launcher) separately owns TeamClaude's client environment.
 The command shell and worker may still create their own variables.
 
 Allowed values come from the destination pane at execution time; they are neither copied from the invoking Firstmate process nor written into the launch command.
@@ -974,12 +998,16 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
 With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch receives a pane-scoped `GIT_CONFIG` `core.hooksPath` pointing at `state/<id>.git-hooks`, where git's `commit-msg` hook strips known AI trailers even when a runtime injects them after the typed message.
-When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and fleet launches do not install or select the strip hooks, so Git uses the repository's configured hooks directly.
+When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and fleet launches do not install or select the strip hooks.
+Fresh launches and supported same-task relaunches apply the current attribution choice without retaining that task's obsolete hook selection, including when `config/launch-env-allowlist` is enabled.
+Unrelated Git environment entries and explicit operator settings remain in the persistent pane; their inheritance by the worker is subject to the [launch environment filter](#worker-launch-environment-configlaunch-env-allowlist).
+When keeping trailers, Git uses the repository's configured hooks unless the worker receives an explicit operator override.
 `bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs when stripping is enabled.
 If the wrapper cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
 When stripping is enabled, the hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
 The flag is a home-wide attribution choice, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract and a secondmate's own workers keep AI trailers too.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
 
 ### Claude API key guard
 
@@ -1039,7 +1067,8 @@ This section is the single owner of the canonical schema and its per-field seman
   ],
   "default": [
     { "harness": "<adapter>", "model": "<optional model>", "effort": "<optional effort>" }
-  ]
+  ],
+  "task_horizon_minutes": 240
 }
 ```
 
@@ -1055,7 +1084,7 @@ This section is the single owner of the canonical schema and its per-field seman
 
 **Fields applied only by typed resolution**
 
-Rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
+Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
 The resolver supplies the fixed neutral Choice option `No listed rule applies to this task.` for work that matches no listed rule.
 
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
@@ -1063,6 +1092,9 @@ The resolver supplies the fixed neutral Choice option `No listed rule applies to
 `min_confidence` is a number from 0 through 1.
 The rule's own probability in the answer must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
 Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
+
+`task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
+The 240-minute default matches the 240-minute single-agent limit no-mistakes applies to one task's agent.
 
 **Rule quota floors**
 
@@ -1074,7 +1106,6 @@ Set it high when a wrong pick is costly and low when the rule is a safe runner-u
 **Provider identifiers and mappings**
 
 A profile `provider` optionally names the quota-axi provider family whose rows apply to that profile; when present, profile and rule-floor provider IDs must match the strict whole-string pattern `^[a-z0-9]+(-[a-z0-9]+)*\z`.
-Bootstrap validates resolver-only `approval`, `min_confidence`, `floor`, and present `provider` values only while typed resolution is active; without the key those inert fields and the pre-existing verified-harness baseline preserve bootstrap behavior.
 
 Typed resolution additively recognizes `gemini` because AGENTS.md section 4 verifies it for crewmate and scout dispatch.
 
@@ -1108,7 +1139,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
@@ -1174,12 +1205,21 @@ After the answer, code applies all remaining checks and ranking:
 - The confidence floor and the matched rule's `approval` and `floor`.
 - Each candidate's `provider` and `floor`.
 - Every applicable account-wide and model/product row from one `quota-axi --json` snapshot.
-- The numeric `spendPriority` argmax over candidates, using each candidate's limiting row.
+- The numeric `spendPriority` argmax over the matched rule's candidates, using each candidate's limiting row, then the task-horizon runway check on that winner.
 
-The [shared quota library](../bin/fm-quota-axi-lib.sh) accepts schema 5 and schema 6 and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version in `FM_QUOTA_AXI_MIN`, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+The resolver checks `quota-axi --version` before taking its one JSON snapshot; an older, unreadable, or unparseable version produces a named `error` requiring that minimum, never a ranking based on incompatible output.
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
+- omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
+  The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
+  The pool is ranked on that account through the task-horizon runway classification in "Candidate eligibility and evidence" below.
+  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked, never vetoed, because another pooled account may still have headroom; any non-passing runway bound is disclosed as a warning.
+  A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
+  The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
+- quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
+  An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
 **Confidence and fallback rules**
 
@@ -1195,8 +1235,19 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 **Candidate eligibility and evidence**
 
-- Any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
+- A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
+- Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
+  The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
+  `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
+  An `established` projection shorter than the horizon on any applicable bound of the highest-ranked candidate produces `escalate` with no `profile:`.
+  For an otherwise rankable candidate, a `projected_exhaustion` bound with `early`, unknown, or absent `projectionConfidence`, or absent or nonnumeric `usableRunwaySeconds`, is warning-only; `unknown` runway is also warning-only.
+  A young or unmeasured projection is not evidence of mid-task exhaustion.
+  Each non-passing bound on a rankable candidate is named in a `[warning: ...]` suffix on its candidate line.
+  Projected-exhaustion warnings include `usableRunwaySeconds` and `projectionConfidence`; other runway warnings name the status and scope.
+  A low positive percentage alone is not a veto unless it falls below a declared floor; the resolver invents no generic percentage floor.
+- Ranking stays inside the matched rule's own `use` array (or `default` when that was selected) and keeps its highest `spendPriority` choice: a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
+- Unranked alternatives do not prevent a measured winner from clearing; the clear result's unranked note names their providers.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
@@ -1205,7 +1256,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, or a genuine tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
 
 Every result above exits 0.
@@ -1213,11 +1264,12 @@ Every result above exits 0.
 - Response probabilities must contain exactly every offered choice, use numeric values from 0 through 1, and sum to approximately 1 within 0.01.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, or missing `jq`, each reported and never selected around.
 - Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
+- Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
 
 **Firstmate retains the dispatch decision**
 
 The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captain-approval gate, or `fm-spawn.sh` validation; `AGENTS.md` section 4 owns what firstmate does with each outcome.
-By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
+A `clear` result still leaves catalog/authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
 
 Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
 
@@ -2275,6 +2327,7 @@ FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into s
 HERDR_SESSION=default  # herdr-only: named session for normal backend ops; not enough for destructive cleanup (docs/herdr-backend.md)
 FM_BACKEND_HERDR_SUBMIT_POLLS=6  # herdr-only: agent-state samples spread across each Enter attempt's budget when confirming a submit (docs/herdr-backend.md "Current transport behavior")
 FM_BACKEND_HERDR_SUBMIT_MIN_SLEEP=0.6  # herdr-only: minimum per-Enter confirmation budget before polling agent-state after an idle baseline
+FM_BACKEND_HERDR_PROOF_WAIT=30  # herdr-only: Claude pre-Enter payload-proof budget in seconds; behavior owned by docs/herdr-backend.md "Claude composer proof"
 FM_ZELLIJ_SESSION=firstmate  # zellij-only: named session for normal backend ops and test isolation (docs/zellij-backend.md)
 CMUX_SOCKET_PASSWORD=   # cmux-only: socket password fallback when config/cmux-socket-password is absent (docs/cmux-backend.md)
 FM_SESSION_START_STATUS_TAIL=5   # state/*.status lines printed per task in the session-start digest; each line is capped by bin/fm-line-cap-lib.sh
@@ -2393,7 +2446,7 @@ FM_BUSY_REGEX=          # optional override for rendered delivery guards and Gro
 FM_COMPOSER_IDLE_RE=    # optional fleet-wide idle-placeholder regex override (bin/fm-composer-lib.sh); a match alone does not prove emptiness because shape-specific position and ANSI de-emphasis safety gates still apply
 FM_COMPOSER_CAPTURE_LINES=20   # fleet-wide bound for tail-capture composer reads; it no longer bounds the adapter composer state/content reads on tmux or herdr, which supply their bounded visible pane instead, while the cmux, orca, and Zellij adapters use this small window so stale scrollback banners stay out of the candidate set; it still bounds the shared inbox composer read (bin/fm-task-inbox-lib.sh) on every backend, and on herdr it also floors how many Ctrl+U presses a refused leftover may take
 FM_COMPOSER_PI_MAX_LINES=8     # fleet-wide: maximum rows admitted between Pi's identity-corroborated separator pair; taller or ambiguous candidates stay unknown
-FM_COMPOSER_GHOST_LUMA_MAX=128   # fleet-wide: max perceived luminance (0.299R+0.587G+0.114B, 0-255) for a TRUECOLOR foreground to count as de-emphasised ghost/placeholder text and be stripped; dim/faint (SGR 2) is stripped regardless. Assumes a dark terminal theme (bin/fm-composer-lib.sh's fm_composer_strip_ghost, used by styled tmux, herdr, and Zellij reads)
+FM_COMPOSER_GHOST_LUMA_MAX=128   # fleet-wide: truecolor ghost luminance ceiling; shared mechanics owned by bin/fm-composer-lib.sh's fm_composer_strip_ghost, Herdr exception by docs/herdr-backend.md "Claude composer proof"
 GROK_HOME=              # optional Grok config home for firstmate's global grok turn-end hook; defaults to ~/.grok
 FM_SEND_RETRIES=3       # fm-send typed-plane Enter-retry attempts after typing the line once; agy typed targets use a longer per-harness default owned by bin/fm-send.sh
 FM_SEND_SLEEP=0.4       # seconds between fm-send typed-plane submit checks

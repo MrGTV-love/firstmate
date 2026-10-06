@@ -333,6 +333,31 @@ test_non_tmux_guard() {
 
 # --- run --------------------------------------------------------------------
 
+# Test: the guard holds unchanged when config/claude-launcher routes Claude
+# through TeamClaude, and --allow-api-key still reaches the TeamClaude launch.
+test_teamclaude_launcher_keeps_the_api_key_guard() {
+  local rec out status
+  rec=$(make_case teamclaude-api-key claude teamclaude-api-key-a1 teamclaude-api-key-a2)
+  read_case "$rec"
+  fm_test_fake_teamclaude "$FAKEBIN_DIR"
+  printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
+    run_case_spawn teamclaude-api-key-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a TeamClaude claude spawn should refuse when ANTHROPIC_API_KEY is set"$'\n'"$out"
+  assert_contains "$out" "ANTHROPIC_API_KEY" "the refusal message should name the variable"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused TeamClaude spawn must not launch anything"
+  assert_absent "$HOME_DIR/state/teamclaude-api-key-a1.meta" "a refused TeamClaude spawn must leave no task record"
+
+  out=$(ANTHROPIC_API_KEY=sk-ant-test-key \
+    run_case_spawn teamclaude-api-key-a2 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "a TeamClaude claude spawn should honor --allow-api-key"$'\n'"$out"
+  assert_contains "$(cat "$LAUNCH_LOG")" "$ROOT/bin/fm-teamclaude-launch.sh' " \
+    "an allowed API-key launch should still start through TeamClaude"
+  pass "config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in"
+}
+
 test_refuse_api_key_no_allowlist
 test_refuse_auth_token_no_allowlist
 test_succeed_unset
@@ -349,3 +374,4 @@ test_tmux_env_follows_the_allowlist
 test_launch_sheds_captured_credentials
 test_launch_preserves_credentials_with_opt_in
 test_non_tmux_guard
+test_teamclaude_launcher_keeps_the_api_key_guard
