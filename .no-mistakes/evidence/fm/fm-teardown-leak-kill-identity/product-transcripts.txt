@@ -1,0 +1,843 @@
+Target commit: 40ff5b9487efd599a8314e9a6d3526501c451e52
+Production custody executable copied unchanged; only sibling account reaper replaced recording-only.
+Invocation: env TMPDIR=<lab>/tmp BASH_ENV=<lab>/verify.bash FM_TEST_SKIP_ORPHAN_REAP=1 FM_REAPER_RECEIPTS=<lab>/reaper-receipts.log /bin/bash <standalone-repo>/tests/custody-selected.sh <selector>
+Fixture endpoint/Treehouse/GitHub adapters are isolated; real production teardown, real OS processes, ps/lsof, durable records and tasks-axi/close replay were exercised.
+
+=== fm-teardown-tests.100tgS/leaked-tasktmp-reap/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.100tgS/leaked-tasktmp-reap/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.100tgS/leaked-tasktmp-reap/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.100tgS/leaked-tasktmp-reap/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.100tgS/leaked-tasktmp-reap/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 69473
+
+
+=== fm-teardown-tests.10TMpe/durable-process-identity/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.10TMpe/durable-process-identity/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.10TMpe/durable-process-identity/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.10TMpe/durable-process-identity/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.10TMpe/durable-process-identity/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 91866
+teardown: force-killing leaked worktree process(es) for task-x1: 91866
+
+
+=== fm-teardown-tests.9WM1rX/process-audit-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 44359
+REFUSED: cannot durably record leaked process 44359 identity for task-x1; preserving the worktree/tasktmp without signalling it.
+
+
+=== fm-teardown-tests.FaZwRi/lsof-absent-refusal/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/repo/bin/fm-wake-lib.sh: line 255: cksum: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/repo/bin/fm-wake-lib.sh: line 255: cksum: command not found
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.FaZwRi/lsof-absent-refusal/wt for task-x1 (lsof is unavailable, so no signal target can be audited); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.I7GlR5/windowless-retry/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: the pending backlog close for task-x1 could not be recorded (task record /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.I7GlR5/windowless-retry/state/task-x1.meta has 0 spawn generation fields; exactly one is required); retaining every durable task record
+error: the legacy incarnation stamp on task-x1's record could not be rolled back; re-run teardown with --legacy-record after reconciling its endpoint
+
+
+=== fm-teardown-tests.I7GlR5/windowless-retry/invocation-2 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.I7GlR5/windowless-retry/project: already current
+teardown task-x1 complete (window none, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.I7GlR5/windowless-retry/missing-wt, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261006T180211Z-41615)
+Backlog: task-x1 is closed in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.I7GlR5/windowless-retry/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: 11s ago, grace 300s) - full banner already printed this episode.
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-manual/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: treehouse return failed for worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-manual/wt; teardown aborted
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-manual/invocation-2 ===
+exit=1
+STDOUT:
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: 5s ago, grace 300s) - full banner already printed this episode.
+error: the previous pending backlog close for task-x1 could not be cleared (pending-close record could not be removed at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-manual/state/task-x1.backlog-close); refusing process cleanup
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-manual/invocation-3 ===
+exit=1
+STDOUT:
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: 7s ago, grace 300s) - full banner already printed this episode.
+REFUSED: process 46742 (lstart=Tue Oct  6 13:01:41 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-manual/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-manual/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-manual/wt/dist for task-x1 (descendant cwd holds process 46742 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted exempt-retry-manual/observations:
+mode=manual rc=1 target_pid=46742 target_birth=lstart=Tue Oct  6 13:01:41 2026 target_alive=1 unrelated_pid=46821 unrelated_birth=lstart=Tue Oct  6 13:01:41 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted exempt-retry-manual/initial.observations:
+initial_rc=1
+
+Persisted exempt-retry-manual/clear.observations:
+clear_rc=1 target_pid=46742 target_birth=lstart=Tue Oct  6 13:01:41 2026 unrelated_pid=46821 unrelated_birth=lstart=Tue Oct  6 13:01:41 2026
+
+Persisted exempt-retry-manual/replay.stdout:
+
+Persisted exempt-retry-manual/replay.stderr:
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: treehouse return failed for worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/wt; teardown aborted
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/invocation-2 ===
+exit=1
+STDOUT:
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: 9s ago, grace 300s) - full banner already printed this episode.
+error: the previous pending backlog close for task-x1 could not be cleared (pending-close record could not be removed at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/state/task-x1.backlog-close); refusing process cleanup
+
+
+=== fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/invocation-3 ===
+exit=1
+STDOUT:
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: 13s ago, grace 300s) - full banner already printed this episode.
+REFUSED: process 91701 (lstart=Tue Oct  6 13:01:52 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.JbwMcj/exempt-retry-missing-backlog/wt/dist for task-x1 (descendant cwd holds process 91701 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted exempt-retry-missing-backlog/observations:
+mode=missing-backlog rc=1 target_pid=91701 target_birth=lstart=Tue Oct  6 13:01:52 2026 target_alive=1 unrelated_pid=91967 unrelated_birth=lstart=Tue Oct  6 13:01:52 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted exempt-retry-missing-backlog/initial.observations:
+initial_rc=1
+
+Persisted exempt-retry-missing-backlog/clear.observations:
+clear_rc=1 target_pid=91701 target_birth=lstart=Tue Oct  6 13:01:52 2026 unrelated_pid=91967 unrelated_birth=lstart=Tue Oct  6 13:01:52 2026
+
+Persisted exempt-retry-missing-backlog/replay.stdout:
+
+Persisted exempt-retry-missing-backlog/replay.stderr:
+
+
+=== fm-teardown-tests.KiABgQ/ordinary-descendant-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 31243 (lstart=Tue Oct  6 13:00:13 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/ordinary-descendant-custody/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/ordinary-descendant-custody/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/ordinary-descendant-custody/wt/dist for task-x1 (descendant cwd holds process 31243 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.KiABgQ/tasktmp-descendant-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 41310 (lstart=Tue Oct  6 13:00:16 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/tasktmp-descendant-custody/tasktmp/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/tasktmp-descendant-custody/tasktmp, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.KiABgQ/tasktmp-descendant-custody/tasktmp/dist for task-x1 (descendant cwd holds process 41310 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.LNBSWd/missing-git-lane-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 92850 (lstart=Tue Oct  6 13:00:03 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.LNBSWd/missing-git-lane-custody/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.LNBSWd/missing-git-lane-custody/wt/other-lane, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.LNBSWd/missing-git-lane-custody/wt/other-lane for task-x1 (registered nested worktree lane holds process 92850); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.SHSghF/exec-changed-process/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.SHSghF/exec-changed-process/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.SHSghF/exec-changed-process/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.SHSghF/exec-changed-process/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.SHSghF/exec-changed-process/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 62120
+teardown: force-killing leaked worktree process(es) for task-x1: 62120
+
+
+=== fm-teardown-tests.VdHeTn/sibling-missing-git-lane-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 7663 (lstart=Tue Oct  6 13:00:06 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.VdHeTn/sibling-missing-git-lane-custody/wt/other-lane beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.VdHeTn/sibling-missing-git-lane-custody/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.VdHeTn/sibling-missing-git-lane-custody/wt/other-lane for task-x1 (descendant cwd holds process 7663 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.WKLkhQ/own-deleted-cwd-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 18799 (lstart=Tue Oct  6 13:00:10 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/own-deleted-cwd-custody/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/own-deleted-cwd-custody/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/own-deleted-cwd-custody/wt/dist for task-x1 (descendant cwd holds process 18799 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.WKLkhQ/tasktmp-deleted-cwd-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 31607 (lstart=Tue Oct  6 13:00:13 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/tasktmp-deleted-cwd-custody/tasktmp/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/tasktmp-deleted-cwd-custody/tasktmp, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WKLkhQ/tasktmp-deleted-cwd-custody/tasktmp/dist for task-x1 (descendant cwd holds process 31607 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.WaTgeJ/lsof-error-refusal/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.WaTgeJ/lsof-error-refusal/wt for task-x1 (lsof failed); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.bhjPp9/reused-pid-identity/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.bhjPp9/reused-pid-identity/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.bhjPp9/reused-pid-identity/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.bhjPp9/reused-pid-identity/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.bhjPp9/reused-pid-identity/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 61149
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-audit/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 51574
+REFUSED: cannot durably record leaked process 51574 identity for task-x1; preserving the worktree/tasktmp without signalling it.
+
+Persisted refusal-replay-audit/replay.stdout:
+
+Persisted refusal-replay-audit/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-descendant/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 41688 (lstart=Tue Oct  6 13:00:46 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-descendant/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-descendant/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-descendant/wt/dist for task-x1 (descendant cwd holds process 41688 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-descendant/replay.stdout:
+
+Persisted refusal-replay-descendant/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-existing-marker/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 9517 (lstart=Tue Oct  6 13:01:31 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-existing-marker/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-existing-marker/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-existing-marker/wt/dist for task-x1 (descendant cwd holds process 9517 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-existing-marker/replay.stdout:
+
+Persisted refusal-replay-existing-marker/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-foreign/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 6s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 65347 (lstart=Tue Oct  6 13:00:52 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-foreign/wt/foreign inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-foreign/wt/foreign, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-foreign/wt/foreign for task-x1 (registered nested worktree lane holds process 65347); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-foreign/replay.stdout:
+
+Persisted refusal-replay-foreign/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-legacy/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 92441 (lstart=Tue Oct  6 13:01:26 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-legacy/wt/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-legacy/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-legacy/wt/dist for task-x1 (descendant cwd holds process 92441 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-legacy/replay.stdout:
+
+Persisted refusal-replay-legacy/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-missing-lsof/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/repo/bin/fm-wake-lib.sh: line 255: cksum: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/repo/bin/fm-wake-lib.sh: line 255: cksum: command not found
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-missing-lsof/wt for task-x1 (lsof is unavailable, so no signal target can be audited); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-missing-lsof/replay.stdout:
+
+Persisted refusal-replay-missing-lsof/replay.stderr:
+
+
+=== fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task task-x1's recorded worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/pool/1/project was reassigned to task other-task (home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/other-home), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+REFUSED: process 76435 (lstart=Tue Oct  6 13:01:21 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/tasktmp/dist beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/tasktmp, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.ii72Gx/refusal-replay-tasktmp/tasktmp/dist for task-x1 (descendant cwd holds process 76435 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+Persisted refusal-replay-tasktmp/replay.stdout:
+
+Persisted refusal-replay-tasktmp/replay.stderr:
+
+
+=== fm-teardown-tests.kLQGpj/deleted-lane-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 5739 (lstart=Tue Oct  6 13:00:06 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.kLQGpj/deleted-lane-custody/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.kLQGpj/deleted-lane-custody/wt/other-lane, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.kLQGpj/deleted-lane-custody/wt/other-lane for task-x1 (registered nested worktree lane holds process 5739); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-KILL-command-exit/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-command-exit/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-command-exit/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-command-exit/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-command-exit/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 41482
+teardown: force-killing leaked worktree process(es) for task-x1: 41482
+WARNING: watcher still down (same stale episode; last beat: 10s ago, grace 300s) - full banner already printed this episode.
+
+Persisted audit-collection-KILL-command-exit/observations:
+signal=KILL field=command outcome=exit rc=0 target_pid=41482 target_birth=lstart=Tue Oct  6 13:01:39 2026 target_alive=0 unrelated_pid=41574 unrelated_birth=lstart=Tue Oct  6 13:01:39 2026 unrelated_alive=1 term_audit=1 kill_audit=0
+
+Persisted audit-collection-KILL-command-exit/boundary.log:
+KILL	command	lstart=Tue Oct  6 13:01:39 2026
+
+Persisted audit-collection-KILL-command-exit/exit-confirmed:
+exited
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-KILL-command-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 91233
+teardown: force-killing leaked worktree process(es) for task-x1: 91233
+REFUSED: cannot durably record leaked process 91233 identity for task-x1; preserving the worktree/tasktmp without force-killing it.
+
+Persisted audit-collection-KILL-command-live-failure/observations:
+signal=KILL field=command outcome=live-failure rc=1 target_pid=91233 target_birth=lstart=Tue Oct  6 13:01:52 2026 target_alive=1 unrelated_pid=91294 unrelated_birth=lstart=Tue Oct  6 13:01:52 2026 unrelated_alive=1 term_audit=1 kill_audit=0
+
+Persisted audit-collection-KILL-command-live-failure/boundary.log:
+KILL	command	lstart=Tue Oct  6 13:01:52 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-exit/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-exit/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-exit/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-exit/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-exit/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 68425
+teardown: force-killing leaked worktree process(es) for task-x1: 68425
+WARNING: watcher still down (same stale episode; last beat: 8s ago, grace 300s) - full banner already printed this episode.
+
+Persisted audit-collection-KILL-lstart-exit/observations:
+signal=KILL field=lstart outcome=exit rc=0 target_pid=68425 target_birth=lstart=Tue Oct  6 13:02:10 2026 target_alive=0 unrelated_pid=68528 unrelated_birth=lstart=Tue Oct  6 13:02:10 2026 unrelated_alive=1 term_audit=1 kill_audit=0
+
+Persisted audit-collection-KILL-lstart-exit/boundary.log:
+KILL	lstart	lstart=Tue Oct  6 13:02:10 2026
+
+Persisted audit-collection-KILL-lstart-exit/exit-confirmed:
+exited
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 10609
+teardown: force-killing leaked worktree process(es) for task-x1: 10609
+REFUSED: cannot durably record leaked process 10609 identity for task-x1; preserving the worktree/tasktmp without force-killing it.
+
+Persisted audit-collection-KILL-lstart-live-failure/observations:
+signal=KILL field=lstart outcome=live-failure rc=1 target_pid=10609 target_birth=lstart=Tue Oct  6 13:02:20 2026 target_alive=1 unrelated_pid=10661 unrelated_birth=lstart=Tue Oct  6 13:02:20 2026 unrelated_alive=1 term_audit=1 kill_audit=0
+
+Persisted audit-collection-KILL-lstart-live-failure/boundary.log:
+KILL	lstart	lstart=Tue Oct  6 13:02:20 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-KILL-lstart-uncertain-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 37682
+teardown: force-killing leaked worktree process(es) for task-x1: 37682
+REFUSED: cannot durably record leaked process 37682 identity for task-x1; preserving the worktree/tasktmp without force-killing it.
+
+Persisted audit-collection-KILL-lstart-uncertain-live-failure/observations:
+signal=KILL field=lstart outcome=uncertain-live-failure rc=1 target_pid=37682 target_birth=lstart=Tue Oct  6 13:02:27 2026 target_alive=1 unrelated_pid=37762 unrelated_birth=lstart=Tue Oct  6 13:02:27 2026 unrelated_alive=1 term_audit=1 kill_audit=0
+
+Persisted audit-collection-KILL-lstart-uncertain-live-failure/boundary.log:
+KILL	lstart	lstart=Tue Oct  6 13:02:27 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-command-control/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-control/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-control/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-control/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-control/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 35998
+teardown: force-killing leaked worktree process(es) for task-x1: 35998
+WARNING: watcher still down (same stale episode; last beat: 10s ago, grace 300s) - full banner already printed this episode.
+
+Persisted audit-collection-TERM-command-control/observations:
+signal=TERM field=command outcome=control rc=0 target_pid=35998 target_birth=lstart=Tue Oct  6 13:01:10 2026 target_alive=0 unrelated_pid=36414 unrelated_birth=lstart=Tue Oct  6 13:01:10 2026 unrelated_alive=1 term_audit=1 kill_audit=1
+
+Persisted audit-collection-TERM-command-control/boundary.log:
+TERM	command	lstart=Tue Oct  6 13:01:10 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-command-exit/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-exit/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-exit/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-exit/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-command-exit/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 40835
+WARNING: watcher still down (same stale episode; last beat: 9s ago, grace 300s) - full banner already printed this episode.
+
+Persisted audit-collection-TERM-command-exit/observations:
+signal=TERM field=command outcome=exit rc=0 target_pid=40835 target_birth=lstart=Tue Oct  6 13:00:46 2026 target_alive=0 unrelated_pid=40899 unrelated_birth=lstart=Tue Oct  6 13:00:46 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted audit-collection-TERM-command-exit/boundary.log:
+TERM	command	lstart=Tue Oct  6 13:00:46 2026
+
+Persisted audit-collection-TERM-command-exit/exit-confirmed:
+exited
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-command-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 95075
+REFUSED: cannot durably record leaked process 95075 identity for task-x1; preserving the worktree/tasktmp without signalling it.
+
+Persisted audit-collection-TERM-command-live-failure/observations:
+signal=TERM field=command outcome=live-failure rc=1 target_pid=95075 target_birth=lstart=Tue Oct  6 13:01:00 2026 target_alive=1 unrelated_pid=95171 unrelated_birth=lstart=Tue Oct  6 13:01:00 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted audit-collection-TERM-command-live-failure/boundary.log:
+TERM	command	lstart=Tue Oct  6 13:01:00 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-exit/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-exit/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-exit/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-exit/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-exit/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 83052
+WARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.
+
+Persisted audit-collection-TERM-lstart-exit/observations:
+signal=TERM field=lstart outcome=exit rc=0 target_pid=83052 target_birth=lstart=Tue Oct  6 13:01:23 2026 target_alive=0 unrelated_pid=83111 unrelated_birth=lstart=Tue Oct  6 13:01:23 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted audit-collection-TERM-lstart-exit/boundary.log:
+TERM	lstart	lstart=Tue Oct  6 13:01:23 2026
+
+Persisted audit-collection-TERM-lstart-exit/exit-confirmed:
+exited
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 10184
+REFUSED: cannot durably record leaked process 10184 identity for task-x1; preserving the worktree/tasktmp without signalling it.
+
+Persisted audit-collection-TERM-lstart-live-failure/observations:
+signal=TERM field=lstart outcome=live-failure rc=1 target_pid=10184 target_birth=lstart=Tue Oct  6 13:01:31 2026 target_alive=1 unrelated_pid=10239 unrelated_birth=lstart=Tue Oct  6 13:01:31 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted audit-collection-TERM-lstart-live-failure/boundary.log:
+TERM	lstart	lstart=Tue Oct  6 13:01:31 2026
+
+
+=== fm-teardown-tests.nZDIOK/audit-collection-TERM-lstart-uncertain-live-failure/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 24869
+REFUSED: cannot durably record leaked process 24869 identity for task-x1; preserving the worktree/tasktmp without signalling it.
+
+Persisted audit-collection-TERM-lstart-uncertain-live-failure/observations:
+signal=TERM field=lstart outcome=uncertain-live-failure rc=1 target_pid=24869 target_birth=lstart=Tue Oct  6 13:01:35 2026 target_alive=1 unrelated_pid=24911 unrelated_birth=lstart=Tue Oct  6 13:01:35 2026 unrelated_alive=1 term_audit=0 kill_audit=0
+
+Persisted audit-collection-TERM-lstart-uncertain-live-failure/boundary.log:
+TERM	lstart	lstart=Tue Oct  6 13:01:35 2026
+
+
+=== fm-teardown-tests.pksxCF/durable-process-identity/invocation-1 ===
+exit=0
+STDOUT:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.pksxCF/durable-process-identity/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.pksxCF/durable-process-identity/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.pksxCF/durable-process-identity/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.pksxCF/durable-process-identity/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 99187
+teardown: force-killing leaked worktree process(es) for task-x1: 99187
+
+
+=== fm-teardown-tests.qextuk/sibling-nested-worktree-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 81802 (lstart=Tue Oct  6 12:59:59 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.qextuk/sibling-nested-worktree-custody/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.qextuk/sibling-nested-worktree-custody/wt/other-lane, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.qextuk/sibling-nested-worktree-custody/wt/other-lane for task-x1 (registered nested worktree lane holds process 81802); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.umCEfv/sibling-deleted-lane-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 17533 (lstart=Tue Oct  6 13:00:09 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.umCEfv/sibling-deleted-lane-custody/wt/other-lane beneath scan root /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.umCEfv/sibling-deleted-lane-custody/wt, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.umCEfv/sibling-deleted-lane-custody/wt/other-lane for task-x1 (descendant cwd holds process 17533 without proven task custody); preserving the worktree/tasktmp for manual inspection or retry.
+
+
+=== fm-teardown-tests.yGfErw/nested-worktree-custody/invocation-1 ===
+exit=1
+STDOUT:
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 69725 (lstart=Tue Oct  6 12:59:56 2026) matched path /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.yGfErw/nested-worktree-custody/wt/other-lane inside registered nested worktree lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.yGfErw/nested-worktree-custody/wt/other-lane, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling.
+REFUSED: cannot determine leaked processes under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4936GXM6ZTR79PNGMDJN2CH/.custody-live-validation/tmp/fm-teardown-tests.yGfErw/nested-worktree-custody/wt/other-lane for task-x1 (registered nested worktree lane holds process 69725); preserving the worktree/tasktmp for manual inspection or retry.
+

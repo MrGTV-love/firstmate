@@ -1,0 +1,5 @@
+Actual resolved sibling replaced recording-only before all execution.
+SHA256=78beaebe525a5143c7cd54afdca74569f5b78917a680703787c127806f3f3ef4
+Calls observed=0
+Every Bash entry and teardown invocation verification retained.
+No real account-wide reaper executed.
