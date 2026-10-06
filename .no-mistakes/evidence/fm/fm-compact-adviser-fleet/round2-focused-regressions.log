@@ -1,0 +1,68 @@
+FM_TEST_BEGIN 2026-10-06T19:16:30Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none
+ok - automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm
+ok - a reused endpoint drops adviser-only hooks on off and emergency-off relaunches, and the backend never inherits the override
+ok - malformed policy and keys other than claude or omp refuse before launch
+ok - the operator's emergency kill switch overrides opted-in auto
+ok - ship and scout batch reexecs preserve emergency-off and ordinary auto for every Claude and omp child
+not ok - tests/fm-spawn-compact-adviser-disable.test.sh exceeded the per-script bound of 180s and was terminated
+FM_TEST_END 2026-10-06T19:19:31Z tests/fm-spawn-compact-adviser-disable.test.sh exit=124 duration_ms=180117 gate_skip=false
+FM_TEST_BEGIN 2026-10-06T19:19:31Z tests/fm-spawn-compact-adviser-disable-remote.test.sh family=backend-dispatch expected_gate_skip=none
+not ok - allowlist absent: the remote second-mate launch failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: remote host-local secondmate launch failed
+FM_TEST_END 2026-10-06T19:20:11Z tests/fm-spawn-compact-adviser-disable-remote.test.sh exit=1 duration_ms=40607 gate_skip=false
+FM_TEST_BEGIN 2026-10-06T19:20:11Z tests/fm-composer-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - fm_composer_classify_content: a bare shell prompt glyph (>/$/%/#) reads unknown, never empty
+ok - fm_composer_classify_content: stripped unbordered content is unknown except verified agent glyphs
+ok - fm_composer_classify_content: a bare shell prompt carrying a command is not empty
+ok - fm_composer_classify_content: a bare prompt glyph inside a bordered composer box reads empty (claude's own idle composer)
+ok - fm_composer_classify_content: agent prompt glyphs (❯ claude, › codex, ⟩ muse) read empty bordered or bare
+ok - fm_composer_classify_content: an empty composer reads empty
+ok - fm_composer_classify_content: idle matching is limited to proven placeholder positions
+ok - fm_composer_classify_content: idle matching preserves the caller's case mode
+ok - fm_composer_classify_content: real unsubmitted text reads pending (including a popup argument-hint fill)
+ok - matrix: claude's ❯+NBSP row reads empty on every profile in both locales (#1988)
+ok - matrix: claude's arrow statusline is footer furniture, not a composer holding text
+ok - fm_composer_classify_screen: footer demotion needs a contiguous, glyph-proven pair
+ok - fm_composer_classify_screen: the footer zone holds for boxes, not only separator pairs
+ok - fm_composer_classify_screen: the footer zone only ever refuses, never allows
+ok - matrix: codex's dim hint is empty when styling proves it, unknown (never pending) when it cannot
+ok - matrix: muse's ⟩ reads empty everywhere and survives losing the styled-glyph signal
+ok - matrix: cursor's reverse-video placeholder remnant reads empty; real typed text stays pending
+ok - matrix: herdr half-block rules bound a bare composer's wrap region
+ok - matrix: omp's status row bounds the bare composer's wrap region
+ok - matrix: codex 0.154's starfield rows are furniture; typed, mixed, and unanchored rows keep their verdicts
+ok - matrix: pi's separated composer needs identity + structure; the blank row alone never proves it
+ok - matrix: a dollar-first pi status footer reads empty; dead shells still refuse
+ok - matrix: opencode's left-bar composer reads empty everywhere and scans the full active run
+ok - matrix: grok's real oversized titled bottom is empty while typed and unproved panes stay safe
+ok - matrix: kimi's bordered shell-glyph box reads empty through the shared owner (spawn's fourth copy retired)
+ok - matrix: the real claude-in-zellij --ansi dump reads empty in both locales
+ok - strict posture: blank and unidentified rows are unknown, never injectable empty
+ok - fm_composer_classify_screen: the bare composer's wrap region stays identified; structure breaks it
+ok - fm_composer_classify_screen: a row-leading agent glyph reanchors the live composer
+ok - fm_composer_classify_screen: a lower dead shell invalidates only cursorless stale composers
+ok - fm_composer_classify_screen: cursorless bare wrap regions participate in verdicts
+ok - fm_composer_classify_screen: cursorless containers reject only contiguous unclaimed activity
+ok - fm_composer_classify_screen: the bottom-most candidate wins; stale banners cannot
+ok - fm_composer_classify_screen: incomplete lower structure invalidates stale boxes
+ok - fm_composer_classify_screen: titled bottoms retain full box geometry
+ok - fm_composer_classify_screen: a proven box tolerates a bottom-border cursor
+ok - fm_composer_extract_selected_content: scopes user content and excludes furniture
+ok - Claude selected slash-menu rows do not replace the actual command or prefix
+ok - slash-menu demotion cannot select an empty parent or replace a real lower draft or shell
+ok - fm_composer_queued_enter_verdict: pending + busy returns empty (queued Enter)
+ok - fm_composer_queued_enter_verdict: pending + idle/unknown stays pending
+ok - fm_composer_queued_enter_verdict: only proven pending is converted
+FM_TEST_END 2026-10-06T19:20:35Z tests/fm-composer-lib.test.sh exit=0 duration_ms=23689 gate_skip=false
+FM_TEST_BEGIN 2026-10-06T19:20:35Z tests/fm-calm-claude-mod-plugin.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - Claude Code 2.1.291 (Claude Code) validates the Calm mod strictly at its folder and its auto-load path
+ok - Claude Code 2.1.291 (Claude Code) runs the Calm mod's plugin test suites clean: persisted toggle, hidden rows, working notes, the clock-driven working ship, and supervision notes
+FM_TEST_END 2026-10-06T19:20:37Z tests/fm-calm-claude-mod-plugin.test.sh exit=0 duration_ms=2174 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=2 skipped_gate=0 duration_ms=246773
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=2 duration_ms=220724 failed=2
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=2174 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=23689 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-compact-adviser-disable.test.sh duration_ms=180117
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-compact-adviser-disable-remote.test.sh duration_ms=40607
+FM_TEST_SLOWEST rank=3 script=tests/fm-composer-lib.test.sh duration_ms=23689
+FM_TEST_SLOWEST rank=4 script=tests/fm-calm-claude-mod-plugin.test.sh duration_ms=2174

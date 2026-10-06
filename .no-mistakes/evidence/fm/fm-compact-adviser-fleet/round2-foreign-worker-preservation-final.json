@@ -1,0 +1,18 @@
+{
+  "task": "adviserr2default",
+  "teardown_exit": 0,
+  "task_metadata_retired": true,
+  "foreign_pid": 7453,
+  "before": "7453  7453 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/foreign-fixture/bin/fm-remote-job-worker.sh --serve",
+  "after": "7453  7453 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/foreign-fixture/bin/fm-remote-job-worker.sh --serve",
+  "foreign_alive": true,
+  "bound_seconds": 120,
+  "administrative_ps_scan_restricted_to": 7453,
+  "native_lsof_scoped_to_live_named_endpoint_and_controller": [
+    1072,
+    2687,
+    3826,
+    98718
+  ],
+  "external_pipeline_operations_refused": true
+}

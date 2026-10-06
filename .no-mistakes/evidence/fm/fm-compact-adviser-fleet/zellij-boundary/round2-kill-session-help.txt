@@ -1,0 +1,11 @@
+zellij-kill-session 
+Kill a specific session
+
+USAGE:
+    zellij kill-session [TARGET_SESSION]
+
+ARGS:
+    <TARGET_SESSION>    Name of target session
+
+OPTIONS:
+    -h, --help    Print help information

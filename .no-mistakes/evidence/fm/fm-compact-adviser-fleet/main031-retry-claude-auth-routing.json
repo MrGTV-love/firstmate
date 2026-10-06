@@ -1,0 +1,9 @@
+{
+  "normal_existing_login": true,
+  "isolated_HOME_loggedIn": false,
+  "isolated_HOME_authMethod": "none",
+  "isolated_CLAUDE_CONFIG_DIR_loggedIn": false,
+  "isolated_CLAUDE_CONFIG_DIR_authMethod": "none",
+  "production_sign_in_or_sign_out_performed": false,
+  "credential_copies": false
+}

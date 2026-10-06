@@ -1,0 +1,21 @@
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-m
+istakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project. Type 'exit' to return.
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d
+18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8d
+b0b7/6/project'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-claude-explicit-open/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=0
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=claude-explicit-open
+charlesabrooker@Mac-Studio project % . '/tmp/fm-claude-explicit-open+254087b424317ceecfa34404
+df46cf0cdc345f7eab236db8328177ce19912cc2/launch.s1791322824.87330.4521.sh'
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Haiku 4.5 · API Usage Billing
+ ▝▝   ▝▝   ~/…/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents              Not logged in · Run /login
+                                                                    firstmate-calm: Calm on

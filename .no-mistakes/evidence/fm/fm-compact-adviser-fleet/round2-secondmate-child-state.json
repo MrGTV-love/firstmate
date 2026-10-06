@@ -1,0 +1,14 @@
+{
+  "endpoint": "fm-lab-adviser-r2-51967-17576:w2:p3",
+  "pid": 26846,
+  "state": {
+    "COMPACT_ADVISER_DISABLE": "0",
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+    "FM_COMPACT_ADVISER_HOOKS": "1"
+  },
+  "inherited_policy": {
+    "claude": "auto",
+    "omp": "auto"
+  }
+}

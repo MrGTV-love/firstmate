@@ -1,0 +1,15 @@
+window=round2-zellij-800f9eb0e0:3
+endpoint_task_id=zellij-auto
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-zellij-auto
+model=haiku
+effort=default
+busy_gen=g1791316184.55522.22258
+spawn_gen=s1791316185.87482.29172
+backend=zellij
+zellij_session=round2-zellij-800f9eb0e0
+zellij_tab_id=2
+zellij_pane_id=3

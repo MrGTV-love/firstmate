@@ -1,0 +1,4 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control.sh adviserr2auto relaunch --harness claude --model haiku
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home
+error: relaunch of a scout task requires --note (or --note-file): the replacement worker inherits the local copy but none of the conversation, so it must be told what happened

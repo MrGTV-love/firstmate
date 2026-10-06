@@ -1,0 +1,36 @@
+{
+  "workers": [
+    {
+      "task": "freshherdremergency",
+      "endpoint": "fm-lab-fresh-adviser-91432-304:w1:p2",
+      "pid": 50022,
+      "actual_worker": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null
+      }
+    },
+    {
+      "task": "freshherdrnormal",
+      "endpoint": "fm-lab-fresh-adviser-91432-304:w1:p3",
+      "pid": 85644,
+      "actual_worker": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "0",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+        "FM_COMPACT_ADVISER_HOOKS": "1"
+      }
+    }
+  ],
+  "server_pid": 1759,
+  "server_state": {
+    "COMPACT_ADVISER_DISABLE": null,
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "FM_COMPACT_ADVISER_HOOKS": null
+  },
+  "server_command": "1759 herdr server --session fm-lab-fresh-adviser-91432-304"
+}

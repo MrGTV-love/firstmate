@@ -1,0 +1,19 @@
+ relaunch --harness claude --model haiku --note "Launch policy verification only. Reply LAB_WORKER_READY, no tools or file changes."; printf "\nLAB_RC_auto_to_off=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+error: the exit command could not be sent to task auto-confined on herdr
+error: relaunch of auto-confined failed while stopping the old agent, which is still running; its original instructions were restored
+
+LAB_RC_auto_to_off=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-control.sh auto-confined relaunch --harness claude --model haiku --note "Launch policy verification only. Reply LAB_WORKER_READY, no tools or file changes."; printf "\nLAB_RC_auto_to_off_settled=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+error: the exit command could not be sent to task auto-confined on herdr
+error: relaunch of auto-confined failed while stopping the old agent, which is still running; its original instructions were restored
+
+LAB_RC_auto_to_off_settled=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-control.sh auto-confined relaunch --harness claude --model haiku --note "Launch policy verification only. Reply LAB_WORKER_READY, no tools or file changes."; printf "\nLAB_RC_auto_to_off_attached=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+error: the exit command could not be sent to task auto-confined on herdr
+error: relaunch of auto-confined failed while stopping the old agent, which is still running; its original instructions were restored
+
+LAB_RC_auto_to_off_attached=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

@@ -1,0 +1,7 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh adviserr2default
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home
+WARNING: watcher still down (same stale episode; last beat: 71s ago, grace 300s) - full banner already printed this episode.
+fm-captain-hold: origin adviserr2default has no completed captain-call inventory
+REFUSED: scout task adviserr2default has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.

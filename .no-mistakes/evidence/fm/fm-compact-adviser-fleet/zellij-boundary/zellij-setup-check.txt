@@ -1,0 +1,23 @@
+[Version]: "0.44.0"
+[CONFIG DIR]: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-config"
+[LOOKING FOR CONFIG FILE FROM]: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-config/config.kdl"
+[CONFIG ERROR]: IoError: No such file or directory (os error 2), File: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-config/config.kdl. 
+ By default, zellij loads default configuration
+[CACHE DIR]: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/home/Library/Caches/org.Zellij-Contributors.Zellij
+[DATA DIR]: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-data"
+[PLUGIN DIR]: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-data/plugins"
+ Builtin, default plugins will not be loaded from disk.
+ Create a custom layout if you require this behavior.
+[LAYOUT DIR]: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-config/layouts"
+[SYSTEM DATA DIR]: "/usr/share/zellij"
+[ARROW SEPARATOR]: 
+ Is the [ARROW_SEPARATOR] displayed correctly?
+ If not you may want to either start zellij with a compatible mode: 'zellij options --simplified-ui true'
+ Or check the font that is in use:
+ ]8;;https://zellij.dev/documentation/compatibility.html#the-status-bar-fonts-dont-render-correctly\https://zellij.dev/documentation/compatibility.html#the-status-bar-fonts-dont-render-correctly]8;;\
+[MOUSE INTERACTION]: 
+ Can be temporarily disabled through pressing the [SHIFT] key.
+ If that doesn't fix any issues consider to disable the mouse handling of zellij: 'zellij options --disable-mouse-mode'
+[DEFAULT EDITOR]: Not set, checked $EDITOR and $VISUAL
+[FEATURES]: []
+[DOCUMENTATION]: ]8;;https://www.zellij.dev/documentation/\zellij.dev/documentation]8;;\

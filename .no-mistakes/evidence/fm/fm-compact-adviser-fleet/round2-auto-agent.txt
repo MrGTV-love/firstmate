@@ -1,0 +1,3 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh run fm-lab-adviser-r2-51967-17576 agent get w1:p2
+exit=0
+{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/1/project","pane_id":"w1:p2","revision":1,"state_change_seq":2,"tab_id":"w1:t2","terminal_id":"term_65d30dc44fdff2","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},"type":"agent_info"}}

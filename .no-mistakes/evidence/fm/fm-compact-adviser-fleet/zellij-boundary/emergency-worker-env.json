@@ -1,0 +1,10 @@
+{
+  "pid": 78616,
+  "role": "emergency-worker",
+  "fields": {
+    "COMPACT_ADVISER_DISABLE": "1",
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "FM_COMPACT_ADVISER_HOOKS": null
+  }
+}

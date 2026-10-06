@@ -1,0 +1,23 @@
+[
+  {
+    "case": "malformed",
+    "exit": 1,
+    "output": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off\n",
+    "metadataCreated": false,
+    "agentsUnchanged": true
+  },
+  {
+    "case": "unknown-harness",
+    "exit": 1,
+    "output": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off\n",
+    "metadataCreated": false,
+    "agentsUnchanged": true
+  },
+  {
+    "case": "invalid-mode",
+    "exit": 1,
+    "output": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off\n",
+    "metadataCreated": false,
+    "agentsUnchanged": true
+  }
+]

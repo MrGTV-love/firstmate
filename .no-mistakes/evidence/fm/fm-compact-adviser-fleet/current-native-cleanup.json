@@ -1,0 +1,13 @@
+{
+  "namedSession": "fm-lab-compact-fleet-58297-3415",
+  "guardedTeardownExit": 0,
+  "guardedTeardownOutput": "",
+  "remainingOwnedProcesses": [],
+  "ownedLabRemoved": true,
+  "nativeTaskMetadataRemaining": [],
+  "foreignFixtureStopped": true,
+  "poolStatusExit": 0,
+  "targetedRegressionScratchRemoved": "See targeted-cleanup.json",
+  "sourceChanges": "No permanent source or test edits initiated; all generated fixtures removed.",
+  "sharedState": "No default Herdr lifecycle, shared plugin installation/preferences, credential mutation, or original preserved-lab cleanup performed."
+}

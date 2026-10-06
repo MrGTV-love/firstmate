@@ -1,0 +1,98 @@
+[
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/secondmate-home",
+    "task": "adviserr2child",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/fresh-herdr-home",
+    "task": "freshherdremergency",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/fresh-herdr-home",
+    "task": "freshherdrnormal",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2auto",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2codex",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2explicit",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2marked",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2omp",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2scout0a",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2scout0b",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2scout1a",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2scout1b",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2ship0a",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2ship0b",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2ship1a",
+    "exit": 1,
+    "task_metadata_retired": false
+  },
+  {
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home",
+    "task": "adviserr2ship1b",
+    "exit": 1,
+    "task_metadata_retired": false
+  }
+]

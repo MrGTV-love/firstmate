@@ -1,0 +1,22 @@
+$ treehouse status
+CWD=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project
+exit=0
+base  main  (configured)
+1     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/1/project  (detached)
+2     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/2/project  (detached)
+3     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/3/project  (detached)
+4     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/4/project  (detached)
+5     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/5/project  (detached)
+6     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/6/project  (detached)
+7     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/7/project  (detached)
+8     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/8/project  (detached)
+9     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/9/project  (detached)
+10    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/10/project  (detached)
+11    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/11/project  (detached)
+12    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/12/project  (detached)
+13    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/13/project  (detached)
+14    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/14/project  (detached)
+15    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/15/project  (detached)
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+

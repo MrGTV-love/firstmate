@@ -1,0 +1,15 @@
+window=fm-zellij-boundary-195:1
+endpoint_task_id=zellij-emergency-a91
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/.treehouse/project-e57b33/1/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-zellij-emergency-a91
+model=default
+effort=default
+busy_gen=g1791309866.38793.21236
+spawn_gen=s1791309866.83701.1355
+backend=zellij
+zellij_session=fm-zellij-boundary-195
+zellij_tab_id=1
+zellij_pane_id=1

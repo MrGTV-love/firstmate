@@ -1,0 +1,1066 @@
+[
+  {
+    "label": "auto unfiltered actual Claude process",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 75632,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "fm-control auto to off same endpoint",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 75632,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "public relaunch retry off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 59052,
+        "name": "zsh",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "unfiltered-public-auto-to-off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 50211,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 49263,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "unfiltered-public-recover-auto",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 12734,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 8534,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "unfiltered-public-auto-to-emergency-off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 69902,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 68087,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "filtered-public-recover-auto",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 21951,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 20384,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      },
+      {
+        "pid": 20367,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1;",
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "filtered-public-auto-to-off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 73988,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 72100,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      },
+      {
+        "pid": 72062,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "filtered-public-auto-before-emergency",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 13224,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 12274,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      },
+      {
+        "pid": 12263,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1;",
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "filtered-public-auto-to-emergency-off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 78993,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 76946,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      },
+      {
+        "pid": 76901,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "raw explicit opt-in has no adviser marker",
+    "task": "adviserr2explicit",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p3",
+    "processes": [
+      {
+        "pid": 48454,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2explicit"
+        }
+      }
+    ]
+  },
+  {
+    "label": "adviser-only auto plugin launch",
+    "task": "adviserr2marked",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p4",
+    "processes": [
+      {
+        "pid": 31200,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2marked"
+        }
+      }
+    ]
+  },
+  {
+    "label": "absent policy actual Claude default off",
+    "task": "adviserr2default",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p5",
+    "processes": [
+      {
+        "pid": 27692,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 26837,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 24257,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2default"
+        }
+      }
+    ]
+  },
+  {
+    "label": "actual OMP auto launch isolated agent store",
+    "task": "adviserr2omp",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p6",
+    "processes": [
+      {
+        "pid": 23032,
+        "name": "omp",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2omp"
+        }
+      }
+    ]
+  },
+  {
+    "label": "real local secondmate inherited auto policy",
+    "task": "adviserr2second",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w2:p2",
+    "processes": [
+      {
+        "pid": 87229,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "attached-viewer-public-recovery-auto",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 27670,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 24922,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "attached-viewer-public-auto-to-off",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 46826,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 46824,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 46720,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 45964,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 27751,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "scout batch emergency filtered=False",
+    "task": "adviserr2scout0a",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p7",
+    "processes": [
+      {
+        "pid": 97210,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 92855,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2scout0a"
+        }
+      }
+    ]
+  },
+  {
+    "label": "scout batch emergency filtered=False",
+    "task": "adviserr2scout0b",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p8",
+    "processes": [
+      {
+        "pid": 70189,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 70183,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 70107,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 67615,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 67550,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 67545,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 67514,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 63900,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2scout0b"
+        }
+      }
+    ]
+  },
+  {
+    "label": "scout batch emergency filtered=True",
+    "task": "adviserr2scout1a",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p9",
+    "processes": [
+      {
+        "pid": 49890,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 46482,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2scout1a"
+        }
+      },
+      {
+        "pid": 46438,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "scout batch emergency filtered=True",
+    "task": "adviserr2scout1b",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pA",
+    "processes": [
+      {
+        "pid": 40568,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 40561,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 40502,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 37777,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 37618,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 37609,
+        "name": "grep",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 37553,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 30887,
+        "name": "2.1.291",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2scout1b"
+        }
+      },
+      {
+        "pid": 30806,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "ship batch emergency filtered=False",
+    "task": "adviserr2ship0a",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pB",
+    "processes": [
+      {
+        "pid": 32130,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 20968,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2ship0a"
+        }
+      }
+    ]
+  },
+  {
+    "label": "ship batch emergency filtered=False",
+    "task": "adviserr2ship0a",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pB",
+    "processes": [
+      {
+        "pid": 20968,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2ship0a"
+        }
+      }
+    ]
+  },
+  {
+    "label": "ship batch emergency filtered=False",
+    "task": "adviserr2ship0b",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pC",
+    "processes": [
+      {
+        "pid": 19471,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 91488,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2ship0b"
+        }
+      }
+    ]
+  },
+  {
+    "label": "ship batch emergency filtered=True",
+    "task": "adviserr2ship1a",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pD",
+    "processes": [
+      {
+        "pid": 62408,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 60302,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2ship1a"
+        }
+      },
+      {
+        "pid": 60256,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "ship batch emergency filtered=True",
+    "task": "adviserr2ship1b",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pE",
+    "processes": [
+      {
+        "pid": 43921,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2ship1b"
+        }
+      },
+      {
+        "pid": 43885,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "other harness remains off despite auto policies",
+    "task": "adviserr2codex",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pF",
+    "processes": [
+      {
+        "pid": 28585,
+        "name": "codex",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2codex"
+        }
+      },
+      {
+        "pid": 28470,
+        "name": "node",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2codex"
+        }
+      }
+    ]
+  },
+  {
+    "label": "upstream adviser loaded in actual OMP auto replacement",
+    "task": "adviserr2omp",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p6",
+    "processes": [
+      {
+        "pid": 40978,
+        "name": "omp",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2omp"
+        }
+      }
+    ]
+  },
+  {
+    "label": "current-claude-client-public-auto",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 36153,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 34075,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      }
+    ]
+  },
+  {
+    "label": "current-claude-client-public-off-filtered",
+    "task": "adviserr2auto",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 99026,
+        "name": "caffeinate",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": null,
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      },
+      {
+        "pid": 97890,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2auto"
+        }
+      },
+      {
+        "pid": 97879,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  },
+  {
+    "label": "filtered raw explicit function hook ownership",
+    "task": "adviserr2rawfiltered",
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p2",
+    "processes": [
+      {
+        "pid": 19870,
+        "name": "2.1.292",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "adviserr2rawfiltered"
+        }
+      },
+      {
+        "pid": 19836,
+        "name": "bash",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0;",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": null
+        }
+      }
+    ]
+  }
+]

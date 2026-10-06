@@ -1,0 +1,7 @@
+Real separate-process-group worker before ordinary task teardown:
+90367 90367 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/foreign-home/bin/fm-remote-job-worker.sh --serve
+
+After deleting only its disposable fixture code root and running real fm-teardown.sh auto-confined:
+90367 90367 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/foreign-home/bin/fm-remote-job-worker.sh --serve
+
+Task metadata removed; unrelated worker remained alive.

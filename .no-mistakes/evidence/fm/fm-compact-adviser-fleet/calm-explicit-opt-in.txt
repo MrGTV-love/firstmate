@@ -1,0 +1,21 @@
+
+charlesabrooker@Mac-Studio confined-probe % cd -- '/Users/charlesabrooker/.no-mistakes/worktr
+ees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.tre
+ehouse/confined-probe-b2ddbb/1/confined-probe'
+charlesabrooker@Mac-Studio confined-probe % export GOTMPDIR=/tmp/fm-auto-reusable/gotmp
+charlesabrooker@Mac-Studio confined-probe % export COMPACT_ADVISER_DISABLE=0
+charlesabrooker@Mac-Studio confined-probe % export FM_TASK_ID=auto-reusable
+charlesabrooker@Mac-Studio confined-probe % . '/tmp/fm-auto-reusable+7b6e53e5cff3de6d8603a02f
+e1e54c5945c5ff8d4e6be559ef26a6014ef9ea15/launch.s1791308762.99590.8300.sh'
+ ▐▛███▛█   Claude Code v2.1.291
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   ~/…/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+⚠ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENT
+  S.md is over the 40.0k-char limit (48.0k chars) · /memory to free up context
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯ /calm
+─────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ /calm                       Toggle Firstmate's Calm transcript presentation and working
+                                ship.

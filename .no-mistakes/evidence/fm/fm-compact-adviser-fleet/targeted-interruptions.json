@@ -1,0 +1,52 @@
+[
+  {
+    "label": "ordinary-term",
+    "command": [
+      "bash",
+      "-c",
+      "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+      "ordinary-term",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+    ],
+    "runner_pid": 18468,
+    "runner_exit_code": 143,
+    "signal": "SIGTERM",
+    "worker_pid": 28944,
+    "sleep_child_pids": [
+      28982
+    ],
+    "elapsed_seconds": 0.167,
+    "final_ps_states": {
+      "28944": "",
+      "28982": ""
+    },
+    "all_exact_fixture_processes_inactive": true,
+    "bound_seconds": 8,
+    "grace_seconds": 4
+  },
+  {
+    "label": "outer-sigkill",
+    "command": [
+      "bash",
+      "-c",
+      "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+      "outer-sigkill",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+    ],
+    "runner_pid": 30607,
+    "runner_exit_code": -9,
+    "signal": "SIGKILL",
+    "worker_pid": 48044,
+    "sleep_child_pids": [
+      48097
+    ],
+    "elapsed_seconds": 7.898,
+    "final_ps_states": {
+      "48044": "",
+      "48097": ""
+    },
+    "all_exact_fixture_processes_inactive": true,
+    "bound_seconds": 8,
+    "grace_seconds": 4
+  }
+]

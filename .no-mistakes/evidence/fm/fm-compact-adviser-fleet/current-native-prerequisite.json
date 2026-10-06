@@ -1,0 +1,10 @@
+{
+  "host": "omp 18.6.3",
+  "defaultPlugin": "compact-adviser@0.1.11",
+  "installedDefaultEntry": "/Users/charlesabrooker/.omp/plugins/node_modules/compact-adviser/src/index.ts",
+  "requiredMergedEntry": "https://raw.githubusercontent.com/MrGTV-love/compact-adviser/8392f4a/packages/pi-extension/src/index.ts",
+  "observedMismatch": "Installed default only passes agentDir, version, and host; required merged entry loads and passes native OMP sources.",
+  "experiment": "Real isolated OMP worker launched, saved-key auto status observed, two authenticated completed audit turns executed above 40k context; stopped when installed-entry mismatch was identified. This older-entry experiment is NOT acceptance proof of Jev or automatic compaction.",
+  "missingPrerequisite": "Owner must install required merged 8392f4a default entry through authorized shared plugin custody; test phase cannot reinstall shared plugins or substitute a local extension.",
+  "savedSettings": "No edits; saved key remained in its original settings file. No secret exported, copied, logged, or put into commands."
+}

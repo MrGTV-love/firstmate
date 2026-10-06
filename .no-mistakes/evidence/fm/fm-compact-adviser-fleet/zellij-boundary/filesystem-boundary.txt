@@ -1,0 +1,1 @@
+Incidental real-tool runtime staging /tmp/fm-<task-id> and /tmp/fm-<task-id>+<homehash> is authorized by parent clarification; intentional fixture, config, home and allocated Git worktrees remain under workspace.

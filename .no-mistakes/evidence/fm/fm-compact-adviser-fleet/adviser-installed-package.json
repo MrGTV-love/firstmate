@@ -1,0 +1,63 @@
+{
+  "name": "compact-adviser",
+  "version": "0.1.5",
+  "license": "MIT",
+  "description": "Tells you when your Pi session has reached a good point to compact: a standalone extension that judges completed checkpoints instead of leaving you to guess.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "compact",
+    "context",
+    "context-management",
+    "checkpoint"
+  ],
+  "homepage": "https://github.com/kunchenguid/compact-adviser#readme",
+  "bugs": {
+    "url": "https://github.com/kunchenguid/compact-adviser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kunchenguid/compact-adviser.git",
+    "directory": "packages/pi-extension"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/generate-package-readme.mjs README.md",
+    "test": "node --import tsx --test test/adviser.test.ts test/core.test.ts test/eval-harness.test.ts test/lockstep.test.ts test/profile.test.ts test/readme.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "test:e2e": "node --import tsx --test test/e2e.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "dependencies": {
+    "proper-lockfile": "^4.1.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.0",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
+    "@types/node": "^24.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

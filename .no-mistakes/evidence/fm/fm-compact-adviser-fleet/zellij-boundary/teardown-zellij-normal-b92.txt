@@ -1,0 +1,13 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh zellij-normal-b92 --force
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown zellij-normal-b92 complete (window fm-zellij-boundary-195:2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/.treehouse/project-e57b33/2/project)
+Backlog: zellij-normal-b92 just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home/data/backlog.md - move zellij-normal-b92 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for zellij-normal-b92: 47914
+teardown: force-killing leaked worktree process(es) for zellij-normal-b92: 47914
+
+exit=0

@@ -1,0 +1,13 @@
+Native targeted checks (supplemental, not live product evidence)
+{
+  "local": {
+    "exit": 0,
+    "terminated": false
+  },
+  "remote": {
+    "exit": 1,
+    "terminated": false
+  }
+}
+Plugin-host subject exit=0
+Foreign-worker regression exit=0

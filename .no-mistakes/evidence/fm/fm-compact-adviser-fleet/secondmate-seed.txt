@@ -1,0 +1,2 @@
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/data/lab-secondmate/brief.md (secondmate charter)
+home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/secondmate

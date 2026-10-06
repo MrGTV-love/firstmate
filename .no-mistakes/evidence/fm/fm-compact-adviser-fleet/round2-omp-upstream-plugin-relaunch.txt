@@ -1,0 +1,5 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh adviserr2omp --relaunch HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/plugin/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/plugin-agent omp --no-extensions --no-skills --no-rules --no-lsp --no-title --no-tools --max-time=5m -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/plugin/node_modules/compact-adviser/src/index.ts
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home
+WARNING: watcher still down (same stale episode; last beat: 885s ago, grace 300s) - full banner already printed this episode.
+error: --relaunch takes the task id only; its project or home comes from the task's own record

@@ -1,0 +1,14 @@
+$ claude --version
+2.1.291 (Claude Code)
+$ claude plugin validate --strict .claude/mods/firstmate-calm
+Validating plugin manifest: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm/.claude-plugin/plugin.json
+
+Validating hooks: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm/hooks/hooks.json
+
+  ❯ ./register.ts hooks: session.start, command.run{command=calm}, config.set{key=theme}, turn.step, ui.render{component=Spinner}, ui.render{component=ToolUse}, ui.render{component=ToolResult}, ui.render{component=ToolGroup}, ui.render{component=UserMessage}, ui.render{component=AssistantMessage}
+  ❯ ./register.ts gating hook without .catch: config.set{key=theme}
+  ❯ ./register.ts calls: $.clock.every (via load, startNotes), $.clock.now (via readIfChanged), $.command.register, $.config.list (via readTheme), $.env.get (via isActivated, load, startNotes), $.fs.exists (via readIfChanged, readText), $.fs.read (via readText), $.fs.stat (via readIfChanged), $.fs.write, $.session.id (via startNotes), $.session.messages (via load), $.store.get (via readStored), $.store.set (via rememberShown), $.ui.blit (via repaintShip), $.ui.invalidate (via invalidateDrawings), $.ui.log (via followTail, pollNotes), $.ui.resolve, $.ui.toast
+  ❯ ./register.ts env writes: nothing
+  ❯ ./register.ts env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, FM_COMPACT_ADVISER_HOOKS, FM_CONFIG_OVERRIDE, FM_HOME, FM_ROOT_OVERRIDE, FM_STATE_OVERRIDE
+
+✔ Validation passed

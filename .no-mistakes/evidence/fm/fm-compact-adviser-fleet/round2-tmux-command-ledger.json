@@ -1,0 +1,438 @@
+{
+  "wrapper": "/opt/homebrew/bin/tmux -L fm-lab -f /dev/null; new-session adds -x 120 -y 40",
+  "controller_tmux_unset": true,
+  "first_controller_policy": {
+    "FM_COMPACT_ADVISER_DISABLE": "1",
+    "FM_COMPACT_ADVISER_HOOKS": "1",
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+    "COMPACT_ADVISER_DISABLE": "1"
+  },
+  "second_controller_policy": {
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "FM_COMPACT_ADVISER_HOOKS": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "COMPACT_ADVISER_DISABLE": null
+  },
+  "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/home",
+  "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/claude",
+  "config_compact_adviser": {
+    "claude": "auto"
+  },
+  "commands": [
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/home"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh",
+        "tmux-dir",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/home"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "init",
+        "-b",
+        "main",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project",
+        "add",
+        "treehouse.toml"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project",
+        "-c",
+        "user.name=Lab",
+        "-c",
+        "user.email=lab@example.invalid",
+        "commit",
+        "-m",
+        "Disposable validation project"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+        "tmux-emergency",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project",
+        "--scout",
+        "--harness",
+        "claude",
+        "--model",
+        "haiku"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "list-panes",
+        "-t",
+        "firstmate:fm-tmux-emergency",
+        "-F",
+        "#{pane_pid} #{pane_width} #{pane_height} #{pane_current_command}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "-axo",
+        "pid=,ppid=,comm="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "28581",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "36374",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "38050",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "58256",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "display-message",
+        "-p",
+        "#{pid}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "show-environment",
+        "-g"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-emergency"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "28384",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+        "tmux-normal",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project",
+        "--scout",
+        "--harness",
+        "claude",
+        "--model",
+        "haiku"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "list-panes",
+        "-t",
+        "firstmate:fm-tmux-normal",
+        "-F",
+        "#{pane_pid} #{pane_width} #{pane_height} #{pane_current_command}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "-axo",
+        "pid=,ppid=,comm="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "26264",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "28871",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "29561",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "45242",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "display-message",
+        "-p",
+        "#{pid}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "show-environment",
+        "-g"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-normal"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "eww",
+        "-p",
+        "28384",
+        "-o",
+        "command="
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "send-keys",
+        "-t",
+        "firstmate:fm-tmux-emergency",
+        "Enter"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "send-keys",
+        "-t",
+        "firstmate:fm-tmux-normal",
+        "Enter"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-emergency"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-normal"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "send-keys",
+        "-t",
+        "firstmate:fm-tmux-normal",
+        "Enter"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-normal"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-emergency"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "capture-pane",
+        "-p",
+        "-S",
+        "-100",
+        "-t",
+        "firstmate:fm-tmux-normal"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh",
+        "tmux-emergency",
+        "--force"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh",
+        "tmux-normal",
+        "--force"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/bin/tmux",
+        "kill-server"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/home"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "ps",
+        "-p",
+        "26264,28384,28581,28871,29561,36374,38050,45242,58256",
+        "-o",
+        "pid=,comm="
+      ],
+      "returncode": 1
+    }
+  ],
+  "result": "Actual native Claude first emergency 1/no hooks, second auto 0/hooks1/marker1; server raw emergency, adviser marker and hook flag absent. Server inherited switch1; second worker overrides it to0. Both TUI Not logged in; no model response/advising claim. External imports declined. Native spawn/teardown owns both slots. Owned server, sockets and scratch removed."
+}

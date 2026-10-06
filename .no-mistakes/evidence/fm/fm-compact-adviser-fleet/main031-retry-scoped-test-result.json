@@ -1,0 +1,100 @@
+{
+  "findings": [
+    {
+      "id": "T1",
+      "severity": "warning",
+      "description": "The scoped step still cannot demonstrate autonomous Jev compaction in either lane. Exact merged adapter 8392f4a installed in the private OMP lab and the approved saved-settings copy was regular mode 0600, but native omp login openai-codex reached an OpenAI account-login page requiring authentication unavailable to this agent. Normal Claude authentication is available; both HOME-only and CLAUDE_CONFIG_DIR isolated auth checks returned loggedIn=false, and the real Claude TUI required a new login. No qualifying turn, actual Jev judgment, native automatic compaction, or before/after context was obtained. Main must arrange lab-owned OMP OAuth completion and supply a supported isolated Claude route, or explicitly authorize lab-owned Claude login and saving the approved adviser key into lab-only Claude plugin settings. No operator agent.db attachment/copy, other credential copies, or shared preferences changes were used. Both labs and the approved settings copy were removed.",
+      "action": "ask-user"
+    },
+    {
+      "id": "T2",
+      "severity": "warning",
+      "description": "The broader host-recovery pause remains active. Main031 lifted it only for these two native turns; Main must explicitly authorize resumption before other scenarios or pipeline phases. This result does not approve full dual-lane acceptance or waive remaining proof.",
+      "action": "ask-user"
+    }
+  ],
+  "summary": "Scoped native-compaction acceptance remains inconclusive: isolated setup was exercised, but authentication blocked both qualifying turns; both labs were cleaned up.",
+  "tested": [
+    "`command -v omp claude tmux bun node npm git`; `omp --help`; `omp login --help`; `omp plugin list --json`; `claude --help`; `claude auth --help`; `claude auth status`.",
+    "`git -C /Users/charlesabrooker/firstmate/projects/compact-adviser rev-parse 8392f4a^{commit}` and read-only `git archive 8392f4aae343b1aee83e685d1fb81e077f181556`, extracted only into disposable labs.",
+    "`bin/fm-lab-home.sh create \"$LAB\"`, private native HOME and tmux directory, authorized regular adviser-settings copy with mode 0600; `npm pack --json \"$LAB/package/packages/pi-extension\" --pack-destination \"$LAB\"`; isolated `omp plugin install \"compact-adviser@file:$TGZ\" --force` and `omp plugin list --json`.",
+    "Isolated native `omp login openai-codex` on `TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab`, 120x40 terminal; opened its localhost OAuth launch route in the browser, observed OpenAI login prerequisite, saved screenshot, closed managed tab.",
+    "Real isolated OMP TUI with no tools, LSP, rules or skills; inspected first-run provider-authentication screen through the same private tmux socket without submitting a model turn.",
+    "`HOME=\"$CLAB/native-home\" claude auth status` and the same command with `CLAUDE_CONFIG_DIR=\"$CLAB/native-home/.claude\"`; both returned unauthenticated while normal existing login was available.",
+    "Real Claude 2.1.292 TUI on a separate private 120x40 tmux session with the exact merged lab plugin, `--setting-sources \"\"`, no tools and no MCP servers; selected the lab theme and captured the native login-method menu without starting login.",
+    "Private `tmux -L fm-lab kill-server` and exact owned-lab removal after each lane; recorded deletion of the OMP settings copy, lab plugin/package/dependencies and native configuration.",
+    "Reviewed retained `compact-remote.log` and `targeted-commands.json`; did not rerun previous suites, remote transport fixtures, or other scenarios. Full command provenance is in main031-retry-command-index.json."
+  ],
+  "testing_summary": "Checked native CLI prerequisites, installed exact merged 8392f4a in an isolated OMP lab, exercised lab-owned OAuth and real OMP/Claude startup, and retained an OAuth screenshot, Claude terminal capture/replay, routing metadata and cleanup receipts; authentication prevented both qualifying turns. Prior targeted/offline evidence was retained without reruns. No Jev or compaction screenshot exists because neither lane reached a qualifying turn; both labs were removed, and no suites, lint, shared-state administration or other pipeline phases ran.",
+  "artifacts": [
+    {
+      "kind": "log",
+      "label": "Scoped command provenance and retained baseline evidence",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-command-index.json"
+    },
+    {
+      "kind": "screenshot",
+      "label": "Actual OpenAI account-login prerequisite for lab-owned OMP OAuth",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-omp-own-login.png"
+    },
+    {
+      "kind": "other",
+      "label": "Merged OMP installation and authentication prerequisite receipt",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-omp-prerequisite.json"
+    },
+    {
+      "kind": "other",
+      "label": "Isolated Claude authentication routing results",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-claude-auth-routing.json"
+    },
+    {
+      "kind": "command-output",
+      "label": "Real isolated Claude TUI requires a login method",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-claude-login-required.txt"
+    },
+    {
+      "kind": "rendered-html",
+      "label": "Labeled replay of the captured Claude login-method terminal grid",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-claude-login-required.html"
+    },
+    {
+      "kind": "other",
+      "label": "OMP lab and approved settings-copy cleanup receipt",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-omp-cleanup.json"
+    },
+    {
+      "kind": "other",
+      "label": "Claude lab cleanup receipt",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/main031-retry-claude-cleanup.json"
+    },
+    {
+      "kind": "log",
+      "label": "Retained earlier offline remote transport evidence\u2014not rerun or credited live",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/compact-remote.log"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "Complete one settled OMP turn and observe actual Jev judgment followed by native automatic compaction and reduced context",
+      "result": "untested",
+      "live": false,
+      "evidence": "main031-retry-omp-prerequisite.json; main031-retry-omp-own-login.png; main031-retry-omp-cleanup.json",
+      "reason": "Built and installed exact merged 8392f4a in a private lab, copied only the approved saved settings as a regular mode-0600 file, and attempted supported lab-owned omp login openai-codex. The real browser flow required account authentication unavailable here; real OMP startup also required provider login. Repository evidence did not supply an alternative authenticated own-login route. Copying/attaching operator agent.db is forbidden and no authentication stand-in was used. Main must arrange authorized lab-owned OAuth completion before the qualifying turn can run. Lab and copied key-bearing settings were deleted."
+    },
+    {
+      "name": "Complete one settled Claude turn and observe actual Jev judgment followed by native automatic compaction with before/after context",
+      "result": "untested",
+      "live": false,
+      "evidence": "main031-retry-claude-auth-routing.json; main031-retry-claude-login-required.txt; main031-retry-claude-login-required.html; main031-retry-claude-cleanup.json",
+      "reason": "Confirmed normal existing Claude login, tried HOME-only and explicit CLAUDE_CONFIG_DIR isolation, and launched the real Claude TUI with the merged lab plugin. Both isolated auth routes returned loggedIn=false; native onboarding required a new login. Primary Claude documentation confirms isolated directories also isolate login/Keychain identity. Reusing the normal root would expose shared plugin state/preferences, while credential copies or new Claude login exceed current authorization. Main must supply a supported isolated existing-auth route or authorize lab-owned Claude authentication and a lab-only adviser saved-key/settings route. No Claude credential or key copy was made; lab was deleted."
+    },
+    {
+      "name": "Propagate automatic policy and scoped emergency stop through a real remote secondmate host",
+      "result": "untested",
+      "live": false,
+      "evidence": "Retained compact-remote.log and targeted-commands.json from earlier work in this run; not rerun",
+      "reason": "Main confirms that no remote secondmate host exists in this fleet and prohibits provisioning or touching shared endpoints. The scoped pause lift permits only the OMP and Claude turns. Existing offline transport evidence is retained, not credited as live remote behavior. A future authorized remote host and explicit scenario permission are required."
+    }
+  ],
+  "verdict": "inconclusive"
+}

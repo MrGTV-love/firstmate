@@ -1,0 +1,10 @@
+{
+  "pid": 83318,
+  "role": "normal-worker",
+  "fields": {
+    "COMPACT_ADVISER_DISABLE": "0",
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "FM_COMPACT_ADVISER_HOOKS": null
+  }
+}

@@ -1,0 +1,5 @@
+$ FM_COMPACT_ADVISER_DISABLE=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh zellij-emergency-a91 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project --scout --harness 'PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/pi-agent HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/home omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time 120'
+spawned zellij-emergency-a91 harness=omp kind=scout window=fm-zellij-boundary-195:1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/.treehouse/project-e57b33/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home
+
+exit=0

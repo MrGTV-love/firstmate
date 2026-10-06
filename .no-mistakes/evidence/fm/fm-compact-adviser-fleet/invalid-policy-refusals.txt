@@ -1,0 +1,8 @@
+unsupported-harness:
+error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off
+
+hint-mode:
+error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off
+
+malformed:
+error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off

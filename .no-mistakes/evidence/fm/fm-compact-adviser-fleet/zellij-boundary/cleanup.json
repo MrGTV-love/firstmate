@@ -1,0 +1,46 @@
+[
+  {
+    "task": "zellij-emergency-a91",
+    "teardown_exit": 0,
+    "output": "A new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-emergency-a91 complete (window fm-zellij-boundary-195:1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/.treehouse/project-e57b33/1/project)\nBacklog: zellij-emergency-a91 just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home/data/backlog.md - move zellij-emergency-a91 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-emergency-a91: 95679\nteardown: force-killing leaked worktree process(es) for zellij-emergency-a91: 95679\n",
+    "meta_removed": true
+  },
+  {
+    "task": "zellij-normal-b92",
+    "teardown_exit": 0,
+    "output": "A new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-normal-b92 complete (window fm-zellij-boundary-195:2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/.treehouse/project-e57b33/2/project)\nBacklog: zellij-normal-b92 just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home/data/backlog.md - move zellij-normal-b92 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-normal-b92: 47914\nteardown: force-killing leaked worktree process(es) for zellij-normal-b92: 47914\n",
+    "meta_removed": true
+  },
+  {
+    "session": "fm-zellij-boundary-195",
+    "safe_delete_exit": 0
+  },
+  {
+    "session_absent_after_delete": true
+  },
+  {
+    "pid": 88085,
+    "absent": true
+  },
+  {
+    "pid": 78616,
+    "absent": true
+  },
+  {
+    "pid": 83318,
+    "absent": true
+  },
+  {
+    "task_temp": "/tmp/fm-zellij-emergency-a91",
+    "removed_by_supported_teardown": true
+  },
+  {
+    "task_temp": "/tmp/fm-zellij-normal-b92",
+    "removed_by_supported_teardown": true
+  },
+  {
+    "owned_fixture": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij",
+    "removed": true,
+    "permanent_source_edits": false
+  }
+]

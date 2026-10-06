@@ -1,0 +1,61 @@
+{
+  "task": "tmux-emergency",
+  "pane": "28581 120 40 2.1.292",
+  "server_pid": 28384,
+  "server_ps_selected_env": {
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "FM_COMPACT_ADVISER_HOOKS": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "COMPACT_ADVISER_DISABLE": "1"
+  },
+  "server_show_environment_selected": [
+    "COMPACT_ADVISER_DISABLE=1"
+  ],
+  "processes": [
+    {
+      "pid": 28581,
+      "ppid": 28384,
+      "comm": "-zsh",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": null
+      }
+    },
+    {
+      "pid": 36374,
+      "ppid": 28581,
+      "comm": "treehouse",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": "1"
+      }
+    },
+    {
+      "pid": 38050,
+      "ppid": 36374,
+      "comm": "/bin/zsh",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": null
+      }
+    },
+    {
+      "pid": 58256,
+      "ppid": 38050,
+      "comm": "claude",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": "1"
+      }
+    }
+  ],
+  "meta": "window=firstmate:fm-tmux-emergency\nendpoint_task_id=tmux-emergency\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project/.treehouse/project-3d385e/1/project\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project\nharness=claude\nkind=scout\ntasktmp=/tmp/fm-tmux-emergency\nmodel=haiku\neffort=default\nbusy_gen=g1791316050.46808.252\nspawn_gen=s1791316050.21317.291\n"
+}

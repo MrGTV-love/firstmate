@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "mode": "auto",
+  "minContextTokens": 40000,
+  "autoAcknowledged": true,
+  "logRequests": false
+}

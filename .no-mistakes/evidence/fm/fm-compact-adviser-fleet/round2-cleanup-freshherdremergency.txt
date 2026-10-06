@@ -1,0 +1,6 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh freshherdremergency
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/fresh-herdr-home
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+warning: task freshherdremergency's recorded worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/4/project was reassigned to task adviserr2codex (home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home), which claimed that pool slot after this record was written; that slot is no longer freshherdremergency's, so its processes, copy, and claim are left untouched and only freshherdremergency's own cleanup runs.
+error: herdr endpoint fm-lab-fresh-adviser-91432-304:w1:p2 for freshherdremergency has ambiguous structured presence; nothing was changed - restore reliable endpoint inspection and rerun teardown

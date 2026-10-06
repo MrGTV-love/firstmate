@@ -1,0 +1,58 @@
+{
+  "normal": {
+    "argv": [
+      "bash",
+      "-c",
+      "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_missing_startup_source_refuses_before_cleanup ]]; then echo \"SELECTED_REGRESSION_COMPLETE\"; exit 0; fi' DEBUG; source \"$1\"",
+      "selected-teardown-regression",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+    ],
+    "exit": 0,
+    "duration_seconds": 8.829,
+    "artifact": "round2-selected-teardown-regression.txt"
+  },
+  "ordinary-term": {
+    "argv": [
+      "bash",
+      "-c",
+      "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+      "ordinary-term",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+    ],
+    "test_harness_pid": 13636,
+    "worker_pid": 20058,
+    "worker_process_group": 20058,
+    "worker_child_pids": [
+      20076
+    ],
+    "bound_seconds": 8,
+    "harness_exit": 143,
+    "after_signal_elapsed_seconds": 0.44,
+    "exact_process_states_before": "20058 20058 S   \n20076 20058 S   \n",
+    "exact_process_states_after": "",
+    "no_active_worker_or_recorded_child": true,
+    "scope": "Unmodified permanent fixture and traps; copied teardown deliberately held to exercise interruption; unit fixture proof, not live product scenario"
+  },
+  "outer-sigkill": {
+    "argv": [
+      "bash",
+      "-c",
+      "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+      "outer-sigkill",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+    ],
+    "test_harness_pid": 22405,
+    "worker_pid": 30183,
+    "worker_process_group": 30183,
+    "worker_child_pids": [
+      30209
+    ],
+    "bound_seconds": 8,
+    "harness_exit": -9,
+    "after_signal_elapsed_seconds": 9.427,
+    "exact_process_states_before": "30183 30183 S   \n30209 30183 S   \n",
+    "exact_process_states_after": "",
+    "no_active_worker_or_recorded_child": true,
+    "scope": "Unmodified permanent fixture and traps; copied teardown deliberately held to exercise interruption; unit fixture proof, not live product scenario"
+  }
+}

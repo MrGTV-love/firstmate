@@ -1,0 +1,13 @@
+{
+  "staging_directory": "/tmp/fm-ios+25250001f438cc4c488fbc338938d342f4e9a35344c767ccc742a1f1097767a0",
+  "ownership_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/remote-test-tmp/fm-remote-compact-adviser.k7Kxxu/remote-root",
+  "validated_fixture_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/remote-test-tmp/fm-remote-compact-adviser.k7Kxxu/remote-home",
+  "removed_files": [
+    "launch.s1791310290.49368.26827.sh",
+    "launch.s1791310390.8929.10775.sh",
+    "launch.s1791310336.14754.5193.sh",
+    "launch.s1791310185.58924.12067.sh",
+    "launch.s1791310242.69063.9041.sh"
+  ],
+  "removed": true
+}

@@ -1,0 +1,30 @@
+{
+  "changed_files": [
+    "tests/fm-backend-herdr-presentation-e2e.test.sh",
+    "docs/herdr-backend.md"
+  ],
+  "root_cause": "TREEHOUSE_ROOT from the controller need not reach the endpoint allocator; fixture project configuration was missing before allocation. Claude trust also requires a private store before the first launch.",
+  "fix": "Commit disposable project treehouse.toml before first allocation; unset ambient root/path-template overrides; export private CLAUDE_CONFIG_DIR early; reject allocations outside the disposable root before exact-worker cleanup registration.",
+  "reproduction": "Agent executed real treehouse get --lease --no-fetch under an in-worktree controller-root override, then without that override under an in-worktree alternate-root project configuration; observed different roots and returned both owned leases.",
+  "verification": [
+    {
+      "command": "bash tests/fm-backend-herdr-presentation-e2e.test.sh --sandbox-only",
+      "exit_code": 0,
+      "observed": "real allocator stays in the configured sandbox without controller environment; pre-launch Claude trust uses its private store"
+    },
+    {
+      "command": "PATH=<worktree>/.no-mistakes/test-tmp/mutation-bin:<native-tool-PATH> bash tests/fm-backend-herdr-presentation-e2e.test.sh --sandbox-only",
+      "exit_code": 1,
+      "mutation": "Throwaway treehouse wrapper rewrote the generated project config to the owned alternate-root before executing the real allocator.",
+      "observed": "allocator without controller environment escaped configured pool",
+      "interpretation": "Regression rejected a real wrong-pool allocation, not implementation source text."
+    },
+    {
+      "command": "bash tests/fm-backend-herdr-presentation-e2e.test.sh --sandbox-only",
+      "exit_code": 0,
+      "observed": "Final corrected fixture passed after cleanup-boundary integration."
+    }
+  ],
+  "cleanup": "Each bounded run returned its own recorded native lease and removed its disposable project/home/pool; throwaway mutation-bin removed. No Herdr session provisioned, no shared lifecycle or external original fixture cleanup.",
+  "allocator_version": "v2.3.1-fm.e58947de"
+}

@@ -1,0 +1,288 @@
+[
+  {
+    "scenario": "Claude auto fresh launch",
+    "pane": "w2:p2",
+    "pid": 79262,
+    "cwd": "/Users/charlesabrooker/.treehouse/probe-7cbd9e/1/probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Claude auto confined fresh launch",
+    "pane": "w4:p2",
+    "pid": 1561,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe/.treehouse/probe-7cbd9e/1/probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Claude auto reusable endpoint",
+    "pane": "w5:p2",
+    "pid": 41797,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Same endpoint auto to off, unfiltered",
+    "pane": "w5:p2",
+    "pid": 44296,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-auto-unfiltered",
+    "pane": "w5:p2",
+    "pid": 31555,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-emergency-unfiltered",
+    "pane": "w5:p2",
+    "pid": 71885,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-recover-unfiltered",
+    "pane": "w5:p2",
+    "pid": 19504,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-policy-off-unfiltered",
+    "pane": "w5:p2",
+    "pid": 66679,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-auto-filtered",
+    "pane": "w5:p2",
+    "pid": 26819,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-emergency-filtered",
+    "pane": "w5:p2",
+    "pid": 69925,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-recover-filtered",
+    "pane": "w5:p2",
+    "pid": 14871,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "reusable-policy-off-filtered",
+    "pane": "w5:p2",
+    "pid": 46826,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "calm-adviser-only",
+    "pane": "w5:p2",
+    "pid": 68234,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "calm-explicit-raw-opt-in",
+    "pane": "w5:p2",
+    "pid": 16314,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Real omp automatic launch, filtered",
+    "pane": "w6:p2",
+    "pid": 6942,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/2/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Real batch scout emergency batch-emergency-a",
+    "pane": "w7:p2",
+    "pid": 92074,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/3/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Real batch scout emergency batch-emergency-b",
+    "pane": "w8:p2",
+    "pid": 19021,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/4/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Local secondmate inherits automatic omp policy",
+    "pane": "w9:p2",
+    "pid": 65156,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/marked-secondmate",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Secondmate worker overrides inherited old disabled output",
+    "pane": "wA:p2",
+    "pid": 94971,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/5/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Absent policy keeps real omp disabled",
+    "pane": "w6:p2",
+    "pid": 63383,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/2/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Real batch ship emergency ship-emergency-a",
+    "pane": "wB:p2",
+    "pid": 75186,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/6/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "Real batch ship emergency ship-emergency-b",
+    "pane": "wC:p2",
+    "pid": 8396,
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/7/confined-probe",
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  {
+    "scenario": "tmux-emergency",
+    "pid": 91057,
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    },
+    "window": "primary:fm-tmux-emergency"
+  },
+  {
+    "scenario": "tmux-normal",
+    "pid": 21457,
+    "environment": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    },
+    "window": "primary:fm-tmux-normal"
+  }
+]

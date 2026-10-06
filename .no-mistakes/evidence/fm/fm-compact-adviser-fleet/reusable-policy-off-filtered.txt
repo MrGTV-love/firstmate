@@ -1,0 +1,16 @@
+RWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+LAB_RC_reusable_emergency_filtered=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home  bin/fm-spawn.sh auto-reusable --relaunch --harness 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project'; printf "\nLAB_RC_reusable_recover_filtered=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+spawned auto-reusable harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+LAB_RC_reusable_recover_filtered=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home  bin/fm-spawn.sh auto-reusable --relaunch --harness 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project'; printf "\nLAB_RC_reusable_policy_off_filtered=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+spawned auto-reusable harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+LAB_RC_reusable_policy_off_filtered=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

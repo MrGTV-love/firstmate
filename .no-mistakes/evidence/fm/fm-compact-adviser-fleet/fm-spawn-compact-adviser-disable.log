@@ -1,0 +1,1 @@
+not ok - auto-claude-absent-secondmate: automatic policy spawn should succeed: error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/tmp/fm-spawn-compact-adviser.rIL0Mz/auto-claude-absent-secondmate/secondmate-home: expected exit 0, got 1

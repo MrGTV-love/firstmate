@@ -1,0 +1,64 @@
+{
+  "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3",
+  "FM_TEST_SKIP_ORPHAN_REAP": "1",
+  "commands": [
+    {
+      "label": "compact-local",
+      "command": [
+        "bash",
+        "tests/fm-spawn-compact-adviser-disable.test.sh"
+      ],
+      "exit_code": 1,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/compact-local.log"
+    },
+    {
+      "label": "compact-remote",
+      "command": [
+        "bash",
+        "tests/fm-spawn-compact-adviser-disable-remote.test.sh"
+      ],
+      "exit_code": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/compact-remote.log"
+    },
+    {
+      "label": "sandbox",
+      "command": [
+        "bash",
+        "tests/fm-backend-herdr-presentation-e2e.test.sh",
+        "--sandbox-only"
+      ],
+      "exit_code": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/sandbox.log"
+    },
+    {
+      "label": "teardown-selected",
+      "command": [
+        "bash",
+        "-x",
+        "tests/fm-teardown-selected-targeted-regressions.poki90y3.test.sh"
+      ],
+      "exit_code": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/teardown-selected.log"
+    },
+    {
+      "label": "composer",
+      "command": [
+        "bash",
+        "tests/fm-composer-lib.test.sh"
+      ],
+      "exit_code": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/composer.log"
+    },
+    {
+      "label": "compact-local-sibling-package",
+      "command": [
+        "bash",
+        "tests/fm-spawn-compact-adviser-disable.test.sh"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/source-package",
+      "exit_code": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/compact-local-sibling-package.log",
+      "setup": "Exact tracked current-worktree bytes in sibling git source package; TMPDIR outside package but within original worktree"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "fixture_inputs": {
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/home",
+    "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/agent",
+    "NPM_CONFIG_CACHE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/npm-cache",
+    "NPM_CONFIG_USERCONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/npm-userconfig",
+    "NPM_CONFIG_GLOBALCONFIG": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/npm-globalconfig",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/xdg-config",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/xdg-cache",
+    "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/xdg-data",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/tmp",
+    "COMPACT_ADVISER_DISABLE": "0",
+    "TMUX_TMPDIR": "/tmp/fml.5WBB5S",
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/lab-home"
+  },
+  "unset": [
+    "NO_MISTAKES_GATE",
+    "FM_GATE_REFUSE_BYPASS",
+    "FM_ROOT_OVERRIDE",
+    "FM_STATE_OVERRIDE",
+    "FM_DATA_OVERRIDE",
+    "FM_CONFIG_OVERRIDE",
+    "FM_PROJECTS_OVERRIDE"
+  ],
+  "ambient_TYPESAFE_API_KEY_present": false,
+  "plugin": "compact-adviser@0.1.5",
+  "tarball": "https://registry.npmjs.org/compact-adviser/-/compact-adviser-0.1.5.tgz"
+}

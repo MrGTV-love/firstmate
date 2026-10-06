@@ -1,0 +1,22 @@
+{
+  "exit": 0,
+  "output": "spawned claude-explicit-open harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:w7:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n",
+  "state": {
+    "pane": "w7:p2",
+    "shell_pid": 97042,
+    "processes": [
+      {
+        "pid": 43918,
+        "process": "claude",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "claude-explicit-open"
+        }
+      }
+    ]
+  },
+  "screen": "\ud83c\udf33 Setting up worktree...\n\ud83c\udf33 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-m\nistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project. Type 'exit' to return.\ncharlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d\n18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8d\nb0b7/6/project'\ncharlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-claude-explicit-open/gotmp\ncharlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=0\ncharlesabrooker@Mac-Studio project % export FM_TASK_ID=claude-explicit-open\ncharlesabrooker@Mac-Studio project % . '/tmp/fm-claude-explicit-open+254087b424317ceecfa34404\ndf46cf0cdc345f7eab236db8328177ce19912cc2/launch.s1791322824.87330.4521.sh'\n \u2590\u259b\u2588\u2588\u2588\u259b\u2588   Claude Code v2.1.292\n\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u2588\u2580  Haiku 4.5 \u00b7 API Usage Billing\n \u259d\u259d   \u259d\u259d   ~/\u2026/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project\n\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u276f\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  \u23f8 manual mode on \u00b7 ? for shortcuts \u00b7 \u2190 for agents              Not logged in \u00b7 Run /login\n                                                                   firstmate-calm: Calm off\n"
+}

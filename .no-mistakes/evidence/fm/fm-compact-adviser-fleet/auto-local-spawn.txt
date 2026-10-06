@@ -1,0 +1,20 @@
+ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for auto-open: 58102
+teardown: force-killing leaked worktree process(es) for auto-open: 58102
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown auto-open complete (window fm-lab-adviser-test-67659-1247:w2:p2, worktree /Users/charlesabrooker/.treehouse/probe-7cbd9e/1/probe)
+Backlog: auto-open just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/data/backlog.md - move auto-open to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+INITIAL_RETURN_RC=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % export TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/treehouse TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/tmp
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECODE DISABLE_AUTOUPDATER=1 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/treehouse TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/tmp FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home  bin/fm-spawn.sh auto-local /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project' --scout; printf "\nLAB_RC_auto_local_spawn=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned auto-local harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w3:p2 worktree=/Users/charlesabrooker/.treehouse/probe-7cbd9e/1/probe
+
+LAB_RC_auto_local_spawn=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

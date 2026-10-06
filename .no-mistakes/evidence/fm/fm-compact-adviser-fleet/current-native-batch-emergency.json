@@ -1,0 +1,194 @@
+[
+  {
+    "kind": "scout",
+    "filtered": false,
+    "exit": 0,
+    "output": "spawned batch-scout-0-a harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:w8:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/5/project\nspawned batch-scout-0-b harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:w9:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/7/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\n",
+    "states": [
+      {
+        "task": "batch-scout-0-a",
+        "state": {
+          "pane": "w8:p2",
+          "shell_pid": 56181,
+          "processes": [
+            {
+              "pid": 16353,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-scout-0-a"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "task": "batch-scout-0-b",
+        "state": {
+          "pane": "w9:p2",
+          "shell_pid": 29229,
+          "processes": [
+            {
+              "pid": 63789,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-scout-0-b"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "scout",
+    "filtered": true,
+    "exit": 0,
+    "output": "spawned batch-scout-1-a harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:wA:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/8/project\nspawned batch-scout-1-b harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:wB:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/9/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\n",
+    "states": [
+      {
+        "task": "batch-scout-1-a",
+        "state": {
+          "pane": "wA:p2",
+          "shell_pid": 86369,
+          "processes": [
+            {
+              "pid": 26165,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-scout-1-a"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "task": "batch-scout-1-b",
+        "state": {
+          "pane": "wB:p2",
+          "shell_pid": 32893,
+          "processes": [
+            {
+              "pid": 87324,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-scout-1-b"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "ship",
+    "filtered": false,
+    "exit": 0,
+    "output": "spawned batch-ship-0-a harness=claude kind=ship mode=local-only yolo=off window=fm-lab-compact-fleet-58297-3415:wC:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/10/project\nspawned batch-ship-0-b harness=claude kind=ship mode=local-only yolo=off window=fm-lab-compact-fleet-58297-3415:wD:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/11/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nnotice: batch-ship-0-a ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nnotice: batch-ship-0-b ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\n",
+    "states": [
+      {
+        "task": "batch-ship-0-a",
+        "state": {
+          "pane": "wC:p2",
+          "shell_pid": 19878,
+          "processes": [
+            {
+              "pid": 65324,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-ship-0-a"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "task": "batch-ship-0-b",
+        "state": {
+          "pane": "wD:p2",
+          "shell_pid": 75839,
+          "processes": [
+            {
+              "pid": 11792,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-ship-0-b"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "ship",
+    "filtered": true,
+    "exit": 0,
+    "output": "spawned batch-ship-1-a harness=claude kind=ship mode=local-only yolo=off window=fm-lab-compact-fleet-58297-3415:wE:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/12/project\nspawned batch-ship-1-b harness=claude kind=ship mode=local-only yolo=off window=fm-lab-compact-fleet-58297-3415:wF:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/13/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nnotice: batch-ship-1-a ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nnotice: batch-ship-1-b ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\n",
+    "states": [
+      {
+        "task": "batch-ship-1-a",
+        "state": {
+          "pane": "wE:p2",
+          "shell_pid": 37452,
+          "processes": [
+            {
+              "pid": 81971,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-ship-1-a"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "task": "batch-ship-1-b",
+        "state": {
+          "pane": "wF:p2",
+          "shell_pid": 88348,
+          "processes": [
+            {
+              "pid": 33040,
+              "process": "claude",
+              "state": {
+                "COMPACT_ADVISER_DISABLE": "1",
+                "FM_COMPACT_ADVISER_DISABLE": null,
+                "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+                "FM_COMPACT_ADVISER_HOOKS": null,
+                "FM_TASK_ID": "batch-ship-1-b"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

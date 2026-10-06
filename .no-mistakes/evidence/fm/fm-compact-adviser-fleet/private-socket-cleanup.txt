@@ -1,0 +1,2 @@
+Private fm-lab tmux server killed; supported fm-lab-home teardown exit=0.
+Short socket directory exists after cleanup: False

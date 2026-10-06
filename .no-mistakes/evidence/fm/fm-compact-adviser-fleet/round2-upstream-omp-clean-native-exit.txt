@@ -1,0 +1,19 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh run fm-lab-adviser-r2-51967-17576 pane read w1:p6 --source visible
+exit=0
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+           Tip: With default keybindings, ⌃D deletes the character under the cursor
+               instead of quitting your draft — see /hotkeys for your exit key
+
+
+ Closing session…
+
+
+ π > ⬢ Apple AFM 3 Core Advanced > 🌳 project/project > ⑂ detached ▶─────24%──────────┃──8.2K─
+╰─                                                                ⇧⇥ to change thinking effort
+charlesabrooker@Mac-Studio project %

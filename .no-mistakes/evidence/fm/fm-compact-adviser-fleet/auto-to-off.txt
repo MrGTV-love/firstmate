@@ -1,0 +1,17 @@
+teardown auto-local complete (window fm-lab-adviser-test-67659-1247:w3:p2, worktree /Users/charlesabrooker/.treehouse/probe-7cbd9e/1/probe)
+Backlog: auto-local just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/data/backlog.md - move auto-local to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+LAB_RC_second_initial_return=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECODE DISABLE_AUTOUPDATER=1 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/treehouse TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/tmp FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home  bin/fm-spawn.sh auto-confined /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project' --scout; printf "\nLAB_RC_auto_confined_spawn=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned auto-confined harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w4:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe/.treehouse/probe-7cbd9e/1/probe
+
+LAB_RC_auto_confined_spawn=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-control.sh auto-confined relaunch --harness claude --model haiku --note "Launch policy verification only. Reply LAB_WORKER_READY, no tools or file changes."; printf "\nLAB_RC_auto_to_off=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+error: the exit command could not be sent to task auto-confined on herdr
+error: relaunch of auto-confined failed while stopping the old agent, which is still running; its original instructions were restored
+
+LAB_RC_auto_to_off=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

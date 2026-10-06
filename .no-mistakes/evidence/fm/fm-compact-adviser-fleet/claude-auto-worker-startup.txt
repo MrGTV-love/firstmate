@@ -1,0 +1,19 @@
+charlesabrooker@Mac-Studio probe % export COMPACT_ADVISER_DISABLE=0
+charlesabrooker@Mac-Studio probe % export FM_TASK_ID=auto-open
+charlesabrooker@Mac-Studio probe % . '/tmp/fm-auto-open+7b6e53e5cff3de6d8603a02fe1e54c5945c5ff8d4e6be559ef26a6014ef9ea15
+/launch.s1791307703.30529.13708.sh'
+ ▐▛███▛█   Claude Code v2.1.291
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   ~/.treehouse/probe-7cbd9e/1/probe
+
+
+❯ Reply only LAB_AUTO_READY. Do not use tools or inspect files.
+
+⏺ LAB_AUTO_READY
+
+✻ Baked for 2s · done 12:29 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents

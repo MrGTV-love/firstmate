@@ -1,0 +1,18 @@
+{
+  "native_host": "omp 18.6.3",
+  "commands": [
+    "omp --help",
+    "omp plugin list",
+    "omp plugin doctor --json"
+  ],
+  "observed_default_plugin": "compact-adviser@0.1.11",
+  "observed_plugin_health": "plugin:compact-adviser ok v0.1.11",
+  "installed_default_entry": "/Users/charlesabrooker/.omp/plugins/node_modules/compact-adviser/src/index.ts",
+  "installed_entry_observation": "Calls installAdviser with agentDir, version and host only; no loadOmpSources import or sources option.",
+  "required_entry": "https://raw.githubusercontent.com/MrGTV-love/compact-adviser/8392f4a/packages/pi-extension/src/index.ts",
+  "required_entry_observation": "Imports loadOmpSources and passes sources: loadOmpSources for OMP.",
+  "live_compaction_result": "blocked",
+  "missing_prerequisite": "Default installed plugin does not contain required merged 8392f4a OMP entry. Shared plugin installation/modification is prohibited. No older-plugin substitute run; no fresh Jev judgment or native automatic compaction claimed.",
+  "secret_handling": "No saved credential/configuration contents read, printed, exported, copied or modified.",
+  "remote_live_result": "Not live-testable here: Main confirms fleet has no remote secondmate host; targeted transport fixtures are not live remote proof."
+}

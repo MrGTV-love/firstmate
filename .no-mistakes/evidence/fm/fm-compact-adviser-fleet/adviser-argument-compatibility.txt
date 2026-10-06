@@ -1,0 +1,41 @@
+$ tmux -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/tmux.conf -L fm-lab new-session -d -s primary -x120 -y40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/lab-home /bin/sh -c 'omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time120 -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/node_modules/compact-adviser/src/index.ts; status=$?; printf "\nOMP_EXIT=%s\n" "$status"; sleep 15'
+Error: unknown flag: --max-time120
+Run `omp --help` for available flags.
+
+OMP_EXIT=2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

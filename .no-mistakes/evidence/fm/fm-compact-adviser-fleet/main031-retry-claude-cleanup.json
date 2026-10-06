@@ -1,0 +1,11 @@
+{
+  "lane": "claude",
+  "lab_removed": true,
+  "private_tmux_kill_server_exit": 0,
+  "lab_source_archive_plugin_files_and_native_config_deleted": true,
+  "settings_key_copies": 0,
+  "other_credential_copies": 0,
+  "new_Claude_sign_in_or_sign_out": false,
+  "shared_preferences_deliberately_changed": false,
+  "qualifying_turn_completed": false
+}

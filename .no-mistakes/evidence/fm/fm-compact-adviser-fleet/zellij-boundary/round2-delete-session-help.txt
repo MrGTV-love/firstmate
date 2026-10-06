@@ -1,0 +1,12 @@
+zellij-delete-session 
+Delete a specific session
+
+USAGE:
+    zellij delete-session [OPTIONS] [TARGET_SESSION]
+
+ARGS:
+    <TARGET_SESSION>    Name of target session
+
+OPTIONS:
+    -f, --force    Kill the session if it's running before deleting it
+    -h, --help     Print help information

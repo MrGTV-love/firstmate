@@ -1,0 +1,14 @@
+$ claude auth status
+exit=0
+{
+  "loggedIn": true,
+  "authMethod": "claude.ai",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": false,
+  "projectsDirectory": "/Users/charlesabrooker/.claude/projects",
+  "configDirectory": "/Users/charlesabrooker/.claude",
+  "email": "charles@greentreetherapeutics.com",
+  "orgId": "de424ec3-e45f-44df-92fb-c1da29501bc9",
+  "orgName": "charles@greentreetherapeutics.com's Organization",
+  "subscriptionType": "max"
+}

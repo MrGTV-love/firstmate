@@ -1,0 +1,13 @@
+{
+  "cli_version": "2.1.292 (Claude Code)",
+  "native_launch_exit": 0,
+  "source_revision": "8392f4aae343b1aee83e685d1fb81e077f181556",
+  "window_columns": 120,
+  "window_rows": 40,
+  "credential_copies": false,
+  "fresh_lab_has_existing_login": false,
+  "qualifying_turn_submitted": false,
+  "jev_judgment_observed": false,
+  "automatic_compaction_observed": false,
+  "before_after_context": null
+}

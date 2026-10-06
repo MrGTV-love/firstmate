@@ -1,0 +1,26 @@
+env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CON
+FIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECODE DISABLE_AUTOUPDATER=1 claude
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVE
+RRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECODE DISABLE_AUTO
+UPDATER=1 claude
+env -u CLAUDECODE DISABLE_AUTOUPDATER=1 claude --model haiku --session-id 562f3deb-33f8-4360-9e21-5792329b0183 --tools
+"" --strict-mcp-config --setting-sources project "Reply only LAB_PRIMARY_READY. Do not inspect or modify files."
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u CLAUDECODE DISABLE_AUTOUPDATER=1 claude --model haiku --
+session-id 2de5c6a3-d594-4778-aeab-c2a82dfe5380 --tools "" --strict-mcp-config --setting-sources project "Reply only LA
+B_PRIMARY_STARTED. Do not use tools or inspect files."
+ ▐▛███▛█   Claude Code v2.1.291
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW
+
+⚠ AGENTS.md is over the 40.0k-char limit (48.0k chars) · /memory to free up context
+
+❯ Reply only LAB_PRIMARY_STARTED. Do not use tools or inspect files.
+
+⏺ LAB_PRIMARY_STARTED
+
+· Swirling… (5s · ↓ 113 tokens · thinking)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · esc to interrupt · ← 1 agent

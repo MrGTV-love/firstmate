@@ -1,0 +1,18 @@
+Backlog: omp-auto-confined just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/data/backlog.md - move omp-auto-confined to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+LAB_RC_cleanup_omp_auto_confined=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-captain-hold.sh complete batch-emergency-a --none && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-teardown.sh batch-emergency-a; printf "\nLAB_RC_cleanup_batch_emergency_a=%s\n" "$?"
+complete: batch-emergency-a captain-call inventory reviewed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for batch-emergency-a: 74061 92047 92074
+teardown: force-killing leaked worktree process(es) for batch-emergency-a: 74061
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown batch-emergency-a complete (window fm-lab-adviser-test-67659-1247:w7:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/3/confined-probe)
+Backlog: batch-emergency-a just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/data/backlog.md - move batch-emergency-a to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+LAB_RC_cleanup_batch_emergency_a=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

@@ -1,0 +1,6 @@
+error: Found argument '/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/zellij-boundary/round2-pane-emergency.txt' which wasn't expected, or isn't valid in this context
+
+USAGE:
+    zellij action dump-screen [OPTIONS]
+
+For more information try --help

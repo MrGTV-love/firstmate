@@ -1,0 +1,40 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh run fm-lab-adviser-r2-51967-17576 pane read w1:p2 --source visible
+exit=0
+
+
+
+
+
+
+
+Resume this session with:
+claude --resume 45cb6553-1f7b-479c-8e41-8098ee9e245a
+charlesabrooker@Mac-Studio project %
+charlesabrooker@Mac-Studio project %
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d
+18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/1/pro
+ject'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-adviserr2auto/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=adviserr2auto
+charlesabrooker@Mac-Studio project % . '/tmp/fm-adviserr2auto+52f5e036d02176d34806003a07c8da3
+bb632cb14fe724837d39ed7f7cfaaab0d/launch.s1791316543.79025.19216.sh'
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Haiku 4.5 · API Usage Billing
+ ▝▝   ▝▝   ~/…/.live-validation/project/.treehouse/project-65c5cc/1/project
+
+⚠ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENT
+  S.md is over the 40.0k-char limit (48.0k chars) · /memory to free up context
+
+❯ : Firstmate operational input waiting: read
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.li
+  ve-validation/lab-home/state/operational-inbox/1791316546-21b68f868e11cfa5.msg' and handle
+  its contents as Firstmate operational input.
+  ⎿  Not logged in · Please run /login
+
+✻ Worked for 0s · done 2:55 PM
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents   Not logged in · Run /login

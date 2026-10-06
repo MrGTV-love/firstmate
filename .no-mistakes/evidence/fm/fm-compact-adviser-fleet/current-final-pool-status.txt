@@ -1,0 +1,17 @@
+base  main  (repository default)
+1     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/1/project  (detached)
+2     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/2/project  (detached)
+3     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/3/project  (detached)
+4     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/4/project  (detached)
+5     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/5/project  (detached)
+6     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/6/project  (detached)
+7     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/7/project  (detached)
+8     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/8/project  (detached)
+9     available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/9/project  (detached)
+10    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/10/project  (detached)
+11    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/11/project  (detached)
+12    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/12/project  (detached)
+13    available    ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/13/project  (detached)
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+

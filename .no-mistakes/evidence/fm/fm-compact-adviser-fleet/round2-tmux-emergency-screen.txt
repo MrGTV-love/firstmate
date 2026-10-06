@@ -1,0 +1,40 @@
+treehouse get
+charlesabrooker@Mac-Studio project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project/.t
+reehouse/project-3d385e/1/project. Type 'exit' to return.
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32K
+KDYZNRWDW/.live-validation-tmux/project/.treehouse/project-3d385e/1/project'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-tmux-emergency/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=tmux-emergency
+charlesabrooker@Mac-Studio project % . '/tmp/fm-tmux-emergency+60adc6aa2ba088b6324543d91d10d61a3689b71caf2f2fc91994edfed
+b36b3d5/launch.s1791316050.21317.291.sh'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for
+  third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks
+  https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+
+
+
+
+
+
+
+

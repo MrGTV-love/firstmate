@@ -1,0 +1,41 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh run fm-lab-adviser-r2-51967-17576 pane read w1:p2 --source visible
+exit=0
+
+
+
+
+
+
+
+
+
+
+Resume this session with:
+claude --resume 09b9c973-0cd6-4324-bbb2-45c84647e29d
+charlesabrooker@Mac-Studio project %
+charlesabrooker@Mac-Studio project %
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32K
+KDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/1/project'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-adviserr2auto/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=adviserr2auto
+charlesabrooker@Mac-Studio project % . '/tmp/fm-adviserr2auto+52f5e036d02176d34806003a07c8da3bb632cb14fe724837d39ed7f7cf
+aaab0d/launch.s1791314635.51332.5325.sh'
+ ▐▛███▛█   Claude Code v2.1.291
+▝▜██████▀  Haiku 4.5 · API Usage Billing
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/project/.treehouse/project-65c5cc/1/project
+
+⚠ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENTS.md is over the 40.0k-char
+  limit (48.0k chars) · /memory to free up context
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFG
+  K32KKDYZNRWDW/.live-validation/lab-home/state/operational-inbox/1791314636-999bb37342659a6e.msg' and handle its
+  contents as Firstmate operational input.
+  ⎿  Not logged in · Please run /login
+
+✻ Brewed for 0s · done 2:23 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents                              Not logged in · Run /login

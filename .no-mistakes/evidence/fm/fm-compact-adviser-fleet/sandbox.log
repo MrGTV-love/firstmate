@@ -1,0 +1,5 @@
+🌳 Setting up worktree...
+🌳 Leased worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/fm-herdr-presentation.1RXCVx/.treehouse/sandbox-project-cfa7b5/1/sandbox-project. Run 'treehouse return /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/fm-herdr-presentation.1RXCVx/.treehouse/sandbox-project-cfa7b5/1/sandbox-project' to release it.
+trusted: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/fm-herdr-presentation.1RXCVx/.treehouse/sandbox-project-cfa7b5/1/sandbox-project
+trusted (project root): /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/fm-herdr-presentation.1RXCVx/sandbox-project
+ok - real allocator stays in the configured sandbox without controller environment; pre-launch Claude trust uses its private store

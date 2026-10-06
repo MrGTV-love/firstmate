@@ -1,0 +1,14 @@
+2KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe --mode local-only --yolo off --harness 'PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/omp-agent HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/user-home omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time 180'; printf "\nLAB_RC_real_ship_batch_emergency=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+notice: ship-emergency-a ships mode=local-only while the standing posture for confined-probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned ship-emergency-a harness=omp kind=ship mode=local-only yolo=off window=fm-lab-adviser-test-67659-1247:wB:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/6/confined-probe
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+notice: ship-emergency-b ships mode=local-only while the standing posture for confined-probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned ship-emergency-b harness=omp kind=ship mode=local-only yolo=off window=fm-lab-adviser-test-67659-1247:wC:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/7/confined-probe
+
+LAB_RC_real_ship_batch_emergency=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

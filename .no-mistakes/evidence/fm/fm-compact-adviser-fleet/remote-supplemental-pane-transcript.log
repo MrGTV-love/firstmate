@@ -1,0 +1,155 @@
+
+phase allowlist absent
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=1 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791310773.10075.27110.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote
+
+phase allowlist enabled
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=1 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791310850.94465.24589.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote
+
+phase automatic Claude, allowlist absent
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=0 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791310907.44287.30055.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote
+
+phase emergency-disabled Claude, allowlist absent
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=1 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791310956.30080.30220.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote
+
+phase automatic Claude, allowlist enabled
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=0 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791311022.17485.168.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote
+
+phase emergency-disabled Claude, allowlist enabled
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=1 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d/launch.s1791311070.4322.32201.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote

@@ -1,0 +1,4 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh run fm-lab-adviser-r2-51967-17576 process info w1:p2
+exit=2
+unknown command: process
+run 'herdr --help' for usage

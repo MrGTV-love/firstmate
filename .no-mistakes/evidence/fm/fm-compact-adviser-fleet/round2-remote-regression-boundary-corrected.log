@@ -1,0 +1,8 @@
+FM_TEST_BEGIN 2026-10-06T19:42:09Z tests/fm-spawn-compact-adviser-disable-remote.test.sh family=backend-dispatch expected_gate_skip=none
+ok - a remote-routed second mate starts with the compact adviser disabled, from the pane export and from the launch command alike
+ok - the remote route keeps the compact-adviser switch through the cleared allowlisted environment
+not ok - tests/fm-spawn-compact-adviser-disable-remote.test.sh exceeded the per-script bound of 240s and was terminated
+FM_TEST_END 2026-10-06T19:46:09Z tests/fm-spawn-compact-adviser-disable-remote.test.sh exit=124 duration_ms=240142 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=240464
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=240142 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-compact-adviser-disable-remote.test.sh duration_ms=240142

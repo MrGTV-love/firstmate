@@ -1,0 +1,24 @@
+pane get w1:p3 --session fm-remote
+status --json
+status --json --session fm-remote
+workspace list --session fm-remote
+workspace create --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/remote-test-tmp/fm-remote-compact-adviser.k7Kxxu/remote-home --label 2ndmate-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+tab create --workspace w1 --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/remote-test-tmp/fm-remote-compact-adviser.k7Kxxu/remote-home --label fm-ios --no-focus --session fm-remote
+tab list --workspace w1 --session fm-remote
+pane list --workspace w1 --session fm-remote
+agent get w1:p2 --session fm-remote
+pane close w1:p2 --session fm-remote
+pane get w1:p3 --session fm-remote
+pane get w1:p3 --session fm-remote
+agent get w1:p3 --session fm-remote
+status --json --session fm-remote
+pane read w1:p3 --source recent --lines 200 --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export GOTMPDIR=/tmp/fm-ios/gotmp --session fm-remote
+status --json --session fm-remote
+pane run w1:p3 export COMPACT_ADVISER_DISABLE=0 --session fm-remote
+status --json --session fm-remote
+pane send-text w1:p3 . '/tmp/fm-ios+25250001f438cc4c488fbc338938d342f4e9a35344c767ccc742a1f1097767a0/launch.s1791310390.8929.10775.sh' --session fm-remote
+status --json --session fm-remote
+pane send-keys w1:p3 enter --session fm-remote

@@ -1,0 +1,12 @@
+ok - automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm
+ok - a reused endpoint drops adviser-only hooks on off and emergency-off relaunches, and the backend never inherits the override
+ok - malformed policy and keys other than claude or omp refuse before launch
+ok - the operator's emergency kill switch overrides opted-in auto
+ok - ship and scout batch reexecs preserve emergency-off and ordinary auto for every Claude and omp child
+ok - raw leading hook assignments remain operator-owned in auto, off, and emergency launches, including reused panes
+ok - ship launch with no allowlist starts its agent with the compact-adviser switch on
+ok - ship launch under an enabled allowlist keeps the compact-adviser switch through the cleared environment
+ok - the launch command sets the switch on its own, whichever allowlist posture is in force
+ok - a secondmate launch carries the compact-adviser switch in both allowlist postures
+ok - relaunch rebuilds default-off and automatic adviser policies in both allowlist postures
+ok - a compound raw launch-command still starts its agent with the compact-adviser switch on

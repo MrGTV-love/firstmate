@@ -1,0 +1,409 @@
+{
+  "notes": [
+    "Real Claude Code 2.1.292 in guarded named Herdr lab, fixed nonzero viewer grid.",
+    "Normal machine Claude login exists; isolated Claude store has no login. These prove process launch/control/UI behavior, not Claude model or Jev execution.",
+    "Two early recovery attempts encountered pending native startup input. After settling that input, retry passed."
+  ],
+  "observations": [
+    {
+      "scenario": "claude auto unfiltered fresh",
+      "observed": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 93572,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-unfiltered-auto-to-off",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 85980,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 2989,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-unfiltered-off-to-auto",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 2989,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 32759,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-unfiltered-auto-to-emergency-off",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 32759,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-unfiltered-emergency-to-auto",
+      "exit": 1,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-auto",
+      "exit": 1,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-auto-after-startup-settle",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 48018,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 63482,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-auto-to-off",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 63482,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 54160,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-off-to-auto",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 54160,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 83918,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-auto-to-emergency-off",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 83918,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 92480,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "current-filtered-emergency-to-auto",
+      "exit": 0,
+      "before": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 92480,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      },
+      "after": {
+        "pane": "w3:p2",
+        "shell_pid": 16867,
+        "processes": [
+          {
+            "pid": 52335,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "claude-open"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

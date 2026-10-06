@@ -1,0 +1,26 @@
+{
+  "command": "FM_HOME=<marked disposable secondmate> COMPACT_ADVISER_DISABLE=1 <current source>/bin/fm-spawn.sh local-child <sandbox project> --scout --backend herdr <real Claude command>",
+  "exit": 0,
+  "output": "spawned local-child harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/3/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/secondmate-home\n",
+  "inheritedPolicy": {
+    "claude": "auto",
+    "omp": "auto"
+  },
+  "childState": {
+    "pane": "w5:p2",
+    "shell_pid": 64674,
+    "processes": [
+      {
+        "pid": 73414,
+        "process": "claude",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "0",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+          "FM_COMPACT_ADVISER_HOOKS": "1",
+          "FM_TASK_ID": "local-child"
+        }
+      }
+    ]
+  }
+}

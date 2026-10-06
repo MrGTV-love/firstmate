@@ -1,0 +1,4 @@
+$ ['bash', '-c', 'set -T; trap \'if [[ "$BASH_COMMAND" == test_missing_startup_source_refuses_before_cleanup ]]; then echo "SELECTED_REGRESSION_COMPLETE"; exit 0; fi\' DEBUG; source "$1"', 'selected-teardown-regression', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh']
+exit=0
+ok - task teardown completes without reaping another home's abandoned worker
+SELECTED_REGRESSION_COMPLETE

@@ -1,0 +1,3 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh adviserr2default
+exit=1
+error: another lifecycle action is already running for task adviserr2default; nothing was changed

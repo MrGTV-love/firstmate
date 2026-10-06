@@ -1,0 +1,22 @@
+{
+  "command": "bin/fm-spawn.sh claude-absent <disposable project> --scout --backend herdr <real raw Claude command>",
+  "exit": 0,
+  "output": "spawned claude-absent harness=claude kind=scout window=fm-lab-compact-fleet-58297-3415:w6:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/5/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\n",
+  "state": {
+    "pane": "w6:p2",
+    "shell_pid": 33725,
+    "processes": [
+      {
+        "pid": 83015,
+        "process": "claude",
+        "state": {
+          "COMPACT_ADVISER_DISABLE": "1",
+          "FM_COMPACT_ADVISER_DISABLE": null,
+          "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+          "FM_COMPACT_ADVISER_HOOKS": null,
+          "FM_TASK_ID": "claude-absent"
+        }
+      }
+    ]
+  }
+}

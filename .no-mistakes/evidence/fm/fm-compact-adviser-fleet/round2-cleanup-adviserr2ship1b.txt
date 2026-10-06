@@ -1,0 +1,5 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh adviserr2ship1b
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/lab-home
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+error: herdr endpoint fm-lab-adviser-r2-51967-17576:w1:pE for adviserr2ship1b has ambiguous structured presence; nothing was changed - restore reliable endpoint inspection and rerun teardown

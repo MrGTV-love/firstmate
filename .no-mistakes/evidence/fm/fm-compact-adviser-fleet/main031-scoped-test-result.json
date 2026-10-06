@@ -1,0 +1,99 @@
+{
+  "verdict": "inconclusive",
+  "scope": "Main031 Test fix_review: two qualifying settled turns only, OMP then Claude; no other phases",
+  "target_commit_from_context": "a025528e0b28e676a2611357de27b91c9d524ba9",
+  "findings": [
+    {
+      "id": "T1",
+      "action": "ask-user",
+      "description": "Main031 permits a regular saved-settings copy and merged-adapter install in a private lab outside all git worktrees. The current workspace boundary permits intentional outside writes only for test evidence; secret-bearing settings, lab homes, login stores and plugin installs are not evidence, while a secret copy into this worktree is forbidden. Main must explicitly authorize the disposable outside-worktree lab exception and cleanup, or supply a supported alternative satisfying both restrictions. No lab created or key copied; the prior symlink failure was not rerun."
+    },
+    {
+      "id": "T2",
+      "action": "ask-user",
+      "description": "The broader host-recovery pause remains: Main031 authorizes only the two qualifying turns. Main must explicitly authorize resumption before any other scenario/phase. No acceptance waiver or pipeline advancement."
+    },
+    {
+      "id": "T3",
+      "action": "ask-user",
+      "description": "Claude proof remains untested. Native session-only settings and plugin-dir interfaces exist, but adviser saved key/mode/acknowledgement use plugin-owned state and isolated Claude roots change macOS Keychain credential identity. Supplied evidence and repository research did not establish a supported isolated settings route using existing authentication without shared preferences changes or other credential copies. Main must supply or authorize this route and necessary private lab/vendor runtime writes. No Claude session launched; normal login is not claimed unavailable."
+    }
+  ],
+  "checks": [
+    {
+      "command": "command -v omp claude bun node npm tmux git",
+      "exit": 0,
+      "observation": "All named tools on PATH; no machine search/install"
+    },
+    {
+      "command": "omp --help",
+      "exit": 0,
+      "observation": "OMP 18.6.3; profile isolates auth/settings/sessions/caches; plugin-dir available"
+    },
+    {
+      "command": "omp login --help",
+      "exit": 0,
+      "observation": "Native provider OAuth interface; no login attempted"
+    },
+    {
+      "command": "claude --help",
+      "exit": 0,
+      "observation": "Session-only settings and plugin-dir available; bare skips hooks and cannot substitute for proof"
+    }
+  ],
+  "reviewed": [
+    "main030-scoped-test-result.json",
+    "main030-test-review-prerequisite.json",
+    "main030-cleanup.json",
+    "current-native-prerequisite.json",
+    "current-manual-command-index.json",
+    "docs/configuration.md:987-1041,853-901",
+    ".no-mistakes.yaml:38-47",
+    "tests/fm-calm-claude-mod-live-e2e.test.sh:19-78",
+    ".agents/skills/harness-adapters/references/harness/claude.md:17-42",
+    "Read-only repository scout: no complete qualifying-turn driver or merged-adapter own-login evidence pointer located"
+  ],
+  "scenarios": [
+    {
+      "name": "OMP Jev judgement/native automatic compaction with before/after context",
+      "result": "untested",
+      "live": false,
+      "reason": "Conflicting lab-location/write restrictions"
+    },
+    {
+      "name": "Claude Jev judgement/native automatic compaction with before/after context",
+      "result": "untested",
+      "live": false,
+      "reason": "Compatible supported isolated settings/authentication route not established"
+    },
+    {
+      "name": "Remote secondmate live propagation",
+      "result": "not-testable",
+      "live": false,
+      "reason": "Main confirms no remote host; provisioning/shared endpoints forbidden. Existing compact-remote.log and targeted-commands.json retained, not rerun or credited live"
+    }
+  ],
+  "qualifying_turns_completed": 0,
+  "jev_judgement_observed": false,
+  "native_automatic_compaction_observed": false,
+  "before_after_context": null,
+  "cleanup": {
+    "new_labs": 0,
+    "live_workers_started": 0,
+    "settings_or_credential_copies": 0,
+    "source_test_doc_changes": false,
+    "shared_state_changes": false,
+    "worktree_transient_artifacts_created": false,
+    "prepared_dependencies_removed": false
+  },
+  "not_run": [
+    "Prior failed symlink scenario",
+    "Passing suites",
+    "Full suite",
+    "Lint/format/static analysis",
+    "Build/install",
+    "Live sessions/lifecycle",
+    "Other scenarios or pipeline phases"
+  ],
+  "acceptance": "Not established; no fresh dual-lane compaction evidence or performance/cost claim. Return to outer Test fix_review; broader pause preserved."
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "task": "tmux-emergency",
+    "rc": 0
+  },
+  {
+    "task": "tmux-normal",
+    "rc": 0
+  },
+  {
+    "socket_helper_rc": 0,
+    "socket_dir_exists": false
+  },
+  {
+    "owned_pids": [
+      26264,
+      28384,
+      28581,
+      28871,
+      29561,
+      36374,
+      38050,
+      45242,
+      58256
+    ],
+    "remaining_owned_processes": "",
+    "scratch_exists": false,
+    "home_exists": false
+  }
+]

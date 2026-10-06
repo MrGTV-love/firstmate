@@ -1,0 +1,9 @@
+{
+  "seedExit": 0,
+  "spawnExit": 0,
+  "spawnOutput": "spawned local-adviser harness=claude kind=secondmate mode=secondmate yolo=off window=fm-lab-compact-fleet-58297-3415:w4:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/secondmate-home\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nwarning: secondmate local-adviser sync skipped before launch: dirty working tree\n",
+  "inheritedPolicy": {
+    "claude": "auto",
+    "omp": "auto"
+  }
+}

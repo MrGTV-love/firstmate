@@ -1,0 +1,21 @@
+{
+  "native_OMP_exit": 0,
+  "private_tmux_kill_server": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "no server running on /private/tmp/fml.5WBB5S/tmux-501/fm-lab\n"
+  },
+  "lab_home_teardown": {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/lab-home",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "owned_plugin_fixture_removed": true,
+  "owned_short_socket_removed": true,
+  "owned_pane_shell_alive": false,
+  "owned_runtime_children_alive": {
+    "70637": false
+  },
+  "remove_command": "rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin"
+}

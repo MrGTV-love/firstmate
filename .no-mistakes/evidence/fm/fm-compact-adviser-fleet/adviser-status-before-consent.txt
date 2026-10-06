@@ -1,0 +1,40 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                        Tip: Hit a Codex rate limit? `/usage reset` spends a saved reset credit
+                                           to immediately restore your quota
+
+ Mode: hint. Minimum: 40,000 tokens. Context: 14079 (172% of the window; hint floor 0.50). Key: missing. No cooldown;
+ semantic checks still apply. Request log: off. Settings:
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/agent/compact
+ -adviser.json
+
+ π > ⬢ Apple AFM 3 Core Advanced > 🌳 32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW > ⑂ detached ?4 ▶──────────────┃─8.2K─172%
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

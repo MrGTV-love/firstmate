@@ -1,0 +1,45 @@
+{
+  "upstream_version": "0.1.5",
+  "runtime": "real OMP v18.6.3; explicitly loaded upstream src/index.ts; native private tmux 120x40",
+  "npm_install_exit": 0,
+  "runtime_dependency": "proper-lockfile 4.1.2",
+  "compatibility": "Registered and executed /compact-adviser without upstream/product patch or peer-package fallback install. --max-time120 was rejected; --max-time=120 is supported and used.",
+  "before_consent": "Mode: hint. Minimum: 40,000 tokens. Context: 14079 (172% of the window; hint floor 0.50). Key: missing. No cooldown; semantic checks still apply. Request log: off.",
+  "after_consent": "Mode: auto. Minimum: 40,000 tokens. Context: 14079 (172% of the window; hint floor 0.50). Key: missing. No cooldown; semantic checks still apply. Request log: off.",
+  "consent_saved": {
+    "mode": "auto",
+    "autoAcknowledged": true,
+    "minContextTokens": 40000,
+    "logRequests": false
+  },
+  "ambient_TYPESAFE_API_KEY_present": false,
+  "missing_prerequisite": "An authorized lab-only TypeSafe API credential injected narrowly into this disposable runtime. Operator saved key and operator .env were not accessed.",
+  "fresh_jev_judgement_exercised": false,
+  "actual_compaction_exercised": false,
+  "model_route_observed": "Real automatically selected Apple AFM 3 Core Advanced; no fake provider/model and no prompt or model API request submitted.",
+  "onboarding": "Initial Enter reached disposable OAuth sign-in prompt; Ctrl+C canceled it, second Ctrl+C saved setup and continued CLI. No authentication completed, sign-in credentials entered, or sign-out performed. Generated OAuth URL omitted from saved evidence.",
+  "state_boundary": "Command registration, actual status UI, first-use auto consent and fixture persistence are established. These do not establish fresh Jev judgment or compaction; missing TypeSafe key remains the runtime prerequisite.",
+  "cleanup": {
+    "native_OMP_exit": 0,
+    "private_tmux_kill_server": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "no server running on /private/tmp/fml.5WBB5S/tmux-501/fm-lab\n"
+    },
+    "lab_home_teardown": {
+      "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin/lab-home",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "owned_plugin_fixture_removed": true,
+    "owned_short_socket_removed": true,
+    "owned_pane_shell_alive": false,
+    "owned_runtime_children_alive": {
+      "70637": false
+    },
+    "remove_command": "rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-plugin"
+  },
+  "source_edits": false,
+  "checks_run": "Only this assigned final actual runtime smoke and setup/runtime/cleanup observations; no tests/build/lint/format/static-analysis commands."
+}

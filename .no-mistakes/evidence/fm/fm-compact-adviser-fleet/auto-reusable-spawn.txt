@@ -1,0 +1,13 @@
+ from that project entry and approve the imports dialog interactively once
+error: refusing to pre-register Claude trust: could not record trust for '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe/.treehouse/probe-7cbd9e/1/probe' and project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe' in '/Users/charlesabrooker/.claude.json'
+error: could not pre-register Claude workspace trust for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe/.treehouse/probe-7cbd9e/1/probe; refusing to launch a claude worker that would wedge on the trust dialog; inspect window fm-lab-adviser-test-67659-1247:w4:p2
+
+LAB_RC_off_direct_relaunch=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE -u CLAUDECODE DISABLE_AUTOUPDATER=1 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/treehouse TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/tmp FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home  bin/fm-spawn.sh auto-reusable /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project' --scout; printf "\nLAB_RC_auto_reusable_spawn=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned auto-reusable harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+LAB_RC_auto_reusable_spawn=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

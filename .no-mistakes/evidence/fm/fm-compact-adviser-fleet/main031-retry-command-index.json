@@ -1,0 +1,42 @@
+{
+  "scope": "Main031 two native qualifying-turn scenarios only; no full-suite or other phase execution",
+  "commands_run": [
+    "command -v omp claude tmux bun node npm git",
+    "omp --help",
+    "omp login --help",
+    "omp plugin list --json",
+    "claude --help",
+    "claude auth --help",
+    "claude auth status (normal existing login; metadata only, identity omitted from evidence)",
+    "git -C /Users/charlesabrooker/firstmate/projects/compact-adviser rev-parse 8392f4a^{commit}",
+    "git -C /Users/charlesabrooker/firstmate/projects/compact-adviser archive 8392f4aae343b1aee83e685d1fb81e077f181556 (read-only source; extracted only into private disposable lab)",
+    "bin/fm-lab-home.sh create \"$LAB\"; mkdir \"$LAB/tmux\"; touch \"$LAB/config/supervision-host\" (each fresh lab separately)",
+    "Private regular copy of /Users/charlesabrooker/.omp/agent/compact-adviser.json into \"$LAB/native-home/.omp/agent/compact-adviser.json\"; chmod 600; no key output",
+    "npm pack --json \"$LAB/package/packages/pi-extension\" --pack-destination \"$LAB\"",
+    "HOME=\"$LAB/native-home\" PI_CODING_AGENT_DIR=\"$LAB/native-home/.omp/agent\" omp plugin install \"compact-adviser@file:$TGZ\" --force",
+    "HOME=\"$LAB/native-home\" PI_CODING_AGENT_DIR=\"$LAB/native-home/.omp/agent\" omp plugin list --json",
+    "TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c \"$PWD\" -e FM_HOME=\"$LAB\" \"omp login openai-codex\" (sanitized lab environment)",
+    "browser.open scoped-lab-own-oauth http://localhost:1455/launch; observe actual OpenAI login page; capture screenshot to evidence; close managed tab",
+    "TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab kill-server (OMP OAuth endpoint only)",
+    "TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c \"$PWD\" -e FM_HOME=\"$LAB\" omp --no-tools --no-lsp --no-rules --no-skills --no-title --model openai-codex/gpt-6.1-sol --thinking low --system-prompt 'Read-only isolated compaction lab. No tools, source edits, lifecycle calls or pipeline actions.'",
+    "TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab send-keys -t primary Enter; capture-pane -p -t primary (OMP first-run provider OAuth requirement)",
+    "TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab kill-server; remove exact owned OMP lab and copied settings",
+    "HOME=\"$CLAB/native-home\" claude auth status (loggedIn=false)",
+    "HOME=\"$CLAB/native-home\" CLAUDE_CONFIG_DIR=\"$CLAB/native-home/.claude\" claude auth status (loggedIn=false)",
+    "TMUX_TMPDIR=\"$CLAB/tmux\" tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c \"$PWD\" -e FM_HOME=\"$CLAB\" claude --model haiku --tools '' --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --setting-sources '' --plugin-dir /Users/charlesabrooker/tmp/fm-lab.y1hzjiri/package/packages/claude-mod --system-prompt 'Read-only isolated compaction laboratory. Do not run commands, tools, edits, fleet actions or pipeline actions.'",
+    "TMUX_TMPDIR=\"$CLAB/tmux\" tmux -L fm-lab capture-pane -p -t primary; send-keys -t primary Enter; capture-pane -p -t primary (native login-method menu)",
+    "TMUX_TMPDIR=\"$CLAB/tmux\" tmux -L fm-lab kill-server; remove exact owned Claude lab",
+    "Write nonsecret prerequisite JSON, cleanup receipts, captured terminal grid and its labeled HTML replay into designated evidence directory"
+  ],
+  "prior_evidence_reviewed_not_rerun": [
+    "main030-scoped-test-result.json",
+    "main030-test-review-prerequisite.json",
+    "main031-scoped-test-result.json",
+    "current-manual-command-index.json",
+    "compact-remote.log",
+    "targeted-commands.json"
+  ],
+  "no_qualifying_turns_submitted": true,
+  "no_jev_judgment_or_native_automatic_compaction_observed": true,
+  "broader_host_recovery_pause_preserved": true
+}

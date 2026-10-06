@@ -1,0 +1,46 @@
+{
+  "namedSession": "fm-lab-compact-fleet-58297-3415",
+  "serverBoundary": "FM_COMPACT_ADVISER_DISABLE=unset FM_COMPACT_ADVISER_HOOKS=unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=unset\n",
+  "nativeProcesses": [
+    {
+      "task": "fresh-emergency",
+      "state": {
+        "pane": "w2:p2",
+        "shell_pid": 34846,
+        "processes": [
+          {
+            "pid": 58217,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "1",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+              "FM_COMPACT_ADVISER_HOOKS": null,
+              "FM_TASK_ID": "fresh-emergency"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "task": "fresh-auto",
+      "state": {
+        "pane": "w3:p2",
+        "shell_pid": 67152,
+        "processes": [
+          {
+            "pid": 98095,
+            "process": "claude",
+            "state": {
+              "COMPACT_ADVISER_DISABLE": "0",
+              "FM_COMPACT_ADVISER_DISABLE": null,
+              "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+              "FM_COMPACT_ADVISER_HOOKS": "1",
+              "FM_TASK_ID": "fresh-auto"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

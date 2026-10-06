@@ -1,0 +1,23 @@
+
+charlesabrooker@Mac-Studio confined-probe % cd -- '/Users/charlesabrooker/.no-mistakes/worktr
+ees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.tre
+ehouse/confined-probe-b2ddbb/1/confined-probe'
+charlesabrooker@Mac-Studio confined-probe % export GOTMPDIR=/tmp/fm-auto-reusable/gotmp
+charlesabrooker@Mac-Studio confined-probe % export COMPACT_ADVISER_DISABLE=0
+charlesabrooker@Mac-Studio confined-probe % export FM_TASK_ID=auto-reusable
+charlesabrooker@Mac-Studio confined-probe % . '/tmp/fm-auto-reusable+7b6e53e5cff3de6d8603a02f
+e1e54c5945c5ff8d4e6be559ef26a6014ef9ea15/launch.s1791308762.99590.8300.sh'
+[0m[38;2;215;119;87m ▐[0m[38;2;215;119;87m[48;2;0;0;0m▛███▛█   [0m[1mClaude Code [0m[38;2;102;102;102mv2.1.291[0m
+[0m[38;2;215;119;87m▝▜[0m[38;2;215;119;87m[48;2;0;0;0m█████[0m[38;2;215;119;87m█▀  [0m[38;2;102;102;102mHaiku 4.5 · Claude Max[0m
+[0m[38;2;215;119;87m ▝▝   ▝▝   [0m[38;2;102;102;102m~/…/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe[0m
+
+[0m[38;2;255;153;0m⚠ [0m[1m[38;2;255;153;0m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENT[0m
+  [0m[1m[38;2;255;153;0mS.md[0m[38;2;255;153;0m is over the 40.0k-char limit (48.0k chars)[0m[38;2;102;102;102m · /memory to free up context[0m
+
+[0m[38;2;138;138;138m─────────────────────────────────────────────────────────────────────────────────────────────[0m
+❯ [0m[38;2;51;102;255m/exit[0m
+[0m[38;2;138;138;138m─────────────────────────────────────────────────────────────────────────────────────────────[0m
+  [0m[38;2;51;102;255m❯ /[0m[1m[38;2;51;102;255mexit[0m[38;2;51;102;255m                       [0m[1m[38;2;51;102;255mExit[0m[38;2;51;102;255m the CLI[0m
+  [0m[38;2;102;102;102m  /context                    Visualize current context usage as a colored grid[0m
+  [0m[38;2;102;102;102m  /usage-credits              Configure usage credits or request them from your admin[0m
+                                [0m[38;2;102;102;102mwhen you hit a limit[0m

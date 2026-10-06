@@ -1,0 +1,44 @@
+{
+  "variables": {
+    "LAB": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3",
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home",
+    "SOURCE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/source-package",
+    "HERDR_SESSION": "fm-lab-compact-fleet-58297-3415"
+  },
+  "commands": [
+    "omp --help; omp plugin list --json; claude --version; claude auth status",
+    "bin/fm-lab-home.sh create \"$LAB/home\"",
+    "bin/fm-herdr-lab.sh provision fm-lab-compact-fleet-58297-3415",
+    "bin/fm-herdr-lab.sh viewer start fm-lab-compact-fleet-58297-3415",
+    "bin/fm-spawn.sh omp-auto \"$LAB/project\" --scout --backend herdr \"omp --model openai-codex/gpt-6.1-sol --thinking low --no-tools --no-lsp --no-rules --no-skills --no-extensions -e /Users/charlesabrooker/.omp/plugins/node_modules/compact-adviser/src/index.ts --session-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/omp-sessions --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/omp.yml --no-title --system-prompt 'You are a read-only laboratory assistant. Answer supplied tasks accurately and concisely. No tool calls, code changes, deployment, or pipeline actions are allowed.'\"",
+    "Native OMP /compact-adviser status, two audit turns above 40k context, /exit; stopped because installed default lacked required merged native-source adapter; NOT Jev/compaction acceptance proof.",
+    "bin/fm-spawn.sh claude-open \"$LAB/project\" --scout --backend herdr \"claude --model haiku --tools '' --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --setting-sources '' --plugin-dir /Users/charlesabrooker/.claude/plugins/cache/compact-adviser/compact-adviser/0.1.11 --system-prompt 'You are a read-only laboratory assistant. Do not run commands, edit files, administer fleet state, or use tools. Answer laboratory prompts concisely.'\"",
+    "bin/fm-control.sh claude-open relaunch --harness claude --model haiku --note \"Validation only. Do not use tools, edit files, or administer anything.\" (off, auto, emergency; filtered/unfiltered)",
+    "bin/fm-control.sh claude-open exit with LAB_PENDING_DRAFT staged (refused; draft preserved)",
+    "bin/fm-spawn.sh claude-explicit \"$LAB/project\" --scout --backend herdr \"CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --model haiku --tools '' --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --setting-sources '' --plugin-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm --system-prompt 'Read-only lab. Do not run tools or edit files.'\" (filtered); claude-explicit-open same raw command unfiltered; native /calm toggles",
+    "bin/fm-spawn.sh claude-filtered \"$LAB/project\" --scout --backend herdr \"claude --model haiku --tools '' --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --setting-sources '' --plugin-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm --system-prompt 'Read-only lab. Do not run tools or edit files.'\"; native /calm reports unknown command under adviser-owned marker",
+    "bin/fm-spawn.sh claude-absent \"$LAB/project\" --scout --backend herdr \"claude --model haiku --tools '' --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --setting-sources '' --plugin-dir /Users/charlesabrooker/.claude/plugins/cache/compact-adviser/compact-adviser/0.1.11 --system-prompt 'You are a read-only laboratory assistant. Do not run commands, edit files, administer fleet state, or use tools. Answer laboratory prompts concisely.'\" (policy absent)",
+    "bin/fm-spawn.sh policy-invalid \"$LAB/project\" --scout --backend herdr --harness claude --model haiku (malformed JSON, unknown harness, hint mode)",
+    "FM_COMPACT_ADVISER_DISABLE=1 bin/fm-spawn.sh batch-scout-{0,1}-a=\"$LAB/project\" batch-scout-{0,1}-b=\"$LAB/project\" --scout --harness claude --model haiku --backend herdr (each two-child batch, absent/enabled allowlist)",
+    "FM_COMPACT_ADVISER_DISABLE=1 bin/fm-spawn.sh batch-ship-{0,1}-a=\"$LAB/project\" batch-ship-{0,1}-b=\"$LAB/project\" --mode local-only --yolo off --harness claude --model haiku --backend herdr (each two-child batch, absent/enabled allowlist)",
+    "bin/fm-herdr-lab.sh viewer stop fm-lab-compact-fleet-58297-3415; bin/fm-herdr-lab.sh stop fm-lab-compact-fleet-58297-3415; fresh-emergency spawn invokes guarded helper provision through real server-start boundary; subsequent fresh-auto spawn",
+    "\"$SOURCE/bin/fm-home-seed.sh\" local-adviser \"$LAB/secondmate-home\" --no-projects; \"$SOURCE/bin/fm-spawn.sh\" local-adviser \"$LAB/secondmate-home\" --secondmate --backend herdr <real raw Claude command>",
+    "FM_HOME=\"$LAB/secondmate-home\" COMPACT_ADVISER_DISABLE=1 \"$SOURCE/bin/fm-spawn.sh\" local-child \"$LAB/project\" --scout --backend herdr <real raw Claude command>",
+    "bin/fm-captain-hold.sh complete <owned fixture task> --none; bin/fm-teardown.sh <owned fixture task> (all tasks; no --force)",
+    "Native teardown of claude-absent while exact separately grouped bounded foreign fixture is alive and its code root is absent; ps -u restricted to exact foreign PID; successful task cleanup and foreign survival; exact fixture group reaped",
+    "treehouse status (cwd \"$LAB/project\"): all owned slots available",
+    "bin/fm-herdr-lab.sh teardown fm-lab-compact-fleet-58297-3415; exact recorded process checks; remove owned \"$LAB\""
+  ],
+  "setup_corrections": [
+    "Initial helper wrapper lacked original PATH, causing recursion before any agent or workspace existed; corrected helper routing, no remaining recursive process.",
+    "Isolated Claude onboarding completed without signing in; accepted only owned fixture trust/startup dialogs. Native startup pending input was settled before recovery retries.",
+    "Owned fixture scout teardown initially refused missing completion inventory; completed inventory through supported helper, then redrove successfully."
+  ],
+  "verification_limits": [
+    "Normal Claude login available but isolated Claude store intentionally unauthenticated. Native Claude checks establish launch, control and plugin UI only, not a fresh model/Jev turn.",
+    "Installed OMP entry mismatches required merged 8392f4a; older-entry experiment excluded from acceptance.",
+    "No real remote secondmate host exists, per Main; complete transport fixtures are non-live.",
+    "PNG is a faithful captured terminal text-grid replay, not an OS window screenshot.",
+    "No broad suite, linter, formatter, static-analysis, push, PR, CI or pipeline control phase executed."
+  ]
+}

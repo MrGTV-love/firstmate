@@ -1,0 +1,102 @@
+{
+  "result": "PASS launch/environment policy on real native Zellij and Claude TUI; no advising/model judgment claim",
+  "session": "round2-zellij-800f9eb0e0",
+  "zellij_version": "0.44.0",
+  "release_sha256": "b0b9f2b95e647e62684b33a469dcbb3e99bb10c84bd66bf907884ade7c1dbf29",
+  "source_sha256_at_evidence_capture": {
+    "bin/fm-spawn.sh": "1681a05bfb5e6a85a2676a566bcee071a309d498598dfc38902d6980e986624a",
+    "bin/fm-compact-adviser-lib.sh": "b1f078f6d40e1429c852d7ee6ca7264db7bc4be25c0fa7b44f2656502015a995",
+    "bin/backends/zellij.sh": "9949964f65d69945934cbd5650afe1bad817060547a75c0b20024b3a23cf4e21"
+  },
+  "lab_home_create": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh",
+    "create",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home"
+  ],
+  "fixture_treehouse_toml": "max_trees = 4\nroot = \".\"\nbase_branch = \"main\"\n",
+  "policy_config": {
+    "claude": "auto"
+  },
+  "onboarding_seed_noncredential": {
+    "hasCompletedOnboarding": true,
+    "theme": "dark",
+    "bypassPermissionsModeAccepted": true
+  },
+  "controller_emergency_env": {
+    "FM_COMPACT_ADVISER_DISABLE": "1",
+    "FM_COMPACT_ADVISER_HOOKS": "1",
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+    "COMPACT_ADVISER_DISABLE": "1"
+  },
+  "controller_later_env": {
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "FM_COMPACT_ADVISER_HOOKS": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "COMPACT_ADVISER_DISABLE": null
+  },
+  "server_pid": 97352,
+  "worker_emergency_pid": 80814,
+  "worker_auto_pid": 93483,
+  "policy_observed": {
+    "server": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    },
+    "emergency_worker": {
+      "COMPACT_ADVISER_DISABLE": "1",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+      "FM_COMPACT_ADVISER_HOOKS": null,
+      "FM_COMPACT_ADVISER_DISABLE": null
+    },
+    "configured_auto_worker": {
+      "COMPACT_ADVISER_DISABLE": "0",
+      "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+      "FM_COMPACT_ADVISER_HOOKS": "1",
+      "FM_COMPACT_ADVISER_DISABLE": null
+    }
+  },
+  "actual_ui": "Both workers reached real Claude external CLAUDE.md imports confirmation. No login performed; no model response or adviser invocation claimed. Isolated CLAUDE_CONFIG_DIR contained no credentials.",
+  "repair": "Second headless new-tab returned empty stdout although native tab 2 existed; retry correctly refused duplicate. Closed exact orphan tab 2, attached actual native Zellij client via private PTY, then same-server fm-spawn auto succeeded (pane 3). No direct pool-slot manipulation.",
+  "cleanup": {
+    "native_task_teardown": [
+      {
+        "task_id": "zellij-emergency",
+        "returncode": 0,
+        "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-emergency: 10758 80814\nteardown: force-killing leaked worktree process(es) for zellij-emergency: 10758\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-emergency complete (window round2-zellij-800f9eb0e0:1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project)\nBacklog: zellij-emergency just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md - move zellij-emergency to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\n"
+      },
+      {
+        "task_id": "zellij-auto",
+        "returncode": 0,
+        "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-auto: 1002 93483\nteardown: force-killing leaked worktree process(es) for zellij-auto: 1002\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-auto complete (window round2-zellij-800f9eb0e0:3, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project)\nBacklog: zellij-auto just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md - move zellij-auto to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\n"
+      }
+    ],
+    "native_session_kill_rc": 0,
+    "native_session_delete_rc": 0,
+    "attach_returncode": 0,
+    "owned_pids_absent": [
+      309,
+      1002,
+      9673,
+      10758,
+      80814,
+      81350,
+      93483,
+      97352,
+      97978
+    ],
+    "owned_socket_absent": "/Users/charlesabrooker/tmp/zellij-501/contract_version_1/round2-zellij-800f9eb0e0",
+    "native_task_temp_absent": {
+      "/tmp/fm-zellij-emergency": false,
+      "/tmp/fm-zellij-emergency+acfe2766772970fb58c2b507dc500fce1b04d0651adf4e5198d7bf2bc18b8021": false,
+      "/tmp/fm-zellij-auto": false,
+      "/tmp/fm-zellij-auto+acfe2766772970fb58c2b507dc500fce1b04d0651adf4e5198d7bf2bc18b8021": false
+    },
+    "scratch_removed": true,
+    "removal_operation": "shutil.rmtree(str(scratch)); scope exact .live-validation-zellij only"
+  },
+  "artifact_prefix": "round2-",
+  "commands_artifact": "round2-commands.json",
+  "checks_not_run": "No build, lint, static analysis, automated tests or full suite."
+}

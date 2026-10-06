@@ -1,0 +1,26 @@
+[
+  {
+    "input": "{\"claude\":\"hint\"}",
+    "exit": 1,
+    "message": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off",
+    "metadata_created": false
+  },
+  {
+    "input": "{\"codex\":\"auto\"}",
+    "exit": 1,
+    "message": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off",
+    "metadata_created": false
+  },
+  {
+    "input": "[\"auto\"]",
+    "exit": 1,
+    "message": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off",
+    "metadata_created": false
+  },
+  {
+    "input": "{\"claude\":\"auto\"}\n{\"omp\":\"auto\"}",
+    "exit": 1,
+    "message": "error: config/compact-adviser expects only claude or omp mapped to off or auto; other harnesses always run with the adviser off",
+    "metadata_created": false
+  }
+]

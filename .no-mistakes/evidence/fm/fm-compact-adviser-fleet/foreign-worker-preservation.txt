@@ -1,0 +1,15 @@
+--relaunch --harness 'CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home claude --model haiku --tools "" --strict-mcp-config --setting-sources project --plugin-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm'; printf "\nLAB_RC_calm_explicit_raw_opt_in=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+spawned auto-reusable harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/1/confined-probe
+
+LAB_RC_calm_explicit_raw_opt_in=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % export CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/claude-config HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/user-home
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-captain-hold.sh complete auto-confined --none && FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-teardown.sh auto-confined; printf "\nLAB_RC_foreign_worker_preservation=%s\n" "$?"
+complete: auto-confined captain-call inventory reviewed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: herdr endpoint fm-lab-adviser-test-67659-1247:w4:p2 for auto-confined has ambiguous structured presence; nothing was changed - restore reliable endpoint inspection and rerun teardown
+
+LAB_RC_foreign_worker_preservation=1
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

@@ -1,0 +1,11 @@
+{
+  "mode": "auto",
+  "autoAcknowledged": true,
+  "saved_key_present": false,
+  "ambient_typesafe_key_present": false,
+  "native_status": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.3\n\n           Tip: With default keybindings, \u2303D deletes the character under the cursor\n               instead of quitting your draft \u2014 see /hotkeys for your exit key\n\n Mode: auto. Minimum: 40,000 tokens. Context: 1984 (24% of the window; hint floor 0.83). Key:\n missing. No cooldown; semantic checks still apply. Request log: off. Settings:\n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-\n validation/plugin-agent/compact-adviser.json\n\n \u03c0 > \u2b22 Apple AFM 3 Core Advanced > \ud83c\udf33 project/project > \u2442 detached \u25b6\u2500\u2500\u2500\u2500\u250024%\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2503\u2500\u25008.2K\u2500\n\u2570\u2500                                                                \u21e7\u21e5 to change thinking effort\n",
+  "plugin_version": "0.1.5",
+  "host_version": "omp 18.6.3",
+  "actual_judgment_observed": false,
+  "actual_native_compaction_observed": false
+}

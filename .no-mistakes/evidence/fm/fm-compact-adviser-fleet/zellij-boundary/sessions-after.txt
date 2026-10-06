@@ -1,0 +1,3 @@
+No active zellij sessions found.
+
+exit=1

@@ -1,0 +1,1281 @@
++ set -u
+++ dirname tests/fm-teardown-selected-targeted-regressions.poki90y3.test.sh
++ . tests/lib.sh
+++ '[' -n '' ']'
+++ FM_TEST_LIB_SOURCED=1
+++ umask 022
++++ dirname tests/lib.sh
+++ . tests/git-config-helpers.sh
++++ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
++++ GIT_CONFIG_GLOBAL=/dev/null
++++ GIT_CONFIG_NOSYSTEM=1
+++ export FM_GATE_REFUSE_BYPASS=1
+++ FM_GATE_REFUSE_BYPASS=1
+++ export FM_TEST_SEAM=1
+++ FM_TEST_SEAM=1
+++ unset FM_TASK_ID
+++ unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
+++ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
+++++ dirname tests/lib.sh
++++ cd tests/..
++++ pwd
+++ ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW
+++ FM_TEST_CLEANUP_DIRS=()
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-cleanup.64058.XXXXXX
+++ FM_TEST_CLEANUP_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-cleanup.64058.gRw0QR
++++ fm_test_pid_identity 64058
++++ local pid=64058
++++ FM_STATE_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3
++++ bash -c '. "$1"; fm_pid_identity "$2"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-lib.sh 64058
+++ FM_TEST_OWNER_IDENTITY='Tue Oct  6 16:32:30 2026     bash -x tests/fm-teardown-selected-targeted-regressions.poki90y3.test.sh'
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-procevent.64058.XXXXXX
+++ FM_TEST_PROCEVENT_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-procevent.64058.jvQBIB
++++ mktemp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-watcher.64058.XXXXXX
+++ FM_TEST_WATCHER_REGISTRY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-watcher.64058.WllVnY
+++ FM_TEST_STUB_MAX_BLOCK_SECONDS=120
+++ export FM_TEST_STUB_MAX_BLOCK_SECONDS
+++ trap fm_test_cleanup EXIT
+++ trap 'fm_test_cleanup; exit 130' INT
+++ trap 'fm_test_cleanup; exit 143' TERM
+++ trap 'fm_test_cleanup; exit 129' HUP
+++ trap 'fm_test_cleanup; exit 131' QUIT
+++ FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
+++ '[' 1 '!=' 1 ']'
++ fm_git_identity fmtest fmtest@example.invalid
++ export GIT_AUTHOR_NAME=fmtest GIT_AUTHOR_EMAIL=fmtest@example.invalid
++ GIT_AUTHOR_NAME=fmtest
++ GIT_AUTHOR_EMAIL=fmtest@example.invalid
++ export GIT_COMMITTER_NAME=fmtest GIT_COMMITTER_EMAIL=fmtest@example.invalid
++ GIT_COMMITTER_NAME=fmtest
++ GIT_COMMITTER_EMAIL=fmtest@example.invalid
++ TEARDOWN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh
++ PR_CHECK=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-check.sh
+++ fm_test_tmproot fm-teardown-tests
+++ local prefix=fm-teardown-tests root tmp_base
+++ tmp_base=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3
+++ tmp_base=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3
++++ mktemp -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.XXXXXX
+++ root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++++ cd -P -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++++ pwd -P
+++ root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
+++ printf '%s\n%s\n' 64058 'Tue Oct  6 16:32:30 2026     bash -x tests/fm-teardown-selected-targeted-regressions.poki90y3.test.sh'
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++ TMP_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
+++ command -v git
++ REAL_GIT_FOR_TEST=/usr/bin/git
++ export REAL_GIT_FOR_TEST
+++ command -v ps
++ REAL_PS_FOR_TEST=/bin/ps
++ export REAL_PS_FOR_TEST
+++ command -v lsof
++ REAL_LSOF_FOR_TEST=/usr/sbin/lsof
++ export REAL_LSOF_FOR_TEST
++ FOREIGN_WORKER_PID=
++ trap 'stop_foreign_worker; fm_test_cleanup' EXIT
++ test_task_teardown_preserves_another_homes_abandoned_worker
++ local case_dir foreign_root pid rc
+++ make_case caller-confined-reaping
+++ local name=caller-confined-reaping case_dir fakebin
+++ case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
+++ fakebin=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin
+++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/data /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin
+++ cat
+++ cat
+++ cat
+++ cat
+++ cat
+++ chmod +x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/treehouse /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/tmux /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/gh-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/gh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/no-mistakes
+++ git init -q --bare /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/origin.git
+++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/origin.git symbolic-ref HEAD refs/heads/main
+++ git clone -q /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/origin.git /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/_seed
+++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/_seed -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'origin baseline'
+++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/_seed push -q origin main
+++ rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/_seed
+++ git clone -q /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/origin.git /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project
+++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project remote set-head origin main
+++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project worktree add -q -b fm/task-x1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/wt main
+++ touch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state/.last-watcher-beat
+++ printf '%s\n' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ write_meta /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping no-mistakes ship
++ local case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping mode=no-mistakes kind=ship
++ fm_write_meta /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state/task-x1.meta window=firstmate:fm-task-x1 endpoint_task_id=task-x1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/wt project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project kind=ship mode=no-mistakes spawn_gen=teardown-test-task-x1
++ local file=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state/task-x1.meta kv
++ shift
++ :
++ for kv in '"$@"'
++ printf '%s\n' window=firstmate:fm-task-x1
++ for kv in '"$@"'
++ printf '%s\n' endpoint_task_id=task-x1
++ for kv in '"$@"'
++ printf '%s\n' worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/wt
++ for kv in '"$@"'
++ printf '%s\n' project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project
++ for kv in '"$@"'
++ printf '%s\n' kind=ship
++ for kv in '"$@"'
++ printf '%s\n' mode=no-mistakes
++ for kv in '"$@"'
++ printf '%s\n' spawn_gen=teardown-test-task-x1
++ land_shippable_commit /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ local case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ wt_commit /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping 'shippable work'
++ local case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping 'msg=shippable work'
++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/wt -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'shippable work'
++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/wt push -q origin fm/task-x1
++ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/project fetch -q origin
++ prepare_teardown_source_copy /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ local case_dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping f base dest=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin s
++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends
++ base=backends
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends ']'
++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/cmux.sh
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/cmux.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/cmux.sh
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr-eventwait.py
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr-eventwait.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/herdr-eventwait.py
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr-workspace-move.py
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr-workspace-move.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/herdr-workspace-move.py
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr.sh
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/herdr.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/herdr.sh
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/orca.sh
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/orca.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/orca.sh
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/tmux.sh
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/tmux.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/tmux.sh
++ for s in '"$f"/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/zellij.sh
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/backends/zellij.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/backends/zellij.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-contract.sh
++ base=fm-afk-contract.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-contract.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-contract.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-afk-contract.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-launch.sh
++ base=fm-afk-launch.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-launch.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-launch.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-afk-launch.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-return.sh
++ base=fm-afk-return.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-return.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-return.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-afk-return.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-start.sh
++ base=fm-afk-start.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-start.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-afk-start.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-afk-start.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agent-process-lib.sh
++ base=fm-agent-process-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agent-process-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agent-process-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-agent-process-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agy-trust.sh
++ base=fm-agy-trust.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agy-trust.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-agy-trust.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-agy-trust.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-command-policy.mjs
++ base=fm-arm-command-policy.mjs
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-command-policy.mjs ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-command-policy.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-arm-command-policy.mjs
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-pretool-check.sh
++ base=fm-arm-pretool-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-pretool-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-arm-pretool-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-arm-pretool-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend-hometag-lib.sh
++ base=fm-backend-hometag-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend-hometag-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend-hometag-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-backend-hometag-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend.sh
++ base=fm-backend.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backend.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-backend.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-handoff.sh
++ base=fm-backlog-handoff.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-handoff.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-handoff.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-backlog-handoff.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-receive.sh
++ base=fm-backlog-receive.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-receive.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-receive.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-backlog-receive.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-transition-lib.sh
++ base=fm-backlog-transition-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-transition-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-backlog-transition-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-backlog-transition-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-board.sh
++ base=fm-bearings-board.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-board.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-board.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-bearings-board.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-snapshot.sh
++ base=fm-bearings-snapshot.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-snapshot.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bearings-snapshot.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-bearings-snapshot.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bootstrap.sh
++ base=fm-bootstrap.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bootstrap.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-bootstrap.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-bootstrap.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-dispatch.mjs
++ base=fm-branch-dispatch.mjs
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-dispatch.mjs ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-dispatch.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-branch-dispatch.mjs
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-outcome.sh
++ base=fm-branch-outcome.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-outcome.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-outcome.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-branch-outcome.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-prompt.sh
++ base=fm-branch-prompt.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-prompt.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-prompt.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-branch-prompt.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-report.sh
++ base=fm-branch-report.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-report.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-branch-report.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-branch-report.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief-heading-lib.sh
++ base=fm-brief-heading-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief-heading-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief-heading-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-brief-heading-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief.sh
++ base=fm-brief.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-brief.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-brief.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-event.sh
++ base=fm-busy-event.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-event.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-event.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-busy-event.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-lib.sh
++ base=fm-busy-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-busy-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-busy-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-captain-hold.sh
++ base=fm-captain-hold.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-captain-hold.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-captain-hold.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-captain-hold.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-command-policy.mjs
++ base=fm-cd-command-policy.mjs
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-command-policy.mjs ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-command-policy.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-cd-command-policy.mjs
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-pretool-check.sh
++ base=fm-cd-pretool-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-pretool-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cd-pretool-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-cd-pretool-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-lib.sh
++ base=fm-check-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-check-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-register.sh
++ base=fm-check-register.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-register.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-register.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-check-register.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-unregister.sh
++ base=fm-check-unregister.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-unregister.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-check-unregister.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-check-unregister.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-classify-lib.sh
++ base=fm-classify-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-classify-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-classify-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-classify-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-launcher-lib.sh
++ base=fm-claude-launcher-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-launcher-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-launcher-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-claude-launcher-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-stop-autoarm.sh
++ base=fm-claude-stop-autoarm.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-stop-autoarm.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-stop-autoarm.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-claude-stop-autoarm.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-trust.sh
++ base=fm-claude-trust.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-trust.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-claude-trust.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-claude-trust.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-compact-adviser-lib.sh
++ base=fm-compact-adviser-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-compact-adviser-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-compact-adviser-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-compact-adviser-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-composer-lib.sh
++ base=fm-composer-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-composer-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-composer-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-composer-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-inherit-lib.sh
++ base=fm-config-inherit-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-inherit-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-inherit-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-config-inherit-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-push.sh
++ base=fm-config-push.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-push.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-config-push.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-config-push.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.jq
++ base=fm-contributions.jq
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.jq ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.jq /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-contributions.jq
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.sh
++ base=fm-contributions.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-contributions.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-contributions.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control-lib.sh
++ base=fm-control-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-control-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control.sh
++ base=fm-control.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-control.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-control.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-crew-state.sh
++ base=fm-crew-state.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-crew-state.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-crew-state.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-crew-state.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cursor-lib.sh
++ base=fm-cursor-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cursor-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-cursor-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-cursor-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-decision-hold.sh
++ base=fm-decision-hold.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-decision-hold.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-decision-hold.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-decision-hold.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-devin-config.sh
++ base=fm-devin-config.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-devin-config.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-devin-config.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-devin-config.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dispatch-resolve.sh
++ base=fm-dispatch-resolve.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dispatch-resolve.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-dispatch-resolve.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-doc-audience-check.sh
++ base=fm-doc-audience-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-doc-audience-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-doc-audience-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-doc-audience-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dod-lib.sh
++ base=fm-dod-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dod-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-dod-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-dod-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ensure-agents-md.sh
++ base=fm-ensure-agents-md.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ensure-agents-md.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ensure-agents-md.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-ensure-agents-md.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-env-lib.sh
++ base=fm-env-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-env-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-env-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-env-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension-launch-barrier.mjs
++ base=fm-extension-launch-barrier.mjs
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension-launch-barrier.mjs ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension-launch-barrier.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-extension-launch-barrier.mjs
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.mjs
++ base=fm-extension.mjs
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.mjs ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-extension.mjs
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.sh
++ base=fm-extension.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-extension.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-extension.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ff-lib.sh
++ base=fm-ff-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ff-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-ff-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-ff-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-ledger.sh
++ base=fm-fleet-ledger.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-ledger.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-ledger.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-fleet-ledger.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-snapshot.sh
++ base=fm-fleet-snapshot.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-snapshot.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-snapshot.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-fleet-snapshot.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-sync.sh
++ base=fm-fleet-sync.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-sync.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-sync.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-fleet-sync.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-view.sh
++ base=fm-fleet-view.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-view.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-fleet-view.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-fleet-view.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-forge-detect.sh
++ base=fm-forge-detect.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-forge-detect.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-forge-detect.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-forge-detect.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gate-refuse-lib.sh
++ base=fm-gate-refuse-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gate-refuse-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gate-refuse-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-gate-refuse-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gemini-lib.sh
++ base=fm-gemini-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gemini-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-gemini-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-gemini-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-git-strip-ai-trailers.sh
++ base=fm-git-strip-ai-trailers.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-git-strip-ai-trailers.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-git-strip-ai-trailers.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-git-strip-ai-trailers.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-guard.sh
++ base=fm-guard.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-guard.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-guard.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-guard.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-harness.sh
++ base=fm-harness.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-harness.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-harness.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-harness.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-ci-cleanup.sh
++ base=fm-herdr-ci-cleanup.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-ci-cleanup.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-ci-cleanup.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-herdr-ci-cleanup.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab-viewer.py
++ base=fm-herdr-lab-viewer.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab-viewer.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab-viewer.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-herdr-lab-viewer.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh
++ base=fm-herdr-lab.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-herdr-lab.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-session-cleanup.sh
++ base=fm-herdr-session-cleanup.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-session-cleanup.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-session-cleanup.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-herdr-session-cleanup.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-seed.sh
++ base=fm-home-seed.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-seed.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-seed.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-home-seed.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-summary-refresh.sh
++ base=fm-home-summary-refresh.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-summary-refresh.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-home-summary-refresh.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-home-summary-refresh.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-hook-host-lib.sh
++ base=fm-hook-host-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-hook-host-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-hook-host-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-hook-host-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-host-mirror.sh
++ base=fm-host-mirror.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-host-mirror.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-host-mirror.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-host-mirror.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inactive-reconcile.sh
++ base=fm-inactive-reconcile.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inactive-reconcile.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inactive-reconcile.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-inactive-reconcile.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inbox.sh
++ base=fm-inbox.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inbox.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-inbox.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-inbox.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-actionlint.sh
++ base=fm-install-actionlint.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-actionlint.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-actionlint.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-install-actionlint.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-herdr.sh
++ base=fm-install-herdr.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-herdr.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-herdr.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-install-herdr.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-shellcheck.sh
++ base=fm-install-shellcheck.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-shellcheck.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-shellcheck.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-install-shellcheck.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-treehouse.sh
++ base=fm-install-treehouse.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-treehouse.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-install-treehouse.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-install-treehouse.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-kimi-turnend-hook.sh
++ base=fm-kimi-turnend-hook.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-kimi-turnend-hook.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-kimi-turnend-hook.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-kimi-turnend-hook.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh
++ base=fm-lab-home.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lab-home.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-landed-lib.sh
++ base=fm-landed-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-landed-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-landed-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-landed-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease-lib.sh
++ base=fm-lease-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lease-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease.sh
++ base=fm-lease.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lease.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lease.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-line-cap-lib.sh
++ base=fm-line-cap-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-line-cap-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-line-cap-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-line-cap-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint-workflows.sh
++ base=fm-lint-workflows.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint-workflows.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint-workflows.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lint-workflows.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint.sh
++ base=fm-lint.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lint.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lint.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock-lib.sh
++ base=fm-lock-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lock-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock.sh
++ base=fm-lock.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lock.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-lock.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail-check.sh
++ base=fm-mail-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-mail-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.py
++ base=fm-mail.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-mail.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.sh
++ base=fm-mail.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mail.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-mail.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-marker-lib.sh
++ base=fm-marker-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-marker-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-marker-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-marker-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.py
++ base=fm-mem-guard.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-mem-guard.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.sh
++ base=fm-mem-guard.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-mem-guard.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-mem-guard.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-authority-lib.sh
++ base=fm-merge-authority-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-authority-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-authority-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-merge-authority-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-local.sh
++ base=fm-merge-local.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-local.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-local.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-merge-local.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-outcome-lib.sh
++ base=fm-merge-outcome-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-outcome-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-merge-outcome-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-merge-outcome-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-nm-run-lib.sh
++ base=fm-nm-run-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-nm-run-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-nm-run-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-nm-run-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-on.sh
++ base=fm-on.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-on.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-on.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-on.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-operational-input.sh
++ base=fm-operational-input.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-operational-input.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-operational-input.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-operational-input.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-parent-channel-lib.sh
++ base=fm-parent-channel-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-parent-channel-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-parent-channel-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-parent-channel-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-path-lib.sh
++ base=fm-path-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-path-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-path-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-path-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-peek.sh
++ base=fm-peek.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-peek.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-peek.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-peek.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pending-reply-lib.sh
++ base=fm-pending-reply-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pending-reply-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pending-reply-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pending-reply-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-check.sh
++ base=fm-pr-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-lib.sh
++ base=fm-pr-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-merge.sh
++ base=fm-pr-merge.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-merge.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-merge.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-merge.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-poll.sh
++ base=fm-pr-poll.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-poll.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-poll.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-poll.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-reviewers.sh
++ base=fm-pr-reviewers.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-reviewers.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-reviewers.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-reviewers.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-state.sh
++ base=fm-pr-state.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-state.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-pr-state.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-pr-state.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-primary-scope-lib.sh
++ base=fm-primary-scope-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-primary-scope-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-primary-scope-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-primary-scope-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-extension-capture.pl
++ base=fm-procevent-extension-capture.pl
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-extension-capture.pl ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-extension-capture.pl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-extension-capture.pl
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lavish.sh
++ base=fm-procevent-lavish.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lavish.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lavish.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-lavish.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lib.sh
++ base=fm-procevent-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-quota.sh
++ base=fm-procevent-quota.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-quota.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-quota.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-quota.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-remote-reply.sh
++ base=fm-procevent-remote-reply.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-remote-reply.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-remote-reply.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-remote-reply.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-when.sh
++ base=fm-procevent-when.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-when.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent-when.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent-when.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent.sh
++ base=fm-procevent.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-procevent.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-procevent.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-mode.sh
++ base=fm-project-mode.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-mode.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-mode.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-project-mode.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-origin-lib.sh
++ base=fm-project-origin-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-origin-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-project-origin-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-project-origin-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-promote.sh
++ base=fm-promote.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-promote.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-promote.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-promote.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-collect.sh
++ base=fm-public-followup-collect.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-collect.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-collect.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-public-followup-collect.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-emit.sh
++ base=fm-public-followup-emit.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-emit.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-emit.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-public-followup-emit.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-lib.sh
++ base=fm-public-followup-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-public-followup-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup.sh
++ base=fm-public-followup.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-public-followup.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-public-followup.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-push-transition-lib.sh
++ base=fm-push-transition-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-push-transition-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-push-transition-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-push-transition-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-axi-lib.sh
++ base=fm-quota-axi-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-axi-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-axi-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-quota-axi-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-choose.sh
++ base=fm-quota-choose.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-choose.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-quota-choose.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-quota-choose.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-delta-read.sh
++ base=fm-remote-delta-read.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-delta-read.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-delta-read.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-delta-read.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-doctor.sh
++ base=fm-remote-doctor.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-doctor.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-doctor.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-doctor.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-entrypoint.sh
++ base=fm-remote-entrypoint.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-entrypoint.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-entrypoint.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-entrypoint.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-file.sh
++ base=fm-remote-file.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-file.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-file.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-file.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-guard.sh
++ base=fm-remote-herdr-guard.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-guard.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-guard.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-herdr-guard.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-owner-lib.sh
++ base=fm-remote-herdr-owner-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-owner-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-herdr-owner-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-herdr-owner-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-provision.sh
++ base=fm-remote-home-provision.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-provision.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-provision.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-home-provision.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-seed.sh
++ base=fm-remote-home-seed.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-seed.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-home-seed.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-home-seed.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit-push.sh
++ base=fm-remote-inherit-push.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit-push.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit-push.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-inherit-push.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit.sh
++ base=fm-remote-inherit.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-inherit.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-inherit.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-lib.sh
++ base=fm-remote-job-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-job-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-reap-orphans.sh
++ base=fm-remote-job-reap-orphans.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-reap-orphans.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-reap-orphans.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-job-reap-orphans.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-worker.sh
++ base=fm-remote-job-worker.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-worker.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-job-worker.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-job-worker.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-readiness-lib.sh
++ base=fm-remote-readiness-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-readiness-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-readiness-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-readiness-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-control.sh
++ base=fm-remote-secondmate-control.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-control.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-control.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-secondmate-control.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-relaunch.sh
++ base=fm-remote-secondmate-relaunch.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-relaunch.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-remote-secondmate-relaunch.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-remote-secondmate-relaunch.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-review-diff.sh
++ base=fm-review-diff.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-review-diff.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-review-diff.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-review-diff.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-charter-lib.sh
++ base=fm-secondmate-charter-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-charter-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-charter-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-charter-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-liveness-lib.sh
++ base=fm-secondmate-liveness-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-liveness-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-liveness-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-liveness-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-nudge-lib.sh
++ base=fm-secondmate-nudge-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-nudge-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-nudge-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-nudge-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-parent-lib.sh
++ base=fm-secondmate-parent-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-parent-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-parent-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-parent-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-reconcile.sh
++ base=fm-secondmate-reconcile.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-reconcile.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-reconcile.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-reconcile.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-registry-lib.sh
++ base=fm-secondmate-registry-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-registry-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-registry-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-registry-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-report.sh
++ base=fm-secondmate-report.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-report.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-report.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-report.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart-lib.sh
++ base=fm-secondmate-restart-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-restart-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart.sh
++ base=fm-secondmate-restart.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-secondmate-restart.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-secondmate-restart.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-send.sh
++ base=fm-send.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-send.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-send.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-send.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-end-relaunch-lib.sh
++ base=fm-session-end-relaunch-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-end-relaunch-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-end-relaunch-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-session-end-relaunch-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-lock-lib.sh
++ base=fm-session-lock-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-lock-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-lock-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-session-lock-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-start.sh
++ base=fm-session-start.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-start.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-session-start.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-session-start.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-cursor.sh
++ base=fm-sessionstart-cursor.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-cursor.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-cursor.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-sessionstart-cursor.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-nudge.sh
++ base=fm-sessionstart-nudge.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-nudge.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-nudge.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-sessionstart-nudge.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-run.sh
++ base=fm-sessionstart-run.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-run.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-sessionstart-run.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-sessionstart-run.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh
++ base=fm-spawn.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-spawn.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget-lib.sh
++ base=fm-startup-memory-budget-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-startup-memory-budget-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget.sh
++ base=fm-startup-memory-budget.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-memory-budget.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-startup-memory-budget.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-network.sh
++ base=fm-startup-network.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-network.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-startup-network.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-startup-network.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-stow-cascade.sh
++ base=fm-stow-cascade.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-stow-cascade.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-stow-cascade.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-stow-cascade.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-subagent-pretool-check.sh
++ base=fm-subagent-pretool-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-subagent-pretool-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-subagent-pretool-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-subagent-pretool-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervise-daemon.sh
++ base=fm-supervise-daemon.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervise-daemon.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervise-daemon.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervise-daemon.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-engine-lib.sh
++ base=fm-supervision-engine-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-engine-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-engine-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervision-engine-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-host.sh
++ base=fm-supervision-host.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-host.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-host.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervision-host.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-instructions.sh
++ base=fm-supervision-instructions.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-instructions.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-instructions.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervision-instructions.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-lib.sh
++ base=fm-supervision-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervision-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervision-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervisor-target-lib.sh
++ base=fm-supervisor-target-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervisor-target-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-supervisor-target-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-supervisor-target-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tangle-lib.sh
++ base=fm-tangle-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tangle-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tangle-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-tangle-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-task-inbox-lib.sh
++ base=fm-task-inbox-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-task-inbox-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-task-inbox-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-task-inbox-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi-lib.sh
++ base=fm-tasks-axi-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-tasks-axi-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi.sh
++ base=fm-tasks-axi.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tasks-axi.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-tasks-axi.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teamclaude-launch.sh
++ base=fm-teamclaude-launch.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teamclaude-launch.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teamclaude-launch.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-teamclaude-launch.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh
++ base=fm-teardown.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-teardown.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-isolation-proof.sh
++ base=fm-test-isolation-proof.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-isolation-proof.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-isolation-proof.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-test-isolation-proof.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-run.sh
++ base=fm-test-run.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-run.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-test-run.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-test-run.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timeout-lib.sh
++ base=fm-timeout-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timeout-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timeout-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-timeout-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timing-lib.sh
++ base=fm-timing-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timing-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-timing-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-timing-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tmux-lib.sh
++ base=fm-tmux-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tmux-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tmux-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-tmux-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tool-update-check.sh
++ base=fm-tool-update-check.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tool-update-check.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-tool-update-check.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-tool-update-check.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-trace-context-lib.sh
++ base=fm-trace-context-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-trace-context-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-trace-context-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-trace-context-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-transition-lib.sh
++ base=fm-transition-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-transition-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-transition-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-transition-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-cursor.sh
++ base=fm-turnend-guard-cursor.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-cursor.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-cursor.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-turnend-guard-cursor.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-grok.sh
++ base=fm-turnend-guard-grok.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-grok.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard-grok.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-turnend-guard-grok.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard.sh
++ base=fm-turnend-guard.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-turnend-guard.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-turnend-guard.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-update.sh
++ base=fm-update.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-update.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-update.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-update.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-vendor-auth-probe.sh
++ base=fm-vendor-auth-probe.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-vendor-auth-probe.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-vendor-auth-probe.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-vendor-auth-probe.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-client.py
++ base=fm-voice-client.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-client.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-client.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-voice-client.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-relay.py
++ base=fm-voice-relay.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-relay.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-voice-relay.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-voice-relay.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-drain.sh
++ base=fm-wake-drain.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-drain.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-drain.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-wake-drain.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-grant.sh
++ base=fm-wake-grant.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-grant.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-grant.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-wake-grant.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-lib.sh
++ base=fm-wake-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-wake-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-wake-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-arm.sh
++ base=fm-watch-arm.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-arm.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-arm.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-watch-arm.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-checkpoint.sh
++ base=fm-watch-checkpoint.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-checkpoint.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch-checkpoint.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-watch-checkpoint.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch.sh
++ base=fm-watch.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-watch.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-watch.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-worker-account-lib.sh
++ base=fm-worker-account-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-worker-account-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-worker-account-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-worker-account-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-dismiss.sh
++ base=fm-x-dismiss.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-dismiss.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-dismiss.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-dismiss.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-followup.sh
++ base=fm-x-followup.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-followup.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-followup.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-followup.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-lib.sh
++ base=fm-x-lib.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-lib.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-lib.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-link.sh
++ base=fm-x-link.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-link.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-link.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-link.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-poll.sh
++ base=fm-x-poll.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-poll.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-poll.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-poll.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-reply.sh
++ base=fm-x-reply.sh
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-reply.sh ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-x-reply.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm-x-reply.sh
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_frame.py
++ base=fm_voice_frame.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_frame.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_frame.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm_voice_frame.py
++ for f in '"$ROOT"/bin/*'
+++ basename /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_records.py
++ base=fm_voice_records.py
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_records.py ']'
++ ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm_voice_records.py /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/test-root/bin/fm_voice_records.py
++ printf 'manual\n'
++ cat
++ chmod +x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/treehouse
++ :
++ :
++ foreign_root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/other-home
++ mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/other-home/bin
++ cat
++ FOREIGN_WORKER_PID=83607
++ pid=83607
++ local tries=0
++ '[' '!' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/foreign-ready ']'
++ '[' 0 -lt 100 ']'
++ sleep 0.05
++ FM_FOREIGN_WORKER_READY=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/foreign-ready
++ perl -e 'setpgrp(0, 0); exec @ARGV' /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/other-home/bin/fm-remote-job-worker.sh --serve
++ tries=1
++ '[' '!' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/foreign-ready ']'
++ '[' '!' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/foreign-ready ']'
++ rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/other-home
++ cat
++ chmod +x /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/fakebin/ps
++ rc=0
++ run_copied_teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping
++ kill -0 83607
++ stop_foreign_worker
++ '[' -n 83607 ']'
++ kill -TERM -- -83607
++ kill -TERM 83607
++ wait 83607
++ true
++ FOREIGN_WORKER_PID=
++ expect_code 0 0 'caller-confinement: ordinary task teardown should complete'
++ local expected=0 actual=0 'label=caller-confinement: ordinary task teardown should complete'
++ '[' 0 = 0 ']'
++ assert_absent /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state/task-x1.meta 'caller-confinement: ordinary task cleanup did not complete'
++ '[' '!' -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb/caller-confined-reaping/state/task-x1.meta ']'
++ pass 'task teardown completes without reaping another home'\''s abandoned worker'
++ printf 'ok - %s\n' 'task teardown completes without reaping another home'\''s abandoned worker'
+ok - task teardown completes without reaping another home's abandoned worker
++ stop_foreign_worker
++ '[' -n '' ']'
++ return 0
++ fm_test_cleanup
++ local d
++ fm_test_reap_watchers
++ local state lock_home 'seen=
+'
++ '[' -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-watcher.64058.WllVnY ']'
++ IFS=
++ read -r state
++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-watcher.64058.WllVnY
++ fm_test_reap_procevent_homes
++ local home claim_root 'seen=
+'
++ '[' -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-procevent.64058.jvQBIB ']'
++ IFS='	'
++ read -r home claim_root
++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-procevent.64058.jvQBIB
++ for d in '"${FM_TEST_CLEANUP_DIRS[@]:-}"'
++ '[' -n '' ']'
++ '[' -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-cleanup.64058.gRw0QR ']'
++ IFS=
++ read -r d
++ '[' -n /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb ']'
++ fm_test_remove_tree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++ local dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++ '[' -d /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb ']'
++ '[' '!' -L /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb ']'
++ find /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb -type d -exec chmod u+rwx '{}' +
++ rm -rf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/fm-teardown-tests.Ovp5Vb
++ IFS=
++ read -r d
++ rm -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp/targeted-regressions.poki90y3/.fm-test-cleanup.64058.gRw0QR

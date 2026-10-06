@@ -1,0 +1,16 @@
+{
+  "source_revision": "8392f4aae343b1aee83e685d1fb81e077f181556",
+  "host_version": "18.6.3",
+  "exact_merged_package_pack_exit": 0,
+  "isolated_native_install_exit": 0,
+  "settings_copy_regular": true,
+  "settings_copy_mode": "0o600",
+  "operator_agent_db_copied_or_attached": false,
+  "oauth_command": "omp login openai-codex",
+  "oauth_native_result": "Opened supported browser authorization and waited for authentication",
+  "browser_result": "OpenAI Welcome back login page requires account authentication; no logged-in lab identity",
+  "qualifying_turn_submitted": false,
+  "jev_judgment_observed": false,
+  "native_automatic_compaction_observed": false,
+  "before_after_context": null
+}

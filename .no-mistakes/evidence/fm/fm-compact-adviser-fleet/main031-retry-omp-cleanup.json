@@ -1,0 +1,10 @@
+{
+  "lane": "omp",
+  "lab_removed": true,
+  "authorized_settings_copy_deleted": true,
+  "exact_merged_lab_plugin_tarball_dependencies_deleted": true,
+  "private_tmux_kill_server_exit": 0,
+  "operator_agent_db_copied_or_attached": false,
+  "shared_plugin_or_preferences_intentionally_modified": false,
+  "qualifying_turn_completed": false
+}

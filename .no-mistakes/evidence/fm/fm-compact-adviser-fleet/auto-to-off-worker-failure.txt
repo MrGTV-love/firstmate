@@ -1,0 +1,12 @@
+ea15/launch.s1791308086.22077.28858.sh'
+ ▐▛███▛█   Claude Code v2.1.291
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   ~/…/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe/.treehouse/probe-7cbd9e/1/probe
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /exit
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ /exit                       Exit the CLI
+    /context                    Visualize current context usage as a colored grid
+    /usage-credits              Configure usage credits or request them from your admin when you hit a limit

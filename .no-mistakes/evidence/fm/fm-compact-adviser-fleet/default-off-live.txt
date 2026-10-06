@@ -1,0 +1,14 @@
+product/bin/fm-spawn.sh marked-secondary /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/marked-secondmate 'PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/omp-agent HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/user-home omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time 180' --secondmate; printf "\nLAB_RC_live_local_secondmate=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: secondmate marked-secondary sync skipped before launch: dirty working tree
+spawned marked-secondary harness=omp kind=secondmate mode=secondmate yolo=off window=fm-lab-adviser-test-67659-1247:w9:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/marked-secondmate
+
+LAB_RC_live_local_secondmate=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-spawn.sh omp-auto-confined --relaunch --harness 'PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/omp-agent HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/user-home omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time 180'; printf "\nLAB_RC_default_off_live=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+spawned omp-auto-confined harness=omp kind=scout window=fm-lab-adviser-test-67659-1247:w6:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/confined-probe/.treehouse/confined-probe-b2ddbb/2/confined-probe
+
+LAB_RC_default_off_live=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

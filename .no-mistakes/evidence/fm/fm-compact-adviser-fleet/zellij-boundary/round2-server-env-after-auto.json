@@ -1,0 +1,30 @@
+{
+  "process": {
+    "pid": 97352,
+    "ppid": 1,
+    "comm": "/Users/charlesab",
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij --server /Users/charlesabrooker/tmp/zellij-501/contract_version_1/round2-zellij-800f9eb0e0"
+  },
+  "selected_env": {
+    "COMPACT_ADVISER_DISABLE": "1",
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "FM_COMPACT_ADVISER_HOOKS": null,
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "FM_ZELLIJ_SESSION": "round2-zellij-800f9eb0e0",
+    "ZELLIJ_SESSION_NAME": "round2-zellij-800f9eb0e0",
+    "ZELLIJ_PANE_ID": null,
+    "FM_TASK_ID": null,
+    "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/claude-config",
+    "ZELLIJ_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij-config",
+    "ZELLIJ_DATA_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij-data",
+    "XDG_RUNTIME_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/xdg-runtime"
+  },
+  "inspection_argv": [
+    "ps",
+    "eww",
+    "-p",
+    "97352",
+    "-o",
+    "command="
+  ]
+}

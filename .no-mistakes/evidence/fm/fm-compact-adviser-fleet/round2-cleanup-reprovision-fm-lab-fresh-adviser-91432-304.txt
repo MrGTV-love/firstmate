@@ -1,0 +1,2 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh provision fm-lab-fresh-adviser-91432-304
+exit=0

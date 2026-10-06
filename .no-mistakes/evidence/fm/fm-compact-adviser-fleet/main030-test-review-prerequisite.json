@@ -1,0 +1,31 @@
+{
+  "scope": "Main030 Test fix_review: one OMP qualifying-turn scenario; host-recovery pause preserved",
+  "source_head_verified": "8392f4aae343b1aee83e685d1fb81e077f181556",
+  "tools_on_path": [
+    "omp",
+    "bun",
+    "node",
+    "npm",
+    "tmux",
+    "git"
+  ],
+  "same_run_runtime_evidence": [
+    "main030-scoped-test-result.json",
+    "main030-cleanup.json"
+  ],
+  "native_observation": "Prior authorized lab-only merged-adapter installation succeeded. /compact-adviser status returned: Error: Cannot read compact-adviser settings; automatic action is disabled. Saved settings were symlink-referenced, not copied. /exit completed with worker exit 0; lab removed.",
+  "current_review": "No failed runtime scenario rerun. Merged ConfigStore.read rejects settings symlinks; saved key is inline, with no supported key-file reference. Native OMP profiles isolate agent.db. Original local database attachment uses writable schema/WAL/chmod initialization, not a read-only credential reference. Native broker route needs an authorized endpoint/token not provided here. Repository-local research found no alternate supported isolated reference driver.",
+  "qualifying_turn_submitted": false,
+  "jev_judgment_observed": false,
+  "native_compaction_observed": false,
+  "before_after_context": null,
+  "needed": "Main must provide a supported isolated authenticated OMP session and adapter-supported in-place saved TypeSafe key reference, or explicitly revise conflicting credential-reference/isolation constraints. Main must separately lift host-recovery pause before remaining scenarios/phases.",
+  "remote": "Main confirms no remote secondmate host. Prior offline compact-remote.log and targeted-commands.json retained; not rerun or credited live.",
+  "cleanup": "Prior owned lab removal recorded in main030-cleanup.json. No new lab, source/test changes, worktree transient files or shared-state writes in this review.",
+  "sources": [
+    "https://github.com/MrGTV-love/compact-adviser/blob/8392f4a/packages/pi-extension/src/config.ts#L91-L107",
+    "https://github.com/can1357/oh-my-pi/blob/v18.6.3/docs/config-usage.md#profiles",
+    "https://github.com/can1357/oh-my-pi/blob/v18.6.3/packages/ai/src/auth-broker/discover.ts#L368-L485",
+    "https://github.com/can1357/oh-my-pi/blob/v18.6.3/packages/ai/src/auth/sqlite-credential-store.ts#L537-L610"
+  ]
+}

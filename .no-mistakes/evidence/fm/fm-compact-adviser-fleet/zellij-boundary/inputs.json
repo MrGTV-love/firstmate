@@ -1,0 +1,36 @@
+{
+  "working_directory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+  "fixture": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij",
+  "marked_fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/fm-home",
+  "backend_configuration": "zellij",
+  "compact_adviser_configuration": {
+    "omp": "auto"
+  },
+  "session": "fm-zellij-boundary-195",
+  "socket_directory_input": ".test-phase-zellij/s",
+  "relative_socket_reason": "Full absolute workspace-local socket path exceeds macOS Unix-socket path limit; official ZELLIJ_SOCKET_DIR supports relative PathBuf, and all actual invocations retain the exact workspace cwd. No symlink or adapter wrapper used.",
+  "owned_home_input": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/home",
+  "owned_tmpdir_input": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/tmp",
+  "owned_pi_agent_dir_input": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/pi-agent",
+  "config_file": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/zellij-config/config.kdl",
+    "content": "default_shell \"/bin/bash\"\nshow_startup_tips false\nshow_release_notes false\n"
+  },
+  "treehouse_config": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/project/treehouse.toml",
+    "content": "root = \".\"\n"
+  },
+  "raw_command": "PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/pi-agent HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-zellij/home omp --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session --max-time 120",
+  "command_evidence": [
+    "spawn-emergency.txt",
+    "spawn-normal.txt",
+    "teardown-zellij-emergency-a91.txt",
+    "teardown-zellij-normal-b92.txt",
+    "session-safe-delete.txt"
+  ],
+  "verification_limits": [
+    "Live terminal/env boundary only; no provider/auth/network inference, no compact adviser recommendation execution.",
+    "Native OMP ran --no-tools --no-lsp --no-extensions --no-skills --no-rules --no-title --no-session, with no saved credentials.",
+    "No permanent source edits, no builds, no tests, no lint/format/static analysis, no watcher or shared lifecycle action."
+  ]
+}

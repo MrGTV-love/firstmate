@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "zellij_version": "0.44.0",
+  "omp_version": "18.6.3",
+  "session": "fm-zellij-boundary-195",
+  "server_pid": 88085,
+  "first_worker_pid": 78616,
+  "normal_worker_pid": 83318,
+  "assertions": [
+    "fresh backend created by emergency real fm-spawn invocation",
+    "first exact native OMP PID COMPACT_ADVISER_DISABLE=1",
+    "later normal exact native OMP PID COMPACT_ADVISER_DISABLE=0",
+    "raw FM_COMPACT_ADVISER_DISABLE absent from both native workers and same fresh/reused zellij server",
+    "all four selected adviser/hook fields captured only; no full environment retained",
+    "both native OMP composers observed following setup exit; native Ctrl+D exits",
+    "both actual Git worktrees allocated under owned project via treehouse.toml root=\".\""
+  ]
+}

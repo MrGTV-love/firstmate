@@ -1,0 +1,29 @@
+{
+  "summary": "Fixed sandboxed native allocator/trust fixtures and remote test working-directory isolation. Focused checks passed; live Jev/native compaction remains blocked by the installed default plugin missing the required merged OMP adapter.",
+  "changed_files": [
+    "tests/fm-backend-herdr-presentation-e2e.test.sh",
+    "tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+    "docs/herdr-backend.md"
+  ],
+  "focused_verification": [
+    "Native sandbox-only regression passed with Treehouse v2.3.1-fm.e58947de; wrong-pool mutation failed as expected.",
+    "Complete compact-adviser remote transport test script passed, including absent/enabled allowlists and Claude auto/hook propagation."
+  ],
+  "blocker": "omp plugin list/doctor resolve compact-adviser 0.1.11. Its installed src/index.ts lacks loadOmpSources and the sources option present at required fork main 8392f4a. Installing/modifying shared plugins is prohibited; no older plugin run, credential copy, judgment or compaction substituted.",
+  "remote_live_limit": "No remote secondmate host exists in this fleet, per Main; passing fixture transport is not live remote-host evidence.",
+  "cleanup": "All in-worktree disposable fixture roots, pools, trust stores, copied remote sources and mutation tooling removed; .no-mistakes/test-tmp observed empty and owned empty directories removed. No prepared dependencies removed.",
+  "not_run": [
+    "Full suite",
+    "Linters",
+    "Formatters",
+    "Static analysis",
+    "Other pipeline phases",
+    "Shared Herdr lifecycle",
+    "Original external fixture cleanup"
+  ],
+  "evidence": [
+    "round3-native-compaction-prerequisite.json",
+    "round3-sandbox-regression.json",
+    "round3-remote-transport.json"
+  ]
+}

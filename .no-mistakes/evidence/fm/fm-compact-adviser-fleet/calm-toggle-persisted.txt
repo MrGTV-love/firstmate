@@ -1,0 +1,3 @@
+Executed /calm in a real Claude v2.1.291 session with explicit unmarked raw-command function-hook opt-in.
+Before: config/calm = on
+After: config/calm = off

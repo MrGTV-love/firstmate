@@ -1,0 +1,46 @@
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:project charlesabrooker$ printf '%s\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\n' '__FM_ZELLIJ_CWD_END__'
+__FM_ZELLIJ_CWD_BEGIN__
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project
+__FM_ZELLIJ_CWD_END__
+Mac-Studio:project charlesabrooker$ printf '%s\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\n' '__FM_ZELLIJ_CWD_END__'
+__FM_ZELLIJ_CWD_BEGIN__
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project
+__FM_ZELLIJ_CWD_END__
+Mac-Studio:project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project'
+Mac-Studio:project charlesabrooker$ printf '%s\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\n' '__FM_ZELLIJ_CWD_END__'
+__FM_ZELLIJ_CWD_BEGIN__
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project
+__FM_ZELLIJ_CWD_END__
+Mac-Studio:project charlesabrooker$ export GOTMPDIR=/tmp/fm-zellij-auto/gotmp
+Mac-Studio:project charlesabrooker$ export COMPACT_ADVISER_DISABLE=0
+Mac-Studio:project charlesabrooker$ export FM_TASK_ID=zellij-auto
+Mac-Studio:project charlesabrooker$ . '/tmp/fm-zellij-auto+acfe2766772970fb58c2b507dc500fce1b04d0651adf4e5198d7bf2bc18b8021/launch.s1791316185.87482.29172.sh'
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+

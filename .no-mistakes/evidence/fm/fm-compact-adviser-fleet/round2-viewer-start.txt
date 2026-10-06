@@ -1,0 +1,3 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-herdr-lab.sh viewer start fm-lab-adviser-r2-51967-17576
+exit=0
+viewer attached to fm-lab-adviser-r2-51967-17576 (pid 99794)

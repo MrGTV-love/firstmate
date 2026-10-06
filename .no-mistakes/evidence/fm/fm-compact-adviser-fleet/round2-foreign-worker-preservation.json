@@ -1,0 +1,11 @@
+{
+  "task": "adviserr2default",
+  "teardown_exit": 1,
+  "task_metadata_retired": false,
+  "foreign_pid": 42722,
+  "before": "42722 42722 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/foreign-fixture/bin/fm-remote-job-worker.sh --serve",
+  "after": "42722 42722 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/foreign-fixture/bin/fm-remote-job-worker.sh --serve",
+  "foreign_alive": true,
+  "bound_seconds": 120,
+  "account_scan_restricted_to": 42722
+}

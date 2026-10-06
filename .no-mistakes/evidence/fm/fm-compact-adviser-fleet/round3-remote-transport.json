@@ -1,0 +1,27 @@
+{
+  "before": {
+    "command": "env TMPDIR=<worktree>/.no-mistakes/test-tmp bash tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+    "exit_code": 1,
+    "output": "not ok - allowlist absent: the remote second-mate launch failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\nerror: remote host-local secondmate launch failed"
+  },
+  "root_cause": "Simulated SSH changed into TMP_ROOT outside the independently initialized remote fixture checkout. With TMP_ROOT under the worktree, cwd inherited the enclosing gate Git ancestry; remote supervisor intentionally does not retain the test bypass.",
+  "fix": "Set FM_FAKE_REMOTE_CWD to REMOTE_ROOT so simulated remote lifecycle runs in the independent remote checkout; do not bypass the production guard.",
+  "verification": {
+    "command": "env TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/test-tmp bash tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+    "exit_code": 0,
+    "output": [
+      "ok - a remote-routed second mate starts with the compact adviser disabled, from the pane export and from the launch command alike",
+      "ok - the remote route keeps the compact-adviser switch through the cleared allowlisted environment",
+      "ok - remote Claude auto and function hooks survive both environment postures and lost pane exports",
+      "ALL TESTS PASSED"
+    ],
+    "wall_seconds": 700.39
+  },
+  "live_remote_limit": "Main confirms no remote secondmate host in this fleet. Fake SSH transport chain is not live remote evidence.",
+  "intervening_attempt": {
+    "exit_code": 1,
+    "output": "tests/fm-spawn-compact-adviser-disable-remote.test.sh: line 147: $1: unbound variable",
+    "limit": "A comments-only edit was applied while the shell was reading the script; this attempt is not a stable-source verification result. Final source rerun started without concurrent edits."
+  },
+  "cleanup": "After final targeted script completed, .no-mistakes/test-tmp was observed empty; empty owned directories removed. No dependency installation or shared fleet operation."
+}

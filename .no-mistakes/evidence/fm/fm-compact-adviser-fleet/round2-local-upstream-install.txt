@@ -1,0 +1,4 @@
+$ npm install --prefix /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/plugin --ignore-scripts --omit=dev --legacy-peer-deps compact-adviser@0.1.5
+exit=0
+
+added 5 packages in 844ms

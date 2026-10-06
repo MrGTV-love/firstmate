@@ -1,0 +1,124 @@
+{
+  "baseline_attempts": [
+    "bash tests/fm-spawn-compact-adviser-disable.test.sh (secondmate path containment refusal with TMPDIR under outer source root)",
+    "bash tests/fm-spawn-compact-adviser-disable-remote.test.sh (bounded setup timeout)",
+    "source-package bin/fm-test-run.sh --jobs 1 --per-script-timeout-secs 180 (launch timeout and inherited outer gate context; repaired fixture ancestry/headroom)"
+  ],
+  "completed_focused_commands": [
+    {
+      "argv": [
+        "bash",
+        "bin/fm-test-run.sh",
+        "--jobs",
+        "1",
+        "--per-script-timeout-secs",
+        "180",
+        "tests/fm-spawn-compact-adviser-disable.test.sh",
+        "tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+        "tests/fm-composer-lib.test.sh",
+        "tests/fm-calm-claude-mod-plugin.test.sh"
+      ],
+      "cwd": "disposable target source package",
+      "result": "composer and Calm native engine suites exit0; local 180s timeout and remote inherited-gate setup failure repaired below"
+    },
+    {
+      "argv": [
+        "bash",
+        "bin/fm-test-run.sh",
+        "--jobs",
+        "1",
+        "--per-script-timeout-secs",
+        "900",
+        "tests/fm-spawn-compact-adviser-disable.test.sh",
+        "tests/fm-spawn-compact-adviser-disable-remote.test.sh"
+      ],
+      "cwd": "disposable target source package",
+      "result": "local launch regressions exit0; remote fixture inherited outer gate until scratch ancestry was isolated"
+    },
+    {
+      "argv": [
+        "bash",
+        "bin/fm-test-run.sh",
+        "--per-script-timeout-secs",
+        "900",
+        "tests/fm-spawn-compact-adviser-disable-remote.test.sh"
+      ],
+      "cwd": "disposable target source package with independent fixture git ancestry",
+      "result": "remote regression exit0 with adequate 900s bound"
+    },
+    {
+      "argv": [
+        "claude",
+        "plugin",
+        "test",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.claude/mods/firstmate-calm"
+      ],
+      "environment": {
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation/claude-config"
+      },
+      "result": "current Claude2.1.292 native plugin runtime suites exit0; mocked host/clock tests, not live model/advising proof"
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_missing_startup_source_refuses_before_cleanup ]]; then echo \"SELECTED_REGRESSION_COMPLETE\"; exit 0; fi' DEBUG; source \"$1\"",
+        "selected-teardown-regression",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+      ],
+      "selected_test": "test_task_teardown_preserves_another_homes_abandoned_worker",
+      "selection": "Bash DEBUG trap exits before next top-level test call; complete original definitions and selected test execute unchanged",
+      "result": "exit0; foreign-worker survival and completed task cleanup assertions passed; no full teardown suite run"
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+        "ordinary-term",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+      ],
+      "check": "Existing separately grouped fixture held at copied teardown; runner process group receives SIGTERM",
+      "result": "registered original interruption traps retire exact foreign worker and recorded sleep child; no active fixture process remains"
+    },
+    {
+      "argv": [
+        "bash",
+        "-c",
+        "set -T; trap 'if [[ \"$BASH_COMMAND\" == test_task_teardown_preserves_another_homes_abandoned_worker ]]; then trap - DEBUG; run_copied_teardown() { printf \"%s\\n\" \"$FOREIGN_WORKER_PID\" >&\"$FM_HOLD_FD\"; sleep 60; }; test_task_teardown_preserves_another_homes_abandoned_worker; exit 0; fi' DEBUG; source \"$1\"",
+        "outer-sigkill",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/tests/fm-teardown.test.sh"
+      ],
+      "check": "Existing separately grouped fixture held at copied teardown; runner process group receives SIGKILL; FM_TEST_STUB_MAX_BLOCK_SECONDS=8",
+      "result": "without runner cleanup, original fixture worker and recorded sleep child expire within bound plus1s; no active fixture process remains"
+    }
+  ],
+  "native_commands": [
+    "bin/fm-herdr-lab.sh provision/run/viewer start/teardown <owned fm-lab-adviser-r2 or fm-lab-fresh-adviser session>",
+    "bin/fm-spawn.sh <task> <disposable project> --scout --harness claude --model haiku",
+    "bin/fm-control.sh adviserr2auto relaunch --harness claude --model haiku --note \"Validation only. Reply LAB_READY; do not use tools or edit files.\" (off/auto/emergency; filtered/unfiltered; attached viewer; observed Claude2.1.291 and2.1.292)",
+    "bin/fm-control.sh adviserr2auto exit over visible /compact draft (refused without modifying draft)",
+    "FM_COMPACT_ADVISER_DISABLE=1 bin/fm-spawn.sh <a=project b=project> --scout or --mode local-only --yolo off --harness claude --model haiku (both environment postures)",
+    "bin/fm-home-seed.sh adviserr2second <disposable home> --no-projects; native secondmate and child spawn from exact target source package",
+    "Explicit CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 raw Claude --plugin-dir .claude/mods/firstmate-calm; native /calm command and persisted fixture toggle in both environment postures",
+    "OMP18.6.3 --no-extensions --no-skills --no-rules --no-lsp --no-title --no-tools --max-time=5m -e <workspace compact-adviser0.1.5/src/index.ts>; /compact-adviser status; /compact-adviser auto; isolated consent; /quit",
+    "bin/fm-teardown.sh adviserr2default with separately grouped foreign fixture worker; administrative ps -u restricted to foreign PID and native lsof to exact owned endpoint/controller; successful cleanup and survival",
+    "Native private tmux and workspace-local Zellij scenarios: see round2-tmux-command-ledger.json and zellij-boundary/round2-commands.json"
+  ],
+  "verification_limits": [
+    "No broad suite, lint, formatter, build, CI, push, PR, or pipeline control run",
+    "Launch environment and command UI proofs do not establish real TypeSafe judgment or automatic native compaction",
+    "Normal Claude login confirmed through claude auth status; isolated lab stores unauthenticated; no saved TypeSafe key supplied/copied",
+    "Remote focused suite uses fake SSH/backend/probe harness; not a real credentialed isolated remote-host proof",
+    "Native TUI had nonzero grid. PNG/HTML evidence is a text-grid terminal replay, not an OS window screenshot."
+  ],
+  "cleanup_checks": [
+    "treehouse status in the isolated fixture repository: all owned slots available after native returns",
+    "ps only recorded native worker PIDs: no remaining process references the owned scratch",
+    "Guarded Herdr lab tripwires and native private tmux/Zellij teardown receipts",
+    "Removed owned source packages, plugin dependencies, cache/data fixtures and test repositories; repaired readonly/PATH_MAX cleanup residue using root-confined descriptor traversal without symlink following",
+    "Browser terminal-replay capture completed; browser tab closed; all four owned scratch roots absent"
+  ]
+}

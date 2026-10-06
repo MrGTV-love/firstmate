@@ -1,0 +1,15 @@
+{
+  "teardown": {
+    "task": "claude-absent",
+    "exit": 0,
+    "output": "A new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown claude-absent complete (window fm-lab-compact-fleet-58297-3415:w6:p2, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/.treehouse/project-8db0b7/5/project)\nBacklog: claude-absent just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home/data/backlog.md - move claude-absent to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.no-mistakes/compact-live-hknzjld3/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for claude-absent: 45395 82992 83015\nteardown: force-killing leaked worktree process(es) for claude-absent: 45395\n",
+    "metadataRemains": false
+  },
+  "foreignPid": 35703,
+  "foreignSeparateProcessGroup": 35703,
+  "foreignCodeRootRemoved": true,
+  "foreignWorkerSurvived": true,
+  "fixtureLifetimeSeconds": 120,
+  "administrativeAccountScanRestrictedToExactFixturePid": true,
+  "initialSetupRefusal": "Missing captain-call inventory; completed owned fixture inventory through fm-captain-hold complete --none, then redrove."
+}

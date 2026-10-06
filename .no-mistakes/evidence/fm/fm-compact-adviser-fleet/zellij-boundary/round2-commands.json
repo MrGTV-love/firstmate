@@ -1,0 +1,378 @@
+[
+  {
+    "argv": [
+      "curl",
+      "--fail",
+      "--location",
+      "--retry",
+      "2",
+      "--output",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij.tar.gz",
+      "https://github.com/zellij-org/zellij/releases/download/v0.44.0/zellij-aarch64-apple-darwin.tar.gz"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\n  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\n  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\n\n 63 13.9M   63 9036k    0     0  17.0M      0 --:--:-- --:--:-- --:--:-- 17.0M\n100 13.9M  100 13.9M    0     0  23.3M      0 --:--:-- --:--:-- --:--:-- 65.4M\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--version"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "zellij 0.44.0\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\n"
+  },
+  {
+    "argv": [
+      "git",
+      "init",
+      "--initial-branch=main",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.git/\n"
+  },
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "add",
+      "treehouse.toml"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": ""
+  },
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "-c",
+      "user.name=Validation Lab",
+      "-c",
+      "user.email=validation@invalid.example",
+      "commit",
+      "-m",
+      "Disposable validation fixture"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[main (root-commit) 57ecbcb] Disposable validation fixture\n 1 file changed, 3 insertions(+)\n create mode 100644 treehouse.toml\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--help"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "zellij 0.44.0\n\nUSAGE:\n    zellij [OPTIONS] [SUBCOMMAND]\n\nOPTIONS:\n    -c, --config <CONFIG>\n            Change where zellij looks for the configuration file [env: ZELLIJ_CONFIG_FILE=]\n\n        --config-dir <CONFIG_DIR>\n            Change where zellij looks for the configuration directory\n            [env: ZELLIJ_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/\n            worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij-config]\n\n    -d, --debug\n            Specify emitting additional debug information\n\n        --data-dir <DATA_DIR>\n            Change where zellij looks for plugins\n\n    -h, --help\n            Print help information\n\n    -l, --layout <LAYOUT>\n            Name of a predefined layout inside the layout directory or the path to a layout file if\n            inside a session (or using the --session flag) will be added to the session as a new tab\n            or tabs, otherwise will start a new session\n\n        --max-panes <MAX_PANES>\n            Maximum panes on screen, caution: opening more panes will close old ones\n\n    -n, --new-session-with-layout <NEW_SESSION_WITH_LAYOUT>\n            Name of a predefined layout inside the layout directory or the path to a layout file\n            Will always start a new session, even if inside an existing session\n\n    -s, --session <SESSION>\n            Specify name of a new session\n\n    -V, --version\n            Print version information\n\nSUBCOMMANDS:\n    action                 Send actions to a specific session [aliases: ac]\n    attach                 Attach to a session [aliases: a]\n    convert-config         \n    convert-layout         \n    convert-theme          \n    delete-all-sessions    Delete all sessions [aliases: da]\n    delete-session         Delete a specific session [aliases: d]\n    edit                   Edit file with default $EDITOR / $VISUAL Returns: Created pane ID\n                               (format: terminal_<id>) [aliases: e]\n    help                   Print this message or the help of the given subcommand(s)\n    kill-all-sessions      Kill all sessions [aliases: ka]\n    kill-session           Kill a specific session [aliases: k]\n    list-aliases           List existing plugin aliases [aliases: la]\n    list-sessions          List active sessions [aliases: ls]\n    options                Change the behaviour of zellij\n    pipe                   Send data to one or more plugins, launch them if they are not running\n    plugin                 Load a plugin Returns: Created pane ID (format: plugin_<id>)\n                               [aliases: p]\n    run                    Run a command in a new pane Returns: Created pane ID (format:\n                               terminal_<id>) [aliases: r]\n    setup                  Setup zellij and check its configuration\n    subscribe              Subscribe to pane render updates (viewport and scrollback)\n    watch                  Watch a session (read-only) [aliases: w]\n    web                    Run a web server to serve terminal sessions\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "list-sessions",
+      "--short",
+      "--no-formatting"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 1,
+    "output": "No active zellij sessions found.\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+      "zellij-emergency",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "--scout",
+      "--harness",
+      "claude",
+      "--model",
+      "haiku"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nspawned zellij-emergency harness=claude kind=scout window=round2-zellij-800f9eb0e0:1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "list-panes",
+      "--json"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[\n  {\n    \"id\": 0,\n    \"is_plugin\": true,\n    \"is_focused\": false,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": true,\n    \"title\": \"(.) - zellij:link\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 13,\n    \"pane_content_x\": 14,\n    \"pane_y\": 13,\n    \"pane_content_y\": 14,\n    \"pane_rows\": 25,\n    \"pane_content_rows\": 23,\n    \"pane_columns\": 25,\n    \"pane_content_columns\": 23,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"zellij:link\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 3,\n    \"is_plugin\": true,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": true,\n    \"is_suppressed\": false,\n    \"title\": \"First Run Setup Wizard (Step 1/1)\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 7,\n    \"pane_content_x\": 8,\n    \"pane_y\": 10,\n    \"pane_content_y\": 11,\n    \"pane_rows\": 31,\n    \"pane_content_rows\": 29,\n    \"pane_columns\": 37,\n    \"pane_content_columns\": 35,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"configuration\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 0,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 50,\n    \"pane_content_columns\": 48,\n    \"cursor_coordinates_in_pane\": [\n      11,\n      7\n    ],\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 1,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 50,\n    \"pane_content_columns\": 48,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 1,\n    \"tab_position\": 1,\n    \"tab_name\": \"fm-firstmate-3f5c9b39-zellij-emergency\"\n  }\n]\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "dump-screen",
+      "--pane-id",
+      "1",
+      "--full",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/zellij-boundary/round2-pane-emergency.txt"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 2,
+    "output": "error: Found argument '/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/zellij-boundary/round2-pane-emergency.txt' which wasn't expected, or isn't valid in this context\n\nUSAGE:\n    zellij action dump-screen [OPTIONS]\n\nFor more information try --help\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "dump-screen",
+      "--pane-id",
+      "1",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "\nThe default interactive shell is now zsh.\nTo update your account to use zsh, please run `chsh -s /bin/zsh`.\nFor more details, please visit https://support.apple.com/kb/HT208050.\nbash-3.2$ treehouse get\n\ud83c\udf33 Setting up worktree...\n\ud83c\udf33 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project. Type 'exit' to return.\n\nThe default interactive shell is now zsh.\nTo update your account to use zsh, please run `chsh -s /bin/zsh`.\nFor more details, please visit https://support.apple.com/kb/HT208050.\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n' '__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n' '__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed\n9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project'\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n''__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ export GOTMPDIR=/tmp/fm-zellij-emergency/gotmp\nMac-Studio:project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1\nMac-Studio:project charlesabrooker$ export FM_TASK_ID=zellij-emergency\nMac-Studio:project charlesabrooker$ . '/tmp/fm-zellij-emergency+acfe2766772970fb58c2b507dc500fce1b04d0651adf4e5198d7bf2bc18b8021/launch.s1791316081.91344.11126.sh'\nbash: child setpgid (80814 to 80814): Operationnot permitted\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  Allow external CLAUDE.md file imports?\n\n  This project's CLAUDE.md or .claude/rules\n  imports files outside the current working\n  directory. Never allow this for third-party\n  repositories.\n\n  External imports:\n    /Users/charlesabrook\u20262KKDYZNRWDW/AGENTS.md\n\n  Important: Only use Claude Code with files\n  you trust. Accessing untrusted files may\n  pose security risks\n  https://code.claude.com/docs/en/security\n\n  \u276f No, disable external imports\n    Yes, allow external imports\n\n  Enter to confirm \u00b7 Esc to cancel\n\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+      "zellij-auto",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "--scout",
+      "--harness",
+      "claude",
+      "--model",
+      "haiku"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nerror: zellij new-tab did not return a numeric tab id for 'fm-firstmate-3f5c9b39-zellij-auto' (got ''; session 'round2-zellij-800f9eb0e0' may not exist)\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "list-sessions",
+      "--short",
+      "--no-formatting"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "round2-zellij-800f9eb0e0\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "list-tabs",
+      "--json"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[\n  {\n    \"position\": 0,\n    \"name\": \"Tab #1\",\n    \"active\": false,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": true,\n    \"other_focused_clients\": [],\n    \"active_swap_layout_name\": \"BASE\",\n    \"is_swap_layout_dirty\": true,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 50,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 50,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 1,\n    \"tab_id\": 0,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  },\n  {\n    \"position\": 1,\n    \"name\": \"fm-firstmate-3f5c9b39-zellij-emergency\",\n    \"active\": false,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": false,\n    \"other_focused_clients\": [],\n    \"active_swap_layout_name\": null,\n    \"is_swap_layout_dirty\": false,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 50,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 50,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 0,\n    \"tab_id\": 1,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  },\n  {\n    \"position\": 2,\n    \"name\": \"fm-firstmate-3f5c9b39-zellij-auto\",\n    \"active\": false,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": false,\n    \"other_focused_clients\": [],\n    \"active_swap_layout_name\": null,\n    \"is_swap_layout_dirty\": false,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 50,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 50,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 0,\n    \"tab_id\": 2,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  }\n]\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "list-panes",
+      "--json"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[\n  {\n    \"id\": 0,\n    \"is_plugin\": true,\n    \"is_focused\": false,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": true,\n    \"title\": \"(.) - zellij:link\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 13,\n    \"pane_content_x\": 14,\n    \"pane_y\": 13,\n    \"pane_content_y\": 14,\n    \"pane_rows\": 25,\n    \"pane_content_rows\": 23,\n    \"pane_columns\": 25,\n    \"pane_content_columns\": 23,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"zellij:link\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 3,\n    \"is_plugin\": true,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": true,\n    \"is_suppressed\": false,\n    \"title\": \"First Run Setup Wizard (Step 1/1)\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 7,\n    \"pane_content_x\": 8,\n    \"pane_y\": 10,\n    \"pane_content_y\": 11,\n    \"pane_rows\": 31,\n    \"pane_content_rows\": 29,\n    \"pane_columns\": 37,\n    \"pane_content_columns\": 35,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"configuration\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 0,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 50,\n    \"pane_content_columns\": 48,\n    \"cursor_coordinates_in_pane\": [\n      11,\n      7\n    ],\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 1,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 50,\n    \"pane_content_columns\": 48,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 1,\n    \"tab_position\": 1,\n    \"tab_name\": \"fm-firstmate-3f5c9b39-zellij-emergency\"\n  },\n  {\n    \"id\": 2,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 50,\n    \"pane_content_columns\": 48,\n    \"cursor_coordinates_in_pane\": [\n      11,\n      7\n    ],\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 2,\n    \"tab_position\": 2,\n    \"tab_name\": \"fm-firstmate-3f5c9b39-zellij-auto\"\n  }\n]\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+      "zellij-auto",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "--scout",
+      "--harness",
+      "claude",
+      "--model",
+      "haiku"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: zellij tab 'fm-firstmate-3f5c9b39-zellij-auto' already exists in session 'round2-zellij-800f9eb0e0'\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "close-tab-by-id",
+      "2"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-spawn.sh",
+      "zellij-auto",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project",
+      "--scout",
+      "--harness",
+      "claude",
+      "--model",
+      "haiku"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nspawned zellij-auto harness=claude kind=scout window=round2-zellij-800f9eb0e0:3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "dump-screen",
+      "--pane-id",
+      "1",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "\nThe default interactive shell is now zsh.\nTo update your account to use zsh, please run `chsh -s /bin/zsh`.\nFor more details, please visit https://support.apple.com/kb/HT208050.\nbash-3.2$ treehouse get\n\ud83c\udf33 Setting up worktree...\n\ud83c\udf33 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project. Type 'exit' to return.\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  Allow external CLAUDE.md file imports?\n\n  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party repositories.\n\n  External imports:\n    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENTS.md\n\n  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks https://code.claude.com/docs/en/security\n\n  \u276f No, disable external imports\n    Yes, allow external imports\n  Enter to confirm \u00b7 Esc to cancel\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "dump-screen",
+      "--pane-id",
+      "3",
+      "--full"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "\nThe default interactive shell is now zsh.\nTo update your account to use zsh, please run `chsh -s /bin/zsh`.\nFor more details, please visit https://support.apple.com/kb/HT208050.\nbash-3.2$ treehouse get\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Setting up worktree...\n\ud83c\udf33 Entered worktree at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project. Type 'exit' to return.\n\nThe default interactive shell is now zsh.\nTo update your account to use zsh, please run `chsh -s /bin/zsh`.\nFor more details, please visit https://support.apple.com/kb/HT208050.\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n' '__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n' '__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project'\nMac-Studio:project charlesabrooker$ printf '%s\\n' '__FM_ZELLIJ_CWD_BEGIN__'; pwd; printf '%s\\n' '__FM_ZELLIJ_CWD_END__'\n__FM_ZELLIJ_CWD_BEGIN__\n/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project\n__FM_ZELLIJ_CWD_END__\nMac-Studio:project charlesabrooker$ export GOTMPDIR=/tmp/fm-zellij-auto/gotmp\nMac-Studio:project charlesabrooker$ export COMPACT_ADVISER_DISABLE=0\nMac-Studio:project charlesabrooker$ export FM_TASK_ID=zellij-auto\nMac-Studio:project charlesabrooker$ . '/tmp/fm-zellij-auto+acfe2766772970fb58c2b507dc500fce1b04d0651adf4e5198d7bf2bc18b8021/launch.s1791316185.87482.29172.sh'\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  Allow external CLAUDE.md file imports?\n\n  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for third-party repositories.\n\n  External imports:\n    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/AGENTS.md\n\n  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks https://code.claude.com/docs/en/security\n\n  \u276f No, disable external imports\n    Yes, allow external imports\n\n  Enter to confirm \u00b7 Esc to cancel\n\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "list-tabs",
+      "--json"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[\n  {\n    \"position\": 0,\n    \"name\": \"Tab #1\",\n    \"active\": true,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": true,\n    \"other_focused_clients\": [\n      1\n    ],\n    \"active_swap_layout_name\": \"BASE\",\n    \"is_swap_layout_dirty\": true,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 160,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 160,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 1,\n    \"tab_id\": 0,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  },\n  {\n    \"position\": 1,\n    \"name\": \"fm-firstmate-3f5c9b39-zellij-emergency\",\n    \"active\": false,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": false,\n    \"other_focused_clients\": [],\n    \"active_swap_layout_name\": null,\n    \"is_swap_layout_dirty\": false,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 160,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 160,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 0,\n    \"tab_id\": 1,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  },\n  {\n    \"position\": 2,\n    \"name\": \"fm-firstmate-3f5c9b39-zellij-auto\",\n    \"active\": false,\n    \"panes_to_hide\": 0,\n    \"is_fullscreen_active\": false,\n    \"is_sync_panes_active\": false,\n    \"are_floating_panes_visible\": false,\n    \"other_focused_clients\": [],\n    \"active_swap_layout_name\": null,\n    \"is_swap_layout_dirty\": false,\n    \"viewport_rows\": 48,\n    \"viewport_columns\": 160,\n    \"display_area_rows\": 50,\n    \"display_area_columns\": 160,\n    \"selectable_tiled_panes_count\": 1,\n    \"selectable_floating_panes_count\": 0,\n    \"tab_id\": 2,\n    \"has_bell_notification\": false,\n    \"is_flashing_bell\": false\n  }\n]\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "--session",
+      "round2-zellij-800f9eb0e0",
+      "action",
+      "list-panes",
+      "--json"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "[\n  {\n    \"id\": 0,\n    \"is_plugin\": true,\n    \"is_focused\": false,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": true,\n    \"title\": \"(.) - zellij:link\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 13,\n    \"pane_content_x\": 14,\n    \"pane_y\": 13,\n    \"pane_content_y\": 14,\n    \"pane_rows\": 25,\n    \"pane_content_rows\": 23,\n    \"pane_columns\": 25,\n    \"pane_content_columns\": 23,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"zellij:link\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 3,\n    \"is_plugin\": true,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": true,\n    \"is_suppressed\": false,\n    \"title\": \"First Run Setup Wizard (Step 1/1)\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 1,\n    \"pane_content_x\": 2,\n    \"pane_y\": 7,\n    \"pane_content_y\": 8,\n    \"pane_rows\": 37,\n    \"pane_content_rows\": 35,\n    \"pane_columns\": 49,\n    \"pane_content_columns\": 47,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": \"configuration\",\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 0,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 160,\n    \"pane_content_columns\": 158,\n    \"cursor_coordinates_in_pane\": [\n      11,\n      5\n    ],\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 0,\n    \"tab_position\": 0,\n    \"tab_name\": \"Tab #1\"\n  },\n  {\n    \"id\": 1,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 160,\n    \"pane_content_columns\": 158,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 1,\n    \"tab_position\": 1,\n    \"tab_name\": \"fm-firstmate-3f5c9b39-zellij-emergency\"\n  },\n  {\n    \"id\": 3,\n    \"is_plugin\": false,\n    \"is_focused\": true,\n    \"is_fullscreen\": false,\n    \"is_floating\": false,\n    \"is_suppressed\": false,\n    \"title\": \"Pane #1\",\n    \"exited\": false,\n    \"exit_status\": null,\n    \"is_held\": false,\n    \"pane_x\": 0,\n    \"pane_content_x\": 1,\n    \"pane_y\": 1,\n    \"pane_content_y\": 2,\n    \"pane_rows\": 48,\n    \"pane_content_rows\": 46,\n    \"pane_columns\": 160,\n    \"pane_content_columns\": 158,\n    \"cursor_coordinates_in_pane\": null,\n    \"terminal_command\": null,\n    \"plugin_url\": null,\n    \"is_selectable\": true,\n    \"index_in_pane_group\": {},\n    \"default_fg\": null,\n    \"default_bg\": null,\n    \"tab_id\": 2,\n    \"tab_position\": 2,\n    \"tab_name\": \"fm-firstmate-3f5c9b39-zellij-auto\"\n  }\n]\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "kill-session",
+      "--help"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "zellij-kill-session \nKill a specific session\n\nUSAGE:\n    zellij kill-session [TARGET_SESSION]\n\nARGS:\n    <TARGET_SESSION>    Name of target session\n\nOPTIONS:\n    -h, --help    Print help information\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "delete-session",
+      "--help"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "zellij-delete-session \nDelete a specific session\n\nUSAGE:\n    zellij delete-session [OPTIONS] [TARGET_SESSION]\n\nARGS:\n    <TARGET_SESSION>    Name of target session\n\nOPTIONS:\n    -f, --force    Kill the session if it's running before deleting it\n    -h, --help     Print help information\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh",
+      "zellij-emergency",
+      "--force"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-emergency: 10758 80814\nteardown: force-killing leaked worktree process(es) for zellij-emergency: 10758\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-emergency complete (window round2-zellij-800f9eb0e0:1, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/1/project)\nBacklog: zellij-emergency just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md - move zellij-emergency to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-teardown.sh",
+      "zellij-auto",
+      "--force"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nteardown: reaping leaked worktree process(es) for zellij-auto: 1002 93483\nteardown: force-killing leaked worktree process(es) for zellij-auto: 1002\nA new version of treehouse is available: v2.3.1-fm.e58947de \u2192 v3.1.2\nRun \"treehouse update\" to update\n\n\ud83c\udf33 Worktree returned to pool.\nteardown zellij-auto complete (window round2-zellij-800f9eb0e0:3, worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/project/.treehouse/project-69f3dd/2/project)\nBacklog: zellij-auto just finished (this home keeps no markdown backlog at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md). Update /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/fm-home/data/backlog.md - move zellij-auto to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "kill-session",
+      "round2-zellij-800f9eb0e0"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": ""
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "delete-session",
+      "round2-zellij-800f9eb0e0",
+      "--force"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 0,
+    "output": "Session: \"round2-zellij-800f9eb0e0\" successfully deleted.\n"
+  },
+  {
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-zellij/zellij",
+      "list-sessions",
+      "--short",
+      "--no-formatting"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW",
+    "returncode": 1,
+    "output": "No active zellij sessions found.\n"
+  }
+]

@@ -1,0 +1,1457 @@
+{
+  "classification": "supplemental fake transport/probe test; NOT LIVE",
+  "original_selector": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/source/tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+  "source_copy_selector": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/source/tests/fm-spawn-compact-adviser-disable-remote.test.sh",
+  "command": [
+    "/bin/bash",
+    "-x",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/source/tests/fm-spawn-compact-adviser-disable-remote.test.sh"
+  ],
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/source",
+  "deadline_seconds": 900,
+  "environment_overrides": {
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp",
+    "FM_REMOTE_SUBJECT_CLEANUP_SCRIPT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/cleanup.py",
+    "FM_REMOTE_SUBJECT_FIXTURE_FILE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/fixture-path",
+    "FM_REMOTE_SUBJECT_TRANSPORT_LOG": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/remote-supplemental-transport.log",
+    "FM_REMOTE_SUBJECT_PANE_LOG": "/Users/charlesabrooker/.no-mistakes/evidence/01M490SW8TBFGK32KKDYZNRWDW/remote-supplemental-pane-transcript.log",
+    "PS4": "+${SECONDS}s ${BASH_SOURCE}:${LINENO}: "
+  },
+  "fixture_changes_only": [
+    "Record fixture path and override signal traps to run complete EXIT cleanup before removing fixtures.",
+    "Replace lone serving-child kill with path/start/argv-validated worker-group shutdown and exact-home process-event sweep.",
+    "Collect launch-phase and fake-SSH entrypoint timestamps plus pane payload logs; assertions and production executables unchanged.",
+    "Git-init independent TMPDIR ancestor for synthetic remote cwd; no remote gate bypass propagated."
+  ],
+  "original_test_sha256": "7031eb717a4847a5742e610953c7d2202ba0e435306b8b588722bc8db667c9ea",
+  "disposable_test_sha256": "01ef46d42f145a01af568934f3b84145157f3019cba7bc5ff7d435acf769ced0",
+  "start_unix": 1791310719.5752409,
+  "test_pid_and_group": 9274,
+  "test_exit": 0,
+  "timed_out": false,
+  "elapsed_seconds": 355.676,
+  "cleanup_errors": [],
+  "transport_incomplete_calls": [],
+  "transport_call_count": 110,
+  "transport_calls": [
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-home-provision.sh",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 5,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/compact-adviser",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "1",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "codex",
+        "-",
+        "-",
+        "herdr",
+        ""
+      ],
+      "seconds": 6,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "2",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 7,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 12,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 6,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/compact-adviser",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "2",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "codex",
+        "-",
+        "-",
+        "herdr",
+        ""
+      ],
+      "seconds": 6,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/compact-adviser",
+        "30",
+        "af7162c358c8217ffd985dd64520c6c433aaa98f316224b34b3cc7557d528f66",
+        "3",
+        ""
+      ],
+      "seconds": 7,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "3",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "claude",
+        "-",
+        "-",
+        "herdr",
+        ""
+      ],
+      "seconds": 6,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/compact-adviser",
+        "30",
+        "af7162c358c8217ffd985dd64520c6c433aaa98f316224b34b3cc7557d528f66",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "4",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "claude",
+        "-",
+        "-",
+        "herdr",
+        "--compact-adviser-disable",
+        ""
+      ],
+      "seconds": 6,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 5,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 11,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "5",
+        ""
+      ],
+      "seconds": 4,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/compact-adviser",
+        "30",
+        "af7162c358c8217ffd985dd64520c6c433aaa98f316224b34b3cc7557d528f66",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "5",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "claude",
+        "-",
+        "-",
+        "herdr",
+        ""
+      ],
+      "seconds": 5,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-doctor.sh",
+        ""
+      ],
+      "seconds": 0,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "sync",
+        "ios",
+        "fdd2352a1d3b78bf7ede4c2e56d2e5f7b2cfe4a9",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/crew-dispatch.json",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/dispatch-never-send",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/crew-harness",
+        "6",
+        "243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8",
+        "6",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/backlog-backend",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/backend",
+        "5",
+        "bdb2da3e07d4deeb97ebe6401bc8f3edf439806cb7b3922d62cc18ee85506f0e",
+        "6",
+        ""
+      ],
+      "seconds": 3,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/herdr-presentation-spaces",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/startup-memory-budget",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/trace-context",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/launch-env-allowlist",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "put",
+        "config/compact-adviser",
+        "30",
+        "af7162c358c8217ffd985dd64520c6c433aaa98f316224b34b3cc7557d528f66",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-permission-mode",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/claude-launcher",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/lavish-axi-host",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "config/keep-ai-trailers",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-inherit.sh",
+        "absent",
+        "data/captain-shared.md",
+        "0",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "6",
+        ""
+      ],
+      "seconds": 2,
+      "exit": 0
+    },
+    {
+      "argv": [
+        "fm-remote-secondmate-control.sh",
+        "launch",
+        "ios",
+        "claude",
+        "-",
+        "-",
+        "herdr",
+        "--compact-adviser-disable",
+        ""
+      ],
+      "seconds": 7,
+      "exit": 0
+    }
+  ],
+  "phase_durations": [
+    {
+      "label": "allowlist absent",
+      "seconds": 53
+    },
+    {
+      "label": "allowlist enabled",
+      "seconds": 76
+    },
+    {
+      "label": "automatic Claude, allowlist absent",
+      "seconds": 57
+    },
+    {
+      "label": "emergency-disabled Claude, allowlist absent",
+      "seconds": 49
+    },
+    {
+      "label": "automatic Claude, allowlist enabled",
+      "seconds": 66
+    },
+    {
+      "label": "emergency-disabled Claude, allowlist enabled",
+      "seconds": 48
+    }
+  ],
+  "assertion_results": [
+    "ok - a remote-routed second mate starts with the compact adviser disabled, from the pane export and from the launch command alike",
+    "ok - the remote route keeps the compact-adviser switch through the cleared allowlisted environment",
+    "ok - remote Claude auto and function hooks survive both environment postures and lost pane exports",
+    "ALL TESTS PASSED"
+  ],
+  "owned_fixture_directory_removed": true
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "worker_pid": 17941,
+    "worker_argv": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-root/bin/fm-remote-job-worker.sh --serve",
+    "worker_group": 17397,
+    "supervisor_argv": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/remote-root/bin/fm-remote-job-worker.sh"
+  },
+  {
+    "cleanup_command": [
+      "/bin/bash",
+      "-c",
+      ". \"$1\"; fm_remote_job_stop_worker_tree \"$2\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/source/bin/fm-remote-job-lib.sh",
+      "17941"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cleanup_command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/source/bin/fm-procevent.sh",
+      "sweep-home"
+    ],
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/parent",
+    "FM_PROCEVENT_CLAIM_ROOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-remote-check/tmp/fm-remote-compact-adviser.4bhow3/claims",
+    "exit": 0,
+    "stdout": "retired: remote-reply-ios\nswept: attempted=1\n",
+    "stderr": ""
+  },
+  {
+    "removed_fixture_launch_staging": "/tmp/fm-ios+1a970ff52b467247b0f8552bb37e61105736e81e6b4ff5c846097bde1e91842d"
+  }
+]

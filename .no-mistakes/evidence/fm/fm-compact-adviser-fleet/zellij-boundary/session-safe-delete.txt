@@ -1,0 +1,3 @@
+$ /bin/bash -c '. "$1/tests/zellij-test-safety.sh"; zellij_safe_delete "$2"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW fm-zellij-boundary-195
+
+exit=0

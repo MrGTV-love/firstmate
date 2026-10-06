@@ -1,0 +1,3 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/bin/fm-captain-hold.sh complete adviserr2auto --none
+exit=0
+complete: adviserr2auto captain-call inventory reviewed

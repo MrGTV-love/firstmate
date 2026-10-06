@@ -1,0 +1,8 @@
+env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-spawn.sh auto-open /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project' --scout; printf "\nSCENARIO_SPAWN_RC=%s\n" "$?"
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE DISABLE_AUTOUPDATER=1 FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home bin/fm-spawn.sh auto-open /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home/projects/probe 'claude --model haiku --tools "" --strict-mcp-config --setting-sources project' --scout; printf "\nSCENARIO_SPAWN_RC=%s\n" "$?"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.test-phase-lab/home
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned auto-open harness=claude kind=scout window=fm-lab-adviser-test-67659-1247:w2:p2 worktree=/Users/charlesabrooker/.treehouse/probe-7cbd9e/1/probe
+
+SCENARIO_SPAWN_RC=0
+charlesabrooker@Mac-Studio 01M490SW8TBFGK32KKDYZNRWDW %

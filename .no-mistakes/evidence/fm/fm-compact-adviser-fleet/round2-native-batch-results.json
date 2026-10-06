@@ -1,0 +1,138 @@
+[
+  {
+    "kind": "scout",
+    "filtered": false,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 92855,
+      "name": "2.1.291",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2scout0a"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p7"
+  },
+  {
+    "kind": "scout",
+    "filtered": false,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 63900,
+      "name": "2.1.291",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2scout0b"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p8"
+  },
+  {
+    "kind": "scout",
+    "filtered": true,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 46482,
+      "name": "2.1.291",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2scout1a"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:p9"
+  },
+  {
+    "kind": "scout",
+    "filtered": true,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 30887,
+      "name": "2.1.291",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2scout1b"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pA"
+  },
+  {
+    "kind": "ship",
+    "filtered": false,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 20968,
+      "name": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2ship0a"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pB"
+  },
+  {
+    "kind": "ship",
+    "filtered": false,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 91488,
+      "name": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2ship0b"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pC"
+  },
+  {
+    "kind": "ship",
+    "filtered": true,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 60302,
+      "name": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2ship1a"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pD"
+  },
+  {
+    "kind": "ship",
+    "filtered": true,
+    "batch_exit": 0,
+    "worker": {
+      "pid": 43921,
+      "name": "2.1.292",
+      "state": {
+        "COMPACT_ADVISER_DISABLE": "1",
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "FM_TASK_ID": "adviserr2ship1b"
+      }
+    },
+    "endpoint": "fm-lab-adviser-r2-51967-17576:w1:pE"
+  }
+]

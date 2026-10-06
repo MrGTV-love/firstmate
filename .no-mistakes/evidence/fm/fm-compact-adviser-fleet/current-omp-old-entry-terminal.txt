@@ -1,0 +1,80 @@
+ export const migrated_1280 = (input: number): number => input + 6; // verified parity case
+ 1280, old and new match
+ export const migrated_1281 = (input: number): number => input + 0; // verified parity case
+ 1281, old and new match
+ export const migrated_1282 = (input: number): number => input + 1; // verified parity case
+ 1282, old and new match
+ export const migrated_1283 = (input: number): number => input + 2; // verified parity case
+ 1283, old and new match
+ export const migrated_1284 = (input: number): number => input + 3; // verified parity case
+ 1284, old and new match
+ export const migrated_1285 = (input : number): number => input + 4; // verified parity case
+ 1285, old and new match
+ export const migrated_1286 = (input: number): number => input + 5; // verified parity case
+ 1286, old and new match
+ export const migrated_1287 = (input: number): number => input + 6; // verified parity case
+ 1287, old and new match
+ export const migrated_1288 = (input: number): number => input + 0; // verified parity case
+ 1288, old and new match
+ export const migrated_1289 = (input: number): number => input + 1; // verified parity case
+ 1289, old and new match
+ export const migrated_1290 = (input: number): number => input + 2; // verified parity case
+ 1290, old and new match
+ export const migrated_1291 = (input: number): number => input + 3; // verified parity case
+ 1291, old and new match
+ export const migrated_1292 = (input: number): number => input + 4; // verified parity case
+ 1292, old and new match
+ export const migrated_1293 = (input: number): number => input + 5; // verified parity case
+ 1293, old and new match
+ export const migrated 1294 = (input: number): number => input + 6; // verified parity case
+ 1294, old and new match
+ export const migrated_1295 = (input: number): number => input + 0; // verified parity case
+ 1295, old and new match
+ export const migrated_1296 = (input: number): number => input + 1; // verified parity case
+ 1296, old and new match
+ export const migrated_1297 = (input: number): number => input + 2; // verified parity case
+ 1297, old and new match
+ export const migrated_1298 = (input: number): number => input + 3; // verified parity case
+ 1298, old and new match
+ export const migrated_1299 = (input: number): number => input + 4; // verified parity case
+ 1299, old and new match
+
+
+ Captain, review complete: the arithmetic rule is correct, but the generated source is
+ invalid as supplied.
+
+ - Constants follow index % 7, preserving the old input + constant behavior for finite
+   inputs, including fractional values, precision rounding at large magnitudes, and -0 + 0
+   becoming +0. Adding these small constants to Number.MAX_VALUE rounds back to that value.
+ - Token-splitting errors prevent compilation—for example, = > in migrated_0014, numb er in
+   migrated_0023, and / / instead of // after migrated_0476. Similar corruption appears
+   elsewhere; parity comments do not establish correctness.
+
+ Verdict: not approved as generated. Syntax repair remains necessary; this read-only audit
+ is complete, and no repository changes were made.
+
+
+ Close the read-only audit. Your arithmetic-parity review is finished, and the syntax
+ defects you identified are fully documented in your final verdict. Repairs are a separate,
+ out-of-scope workstream. Return a concise final report with the parity conclusion and
+ recorded syntax failure; this unit has no remaining actions.
+
+
+ Captain, the read-only audit is closed.
+
+ - Arithmetic parity: The index % 7 constants preserve the old addition behavior for finite
+   inputs, including floating-point rounding and signed-zero boundaries.
+ - Recorded syntax failure: Split tokens and a malformed comment delimiter make the supplied
+   source invalid TypeScript, despite its parity comments.
+
+ Repairs are a separate, out-of-scope workstream. This audit has no remaining actions.
+
+ Closing session…
+
+
+╭── π > ◔ GPT-6.1-Sol 🙈 > 📁 …house/project-8db0b7/1/project > (sub) + 👁 0.12 ▶─5%─┃272K───╮
+╰─                                                            ⇧⇥ to change thinking effort ─╯
+
+Resume this session with
+omp --resume 01a11318-dc09-7598-9ea3-1704558576ee
+charlesabrooker@Mac-Studio project %

@@ -1,0 +1,61 @@
+{
+  "task": "tmux-normal",
+  "pane": "26264 120 40 2.1.292",
+  "server_pid": 28384,
+  "server_ps_selected_env": {
+    "FM_COMPACT_ADVISER_DISABLE": null,
+    "FM_COMPACT_ADVISER_HOOKS": null,
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+    "COMPACT_ADVISER_DISABLE": "1"
+  },
+  "server_show_environment_selected": [
+    "COMPACT_ADVISER_DISABLE=1"
+  ],
+  "processes": [
+    {
+      "pid": 26264,
+      "ppid": 28384,
+      "comm": "-zsh",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": null
+      }
+    },
+    {
+      "pid": 28871,
+      "ppid": 26264,
+      "comm": "treehouse",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": "1"
+      }
+    },
+    {
+      "pid": 29561,
+      "ppid": 28871,
+      "comm": "/bin/zsh",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": null,
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": null,
+        "COMPACT_ADVISER_DISABLE": null
+      }
+    },
+    {
+      "pid": 45242,
+      "ppid": 29561,
+      "comm": "claude",
+      "selected_env": {
+        "FM_COMPACT_ADVISER_DISABLE": null,
+        "FM_COMPACT_ADVISER_HOOKS": "1",
+        "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
+        "COMPACT_ADVISER_DISABLE": "0"
+      }
+    }
+  ],
+  "meta": "window=firstmate:fm-tmux-normal\nendpoint_task_id=tmux-normal\nworktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project/.treehouse/project-3d385e/2/project\nproject=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M490SW8TBFGK32KKDYZNRWDW/.live-validation-tmux/project\nharness=claude\nkind=scout\ntasktmp=/tmp/fm-tmux-normal\nmodel=haiku\neffort=default\nbusy_gen=g1791316076.37317.9234\nspawn_gen=s1791316077.22425.8024\n"
+}
