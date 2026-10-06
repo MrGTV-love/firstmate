@@ -454,7 +454,7 @@ bash bin/fm-test-run.sh --jobs 1 tests/fm-backend-herdr.test.sh tests/fm-spawn-a
 ```
 
 The regression runs the real spawn entrypoint and real terminals with a fake `treehouse get` that holds a process lease until its shell exits.
-Only the caller's polling sleeps are accelerated; the fake get waits for permission that the test grants after the isolation deadline has already refused the spawn.
+Caller sleeps are accelerated except for the contended cleanup wait; the fake get uses real sleeps and, in the slow-refusal case, receives permission only after spawn has refused.
 The tests observe the released lease, the vanished get process, and surviving unrelated panes and a previously successful acquisition.
 The foreign-copy case reaches Claude's existing workspace-trust refusal, while a separate dirty-copy case refuses after successful discovery.
 No real Treehouse pool or model session is used.
@@ -463,9 +463,9 @@ Both terminal shells and the fake get's interactive child use lab-private histor
 
 The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
 After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
-The shared endpoint-close boundary waits for that lock rather than abandoning cleanup or closing unlocked.
+The refused spawn remained blocked in endpoint cleanup until the projected spawn released the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
 Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
-An unresolved session lock identity still refuses an unlocked close.
+The companion `tests/fm-backend-herdr.test.sh` checks unresolved-lock refusal without any pane-close mutation.
 
 Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
 
@@ -486,9 +486,7 @@ ok - herdr contention releases only the refused acquisition after projected laun
 
 Focused verification passed all three scripts with no failures or gate skips.
 
-The Zellij and cmux creation paths also retain their response-derived endpoint identifiers for abort cleanup, but those real backends were not exercised by this command.
-Orca does not run Treehouse acquisition and retains its separate abort cleanup.
-Secondmate launches and adopted relaunch endpoints are outside this acquisition cleanup.
+This command exercised tmux and Herdr; Zellij and cmux were not exercised.
 
 ## TeamClaude launcher
 

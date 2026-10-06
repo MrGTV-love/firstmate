@@ -245,9 +245,10 @@
 #   itself a linked worktree of the project repository still launches. A pane
 #   that never reaches an isolated worktree refuses at the end of that wait,
 #   naming the last path seen and why it was rejected.
-#   A refused fresh Treehouse-backed launch closes only the endpoint created
-#   by this attempt, ending its get process lease even if allocation completes
-#   after the isolation deadline. Relaunches and adopted endpoints are untouched.
+#   A pre-launch refusal of a fresh Treehouse-backed spawn closes only the
+#   endpoint created by this attempt, ending its get process lease even if
+#   allocation completes after the isolation deadline. Relaunches and adopted
+#   endpoints are untouched.
 #   That placement is proven only at launch. Every ship or scout pane therefore
 #   also receives `export FM_TASK_ID=<task-id>` before the launch command, on
 #   the same channel as GOTMPDIR, and bin/fm-test-run.sh refuses to execute the
@@ -4468,9 +4469,8 @@ spawn_assert_agent_worktree
 # for this id; a refusal blocks the spawn rather than launching a worker that
 # would wedge. Refusing here rather than beside the
 # arm keeps this in the same class as the two worktree refusals just above: no
-# temp root, no retired relaunch wiring and no busy record exists yet to strand,
-# so the refusal names the endpoint the same way they do and leaves nothing else
-# behind.
+# temp root, no retired relaunch wiring and no busy record exists yet to strand.
+# The header owns cleanup of a fresh acquisition endpoint on pre-launch refusal.
 # agy gates a fresh worktree behind its own folder-trust dialog and honours a
 # trustedWorkspaces entry written ahead of launch (bin/fm-agy-trust.sh), so the
 # same pre-registration removes the dialog for it. Unlike claude's dialog, agy's

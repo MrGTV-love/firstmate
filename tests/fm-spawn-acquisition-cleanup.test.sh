@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Exercise the real spawn entrypoint and terminal with a fake process-leased get.
-# --herdr uses only a generated, guarded lab session; the default uses private tmux.
+# The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -55,7 +55,7 @@ cleanup_acquisition() {
 }
 trap cleanup_acquisition EXIT
 FAKEBIN=$(fm_fakebin "$TMP_ROOT/fake")
-# Speed only the caller's polling sleeps. The acquisition uses /bin/sleep.
+# Speed caller sleeps except marked real cleanup waits; acquisition uses /bin/sleep.
 cat > "$FAKEBIN/sleep" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_POLL_READY:-}" ]; then
