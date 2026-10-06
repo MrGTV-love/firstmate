@@ -202,6 +202,17 @@ printf 'signal: task.status done: fixture\n'
 exit 0
 SH
       ;;
+    source-retires)
+      cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
+printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+  "$(date +%s)" > "$FM_HOME/state/.wake-queue"
+rm -f "$FM_HOME/state/procevent/lavish-final.source"
+touch "$FM_HOME/state/.last-watcher-beat"
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+printf 'check: process-event result captured: procevent:lavish-final:1\n'
+exit 0
+SH
+      ;;
     afk-appears)
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 : > "$FM_HOME/state/.afk"
@@ -431,6 +442,33 @@ test_inert_when_fleet_idle() {
   assert_present "$dir/state/.claude-autoarm-failure-notified" "idle state without positive recovery reset the failure notice"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "idle state without positive recovery reset the attended alarm"
   pass "auto-arm: inert with nothing in flight and no X-mode need"
+}
+
+test_terminal_source_wake_survives_retirement() {
+  local dir when out status before
+  for when in before-stop during-stop; do
+    dir=$(make_primary_dir "$TMP_ROOT/terminal-$when")
+    mkdir -p "$dir/state/procevent"
+    if [ "$when" = during-stop ]; then
+      : > "$dir/state/procevent/lavish-final.source"
+    else
+      printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+        "$(date +%s)" > "$dir/state/.wake-queue"
+    fi
+    write_arm_fixture "$dir" source-retires
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 2 "$status" "the last source's final wake must reach Claude when captured $when"
+    assert_contains "$out" 'procevent:lavish-final:1' "the final capture must be the rewake reason"
+    assert_absent "$dir/state/procevent/lavish-final.source" "the source must have retired"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "final feedback must record a rewake, not clean"
+    : > "$dir/state/.wake-queue"
+    before=$(wc -l < "$dir/state/arm-ran")
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 0 "$status" "acknowledging the final wake must let the idle primary stop"
+    [ -z "$out" ] || fail "acknowledged final feedback caused another notice: $out"
+    [ "$(wc -l < "$dir/state/arm-ran")" = "$before" ] || fail "the idle home armed again after the final acknowledgement"
+  done
+  pass "auto-arm: final feedback captured before or during Stop survives source retirement until acknowledged"
 }
 
 # --- the armed cycle ----------------------------------------------------------
@@ -1791,6 +1829,7 @@ test_inert_when_afk
 test_stale_lock_recovery_preserves_afk_and_need_gates
 test_resolves_outermost_claude_pid_in_nested_bgspare_chain
 test_inert_when_fleet_idle
+test_terminal_source_wake_survives_retirement
 test_actionable_close_rewakes_with_reason
 test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
