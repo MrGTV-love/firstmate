@@ -306,6 +306,41 @@ One measured answer reached durable capture in approximately 1.7 seconds; this i
 The portable process-event regression covers consecutive unhandled answers, disconnect, empty and `waiting` poll returns, exclusive ownership, age reporting, and ended or missing session retirement.
 The existing destructive-poll durability limit still applies: feedback lost before the runner captures the poll output is not recoverable.
 
+#### Real native review revalidation, 2026-10-06
+
+Claude Code 2.1.291, TeamClaude 1.1.21-affinity.0 and lavish-axi 0.1.79 were exercised in a standalone Git primary with isolated `FM_HOME` and unchanged tracked hooks and default user settings.
+The native launch used the shipped proxy wrapper and existing managed authentication:
+
+```sh
+bash bin/fm-teamclaude-launch.sh --print "$PROMPT" \
+  --tools Bash,Read --allowedTools Bash,Read --permission-mode dontAsk \
+  --effort low --output-format stream-json --include-hook-events --verbose
+```
+
+The bounded prompt armed one real private review, held an ordinary Bash tool open for 60 seconds, and required each actual browser message to be read, acted on and acknowledged through the public adapter and queue commands.
+Two messages were sent through the native composer before the first acknowledgement; both durable captures existed while that first message was still unhandled.
+The real `PostToolUse` context triggered both owning actions and acknowledgements before the first Stop.
+A third native message and a final native Send & End then caused two genuine Stop-owned reawakening turns with no model-issued watcher arm.
+All four actions, capture acknowledgements and queue acknowledgements completed; the source self-retired and the final queue was empty.
+Observed server-acceptance-to-capture times ranged from 1040.615 to 1045.091 milliseconds, not a promised latency bound.
+The final feedback remained actionable after the last source retired, as the [supervision-need contract](../turnend-guard.md#supervision-need) requires.
+The native JSONL and normalized receipt reported:
+
+```json
+{
+  "two_native_stop_rewakes": 2,
+  "real_second_capture_before_first_ack": true,
+  "zero_model_issued_watcher_arms": true,
+  "all_four_results_and_wakes_acknowledged": true,
+  "source_self_retired": true,
+  "claims_absent": true
+}
+```
+
+`tests/fm-claude-stop-autoarm.test.sh` covers final capture before and during Stop, and the idle transition after acknowledgement; `tests/fm-turnend-guard.test.sh` covers the shared last-source retirement predicate.
+The observed native path does not establish universal every-send or no-loss delivery, and it does not remove the source-side destructive-poll limitation above.
+
+
 ### Cursor primary park, 2026-08-13
 
 Cursor was validated as a primary on 2026-08-13 against the installed CLI on macOS 26.5.2 arm64 with tmux 3.6a, in a throwaway firstmate home on a private tmux socket, never against a live home and never with a user-scope hook.
