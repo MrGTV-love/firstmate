@@ -1,0 +1,55 @@
+{
+  "verdict": "pass",
+  "tested_head_sha": "b3b2ffe0ce1300038eaee445c8b0347ed00f0f18",
+  "previously_untested_scenarios": [
+    {
+      "name": "Genuine multiple-skill advice and bounded ambiguous top-three recheck",
+      "verdict": "pass",
+      "evidence": [
+        "genuine-multiple-wire.jsonl",
+        "genuine-multiple-output.txt"
+      ]
+    },
+    {
+      "name": "Genuine no-fit with ordinary agent selection",
+      "verdict": "pass",
+      "evidence": [
+        "genuine-no-fit-wire.jsonl",
+        "genuine-no-fit-output.txt",
+        "genuine-no-fit-agent.jsonl"
+      ]
+    },
+    {
+      "name": "Genuine public ranking/recheck omits linked private identity/description/excerpt in both roots",
+      "verdict": "pass",
+      "evidence": [
+        "genuine-picker-receipts.json",
+        "genuine-multiple-wire.jsonl"
+      ]
+    },
+    {
+      "name": "Automatic genuine worker launch and relaunch advice, preserved source intent, actual ordinary body reads",
+      "verdict": "pass",
+      "evidence": [
+        "genuine-worker-acceptance.json",
+        "genuine-worker-wire.jsonl",
+        "genuine-worker-body-read-receipts.json",
+        "genuine-worker-delivered-launch-inputs.json",
+        "genuine-worker-session-receipts.jsonl",
+        "genuine-worker-result-1.json",
+        "genuine-worker-result-2.json"
+      ]
+    }
+  ],
+  "root_cause": "Previous test-phase incompleteness: authorized process-only external accessor route had not been exercised. The existing valid key worked when loaded only inside the live picker process; no product or permanent test change required.",
+  "focused_verification": "Actual production picker and real curl; real omp no-fit task; actual production spawn and fm-control relaunch in a marked isolated private-tmux lab using unmodified current production copies. No broad suite, lint, format, static analysis, push, PR, CI or no-mistakes phase-control command.",
+  "role_coverage": "Ordinary explicit tool intake and automatic worker launch/relaunch; no global hook or vendor-internal agent coverage claimed.",
+  "limits": [
+    "Fixture-controlled acquisition: genuine isolated git worktree and actual production isolation checks, not a real Treehouse lifecycle proof.",
+    "Single representative local monetary task, two real omp sessions; no context-savings/performance/generalization claim.",
+    "Preliminary completed launch was retired before final scenario to improve fixture minimal-input heading boundary; retained separately.",
+    "Exact production source copies unmodified; no product fix, no build/lint/static analysis/full suite or pipeline commands exercised."
+  ],
+  "prior_evidence": "Previously passing evidence untouched. New credential-free receipts supplement it. No performance/context-saving or external benchmark claim.",
+  "cleanup": "Worker control exit/private server shutdown/helper teardown observed; temporary worktree fixtures removed after evidence retention."
+}

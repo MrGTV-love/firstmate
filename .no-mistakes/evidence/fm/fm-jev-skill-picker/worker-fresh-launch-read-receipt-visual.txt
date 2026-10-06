@@ -1,0 +1,28 @@
+ task in place, and you would then receive mode-specific ship instructions as a follow-up message.
+
+ Skill selection advice
+
+ Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+ This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+ Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+ Optional suggestion: diagnostic-reasoning - read
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.agents/skills/diagnostic-reasoning/SKILL.md; fit=0.96,
+ uncertain=false, evidence=opening-instruction recheck.
+ Advice source: live; model: jev-1.13.0.
+
+
+ • Read (4)
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.agents/skills/diagnostic-reasoning/SKILL.md
+   ├─ metrics.json
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.agents/skills/captain-hold-lifecycle/SKILL.md
+   └─ ✘ ~/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home/state/worker-jev-fresh.inbox
+
+ Evaluating reporting observations
+
+ I’ve noticed that just one observation isn’t enough to falsify broad population claims. I need more immediate details from the user, especially
+ since there are no timestamps on the fixtures. It’s important to consider that there's no source or error class for the traffic sample, and I can’t
+ analyze counts independently. The excess numeric value of +16 from 100 holds no significance. Overall, I won’t recommend any changes or rollbacks at
+ this point.
+
+╭─── ✎ Write: 📝 ~/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home/data/worker-jev-fresh/report.md · 33 li…╮
+│   1 # Cache-key deployment: error-rate diagnosis                                                                                                   │

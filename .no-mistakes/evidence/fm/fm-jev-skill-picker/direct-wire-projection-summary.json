@@ -1,0 +1,972 @@
+[
+  {
+    "scenario": "actor-genuine-advice",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-genuine-advice-wire/1791322934771084000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-genuine-advice-wire/1791322934771084000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3183,
+      "exit_code": 0,
+      "http_and_time": "200 0.170258"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate invoices, malformed amounts, unmatched invoices, underpayments and overpayments. Compare money exactly, including small split payments, and write a discrepancy report.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.84
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.64
+      }
+    },
+    "usage": {
+      "input_tokens": 827,
+      "output_tokens": 122
+    }
+  },
+  {
+    "scenario": "actor-genuine-advice",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-genuine-advice-wire/1791322935083430000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-genuine-advice-wire/1791322935083430000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2750,
+      "exit_code": 0,
+      "http_and_time": "200 0.185448"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate invoices, malformed amounts, unmatched invoices, underpayments and overpayments. Compare money exactly, including small split payments, and write a discrepancy report.",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.66
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.95
+      }
+    },
+    "usage": {
+      "input_tokens": 765,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "denied-recheck-excerpt",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/denied-recheck-excerpt-wire/1791323288238394000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/denied-recheck-excerpt-wire/1791323288238394000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3131,
+      "exit_code": 0,
+      "http_and_time": "200 0.180587"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports for missing fields, malformed amounts, duplicates, underpayments, overpayments and unmatched records, then write a concise discrepancy report.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.82
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.68
+      }
+    },
+    "usage": {
+      "input_tokens": 818,
+      "output_tokens": 122
+    }
+  },
+  {
+    "scenario": "dispatch-genuine",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/dispatch-genuine-wire/1791322975637998000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/dispatch-genuine-wire/1791322975637998000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 804,
+      "exit_code": 0,
+      "http_and_time": "200 0.180023"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": {
+      "project": "disposable-pager",
+      "brief": "## Captain's intent\nFix a shell pager off-by-one: the known root cause is <= instead of < in a page boundary.\n\n## Firstmate spec\nCorrect the comparison while retaining exact page semantics.\n"
+    },
+    "catalog": null,
+    "answers": {
+      "rule": {
+        "type": "choice",
+        "choice": "rule_1",
+        "confidence": 0.99,
+        "probabilities": {
+          "default": 0.01,
+          "rule_1": 0.99
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 442,
+      "output_tokens": 35
+    }
+  },
+  {
+    "scenario": "fresh-repeat",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/fresh-repeat-wire/1791322755860809000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/fresh-repeat-wire/1791322755860809000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3652,
+      "exit_code": 0,
+      "http_and_time": "200 0.153250"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate records, malformed amounts, unmatched invoices, underpayments and overpayments, then write a concise discrepancy report.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "independent-precision",
+        "description": "Check exact decimal arithmetic when reconciling money, independently of optional advice."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.81
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_independent-precision": {
+        "type": "noul",
+        "noul": 0.7
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.67
+      }
+    },
+    "usage": {
+      "input_tokens": 918,
+      "output_tokens": 145
+    }
+  },
+  {
+    "scenario": "fresh-repeat",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/fresh-repeat-wire/1791322756154079000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/fresh-repeat-wire/1791322756154079000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2703,
+      "exit_code": 0,
+      "http_and_time": "200 0.166428"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate records, malformed amounts, unmatched invoices, underpayments and overpayments, then write a concise discrepancy report.",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.69
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.96
+      }
+    },
+    "usage": {
+      "input_tokens": 757,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "genuine-multiple",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple-wire/1791322747548817000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple-wire/1791322747548817000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3788,
+      "exit_code": 0,
+      "http_and_time": "200 0.210339"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate records, malformed amounts, unmatched invoices, underpayments and overpayments, then write a concise discrepancy report. The task might involve validation, reconciliation and reporting; choose independently relevant skills, not general unrelated workflows.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "independent-precision",
+        "description": "Check exact decimal arithmetic when reconciling money, independently of optional advice."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.82
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.98
+      },
+      "skill_independent-precision": {
+        "type": "noul",
+        "noul": 0.81
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.63
+      }
+    },
+    "usage": {
+      "input_tokens": 938,
+      "output_tokens": 145
+    }
+  },
+  {
+    "scenario": "genuine-multiple",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple-wire/1791322747869970000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple-wire/1791322747869970000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2839,
+      "exit_code": 0,
+      "http_and_time": "200 0.206667"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports for missing IDs, duplicate records, malformed amounts, unmatched invoices, underpayments and overpayments, then write a concise discrepancy report. The task might involve validation, reconciliation and reporting; choose independently relevant skills, not general unrelated workflows.",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.98
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.97
+      }
+    },
+    "usage": {
+      "input_tokens": 777,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "genuine-no-fit",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-no-fit-wire/1791322755055092000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-no-fit-wire/1791322755055092000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3625,
+      "exit_code": 0,
+      "http_and_time": "200 0.135848"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Explain why a rainbow forms after a rain shower to a curious child in two short sentences. Do not audit data, reconcile payments or prepare software releases.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "independent-precision",
+        "description": "Check exact decimal arithmetic when reconciling money, independently of optional advice."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.01
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.01
+      },
+      "skill_independent-precision": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "need": {
+        "type": "noul",
+        "noul": 0.04
+      }
+    },
+    "usage": {
+      "input_tokens": 915,
+      "output_tokens": 145
+    }
+  },
+  {
+    "scenario": "minimal-brief",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/minimal-brief-wire/1791323229703710000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/minimal-brief-wire/1791323229703710000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3046,
+      "exit_code": 0,
+      "http_and_time": "200 0.181280"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports and report validation and reconciliation discrepancies.\n",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.84
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.93
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.71
+      }
+    },
+    "usage": {
+      "input_tokens": 798,
+      "output_tokens": 122
+    }
+  },
+  {
+    "scenario": "minimal-brief",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/minimal-brief-wire/1791323229961966000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/minimal-brief-wire/1791323229961966000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2613,
+      "exit_code": 0,
+      "http_and_time": "200 0.199909"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports and report validation and reconciliation discrepancies.\n",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.74
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.95
+      }
+    },
+    "usage": {
+      "input_tokens": 736,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "private-catalog-public-siblings",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-public-siblings-wire/1791322771383157000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-public-siblings-wire/1791322771383157000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3590,
+      "exit_code": 0,
+      "http_and_time": "200 0.198458"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports, identify data quality and reconciliation discrepancies, then write a concise report.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "independent-precision",
+        "description": "Check exact decimal arithmetic when reconciling money, independently of optional advice."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.82
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_independent-precision": {
+        "type": "noul",
+        "noul": 0.79
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.69
+      }
+    },
+    "usage": {
+      "input_tokens": 904,
+      "output_tokens": 145
+    }
+  },
+  {
+    "scenario": "private-catalog-public-siblings",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-public-siblings-wire/1791322771750905000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-public-siblings-wire/1791322771750905000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2641,
+      "exit_code": 0,
+      "http_and_time": "200 0.161824"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports, identify data quality and reconciliation discrepancies, then write a concise report.",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.73
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.96
+      }
+    },
+    "usage": {
+      "input_tokens": 743,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "private-home-public-siblings",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-public-siblings-wire/1791322773515294000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-public-siblings-wire/1791322773515294000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 3590,
+      "exit_code": 0,
+      "http_and_time": "200 0.150613"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice and payment CSV exports, identify data quality and reconciliation discrepancies, then write a concise report.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "independent-precision",
+        "description": "Check exact decimal arithmetic when reconciling money, independently of optional advice."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.84
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "skill_independent-precision": {
+        "type": "noul",
+        "noul": 0.77
+      },
+      "skill_release-notes": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_spreadsheet-review": {
+        "type": "noul",
+        "noul": 0.7
+      }
+    },
+    "usage": {
+      "input_tokens": 904,
+      "output_tokens": 145
+    }
+  },
+  {
+    "scenario": "private-home-public-siblings",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-public-siblings-wire/1791322773798410000-request.json",
+    "response": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-public-siblings-wire/1791322773798410000-response.json",
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2641,
+      "exit_code": 0,
+      "http_and_time": "200 0.178155"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "task": "Audit invoice and payment CSV exports, identify data quality and reconciliation discrepancies, then write a concise report.",
+    "catalog": [
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.",
+        "excerpt": "# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.\n"
+      },
+      {
+        "id": "csv-validation",
+        "description": "Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.",
+        "excerpt": "# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.\n"
+      },
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.",
+        "excerpt": "# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.\n"
+      }
+    ],
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.79
+      },
+      "skill_financial-reconciliation": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_csv-validation": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_audit-reporting": {
+        "type": "noul",
+        "noul": 0.96
+      }
+    },
+    "usage": {
+      "input_tokens": 743,
+      "output_tokens": 83
+    }
+  },
+  {
+    "scenario": "unreachable-network",
+    "request": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/unreachable-network-wire/1791323229297998000-request.json",
+    "response": null,
+    "transport": {
+      "credential_in_environment": false,
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "request_bytes": 2470,
+      "exit_code": 7,
+      "http_and_time": "000 0.000219",
+      "response_error": "FileNotFoundError"
+    },
+    "model": null,
+    "stage": "rank-or-dispatch",
+    "task": "Audit invoice exports using csv-validation.",
+    "catalog": [
+      {
+        "id": "audit-reporting",
+        "description": "Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions."
+      },
+      {
+        "id": "financial-reconciliation",
+        "description": "Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches."
+      },
+      {
+        "id": "release-notes",
+        "description": "Write software release notes from merged commit descriptions."
+      },
+      {
+        "id": "spreadsheet-review",
+        "description": "Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity."
+      }
+    ],
+    "answers": null,
+    "usage": null
+  }
+]

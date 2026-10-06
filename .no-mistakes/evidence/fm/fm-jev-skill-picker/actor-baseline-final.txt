@@ -1,0 +1,16 @@
+Captain, the read-only audit found these discrepancies. Line numbers include the CSV header.
+
+| Record | Finding | Amount / consequence |
+|---|---|---|
+| **I2** | Identical invoice rows at `invoices.csv` lines **3 and 6**, each for **50.00**; payments total **45.00**. | **Ambiguous duplicate.** If both rows represent one invoice, it is underpaid by **5.00**. I did not count them as two obligations. |
+| **I3** | Invoice for **25.00**, with no matching payment. | **25.00 unpaid.** |
+| **Missing invoice ID** | `invoices.csv` line **7** contains **12.00** but no ID. | Cannot match the amount to payments or attribute it to an invoice. |
+| **I5** | `invoices.csv` line **8** has the invalid amount `bad`. | Balance cannot be calculated; no matching payment exists. |
+| **I6** | `payments.csv` line **6** records **10.00**, with no matching invoice. | **10.00 unmatched payment**, not a proven overpayment. |
+
+**Verified matches**
+- **I1:** invoiced **100.00**, paid **100.00** — fully paid.
+- **I4:** invoiced **0.30**, paid in splits of **0.10 + 0.20 = 0.30** — fully paid. Exact decimal arithmetic avoids the binary floating-point result `0.30000000000000004`; there is no discrepancy.
+- No duplicate payment rows, missing payment fields, or invalid payment amounts were found. I4’s repeated invoice ID represents distinct split payments, not duplicate records.
+
+**Outcome:** reconciliation remains incomplete because of the duplicate I2 invoice, missing invoice ID, invalid I5 amount, and unmatched I6 payment. Resolve those records before relying on an overall outstanding balance. No files were changed.

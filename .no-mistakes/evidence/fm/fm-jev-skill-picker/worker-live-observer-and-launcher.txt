@@ -1,0 +1,51 @@
+## Actual launcher
+#!/bin/bash
+set -eu
+ROOT='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK'
+LAB='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home'
+export FM_HOME="$LAB"
+unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+export TREEHOUSE_ROOT='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/pool'
+export PATH='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/observer':"$PATH"
+export TMUX_TMPDIR=$("$ROOT/bin/fm-lab-home.sh" tmux-dir "$LAB")
+printf '%s\n' "$TMUX_TMPDIR" > '/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-socket-dir.txt'
+env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE tmux -L fm-worker-lab new-session -d -s primary -c '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/project' -e FM_HOME="$LAB" omp
+tmux -L fm-worker-lab set-option -g default-shell /bin/bash
+tmux -L fm-worker-lab set-option -g default-command '/bin/bash --noprofile --norc'
+tmux -L fm-worker-lab resize-window -t primary:0 -x 140 -y 46
+TMUX="$(tmux -L fm-worker-lab display-message -p '#{socket_path}'),$(tmux -L fm-worker-lab display-message -p '#{pid}'),0"
+export TMUX
+printf '%s\n' "$TMUX" > '/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-tmux-context.txt'
+"$ROOT/bin/fm-brief.sh" worker-jev project --scout
+
+## Process-only picker credential wrapper
+#!/bin/bash
+if [ "${1:-}" = "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh" ]; then
+  . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-typesafe-lib.sh"
+  if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
+    TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY /Users/charlesabrooker/firstmate/.env)
+  fi
+  export -n TYPESAFE_API_KEY_PRIVATE 2>/dev/null || true
+  script=$1; shift
+  . "$script"
+  exit $?
+fi
+exec /bin/bash "$@"
+
+## Pass-through curl observer (never reads fd3/header)
+#!/usr/bin/env python3
+import sys, subprocess, os, json, uuid
+from pathlib import Path
+args=sys.argv[1:]
+if 'https://api.typesafe.ai/v1/systemone' not in args:
+    os.execv('/usr/bin/curl',['/usr/bin/curl']+args)
+request=sys.stdin.buffer.read()
+prefix=Path('/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK')/('worker-wire-'+uuid.uuid4().hex)
+prefix.with_suffix('.request.json').write_bytes(request)
+result=subprocess.run(['/usr/bin/curl']+args,input=request,stdout=subprocess.PIPE,close_fds=False)
+if '-o' in args:
+    response=Path(args[args.index('-o')+1])
+    if response.exists(): prefix.with_suffix('.response.json').write_bytes(response.read_bytes())
+prefix.with_suffix('.http.txt').write_bytes(result.stdout)
+sys.stdout.buffer.write(result.stdout)
+sys.exit(result.returncode)

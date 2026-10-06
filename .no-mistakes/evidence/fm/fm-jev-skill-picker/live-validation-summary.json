@@ -1,0 +1,16 @@
+{
+  "head": "b3b2ffe0ce1300038eaee445c8b0347ed00f0f18",
+  "result": "All derived live advisory-selection scenarios passed on fresh head.",
+  "targeted_checks": [
+    "/bin/bash tests/fm-skill-suggest.test.sh",
+    "/bin/bash tests/fm-dispatch-resolve.test.sh"
+  ],
+  "live_advice": "Real Jev 1.13.0 returned three independent optional suggestions after bounded three-entry recheck; unrelated task returned genuine no-fit.",
+  "privacy": "Both selected and active-home indexed readable child links remained locally resolvable, private fields absent from real ranking/recheck; named private task and incomplete permission discovery produced zero outbound requests. Literal/directive/inaccessible-policy guards and denied recheck opening withheld as required.",
+  "ordinary_agent_outcomes": "Four real omp actors (baseline/advice CSV audit and baseline/no-fit rainbow task) completed with successful read-tool receipts. Advice actor independently added precision skill absent from ranking; both audits identified duplicate I2, conditional 5.00 shortfall, unpaid I3 25.00, malformed I5, missing ID and unmatched I6; I4 exact split payments fully settled.",
+  "worker_integration": "Real fm-spawn launch and fm-control relaunch both generated fresh genuine advice, actual selected-body reads and correct diagnostic report; source intent unchanged, supported progress note additive.",
+  "visual": "Native omp HTML export viewed in real Chromium and captured ordinary-selection-transcript.png; worker native terminal/render and TUI captures retained.",
+  "recovered_setup": "Pass-through observer syntax and print-mode stdin fixed before proof; real Gemini quota 429 recovered using supported explicit GPT-6.1-Sol.",
+  "coverage_limits": "Ordinary task-file consumption and omp scout launch/relaunch exercised, not universal native interception or vendor-internal agents. Two small paired tasks and diagnostic report are local outcomes, not cookbook benchmark, context/cost reduction or broad noninferiority. Fleet completion attestation not exercised. No linters/static analysis/full suite/other pipeline phases run.",
+  "cleanup": "Direct fixture and actor sessions removed; worker home, private socket and disposable pool removed; evidence retained; no source/permanent test changes."
+}

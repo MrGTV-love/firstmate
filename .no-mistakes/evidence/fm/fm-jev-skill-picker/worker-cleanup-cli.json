@@ -1,0 +1,22 @@
+[
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-control.sh worker-jev exit",
+    "exit": 0,
+    "output": "stopped worker-jev harness=omp backend=tmux endpoint=primary:fm-worker-jev worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/pool/.treehouse/project-efd7b5/1/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home\n"
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-control.sh worker-jev-fresh exit",
+    "exit": 0,
+    "output": "stopped worker-jev-fresh harness=omp backend=tmux endpoint=primary:fm-worker-jev-fresh worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/pool/.treehouse/project-efd7b5/2/project\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home\n"
+  },
+  {
+    "command": "TMUX_TMPDIR=/tmp/fml.1wjgL8 tmux -L fm-worker-lab kill-server",
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home",
+    "exit": 0,
+    "output": ""
+  }
+]

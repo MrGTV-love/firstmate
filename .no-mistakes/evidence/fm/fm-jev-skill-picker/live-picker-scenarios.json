@@ -1,0 +1,302 @@
+[
+  {
+    "name": "Missing key retains named and safety workflows",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"TypeSafe key unavailable\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "Missing key brief is additive, not authority replacement",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format brief --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "\n# Skill selection advice\n\nApply all existing mandatory explicit/named and safety triggers first, even if absent below.\nThis additive advice does not replace the skill index, authorize actions, or suppress any workflow.\nRead relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.\nRequired named skill: data-json - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md.\nRequired named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md.\nNo optional suggestion (off: TypeSafe key unavailable); continue ordinary selection.\n",
+    "stderr": ""
+  },
+  {
+    "name": "Denied task literal is withheld",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "Malformed reserved directive is withheld: #dispatch-never-send marked-sections",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "Malformed reserved directive is withheld: # Dispatch-Never-Send marked-sections",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "Unsearchable policy ancestor withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected readable indexed child link stays locally required",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/private-linked/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected readable indexed child link stays locally required",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/private-linked/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible root symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"safety\",null\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible root symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"safety\",null\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible child symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible child symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible body symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected inaccessible body symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected root-enumeration prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-local\",null\n    \"safety\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected child-search prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"private-local\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "selected ancestor-search prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-local\",null\n    \"safety\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home readable indexed child link stays locally required",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/home/.agents/skills/private-linked/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home readable indexed child link stays locally required",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/home/.agents/skills/private-linked/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible root symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible root symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible child symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible child symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible body symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home inaccessible body symlink preserves requirements and withholds",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --brief /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/brief.md --format toon --required safety --required uninspectable-private",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n    \"uninspectable-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home root-enumeration prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"private-local\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home child-search prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"private-local\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "home ancestor-search prevents incomplete discovery",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety --required private-local",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"private-local\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "Unsupported metadata keeps required workflow and returns ordinary selection",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  },
+  {
+    "name": "UTF-8 task byte boundary refuses rather than truncates",
+    "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/task.txt --format toon --required safety",
+    "exit": 0,
+    "live": true,
+    "curl_invocations": 0,
+    "passed": true,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"task exceeds 4 KiB; supply minimal permitted text\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"data-json\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/data-json/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/product/selected/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": ""
+  }
+]

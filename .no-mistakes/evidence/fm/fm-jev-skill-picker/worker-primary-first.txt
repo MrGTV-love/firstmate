@@ -1,0 +1,61 @@
+
+                                                      ████████████
+                                                         ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                         ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                         ▒▒  ██                  █
+                                                             ██       v18.6.3
+
+                                  Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                               parallel subagents — watch it glow as you type
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ This is an isolated product smoke lab. Remain idle: do not invoke tools, pipeline, build, test, lint, network, shared fleet, other homes,
+ worktree administration, or Herdr lifecycle. An external lab supervisor owns all launch/control/cleanup. Your sole response is LAB PRIMARY
+ READY; then wait.
+
+
+ Error: Cloud Code Assist API error (429): {
+   "error": {
+   "code": 429,
+   "message": "Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 3h32m33s.",
+   "status": "RESOURCE_EXHAUSTED",
+   "details": [
+   {
+   "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+   … +16 more lines (⌃O to expand)
+
+ Error: Retry failed after 1 attempts: Provider requested 12754880ms wait, exceeds retry.maxDelayMs (300000ms). Original error: Cloud Code
+ Assist API error (429): {
+   "error": {
+     "code": 429,
+     "message": "Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 3h32m33s.",
+     "status": "RESOURCE_EXHAUSTED",
+     "details": [
+       {
+         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+         "reason": "QUOTA_EXHAUSTED",
+         "domain": "cloudcode-pa.googleapis.com",
+         "metadata": {
+           "uiMessage": "true",
+           "model": "gemini-3.8-flash-high",
+           "quotaResetDelay": "3h32m33.81335476s",
+           "quotaResetTimeStamp": "2026-10-07T01:15:39Z"
+         }
+       },
+       {
+         "@type": "type.googleapis.com/google.rpc.RetryInfo",
+         "retryDelay": "12753.813354760s"
+       }
+     ]
+   }
+ }
+
+
+╭── π > ◒ Gemini 3.8 Flash 👁 > 📁 …7KK1JRVBK/.worker-live-8_lqbhfu/project > ⑂ main > (sub) ▶─2%────────────────────┃───1M─◀ 🆔 01a1132b ──╮
+╰─                                                                                                                                        ─╯

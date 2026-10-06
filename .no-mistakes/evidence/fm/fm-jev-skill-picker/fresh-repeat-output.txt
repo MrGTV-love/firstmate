@@ -1,0 +1,15 @@
+skill-advice:
+  status: suggested
+  reason: "optional relevance only"
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.31000000000000005
+  required[1]{id,path}:
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+  suggestions[3]{id,path,fit,uncertain,evidence}:
+    "financial-reconciliation","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md",0.96,true,"opening-instruction recheck"
+    "csv-validation","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md",0.96,true,"opening-instruction recheck"
+    "audit-reporting","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md",0.96,true,"opening-instruction recheck"
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

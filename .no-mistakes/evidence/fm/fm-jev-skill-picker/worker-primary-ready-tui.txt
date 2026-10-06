@@ -1,0 +1,46 @@
+
+                                                      ████████████
+                                                         ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                         ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                         ▒▒  ██                  █
+                                                             ██       v18.6.3
+
+                                  Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                               parallel subagents — watch it glow as you type
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ This is an isolated product smoke lab. Remain idle: do not invoke tools, pipeline, build, test, lint, network, shared fleet, other homes,
+ worktree administration, or Herdr lifecycle. An external lab supervisor owns all launch/control/cleanup. Your sole response is LAB PRIMARY
+ READY; then wait.
+
+
+ LAB PRIMARY READY
+
+╭── π > ◒ GPT-6.1-Sol 🙈 > 📁 …7KK1JRVBK/.worker-live-8_lqbhfu/project > ⑂ main > S0.03 + 👁 0.02 ▶─7%────────────╎─┃──272K─◀ 🆔 01a1132c ──╮
+╰─                                                                                                                                        ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

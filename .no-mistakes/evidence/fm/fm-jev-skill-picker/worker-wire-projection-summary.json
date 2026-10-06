@@ -1,0 +1,182 @@
+[
+  {
+    "request": "worker-wire-17ec7b74444a4a528a4aa90bd6b23dc1.request.json",
+    "response": "worker-wire-17ec7b74444a4a528a4aa90bd6b23dc1.response.json",
+    "http": "200 0.292948",
+    "stage": "rank",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.79,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 4909,
+      "output_tokens": 616
+    },
+    "created_ns": 1791322992983942919,
+    "sha256": "a56415280a09496a9459bb3f8c6a0501e17367a8043a1e88f3e8904a75890154",
+    "invocation": "default-launch"
+  },
+  {
+    "request": "worker-wire-249a13251fa94948b08df33780e19554.request.json",
+    "response": "worker-wire-249a13251fa94948b08df33780e19554.response.json",
+    "http": "200 0.160951",
+    "stage": "recheck",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 2,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.84,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 888,
+      "output_tokens": 64
+    },
+    "created_ns": 1791322993585464159,
+    "sha256": "d17b7efd6faccb351a49c4c386ad981db420bdc4bed3812a2f306bb18b2e7634",
+    "invocation": "default-launch"
+  },
+  {
+    "request": "worker-wire-6416119d335c4448afc1dc376456d9aa.request.json",
+    "response": "worker-wire-6416119d335c4448afc1dc376456d9aa.response.json",
+    "http": "200 0.181496",
+    "stage": "rank",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.72,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 4909,
+      "output_tokens": 616
+    },
+    "created_ns": 1791323038104115477,
+    "sha256": "a56415280a09496a9459bb3f8c6a0501e17367a8043a1e88f3e8904a75890154",
+    "invocation": "quota-recovery-relaunch"
+  },
+  {
+    "request": "worker-wire-f81942be124f4ce4a318edb923dea926.request.json",
+    "response": "worker-wire-f81942be124f4ce4a318edb923dea926.response.json",
+    "http": "200 0.166927",
+    "stage": "recheck",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 2,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.84,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 888,
+      "output_tokens": 64
+    },
+    "created_ns": 1791323038471475582,
+    "sha256": "d17b7efd6faccb351a49c4c386ad981db420bdc4bed3812a2f306bb18b2e7634",
+    "invocation": "quota-recovery-relaunch"
+  },
+  {
+    "request": "worker-wire-ac777410f83f4942850a814feb2b31c5.request.json",
+    "response": "worker-wire-ac777410f83f4942850a814feb2b31c5.response.json",
+    "http": "200 0.201993",
+    "stage": "rank",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.77,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 4909,
+      "output_tokens": 616
+    },
+    "created_ns": 1791323068099324248,
+    "sha256": "a56415280a09496a9459bb3f8c6a0501e17367a8043a1e88f3e8904a75890154",
+    "invocation": "fresh-launch"
+  },
+  {
+    "request": "worker-wire-a3195036bd3b48329aa89093d65adbdd.request.json",
+    "response": "worker-wire-a3195036bd3b48329aa89093d65adbdd.response.json",
+    "http": "200 0.154666",
+    "stage": "recheck",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 2,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.86,
+    "diagnostic_fit": 0.96,
+    "usage": {
+      "input_tokens": 888,
+      "output_tokens": 64
+    },
+    "created_ns": 1791323068398932864,
+    "sha256": "d17b7efd6faccb351a49c4c386ad981db420bdc4bed3812a2f306bb18b2e7634",
+    "invocation": "fresh-launch"
+  },
+  {
+    "request": "worker-wire-f3324772bd08490a908b8ee121dfa0f4.request.json",
+    "response": "worker-wire-f3324772bd08490a908b8ee121dfa0f4.response.json",
+    "http": "200 0.204589",
+    "stage": "rank",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.77,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 4909,
+      "output_tokens": 616
+    },
+    "created_ns": 1791323146398897095,
+    "sha256": "a56415280a09496a9459bb3f8c6a0501e17367a8043a1e88f3e8904a75890154",
+    "invocation": "fresh-relaunch"
+  },
+  {
+    "request": "worker-wire-851df8a19da144fb95245198984cfb7e.request.json",
+    "response": "worker-wire-851df8a19da144fb95245198984cfb7e.response.json",
+    "http": "200 0.153887",
+    "stage": "recheck",
+    "task": "Diagnose a sudden error-rate regression after a cache-key deployment, separate observed facts from hypothesis, and choose the smallest falsifying next check without editing code.\n\n",
+    "catalog_rows": 2,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "model": "jev-1.13.0",
+    "need": 0.85,
+    "diagnostic_fit": 0.95,
+    "usage": {
+      "input_tokens": 888,
+      "output_tokens": 64
+    },
+    "created_ns": 1791323146683427356,
+    "sha256": "d17b7efd6faccb351a49c4c386ad981db420bdc4bed3812a2f306bb18b2e7634",
+    "invocation": "fresh-relaunch"
+  }
+]

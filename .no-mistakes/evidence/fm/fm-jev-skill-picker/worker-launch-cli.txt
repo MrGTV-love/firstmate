@@ -1,0 +1,2 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/home
+spawned worker-jev harness=omp kind=scout window=primary:fm-worker-jev worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/pool/.treehouse/project-efd7b5/1/project

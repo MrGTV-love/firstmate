@@ -1,0 +1,3 @@
+no server running on /tmp/fml.19lfbs/tmux-501/worker-proof
+
+exit=1

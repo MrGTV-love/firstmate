@@ -1,0 +1,33 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "need": {
+      "type": "noul",
+      "noul": 0.82
+    },
+    "skill_audit-reporting": {
+      "type": "noul",
+      "noul": 0.95
+    },
+    "skill_csv-validation": {
+      "type": "noul",
+      "noul": 0.96
+    },
+    "skill_financial-reconciliation": {
+      "type": "noul",
+      "noul": 0.96
+    },
+    "skill_release-notes": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "skill_spreadsheet-review": {
+      "type": "noul",
+      "noul": 0.68
+    }
+  },
+  "usage": {
+    "input_tokens": 818,
+    "output_tokens": 122
+  }
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "arm": "ordinary",
+    "exit": 0,
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/agent-ordinary.jsonl"
+  },
+  {
+    "arm": "fallback-advice",
+    "exit": 0,
+    "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/agent-fallback-advice.jsonl"
+  }
+]

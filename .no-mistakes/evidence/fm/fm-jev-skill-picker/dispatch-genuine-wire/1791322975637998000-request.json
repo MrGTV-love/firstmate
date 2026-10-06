@@ -1,0 +1,19 @@
+{
+  "model": "jev-latest",
+  "state": {
+    "task": {
+      "project": "disposable-pager",
+      "brief": "## Captain's intent\nFix a shell pager off-by-one: the known root cause is <= instead of < in a page boundary.\n\n## Firstmate spec\nCorrect the comparison while retaining exact page semantics.\n"
+    }
+  },
+  "questions": {
+    "rule": {
+      "type": "choice",
+      "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+      "criteria": {
+        "rule_1": "A simple shell bug fix with a stated root cause.",
+        "default": "No listed rule applies to this task."
+      }
+    }
+  }
+}

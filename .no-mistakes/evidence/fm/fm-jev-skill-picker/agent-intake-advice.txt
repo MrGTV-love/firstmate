@@ -1,0 +1,8 @@
+
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: input-safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/agent-work/skills/input-safety/SKILL.md.
+No optional suggestion (off: TypeSafe key unavailable); continue ordinary selection.

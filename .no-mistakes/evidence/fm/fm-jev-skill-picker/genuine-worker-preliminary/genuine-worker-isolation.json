@@ -1,0 +1,13 @@
+{
+  "base": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab",
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/home",
+  "code": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/code",
+  "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/worktree",
+  "private_socket": "/tmp/fml.SwCVOM/tmux-501/worker-proof",
+  "tmux_tmpdir": "/tmp/fml.SwCVOM",
+  "id": "genuine-worker",
+  "model": "openai-codex/gpt-6.1-sol",
+  "acquisition": "fixture-controlled treehouse get shell function; genuine git worktree, production isolation checks",
+  "omp_real_binary": "/Users/charlesabrooker/.bun/bin/omp",
+  "omp_storage_flag": "--session-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/sessions"
+}

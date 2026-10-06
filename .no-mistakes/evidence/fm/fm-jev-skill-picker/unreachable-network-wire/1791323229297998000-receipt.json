@@ -1,0 +1,8 @@
+{
+  "credential_in_environment": false,
+  "endpoint": "https://api.typesafe.ai/v1/systemone",
+  "request_bytes": 2470,
+  "exit_code": 7,
+  "http_and_time": "000 0.000219",
+  "response_error": "FileNotFoundError"
+}

@@ -1,0 +1,7 @@
+{
+  "credential_in_environment": false,
+  "endpoint": "https://api.typesafe.ai/v1/systemone",
+  "request_bytes": 3183,
+  "exit_code": 0,
+  "http_and_time": "200 0.170258"
+}

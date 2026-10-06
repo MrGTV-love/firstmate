@@ -1,0 +1,26 @@
+{
+  "source_intent": "SOURCE_INTENT_MONETARY_4_10_21",
+  "record_count": "4",
+  "net_total": "10.21",
+  "positive_total": "12.31",
+  "negative_total": "-2.10",
+  "zero_count": "1",
+  "report_details": {
+    "report": "../home/data/genuine-worker/report-2.md",
+    "advice_source": "live",
+    "advice_model": "jev-1.13.0",
+    "suggestions": [
+      {"skill": "ledger-summary", "fit": "0.96", "uncertain": true, "evidence": "opening-instruction recheck", "selected": true},
+      {"skill": "money-json", "fit": "0.96", "uncertain": true, "evidence": "opening-instruction recheck", "selected": true},
+      {"skill": "schema-audit", "fit": "0.92", "uncertain": true, "evidence": "opening-instruction recheck", "selected": true}
+    ],
+    "full_skill_index": ["boundary-checks", "captain-hold-lifecycle", "image-layout", "input-safety", "ledger-summary", "money-json", "schema-audit"],
+    "mandatory_reads": ["input-safety", "captain-hold-lifecycle"],
+    "extra_selected": ["boundary-checks"],
+    "rejected_index_skill": {"image-layout": "No image or pixel-based UI is involved; not suggested by advice."},
+    "schema": "All four records have finite decimal-string amounts; no malformed entries.",
+    "boundaries": {"positive": "2", "negative": "1", "zero": "1"},
+    "cross_checks": ["12.31 + (-2.10) = 10.21", "2 + 1 + 1 = 4", "Independent integer-cent sum = 1021, equivalent to 10.21"],
+    "receipt_scope": "Ordinary reads and local Decimal computation; no implementation-source assertion or independent model invocation."
+  }
+}

@@ -1,0 +1,13 @@
+window=firstmate:fm-genuine-worker
+endpoint_task_id=genuine-worker
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/worktree
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-genuine-worker
+model=openai-codex/gpt-6.1-sol
+effort=low
+busy_gen=g1791322160.6465.29166
+spawn_gen=s1791322161.74473.3119
+decisions_reviewed=1
+decision_keys=

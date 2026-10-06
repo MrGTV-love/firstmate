@@ -1,0 +1,13 @@
+{
+  "fixture_removed": true,
+  "socket_directory_removed": true,
+  "original_private_server_descendants_remaining": [],
+  "exact_private_descendants_needing_term_after_supported_exit": [],
+  "own_temp_dirs_removed": [
+    "/tmp/fm-worker-jev-fresh",
+    "/tmp/fm-worker-jev"
+  ],
+  "inherited_typesafe_key_present": false,
+  "key_handling": "No key value read by evidence observer, transcript renderer, or evidence analysis. Process-only credential wrapper sourced real library and used fmx_env_get on explicitly authorized operator .env only if needed; unexported private variable; curl fd3 forwarded unchanged and never read/captured.",
+  "cleanup_permission_retry": "Product-generated git-hooks directory was read-only; chmod confined to own fixture, then removal succeeded."
+}

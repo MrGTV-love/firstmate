@@ -1,0 +1,13 @@
+skill-advice:
+  status: off
+  reason: "task names a private local skill; use ordinary selection"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[2]{id,path}:
+    "private-linked-catalog","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/private-linked-catalog/SKILL.md"
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

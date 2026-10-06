@@ -1,0 +1,48 @@
+{
+  "verdict": "PASS for real model-explicit fresh launch and same-task fm-control relaunch advice delivery, ordinary-read receipts, and correct local report outcome",
+  "source_head_from_assignment": "b3b2ffe0ce1300038eaee445c8b0347ed00f0f18",
+  "primary": {
+    "initial_command_artifact": "worker-live-observer-and-launcher.txt",
+    "initial_default_provider": "Gemini 3.8 Flash quota exhausted with actual 429",
+    "supported_recovery_command": "tmux -L fm-worker-lab new-window -d -t primary -n lab-primary -c <own fixture project> \"omp --model openai-codex/gpt-6.1-sol\"",
+    "ready_receipt": "worker-primary-ready-tui.txt",
+    "instructions": "Explicit remain-idle, no pipeline/build/test/lint/network/shared fleet/other homes/pool administration/Herdr prohibition."
+  },
+  "fresh_launch": {
+    "command_artifact": "worker-fresh-launch-command.txt",
+    "cli_exit": 0,
+    "cli": "worker-fresh-launch-cli.txt",
+    "overlay": "worker-fresh-launch-brief.md",
+    "native_transcript": "worker-fresh-native-render.txt",
+    "complete_live_tui": "worker-fresh-launch-tui-final.txt",
+    "report": "worker-fresh-launch-report.md",
+    "suggestion": "diagnostic-reasoning; fit 0.96; live Jev 1.13.0; opening-instruction recheck",
+    "ordinary_tool_receipt": "Actual Read (4) tool-call card (not prompt quote), includes diagnostic-reasoning SKILL.md and metrics.json; actual write and epoch/date tool receipts; done at 1791323117."
+  },
+  "fresh_relaunch": {
+    "command_artifact": "worker-fresh-relaunch-command.txt",
+    "cli_exit": 0,
+    "cli": "worker-fresh-relaunch-cli.txt",
+    "overlay": "worker-fresh-relaunch-launch-brief.md",
+    "complete_native_transcript": "worker-fresh-final-native-render-complete.txt",
+    "complete_live_tui": "worker-fresh-relaunch-tui-final.txt",
+    "report": "worker-fresh-final-report.md",
+    "state": "worker-fresh-final-worker-jev-fresh.status",
+    "suggestion": "Fresh genuine rank/recheck calls; diagnostic-reasoning fit 0.95; source live; unchanged minimal remote task",
+    "ordinary_tool_receipt": "New actual Read (4) tool card in replacement session; selected diagnostic-reasoning body, completion body, metrics.json and prior report; actual report edit +9 and done status at 1791323177."
+  },
+  "outcome": "2% before, 18% after, +16 percentage points, 9x baseline, reported bypass 2%; bounded cache-path/key-regression hypothesis and one controlled old/new-key falsifying comparison. Proposed check intentionally not executed. Relaunch independently recomputed all rates and preserved findings. Fixture metrics unchanged.",
+  "completion_boundary": "Worker inventoried zero human choices but did not run fleet-related completion attestation under explicit isolation prohibition. Fresh worker wrote done both turns; earlier quota-recovery worker conservatively wrote blocked solely for this operational attestation despite correct completed report. Do not claim fleet completion was exercised.",
+  "wire": "worker-wire-projection-summary.json maps all eight genuine HTTP200 request/response pairs: default launch, quota recovery relaunch, fresh launch, fresh relaunch. Rank metadata id/description; recheck id/description/excerpt; task is minimal diagnostic summary, no whole brief or local paths. Unchanged real /usr/bin/curl, no synthetic response.",
+  "source_comparison": "worker-source-overlay-hash-comparison.json: fresh-launch source bytes identical; captain intent, firstmate spec and skill-selection input identical across relaunch. Full source changes only by supported fm-control progress note append. Source/overlay hashes preserved.",
+  "visual": {
+    "artifact": "worker-fresh-relaunch-native-terminal.ansi",
+    "kind": "Actual production omp render of observed session ID prefix 01a1132e, not constructed UI or screenshot",
+    "command_result": "worker-fresh-relaunch-native-render-result.json",
+    "native_screenshot_produced": false,
+    "reason": "Private detached tmux has no task-owned desktop screenshot surface; did not capture operator screen or manufacture UI. Constructed SVG text render drafts deleted; actual terminal captures and native ANSI production rendering retained."
+  },
+  "secrets": "No TypeSafe key persisted, logged or argv/external export. Inherited public key absent. Only real picker process invoked authorized fmx_env_get; private key variable unexported; observer never reads fd3 Authorization header. Evidence has task/catalog projections, real service answers, task terminal/transcript/state, credential-free wrapper source.",
+  "cleanup": "worker-cleanup-cli.json and worker-cleanup-result.json: both supported fm-control exit calls and private server kill succeeded; lab socket, home, fixture removed; zero original private descendants remain; own GOTMPDIR task temp dirs removed. Source untouched and parent .skill-live fixture untouched.",
+  "checks": "Actual product smoke only. No test suite, build, lint, static analysis, formatter, daemon lifecycle, shared fleet/pool or Herdr interaction."
+}

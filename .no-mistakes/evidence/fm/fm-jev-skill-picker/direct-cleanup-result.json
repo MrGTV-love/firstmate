@@ -1,0 +1,7 @@
+{
+  "fixture_removed": true,
+  "actor_processes_exited": true,
+  "native_export_transient_removed": true,
+  "evidence_retained": true,
+  "intentional_source_or_permanent_test_changes": false
+}

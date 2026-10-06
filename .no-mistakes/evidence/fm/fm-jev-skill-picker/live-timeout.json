@@ -1,0 +1,14 @@
+{
+  "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/task.txt --required safety",
+  "fixture": "Local nonresponding HTTPS CONNECT proxy; real product and system curl unchanged. No real credential or API response supplied.",
+  "observed_connections": [
+    {
+      "first_line": "CONNECT api.typesafe.ai:443 HTTP/1.1"
+    }
+  ],
+  "exit": 0,
+  "elapsed_seconds": 6.281,
+  "stdout": "skill-advice:\n  status: fallback\n  reason: \"TypeSafe transport or HTTP failure\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+  "stderr": "",
+  "passed": true
+}

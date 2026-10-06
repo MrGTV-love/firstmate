@@ -1,0 +1,15 @@
+skill-advice:
+  status: fallback
+  reason: "unsupported skill metadata"
+  uncertain: true
+  source: unavailable
+  model: jev-1.13.0
+  stages: 0
+  no_fit: null
+  required[3]{id,path}:
+    "csv-validation","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md"
+    "private-linked-home",null
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh: line 112: cd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/home/.agents/skills: Permission denied

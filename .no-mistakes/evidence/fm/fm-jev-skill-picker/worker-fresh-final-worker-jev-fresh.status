@@ -1,0 +1,2 @@
+done [at=1791323117]: Report complete: errors 2% to 18%, bypass 2%; cache-key mechanism suspected, not proven; controlled old/new-key check recommended. No human choices; supervisor completion attestation remains because lab forbids fleet access.
+done [at=1791323177]: Relaunch confirmation added to report: independently recomputed 2% before, 18% after, reported bypass 2%; bounded cache-key hypothesis and falsifying comparison preserved. No human choices; supervisor operational attestation remains.

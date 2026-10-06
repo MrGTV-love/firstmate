@@ -1,0 +1,12 @@
+
+# Skill selection advice
+
+Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
+This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
+Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
+Required named skill: private-linked-catalog - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/private-linked-catalog/SKILL.md.
+Required named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md.
+Optional suggestion: financial-reconciliation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.
+Optional suggestion: csv-validation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md; fit=0.95, uncertain=true, evidence=opening-instruction recheck.
+Optional suggestion: audit-reporting - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.
+Advice source: live; model: jev-1.13.0.

@@ -1,0 +1,12 @@
+window=primary:fm-worker-jev-fresh
+endpoint_task_id=worker-jev-fresh
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/pool/.treehouse/project-efd7b5/2/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live-8_lqbhfu/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-worker-jev-fresh
+model=openai-codex/gpt-6.1-sol
+effort=default
+busy_gen=g1791323147.31581.9525
+spawn_gen=s1791323147.22066.12257
+control_relaunch_tx=5314.20261006T214543Z.16562

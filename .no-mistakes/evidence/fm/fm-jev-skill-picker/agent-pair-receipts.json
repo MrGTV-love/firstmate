@@ -1,0 +1,69 @@
+{
+  "scope": "One synthetic local aggregation pair; fallback advice only, not successful Jev advice, lifecycle launch, universal role coverage, or performance proof. The complete fixture index was explicitly supplied; automatic global rule and skill discovery disabled to isolate the fixture.",
+  "receipts": [
+    {
+      "arm": "ordinary",
+      "expected": {
+        "count": 4,
+        "total": "10.21",
+        "positive_total": "12.31",
+        "negative_total": "-2.10",
+        "zero_count": 1
+      },
+      "actual": {
+        "count": 4,
+        "total": "10.21",
+        "positive_total": "12.31",
+        "negative_total": "-2.10",
+        "zero_count": 1,
+        "loaded_skills": [
+          "input-safety",
+          "money-json",
+          "boundary-checks"
+        ]
+      },
+      "successful_ordinary_read_paths": [
+        "skills/input-safety/SKILL.md",
+        "skills/money-json/SKILL.md",
+        "records.json",
+        "skills/boundary-checks/SKILL.md"
+      ],
+      "shell_commands": [
+        "python3 -c 'import json; from decimal import Decimal; r=json.load(open(\"records.json\")); a=[Decimal(x[\"amount\"]) for x in r]; p=sum((x for x in a if x>0),Decimal(0)); n=sum((x for x in a if x<0),Decimal(0)); t=sum(a,Decimal(0)); assert t==p+n; print(json.dumps(dict(count=len(a),total=format(t,\".2f\"),positive_total=format(p,\".2f\"),negative_total=format(n,\".2f\"),zero_count=sum(x==0 for x in a),loaded_skills=[\"input-safety\",\"money-json\",\"boundary-checks\"])))'"
+      ],
+      "matched_expected": true
+    },
+    {
+      "arm": "fallback-advice",
+      "expected": {
+        "count": 4,
+        "total": "10.21",
+        "positive_total": "12.31",
+        "negative_total": "-2.10",
+        "zero_count": 1
+      },
+      "actual": {
+        "count": 4,
+        "total": "10.21",
+        "positive_total": "12.31",
+        "negative_total": "-2.10",
+        "zero_count": 1,
+        "loaded_skills": [
+          "input-safety",
+          "money-json",
+          "boundary-checks"
+        ]
+      },
+      "successful_ordinary_read_paths": [
+        "records.json",
+        "skills/money-json/SKILL.md",
+        "skills/input-safety/SKILL.md",
+        "skills/boundary-checks/SKILL.md"
+      ],
+      "shell_commands": [
+        "python3 -c 'import json; from decimal import Decimal; from pathlib import Path; r=json.loads(Path(\"records.json\").read_text()); a=[Decimal(x[\"amount\"]) for x in r]; p=sum((x for x in a if x>0),Decimal(0)); n=sum((x for x in a if x<0),Decimal(0)); t=sum(a,Decimal(0)); assert t==p+n; print(json.dumps({\"count\":len(a),\"total\":format(t,\".2f\"),\"positive_total\":format(p,\".2f\"),\"negative_total\":format(n,\".2f\"),\"zero_count\":sum(x==0 for x in a),\"loaded_skills\":[\"input-safety\",\"money-json\",\"boundary-checks\"]}))'"
+      ],
+      "matched_expected": true
+    }
+  ]
+}

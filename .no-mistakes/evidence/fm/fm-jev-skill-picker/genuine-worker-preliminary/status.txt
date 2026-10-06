@@ -1,0 +1,1 @@
+done [at=1791322090]: Exact Decimal ledger totals verified; result-1.json and standalone report written; shared completion gate passed.

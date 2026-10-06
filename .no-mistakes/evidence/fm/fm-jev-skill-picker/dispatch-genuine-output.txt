@@ -1,0 +1,9 @@
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 180   tokens: 442/35
+  rule: rule_1 (A simple shell bug fix with a stated root cause.)   confidence: 0.99
+  probabilities: default=0.01 rule_1=0.99
+  reason: rule requires the captain's explicit approval before dispatch
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  -> eligible, unranked: omp Codex account pool is only lower-bounded by its visible account (runway exhausted_now at all_models): disclosed uncertainty [warning: exhausted_now at all_models]
+  timings: api_ms=180 quota_ms=3035 local_ms=428 total_ms=3643
+  usage: input_tokens=442 output_tokens=35 jev_cost_usd=1.8564e-05 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0

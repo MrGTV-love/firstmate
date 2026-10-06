@@ -1,0 +1,55 @@
+{
+  "multiple": {
+    "verdict": "pass",
+    "live": true,
+    "calls": 2,
+    "model": "jev-1.13.0",
+    "rank_ids": [
+      "boundary-checks",
+      "image-layout",
+      "ledger-summary",
+      "money-json",
+      "schema-audit"
+    ],
+    "recheck_ids": [
+      "ledger-summary",
+      "money-json",
+      "boundary-checks"
+    ],
+    "need": [
+      0.66,
+      0.53
+    ],
+    "wire": "genuine-multiple-wire.jsonl",
+    "output": "genuine-multiple-output.txt"
+  },
+  "no_fit": {
+    "verdict": "pass",
+    "live": true,
+    "calls": 1,
+    "need": 0.04,
+    "ordinary_body_reads": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/catalog/input-safety/SKILL.md"
+    ],
+    "final": "Captain, a sonnet is a 14-line poem, traditionally written in a regular meter with a structured rhyme scheme, often exploring love or another developing argument. A haiku is a three-line Japanese poetic form traditionally involving seasonal imagery and a juxtaposition of observations, commonly adapted in English to a 5\u20137\u20135 syllable pattern.",
+    "wire": "genuine-no-fit-wire.jsonl",
+    "output": "genuine-no-fit-output.txt",
+    "agent_transcript": "genuine-no-fit-agent.jsonl"
+  },
+  "private_projection": {
+    "verdict": "pass",
+    "live": true,
+    "roots": [
+      "selected catalog indexed readable child link",
+      "active-home readable child link"
+    ],
+    "omitted": [
+      "acme-private",
+      "PRIVATE_DESCRIPTION_SENTINEL",
+      "PRIVATE_EXCERPT_SENTINEL"
+    ],
+    "checked_actual_rank_and_recheck_requests": true,
+    "credentials_exported": false,
+    "wire": "genuine-multiple-wire.jsonl"
+  }
+}

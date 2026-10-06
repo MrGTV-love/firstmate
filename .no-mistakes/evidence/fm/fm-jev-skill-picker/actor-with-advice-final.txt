@@ -1,0 +1,27 @@
+Captain, the local audit found an ambiguous duplicate invoice, missing and short payments, an unmatched payment, and two invalid invoice records. No files were changed.
+
+### Reconciliation
+
+| Invoice | Invoice amount | Payments | Finding |
+|---|---:|---:|---|
+| I1 | 100.00 | 100.00 | Fully paid. |
+| I2 | 50.00, listed twice | 45.00 | **Duplicate ambiguity.** If both rows represent the same invoice, the shortfall is **5.00**. Do not count them as 100.00 without confirmation. |
+| I3 | 25.00 | None | **Unpaid: 25.00.** |
+| I4 | 0.30 | 0.10 + 0.20 = 0.30 | Fully paid using exact decimal arithmetic. These are split payments, not duplicate rows. |
+| I5 | `bad` | None | **Invalid invoice amount**; balance cannot be determined. |
+| I6 | No invoice | 10.00 | **Unmatched payment**; cannot classify it as an overpayment without an invoice. |
+
+### Data-quality discrepancies
+
+CSV row numbers below include the header:
+
+- **`invoices.csv`, rows 3 and 6:** identical `I2,50.00` records. Confirm whether this is a duplicated export row or separate obligations incorrectly sharing an ID.
+- **`invoices.csv`, row 7:** amount **12.00** has a missing invoice ID, so it cannot be matched.
+- **`invoices.csv`, row 8:** I5 has the malformed amount **`bad`**. It was not coerced to zero.
+- **`payments.csv`:** all five rows have populated invoice IDs and valid decimal amounts; no exact duplicate rows were found. Repeated I4 IDs alone do not establish duplication, and the file provides no payment-record IDs for further identity checks.
+
+### Outcome and next actions
+
+Under the **single-invoice interpretation of I2**, identifiable valid invoices total **175.30**, with **145.30** in matched payments and a **30.00 shortfall**: I2’s 5.00 plus I3’s 25.00. This is a conditional subtotal, not a complete ledger balance; the missing-ID row and I5 remain unresolved, and I6’s 10.00 is unmatched.
+
+Confirm I2’s identity, repair the missing ID and I5 amount, and trace I6’s payment before approving a final balance. Exact decimal checking confirms I4 has **zero discrepancy**; binary floating point would produce `0.30000000000000004` for `0.10 + 0.20`, creating a spurious mismatch.

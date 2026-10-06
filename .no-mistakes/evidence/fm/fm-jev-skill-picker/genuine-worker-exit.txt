@@ -1,0 +1,4 @@
+stopped genuine-worker harness=omp backend=tmux endpoint=firstmate:fm-genuine-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/worktree
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/worker-lab/home
+
+exit=0

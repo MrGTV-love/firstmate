@@ -1,0 +1,230 @@
+{
+  "target_commit": "b3b2ffe0ce1300038eaee445c8b0347ed00f0f18",
+  "product": "real bin/fm-skill-suggest.sh and shared TypeSafe transport under /bin/bash",
+  "credential_custody": "Authorized fmx_env_get route used only in picker/dispatcher shell process; no credential exported/logged/persisted/argv; real curl observer records request/response only, not fd3 header.",
+  "observer": "Pass-through /usr/bin/curl; HTTPS endpoint unchanged; bounded five-second product timeout; receipt includes real HTTP and transfer time, environment key presence false.",
+  "inputs": {
+    "invoice_csv": "invoice_id,amount\nI1,100.00\nI2,50.00\nI3,25.00\nI4,0.30\nI2,50.00\n,12.00\nI5,bad\n",
+    "payment_csv": "invoice_id,amount\nI1,100.00\nI2,45.00\nI4,0.10\nI4,0.20\nI6,10.00\n",
+    "full_skill_index": "- csv-validation: Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\n- financial-reconciliation: Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md\n- audit-reporting: Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md\n- spreadsheet-review: Review spreadsheet exports and numeric totals for small data-analysis tasks; assess table integrity.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/spreadsheet-review/SKILL.md\n- release-notes: Write software release notes from merged commit descriptions.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/release-notes/SKILL.md\n- safety: Mandatory isolated-fixture safety for these disposable exercises.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\n- independent-precision: Check exact decimal arithmetic when reconciling money, independently of optional advice.; body: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/independent-precision/SKILL.md"
+  },
+  "actor_commands": [
+    {
+      "name": "actor-baseline",
+      "command": "omp --print --mode json --model openai-codex/gpt-6.1-sol --thinking low --no-extensions --no-lsp --no-rules --no-title --session-dir <fixture sessions> --tools read,bash --cwd <fixture project> <task and full index>"
+    },
+    {
+      "name": "actor-with-advice",
+      "command": "omp --print --mode json --model openai-codex/gpt-6.1-sol --thinking low --no-extensions --no-lsp --no-rules --no-title --session-dir <fixture sessions> --tools read,bash --cwd <fixture project> <task and full index>"
+    },
+    {
+      "name": "actor-no-fit-baseline",
+      "command": "omp --print --mode json --model openai-codex/gpt-6.1-sol --thinking low --no-extensions --no-lsp --no-rules --no-title --session-dir <fixture sessions> --tools read,bash --cwd <fixture project> <task and full index>"
+    },
+    {
+      "name": "actor-no-fit-with-advice",
+      "command": "omp --print --mode json --model openai-codex/gpt-6.1-sol --thinking low --no-extensions --no-lsp --no-rules --no-title --session-dir <fixture sessions> --tools read,bash --cwd <fixture project> <task and full index>"
+    }
+  ],
+  "successful_actor_results": [
+    {
+      "name": "actor-baseline",
+      "exit": 0,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-baseline.jsonl"
+    },
+    {
+      "name": "actor-with-advice",
+      "exit": 0,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-with-advice.jsonl"
+    },
+    {
+      "name": "actor-no-fit-baseline",
+      "exit": 0,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-no-fit-baseline.jsonl"
+    },
+    {
+      "name": "actor-no-fit-with-advice",
+      "exit": 0,
+      "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-no-fit-with-advice.jsonl"
+    }
+  ],
+  "direct_cli_receipts": [
+    {
+      "name": "genuine-multiple",
+      "exit": 0,
+      "output": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.040000000000000036\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"financial-reconciliation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md\",0.98,false,\"opening-instruction recheck\"\n    \"audit-reporting\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 2,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple-wire"
+    },
+    {
+      "name": "genuine-no-fit",
+      "exit": 0,
+      "output": "skill-advice:\n  status: none\n  reason: \"no optional fit; ordinary selection remains available\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 1\n  no_fit: 0.96\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 1,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-no-fit-wire"
+    },
+    {
+      "name": "fresh-repeat",
+      "exit": 0,
+      "output": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: true\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.31000000000000005\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"financial-reconciliation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md\",0.96,true,\"opening-instruction recheck\"\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\",0.96,true,\"opening-instruction recheck\"\n    \"audit-reporting\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md\",0.96,true,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 2,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/fresh-repeat-wire"
+    },
+    {
+      "name": "private-catalog-public-siblings",
+      "exit": 0,
+      "output": "\n# Skill selection advice\n\nApply all existing mandatory explicit/named and safety triggers first, even if absent below.\nThis additive advice does not replace the skill index, authorize actions, or suppress any workflow.\nRead relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.\nRequired named skill: private-linked-catalog - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/private-linked-catalog/SKILL.md.\nRequired named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md.\nOptional suggestion: financial-reconciliation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: csv-validation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md; fit=0.95, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: audit-reporting - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.\nAdvice source: live; model: jev-1.13.0.\n",
+      "wire_requests": 2,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-public-siblings-wire"
+    },
+    {
+      "name": "private-catalog-named",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked-catalog\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/private-linked-catalog/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-catalog-named-wire"
+    },
+    {
+      "name": "private-home-public-siblings",
+      "exit": 0,
+      "output": "\n# Skill selection advice\n\nApply all existing mandatory explicit/named and safety triggers first, even if absent below.\nThis additive advice does not replace the skill index, authorize actions, or suppress any workflow.\nRead relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.\nRequired named skill: private-linked-home - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/home/.agents/skills/private-linked-home/SKILL.md.\nRequired named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md.\nOptional suggestion: financial-reconciliation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: csv-validation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md; fit=0.95, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: audit-reporting - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.\nAdvice source: live; model: jev-1.13.0.\n",
+      "wire_requests": 2,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-public-siblings-wire"
+    },
+    {
+      "name": "private-home-named",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked-home\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/home/.agents/skills/private-linked-home/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/private-home-named-wire"
+    },
+    {
+      "name": "unsearchable-home-link",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-linked-home\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/unsearchable-home-link-wire"
+    },
+    {
+      "name": "unsearchable-catalog-link",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-linked-catalog\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/unsearchable-catalog-link-wire"
+    },
+    {
+      "name": "unsearchable-final-file-link",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-final-link\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/unsearchable-final-file-link-wire"
+    },
+    {
+      "name": "unsearchable-policy-ancestor",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/unsearchable-policy-ancestor-wire"
+    },
+    {
+      "name": "policy-literal",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/policy-literal-wire"
+    },
+    {
+      "name": "policy-spacing",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/policy-spacing-wire"
+    },
+    {
+      "name": "policy-case",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/policy-case-wire"
+    },
+    {
+      "name": "missing-key",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"TypeSafe key unavailable\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/missing-key-wire"
+    },
+    {
+      "name": "actor-genuine-advice",
+      "exit": 0,
+      "output": "\n# Skill selection advice\n\nApply all existing mandatory explicit/named and safety triggers first, even if absent below.\nThis additive advice does not replace the skill index, authorize actions, or suppress any workflow.\nRead relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.\nRequired named skill: safety - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md.\nOptional suggestion: financial-reconciliation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md; fit=0.97, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: csv-validation - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md; fit=0.96, uncertain=true, evidence=opening-instruction recheck.\nOptional suggestion: audit-reporting - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md; fit=0.95, uncertain=true, evidence=opening-instruction recheck.\nAdvice source: live; model: jev-1.13.0.\n",
+      "wire_requests": 2,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/actor-genuine-advice-wire"
+    },
+    {
+      "name": "oversized-task",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"task exceeds 4 KiB; supply minimal permitted text\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/oversized-task-wire"
+    },
+    {
+      "name": "denied-recheck-excerpt",
+      "exit": 0,
+      "output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 1,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/denied-recheck-excerpt-wire"
+    },
+    {
+      "name": "home-root-enumeration",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-linked-home\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/home-root-enumeration-wire"
+    },
+    {
+      "name": "home-root-search",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-linked-home\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/home-root-search-wire"
+    },
+    {
+      "name": "home-ancestor-search",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"csv-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md\"\n    \"private-linked-home\",null\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/home-ancestor-search-wire"
+    },
+    {
+      "name": "catalog-root-enumeration",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked-home\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/home/.agents/skills/private-linked-home/SKILL.md\"\n    \"safety\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/catalog-root-enumeration-wire"
+    },
+    {
+      "name": "catalog-root-search",
+      "exit": 0,
+      "output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-linked-home\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/home/.agents/skills/private-linked-home/SKILL.md\"\n    \"safety\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "wire_requests": 0,
+      "wire": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/catalog-root-search-wire"
+    }
+  ],
+  "real_transport_failure": "Real curl against disposable closed localhost HTTPS proxy, no fabricated response.",
+  "supplemental_regressions": [
+    "/bin/bash tests/fm-skill-suggest.test.sh",
+    "/bin/bash tests/fm-dispatch-resolve.test.sh"
+  ],
+  "setup_corrections": [
+    "Fixed wire-observer syntax before any recorded remote call.",
+    "Closed actor stdin with subprocess.DEVNULL to let real print-mode CLI start.",
+    "Added authoritative provider codex to disposable omp dispatch configuration."
+  ],
+  "limits": "Two small paired tasks only; not external cookbook performance evidence, no claim of lower context/cost or broad noninferiority.",
+  "wire_summary": "direct-wire-projection-summary.json",
+  "visual_artifacts": [
+    "ordinary-selection-production-transcript.html",
+    "ordinary-selection-transcript.png"
+  ]
+}

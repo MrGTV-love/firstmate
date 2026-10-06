@@ -1,0 +1,1127 @@
+[
+  {
+    "path": "bin/backends/cmux.sh",
+    "source_sha256": "ed2e7ebd3b44d1b5da10a6c484a4ab29b05f378779cd2a490b878e54cccfb8e0",
+    "copy_sha256": "ed2e7ebd3b44d1b5da10a6c484a4ab29b05f378779cd2a490b878e54cccfb8e0"
+  },
+  {
+    "path": "bin/backends/herdr-eventwait.py",
+    "source_sha256": "de4dcc2e61e63694959e0848ee96920434a0becb9fa7d224d86f21836513e231",
+    "copy_sha256": "de4dcc2e61e63694959e0848ee96920434a0becb9fa7d224d86f21836513e231"
+  },
+  {
+    "path": "bin/backends/herdr-workspace-move.py",
+    "source_sha256": "07fba3b51fb79cc4cf07c4ec1ed6e7b50813ec01e92cac908b5e417f8685d86a",
+    "copy_sha256": "07fba3b51fb79cc4cf07c4ec1ed6e7b50813ec01e92cac908b5e417f8685d86a"
+  },
+  {
+    "path": "bin/backends/herdr.sh",
+    "source_sha256": "0ca6820439dfa454dd91ad766acb225942d25047d97fad7f3a065d992f22177e",
+    "copy_sha256": "0ca6820439dfa454dd91ad766acb225942d25047d97fad7f3a065d992f22177e"
+  },
+  {
+    "path": "bin/backends/orca.sh",
+    "source_sha256": "2bc3b0c31bfe6b98bbf296607d85f74fa65500ce8937b48e8171ea6e7db3703b",
+    "copy_sha256": "2bc3b0c31bfe6b98bbf296607d85f74fa65500ce8937b48e8171ea6e7db3703b"
+  },
+  {
+    "path": "bin/backends/tmux.sh",
+    "source_sha256": "63efe34aa1d1905912e34c7c5d2e8d798c98be77fe3d71b433e24b276469abdb",
+    "copy_sha256": "63efe34aa1d1905912e34c7c5d2e8d798c98be77fe3d71b433e24b276469abdb"
+  },
+  {
+    "path": "bin/backends/zellij.sh",
+    "source_sha256": "9949964f65d69945934cbd5650afe1bad817060547a75c0b20024b3a23cf4e21",
+    "copy_sha256": "9949964f65d69945934cbd5650afe1bad817060547a75c0b20024b3a23cf4e21"
+  },
+  {
+    "path": "bin/fm-afk-contract.sh",
+    "source_sha256": "3e99ac9918548398adfc14af68d0d61879ac614e7aa79193d2dc919db823de8b",
+    "copy_sha256": "3e99ac9918548398adfc14af68d0d61879ac614e7aa79193d2dc919db823de8b"
+  },
+  {
+    "path": "bin/fm-afk-launch.sh",
+    "source_sha256": "0e0886e31baa50887a4e1d85ee692a486e4d9853b1ede006deb8012e23566acb",
+    "copy_sha256": "0e0886e31baa50887a4e1d85ee692a486e4d9853b1ede006deb8012e23566acb"
+  },
+  {
+    "path": "bin/fm-afk-return.sh",
+    "source_sha256": "15d726ae2ce3894dd6e231eb281100b3c288daedfa89bd7438b1075bd4591068",
+    "copy_sha256": "15d726ae2ce3894dd6e231eb281100b3c288daedfa89bd7438b1075bd4591068"
+  },
+  {
+    "path": "bin/fm-afk-start.sh",
+    "source_sha256": "c5bc11db6264de06e1b512daefd0ea7b418d136890df68fac64fbb5e21bfb53b",
+    "copy_sha256": "c5bc11db6264de06e1b512daefd0ea7b418d136890df68fac64fbb5e21bfb53b"
+  },
+  {
+    "path": "bin/fm-agent-process-lib.sh",
+    "source_sha256": "7af415f6efe195d884625444382b20e17d9e1a5ed36519297ffd430526c1d340",
+    "copy_sha256": "7af415f6efe195d884625444382b20e17d9e1a5ed36519297ffd430526c1d340"
+  },
+  {
+    "path": "bin/fm-agy-trust.sh",
+    "source_sha256": "390968791c10739303e036128389bc64bb7369477a9ce6311a567b4d27829efa",
+    "copy_sha256": "390968791c10739303e036128389bc64bb7369477a9ce6311a567b4d27829efa"
+  },
+  {
+    "path": "bin/fm-api-key-guard-lib.sh",
+    "source_sha256": "89e55f6e22521934582e123868eb2f34d1c28e0542dc5f3e8b026876e6e807e9",
+    "copy_sha256": "89e55f6e22521934582e123868eb2f34d1c28e0542dc5f3e8b026876e6e807e9"
+  },
+  {
+    "path": "bin/fm-arm-command-policy.mjs",
+    "source_sha256": "5aaf6c166a78cd9154e41ca7e2cb6c6f5f784e9c65645c7be5d1873cad5c7931",
+    "copy_sha256": "5aaf6c166a78cd9154e41ca7e2cb6c6f5f784e9c65645c7be5d1873cad5c7931"
+  },
+  {
+    "path": "bin/fm-arm-pretool-check.sh",
+    "source_sha256": "f6091a9b15de85161001f30a5fa997041f02cd86fe83d8da98303fac2733180b",
+    "copy_sha256": "f6091a9b15de85161001f30a5fa997041f02cd86fe83d8da98303fac2733180b"
+  },
+  {
+    "path": "bin/fm-backend-hometag-lib.sh",
+    "source_sha256": "ba1adf7377256345a3a7e3c671128364905435cd6d4087e0ac992e2379a2e4bd",
+    "copy_sha256": "ba1adf7377256345a3a7e3c671128364905435cd6d4087e0ac992e2379a2e4bd"
+  },
+  {
+    "path": "bin/fm-backend.sh",
+    "source_sha256": "8c0ef491b2a0a0c782ba356f6904237cf73d3c345d661662e99cf6ec5125e273",
+    "copy_sha256": "8c0ef491b2a0a0c782ba356f6904237cf73d3c345d661662e99cf6ec5125e273"
+  },
+  {
+    "path": "bin/fm-backlog-handoff.sh",
+    "source_sha256": "0fa0dcdffd237fce56051f52ccf0fec83859791a892e41899c9666c469888558",
+    "copy_sha256": "0fa0dcdffd237fce56051f52ccf0fec83859791a892e41899c9666c469888558"
+  },
+  {
+    "path": "bin/fm-backlog-receive.sh",
+    "source_sha256": "75a3606702759e8c56858db83b63f0d026c9c42387bf0367e048b254c027ef74",
+    "copy_sha256": "75a3606702759e8c56858db83b63f0d026c9c42387bf0367e048b254c027ef74"
+  },
+  {
+    "path": "bin/fm-backlog-transition-lib.sh",
+    "source_sha256": "3decb5f300f20d2d07dd68817a9ae009c2f359cf51e4a0cf617f0f3167a0356c",
+    "copy_sha256": "3decb5f300f20d2d07dd68817a9ae009c2f359cf51e4a0cf617f0f3167a0356c"
+  },
+  {
+    "path": "bin/fm-bearings-board.sh",
+    "source_sha256": "5c0ac979d8b4ec4fe3c73168b52d23709b28200d56fda77a67df02560b77a7a8",
+    "copy_sha256": "5c0ac979d8b4ec4fe3c73168b52d23709b28200d56fda77a67df02560b77a7a8"
+  },
+  {
+    "path": "bin/fm-bearings-snapshot.sh",
+    "source_sha256": "85a029c7b886d96dccffcf30e56b62cef230cb5406581c99965ac2225056fa13",
+    "copy_sha256": "85a029c7b886d96dccffcf30e56b62cef230cb5406581c99965ac2225056fa13"
+  },
+  {
+    "path": "bin/fm-bootstrap.sh",
+    "source_sha256": "9832f99c2920211bb78c5493f12cf55895624d0375f71fb3e2799acc31b35aab",
+    "copy_sha256": "9832f99c2920211bb78c5493f12cf55895624d0375f71fb3e2799acc31b35aab"
+  },
+  {
+    "path": "bin/fm-branch-dispatch.mjs",
+    "source_sha256": "0e8d76f75bd238162477815837d0043cc476bc2952ec24bf72f40a4f5f68bbc2",
+    "copy_sha256": "0e8d76f75bd238162477815837d0043cc476bc2952ec24bf72f40a4f5f68bbc2"
+  },
+  {
+    "path": "bin/fm-branch-outcome.sh",
+    "source_sha256": "4fb66175a469cb4c7c5c7638fe81cc0f86af76977180dae414cf731010a6f523",
+    "copy_sha256": "4fb66175a469cb4c7c5c7638fe81cc0f86af76977180dae414cf731010a6f523"
+  },
+  {
+    "path": "bin/fm-branch-prompt.sh",
+    "source_sha256": "0a80070c7078ba377011188917a35a2954fb85c78c7e028e32e275098112e2db",
+    "copy_sha256": "0a80070c7078ba377011188917a35a2954fb85c78c7e028e32e275098112e2db"
+  },
+  {
+    "path": "bin/fm-branch-report.sh",
+    "source_sha256": "cdd6c6f201875b2e9a007396f542c660258e5b2c452baba2c4973940fc15fefa",
+    "copy_sha256": "cdd6c6f201875b2e9a007396f542c660258e5b2c452baba2c4973940fc15fefa"
+  },
+  {
+    "path": "bin/fm-brief-heading-lib.sh",
+    "source_sha256": "bf202f96ca210fd4712fe33c04ae0e4432b14f61b5262e9a642a83a2018f0dfa",
+    "copy_sha256": "bf202f96ca210fd4712fe33c04ae0e4432b14f61b5262e9a642a83a2018f0dfa"
+  },
+  {
+    "path": "bin/fm-brief.sh",
+    "source_sha256": "967d0b61798bfa32c46504c68ff5671368a25c405678cbffad2ff8463a9d2af8",
+    "copy_sha256": "967d0b61798bfa32c46504c68ff5671368a25c405678cbffad2ff8463a9d2af8"
+  },
+  {
+    "path": "bin/fm-busy-event.sh",
+    "source_sha256": "11d3c7577ee57711e3fc88a577f58cc924ded8a96acc5f8295a65f89bf834e2c",
+    "copy_sha256": "11d3c7577ee57711e3fc88a577f58cc924ded8a96acc5f8295a65f89bf834e2c"
+  },
+  {
+    "path": "bin/fm-busy-lib.sh",
+    "source_sha256": "cab28f5bb2080c0259db22e54da6922084cb2529add625406ff1217a69d3454f",
+    "copy_sha256": "cab28f5bb2080c0259db22e54da6922084cb2529add625406ff1217a69d3454f"
+  },
+  {
+    "path": "bin/fm-captain-hold.sh",
+    "source_sha256": "d98639cf7523c6612b670c4f98cc9cb40d7c90621e5435df3c395ff91b221edc",
+    "copy_sha256": "d98639cf7523c6612b670c4f98cc9cb40d7c90621e5435df3c395ff91b221edc"
+  },
+  {
+    "path": "bin/fm-cd-command-policy.mjs",
+    "source_sha256": "f9f897ec09e764a3b7e4792385e10d8cecc08bc8f561dbdd3fb9ba3a9efbd88a",
+    "copy_sha256": "f9f897ec09e764a3b7e4792385e10d8cecc08bc8f561dbdd3fb9ba3a9efbd88a"
+  },
+  {
+    "path": "bin/fm-cd-pretool-check.sh",
+    "source_sha256": "5920f565b466a76bb1c080fe58099110ec5183faea36f49bc1df59b64aaacf7c",
+    "copy_sha256": "5920f565b466a76bb1c080fe58099110ec5183faea36f49bc1df59b64aaacf7c"
+  },
+  {
+    "path": "bin/fm-check-lib.sh",
+    "source_sha256": "b2b6ef0745f55079af24522271a92756ab275164829b7160334d688937b8c532",
+    "copy_sha256": "b2b6ef0745f55079af24522271a92756ab275164829b7160334d688937b8c532"
+  },
+  {
+    "path": "bin/fm-check-register.sh",
+    "source_sha256": "473eafa95c3e6f8341986ba7ade9aa9aab6eefe9039bb7e4fb32ac588e4a25cd",
+    "copy_sha256": "473eafa95c3e6f8341986ba7ade9aa9aab6eefe9039bb7e4fb32ac588e4a25cd"
+  },
+  {
+    "path": "bin/fm-check-unregister.sh",
+    "source_sha256": "2277b28c8405484f424b98ee14464962d44b4421eb194e124e33c6de7b086ae3",
+    "copy_sha256": "2277b28c8405484f424b98ee14464962d44b4421eb194e124e33c6de7b086ae3"
+  },
+  {
+    "path": "bin/fm-classify-lib.sh",
+    "source_sha256": "08370a05db26e37e5b07a48153a02581259d77666884468d302758e87e145e88",
+    "copy_sha256": "08370a05db26e37e5b07a48153a02581259d77666884468d302758e87e145e88"
+  },
+  {
+    "path": "bin/fm-claude-launcher-lib.sh",
+    "source_sha256": "4a33306422da1f16670dfc2444eb0b0458a86da79215d5835f281dde7aee6dcd",
+    "copy_sha256": "4a33306422da1f16670dfc2444eb0b0458a86da79215d5835f281dde7aee6dcd"
+  },
+  {
+    "path": "bin/fm-claude-stop-autoarm.sh",
+    "source_sha256": "99b6f70c421694c22ba21ee2dc30f04b097cec2026fe54115c939a23e9592fea",
+    "copy_sha256": "99b6f70c421694c22ba21ee2dc30f04b097cec2026fe54115c939a23e9592fea"
+  },
+  {
+    "path": "bin/fm-claude-trust.sh",
+    "source_sha256": "7f2392c31a3c338f1a9d97967611a201368bfe01396a46c7f97aba55a3eda547",
+    "copy_sha256": "7f2392c31a3c338f1a9d97967611a201368bfe01396a46c7f97aba55a3eda547"
+  },
+  {
+    "path": "bin/fm-composer-lib.sh",
+    "source_sha256": "f3896cba7986fc48abb246824b5b18f85158bdceb450235841fae898dbaabbca",
+    "copy_sha256": "f3896cba7986fc48abb246824b5b18f85158bdceb450235841fae898dbaabbca"
+  },
+  {
+    "path": "bin/fm-config-inherit-lib.sh",
+    "source_sha256": "2c801f928288d98be97ba3014a3e4c8ec449058e311710ca6ce60b69163b7aa7",
+    "copy_sha256": "2c801f928288d98be97ba3014a3e4c8ec449058e311710ca6ce60b69163b7aa7"
+  },
+  {
+    "path": "bin/fm-config-push.sh",
+    "source_sha256": "11a1f04a9d44828af18e2d4364d75a41bb16cba5f542ca3b63e22829ff8241a3",
+    "copy_sha256": "11a1f04a9d44828af18e2d4364d75a41bb16cba5f542ca3b63e22829ff8241a3"
+  },
+  {
+    "path": "bin/fm-contributions.jq",
+    "source_sha256": "403ee4c2454ca364d47f21050adcf8132f043a749768ce006ef8c72018fe8def",
+    "copy_sha256": "403ee4c2454ca364d47f21050adcf8132f043a749768ce006ef8c72018fe8def"
+  },
+  {
+    "path": "bin/fm-contributions.sh",
+    "source_sha256": "98a5028b7ba592d72e15de63dc3c1c429bfaa707a51d6d413761e0953518c1c6",
+    "copy_sha256": "98a5028b7ba592d72e15de63dc3c1c429bfaa707a51d6d413761e0953518c1c6"
+  },
+  {
+    "path": "bin/fm-control-lib.sh",
+    "source_sha256": "012d1901c047f2adccc10fdf328b6ec47e1c057d93776899a3b09cc3a64dc3bd",
+    "copy_sha256": "012d1901c047f2adccc10fdf328b6ec47e1c057d93776899a3b09cc3a64dc3bd"
+  },
+  {
+    "path": "bin/fm-control.sh",
+    "source_sha256": "b0124f791fb23f0eb17de68aba699933061dcde275f5f905d310db01d5ae7c2c",
+    "copy_sha256": "b0124f791fb23f0eb17de68aba699933061dcde275f5f905d310db01d5ae7c2c"
+  },
+  {
+    "path": "bin/fm-crew-state.sh",
+    "source_sha256": "06b7a99c2d48ef9fbf408ee47f2d9d1dc440f004886c30a63505473f407d29d5",
+    "copy_sha256": "06b7a99c2d48ef9fbf408ee47f2d9d1dc440f004886c30a63505473f407d29d5"
+  },
+  {
+    "path": "bin/fm-cursor-lib.sh",
+    "source_sha256": "4522e864e1257944c7ae9d3f311b030164490349be894d58b6df6284a45b29db",
+    "copy_sha256": "4522e864e1257944c7ae9d3f311b030164490349be894d58b6df6284a45b29db"
+  },
+  {
+    "path": "bin/fm-decision-hold.sh",
+    "source_sha256": "14144c1ad15eec0e8e29f2b349bede3af6e3e432f127c9e94fdf2973664dbf9f",
+    "copy_sha256": "14144c1ad15eec0e8e29f2b349bede3af6e3e432f127c9e94fdf2973664dbf9f"
+  },
+  {
+    "path": "bin/fm-devin-config.sh",
+    "source_sha256": "7f5e8405e103f76f1c4ddee9d3fb7c7af6bfde4f914804a566f8b5171efdc907",
+    "copy_sha256": "7f5e8405e103f76f1c4ddee9d3fb7c7af6bfde4f914804a566f8b5171efdc907"
+  },
+  {
+    "path": "bin/fm-dispatch-resolve.sh",
+    "source_sha256": "e2e8f783e9882cc668bc98bb2ba33b21d8e98f2e35ae7c630695ab2798643fc5",
+    "copy_sha256": "e2e8f783e9882cc668bc98bb2ba33b21d8e98f2e35ae7c630695ab2798643fc5"
+  },
+  {
+    "path": "bin/fm-doc-audience-check.sh",
+    "source_sha256": "7e5501bc754778d315a1e71a5e1b9d03e1c471762f82aa4f5e90dd90a35e09bf",
+    "copy_sha256": "7e5501bc754778d315a1e71a5e1b9d03e1c471762f82aa4f5e90dd90a35e09bf"
+  },
+  {
+    "path": "bin/fm-dod-lib.sh",
+    "source_sha256": "8d5c0f4775b483620f482685e1448bd613b93acb32991dc701316cd15c7037aa",
+    "copy_sha256": "8d5c0f4775b483620f482685e1448bd613b93acb32991dc701316cd15c7037aa"
+  },
+  {
+    "path": "bin/fm-ensure-agents-md.sh",
+    "source_sha256": "e7211ddeba2f497ba024022c6ce7ff8fa5be56a77351267cd21443e1b5fa2dc8",
+    "copy_sha256": "e7211ddeba2f497ba024022c6ce7ff8fa5be56a77351267cd21443e1b5fa2dc8"
+  },
+  {
+    "path": "bin/fm-env-lib.sh",
+    "source_sha256": "1740a09266e1669f2d12cae755cd1d3e41b7d8b7b8fcc9f5494a97344acb9515",
+    "copy_sha256": "1740a09266e1669f2d12cae755cd1d3e41b7d8b7b8fcc9f5494a97344acb9515"
+  },
+  {
+    "path": "bin/fm-extension-launch-barrier.mjs",
+    "source_sha256": "a928d000ad0a592aa7ccfcb573fb3972c7db4e873da125c1b40a4a686c1ccb44",
+    "copy_sha256": "a928d000ad0a592aa7ccfcb573fb3972c7db4e873da125c1b40a4a686c1ccb44"
+  },
+  {
+    "path": "bin/fm-extension.mjs",
+    "source_sha256": "882ecbcd1c20749afa8f50f43e3d362df96939fc50c09270d350079d14082406",
+    "copy_sha256": "882ecbcd1c20749afa8f50f43e3d362df96939fc50c09270d350079d14082406"
+  },
+  {
+    "path": "bin/fm-extension.sh",
+    "source_sha256": "81ece53ed786eff6d6a9d505859ba748fd1fad767dd51667ac1855e91d5b76b6",
+    "copy_sha256": "81ece53ed786eff6d6a9d505859ba748fd1fad767dd51667ac1855e91d5b76b6"
+  },
+  {
+    "path": "bin/fm-ff-lib.sh",
+    "source_sha256": "f2f808f8c93d12e2935e31a0f4bf829366874b798ba033deb59885bd511ecdb1",
+    "copy_sha256": "f2f808f8c93d12e2935e31a0f4bf829366874b798ba033deb59885bd511ecdb1"
+  },
+  {
+    "path": "bin/fm-fleet-ledger.sh",
+    "source_sha256": "4b640861832269b024a293fddc841a9042206435e9252f5e3fc196c13c3f96eb",
+    "copy_sha256": "4b640861832269b024a293fddc841a9042206435e9252f5e3fc196c13c3f96eb"
+  },
+  {
+    "path": "bin/fm-fleet-snapshot.sh",
+    "source_sha256": "b85700a4c23f0d69b31ef0e58dda0a0f336e8f37fbc2395f8ea15a5862d00293",
+    "copy_sha256": "b85700a4c23f0d69b31ef0e58dda0a0f336e8f37fbc2395f8ea15a5862d00293"
+  },
+  {
+    "path": "bin/fm-fleet-sync.sh",
+    "source_sha256": "21918d4ad81312be8e82b155cbcdbfae37e04b9a5de1d5d79677e7407e68a2d7",
+    "copy_sha256": "21918d4ad81312be8e82b155cbcdbfae37e04b9a5de1d5d79677e7407e68a2d7"
+  },
+  {
+    "path": "bin/fm-fleet-view.sh",
+    "source_sha256": "2a3ff22b2db0ad53d6a9cba532f096f6c0e225fda7e8358e6814472f40fb9806",
+    "copy_sha256": "2a3ff22b2db0ad53d6a9cba532f096f6c0e225fda7e8358e6814472f40fb9806"
+  },
+  {
+    "path": "bin/fm-forge-detect.sh",
+    "source_sha256": "5567b96a797c25c5f6249a9c939e45dc369399c9fa686946f960b8019d17b0d8",
+    "copy_sha256": "5567b96a797c25c5f6249a9c939e45dc369399c9fa686946f960b8019d17b0d8"
+  },
+  {
+    "path": "bin/fm-gate-refuse-lib.sh",
+    "source_sha256": "ec3633e039a65eab68b2cce8e4d3d2fe670fceb6401679e8daec36d799d87835",
+    "copy_sha256": "ec3633e039a65eab68b2cce8e4d3d2fe670fceb6401679e8daec36d799d87835"
+  },
+  {
+    "path": "bin/fm-gemini-lib.sh",
+    "source_sha256": "02ef57ee50b23b4b2be3c3761dc568548d8800dde0c8786470141d1203edcf5b",
+    "copy_sha256": "02ef57ee50b23b4b2be3c3761dc568548d8800dde0c8786470141d1203edcf5b"
+  },
+  {
+    "path": "bin/fm-git-strip-ai-trailers.sh",
+    "source_sha256": "6f0e27ab15687d069146146f720c8c80f53585831bd54c5287415672d7028f3a",
+    "copy_sha256": "6f0e27ab15687d069146146f720c8c80f53585831bd54c5287415672d7028f3a"
+  },
+  {
+    "path": "bin/fm-guard.sh",
+    "source_sha256": "df81ee1b5c6927ecc5cf92d11472c63f0ec00e01affa66147ecbd00dfb96d143",
+    "copy_sha256": "df81ee1b5c6927ecc5cf92d11472c63f0ec00e01affa66147ecbd00dfb96d143"
+  },
+  {
+    "path": "bin/fm-harness.sh",
+    "source_sha256": "c9fa8c6aac25b7487677659dd5d36a1c414469ba9ada548ce5a221cfa37906c1",
+    "copy_sha256": "c9fa8c6aac25b7487677659dd5d36a1c414469ba9ada548ce5a221cfa37906c1"
+  },
+  {
+    "path": "bin/fm-herdr-ci-cleanup.sh",
+    "source_sha256": "5751eb6f3204ab610b4c5b176ffa3f36b3a1279093cf38f617c53bf323859180",
+    "copy_sha256": "5751eb6f3204ab610b4c5b176ffa3f36b3a1279093cf38f617c53bf323859180"
+  },
+  {
+    "path": "bin/fm-herdr-lab-viewer.py",
+    "source_sha256": "8632eb9e03e5410d81ed41b91a1e3aa3f08fee7309d378cd7023bc2eb2a45d44",
+    "copy_sha256": "8632eb9e03e5410d81ed41b91a1e3aa3f08fee7309d378cd7023bc2eb2a45d44"
+  },
+  {
+    "path": "bin/fm-herdr-lab.sh",
+    "source_sha256": "e862f07947698ae19feb99529538dffc7710d21c6f06182c9d868142e750f317",
+    "copy_sha256": "e862f07947698ae19feb99529538dffc7710d21c6f06182c9d868142e750f317"
+  },
+  {
+    "path": "bin/fm-herdr-session-cleanup.sh",
+    "source_sha256": "3ef0f2d5ad344b96ef4dfdf76a6fcf5c4963ed5e11caf0a4abb6e95376ba018d",
+    "copy_sha256": "3ef0f2d5ad344b96ef4dfdf76a6fcf5c4963ed5e11caf0a4abb6e95376ba018d"
+  },
+  {
+    "path": "bin/fm-home-seed.sh",
+    "source_sha256": "e54b62ec55126d5caf0987e3a3a6339d4c75c8cae4f8d423ace13ae63b448621",
+    "copy_sha256": "e54b62ec55126d5caf0987e3a3a6339d4c75c8cae4f8d423ace13ae63b448621"
+  },
+  {
+    "path": "bin/fm-home-summary-refresh.sh",
+    "source_sha256": "26596900ad973b8f892ee620d8c2fafa4219436099802e507643cfcf199fe402",
+    "copy_sha256": "26596900ad973b8f892ee620d8c2fafa4219436099802e507643cfcf199fe402"
+  },
+  {
+    "path": "bin/fm-hook-host-lib.sh",
+    "source_sha256": "d4ec4ed6408a9005cda3385dce9aa3c1fa27e4808b085cd6118c86bd43ac68fb",
+    "copy_sha256": "d4ec4ed6408a9005cda3385dce9aa3c1fa27e4808b085cd6118c86bd43ac68fb"
+  },
+  {
+    "path": "bin/fm-host-mirror.sh",
+    "source_sha256": "285fc16920ac66dc25f6b3baf7e24413711e9c9508fbc474bfd7a4440c2e6a4a",
+    "copy_sha256": "285fc16920ac66dc25f6b3baf7e24413711e9c9508fbc474bfd7a4440c2e6a4a"
+  },
+  {
+    "path": "bin/fm-inactive-reconcile.sh",
+    "source_sha256": "73362d377adc7c30ac123995777e1b1800529498c5e3b3d055b85452b733a349",
+    "copy_sha256": "73362d377adc7c30ac123995777e1b1800529498c5e3b3d055b85452b733a349"
+  },
+  {
+    "path": "bin/fm-inbox.sh",
+    "source_sha256": "9ebd8c2d786c035976f2c0a87f024ef779a841241e5276cbad82ac88b3cf8da9",
+    "copy_sha256": "9ebd8c2d786c035976f2c0a87f024ef779a841241e5276cbad82ac88b3cf8da9"
+  },
+  {
+    "path": "bin/fm-install-actionlint.sh",
+    "source_sha256": "2d58219cb106242d61b2edb74d094dacaa0e50ddd79073a231b38adff29c41d5",
+    "copy_sha256": "2d58219cb106242d61b2edb74d094dacaa0e50ddd79073a231b38adff29c41d5"
+  },
+  {
+    "path": "bin/fm-install-herdr.sh",
+    "source_sha256": "d6d366db784f1af914bddf8ec8fc03a136025d520486fdf2788d834f495e2cb4",
+    "copy_sha256": "d6d366db784f1af914bddf8ec8fc03a136025d520486fdf2788d834f495e2cb4"
+  },
+  {
+    "path": "bin/fm-install-shellcheck.sh",
+    "source_sha256": "a3cdb28bee870b5a69a54a526280a512b2e3735f65c3d75e9c551253dac4431c",
+    "copy_sha256": "a3cdb28bee870b5a69a54a526280a512b2e3735f65c3d75e9c551253dac4431c"
+  },
+  {
+    "path": "bin/fm-install-treehouse.sh",
+    "source_sha256": "e0b7ff5f8b678c4ea3074bdf215d0a338a7d17daec12986358551061cdc35c0e",
+    "copy_sha256": "e0b7ff5f8b678c4ea3074bdf215d0a338a7d17daec12986358551061cdc35c0e"
+  },
+  {
+    "path": "bin/fm-kimi-turnend-hook.sh",
+    "source_sha256": "ed0aaea47f959e8784a0e1f4db5ba9870017faefa6051deafd5fdb64faf8e273",
+    "copy_sha256": "ed0aaea47f959e8784a0e1f4db5ba9870017faefa6051deafd5fdb64faf8e273"
+  },
+  {
+    "path": "bin/fm-lab-home.sh",
+    "source_sha256": "31615e7dd9d439bab09ae06daf5027e32aebfc2f65ae109ccabb5e046bad4080",
+    "copy_sha256": "31615e7dd9d439bab09ae06daf5027e32aebfc2f65ae109ccabb5e046bad4080"
+  },
+  {
+    "path": "bin/fm-landed-lib.sh",
+    "source_sha256": "a53f8088154a7a1a252294df2887d7a4a1514ca6536b2cbe2b57886003033cce",
+    "copy_sha256": "a53f8088154a7a1a252294df2887d7a4a1514ca6536b2cbe2b57886003033cce"
+  },
+  {
+    "path": "bin/fm-lease-lib.sh",
+    "source_sha256": "ad683ab9e84f5f37b0a0424257ae312d41a7dd1bf3e2b7fa34237b7e517a6401",
+    "copy_sha256": "ad683ab9e84f5f37b0a0424257ae312d41a7dd1bf3e2b7fa34237b7e517a6401"
+  },
+  {
+    "path": "bin/fm-lease.sh",
+    "source_sha256": "01dabbe46af0b980feca95cf6f7fa305eb897190afc254ea170c09cdb84a410f",
+    "copy_sha256": "01dabbe46af0b980feca95cf6f7fa305eb897190afc254ea170c09cdb84a410f"
+  },
+  {
+    "path": "bin/fm-line-cap-lib.sh",
+    "source_sha256": "ef3666d98316d3ae6fd355a6f069bba90d9fd2847934a40f471859f261b72783",
+    "copy_sha256": "ef3666d98316d3ae6fd355a6f069bba90d9fd2847934a40f471859f261b72783"
+  },
+  {
+    "path": "bin/fm-lint-workflows.sh",
+    "source_sha256": "36d72a6195931cbf2b9dd1e50a429fb45d7b62e0aea5d704a7a3a8dd8b5f5532",
+    "copy_sha256": "36d72a6195931cbf2b9dd1e50a429fb45d7b62e0aea5d704a7a3a8dd8b5f5532"
+  },
+  {
+    "path": "bin/fm-lint.sh",
+    "source_sha256": "289ea74f6ba7ff5a1fb375d9e84c8843d2cdadc28954deeedac74c38b81a423b",
+    "copy_sha256": "289ea74f6ba7ff5a1fb375d9e84c8843d2cdadc28954deeedac74c38b81a423b"
+  },
+  {
+    "path": "bin/fm-lock-lib.sh",
+    "source_sha256": "e8658dc6264d9f64ea84216bef516988dc9ccea659f87d691cd5f34e8e5e903c",
+    "copy_sha256": "e8658dc6264d9f64ea84216bef516988dc9ccea659f87d691cd5f34e8e5e903c"
+  },
+  {
+    "path": "bin/fm-lock.sh",
+    "source_sha256": "cf078a56ae99e8fab115e08cbe77be6556ad9f1ac53c483a0c0526549b3a6613",
+    "copy_sha256": "cf078a56ae99e8fab115e08cbe77be6556ad9f1ac53c483a0c0526549b3a6613"
+  },
+  {
+    "path": "bin/fm-mail-check.sh",
+    "source_sha256": "abe2a853bfc578997f6fba55f7662d5b598d883d69928adce51cbfd370c6297c",
+    "copy_sha256": "abe2a853bfc578997f6fba55f7662d5b598d883d69928adce51cbfd370c6297c"
+  },
+  {
+    "path": "bin/fm-mail.py",
+    "source_sha256": "9c75014f1558ea4e0dee043c556b6f5ec520ced448b591843d0dda8366ce6b3b",
+    "copy_sha256": "9c75014f1558ea4e0dee043c556b6f5ec520ced448b591843d0dda8366ce6b3b"
+  },
+  {
+    "path": "bin/fm-mail.sh",
+    "source_sha256": "1ca888697d075431c91b274b86889c1d08c5b12fc1784bdcb59a4dbb19ed8311",
+    "copy_sha256": "1ca888697d075431c91b274b86889c1d08c5b12fc1784bdcb59a4dbb19ed8311"
+  },
+  {
+    "path": "bin/fm-marker-lib.sh",
+    "source_sha256": "8dd10f56df9871e8c119e30340d2b0aa9c0e9d6c0a5a39db302de6b50d97266a",
+    "copy_sha256": "8dd10f56df9871e8c119e30340d2b0aa9c0e9d6c0a5a39db302de6b50d97266a"
+  },
+  {
+    "path": "bin/fm-mem-guard.py",
+    "source_sha256": "fa3e6af47749e5d3331dc10b581d41c632f095de2c366de2a71145245fd72b62",
+    "copy_sha256": "fa3e6af47749e5d3331dc10b581d41c632f095de2c366de2a71145245fd72b62"
+  },
+  {
+    "path": "bin/fm-mem-guard.sh",
+    "source_sha256": "3e3487a07465cae8e73bfcbc1edc6d2a487f2a8142103aa62c9eb1058cd96bc5",
+    "copy_sha256": "3e3487a07465cae8e73bfcbc1edc6d2a487f2a8142103aa62c9eb1058cd96bc5"
+  },
+  {
+    "path": "bin/fm-merge-authority-lib.sh",
+    "source_sha256": "26f20a4224999756112851b691ad0391aa003152bc507d3a83b69822deaa7d9d",
+    "copy_sha256": "26f20a4224999756112851b691ad0391aa003152bc507d3a83b69822deaa7d9d"
+  },
+  {
+    "path": "bin/fm-merge-local.sh",
+    "source_sha256": "56eaa73402a15d0136b158b210304ef8ea5fb56d8209efef2038e4b224a08ac0",
+    "copy_sha256": "56eaa73402a15d0136b158b210304ef8ea5fb56d8209efef2038e4b224a08ac0"
+  },
+  {
+    "path": "bin/fm-merge-outcome-lib.sh",
+    "source_sha256": "5da19eef3fef4b0c17ffb597d54764011726c0a898b554deb0ddaf14f7ce9a92",
+    "copy_sha256": "5da19eef3fef4b0c17ffb597d54764011726c0a898b554deb0ddaf14f7ce9a92"
+  },
+  {
+    "path": "bin/fm-nm-run-lib.sh",
+    "source_sha256": "0d32b78a6575a669bcbd43d50aef7c40cc9ce594a8583ff867b25f78616ec4d2",
+    "copy_sha256": "0d32b78a6575a669bcbd43d50aef7c40cc9ce594a8583ff867b25f78616ec4d2"
+  },
+  {
+    "path": "bin/fm-on.sh",
+    "source_sha256": "3f8a255ab097d34285d72ab16e40dc69cb2cc0cd079b5d777f20eec639f8a19d",
+    "copy_sha256": "3f8a255ab097d34285d72ab16e40dc69cb2cc0cd079b5d777f20eec639f8a19d"
+  },
+  {
+    "path": "bin/fm-operational-input.sh",
+    "source_sha256": "b796910c2ebbc2f77c18ef73722cbe76abb874d6f120cc9e2e326fbae219334d",
+    "copy_sha256": "b796910c2ebbc2f77c18ef73722cbe76abb874d6f120cc9e2e326fbae219334d"
+  },
+  {
+    "path": "bin/fm-parent-channel-lib.sh",
+    "source_sha256": "f482d6473ed36aedba1512e92bfa89945a5d7a5f5e60838dd5e2b8dfe8a1838c",
+    "copy_sha256": "f482d6473ed36aedba1512e92bfa89945a5d7a5f5e60838dd5e2b8dfe8a1838c"
+  },
+  {
+    "path": "bin/fm-path-lib.sh",
+    "source_sha256": "4aa1aafe3406676fa5df289a0c30dc762115eba6a1a218921ea6857c26e86b98",
+    "copy_sha256": "4aa1aafe3406676fa5df289a0c30dc762115eba6a1a218921ea6857c26e86b98"
+  },
+  {
+    "path": "bin/fm-peek.sh",
+    "source_sha256": "42f1e5199e90920452864c4846ee1e61ad1db0cc43c34b775969052445021d12",
+    "copy_sha256": "42f1e5199e90920452864c4846ee1e61ad1db0cc43c34b775969052445021d12"
+  },
+  {
+    "path": "bin/fm-pending-reply-lib.sh",
+    "source_sha256": "ac96547471c4f5bc325e4db82f713a147fbee94427c15e79aab57d7225178528",
+    "copy_sha256": "ac96547471c4f5bc325e4db82f713a147fbee94427c15e79aab57d7225178528"
+  },
+  {
+    "path": "bin/fm-pr-check.sh",
+    "source_sha256": "3343674e66aae980d8c450e85104d69eb7b8526ab3d5080d5ee1f9c7b299a9b7",
+    "copy_sha256": "3343674e66aae980d8c450e85104d69eb7b8526ab3d5080d5ee1f9c7b299a9b7"
+  },
+  {
+    "path": "bin/fm-pr-lib.sh",
+    "source_sha256": "a774defb450e4bad2d1d7ea57401a5b78c3f5555c9bd117ab8f8260edf6e3e66",
+    "copy_sha256": "a774defb450e4bad2d1d7ea57401a5b78c3f5555c9bd117ab8f8260edf6e3e66"
+  },
+  {
+    "path": "bin/fm-pr-merge.sh",
+    "source_sha256": "61b6ddb09365ff852e739c3d7a2f5beda24718f4928462fd226c4a392c53c510",
+    "copy_sha256": "61b6ddb09365ff852e739c3d7a2f5beda24718f4928462fd226c4a392c53c510"
+  },
+  {
+    "path": "bin/fm-pr-poll.sh",
+    "source_sha256": "0d9ebce47103772895f489ac9a31eeb817de0ccaa771a2c2db5dd1518d9db3cd",
+    "copy_sha256": "0d9ebce47103772895f489ac9a31eeb817de0ccaa771a2c2db5dd1518d9db3cd"
+  },
+  {
+    "path": "bin/fm-pr-reviewers.sh",
+    "source_sha256": "629d4c52fd0cf8b89ed5a29c9ccf1df3c116db0712fcfb71e5c947d4b3d28312",
+    "copy_sha256": "629d4c52fd0cf8b89ed5a29c9ccf1df3c116db0712fcfb71e5c947d4b3d28312"
+  },
+  {
+    "path": "bin/fm-pr-state.sh",
+    "source_sha256": "af9c1522d00d36a210500df556b672a2f749a176094138941d7ffd2e835f5c67",
+    "copy_sha256": "af9c1522d00d36a210500df556b672a2f749a176094138941d7ffd2e835f5c67"
+  },
+  {
+    "path": "bin/fm-primary-scope-lib.sh",
+    "source_sha256": "19c4d6e29ce4d4b132a441dfbc4daed1650d5de350039a70ba29ce1acb4c670b",
+    "copy_sha256": "19c4d6e29ce4d4b132a441dfbc4daed1650d5de350039a70ba29ce1acb4c670b"
+  },
+  {
+    "path": "bin/fm-procevent-extension-capture.pl",
+    "source_sha256": "c29845bf2c34fa470cab41a16ab457f1691ac6640686ba91dcbba12c66e6bfb0",
+    "copy_sha256": "c29845bf2c34fa470cab41a16ab457f1691ac6640686ba91dcbba12c66e6bfb0"
+  },
+  {
+    "path": "bin/fm-procevent-lavish.sh",
+    "source_sha256": "3879ceda259fc772233023c35a402fdfe436f75df5833af6402a99b6d0c4745c",
+    "copy_sha256": "3879ceda259fc772233023c35a402fdfe436f75df5833af6402a99b6d0c4745c"
+  },
+  {
+    "path": "bin/fm-procevent-lib.sh",
+    "source_sha256": "bd14ff1b8e38000e61b98e4cf0cc09d41cf4fe78bdf6eb459268d60470adf1e1",
+    "copy_sha256": "bd14ff1b8e38000e61b98e4cf0cc09d41cf4fe78bdf6eb459268d60470adf1e1"
+  },
+  {
+    "path": "bin/fm-procevent-quota.sh",
+    "source_sha256": "19b70e4bfbf8974ee76228d40ac5c3d0d9798a08d7adbcc70b65b6b3a3bb20dc",
+    "copy_sha256": "19b70e4bfbf8974ee76228d40ac5c3d0d9798a08d7adbcc70b65b6b3a3bb20dc"
+  },
+  {
+    "path": "bin/fm-procevent-remote-reply.sh",
+    "source_sha256": "121fbc9a3523afc1dd9a9b519c75be54067407fb3e071272a1dbe0b53546b7cc",
+    "copy_sha256": "121fbc9a3523afc1dd9a9b519c75be54067407fb3e071272a1dbe0b53546b7cc"
+  },
+  {
+    "path": "bin/fm-procevent-when.sh",
+    "source_sha256": "c0ad96b3e5ae353a2a4f41fbbc224bc9b0b9b56c71ab6a4c13ccb6f3b537f125",
+    "copy_sha256": "c0ad96b3e5ae353a2a4f41fbbc224bc9b0b9b56c71ab6a4c13ccb6f3b537f125"
+  },
+  {
+    "path": "bin/fm-procevent.sh",
+    "source_sha256": "f93ddc4b520ab4a3c1ea986da6955327ddf6d890b8c61c4cd642dbc96aed9374",
+    "copy_sha256": "f93ddc4b520ab4a3c1ea986da6955327ddf6d890b8c61c4cd642dbc96aed9374"
+  },
+  {
+    "path": "bin/fm-project-mode.sh",
+    "source_sha256": "0e22d7df5da7d11246b921af6406b79056b8d93cf69053244c8c9b315b511d76",
+    "copy_sha256": "0e22d7df5da7d11246b921af6406b79056b8d93cf69053244c8c9b315b511d76"
+  },
+  {
+    "path": "bin/fm-project-origin-lib.sh",
+    "source_sha256": "215d19dab218bd64a5e9da88039aa5136f1087f949b80a24a047cf2049022d14",
+    "copy_sha256": "215d19dab218bd64a5e9da88039aa5136f1087f949b80a24a047cf2049022d14"
+  },
+  {
+    "path": "bin/fm-promote.sh",
+    "source_sha256": "ae752d4dc2a2cab0f51c02519367f0f557ee144001c37a289e1cbfadc78274fd",
+    "copy_sha256": "ae752d4dc2a2cab0f51c02519367f0f557ee144001c37a289e1cbfadc78274fd"
+  },
+  {
+    "path": "bin/fm-public-followup-collect.sh",
+    "source_sha256": "62a6182ba29988ac1f8814bffd7a9378e5682430ddfa98e5d8a9b4884c78bebd",
+    "copy_sha256": "62a6182ba29988ac1f8814bffd7a9378e5682430ddfa98e5d8a9b4884c78bebd"
+  },
+  {
+    "path": "bin/fm-public-followup-emit.sh",
+    "source_sha256": "ae684c4e0b69bb1439fcf8f326642ebbae33e926a5665f399e75b3953b18f40e",
+    "copy_sha256": "ae684c4e0b69bb1439fcf8f326642ebbae33e926a5665f399e75b3953b18f40e"
+  },
+  {
+    "path": "bin/fm-public-followup-lib.sh",
+    "source_sha256": "56ecfab51971ee517030b65df5ab82930d07f7279c5d8f97d7bf823df5730212",
+    "copy_sha256": "56ecfab51971ee517030b65df5ab82930d07f7279c5d8f97d7bf823df5730212"
+  },
+  {
+    "path": "bin/fm-public-followup.sh",
+    "source_sha256": "3b8e4cf1219bddcabfd917f361f8bd8a83f62e1f1756ed79374d6990ca5e6309",
+    "copy_sha256": "3b8e4cf1219bddcabfd917f361f8bd8a83f62e1f1756ed79374d6990ca5e6309"
+  },
+  {
+    "path": "bin/fm-push-transition-lib.sh",
+    "source_sha256": "f067f85849f7a3e264963c719bd3e9ce975bb78128860dd08cc0ee8af538382e",
+    "copy_sha256": "f067f85849f7a3e264963c719bd3e9ce975bb78128860dd08cc0ee8af538382e"
+  },
+  {
+    "path": "bin/fm-quota-axi-lib.sh",
+    "source_sha256": "8ab26790a7a359b2779d383ad97ef236e9784093f0b172fc691f1052da309bff",
+    "copy_sha256": "8ab26790a7a359b2779d383ad97ef236e9784093f0b172fc691f1052da309bff"
+  },
+  {
+    "path": "bin/fm-quota-choose.sh",
+    "source_sha256": "3c7e4477e2b653af2e3480f75007f4ac55c13072478a599a7cedc46f7c47f968",
+    "copy_sha256": "3c7e4477e2b653af2e3480f75007f4ac55c13072478a599a7cedc46f7c47f968"
+  },
+  {
+    "path": "bin/fm-remote-delta-read.sh",
+    "source_sha256": "64e530ed018090181385510bb9a24c1de60942f0bfb63bf28d42e88d6ca7d4fb",
+    "copy_sha256": "64e530ed018090181385510bb9a24c1de60942f0bfb63bf28d42e88d6ca7d4fb"
+  },
+  {
+    "path": "bin/fm-remote-doctor.sh",
+    "source_sha256": "78efccd6cb7a0123400e49fa323292a64c8e3c7ebd3717151be69f87735302fb",
+    "copy_sha256": "78efccd6cb7a0123400e49fa323292a64c8e3c7ebd3717151be69f87735302fb"
+  },
+  {
+    "path": "bin/fm-remote-entrypoint.sh",
+    "source_sha256": "7b1a40404f78dd89fdd97e3627a8a00cae8cfb284bc8c78de1bc127aab774f57",
+    "copy_sha256": "7b1a40404f78dd89fdd97e3627a8a00cae8cfb284bc8c78de1bc127aab774f57"
+  },
+  {
+    "path": "bin/fm-remote-file.sh",
+    "source_sha256": "26b2ba2ba93cc92869d06a509013b799bf7f589f6e435a3dd4edb4c20f8da821",
+    "copy_sha256": "26b2ba2ba93cc92869d06a509013b799bf7f589f6e435a3dd4edb4c20f8da821"
+  },
+  {
+    "path": "bin/fm-remote-herdr-guard.sh",
+    "source_sha256": "070f97a986a33922835ffec4e0ef6a21d0172803a9276694b777977a64c26173",
+    "copy_sha256": "070f97a986a33922835ffec4e0ef6a21d0172803a9276694b777977a64c26173"
+  },
+  {
+    "path": "bin/fm-remote-herdr-owner-lib.sh",
+    "source_sha256": "8a6bdb474f7a126105482c3ebea937f961be46cfc16f9622ca69e92c2790bedb",
+    "copy_sha256": "8a6bdb474f7a126105482c3ebea937f961be46cfc16f9622ca69e92c2790bedb"
+  },
+  {
+    "path": "bin/fm-remote-home-provision.sh",
+    "source_sha256": "0612cb6f311b0decc8eb15c22c135a29143afdac35b333ebc2de6c11e7d1074f",
+    "copy_sha256": "0612cb6f311b0decc8eb15c22c135a29143afdac35b333ebc2de6c11e7d1074f"
+  },
+  {
+    "path": "bin/fm-remote-home-seed.sh",
+    "source_sha256": "ef5b2f4158da77271475cfe3aa32916942a5d272a2238173a6cd606399ae16c1",
+    "copy_sha256": "ef5b2f4158da77271475cfe3aa32916942a5d272a2238173a6cd606399ae16c1"
+  },
+  {
+    "path": "bin/fm-remote-inherit-push.sh",
+    "source_sha256": "06776defcc7f75e277b65a43fc6badd744cdb12b38388ada999108418444697b",
+    "copy_sha256": "06776defcc7f75e277b65a43fc6badd744cdb12b38388ada999108418444697b"
+  },
+  {
+    "path": "bin/fm-remote-inherit.sh",
+    "source_sha256": "070b4c4afcb7e8435205e4c062781e27e7387a338ba6aa7bc16bed0aeff65c6c",
+    "copy_sha256": "070b4c4afcb7e8435205e4c062781e27e7387a338ba6aa7bc16bed0aeff65c6c"
+  },
+  {
+    "path": "bin/fm-remote-job-lib.sh",
+    "source_sha256": "0154b612692c5a8f6161fffbd6b06cd75ec7594e0ce2e0382ca2e195a134230c",
+    "copy_sha256": "0154b612692c5a8f6161fffbd6b06cd75ec7594e0ce2e0382ca2e195a134230c"
+  },
+  {
+    "path": "bin/fm-remote-job-reap-orphans.sh",
+    "source_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88",
+    "copy_sha256": "f026798a6c39f5ab1d2f90a6a8811e36dc22889bbeb9d0486c43aad65b38ce88"
+  },
+  {
+    "path": "bin/fm-remote-job-worker.sh",
+    "source_sha256": "4ef70470032d849eac84136cccb9bdb6d357c64177b8815d14fc262a8ec4d29e",
+    "copy_sha256": "4ef70470032d849eac84136cccb9bdb6d357c64177b8815d14fc262a8ec4d29e"
+  },
+  {
+    "path": "bin/fm-remote-readiness-lib.sh",
+    "source_sha256": "e0ab0eb3f75a780ac84eca2e9fad21dd5f44fa190d40627e7020a21343d53050",
+    "copy_sha256": "e0ab0eb3f75a780ac84eca2e9fad21dd5f44fa190d40627e7020a21343d53050"
+  },
+  {
+    "path": "bin/fm-remote-secondmate-control.sh",
+    "source_sha256": "f872348aa7a970c2ac27be0e40b7a748b3ae4c68821caa68a766c4ddc86f8492",
+    "copy_sha256": "f872348aa7a970c2ac27be0e40b7a748b3ae4c68821caa68a766c4ddc86f8492"
+  },
+  {
+    "path": "bin/fm-remote-secondmate-relaunch.sh",
+    "source_sha256": "d92a14c171bd5016cc53cbba4d6e0cc75c857ee254c36ddd726c901be9982150",
+    "copy_sha256": "d92a14c171bd5016cc53cbba4d6e0cc75c857ee254c36ddd726c901be9982150"
+  },
+  {
+    "path": "bin/fm-review-diff.sh",
+    "source_sha256": "8485213c60fcce7478e91803d8b2f48f4d6118f4b6f9719e7dc0fa60bb212036",
+    "copy_sha256": "8485213c60fcce7478e91803d8b2f48f4d6118f4b6f9719e7dc0fa60bb212036"
+  },
+  {
+    "path": "bin/fm-secondmate-charter-lib.sh",
+    "source_sha256": "2bfb6db625bf623ddbd209f3338bec7af80c8a337e9385d8f6863b4832a2d885",
+    "copy_sha256": "2bfb6db625bf623ddbd209f3338bec7af80c8a337e9385d8f6863b4832a2d885"
+  },
+  {
+    "path": "bin/fm-secondmate-liveness-lib.sh",
+    "source_sha256": "12a69ef18aa963eda9142c966ed8a313651ceca26e1f307a6026f347c20d7e10",
+    "copy_sha256": "12a69ef18aa963eda9142c966ed8a313651ceca26e1f307a6026f347c20d7e10"
+  },
+  {
+    "path": "bin/fm-secondmate-nudge-lib.sh",
+    "source_sha256": "ef93842d57eea7d13e5e7f54b702ed751a57274a51aa8825f8f9ac3be9856e41",
+    "copy_sha256": "ef93842d57eea7d13e5e7f54b702ed751a57274a51aa8825f8f9ac3be9856e41"
+  },
+  {
+    "path": "bin/fm-secondmate-parent-lib.sh",
+    "source_sha256": "70d883d40ae08d79a530477d08bb63b9297693dd83bdf037e1fdc7ad86a3d938",
+    "copy_sha256": "70d883d40ae08d79a530477d08bb63b9297693dd83bdf037e1fdc7ad86a3d938"
+  },
+  {
+    "path": "bin/fm-secondmate-reconcile.sh",
+    "source_sha256": "d50de8b7742e6e264e944e1f4ed8acf20665ac484886e5219c1e932d7bd52b8f",
+    "copy_sha256": "d50de8b7742e6e264e944e1f4ed8acf20665ac484886e5219c1e932d7bd52b8f"
+  },
+  {
+    "path": "bin/fm-secondmate-registry-lib.sh",
+    "source_sha256": "8ace16266479fedb84891b08bdf95a73970429324f83201ba83abcd28ffe0d23",
+    "copy_sha256": "8ace16266479fedb84891b08bdf95a73970429324f83201ba83abcd28ffe0d23"
+  },
+  {
+    "path": "bin/fm-secondmate-report.sh",
+    "source_sha256": "2960c3760978ebbba8f274db7c4af8453e6906183ca5dcc8de8aea2fde45bb05",
+    "copy_sha256": "2960c3760978ebbba8f274db7c4af8453e6906183ca5dcc8de8aea2fde45bb05"
+  },
+  {
+    "path": "bin/fm-secondmate-restart-lib.sh",
+    "source_sha256": "a2c665d68418727e8ea623656651b5fb15e608c56d8ff33fbf731dbef5a25894",
+    "copy_sha256": "a2c665d68418727e8ea623656651b5fb15e608c56d8ff33fbf731dbef5a25894"
+  },
+  {
+    "path": "bin/fm-secondmate-restart.sh",
+    "source_sha256": "20c9ecc0be3c455fab379d5aa2b067bf5fe418d54913d27703be19bbac71efe0",
+    "copy_sha256": "20c9ecc0be3c455fab379d5aa2b067bf5fe418d54913d27703be19bbac71efe0"
+  },
+  {
+    "path": "bin/fm-send.sh",
+    "source_sha256": "2d45fab9fd9d57d8c25412758217076889db51ec77bd5337777ebe7b2ae27285",
+    "copy_sha256": "2d45fab9fd9d57d8c25412758217076889db51ec77bd5337777ebe7b2ae27285"
+  },
+  {
+    "path": "bin/fm-session-end-relaunch-lib.sh",
+    "source_sha256": "0e9d4420ea05ac21c339bce88690de6aff817ff4633bc1db5ab2d0ff897c8ebe",
+    "copy_sha256": "0e9d4420ea05ac21c339bce88690de6aff817ff4633bc1db5ab2d0ff897c8ebe"
+  },
+  {
+    "path": "bin/fm-session-lock-lib.sh",
+    "source_sha256": "40886c11406eb5a9718a27c00c49567c042043d3eb4b4a2bbf12d3d9555f39dc",
+    "copy_sha256": "40886c11406eb5a9718a27c00c49567c042043d3eb4b4a2bbf12d3d9555f39dc"
+  },
+  {
+    "path": "bin/fm-session-start.sh",
+    "source_sha256": "44207031956d1f0751c37767e530b5f4eb5ceacee2f242c4c7fe753a5bb4772a",
+    "copy_sha256": "44207031956d1f0751c37767e530b5f4eb5ceacee2f242c4c7fe753a5bb4772a"
+  },
+  {
+    "path": "bin/fm-sessionstart-cursor.sh",
+    "source_sha256": "787459d1f296c3a8d95c471aa02041533880b0d1a47b75fb786d8fffcc1f13e5",
+    "copy_sha256": "787459d1f296c3a8d95c471aa02041533880b0d1a47b75fb786d8fffcc1f13e5"
+  },
+  {
+    "path": "bin/fm-sessionstart-nudge.sh",
+    "source_sha256": "948370578b9c823d8fcc09ffc692cc80fc34c34b7ecad033fe49f6939da17dc6",
+    "copy_sha256": "948370578b9c823d8fcc09ffc692cc80fc34c34b7ecad033fe49f6939da17dc6"
+  },
+  {
+    "path": "bin/fm-sessionstart-run.sh",
+    "source_sha256": "4efc9456420988eb2b1cc82e7012947fda143975664c59dd3be2d5f9971c034e",
+    "copy_sha256": "4efc9456420988eb2b1cc82e7012947fda143975664c59dd3be2d5f9971c034e"
+  },
+  {
+    "path": "bin/fm-skill-catalog.jq",
+    "source_sha256": "09898ee378cb1afacae870207d92f59578c905fc7599df51d6fa42f4faf03976",
+    "copy_sha256": "09898ee378cb1afacae870207d92f59578c905fc7599df51d6fa42f4faf03976"
+  },
+  {
+    "path": "bin/fm-skill-suggest.sh",
+    "source_sha256": "b7d3d8400cad8814a0e477535145a470fe593be1d152d11881443718534e7349",
+    "copy_sha256": "b7d3d8400cad8814a0e477535145a470fe593be1d152d11881443718534e7349"
+  },
+  {
+    "path": "bin/fm-spawn.sh",
+    "source_sha256": "23f29310b99472007bab79b36a3e0d432714da9a1829ab38410b8609db38fd4a",
+    "copy_sha256": "23f29310b99472007bab79b36a3e0d432714da9a1829ab38410b8609db38fd4a"
+  },
+  {
+    "path": "bin/fm-startup-memory-budget-lib.sh",
+    "source_sha256": "a9870453abe03c77b148e6bc55b59b9e560a48cd8440ba63b689b1ac221c853a",
+    "copy_sha256": "a9870453abe03c77b148e6bc55b59b9e560a48cd8440ba63b689b1ac221c853a"
+  },
+  {
+    "path": "bin/fm-startup-memory-budget.sh",
+    "source_sha256": "bbfd382cb62dd508b1678910e482101d4db40139a82e99001e7095d78d1da06a",
+    "copy_sha256": "bbfd382cb62dd508b1678910e482101d4db40139a82e99001e7095d78d1da06a"
+  },
+  {
+    "path": "bin/fm-startup-network.sh",
+    "source_sha256": "1efcc78e4d5006be1d7b9676d54006db52453267752d6a0793f19e932f37e0fd",
+    "copy_sha256": "1efcc78e4d5006be1d7b9676d54006db52453267752d6a0793f19e932f37e0fd"
+  },
+  {
+    "path": "bin/fm-stow-cascade.sh",
+    "source_sha256": "686bb48ce7afdd3c4083aaf10013ba4cb886017011f109d142b4759951844c05",
+    "copy_sha256": "686bb48ce7afdd3c4083aaf10013ba4cb886017011f109d142b4759951844c05"
+  },
+  {
+    "path": "bin/fm-subagent-pretool-check.sh",
+    "source_sha256": "8218f2303fa676f493891e9362b03f5f6929b44fcf9e025f18c490ef3dcdd719",
+    "copy_sha256": "8218f2303fa676f493891e9362b03f5f6929b44fcf9e025f18c490ef3dcdd719"
+  },
+  {
+    "path": "bin/fm-supervise-daemon.sh",
+    "source_sha256": "2992beaae41468c83a4b6999bb51ed622fa75637ab0371e273f510469d7ea9a1",
+    "copy_sha256": "2992beaae41468c83a4b6999bb51ed622fa75637ab0371e273f510469d7ea9a1"
+  },
+  {
+    "path": "bin/fm-supervision-engine-lib.sh",
+    "source_sha256": "1f7cad987e197bb91defabe08625803f0b2594b0ea8642bd6b20e24a281bb210",
+    "copy_sha256": "1f7cad987e197bb91defabe08625803f0b2594b0ea8642bd6b20e24a281bb210"
+  },
+  {
+    "path": "bin/fm-supervision-host.sh",
+    "source_sha256": "b76955785d24b0315fb01d1382221aad092fb20f6c85a33f6513f242f5588a6e",
+    "copy_sha256": "b76955785d24b0315fb01d1382221aad092fb20f6c85a33f6513f242f5588a6e"
+  },
+  {
+    "path": "bin/fm-supervision-instructions.sh",
+    "source_sha256": "afb205261e650b26842f060f15db876e407c6bd18396e7f1f026f48f9eceab70",
+    "copy_sha256": "afb205261e650b26842f060f15db876e407c6bd18396e7f1f026f48f9eceab70"
+  },
+  {
+    "path": "bin/fm-supervision-lib.sh",
+    "source_sha256": "e2302e86fd116c75dbc3d906211807e4107016f849e0ff637ee24e0715b45020",
+    "copy_sha256": "e2302e86fd116c75dbc3d906211807e4107016f849e0ff637ee24e0715b45020"
+  },
+  {
+    "path": "bin/fm-supervisor-target-lib.sh",
+    "source_sha256": "60db6295366bd87191a0a7d89c8e1a33f90745938ca23feb84ffec05744e6139",
+    "copy_sha256": "60db6295366bd87191a0a7d89c8e1a33f90745938ca23feb84ffec05744e6139"
+  },
+  {
+    "path": "bin/fm-tangle-lib.sh",
+    "source_sha256": "2df0a821c3118aaba918e17b3638be8bc469cb3e7aad488187ff27dc144d306a",
+    "copy_sha256": "2df0a821c3118aaba918e17b3638be8bc469cb3e7aad488187ff27dc144d306a"
+  },
+  {
+    "path": "bin/fm-task-inbox-lib.sh",
+    "source_sha256": "65053e9507510166abf85dff9491590efbb6d97de57d6e5ae8038cad60062020",
+    "copy_sha256": "65053e9507510166abf85dff9491590efbb6d97de57d6e5ae8038cad60062020"
+  },
+  {
+    "path": "bin/fm-tasks-axi-lib.sh",
+    "source_sha256": "0f62946a3c273f41d24707cc0b2684e6192138dc027056ea1a8c03ced9adc6cf",
+    "copy_sha256": "0f62946a3c273f41d24707cc0b2684e6192138dc027056ea1a8c03ced9adc6cf"
+  },
+  {
+    "path": "bin/fm-tasks-axi.sh",
+    "source_sha256": "b00026d32b53840fb0e1fac1967989521d120afefaee9f436a04196799d3904b",
+    "copy_sha256": "b00026d32b53840fb0e1fac1967989521d120afefaee9f436a04196799d3904b"
+  },
+  {
+    "path": "bin/fm-teamclaude-launch.sh",
+    "source_sha256": "b8370d5ac9c7e3ca5efaf3dc9df1152a9914f6c1d2da886c1a3c598acf7f0faa",
+    "copy_sha256": "b8370d5ac9c7e3ca5efaf3dc9df1152a9914f6c1d2da886c1a3c598acf7f0faa"
+  },
+  {
+    "path": "bin/fm-teardown.sh",
+    "source_sha256": "dabdd9dc36f89635e51d1da9b5042452af2ffe370619830e33f0f039ab0a9338",
+    "copy_sha256": "dabdd9dc36f89635e51d1da9b5042452af2ffe370619830e33f0f039ab0a9338"
+  },
+  {
+    "path": "bin/fm-test-isolation-proof.sh",
+    "source_sha256": "1d49404b3402201bb55e4c06a519fcb2259e0304d3fcad77dd5b27e8073437dc",
+    "copy_sha256": "1d49404b3402201bb55e4c06a519fcb2259e0304d3fcad77dd5b27e8073437dc"
+  },
+  {
+    "path": "bin/fm-test-run.sh",
+    "source_sha256": "ca62339589f73d94b055c14d00dedbb672ca34f150096d1a6676296cf8e1d16c",
+    "copy_sha256": "ca62339589f73d94b055c14d00dedbb672ca34f150096d1a6676296cf8e1d16c"
+  },
+  {
+    "path": "bin/fm-timeout-lib.sh",
+    "source_sha256": "38de4e625ad963109678a9e3f59d789c89aa368369a2194daeb2266a2e5412b7",
+    "copy_sha256": "38de4e625ad963109678a9e3f59d789c89aa368369a2194daeb2266a2e5412b7"
+  },
+  {
+    "path": "bin/fm-timing-lib.sh",
+    "source_sha256": "5ff809c8665c58a863b2486f73ef0e82deabdf010f686c19e7a1bfafaae3094c",
+    "copy_sha256": "5ff809c8665c58a863b2486f73ef0e82deabdf010f686c19e7a1bfafaae3094c"
+  },
+  {
+    "path": "bin/fm-tmux-lib.sh",
+    "source_sha256": "74ec9636eeeb3856587c75e0c1d3711343d39c0010917c33c37794d22742812c",
+    "copy_sha256": "74ec9636eeeb3856587c75e0c1d3711343d39c0010917c33c37794d22742812c"
+  },
+  {
+    "path": "bin/fm-tool-update-check.sh",
+    "source_sha256": "5a2cc8345527fb46891a5eeff07e2a1ffa35b9a5d55fb514a940a1ccef722577",
+    "copy_sha256": "5a2cc8345527fb46891a5eeff07e2a1ffa35b9a5d55fb514a940a1ccef722577"
+  },
+  {
+    "path": "bin/fm-trace-context-lib.sh",
+    "source_sha256": "1aa8843296e1c06048795a23b9aa7492f3cca250b4baefb17c855fd4f3eb15c5",
+    "copy_sha256": "1aa8843296e1c06048795a23b9aa7492f3cca250b4baefb17c855fd4f3eb15c5"
+  },
+  {
+    "path": "bin/fm-transition-lib.sh",
+    "source_sha256": "a62fd8f071b6b7037eff7b54d1bcbd49a6454c96764d81a62b465fc17a345ece",
+    "copy_sha256": "a62fd8f071b6b7037eff7b54d1bcbd49a6454c96764d81a62b465fc17a345ece"
+  },
+  {
+    "path": "bin/fm-turnend-guard-cursor.sh",
+    "source_sha256": "be81e301059ccf4bab91b7017a240017726cbd878f07960100f2ba50a5958737",
+    "copy_sha256": "be81e301059ccf4bab91b7017a240017726cbd878f07960100f2ba50a5958737"
+  },
+  {
+    "path": "bin/fm-turnend-guard-grok.sh",
+    "source_sha256": "3df6c37f614c36660d858fff669c95885ee49b27dd9dabba66f84302934bd05a",
+    "copy_sha256": "3df6c37f614c36660d858fff669c95885ee49b27dd9dabba66f84302934bd05a"
+  },
+  {
+    "path": "bin/fm-turnend-guard.sh",
+    "source_sha256": "79d4fbb80a18e6db6308f942e10dec8cef98917c65f3c1e5a8bf7e279c4d72ff",
+    "copy_sha256": "79d4fbb80a18e6db6308f942e10dec8cef98917c65f3c1e5a8bf7e279c4d72ff"
+  },
+  {
+    "path": "bin/fm-typesafe-lib.sh",
+    "source_sha256": "7c9c5738b88fc4e4266f2099af280d5b5fe4973f088e320a30c09140f941ed2c",
+    "copy_sha256": "7c9c5738b88fc4e4266f2099af280d5b5fe4973f088e320a30c09140f941ed2c"
+  },
+  {
+    "path": "bin/fm-update.sh",
+    "source_sha256": "8bad35d2ca30b00d5add3581bb49774cd0b89b2433c1f2d57e59f02f6e1ebd3b",
+    "copy_sha256": "8bad35d2ca30b00d5add3581bb49774cd0b89b2433c1f2d57e59f02f6e1ebd3b"
+  },
+  {
+    "path": "bin/fm-vendor-auth-probe.sh",
+    "source_sha256": "da372b65677e7d35f89900a64e751f40e9e903c43d6a0d992a2a766de7c23d20",
+    "copy_sha256": "da372b65677e7d35f89900a64e751f40e9e903c43d6a0d992a2a766de7c23d20"
+  },
+  {
+    "path": "bin/fm-voice-client.py",
+    "source_sha256": "565925970cdca5cd44e6b3e6c957aeb6d86c7e7dec752ce4e024e5d2f1347616",
+    "copy_sha256": "565925970cdca5cd44e6b3e6c957aeb6d86c7e7dec752ce4e024e5d2f1347616"
+  },
+  {
+    "path": "bin/fm-voice-relay.py",
+    "source_sha256": "b9ad739ab30359862209c78ae0a7cd6afdcb9af06300c4b7b53a77d4763ea7b5",
+    "copy_sha256": "b9ad739ab30359862209c78ae0a7cd6afdcb9af06300c4b7b53a77d4763ea7b5"
+  },
+  {
+    "path": "bin/fm-wake-drain.sh",
+    "source_sha256": "3a214c1de8de96dcb2b9cfec04c990d4781c56a3e9e1ef8ce9511b9b4beff85f",
+    "copy_sha256": "3a214c1de8de96dcb2b9cfec04c990d4781c56a3e9e1ef8ce9511b9b4beff85f"
+  },
+  {
+    "path": "bin/fm-wake-grant.sh",
+    "source_sha256": "2d0a040e7c5a31d1b8809e8b8daa966d2baaa871c59c4990cc506406e196fb41",
+    "copy_sha256": "2d0a040e7c5a31d1b8809e8b8daa966d2baaa871c59c4990cc506406e196fb41"
+  },
+  {
+    "path": "bin/fm-wake-lib.sh",
+    "source_sha256": "e5b436d39efd861e839b3be0e85dc52047618341ac810b463d54d81cec58b4ce",
+    "copy_sha256": "e5b436d39efd861e839b3be0e85dc52047618341ac810b463d54d81cec58b4ce"
+  },
+  {
+    "path": "bin/fm-watch-arm.sh",
+    "source_sha256": "b0dbb709da086f23c0397932280c5571128970566ff2c28293f54eeab13710a7",
+    "copy_sha256": "b0dbb709da086f23c0397932280c5571128970566ff2c28293f54eeab13710a7"
+  },
+  {
+    "path": "bin/fm-watch-checkpoint.sh",
+    "source_sha256": "b9812d97c5b8ec551475987c300b4f3624a96b7de11f8ed66c0bd381df9ea42c",
+    "copy_sha256": "b9812d97c5b8ec551475987c300b4f3624a96b7de11f8ed66c0bd381df9ea42c"
+  },
+  {
+    "path": "bin/fm-watch.sh",
+    "source_sha256": "1642a42f7fdbfdcbbdd70fd2a692400e31d122c026b2ae8be8cb26489c7ea4c0",
+    "copy_sha256": "1642a42f7fdbfdcbbdd70fd2a692400e31d122c026b2ae8be8cb26489c7ea4c0"
+  },
+  {
+    "path": "bin/fm-worker-account-lib.sh",
+    "source_sha256": "cbe36af860dec6036c4e0c7dfc8dcd35b84e3fc44c1bf299298396fef741aa98",
+    "copy_sha256": "cbe36af860dec6036c4e0c7dfc8dcd35b84e3fc44c1bf299298396fef741aa98"
+  },
+  {
+    "path": "bin/fm-x-dismiss.sh",
+    "source_sha256": "ebafaf74b7fe0ebbee29259f5d457fdbf8c7892d4bce928946c581971e51901c",
+    "copy_sha256": "ebafaf74b7fe0ebbee29259f5d457fdbf8c7892d4bce928946c581971e51901c"
+  },
+  {
+    "path": "bin/fm-x-followup.sh",
+    "source_sha256": "b6dcb8d3a0e01ef784a567df4295c7121cbcad8dc9e2aa1a06a323b009907a1d",
+    "copy_sha256": "b6dcb8d3a0e01ef784a567df4295c7121cbcad8dc9e2aa1a06a323b009907a1d"
+  },
+  {
+    "path": "bin/fm-x-lib.sh",
+    "source_sha256": "caeff5a03213e19439a809c8afa53b4451c3119c1b59f3ac895cc9ca71436ea3",
+    "copy_sha256": "caeff5a03213e19439a809c8afa53b4451c3119c1b59f3ac895cc9ca71436ea3"
+  },
+  {
+    "path": "bin/fm-x-link.sh",
+    "source_sha256": "3ba387ba23dce652af3aeafdbea87985f296430503e2725c2fae00f9f95455d9",
+    "copy_sha256": "3ba387ba23dce652af3aeafdbea87985f296430503e2725c2fae00f9f95455d9"
+  },
+  {
+    "path": "bin/fm-x-poll.sh",
+    "source_sha256": "ced38e48cf87dcb3c5afe46cda0e4fb9462bccd81523029e79a449a18255c8cd",
+    "copy_sha256": "ced38e48cf87dcb3c5afe46cda0e4fb9462bccd81523029e79a449a18255c8cd"
+  },
+  {
+    "path": "bin/fm-x-reply.sh",
+    "source_sha256": "920618a65e372b764413f9cad5be4771af21fe7b73cd84b5982359ef2a32f3e0",
+    "copy_sha256": "920618a65e372b764413f9cad5be4771af21fe7b73cd84b5982359ef2a32f3e0"
+  },
+  {
+    "path": "bin/fm_voice_frame.py",
+    "source_sha256": "3985c20f49885aabdda6fb3183d9719a3b362c2aaf82398c1e3ac18da058d74d",
+    "copy_sha256": "3985c20f49885aabdda6fb3183d9719a3b362c2aaf82398c1e3ac18da058d74d"
+  },
+  {
+    "path": "bin/fm_voice_records.py",
+    "source_sha256": "d1678957eebb5750f1e20f981e19ab2379f2ba8557ee4984e0a4adb3b161bac2",
+    "copy_sha256": "d1678957eebb5750f1e20f981e19ab2379f2ba8557ee4984e0a4adb3b161bac2"
+  },
+  {
+    "path": ".omp/extensions/fm-primary-omp-watch.ts",
+    "source_sha256": "f9f4f56e0d24c05ced4181083127ee24c0206af4f75844f721848daea21f1096",
+    "copy_sha256": "f9f4f56e0d24c05ced4181083127ee24c0206af4f75844f721848daea21f1096"
+  },
+  {
+    "path": ".omp/extensions/fm-primary-turnend-guard.ts",
+    "source_sha256": "7c2d30b6906586f4169e716429e360de61675de3309de19b9179a836325f49bb",
+    "copy_sha256": "7c2d30b6906586f4169e716429e360de61675de3309de19b9179a836325f49bb"
+  },
+  {
+    "path": ".omp/fm-session-overlay.yml",
+    "source_sha256": "051ac0c6fbc2d9bc67f9cf1028cd66fcc43b6f1b587cf5885aafdd8f751c6714",
+    "copy_sha256": "051ac0c6fbc2d9bc67f9cf1028cd66fcc43b6f1b587cf5885aafdd8f751c6714"
+  },
+  {
+    "path": ".omp/fm-worker-overlay.yml",
+    "source_sha256": "5ed5ea34dc81f102733d630ae4b60957a94947d199adb622cf3f3b07a7359c8e",
+    "copy_sha256": "5ed5ea34dc81f102733d630ae4b60957a94947d199adb622cf3f3b07a7359c8e"
+  },
+  {
+    "path": ".agents/skills/captain-hold-lifecycle/SKILL.md",
+    "source_sha256": "5b103fa44d5b943d83c2e65ea2746fb5a92e933cf7b44f46ef2ca490aa1742c2",
+    "copy_sha256": "5b103fa44d5b943d83c2e65ea2746fb5a92e933cf7b44f46ef2ca490aa1742c2"
+  }
+]

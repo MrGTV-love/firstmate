@@ -1,0 +1,42 @@
+{
+  "scenarios": [
+    {
+      "name": "Real unavailable TypeSafe falls back; invocation 1",
+      "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/task.txt --required safety",
+      "exit": 0,
+      "stdout": "skill-advice:\n  status: fallback\n  reason: \"TypeSafe transport or HTTP failure\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "Real unavailable TypeSafe falls back; invocation 2",
+      "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-skill-suggest.sh --catalog /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog --task-file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/task.txt --required safety",
+      "exit": 0,
+      "stdout": "skill-advice:\n  status: fallback\n  reason: \"TypeSafe transport or HTTP failure\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "Stock Bash dispatch preserves real curl transfer timing on failure",
+      "command": "/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-dispatch-resolve.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-validation/transport/brief.md",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 401 after 163 ms\n  timings: api_ms=163 quota_ms=null local_ms=768 total_ms=931\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 401 after 163 ms)\n",
+      "passed": true
+    }
+  ],
+  "network_observations": [
+    {
+      "curl_invoked": true,
+      "credential_exported": false
+    },
+    {
+      "curl_invoked": true,
+      "credential_exported": false
+    },
+    {
+      "curl_invoked": true,
+      "credential_exported": false
+    }
+  ]
+}

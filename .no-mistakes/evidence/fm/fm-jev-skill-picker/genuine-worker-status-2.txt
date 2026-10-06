@@ -1,0 +1,2 @@
+done [at=1791322255]: Exact Decimal totals computed; result-1.json and standalone report written; shared completion inventory passed with no unresolved choices.
+done [at=1791322392]: Second independent receipt complete: 4 records, net 10.21, positive 12.31, negative -2.10, zero count 1; report-2.md and result-2.json written; shared completion gate passed.

@@ -1,0 +1,811 @@
+[
+  {
+    "name": "actor-baseline",
+    "exit": 0,
+    "read_paths": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/independent-precision/SKILL.md",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/invoices.csv",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/payments.csv"
+    ],
+    "actual_tool_starts": [
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_6cc623cfc8e74c04b4cc4a740d315684|fc_00e138c83cc0078c016ac56c4337a081979fe9b6292ade25ae",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+        },
+        "intent": "Reading mandatory safety skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_08bdc59a15a747a9a9167996b8a13db3|fc_00e138c83cc0078c016ac56c4705b481978338bf49b3ae3542",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md"
+        },
+        "intent": "Reading CSV validation skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_19b4a76626bb40e2963e8c1e14ce0fbd|fc_00e138c83cc0078c016ac56c4b147881979b9ab0246b9b750e",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md"
+        },
+        "intent": "Reading reconciliation skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_2dde9e5954e14073986649f2a06f5d96|fc_00e138c83cc0078c016ac56c4b1478819793ab2a0e251c39ad",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md"
+        },
+        "intent": "Reading audit reporting skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_3a9608a41a8642cb9f59acee72f8ff77|fc_00e138c83cc0078c016ac56c4b14788197ae990781db364364",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/independent-precision/SKILL.md"
+        },
+        "intent": "Reading exact precision skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_78f70569bf28486ba254e81308ef8b9e|fc_00e138c83cc0078c016ac56c4cf1048197aa73269165b52974",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/invoices.csv"
+        },
+        "intent": "Reading invoice source records"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_bb10b032daa74a638880539ef063ed21|fc_00e138c83cc0078c016ac56c4ee2ac819790e82fb124ee3f75",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/payments.csv"
+        },
+        "intent": "Reading payment source records"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_f8a3a2d087ad4cdaa5e52648a79b00fb|fc_00e138c83cc0078c016ac56c501de48197b98b81603b6f330e",
+        "toolName": "bash",
+        "args": {
+          "command": "python3 -c 'import csv; from decimal import Decimal, InvalidOperation; from collections import defaultdict; inv=defaultdict(list); pay=defaultdict(list)\nfor filename,target in [(\"invoices.csv\",inv),(\"payments.csv\",pay)]:\n with open(filename,newline=\"\") as f:\n  for line,row in enumerate(csv.DictReader(f),2):\n   try:\n    amount=Decimal(row[\"amount\"])\n    if not amount.is_finite(): raise InvalidOperation\n   except InvalidOperation:\n    print(filename,\"line\",line,\"invalid amount\",repr(row[\"amount\"])); continue\n   if not row[\"invoice_id\"]:\n    print(filename,\"line\",line,\"missing invoice ID\",amount); continue\n   target[row[\"invoice_id\"]].append(amount)\nfor key,amounts in inv.items():\n paid=sum(pay.get(key,[]),Decimal(0))\n if len(amounts)>1: print(key,\"AMBIGUOUS invoice rows\",amounts,\"paid\",paid,\"single-invoice shortfall\",amounts[0]-paid)\n else: print(key,\"invoice\",amounts[0],\"paid\",paid,\"balance\",amounts[0]-paid)\nfor key,amounts in pay.items():\n if key not in inv: print(key,\"unmatched payments\",sum(amounts,Decimal(0)))\nprint(\"Exact split\",Decimal(\"0.10\")+Decimal(\"0.20\"),\"binary float\",repr(0.10+0.20))'",
+          "timeout": 30,
+          "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project",
+          "pty": false,
+          "async": false
+        },
+        "intent": "Checking exact reconciliation amounts"
+      }
+    ],
+    "final_response": "Captain, the read-only audit found these discrepancies. Line numbers include the CSV header.\n\n| Record | Finding | Amount / consequence |\n|---|---|---|\n| **I2** | Identical invoice rows at `invoices.csv` lines **3 and 6**, each for **50.00**; payments total **45.00**. | **Ambiguous duplicate.** If both rows represent one invoice, it is underpaid by **5.00**. I did not count them as two obligations. |\n| **I3** | Invoice for **25.00**, with no matching payment. | **25.00 unpaid.** |\n| **Missing invoice ID** | `invoices.csv` line **7** contains **12.00** but no ID. | Cannot match the amount to payments or attribute it to an invoice. |\n| **I5** | `invoices.csv` line **8** has the invalid amount `bad`. | Balance cannot be calculated; no matching payment exists. |\n| **I6** | `payments.csv` line **6** records **10.00**, with no matching invoice. | **10.00 unmatched payment**, not a proven overpayment. |\n\n**Verified matches**\n- **I1:** invoiced **100.00**, paid **100.00** — fully paid.\n- **I4:** invoiced **0.30**, paid in splits of **0.10 + 0.20 = 0.30** — fully paid. Exact decimal arithmetic avoids the binary floating-point result `0.30000000000000004`; there is no discrepancy.\n- No duplicate payment rows, missing payment fields, or invalid payment amounts were found. I4’s repeated invoice ID represents distinct split payments, not duplicate records.\n\n**Outcome:** reconciliation remains incomplete because of the duplicate I2 invoice, missing invoice ID, invalid I5 amount, and unmatched I6 payment. Resolve those records before relying on an overall outstanding balance. No files were changed.",
+    "successful_read_receipts": [
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_6cc623cfc8e74c04b4cc4a740d315684|fc_00e138c83cc0078c016ac56c4337a081979fe9b6292ade25ae",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 258,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_08bdc59a15a747a9a9167996b8a13db3|fc_00e138c83cc0078c016ac56c4705b481978338bf49b3ae3542",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: csv-validation\ndescription: Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.\n---\n# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: csv-validation\ndescription: Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.\n---\n# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 344,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_19b4a76626bb40e2963e8c1e14ce0fbd|fc_00e138c83cc0078c016ac56c4b147881979b9ab0246b9b750e",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: financial-reconciliation\ndescription: Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.\n---\n# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: financial-reconciliation\ndescription: Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.\n---\n# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 327,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_2dde9e5954e14073986649f2a06f5d96|fc_00e138c83cc0078c016ac56c4b1478819793ab2a0e251c39ad",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: audit-reporting\ndescription: Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.\n---\n# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: audit-reporting\ndescription: Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.\n---\n# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 302,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_3a9608a41a8642cb9f59acee72f8ff77|fc_00e138c83cc0078c016ac56c4b14788197ae990781db364364",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: independent-precision\ndescription: Check exact decimal arithmetic when reconciling money, independently of optional advice.\n---\n# independent-precision\nUse decimal arithmetic. Specifically identify when 0.10 plus 0.20 would be rounded by binary floating point; never round amounts before comparison."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: independent-precision\ndescription: Check exact decimal arithmetic when reconciling money, independently of optional advice.\n---\n# independent-precision\nUse decimal arithmetic. Specifically identify when 0.10 plus 0.20 would be rounded by binary floating point; never round amounts before comparison.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 310,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/independent-precision/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_78f70569bf28486ba254e81308ef8b9e|fc_00e138c83cc0078c016ac56c4cf1048197aa73269165b52974",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "invoice_id,amount\nI1,100.00\nI2,50.00\nI3,25.00\nI4,0.30\nI2,50.00\n,12.00\nI5,bad"
+            }
+          ],
+          "details": {
+            "totalLines": 8,
+            "displayContent": {
+              "text": "invoice_id,amount\nI1,100.00\nI2,50.00\nI3,25.00\nI4,0.30\nI2,50.00\n,12.00\nI5,bad",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ]
+            },
+            "fileSize": 77,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/invoices.csv"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_bb10b032daa74a638880539ef063ed21|fc_00e138c83cc0078c016ac56c4ee2ac819790e82fb124ee3f75",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "invoice_id,amount\nI1,100.00\nI2,45.00\nI4,0.10\nI4,0.20\nI6,10.00"
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "invoice_id,amount\nI1,100.00\nI2,45.00\nI4,0.10\nI4,0.20\nI6,10.00",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 62,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/payments.csv"
+              }
+            }
+          }
+        },
+        "isError": false
+      }
+    ]
+  },
+  {
+    "name": "actor-with-advice",
+    "exit": 0,
+    "read_paths": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md",
+      "../catalog/csv-validation/SKILL.md",
+      "../catalog/financial-reconciliation/SKILL.md",
+      "../catalog/independent-precision/SKILL.md",
+      "../catalog/audit-reporting/SKILL.md",
+      "invoices.csv",
+      "payments.csv"
+    ],
+    "actual_tool_starts": [
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_fb6118f7d77249148815ce3107119c76|fc_078be02f43f169a7016ac56c431d0c8194aa9a10fc2d606170",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+        },
+        "intent": "Reading mandatory safety skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_ede6d8ae5df048498790cf332a4ad24a|fc_078be02f43f169a7016ac56c4656c8819481f3caef550b59bc",
+        "toolName": "read",
+        "args": {
+          "path": "../catalog/csv-validation/SKILL.md"
+        },
+        "intent": "Reading CSV validation skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_60fe498da23a456595ace80d04bc9e9d|fc_078be02f43f169a7016ac56c483c988194bdfa202e6a4bbf35",
+        "toolName": "read",
+        "args": {
+          "path": "../catalog/financial-reconciliation/SKILL.md"
+        },
+        "intent": "Reading reconciliation skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_d47f734f0e81402baa48f8630d9d8757|fc_078be02f43f169a7016ac56c49cea481948da5497bea473fc5",
+        "toolName": "read",
+        "args": {
+          "path": "../catalog/independent-precision/SKILL.md"
+        },
+        "intent": "Reading precision skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_f304c4a5a7244dcfb5c0b3a220e79ce2|fc_078be02f43f169a7016ac56c4bdd08819491c6be6f102911f8",
+        "toolName": "read",
+        "args": {
+          "path": "../catalog/audit-reporting/SKILL.md"
+        },
+        "intent": "Reading audit reporting skill"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_89dde83d3c58423897bfe17584a1270c|fc_078be02f43f169a7016ac56c4d9b2c819492748f07a5dce571",
+        "toolName": "read",
+        "args": {
+          "path": "invoices.csv"
+        },
+        "intent": "Reading invoice records"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_3442d11c90b541eeb125cffcb4f00d58|fc_078be02f43f169a7016ac56c4fe7c8819485c23b04a09bbede",
+        "toolName": "read",
+        "args": {
+          "path": "payments.csv"
+        },
+        "intent": "Reading payment records"
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_d9800f49e59041e8a507dd8747a85d8a|fc_078be02f43f169a7016ac56c536bb88194a7355d8c61ce03c2",
+        "toolName": "bash",
+        "args": {
+          "command": "python3 -c 'from decimal import Decimal as D; print(\"I2 shortfall:\", D(\"50.00\")-D(\"45.00\")); print(\"I4 payments:\", D(\"0.10\")+D(\"0.20\")); print(\"I4 balance:\", D(\"0.30\")-D(\"0.10\")-D(\"0.20\")); print(\"Unambiguous plus single-I2 invoice subtotal:\", sum(map(D,[\"100.00\",\"50.00\",\"25.00\",\"0.30\"]))); print(\"Matched payments:\", sum(map(D,[\"100.00\",\"45.00\",\"0.10\",\"0.20\"]))); print(\"Known shortfall under single-I2 interpretation:\", D(\"5.00\")+D(\"25.00\")); print(\"Binary float demonstration:\", 0.10+0.20)'",
+          "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project",
+          "pty": false,
+          "async": false
+        },
+        "intent": "Checking exact reconciliation amounts"
+      }
+    ],
+    "final_response": "Captain, the local audit found an ambiguous duplicate invoice, missing and short payments, an unmatched payment, and two invalid invoice records. No files were changed.\n\n### Reconciliation\n\n| Invoice | Invoice amount | Payments | Finding |\n|---|---:|---:|---|\n| I1 | 100.00 | 100.00 | Fully paid. |\n| I2 | 50.00, listed twice | 45.00 | **Duplicate ambiguity.** If both rows represent the same invoice, the shortfall is **5.00**. Do not count them as 100.00 without confirmation. |\n| I3 | 25.00 | None | **Unpaid: 25.00.** |\n| I4 | 0.30 | 0.10 + 0.20 = 0.30 | Fully paid using exact decimal arithmetic. These are split payments, not duplicate rows. |\n| I5 | `bad` | None | **Invalid invoice amount**; balance cannot be determined. |\n| I6 | No invoice | 10.00 | **Unmatched payment**; cannot classify it as an overpayment without an invoice. |\n\n### Data-quality discrepancies\n\nCSV row numbers below include the header:\n\n- **`invoices.csv`, rows 3 and 6:** identical `I2,50.00` records. Confirm whether this is a duplicated export row or separate obligations incorrectly sharing an ID.\n- **`invoices.csv`, row 7:** amount **12.00** has a missing invoice ID, so it cannot be matched.\n- **`invoices.csv`, row 8:** I5 has the malformed amount **`bad`**. It was not coerced to zero.\n- **`payments.csv`:** all five rows have populated invoice IDs and valid decimal amounts; no exact duplicate rows were found. Repeated I4 IDs alone do not establish duplication, and the file provides no payment-record IDs for further identity checks.\n\n### Outcome and next actions\n\nUnder the **single-invoice interpretation of I2**, identifiable valid invoices total **175.30**, with **145.30** in matched payments and a **30.00 shortfall**: I2’s 5.00 plus I3’s 25.00. This is a conditional subtotal, not a complete ledger balance; the missing-ID row and I5 remain unresolved, and I6’s 10.00 is unmatched.\n\nConfirm I2’s identity, repair the missing ID and I5 amount, and trace I6’s payment before approving a final balance. Exact decimal checking confirms I4 has **zero discrepancy**; binary floating point would produce `0.30000000000000004` for `0.10 + 0.20`, creating a spurious mismatch.",
+    "successful_read_receipts": [
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_fb6118f7d77249148815ce3107119c76|fc_078be02f43f169a7016ac56c431d0c8194aa9a10fc2d606170",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 258,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_ede6d8ae5df048498790cf332a4ad24a|fc_078be02f43f169a7016ac56c4656c8819481f3caef550b59bc",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: csv-validation\ndescription: Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.\n---\n# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: csv-validation\ndescription: Validate CSV exports for missing fields, duplicate record IDs and malformed amounts. Use for CSV data quality audits.\n---\n# csv-validation\nRead the CSV with the ordinary read tool. Validate every record and explain missing values, duplicate IDs and invalid decimal amounts. Never silently coerce bad data.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 344,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/csv-validation/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_60fe498da23a456595ace80d04bc9e9d|fc_078be02f43f169a7016ac56c483c988194bdfa202e6a4bbf35",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: financial-reconciliation\ndescription: Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.\n---\n# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: financial-reconciliation\ndescription: Reconcile invoice and payment CSV files by invoice ID, identify unmatched invoices, overpayments and amount mismatches.\n---\n# financial-reconciliation\nRead source CSV files. Join by invoice ID; use exact decimal arithmetic. Report paid, underpaid, overpaid and missing payments.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 327,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/financial-reconciliation/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_d47f734f0e81402baa48f8630d9d8757|fc_078be02f43f169a7016ac56c49cea481948da5497bea473fc5",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: independent-precision\ndescription: Check exact decimal arithmetic when reconciling money, independently of optional advice.\n---\n# independent-precision\nUse decimal arithmetic. Specifically identify when 0.10 plus 0.20 would be rounded by binary floating point; never round amounts before comparison."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: independent-precision\ndescription: Check exact decimal arithmetic when reconciling money, independently of optional advice.\n---\n# independent-precision\nUse decimal arithmetic. Specifically identify when 0.10 plus 0.20 would be rounded by binary floating point; never round amounts before comparison.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 310,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/independent-precision/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_f304c4a5a7244dcfb5c0b3a220e79ce2|fc_078be02f43f169a7016ac56c4bdd08819491c6be6f102911f8",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: audit-reporting\ndescription: Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.\n---\n# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: audit-reporting\ndescription: Write a concise human-readable discrepancy report for a data audit, with references to affected records and next actions.\n---\n# audit-reporting\nReport concrete discrepancies by record ID, separate known facts from uncertainty, and keep proposed actions advisory.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 302,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/audit-reporting/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_89dde83d3c58423897bfe17584a1270c|fc_078be02f43f169a7016ac56c4d9b2c819492748f07a5dce571",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "invoice_id,amount\nI1,100.00\nI2,50.00\nI3,25.00\nI4,0.30\nI2,50.00\n,12.00\nI5,bad"
+            }
+          ],
+          "details": {
+            "totalLines": 8,
+            "displayContent": {
+              "text": "invoice_id,amount\nI1,100.00\nI2,50.00\nI3,25.00\nI4,0.30\nI2,50.00\n,12.00\nI5,bad",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ]
+            },
+            "fileSize": 77,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/invoices.csv"
+              }
+            }
+          }
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_3442d11c90b541eeb125cffcb4f00d58|fc_078be02f43f169a7016ac56c4fe7c8819485c23b04a09bbede",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "invoice_id,amount\nI1,100.00\nI2,45.00\nI4,0.10\nI4,0.20\nI6,10.00"
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "invoice_id,amount\nI1,100.00\nI2,45.00\nI4,0.10\nI4,0.20\nI6,10.00",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 62,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/actor-project/payments.csv"
+              }
+            }
+          }
+        },
+        "isError": false
+      }
+    ]
+  },
+  {
+    "name": "actor-no-fit-baseline",
+    "exit": 0,
+    "read_paths": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+    ],
+    "actual_tool_starts": [
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_qjv6PBL2YPgZXWQQR9lfgHbS|fc_0f67e5f1f8cff9ea016ac56c43ab8c87d1a0a0c472c5e05b65",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+        },
+        "intent": "Reading mandatory safety instructions"
+      }
+    ],
+    "final_response": "Captain, a rainbow forms when sunlight shines through raindrops, bending and splitting into different colors. The light bounces inside the drops and comes back toward your eyes, making a colorful arc in the sky.",
+    "successful_read_receipts": [
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_qjv6PBL2YPgZXWQQR9lfgHbS|fc_0f67e5f1f8cff9ea016ac56c43ab8c87d1a0a0c472c5e05b65",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 258,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      }
+    ]
+  },
+  {
+    "name": "actor-no-fit-with-advice",
+    "exit": 0,
+    "read_paths": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+    ],
+    "actual_tool_starts": [
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call_5e1d561f392243ccb28f3e7fbca1d1c5|fc_09fe71fdcf4402ae016ac56c43b0d48193ab43b84412f176d0",
+        "toolName": "read",
+        "args": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+        },
+        "intent": "Reading required safety instructions"
+      }
+    ],
+    "final_response": "Captain, a rainbow forms when sunlight shines through raindrops, bending and bouncing inside them to reveal its hidden colors. With the sun behind you and rain ahead, those colors make a beautiful arc across the sky.",
+    "successful_read_receipts": [
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call_5e1d561f392243ccb28f3e7fbca1d1c5|fc_09fe71fdcf4402ae016ac56c43b0d48193ab43b84412f176d0",
+        "toolName": "read",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations."
+            }
+          ],
+          "details": {
+            "totalLines": 6,
+            "displayContent": {
+              "text": "---\nname: safety\ndescription: Mandatory isolated-fixture safety for these disposable exercises.\n---\n# safety\nNever modify files outside the disposable fixture. Read inputs through ordinary tools. Only output an analysis, no lifecycle or external operations.",
+              "startLine": 1,
+              "lineNumbers": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            "fileSize": 258,
+            "meta": {
+              "source": {
+                "type": "path",
+                "value": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.skill-live-2ohwtmnd/catalog/safety/SKILL.md"
+              }
+            }
+          }
+        },
+        "isError": false
+      }
+    ]
+  }
+]
