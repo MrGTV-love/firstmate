@@ -42,10 +42,29 @@ trap 'rm -rf -- "$TMP"' EXIT
 EMPTY="$TMP/empty"
 : > "$EMPTY"
 EMPTY_HASH=$(sha256_file "$EMPTY") || die "cannot hash empty inheritance payload"
+PAIR_ALLOWED=1
+RC=0
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*|*" crew-dispatch.json "*)
+    if pair_check=$("$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-inherit.sh check \
+      config/model-index.json 0 "$EMPTY_HASH" "$GENERATION" < /dev/null 2>&1); then
+      :
+    else
+      RC=$?
+      PAIR_ALLOWED=0
+      printf 'skipped: config/model-index.json and config/crew-dispatch.json (%s)\n' "$pair_check" >&2
+    fi
+    ;;
+esac
 
 ITEMS=$(fm_config_inherit_items)
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
+  case "$rel" in
+    config/model-index.json|config/crew-dispatch.json)
+      [ "$PAIR_ALLOWED" = 1 ] || continue
+      ;;
+  esac
   if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ]; then
     case "$rel" in
       config/*)
@@ -84,3 +103,4 @@ while IFS= read -r rel; do
 done <<EOF
 $ITEMS
 EOF
+exit "$RC"

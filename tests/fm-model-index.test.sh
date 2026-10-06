@@ -45,6 +45,14 @@ refuses model codex role:missing
 refuses model codex stand-in:strong
 pass 'roles select the correct harness id and only explicitly configured stand-ins'
 
+[ "$("$TOOL" entry codex current)" = true ] || fail 'primary index entry was not recognized'
+[ "$("$TOOL" entry omp openrouter/vendor/stand-in)" = true ] || fail 'stand-in index entry was not recognized'
+[ "$("$TOOL" entry claude current)" = false ] || fail 'entry membership crossed harnesses'
+[ "$("$TOOL" entry codex unlisted)" = false ] || fail 'nonentry literal was recognized'
+mkdir -p "$TMP_ROOT/no-index/config"
+[ "$(FM_HOME="$TMP_ROOT/no-index" "$TOOL" entry codex current)" = false ] || fail 'entry membership without an index was not false'
+pass 'entry membership is exact, per-harness, and includes configured stand-ins'
+
 printf '%s\n' '{"rules":[{"when":"hard","use":[{"harness":"codex","role":"strong","effort":"high"},{"harness":"claude","model":"literal"}]}],"default":{"harness":"omp","role":"routine","stand_in":true,"provider":"vendor"}}' > "$TMP_ROOT/dispatch.json"
 "$TOOL" profiles "$TMP_ROOT/dispatch.json" > "$TMP_ROOT/concrete.json" 2> "$TMP_ROOT/profile-warnings"
 jq -e '.rules[0].use[0] == {harness:"codex",model:"current",effort:"high"} and .rules[0].use[1].model == "literal" and .default == {harness:"omp",model:"openrouter/vendor/stand-in",provider:"vendor"}' "$TMP_ROOT/concrete.json" >/dev/null || fail 'concrete profiles lose policy fields or select wrong ids'
@@ -196,6 +204,118 @@ jq '.roles.strong.codex.model = "next"' "$BASE" > "$INDEX"
 propagate_inheritable_config "$HOME_DIR/config" "$SECOND/config"
 [ "$(FM_HOME="$SECOND" "$TOOL" model codex role:strong)" = next ] || fail 'second home did not consume the index update'
 pass 'secondmate inheritance changes the model selected by the destination home'
+
+PAIR_SOURCE="$TMP_ROOT/pair-source"
+mkdir -p "$PAIR_SOURCE"
+printf '%s\n' '{"version":1,"roles":{"retained":{"codex":{"model":"next"}}},"retired":[]}' > "$TMP_ROOT/retained-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"retained"}}' > "$TMP_ROOT/retained-dispatch.json"
+printf '%s\n' '{"version":1,"roles":{"incoming":{"codex":{"model":"current"}}},"retired":[]}' > "$TMP_ROOT/incoming-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"incoming"}}' > "$TMP_ROOT/incoming-dispatch.json"
+set_pair_source() {
+  local presence=$1
+  rm -f "$PAIR_SOURCE/model-index.json" "$PAIR_SOURCE/crew-dispatch.json"
+  case "$presence" in
+    both|index-only) cp "$TMP_ROOT/incoming-index.json" "$PAIR_SOURCE/model-index.json" ;;
+  esac
+  case "$presence" in
+    both|dispatch-only) cp "$TMP_ROOT/incoming-dispatch.json" "$PAIR_SOURCE/crew-dispatch.json" ;;
+  esac
+  printf '%s\n' "$presence" > "$PAIR_SOURCE/dispatch-never-send"
+  printf 'retain-trailers\n' > "$PAIR_SOURCE/keep-ai-trailers"
+}
+assert_retained_pair() {
+  local home=$1 label=$2
+  cmp -s "$TMP_ROOT/retained-index.json" "$home/config/model-index.json" || fail "$label changed the retained index"
+  cmp -s "$TMP_ROOT/retained-dispatch.json" "$home/config/crew-dispatch.json" || fail "$label changed the retained dispatch"
+  [ "$(FM_HOME="$home" "$TOOL" profiles "$home/config/crew-dispatch.json" | jq -r '.default.model')" = next ] \
+    || fail "$label left a pair that the destination profiles consumer cannot resolve"
+}
+for guarded in model-index.json crew-dispatch.json; do
+  for local_guard in gitignore directory; do
+    for presence in both index-only dispatch-only absent; do
+      guard_home="$TMP_ROOT/local-pair-$guarded-$local_guard-$presence"
+      mkdir -p "$guard_home/config"
+      git -C "$guard_home" init -q
+      printf 'config/\n' > "$guard_home/.gitignore"
+      if [ "$local_guard" = gitignore ]; then
+        printf 'config/*\n!config/%s\n' "$guarded" > "$guard_home/.gitignore"
+      fi
+      cp "$TMP_ROOT/retained-index.json" "$guard_home/config/model-index.json"
+      cp "$TMP_ROOT/retained-dispatch.json" "$guard_home/config/crew-dispatch.json"
+      if [ "$local_guard" = directory ]; then
+        rm "$guard_home/config/$guarded"
+        mkdir "$guard_home/config/$guarded"
+        printf 'retain\n' > "$guard_home/config/$guarded/marker"
+      fi
+      set_pair_source "$presence"
+      printf 'retain-trailers\n' > "$guard_home/config/keep-ai-trailers"
+      FM_CONFIG_INHERIT_LIVE=1 FM_CONFIG_INHERIT_REPORT="$TMP_ROOT/local-pair-report" \
+        propagate_inheritable_config "$PAIR_SOURCE" "$guard_home/config" 2> "$TMP_ROOT/local-pair-warning"
+      assert_contains "$(cat "$TMP_ROOT/local-pair-warning")" "skipped model-index.json" 'local refusal must report the index'
+      assert_contains "$(cat "$TMP_ROOT/local-pair-warning")" "skipped crew-dispatch.json" 'local refusal must report the dispatch'
+      cmp -s "$PAIR_SOURCE/dispatch-never-send" "$guard_home/config/dispatch-never-send" || fail 'local pair refusal blocked unrelated propagation'
+      [ "$(cat "$guard_home/config/keep-ai-trailers")" = retain-trailers ] || fail 'local pair refusal changed an unchanged trailer setting'
+      if [ "$local_guard" = directory ]; then
+        [ "$(cat "$guard_home/config/$guarded/marker")" = retain ] || fail 'local pair refusal changed the nonregular destination'
+        rm "$guard_home/config/$guarded/marker"
+        rmdir "$guard_home/config/$guarded"
+        case "$guarded" in
+          model-index.json) cp "$TMP_ROOT/retained-index.json" "$guard_home/config/$guarded" ;;
+          crew-dispatch.json) cp "$TMP_ROOT/retained-dispatch.json" "$guard_home/config/$guarded" ;;
+        esac
+      fi
+      assert_retained_pair "$guard_home" "local $guarded $local_guard $presence"
+      printf 'config/\n' > "$guard_home/.gitignore"
+      propagate_inheritable_config "$PAIR_SOURCE" "$guard_home/config"
+      for member in model-index.json crew-dispatch.json; do
+        if [ -f "$PAIR_SOURCE/$member" ]; then
+          cmp -s "$PAIR_SOURCE/$member" "$guard_home/config/$member" || fail 'allowed local pair payload did not converge'
+        else
+          [ ! -e "$guard_home/config/$member" ] || fail 'allowed local pair absence did not converge'
+        fi
+      done
+      if [ "$presence" = both ]; then
+        [ "$(FM_HOME="$guard_home" "$TOOL" profiles "$guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail 'allowed local pair did not reach the destination profiles consumer'
+      fi
+    done
+  done
+done
+pass 'local pair guards retain both members in either direction for copy and absence while unrelated items converge'
+for member in model-index.json crew-dispatch.json; do
+  for link_kind in symlink hardlink; do
+    for presence in both absent; do
+      link_home="$TMP_ROOT/local-pair-$member-$link_kind-$presence"
+      mkdir -p "$link_home/config"
+      git -C "$link_home" init -q
+      printf 'config/\n' > "$link_home/.gitignore"
+      cp "$TMP_ROOT/retained-index.json" "$link_home/config/model-index.json"
+      cp "$TMP_ROOT/retained-dispatch.json" "$link_home/config/crew-dispatch.json"
+      mv "$link_home/config/$member" "$link_home/link-payload"
+      case "$link_kind" in
+        symlink) ln -s "$link_home/link-payload" "$link_home/config/$member" ;;
+        hardlink) ln "$link_home/link-payload" "$link_home/config/$member" ;;
+      esac
+      set_pair_source "$presence"
+      propagate_inheritable_config "$PAIR_SOURCE" "$link_home/config"
+      case "$member" in
+        model-index.json) retained_payload="$TMP_ROOT/retained-index.json" ;;
+        crew-dispatch.json) retained_payload="$TMP_ROOT/retained-dispatch.json" ;;
+      esac
+      cmp -s "$retained_payload" "$link_home/link-payload" || fail 'local convergence modified the link target'
+      if [ "$presence" = both ]; then
+        cmp -s "$PAIR_SOURCE/$member" "$link_home/config/$member" || fail 'local convergence refused a replaceable link'
+        [ ! -L "$link_home/config/$member" ] || fail 'local convergence retained a destination symlink'
+        [ "$(fm_inherit_file_link_count "$link_home/config/$member")" = 1 ] || fail 'local convergence retained a destination hardlink'
+        [ "$(FM_HOME="$link_home" "$TOOL" profiles "$link_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail 'locally replaced link pair did not reach the profiles consumer'
+      else
+        [ ! -e "$link_home/config/$member" ] && [ ! -L "$link_home/config/$member" ] || fail 'local convergence did not mirror absence over a link'
+      fi
+    done
+  done
+done
+pass 'local pair propagation still safely replaces or removes destination symlinks and hardlinks'
 
 # fm-config-push runs the full index check before the index reaches any home.
 fm_git_identity fmtest fmtest@example.invalid
@@ -378,6 +498,97 @@ done
 rm "$PUSH/home/state/remote.meta" "$PUSH/jqbin/omp"
 printf '%s\n' '{"default":{"harness":"codex","model":"current"}}' > "$PUSH/home/config/crew-dispatch.json"
 pass 'real local and remote inheritance consume the frozen pair after native catalog mutation, including staged dispatch absence'
+
+: > "$TMP_ROOT/empty-inheritance"
+empty_hash=$(fm_inherit_sha256 "$TMP_ROOT/empty-inheritance")
+remote_generation=1000
+for guarded in model-index.json crew-dispatch.json; do
+  for remote_guard in symlink hardlink directory; do
+    for presence in both index-only dispatch-only absent; do
+      remote_guard_home="$TMP_ROOT/remote-pair-$guarded-$remote_guard-$presence"
+      mkdir -p "$remote_guard_home/config" "$remote_guard_home/state"
+      cp "$TMP_ROOT/retained-index.json" "$remote_guard_home/config/model-index.json"
+      cp "$TMP_ROOT/retained-dispatch.json" "$remote_guard_home/config/crew-dispatch.json"
+      mv "$remote_guard_home/config/$guarded" "$remote_guard_home/guarded-payload"
+      case "$remote_guard" in
+        symlink) ln -s "$remote_guard_home/guarded-payload" "$remote_guard_home/config/$guarded" ;;
+        hardlink) ln "$remote_guard_home/guarded-payload" "$remote_guard_home/config/$guarded" ;;
+        directory)
+          mkdir "$remote_guard_home/config/$guarded"
+          printf 'retain\n' > "$remote_guard_home/config/$guarded/marker"
+          ;;
+      esac
+      set_pair_source "$presence"
+      for attempted in model-index.json crew-dispatch.json; do
+        for command in put absent; do
+          payload="$TMP_ROOT/incoming-index.json"
+          [ "$attempted" != crew-dispatch.json ] || payload="$TMP_ROOT/incoming-dispatch.json"
+          bytes=$(LC_ALL=C wc -c < "$payload" | tr -d ' ')
+          hash=$(fm_inherit_sha256 "$payload")
+          if [ "$command" = absent ]; then
+            payload="$TMP_ROOT/empty-inheritance"
+            bytes=0
+            hash=$empty_hash
+          fi
+          receiver_code=0
+          FM_HOME="$remote_guard_home" FM_STATE_OVERRIDE="$remote_guard_home/state" \
+            "$ROOT/bin/fm-remote-inherit.sh" "$command" "config/$attempted" "$bytes" "$hash" "$remote_generation" \
+            < "$payload" > "$TMP_ROOT/receiver-guard.out" 2>&1 || receiver_code=$?
+          [ "$receiver_code" -ne 0 ] || fail "direct receiver accepted $command $attempted with $guarded $remote_guard"
+          assert_contains "$(cat "$TMP_ROOT/receiver-guard.out")" 'inherited destination' 'direct receiver refusal must name its destination guard'
+        done
+      done
+      printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+        "$ROOT" "$remote_guard_home" > "$PUSH/home/data/secondmates.md"
+      printf 'retain-trailers\n' > "$remote_guard_home/config/keep-ai-trailers"
+      sender_code=0
+      FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" FM_CONFIG_OVERRIDE="$PAIR_SOURCE" \
+        FM_CONFIG_INHERIT_LIVE=1 FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
+        "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+        > "$TMP_ROOT/sender-guard.out" 2>&1 || sender_code=$?
+      [ "$sender_code" -ne 0 ] || fail "sender accepted guarded remote pair: $guarded $remote_guard $presence"
+      assert_contains "$(cat "$TMP_ROOT/sender-guard.out")" 'skipped: config/model-index.json and config/crew-dispatch.json' 'sender must report pair preflight refusal'
+      cmp -s "$PAIR_SOURCE/dispatch-never-send" "$remote_guard_home/config/dispatch-never-send" || fail 'remote pair refusal blocked unrelated propagation'
+      [ "$(cat "$remote_guard_home/config/keep-ai-trailers")" = retain-trailers ] || fail 'remote pair refusal changed an unchanged trailer setting'
+      case "$remote_guard" in
+        symlink)
+          [ -L "$remote_guard_home/config/$guarded" ] || fail 'remote refusal replaced the guarded symlink'
+          rm "$remote_guard_home/config/$guarded"
+          ;;
+        hardlink)
+          cmp -s "$remote_guard_home/guarded-payload" "$remote_guard_home/config/$guarded" || fail 'remote refusal changed the guarded hardlink'
+          [ "$(fm_inherit_file_link_count "$remote_guard_home/config/$guarded")" = 2 ] || fail 'remote refusal replaced the guarded hardlink'
+          rm "$remote_guard_home/config/$guarded"
+          ;;
+        directory)
+          [ "$(cat "$remote_guard_home/config/$guarded/marker")" = retain ] || fail 'remote refusal changed the guarded nonregular destination'
+          rm "$remote_guard_home/config/$guarded/marker"
+          rmdir "$remote_guard_home/config/$guarded"
+          ;;
+      esac
+      cp "$remote_guard_home/guarded-payload" "$remote_guard_home/config/$guarded"
+      assert_retained_pair "$remote_guard_home" "remote $guarded $remote_guard $presence"
+      remote_generation=$((remote_generation + 1))
+      FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" FM_CONFIG_OVERRIDE="$PAIR_SOURCE" \
+        FM_CONFIG_INHERIT_LIVE=1 FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
+        "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+        > "$TMP_ROOT/sender-success.out" 2>&1 || fail "unguarded remote pair was refused: $(cat "$TMP_ROOT/sender-success.out")"
+      for member in model-index.json crew-dispatch.json; do
+        if [ -f "$PAIR_SOURCE/$member" ]; then
+          cmp -s "$PAIR_SOURCE/$member" "$remote_guard_home/config/$member" || fail 'allowed remote pair payload did not converge'
+        else
+          [ ! -e "$remote_guard_home/config/$member" ] || fail 'allowed remote pair absence did not converge'
+        fi
+      done
+      if [ "$presence" = both ]; then
+        [ "$(FM_HOME="$remote_guard_home" "$TOOL" profiles "$remote_guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail 'allowed remote pair did not reach the destination profiles consumer'
+      fi
+      remote_generation=$((remote_generation + 1))
+    done
+  done
+done
+pass 'remote sender and direct receiver guard both pair members for put and absent; refusal preserves unrelated propagation'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0

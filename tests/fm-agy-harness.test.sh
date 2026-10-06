@@ -922,6 +922,43 @@ SH
   pass "fm-spawn: indexed agy selections launch into a processing turn without supervisor catalog evidence"
 }
 
+test_agy_unrelated_index_retains_native_literal_validation() {
+  local id rec out rc model selected
+  for selected in unsupported supported primary stand-in; do
+    id="agy-index-literal-$selected-$$"
+    rec=$(make_agy_spawn_case "index-literal-$selected" "$id")
+    read_agy_spawn_record "$rec"
+    printf '%s\n' '{"version":1,"roles":{"unrelated":{"agy":{"model":"gemini-primary-only","stand_in":"gemini-stand-in-only"}},"other_harness":{"claude":{"model":"gemini-unsupported"}}},"retired":[]}' \
+      > "$HOME_DIR/config/model-index.json"
+    case "$selected" in
+      unsupported) model=gemini-unsupported ;;
+      supported) model=gemini-3.8-flash-low ;;
+      primary) model=gemini-primary-only ;;
+      stand-in) model=gemini-stand-in-only ;;
+    esac
+    out=$(run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" \
+      --model "$model"); rc=$?
+    if [ "$selected" = unsupported ]; then
+      expect_code 1 "$rc" "an unrelated index must not disable agy's literal model guard: $out"
+      assert_contains "$out" "not listed by 'agy models'" "the non-entry agy refusal must retain concrete native evidence"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused non-entry agy literal must publish no metadata"
+      [ ! -s "$CASE_DIR/launch.log" ] || fail "an unsupported non-entry agy literal must not launch"
+    else
+      expect_code 0 "$rc" "supported nonentries and actual indexed agy literals must launch: $out"
+      assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the launch must retain its literal selector"
+      [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the agy literal spawn must complete its processing-turn gate"
+      if [ "$selected" = supported ]; then
+        assert_contains "$out" "not an index entry" "a supported non-entry literal must retain the warning"
+        assert_not_contains "$out" "effective worker account context is not established" "a supported non-entry must not delegate its native guard"
+      else
+        assert_contains "$out" "effective worker account context is not established" "an exact primary or stand-in literal must delegate its native guard"
+        assert_contains "$out" "not validated" "unknown indexed context must not claim validation"
+      fi
+    fi
+  done
+  pass "fm-spawn: agy delegates only exact entry literals and keeps native validation for unrelated indexed literals"
+}
+
 test_agy_ancestry_detects_the_native_command_name
 test_agy_ancestry_rejects_unrelated_mentions
 test_agy_claims_no_inherited_launcher_marker
@@ -946,6 +983,7 @@ test_agy_trust_creates_a_missing_store
 test_agy_trust_refuses_out_of_scope_paths
 test_agy_fresh_worktree_is_pre_trusted_and_launches_without_a_dialog
 test_agy_indexed_selection_never_queries_the_supervisor_catalog
+test_agy_unrelated_index_retains_native_literal_validation
 test_agy_dialog_despite_registration_is_answered_once
 test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered
 test_agy_unregistered_path_without_a_dialog_fails_the_spawn

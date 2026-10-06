@@ -2,6 +2,7 @@
 # fm-model-index.sh - validate the home model index and resolve dispatch roles.
 # Usage: fm-model-index.sh check [<harness> [<model>]]
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
+#        fm-model-index.sh entry <harness> <concrete-model>
 #        fm-model-index.sh profiles <crew-dispatch.json>
 # Schema owner: docs/configuration.md "Fleet model index".
 # check with no arguments is the index-edit check: every active id, including
@@ -18,6 +19,7 @@
 # passes with a notice on stderr.
 # model and profiles resolve offline and never fetch a catalog: a role
 # resolves once, profiles emits concrete JSON, model emits one id.
+# entry emits true or false for exact primary/stand-in membership, offline.
 # Stand-ins are explicit selections, never automatic failure or quota fallbacks.
 # Literal models work without an index; with one they cannot name a retired id,
 # and a literal that is not an index entry for its harness draws a warning.
@@ -52,7 +54,7 @@ usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|check:1|check:2|model:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+case "$VERB:$#" in check:0|check:1|check:2|model:2|entry:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
   case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
   printf '%s\n' "$2"
@@ -214,6 +216,9 @@ RESOLVE_JQ="$LIB_JQ"'
     "model-index: warning: literal model \u0027\(.model)\u0027 for \(.harness) is not an index entry; name its role so the next model release is one index edit";
 '
 case "$VERB" in
+  entry)
+    jq -r --arg h "$1" --arg m "$2" --slurpfile idx "$TMP/index.json" "$LIB_JQ entry(\$h; \$m)" -n
+    ;;
   model)
     case "$2" in
       role:*) p=$(jq -n --arg h "$1" --arg r "${2#role:}" '{harness:$h,role:$r}') ;;

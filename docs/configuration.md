@@ -1179,6 +1179,7 @@ Claude's catalog lists some ids only with or only without that suffix, so a Clau
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
 `bin/fm-config-push.sh` runs the same check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
 The push stages the index and inheritable dispatch document once, validates that staged pair, and sends those same bytes or absences through both local and remote propagation.
+Before either routing file is replaced or removed, local and remote inheritance preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
 When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
@@ -1189,6 +1190,7 @@ Spawn resolves role references, including a model token in `config/secondmate-ha
 `fm-control.sh relaunch` and the remote secondmate spawn and restart paths resolve the same way before anything stops, so a role pin launches and a since-retired id refuses on the pre-stop side.
 A relaunch also runs the selected-entry catalog check, under the replacement's worker account, before it stops the running agent.
 Spawn checks only the selected index entry, after worker-account selection, using a declared worker account pin or an authoritative catalog export.
+Only an exact primary or stand-in entry for the selected harness delegates spawn's native model validation to this check; unrelated index entries do not disable the existing validation of literal selectors.
 Spawn, intake, and relaunch checks report unavailable catalog evidence when the destination worker's account and environment cannot be established, including unpinned launches, ordinary Claude's destination-dependent home, and wrapped or raw launch commands; the supervisor's live catalog does not stand in for the worker's.
 Resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and the selected-entry checks at intake and spawn do.
 The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.

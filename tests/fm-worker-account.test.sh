@@ -435,11 +435,12 @@ test_model_index_catalog_follows_the_pinned_account() {
 
 test_unpinned_model_index_never_uses_the_supervisor_catalog() {
   local harness filter model out rc id pane_root
-  for harness in codex pi; do
+  for harness in codex pi pi-signed; do
     for filter in absent empty; do
       for model in pane-only supervisor-only; do
         id="acct-context-$harness-$filter-$model"
         new_case "$id" "$harness"
+        [ "$harness" != pi-signed ] || cp "$FAKEBIN/pi" "$FAKEBIN/pi-signed"
         mkdir -p "$CASE/supervisor" "$CASE/ambient-pi" "$HOME_DIR/user-home/.pi/agent" "$CASE/pane-codex" "$HOME_DIR/user-home/.codex"
         printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$CASE/supervisor/models_cache.json"
         printf 'openai  supervisor-only  272K  32K  yes  no\n' > "$CASE/supervisor/listed"
@@ -454,8 +455,8 @@ cat "\${CODEX_HOME:-\$HOME/.codex}/models_cache.json" > '$CASE/codex-worker-cata
 SH
         chmod +x "$FAKEBIN/codex"
         [ "$filter" != empty ] || : > "$HOME_DIR/config/launch-env-allowlist"
-        if [ "$harness" = pi ]; then
-          printf '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/%s"}}},"retired":[]}\n' "$model" > "$HOME_DIR/config/model-index.json"
+        if [ "$harness" != codex ]; then
+          printf '{"version":1,"roles":{"chosen":{"%s":{"model":"openai/%s"}}},"retired":[]}\n' "$harness" "$model" > "$HOME_DIR/config/model-index.json"
         else
           printf '{"version":1,"roles":{"chosen":{"codex":{"model":"%s"}}},"retired":[]}\n' "$model" > "$HOME_DIR/config/model-index.json"
         fi
@@ -466,7 +467,7 @@ SH
         assert_contains "$out" "not validated" "unknown context must never claim catalog validation"
         assert_absent "$CASE/pi-catalogs" "an unpinned selected check must never query the supervisor Pi catalog"
         run_pane
-        if [ "$harness" = pi ]; then
+        if [ "$harness" != codex ]; then
           pane_root=$CASE/ambient-pi
           [ "$filter" != empty ] || pane_root=$HOME_DIR/user-home/.pi/agent
           assert_grep "pane-only" "$CASE/pi-worker-catalog" "the actual Pi worker must see the pane catalog, not the supervisor catalog"
@@ -486,7 +487,7 @@ SH
       done
     done
   done
-  pass "unpinned Codex and Pi selected checks disclose unknown context and never use supervisor catalogs"
+  pass "unpinned Codex, Pi, and Pi-signed selected checks disclose unknown context and never use supervisor catalogs"
 }
 
 test_ordinary_claude_catalog_context_is_unavailable() {
@@ -519,15 +520,16 @@ test_ordinary_claude_catalog_context_is_unavailable() {
 }
 
 test_indexed_native_catalog_guards_use_the_shared_boundary() {
-  local harness executable model out rc id
+  local harness executable model selected out rc id
   for harness in cursor omp; do
-    id="acct-native-$harness"
-    new_case "$id" "$harness"
-    executable=$harness
-    [ "$harness" != cursor ] || executable=cursor-agent
-    model=pane-only
-    [ "$harness" != omp ] || model=openai/pane-only
-    cat > "$FAKEBIN/$executable" <<SH
+    for selected in role:chosen stand-in:chosen primary-literal stand-in-literal; do
+      id="acct-native-$harness-${selected//:/-}"
+      new_case "$id" "$harness"
+      executable=$harness
+      [ "$harness" != cursor ] || executable=cursor-agent
+      model=pane-only
+      [ "$harness" != omp ] || model=openai/pane-only
+      cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
   --list-models|models)
@@ -540,17 +542,65 @@ case "\${1:-}" in
   *) exit 0 ;;
 esac
 SH
-    chmod +x "$FAKEBIN/$executable"
-    jq -n --arg h "$harness" --arg m "$model" \
-      '{version:1,roles:{chosen:{($h):{model:$m}}},retired:[]}' > "$HOME_DIR/config/model-index.json"
-    out=$(spawn_ship "$id" --model role:chosen); rc=$?
-    expect_code 0 "$rc" "an indexed $harness model must not refuse through a native supervisor catalog guard: $out"
-    assert_contains "$out" "effective worker account context is not established" "the shared indexed boundary must disclose unknown $harness context"
-    assert_absent "$CASE/native-catalogs" "the legacy $harness precheck must not query a supervisor catalog for an indexed selection"
+      chmod +x "$FAKEBIN/$executable"
+      jq -n --arg h "$harness" --arg m "$model" \
+        '{version:1,roles:{chosen:{($h):{model:$m,stand_in:($m+"-stand-in")}}},retired:[]}' > "$HOME_DIR/config/model-index.json"
+      case "$selected" in
+        primary-literal) selected=$model ;;
+        stand-in-literal) selected=$model-stand-in ;;
+      esac
+      out=$(spawn_ship "$id" --model "$selected"); rc=$?
+      expect_code 0 "$rc" "an indexed $harness selection must not refuse through a native supervisor catalog guard: $out"
+      assert_contains "$out" "effective worker account context is not established" "the shared indexed boundary must disclose unknown $harness context"
+      assert_absent "$CASE/native-catalogs" "the legacy $harness precheck must not query a supervisor catalog for an indexed selection"
+    done
   done
-  pass "indexed Cursor and omp selected checks have no alternate supervisor catalog refusal path"
+  pass "Cursor and omp primary and stand-in entries delegate their native guards through the shared boundary"
 }
 
+test_nonentry_literals_keep_the_native_catalog_guards() {
+  local harness executable model out rc id
+  for harness in cursor omp; do
+    id="acct-nonentry-$harness"
+    new_case "$id" "$harness"
+    executable=$harness
+    [ "$harness" != cursor ] || executable=cursor-agent
+    model=unsupported
+    [ "$harness" != omp ] || model=openai/unsupported
+    cat > "$FAKEBIN/$executable" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  --list-models|models)
+    printf '%s\n' "\$*" >> '$CASE/native-catalogs'
+    case '$harness' in
+      omp) printf '%s\n' '{"models":[{"provider":"openai","selector":"openai/supported"}]}' ;;
+      cursor) printf 'supported - Supported model\n' ;;
+    esac
+    ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$FAKEBIN/$executable"
+    jq -n --arg h "$harness" --arg m "$model" \
+      '{version:1,roles:{unrelated:{($h):{model:"unrelated"}},other_harness:{claude:{model:$m}}},retired:[]}' \
+      > "$HOME_DIR/config/model-index.json"
+    out=$(spawn_ship "$id" --model "$model"); rc=$?
+    expect_code 1 "$rc" "an unrelated index must not disable the $harness literal guard: $out"
+    assert_refused_before_launch "$id" "$out" "$model"
+    assert_present "$CASE/native-catalogs" "a non-entry literal must query the native catalog"
+    assert_contains "$out" "is not" "the native guard must give concrete unsupported evidence"
+    model=supported
+    [ "$harness" != omp ] || model=openai/supported
+    out=$(spawn_ship "$id-supported" --model "$model"); rc=$?
+    expect_code 0 "$rc" "a listed non-entry $harness literal should still launch: $out"
+    assert_contains "$out" "not an index entry" "non-entry literals retain the index warning"
+    assert_not_contains "$out" "effective worker account context is not established" "a non-entry literal must not claim delegated catalog validation"
+    assert_grep "model=$model" "$HOME_DIR/state/$id-supported.meta" "a supported literal must retain its concrete model"
+  done
+  pass "an unrelated or other-harness index entry leaves Cursor and omp non-entry native guards active"
+}
+
+test_nonentry_literals_keep_the_native_catalog_guards
 test_indexed_native_catalog_guards_use_the_shared_boundary
 test_ordinary_claude_catalog_context_is_unavailable
 test_unpinned_model_index_never_uses_the_supervisor_catalog

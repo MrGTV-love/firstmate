@@ -2433,6 +2433,8 @@ case "$MODEL" in role:*|stand-in:*)
 esac
 if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
   MODEL=$("$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+  MODEL_INDEXED=$("$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+  if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
 else
   MODEL_INDEXED=0
 fi

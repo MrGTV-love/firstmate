@@ -197,6 +197,17 @@ destination_allows_inherited_item() {
   git -C "$top" check-ignore -q -- "$rel_path" 2>/dev/null
 }
 
+destination_allows_inherited_pair() {
+  local dest_config=$1 item dest
+  for item in model-index.json crew-dispatch.json; do
+    destination_allows_inherited_item "$dest_config" "$item" || return 1
+    dest="$dest_config/$item"
+    if [ -e "$dest" ] && [ ! -f "$dest" ] && [ ! -L "$dest" ]; then
+      return 1
+    fi
+  done
+}
+
 # propagate_inheritable_config <src-config-dir> <dest-config-dir>
 # Copy each declared inheritable item from the primary's config dir (src) into a
 # secondmate home's config dir (dest). SILENT on stdout - callers parse stdout,
@@ -561,10 +572,15 @@ fm_config_inherit_source() {
 }
 
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
+  case " $FM_INHERITABLE_CONFIG " in
+    *" model-index.json "*|*" crew-dispatch.json "*)
+      destination_allows_inherited_pair "$dest_config" || pair_allowed=0
+      ;;
+  esac
   for item in $FM_INHERITABLE_CONFIG; do
     case "$item" in
       ''|/*|.|..|../*|*/../*|*/..) return 1 ;;
@@ -573,6 +589,16 @@ propagate_inheritable_config() {
       record_inheritable_config_result "$item" unchanged "session-scoped"
       continue
     fi
+    case "$item" in
+      model-index.json|crew-dispatch.json)
+        if [ "$pair_allowed" = 0 ]; then
+          reason=$(inheritable_config_skip_reason)
+          warn_inheritable_config_skip "$item" "$dest_config" "$reason"
+          record_inheritable_config_result "$item" skipped "$reason"
+          continue
+        fi
+        ;;
+    esac
     src=$(fm_config_inherit_source "$src_config" "$item") || return 1
     dest="$dest_config/$item"
     if ! source_present=$(fm_config_source_present "$src"); then
