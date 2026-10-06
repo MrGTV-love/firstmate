@@ -189,6 +189,137 @@ test_live_stale_watch_lock_is_actionable() {
   pass "live watcher lock with stale heartbeat is actionable"
 }
 
+watcher_check_timeout_case() {
+  local fallback=$1 timeout=$2 runtime=$3 setup=$4 expected=$5
+  local dir state fakebin pid i real_mktemp
+  real_mktemp=$(command -v mktemp)
+  dir=$(make_case "check-timeout-$fallback-$timeout-$setup-$expected")
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  cat > "$state/timeout.check.sh" <<'SH'
+#!/usr/bin/env bash
+touch "$FM_STATE_OVERRIDE/check-started"
+sleep "$FM_TEST_CHECK_RUNTIME"
+touch "$FM_STATE_OVERRIDE/check-finished"
+printf 'check-completed\n'
+SH
+  chmod 0700 "$state/timeout.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" timeout >/dev/null \
+    || fail "could not register timeout check"
+  if [ "$setup" -gt 0 ]; then
+    cat > "$fakebin/mktemp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  "$FM_STATE_OVERRIDE"/.fm-check-output.*)
+    touch "$FM_STATE_OVERRIDE/output-setup-started"
+    sleep "$FM_TEST_CHECK_SETUP"
+    touch "$FM_STATE_OVERRIDE/output-setup-finished"
+    ;;
+esac
+exec "$FM_TEST_REAL_MKTEMP" "$@"
+SH
+    chmod 0700 "$fakebin/mktemp"
+  fi
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    FM_CHECK_TIMEOUT="$timeout" FM_CHECK_FORCE_FALLBACK="$fallback" \
+    FM_TEST_CHECK_RUNTIME="$runtime" FM_TEST_CHECK_SETUP="$setup" \
+    FM_TEST_REAL_MKTEMP="$real_mktemp" \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  for ((i = 0; i < 400; i++)); do
+    if [ "$expected" = complete ]; then
+      grep -F "check: $state/timeout.check.sh: check-completed" "$dir/watch.out" >/dev/null && break
+      [ ! -e "$state/.last-check" ] || [ -e "$state/check-finished" ] || break
+    else
+      [ ! -e "$state/.last-check" ] || break
+    fi
+    is_live_non_zombie "$pid" || break
+    sleep 0.1
+  done
+  stop_seed_watcher "$pid" "$dir/watch.err"
+  [ -e "$state/check-started" ] || fail "timeout $timeout never launched (fallback $fallback): $(cat "$dir/watch.err")"
+  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep (fallback $fallback): $(cat "$dir/watch.err")"
+  if [ "$setup" -gt 0 ]; then
+    [ -e "$state/output-setup-started" ] && [ -e "$state/output-setup-finished" ] \
+      || fail "slow check-output setup was not exercised"
+  fi
+  if [ "$expected" = complete ]; then
+    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (fallback $fallback, setup $setup)"
+    grep -F "check: $state/timeout.check.sh: check-completed" "$dir/watch.out" >/dev/null \
+      || fail "timeout $timeout lost actual watcher output (fallback $fallback, setup $setup)"
+    grep -F "check: $state/timeout.check.sh: check-completed" "$state/.wake-queue" >/dev/null \
+      || fail "timeout $timeout did not queue check output"
+  else
+    [ ! -e "$state/check-finished" ] || fail "expired check ran beyond timeout $timeout"
+    ! grep -F 'check-completed' "$dir/watch.out" >/dev/null \
+      || fail "expired check produced completion output"
+  fi
+}
+
+test_check_timeout_configuration_and_launch_allowance() {
+  local fallback
+  for fallback in 0 1; do
+    watcher_check_timeout_case "$fallback" 08 0.5 0 complete
+    watcher_check_timeout_case "$fallback" 010 9.2 0 complete
+    watcher_check_timeout_case "$fallback" 2 1 4 complete
+    watcher_check_timeout_case "$fallback" 2 4 0 expired
+  done
+  pass "decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers"
+}
+
+test_slow_check_beats_but_stopped_poll_goes_stale() {
+  local dir state fakebin pid i age
+  dir=$(make_case slow-check-beacon)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  cat > "$state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_HOME/state/check-started"
+while [ ! -e "$FM_HOME/state/check-release" ]; do sleep 0.1; done
+touch "$FM_HOME/state/check-finished"
+SH
+  chmod 0700 "$state/slow.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
+    || fail "could not register slow check"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_GUARD_GRACE=6 FM_CHECK_TIMEOUT=120 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  for ((i = 0; i < 300; i++)); do
+    [ ! -s "$state/check-started" ] || break
+    sleep 0.1
+  done
+  [ -s "$state/check-started" ] || fail "watcher never entered slow check"
+  # The pass is still inside one slow step beyond grace, not merely several
+  # quick cycles. Its bounded wait must keep supervision alive throughout.
+  sleep 8
+  [ ! -e "$state/check-finished" ] || fail "slow step finished before freshness proof"
+  is_live_non_zombie "$pid" || fail "watcher exited during slow check"
+  age=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_path_age "$2"' _ "$LIB" "$state/.last-watcher-beat")
+  [ "$age" -lt 6 ] || fail "working slow pass has stale beacon (${age}s)"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 6 "$4"' _ \
+    "$LIB" "$state" "$WATCH" "$dir" || fail "slow pass does not satisfy strict watcher health"
+
+  # Same live check, but a poll loop that cannot advance. An independent
+  # heartbeat helper would wrongly keep this stopped watcher looking healthy.
+  kill -STOP "$pid"
+  sleep 8
+  age=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_path_age "$2"' _ "$LIB" "$state/.last-watcher-beat")
+  [ "$age" -ge 6 ] || fail "stopped poll kept refreshing beacon (${age}s)"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 6 "$4"' _ \
+    "$LIB" "$state" "$WATCH" "$dir" && fail "stopped poll was reported healthy"
+  kill -CONT "$pid"
+  touch "$state/check-release"
+  for ((i = 0; i < 300; i++)); do
+    [ ! -e "$state/check-finished" ] || break
+    sleep 0.1
+  done
+  [ -e "$state/check-finished" ] || fail "slow check did not resume and finish"
+  stop_seed_watcher "$pid" "$dir/watch.err"
+  pass "slow bounded check stays fresh; stopped live poll goes stale and resumes"
+}
+
 test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   # A live holder whose beacon is stale past the ordinary grace is refused, but
   # a beacon stale past the hard bound evicts that holder (identity-verified
@@ -1546,6 +1677,11 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_wait_deadline_reaps_a_stopped_child
 test_singleton_start
 test_pid_identity_is_locale_invariant
@@ -1555,6 +1691,8 @@ test_msys_pid_identity_uses_proc
 test_stale_watch_lock_reclaimed
 test_stale_watch_reclaim_publishes_before_clear
 test_live_stale_watch_lock_is_actionable
+test_slow_check_beats_but_stopped_poll_goes_stale
+test_check_timeout_configuration_and_launch_allowance
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

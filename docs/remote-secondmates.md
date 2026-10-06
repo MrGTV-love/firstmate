@@ -678,6 +678,10 @@ The lifecycle test covers seeding a registered project that this machine has nev
 It asserts that the local project tree is unchanged afterwards.
 It carries Bitbucket, self-hosted, and scp-like origins through to the remote clone.
 It also repacks the source at Git's transport pack-creation boundary and checks that the provisioned home remains complete after the source's loose and packed objects are removed.
+
+The remote-job TERM, crash-recovery, and failed-stop tests keep their commands blocked on test-owned FIFOs rather than relying on a short sleep surviving scheduler delays.
+They confirm command groups are stopped after termination or recovery; the failed-stop case also requires quarantined ownership and replacement refusal while its command group remains live.
+
 The portable tests run with these commands:
 
 ```sh
