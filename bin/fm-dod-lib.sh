@@ -129,12 +129,12 @@ fm_brief_reconciliation_role() {
 # Current reconciliation-only recovery contract
 This section supersedes every instruction below that would advance the task, including Setup, progress notes, validation, and Definition of done.
 You are recovering an exited instruction owner, not resuming implementation.
-The original task instructions below are historical context only until firstmate explicitly authorizes continuation after reconciling the real hold and dependency state.
+The original task instructions below are historical context only until the lock-owning main Firstmate clears recovery with `fm-control <task-id> authorize-continuation` after reconciling the real hold and dependency state.
 Read and acknowledge the task-owned instruction inbox in numeric order, reconcile the preserved local files, commits, prior results, and outstanding decisions, then report the factual outcome and wait.
 Do not edit project files, create a branch or commit, run implementation or validation, start or respond to no-mistakes, push, open or merge a PR, clear a dependency, or lift a hold.
 A relaunch, a restored agent, an older progress note, and a dependency becoming green are not clearance.
 If any inbox instruction would advance blocked work or conflicts with a real hold, report that conflict to firstmate without executing it.
-Only a new explicit firstmate instruction reconciling the hold and dependency and authorizing continuation can end this recovery-only scope.
+Only that explicit metadata clearance followed by a new firstmate continuation instruction can end this recovery-only scope; message text alone is not clearance.
 
 # Preserved task context - not execution authority
 EOF

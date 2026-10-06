@@ -472,11 +472,6 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # FM_COMPOSER_IDLE_RE overrides for an unverified harness; matching is
 # case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
-# omp 18.4.10's bare-row hint leaves bright shortcut keys after its muted
-# explanation is ghost-stripped. It is a styled remnant, NOT a boxed or plain
-# placeholder: complete bright typed copies and unstyled captures never prove
-# emptiness. The existing proper-substring proof below owns that distinction.
-FM_COMPOSER_OMP_EFFORT_HINT_RE='^⇧⇥ to change thinking effort$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
@@ -716,9 +711,7 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
     fi
     fm_composer_normalize_trim_var plain_body
     if [ "${#content}" -lt "${#plain_body}" ] \
-       && { fm_composer_idle_matches "$plain_body" "$idle_re" "$idle_case" \
-            || { [ "$bordered" != 1 ] && [ "$plain_glyph" = '❯' ] \
-                 && fm_composer_idle_matches "$plain_body" "$FM_COMPOSER_OMP_EFFORT_HINT_RE" sensitive; }; }; then
+       && fm_composer_idle_matches "$plain_body" "$idle_re" "$idle_case"; then
       case "$plain_body" in
         *"$content"*) printf 'empty'; return 0 ;;
       esac
@@ -1137,13 +1130,32 @@ _fm_composer_screen_row() {  # <n> <screen>
 # ghost-strip when styled, plain otherwise, normalize-trim, and strip one
 # matching pair of side border glyphs.
 _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
-  local raw=$1 styled=$2 stripped
+  local raw=$1 styled=$2 stripped plain suffix hint='⇧⇥ to change thinking effort'
   if [ "$styled" = 1 ]; then
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
   else
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
   fi
   fm_composer_normalize_trim_var stripped
+  if [ "$styled" = 1 ]; then
+    plain=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+    fm_composer_normalize_trim_var plain
+    case "$plain" in
+      '❯'*"$hint")
+        suffix=$(printf '%s\n' "⇧⇥${raw##*⇧⇥}" | fm_composer_strip_ghost)
+        fm_composer_normalize_trim_var suffix
+        if [ -n "$suffix" ] && [ "${#suffix}" -lt "${#hint}" ]; then
+          case "$hint" in
+            *"$suffix"*)
+              case "$stripped" in
+                *"$suffix") stripped=${stripped%"$suffix"} ;;
+              esac
+              ;;
+          esac
+        fi
+        ;;
+    esac
+  fi
   case "$stripped" in
     '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
     '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;

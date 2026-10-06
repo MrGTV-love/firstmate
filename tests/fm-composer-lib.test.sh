@@ -489,20 +489,49 @@ test_matrix_omp_status_row_bounds_bare_composer() {
 test_matrix_omp_effort_hint_remnant() {
   # omp 18.4.10 draws cyan shortcut keys and a muted explanation on the
   # otherwise empty row. The keys survive the shared ghost extractor.
-  local hint row screen typed plain
+  local hint row screen typed plain out draft
   hint="${ESC}[38;2;0;180;255m⇧⇥${ESC}[38;2;229;229;231m ${ESC}[38;2;107;114;128mto change thinking effort"
   row="❯ ${ESC}[38;2;229;229;231m                                                   $hint"
   screen=$'transcript\n\n'"$row"$'\n π · ◔ GPT-6.1-Sol · ◫ 7.5%/272K'
   assert_screen "omp styled effort hint on tmux" empty "$CAPS_TMUX" "$screen" 2
   assert_screen "omp styled effort hint cursorless" empty "$CAPS_STYLED_NOID" "$screen"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ -z "$out" ] || fail "styled effort hint must extract no draft, got '$out'"
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   assert_screen "omp unstyled hint has no emptiness proof" unknown "$CAPS_PLAIN" "$plain"
+  out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$plain")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "unstyled effort hint must remain extracted content, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" \
+    $'╭────────────────────────╮\n│ ❯ '"$hint"$'\033[0m │\n╰────────────────────────╯')
+  [ "$out" = '⇧⇥' ] || fail "boxed effort-like content must not gain bare-hint stripping, got '$out'"
   [ "$(classify 1 '❯ ⇧⇥ to change thinking effort' "$FM_COMPOSER_IDLE_RE_DEFAULT" \
     sensitive '❯ ⇧⇥ to change thinking effort' 1 0)" = pending ] \
     || fail "the effort hint must never become a plain boxed placeholder"
   typed="❯ ${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[39m"
   assert_screen "typed complete hint stays pending" pending "$CAPS_TMUX" "$typed" 0
   assert_screen "typed shortcut-only stays pending" pending "$CAPS_TMUX" '❯ ⇧⇥' 0
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$typed")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "human full hint must survive extraction, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ ⇧⇥')
+  [ "$out" = '⇧⇥' ] || fail "human shortcut keys must survive extraction, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ shift+tab to change thinking effort')
+  [ "$out" = 'shift+tab to change thinking effort' ] || fail "generic shortcut text must survive extraction, got '$out'"
+  draft="❯ ${ESC}[38;2;229;229;231mdo not discard this draft      $hint"
+  assert_screen "draft before rendered hint cursorless" pending "$CAPS_STYLED_NOID" "$draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = 'do not discard this draft' ] || fail "only effort furniture must be removed beside a draft, got '$out'"
+  draft="$draft"$'\n'"${ESC}[38;2;229;229;231mkeep this second line"
+  assert_screen "wrapped draft with hint cursorless" pending "$CAPS_STYLED_NOID" "$draft"
+  assert_screen "wrapped draft with hint cursor anchored" pending "$CAPS_TMUX" "$draft" 1
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = 'do not discard this draft keep this second line' ] || fail "wrapped draft extraction must omit only the effort hint, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ do not discard this draft')
+  [ "$out" = 'do not discard this draft' ] || fail "hint disappearance must not change the extracted draft, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯')
+  [ -z "$out" ] || fail "hint disappearance must preserve empty extraction, got '$out'"
+  draft="❯ ${ESC}[2mghost${ESC}[0m ⇧⇥ to change thinking effort"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "unrelated ghost text must not prove a bright human hint is furniture, got '$out'"
   assert_screen "draft before rendered hint stays pending" pending "$CAPS_TMUX" \
     "❯ ${ESC}[38;2;229;229;231mdo not discard this draft      $hint" 0
   assert_screen "multiline draft before hint stays pending" pending "$CAPS_TMUX" \

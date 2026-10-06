@@ -944,6 +944,35 @@ test_send_text_submit_detects_landed_send() {
   pass "fm_backend_zellij_send_text_submit: reports 'empty' once the composer classifies empty (submitted)"
 }
 
+test_send_text_submit_ignores_styled_effort_hint() {
+  local dir fb out hint after mode
+  hint=$'\033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m'
+  for mode in remains disappears wraps; do
+    dir="$TMP_ROOT/submit-effort-$mode"; mkdir -p "$dir/responses"
+    zellij_pane_response "$dir" 1 7 3
+    printf '%s' "❯      $hint" > "$dir/responses/2.out"
+    zellij_pane_response "$dir" 3 7 3
+    zellij_pane_response "$dir" 5 7 3
+    case "$mode" in
+      remains) after="❯ hello captain      $hint" ;;
+      disappears) after='❯ hello captain' ;;
+      wraps) after="❯ hello      $hint"$'\ncaptain' ;;
+    esac
+    printf '%s' "$after" > "$dir/responses/6.out"
+    zellij_pane_response "$dir" 7 7 3
+    zellij_pane_response "$dir" 9 7 3
+    printf '%s' $'hello captain\n'"❯      $hint" > "$dir/responses/10.out"
+    fb=$(make_zellij_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
+      FM_ZELLIJ_SESSION_LIST="firstmate" \
+      bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
+    [ "$out" = empty ] || fail "styled effort hint ($mode) must not obstruct observed paste and submission, got '$out'"
+    assert_contains "$(cat "$dir/log")" $'\x1f''send-keys'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''Enter' \
+      "styled effort hint ($mode) must permit Enter after the payload is observed"
+  done
+  pass "fm_backend_zellij_send_text_submit: observes payload independently of styled effort hint furniture"
+}
+
 test_send_text_submit_detects_swallowed_enter() {
   local dir fb out
   dir="$TMP_ROOT/submit-swallow"; mkdir -p "$dir/responses"
@@ -1341,6 +1370,7 @@ test_kill_is_noop_when_session_absent
 test_teardown_passes_recorded_tab_id_to_zellij_kill
 test_forced_secondmate_teardown_kills_zellij_children_with_child_home_tag
 test_send_text_submit_detects_landed_send
+test_send_text_submit_ignores_styled_effort_hint
 test_send_text_submit_detects_swallowed_enter
 test_send_text_submit_unrelated_change_is_not_delivery
 test_send_text_submit_rejects_unobserved_paste

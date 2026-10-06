@@ -528,11 +528,27 @@ Each real model read and acknowledged unread instruction 005, wrote a factual re
 The fixture compared the retained commit, dirty file bytes, untracked file bytes, acknowledged instruction bytes, and whole backlog bytes; all were preserved.
 The named Herdr helper completed cleanup without its default-session tripwire firing.
 
-The portable public-interface regressions in `tests/fm-control-relaunch.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, and ordinary or automatic subsequent replacement after a genuine prerequisite completes.
-Their 14-harness admission matrix is structural evidence, not a new liveness or model-compliance claim for every harness.
+The portable public-interface regressions in `tests/fm-control-relaunch.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, inherited recovery after a genuine prerequisite completes, explicit owner-authorized clearance, both continuation/replacement lock orderings, and away-branch replacement admission.
+Their session-authority fixtures, stubbed backends, and 14-harness admission matrix are structural evidence, not live-harness liveness or model-compliance proof.
 The recovery-grade boundary remains tmux and Herdr; zellij, Orca, and cmux retain their existing refusal, and no native recovery surface was added for them.
 Secondmates retain their separate recovery owner rather than acquiring this ship/scout recovery option.
 The existing control, backlog-atomicity, and brief suites supply the unchanged capability, dispatch, and instruction-contract coverage.
+
+Verified on 2026-10-06 with stock Bash 3.2.57 and tasks-axi 0.2.6:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh
+```
+
+Observed focused results:
+
+```text
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=580695
+```
 
 ## Claude workspace trust
 
@@ -881,7 +897,9 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 The same live owner-recovery run above captured omp's otherwise empty borderless composer as a `❯` row followed by a right-side `⇧⇥ to change thinking effort` hint and the omp status row.
 The shortcut keys were `SGR 38;2;0;180;255`, followed by a normal-colour space and a muted explanation in `SGR 38;2;107;114;128`.
 The shared ghost extractor correctly kept the bright keys while dropping the explanation, so the first divergent stage was the remnant classification, not capture or ghost stripping.
-The classifier now applies its existing proper-substring proof to this complete anchored hint only on a styled bare `❯` row; a bright typed copy, a plain capture, and a boxed draft do not acquire empty-composer authority.
+The shared row-content boundary removes the exact terminal hint and its corresponding ghost-stripped suffix only when the suffix itself provides a proper-substring styling proof on a bare `❯` row, so classification and selected-content extraction agree even beside a real draft.
+A bright typed copy, a plain capture, a boxed draft, and generic shortcut text do not acquire empty-composer authority.
+The behavioral regressions in `tests/fm-composer-lib.test.sh` cover empty and draft-bearing extraction, wrapped drafts, human shortcut-like input, unrelated ghost text, and hint disappearance; `tests/fm-backend-zellij.test.sh` exercises public submission with the hint retained, disappeared, or beside wrapped payload text.
 Real typed copies remained `pending` and public exit refused without clearing them on both tmux and Herdr; busy drafts also read `pending`, and a real slash popup refused as `unknown` on tmux and `pending` on Herdr.
 The Herdr busy capture showed a native `Steering · 1` queue while the real model remained working; the queued reconciliation instruction did not change the owner's restricted authority.
 

@@ -4,6 +4,7 @@
 #
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
+#        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
 #                                         [--reconcile-only]
@@ -20,6 +21,10 @@
 # historical instructions, not implementation or validation permission.
 # A recorded recovery=reconcile-only is inherited even by ordinary replacement
 # calls; completing a dependency or restarting the owner is not clearance.
+# authorize-continuation is metadata-only: the lock-owning main Firstmate must
+# explicitly clear recovery after ordinary automatic-backlog admission.
+# It neither launches an agent nor delivers instructions; then use fm-send for
+# a new continuation instruction, or ordinary relaunch for an exited owner.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
@@ -214,6 +219,9 @@ die() {  # <message>
 
 CONTROL_LOCK=
 CONTROL_LOCK_HELD=0
+CONTROL_META_LOCK=
+CONTROL_META_LOCK_HELD=0
+CONTROL_META_TMP=
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 
@@ -222,6 +230,11 @@ control_cleanup() {
   if [ "$RELAUNCH_ACTIVE" = 1 ] \
      && declare -F relaunch_rollback >/dev/null 2>&1; then
     relaunch_rollback || true
+  fi
+  [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
+  if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
+    CONTROL_META_LOCK_HELD=0
+    fm_lock_release "$CONTROL_META_LOCK" || true
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -352,6 +365,47 @@ if [ ! -f "$META" ]; then
   die "no task '$ID' in $STATE (fm-control resolves an exact task id only)"
 fi
 
+if [ "$VERB" = authorize-continuation ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot authorize continuation"
+  fm_lease_forbid_branch "continuation authorization (fm-control)"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "continuation authorization requires the actual lock-owning main Firstmate"
+  fm_backlog_record_present "$META" "task record" "$STATE" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ -z "$(fm_meta_get "$META" remote_host)" ] \
+    || die "continuation authorization requires a local ship or scout"
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  continuation_kind=$(fm_backend_meta_exact_value "$META" kind) \
+    || die "continuation authorization requires an unambiguous ship or scout kind"
+  case "$continuation_kind" in
+    ship|scout) ;;
+    *) die "continuation authorization requires a ship or scout" ;;
+  esac
+  continuation_recovery=$(fm_backend_meta_exact_value "$META" recovery) \
+    || die "continuation authorization requires an unambiguous recovery field"
+  [ "$continuation_recovery" = reconcile-only ] \
+    || die "continuation authorization requires recovery=reconcile-only"
+  fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$continuation_kind" \
+    || die "continuation authorization requires a readable automatic backlog"
+  fm_backlog_relaunch_admission "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$continuation_kind" "$ID" 0 \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
+    || die "task $ID has a pending authoritative backlog close; finish or repair it before authorizing continuation"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.meta.continuation.XXXXXX") \
+    || die "could not stage continuation authorization for $ID"
+  perl -e 'open(my $f, "<", $ARGV[0]) or exit 1; binmode $f; binmode STDOUT; local $/; my $s = <$f>; defined $s or exit 1; $s =~ s/^recovery=reconcile-only(?:\n|\z)//mg; print $s or exit 1' -- "$META" > "$CONTROL_META_TMP" \
+    || die "could not stage continuation authorization for $ID"
+  fm_backlog_atomic_transition publish "$CONTROL_META_TMP" "$META" "task record" "$STATE" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  CONTROL_META_TMP=
+  echo "continuation-authorized $ID"
+  exit 0
+fi
 # A remotely placed secondmate records its endpoint on ANOTHER host, so every
 # postcondition this plane verifies - the agent-state classification, the busy
 # verdict, the endpoint's existence - would be read here for an endpoint that

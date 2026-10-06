@@ -15,7 +15,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `relaunch`.
+- The **verb allowlist**: `interrupt`, `exit`, `relaunch`, `authorize-continuation`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -35,6 +35,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `interrupt` | Deliver the harness's verified interrupt sequence while leaving the agent running. | Delivery succeeds while the endpoint still exists and the agent is still alive where the backend can classify that; cancellation is confirmed only from an adapter-owned acknowledgement and otherwise reports `cancel=unconfirmed`. |
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
 | `relaunch` | Replace the running agent with a new one in the same worktree - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
+| `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
 Interrupt never rewrites busy state as proof of its own success.
@@ -62,7 +63,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 
 ## Transactional relaunch
 
-`relaunch` is the only verb that changes durable records, so it runs as a transaction with a journal at `state/<id>.control-relaunch`, the prior record preserved beside it, and a ship or scout's prior instructions preserved when a progress note is appended.
+`relaunch` runs as a transaction with a journal at `state/<id>.control-relaunch`, the prior record preserved beside it, and a ship or scout's prior instructions preserved when a progress note is appended.
 
 1. **Resolve the profile.**
    An explicit `--harness`, `--model`, or `--effort` wins.
@@ -101,7 +102,12 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 Restoring an exited owner to reconcile instructions is not permission to advance held or dependency-blocked work.
 The control and launch headers own the reconciliation-only option and its admission limits; [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns the replacement's current instruction contract, which supersedes historical execution instructions.
 The task's recorded recovery scope survives ordinary and automatic replacement, including a session-end replacement after a genuine dependency completes.
-Continuation requires an explicit new Firstmate instruction reconciling the real restrictions, not an inference from restored liveness or a completed prerequisite.
+The actual lock-owning main Firstmate must run `fm-control <task-id> authorize-continuation` after reconciling the real restrictions.
+This metadata-only operation holds the lifecycle lock before the metadata lock, revalidates the local regular task record and recovery field, requires readable automatic-backlog ordinary admission, and refuses a pending authoritative close.
+Missing, foreign, or dead session ownership, a worker, and the supervision branch in any posture cannot authorize clearance.
+It does not start a worker or send conversational text.
+After clearance, send a new continuation instruction with `fm-send` to a live owner, or use ordinary `fm-control <task-id> relaunch --note ...` for an exited owner.
+An `fm-send` message never clears recovery by its text.
 
 ### Reclaiming a task whose endpoint is gone
 
