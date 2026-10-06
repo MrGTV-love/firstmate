@@ -727,8 +727,8 @@ function append(log, record) {
     fd = openSync(log, constants.O_APPEND | constants.O_CREAT | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
     const stat = fstatSync(fd);
     if (!stat.isFile() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid()) return false;
-    writeSync(fd, JSON.stringify({ version: 1, policy: policyVersion, at: Date.now(), mode: 'shadow', ...record }) + '\n');
-    return true;
+    const row = JSON.stringify({ version: 1, policy: policyVersion, at: Date.now(), mode: 'shadow', ...record }) + '\n';
+    return writeSync(fd, row) === Buffer.byteLength(row, 'utf8');
   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
 

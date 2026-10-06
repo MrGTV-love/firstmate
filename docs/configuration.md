@@ -1395,7 +1395,7 @@ The key is removed from child environments and passed to `curl` through a header
 
 The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
 An interrupted attempt or unavailable usage remains unknown, not zero.
-Records require a private regular file; if attempt accounting cannot be written, no model request starts.
+Records require a private regular file and a complete UTF-8 row write; if attempt accounting cannot be fully written, no model request starts.
 The current integration screens pre-tool inputs only; it does not register completion hooks or correlate native success, failure or denial outcomes.
 The script header and `--help` own invocation mechanics.
 
@@ -1403,7 +1403,8 @@ The script header and `--help` own invocation mechanics.
 Labelled counts, risky recall and routine would-block rates appear only in separate `historical_september30` and `synthetic` objects, never as pooled or duplicated top-level quality fields.
 The top-level `unclassified_labelled` count reports old labelled records without a recognized dataset; those labels cannot contribute to either dataset's quality.
 `evaluate` consumes labelled native inputs without executing their commands; every new case requires `dataset: "historical_september30"` or `dataset: "synthetic"`, and provenance and independent labels remain the evaluator's responsibility.
-If any case result or required attempt cannot be persisted, evaluation stops with an explicit error and nonzero exit instead of printing success metrics; previously recorded evidence remains available through `metrics`.
+If any case result or required attempt cannot be fully persisted, evaluation stops with an explicit error and nonzero exit instead of printing success metrics.
+Existing bytes remain intact without retries or ledger repair; a partial row can prevent `metrics` from parsing the ledger.
 Only authentic September 30 command/decision receipts may be labelled `historical_september30`; proposal examples, later synthetic observations and reconstructed commands belong to neither historical evidence nor its counts.
 The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
 The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.

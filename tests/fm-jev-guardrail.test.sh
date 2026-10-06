@@ -689,6 +689,14 @@ fs.writeSync = function(fd, data, ...rest) {
   try { row = JSON.parse(typeof data === 'string' ? data : data.toString()); } catch {}
   if (row && row.event === process.env.REFUSE_EVENT && (!process.env.REFUSE_STATUS || row.status === process.env.REFUSE_STATUS)) {
     fs.appendFileSync(process.env.REFUSAL_TRACE, 'refused\\n');
+    if (process.env.SHORT_WRITE === '1') {
+      const before = fs.readFileSync(process.env.PARTIAL_LOG);
+      const bytes = Buffer.from(data);
+      const partial = bytes.subarray(0, 17);
+      const written = original.call(this, fd, partial);
+      fs.appendFileSync(process.env.PARTIAL_TRACE, JSON.stringify({before:before.toString('base64'),partial:partial.toString('base64'),written,row}) + '\\n');
+      return written;
+    }
     throw new Error('synthetic append refusal');
   }
   return original.call(this, fd, data, ...rest);
@@ -714,8 +722,8 @@ const setup = (scenario, refusal = false, mode = 0o600) => {
     {id:'first',expected:'risky',dataset:'synthetic',payload:scenario.payload},
     {id:'later',expected:'risky',dataset:'synthetic',payload:payload('cat .env')},
   ]));
-  const childEnv = { ...env, REPLY:scenario.reply || 'judged', TRANSPORT_TRACE:`${prefix}.transport`, REFUSAL_TRACE:`${prefix}.refusals`, ...(scenario.env || {}) };
-  if (refusal) Object.assign(childEnv, { NODE_OPTIONS:`--require=${preload}`, REFUSE_EVENT:scenario.event || 'result', REFUSE_STATUS:scenario.event === 'attempt' ? '' : scenario.status });
+  const childEnv = { ...env, REPLY:scenario.reply || 'judged', TRANSPORT_TRACE:`${prefix}.transport`, REFUSAL_TRACE:`${prefix}.refusals`, PARTIAL_TRACE:`${prefix}.partial`, PARTIAL_LOG:log, ...(scenario.env || {}) };
+  if (refusal) Object.assign(childEnv, { NODE_OPTIONS:`--require=${preload}`, REFUSE_EVENT:scenario.event || 'result', REFUSE_STATUS:scenario.event === 'attempt' ? '' : scenario.status, SHORT_WRITE:refusal === 'short' ? '1' : '0' });
   return {log,cases,env:childEnv};
 };
 const run = (args, fixture, input) => spawnSync(process.execPath, [tool, ...args, '--log', fixture.log], {env:fixture.env,input,encoding:'utf8'});
@@ -806,6 +814,48 @@ try {
     assert.equal(rows(fixture.log).at(-1).status, 'log_unavailable');
     assert.equal(rows(fixture.log).filter(row => row.event === 'attempt').length, 0);
     assertPreserved(fixture);
+  }
+  for (const scenario of [attemptScenario, ...scenarios]) {
+    for (const host of ['evaluation','claude','omp']) {
+      const fixture = setup(scenario, 'short');
+      const result = host === 'evaluation'
+        ? run(['evaluate','--cases',fixture.cases], fixture)
+        : run(['hook','--host',host], fixture, JSON.stringify(host === 'claude' ? scenario.payload : {toolName:'bash',input:scenario.payload.tool_input}));
+      if (host === 'evaluation') assertFailure(result);
+      else { assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, ''); }
+      assert.equal(count(fixture.env.REFUSAL_TRACE), 1);
+      assert.equal(count(fixture.env.PARTIAL_TRACE), 1);
+      assert.equal(count(fixture.env.TRANSPORT_TRACE), scenario.transport ? 1 : 0);
+      const [evidence] = rows(fixture.env.PARTIAL_TRACE);
+      const before = Buffer.from(evidence.before, 'base64');
+      const partial = Buffer.from(evidence.partial, 'base64');
+      const serialized = Buffer.from(JSON.stringify(evidence.row) + '\n');
+      assert.equal(evidence.written, 17);
+      assert.ok(evidence.written < serialized.length);
+      assert.deepEqual(partial, serialized.subarray(0, evidence.written));
+      const preceding = before.toString('utf8').trim().split('\n').map(JSON.parse);
+      assert.equal(preceding.length, scenario.transport ? 2 : 1);
+      assert.equal(before.subarray(0, Buffer.byteLength(seed)).toString('utf8'), seed);
+      if (scenario.transport) {
+        assert.equal(preceding[1].event, 'attempt');
+        if (host === 'evaluation') assert.equal(preceding[1].case_id, 'first');
+      }
+      const ledger = readFileSync(fixture.log);
+      const prefix = Buffer.concat([before, partial]);
+      assert.deepEqual(ledger.subarray(0, prefix.length), prefix);
+      if (scenario.event === 'attempt') {
+        const unavailable = ledger.subarray(prefix.length).toString('utf8');
+        assert.ok(unavailable.endsWith('\n'));
+        const record = JSON.parse(unavailable);
+        assert.equal(record.event, 'result');
+        assert.equal(record.status, 'log_unavailable');
+        if (host === 'evaluation') assert.equal(record.case_id, 'first');
+        assert.equal(unavailable, JSON.stringify(record) + '\n');
+      } else {
+        assert.deepEqual(ledger, prefix);
+      }
+      assertPreserved(fixture);
+    }
   }
   for (const host of ['evaluation','claude','omp']) {
     const fixture = setup({payload:payload('cat .env')}, false, 0o644);
