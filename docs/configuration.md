@@ -1183,8 +1183,9 @@ Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a se
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
 Ordinary `#` comments remain ignored.
-The one supported directive is the exact line `# dispatch-never-send marked-sections`, which opts into section markers.
-Any other comment that starts with `dispatch-never-send` after the `#`, in any case or spacing (for example `#dispatch-never-send marked-sections` or `# Dispatch-Never-Send marked-sections`), is an invalid directive and stops every request.
+The one supported directive is `# dispatch-never-send marked-sections`, compared after trimming surrounding whitespace and collapsing whitespace runs to one space.
+Its spelling and case must match exactly, and the space after `#` is required.
+Any other comment that starts with `dispatch-never-send` after the `#` and optional whitespace, compared case-insensitively (for example `#dispatch-never-send marked-sections` or `# Dispatch-Never-Send marked-sections`), is an invalid directive and stops every request.
 
 ```text
 # Literal values still stop the whole request
@@ -1208,8 +1209,8 @@ Surrounding whitespace on marker lines is allowed, markers apply even inside Mar
 The local brief and other brief consumers remain unchanged.
 
 Markers never send silently.
-A brief containing `<!--` followed by `dispatch-never-send`, in any case or spacing, stops the entire request when the directive is absent, whether the list file is missing or only holds literals.
-With the directive present, every such line must be exactly one of the two canonical markers above: nested, unmatched, inline, misspelled, unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
+A brief containing `<!--` followed by optional whitespace and the reserved `dispatch-never-send` prefix, compared case-insensitively on the same line, stops the entire request when the directive is absent, whether the list file is missing or only holds literals.
+With the directive present, every such line must be exactly one of the two canonical markers above after trimming surrounding whitespace: nested, unmatched, inline, malformed suffixes (`<!-- dispatch-never-send:star -->`), unspaced (`<!--dispatch-never-send:start-->`), or differently cased (`<!-- Dispatch-Never-Send:start -->`) markers stop the entire request rather than being corrected.
 A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
