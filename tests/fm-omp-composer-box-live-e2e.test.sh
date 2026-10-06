@@ -188,6 +188,8 @@ pass "live omp box composer: $SUBJECT draws the box shape (status in the top bor
 state=$(fm_backend_herdr_composer_state "$TARGET")
 [ "$state" = empty ] \
   || fail "$SUBJECT: an idle empty box composer read '$state', not empty"
+[ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
+  || fail "$SUBJECT: the initial empty box composer has no live agent"
 pass "live omp box composer: $SUBJECT idle empty composer reads empty through the production Herdr adapter"
 
 fm_backend_herdr_send_literal "$TARGET" 'unsent draft text' \
@@ -233,6 +235,8 @@ while [ "$i" -lt 20 ]; do
   sleep 1
 done
 [ "$state" = empty ] || fail "$SUBJECT: the cleared box composer read '$state', not empty"
+[ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
+  || fail "$SUBJECT: the cleared empty box composer has no live agent"
 
 out=$(control "$TASK_ID" exit) \
   || fail "$SUBJECT: fm-control exit refused an idle box composer: $out"
@@ -251,10 +255,19 @@ if [ "${FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH:-0}" = 1 ]; then
     || fail "could not relaunch $SUBJECT in the box shape"
   i=0
   while [ "$i" -lt 60 ]; do
-    [ "$(fm_backend_herdr_composer_state "$TARGET")" != empty ] || break
+    state=$(fm_backend_herdr_composer_state "$TARGET")
+    agent=$(fm_backend_herdr_agent_state "$TARGET")
+    screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
+    if [ "$state" = empty ] && [ "$agent" = alive ] \
+      && printf '%s\n' "$screen" | grep -Eq '^╭── (π|󰵗) [>·] ' \
+      && printf '%s\n' "$screen" | grep -Eq '^╰─ .* ─╯$'; then
+      break
+    fi
     i=$((i + 1))
     sleep 1
   done
+  [ "$i" -lt 60 ] \
+    || fail "$SUBJECT: the second launch never proved a live agent with an empty box composer (agent='$agent', composer='$state')"
   out=$(control "$TASK_ID" relaunch --note "Live guard relaunch.") \
     || fail "$SUBJECT: fm-control relaunch refused an idle box composer: $out"
   case "$out" in

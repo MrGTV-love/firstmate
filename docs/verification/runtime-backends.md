@@ -1032,7 +1032,7 @@ FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
 
 Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
 Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
-The relaunch proof checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
+The relaunch proof first requires a live agent with a proven empty box composer, failing if that readiness wait expires, then checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
 
 Observed output:
 
