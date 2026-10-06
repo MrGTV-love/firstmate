@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exercise the real spawn entrypoint and terminal with a fake process-leased get.
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
+# FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -159,8 +160,18 @@ PATH="$FM_GET_REAL_PATH" exec "$FM_GET_LAB_HELPER" run "$FM_GET_LAB_SESSION" "${
 SH
   chmod +x "$FAKEBIN/herdr"
 fi
+if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
+  . "$ROOT/bin/backends/herdr.sh"
+  parent_out=$("$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" workspace create --cwd "$PROJECT" --label firstmate --no-focus) \
+    || fail 'cannot establish projected acquisition parent'
+  HERDR_PANE_ID=$(printf '%s' "$parent_out" | jq -er '.result.root_pane.pane_id') || fail 'missing projected acquisition parent pane'
+  HERDR_SOCKET_PATH=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_socket_path "$HERDR_LAB_SESSION") \
+    || fail 'cannot resolve projected acquisition session socket'
+  export HERDR_PANE_ID HERDR_SOCKET_PATH
+fi
 
 for MODE in success slow spawning foreign dirty; do
+  [ "${FM_TEST_ACQUISITION_CASES:-all}" != contention ] || [ "$MODE" = success ] || continue
   ID="get-cleanup-$MODE-$$"
   CASE="$TMP_ROOT/case-$MODE"
   mkdir -p "$CASE"
@@ -206,9 +217,9 @@ for MODE in success slow spawning foreign dirty; do
   ! kill -0 "$pid" 2>/dev/null || fail "$MODE left get subshell $pid alive"
   [ "$MODE" != slow ] || [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
   if [ "$BACKEND" = tmux ]; then
-    windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_name}') || fail 'spawn destroyed unrelated session'
-    assert_not_contains "$windows" "fm-$ID" 'refused attempt pane remained'
-    assert_contains "$windows" sentinel 'spawn closed a pane it did not create'
+    tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_name}') || fail 'spawn destroyed unrelated session'
+    assert_not_contains "$tmux_windows" "fm-$ID" 'refused attempt pane remained'
+    assert_contains "$tmux_windows" sentinel 'spawn closed a pane it did not create'
   fi
   if [ "$BACKEND" = herdr ]; then
     "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" pane get "$sentinel" >/dev/null || fail 'spawn closed an unrelated Herdr pane'
@@ -350,7 +361,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   B_SPAWN_PID=
   expect_code 0 "$b_rc" "contention B clean isolated acquisition did not launch: $(cat "$B_OUT")"
   [ -e "$B_ARRIVED" ] || fail 'contention B never acquired its clean isolated worktree'
-  [ -f "$B_HOME/state/$B_ID.meta" ] || fail 'contention B launch did not publish its task record'
+  [ -f "$B_HOME/state/$B_ID.meta" ] || fail "contention B launch did not publish its task record: $(cat "$B_OUT")"
   for _ in $(seq 1 3000); do
     kill -0 "$A_SPAWN_PID" 2>/dev/null || break
     /bin/sleep 0.02
@@ -381,4 +392,98 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
       || fail "contention cleanup closed surviving pane $pane"
   done
   pass 'herdr contention releases only the refused acquisition after projected launch'
+fi
+
+if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
+  A_CASE="$TMP_ROOT/case-projected-contention"
+  mkdir -p "$A_CASE"
+  A_ID="get-cleanup-projected-contention-$$"
+  A_LEASE="$A_CASE/lease"
+  A_PIDFILE="$A_CASE/pid"
+  A_ALLOW="$A_CASE/allow"
+  A_ARRIVED="$A_CASE/arrived"
+  A_POLL_READY="$A_CASE/poll-ready"
+  A_OUT="$A_CASE/out"
+  protected_journal=$(fm_backend_herdr_projection_journal_path "$FM_HOME/state" "get-cleanup-success-$$")
+  cp "$protected_journal" "$A_CASE/sibling-journal" || fail 'cannot snapshot projected sibling journal'
+  protected_meta="$FM_HOME/state/get-cleanup-success-$$.meta"
+  cp "$protected_meta" "$A_CASE/sibling-meta" || fail 'cannot snapshot sibling spawn metadata'
+  protected_pane=$(fm_backend_herdr_projection_journal_field "$protected_journal" pane_id) || fail 'missing sibling endpoint'
+  parent=$(printf '%s' "$parent_out" | jq -er '.result.workspace.workspace_id') || fail 'missing refusal parent workspace'
+  parent_pane=$(printf '%s' "$parent_out" | jq -er '.result.root_pane.pane_id') || fail 'missing refusal parent pane'
+  socket=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_socket_path "$HERDR_LAB_SESSION") || fail 'missing exact lab socket'
+  printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
+    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$DIRTY" > "$TMP_ROOT/get-config"
+  fm_test_spawn_brief "$FM_HOME" "$A_ID" 'Projected refusal must retain its endpoint when session custody is unavailable.'
+  FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$A_CASE/claude" PATH="$FAKEBIN:$PATH" \
+    HERDR_PANE_ID="$parent_pane" HERDR_SOCKET_PATH="$socket" \
+    FM_TEST_POLL_READY="$A_POLL_READY" FM_TEST_REAL_CLEANUP_SLEEP=1 \
+    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
+    > "$A_OUT" 2>&1 &
+  A_SPAWN_PID=$!
+  for _ in $(seq 1 1000); do
+    [ ! -s "$A_PIDFILE" ] || [ ! -e "$A_LEASE" ] || break
+    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  [ -s "$A_PIDFILE" ] && [ -e "$A_LEASE" ] || fail "projected get never started: $(cat "$A_OUT")"
+  a_get_pid=$(cat "$A_PIDFILE")
+  kill -0 "$a_get_pid" 2>/dev/null || fail 'projected get exited before custody contention'
+  A_JOURNAL=$(fm_backend_herdr_projection_journal_path "$FM_HOME/state" "$A_ID")
+  cp "$A_JOURNAL" "$A_CASE/journal-before" || fail 'projected refusal did not publish its journal'
+  [ ! -e "$FM_HOME/state/$A_ID.meta" ] || fail 'pending projected acquisition published task metadata'
+  a_pane=$(fm_backend_herdr_projection_journal_field "$A_JOURNAL" pane_id) || fail 'missing projected refusal endpoint'
+  projection_id=$(fm_backend_herdr_projection_journal_field "$A_JOURNAL" projection_id) || fail 'missing projection token'
+  [ -n "$projection_id" ] && [ "$(fm_backend_herdr_projection_journal_field "$A_JOURNAL" parent_workspace_id)" = "$parent" ] \
+    || fail 'projected refusal journal has the wrong token or parent'
+  SESSION_LOCK=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_lock_path "$HERDR_LAB_SESSION") || fail 'missing session custody path'
+  fm_lock_try_acquire "$SESSION_LOCK" || fail 'cannot hold projected session custody'
+  focus_before=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION") || fail 'cannot snapshot contention focus'
+  touch "$A_ALLOW" "$A_POLL_READY"
+  # Keep custody through all 50 real 0.1s probes, plus a bounded scheduling margin.
+  # One sleep avoids a high-frequency subprocess poll on memory-constrained hosts.
+  /bin/sleep 30
+  ! kill -0 "$A_SPAWN_PID" 2>/dev/null \
+    || fail "projected refusal queued an unbounded generic cleanup wait while custody stayed owned: $(cat "$A_OUT")"
+  wait "$A_SPAWN_PID"
+  a_rc=$?
+  A_SPAWN_PID=
+  [ "$a_rc" -ne 0 ] || fail "projected refused caller launched: $(cat "$A_OUT")"
+  assert_contains "$(cat "$A_OUT")" 'not clean' 'projected caller missed acquired-copy dirty refusal'
+  [ "$(cat "$SESSION_LOCK/pid")" = "$$" ] || fail 'projected refusal changed fixture custody'
+  assert_projected_retained() {
+    cmp -s "$A_JOURNAL" "$A_CASE/journal-before" || fail 'projected refusal changed its exact journal or projection identity'
+    cmp -s "$protected_journal" "$A_CASE/sibling-journal" || fail 'projected refusal changed sibling journal or projection identity'
+    cmp -s "$protected_meta" "$A_CASE/sibling-meta" || fail 'projected refusal changed sibling metadata or spawn generation'
+    [ ! -e "$FM_HOME/state/$A_ID.meta" ] || fail 'refused projected acquisition published task metadata'
+    [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")" = "$focus_before" ] || fail 'projected refusal changed focus'
+    for pane in "$a_pane" "$protected_pane" "$parent_pane" "$sentinel"; do
+      [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$pane")" = present ] \
+        || fail "projected refusal changed retained or sibling endpoint $pane"
+    done
+    if [ ! -e "$A_LEASE" ] || ! kill -0 "$a_get_pid" 2>/dev/null; then
+      fail 'projected refusal ended retained get lease'
+    fi
+    if [ ! -e "$protected_lease" ] || ! kill -0 "$protected_pid" 2>/dev/null; then
+      fail 'projected refusal ended sibling get lease'
+    fi
+    [ -e "$A_ARRIVED" ] || fail 'projected get never reached the dirty acquired copy'
+  }
+  assert_projected_retained
+  fm_lock_release "$SESSION_LOCK" || fail 'cannot release projected fixture custody'
+  /bin/sleep 1
+  assert_projected_retained
+  # The caller retained a live endpoint, not a dead journal. Retire it explicitly
+  # under the adapter's serialized close before the combined lab cleanup.
+  PATH="$FAKEBIN:$PATH" fm_backend_herdr_kill "$HERDR_LAB_SESSION:$a_pane" || fail 'cannot retire retained fixture endpoint'
+  [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$a_pane")" = dead ] \
+    || fail 'fixture endpoint retirement was not confirmed dead'
+  for _ in $(seq 1 100); do
+    [ -e "$A_LEASE" ] || kill -0 "$a_get_pid" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  if [ -e "$A_LEASE" ] || kill -0 "$a_get_pid" 2>/dev/null; then
+    fail 'fixture retirement retained the get process lease'
+  fi
+  pass 'herdr projected refusal terminates under custody and never queues later generic closure'
 fi

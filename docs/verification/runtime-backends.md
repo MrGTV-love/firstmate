@@ -463,11 +463,39 @@ Herdr runs both flat and projected layouts in generated lab sessions through `bi
 Both terminal shells and the fake get's interactive child use lab-private history files.
 
 The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
-After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
-The refused spawn remained blocked in endpoint cleanup until the projected spawn released the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
-Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
+After both acquisitions release presentation custody, the fixture holds the session lock for ten actual seconds while the flat acquisition refuses at its unchanged isolation deadline.
+The refused spawn stays blocked in endpoint cleanup until the fixture releases the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
+Once custody is released and the projected acquisition is allowed to launch, the flat attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
 The companion `tests/fm-backend-herdr.test.sh` checks unresolved-lock refusal without any pane-close mutation.
-Projected abort cleanup confirms its exact acquisition pane is gone before releasing the presentation lock and retires that pane's generic cleanup target, avoiding a second close outside the original transaction.
+Projected spawn aborts instead follow the bounded contract in `bin/fm-spawn.sh`'s header.
+
+Focused projected-refusal verification on 2026-10-06 used the checksum-verified official CI Herdr 0.7.4 binary (protocol 16), generated checkout-local fixture homes, and the unchanged named-lab/default-fleet tripwire.
+With that binary on `PATH`, the selected executable scenarios were:
+
+```sh
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr off
+bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+```
+
+The public CLI acquired a generated dirty copy while the fixture held real session custody beyond all 50 existing abort acquisition probes.
+Before the correction it printed the custody refusal but remained waiting in generic cleanup, failing the bounded caller-exit assertion.
+After the correction it exited nonzero while the fixture still owned custody, leaving the exact journal, pane and get lease intact without publishing task metadata.
+Sibling metadata (including its spawn generation), journal, pane, process lease, parent, sentinel and exact workspace/tab focus stayed unchanged both before and after custody was released.
+The fixture then explicitly closed its retained endpoint and required structured `dead` plus actual process-lease cessation.
+
+```text
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+```
+
+The flat contention scenario also passed with both acquisition leases held during contention and cleanup releasing only the refused flat attempt after the projected launch.
+The projected-layout entrypoint also passed its ordinary successful acquisition and all four refusal/lease-cleanup paths (105.45 seconds total).
+The selector limits local execution; the default CI entrypoint still executes all acquisition cases in both layouts, including both contention paths.
 
 Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
 

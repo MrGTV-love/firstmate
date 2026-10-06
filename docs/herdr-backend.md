@@ -385,6 +385,8 @@ Ordinary non-projected task removal:
 - Keeps the legitimate plain close when the target is the active tab.
 - Refuses an unlocked close if the session lock's identity cannot be resolved.
 
+Projected spawn aborts use the separate bounded cleanup contract owned by `bin/fm-spawn.sh`'s header, not the ordinary removal wait above.
+
 Task cleanup first admits the exact endpoint read-only under its named-session presentation lock.
 A contended or ambiguous admission refuses while the copy, durable records, and endpoint are still intact.
 Admission records the validated endpoint metadata, its `spawn_gen` (including an absent legacy field), and the exact session lock identity.
