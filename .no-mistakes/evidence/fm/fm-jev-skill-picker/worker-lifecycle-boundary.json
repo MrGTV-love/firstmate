@@ -1,0 +1,13 @@
+{
+  "attempt": "Real omp primary on named private fm-lab tmux server with worktree-local marked lab home, 120x40 grid and TMUX_TMPDIR=.wlab/tmux",
+  "result": "error connecting to /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.wlab/tmux/tmux-501/fm-lab (File name too long)",
+  "socket_path_bytes": 112,
+  "workarounds_inspected": [
+    "FM_HOME and TMPDIR relocation",
+    "TREEHOUSE_ROOT private workspace pool",
+    "helper-owned short tmux socket route"
+  ],
+  "remaining_authority": "The supported short-socket helper intentionally creates /tmp/fml.XXXXXX; spawn unconditionally creates /tmp/fm-<id> and /tmp/fm-<id>+<home-hash>. These cannot be redirected with existing flags. No worker spawn or relaunch was executed; no existing external pool or fleet was touched.",
+  "resolved": "Used the owning helper short-socket contract and the explicit allowance for incidental ephemeral temp outputs from manual project verification. All deliberate fixture, state, pool and agent-session files remained worktree-local. Genuine worker launch/relaunch and normal teardown completed.",
+  "final_result": "pass"
+}

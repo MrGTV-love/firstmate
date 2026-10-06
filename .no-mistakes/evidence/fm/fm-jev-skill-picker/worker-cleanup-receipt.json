@@ -1,0 +1,8 @@
+{
+  "worker_exit_and_teardown": "0 0",
+  "task_metadata_removed": true,
+  "private_server_kill_exit": 0,
+  "helper_socket_teardown_exit": 0,
+  "ephemeral_helper_socket_removed": true,
+  "task_staging_removed": true
+}

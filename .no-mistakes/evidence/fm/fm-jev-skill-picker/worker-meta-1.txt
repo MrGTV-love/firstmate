@@ -1,0 +1,11 @@
+window=primary:fm-jev-live-probe
+endpoint_task_id=jev-live-probe
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/pool/.treehouse/worker-probe-f15ca2/1/worker-probe
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/projects/worker-probe
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-jev-live-probe
+model=openai-codex/gpt-6.1-sol
+effort=low
+busy_gen=g1791326796.20977.11936
+spawn_gen=s1791326797.7251.16160

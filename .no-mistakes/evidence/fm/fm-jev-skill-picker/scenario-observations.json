@@ -1,0 +1,29 @@
+{
+  "multiple": {
+    "status": "suggested",
+    "optional_count": 2,
+    "stages": 1
+  },
+  "ambiguous": {
+    "status": "suggested",
+    "optional_count": 3,
+    "stages": 2
+  },
+  "no_fit": {
+    "status": "none",
+    "stages": 1
+  },
+  "private_projection": {
+    "stages": 2,
+    "remote_private_fields": false
+  },
+  "worker_lifecycle": {
+    "status": "pass",
+    "fresh_launch": true,
+    "relaunch": true,
+    "genuine_rank_recheck_each_incarnation": true,
+    "ordinary_successful_body_reads_each_incarnation": true,
+    "same_worktree_and_source_intent": true,
+    "normal_teardown": true
+  }
+}

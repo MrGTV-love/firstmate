@@ -1,0 +1,21 @@
+You are running an isolated, read-only skill-selection product probe. Do not write any files, invoke lifecycle, or inspect credentials or operator configuration. Read relevant selected skill bodies through the ordinary read tool, then perform the requested task. Required safety workflow stays mandatory; optional advice is advisory. The complete local index follows. You may add any needed skills independently, or reject unsuitable advice. Report which bodies you actually read and why.
+review-patch: Review proposed code changes for correctness, regressions and maintainability.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md
+boundary-check: Check tricky input boundaries and invariants for code changes; useful alongside review.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/boundary-check/SKILL.md
+doc-audit: Review documentation and operator-facing examples for consistency and missing prerequisites.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/doc-audit/SKILL.md
+frontend-layout: Evaluate browser visual layout and responsive CSS surfaces.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/frontend-layout/SKILL.md
+release-coordination: Plan releases across multiple services and teams.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/release-coordination/SKILL.md
+safety: Required local safety checks before making filesystem or runtime changes.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md
+regression-design: Design regression scenarios for arithmetic helper changes.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/regression-design/SKILL.md
+invariant-review: Review count invariants and slicing boundaries.
+  /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/invariant-review/SKILL.md
+
+
+
+Task: Review /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/agent-project/helper.py against its docstring; produce consumer-visible regression examples, and audit /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/agent-project/README.md for contradictions. Apply ordinary selection across the entire index; add relevant bodies even if absent from the top-three advisory output. Do not modify files.

@@ -1,0 +1,16 @@
+{
+  "baseline_receipt": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/ordinary-agent-baseline-receipt.json",
+  "advisory_receipt": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/ordinary-agent-discretion-receipt.json",
+  "independent_observed_examples": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/local-task-observed-outcomes.json",
+  "observations": [
+    "Both real omp sessions identified the off-by-one slicing and missing negative-limit rejection.",
+    "Both identified README contradictions.",
+    "Advisory session independently read regression-design and doc-audit outside Jev top three.",
+    "All recorded ordinary body reads completed without tool errors."
+  ],
+  "limits": [
+    "Small disposable local task only, not an external cookbook benchmark.",
+    "No context, cost, optional-load reduction or broad noninferiority claim.",
+    "These are ordinary task-input sessions, not real fm-spawn worker launch/relaunch receipts."
+  ]
+}

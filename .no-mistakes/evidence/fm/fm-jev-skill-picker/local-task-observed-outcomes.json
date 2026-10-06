@@ -1,0 +1,78 @@
+[
+  {
+    "input": [
+      10,
+      20,
+      30
+    ],
+    "limit": 2,
+    "actual": [
+      10
+    ],
+    "contract_expected": [
+      10,
+      20
+    ]
+  },
+  {
+    "input": [
+      10,
+      20,
+      30
+    ],
+    "limit": 0,
+    "actual": [
+      10,
+      20
+    ],
+    "contract_expected": []
+  },
+  {
+    "input": [
+      10,
+      20,
+      30
+    ],
+    "limit": -1,
+    "actual": [
+      10
+    ],
+    "contract_expected": "reject"
+  },
+  {
+    "input": [
+      10,
+      20,
+      30
+    ],
+    "limit": null,
+    "actual": [
+      10,
+      20,
+      30
+    ],
+    "contract_expected": [
+      10,
+      20,
+      30
+    ]
+  },
+  {
+    "input": [
+      10,
+      20,
+      30
+    ],
+    "limit": 100,
+    "actual": [
+      10,
+      20,
+      30
+    ],
+    "contract_expected": [
+      10,
+      20,
+      30
+    ]
+  }
+]

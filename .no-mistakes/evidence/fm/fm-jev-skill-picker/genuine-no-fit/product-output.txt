@@ -1,0 +1,12 @@
+skill-advice:
+  status: none
+  reason: "no optional fit; ordinary selection remains available"
+  uncertain: false
+  source: live
+  model: jev-1.13.0
+  stages: 1
+  no_fit: 0.95
+  required[1]{id,path}:
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md"
+  suggestions[0]{id,path,fit,uncertain,evidence}:
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

@@ -1,0 +1,15 @@
+skill-advice:
+  status: suggested
+  reason: "optional relevance only"
+  uncertain: true
+  source: live
+  model: jev-1.13.0
+  stages: 2
+  no_fit: 0.08999999999999997
+  required[1]{id,path}:
+    "safety","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md"
+  suggestions[3]{id,path,fit,uncertain,evidence}:
+    "invariant-review","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/invariant-review/SKILL.md",0.9,false,"opening-instruction recheck"
+    "review-patch","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md",0.82,true,"opening-instruction recheck"
+    "boundary-check","/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/boundary-check/SKILL.md",0.94,false,"opening-instruction recheck"
+help[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools

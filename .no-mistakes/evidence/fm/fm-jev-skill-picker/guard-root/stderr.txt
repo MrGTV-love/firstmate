@@ -1,0 +1,1 @@
+bin/fm-skill-suggest.sh: line 112: cd: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/guard-root/home/.agents/skills: Permission denied

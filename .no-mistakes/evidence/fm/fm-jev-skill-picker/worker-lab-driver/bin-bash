@@ -1,0 +1,15 @@
+#!/bin/bash
+if [ "${1##*/}" = fm-skill-suggest.sh ]; then
+  PICKER=$1; shift
+  . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-typesafe-lib.sh"
+  if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
+    TYPESAFE_API_KEY_PRIVATE=$(fmx_env_get TYPESAFE_API_KEY /Users/charlesabrooker/firstmate/.env)
+  fi
+  COUNT_FILE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/picker-count"
+  n=0; [ ! -f "$COUNT_FILE" ] || read -r n < "$COUNT_FILE"
+  n=$((n+1)); printf '%s\n' "$n" > "$COUNT_FILE"
+  export LIVE_WIRE_DIR="/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-$n"
+  . "$PICKER"
+else
+  exec /bin/bash "$@"
+fi

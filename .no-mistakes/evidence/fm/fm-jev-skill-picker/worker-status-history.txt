@@ -1,0 +1,2 @@
+done [at=1791326854]: Report complete: off-by-one bounds, missing negative exception, and contradictory README reproduced; isolated completion gate passed.
+done [at=1791326959]: Refreshed report reproduces off-by-one caps, zero and negative contract failures, and README contradiction; isolated completion gate passed.

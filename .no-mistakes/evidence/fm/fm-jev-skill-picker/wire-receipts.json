@@ -1,0 +1,1083 @@
+[
+  {
+    "scenario": "genuine-agent-discretion",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-agent-discretion/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-agent-discretion/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.180936"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit collection helper for correctness, boundary invariants, consumer regression examples and consistency of operator instructions with its contract.\n",
+    "wire_bytes": 3930,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.96
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.93
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.85
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.06
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.93
+      }
+    }
+  },
+  {
+    "scenario": "genuine-agent-discretion",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-agent-discretion/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-agent-discretion/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.210097"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "invariant-review",
+      "boundary-check",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit collection helper for correctness, boundary invariants, consumer regression examples and consistency of operator instructions with its contract.\n",
+    "wire_bytes": 2586,
+    "excerpt_characters": {
+      "invariant-review": 128,
+      "boundary-check": 197,
+      "review-patch": 193
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.88
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.92
+      }
+    }
+  },
+  {
+    "scenario": "genuine-ambiguous-top-three",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-ambiguous-top-three/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-ambiguous-top-three/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.151939"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review a small arithmetic helper for correctness and edge cases. It parses an optional integer limit and selects items from a collection. Assess empty input, negative bounds, off-by-one behavior and explain the change. Do not implement anything.\n",
+    "wire_bytes": 4007,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.72
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.92
+      }
+    }
+  },
+  {
+    "scenario": "genuine-ambiguous-top-three",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-ambiguous-top-three/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-ambiguous-top-three/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.168503"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "invariant-review",
+      "review-patch",
+      "boundary-check"
+    ],
+    "task": "Review a small arithmetic helper for correctness and edge cases. It parses an optional integer limit and selects items from a collection. Assess empty input, negative bounds, off-by-one behavior and explain the change. Do not implement anything.\n",
+    "wire_bytes": 2663,
+    "excerpt_characters": {
+      "invariant-review": 128,
+      "review-patch": 193,
+      "boundary-check": 197
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.86
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.89
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.86
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.93
+      }
+    }
+  },
+  {
+    "scenario": "genuine-minimal-brief",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-minimal-brief/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-minimal-brief/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.187345"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit arithmetic helper for collection slicing correctness and boundary scenarios.\n",
+    "wire_bytes": 3862,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.28
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.84
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.06
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.91
+      }
+    }
+  },
+  {
+    "scenario": "genuine-minimal-brief",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-minimal-brief/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-minimal-brief/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.141636"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "invariant-review",
+      "review-patch",
+      "boundary-check"
+    ],
+    "task": "Review an integer-limit arithmetic helper for collection slicing correctness and boundary scenarios.\n",
+    "wire_bytes": 2518,
+    "excerpt_characters": {
+      "invariant-review": 128,
+      "review-patch": 193,
+      "boundary-check": 197
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.87
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.83
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.93
+      }
+    }
+  },
+  {
+    "scenario": "genuine-multiple",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-multiple/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.243910"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review a small arithmetic helper for correctness and edge cases. It parses an optional integer limit and selects items from a collection. Assess empty input, negative bounds, off-by-one behavior and explain the change. Do not implement anything.\n",
+    "wire_bytes": 3003,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.93
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.94
+      }
+    }
+  },
+  {
+    "scenario": "genuine-no-fit",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-no-fit/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-no-fit/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.148356"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Compose a four-line birthday poem about a friendly orange cat. No software, operational change, code review, testing, browser or release work is needed.\n",
+    "wire_bytes": 3914,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.05
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.02
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.02
+      }
+    }
+  },
+  {
+    "scenario": "genuine-private-link-projection",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-private-link-projection/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-private-link-projection/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.230157"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review a small arithmetic helper for correctness and edge cases. It parses an optional integer limit and selects items from a collection. Assess empty input, negative bounds and off-by-one behavior.\n",
+    "wire_bytes": 3960,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.03
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.79
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.92
+      }
+    }
+  },
+  {
+    "scenario": "genuine-private-link-projection",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-private-link-projection/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-private-link-projection/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.172589"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "invariant-review",
+      "review-patch",
+      "boundary-check"
+    ],
+    "task": "Review a small arithmetic helper for correctness and edge cases. It parses an optional integer limit and selects items from a collection. Assess empty input, negative bounds and off-by-one behavior.\n",
+    "wire_bytes": 2616,
+    "excerpt_characters": {
+      "invariant-review": 128,
+      "review-patch": 193,
+      "boundary-check": 197
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.82
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.94
+      }
+    }
+  },
+  {
+    "scenario": "genuine-recheck-withheld",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-recheck-withheld/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-recheck-withheld/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.171615"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit collection helper for correctness, boundary invariants, consumer regression examples and consistency of operator instructions with its contract.\n",
+    "wire_bytes": 3930,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.85
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.06
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.94
+      }
+    }
+  },
+  {
+    "scenario": "genuine-repeat-no-cache",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-repeat-no-cache/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-repeat-no-cache/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.231747"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit arithmetic helper for collection slicing correctness and boundary scenarios.\n",
+    "wire_bytes": 3862,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_doc-audit": {
+        "type": "noul",
+        "noul": 0.29
+      },
+      "skill_frontend-layout": {
+        "type": "noul",
+        "noul": 0.04
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.95
+      },
+      "skill_regression-design": {
+        "type": "noul",
+        "noul": 0.85
+      },
+      "skill_release-coordination": {
+        "type": "noul",
+        "noul": 0.06
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.9
+      }
+    }
+  },
+  {
+    "scenario": "genuine-repeat-no-cache",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-repeat-no-cache/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/genuine-repeat-no-cache/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.474066"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "invariant-review",
+      "boundary-check",
+      "review-patch"
+    ],
+    "task": "Review an integer-limit arithmetic helper for collection slicing correctness and boundary scenarios.\n",
+    "wire_bytes": 2518,
+    "excerpt_characters": {
+      "invariant-review": 128,
+      "boundary-check": 197,
+      "review-patch": 193
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.9
+      },
+      "skill_invariant-review": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "skill_boundary-check": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "skill_review-patch": {
+        "type": "noul",
+        "noul": 0.83
+      }
+    }
+  },
+  {
+    "scenario": "real-transport-fallback",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/real-transport-fallback/request-1.json",
+    "response_file": null,
+    "transport": {
+      "returncode": 7,
+      "http_and_time": "000 0.000191"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "boundary-check",
+      "doc-audit",
+      "frontend-layout",
+      "invariant-review",
+      "regression-design",
+      "release-coordination",
+      "review-patch"
+    ],
+    "task": "Review integer collection slicing boundaries and input parsing.\n",
+    "wire_bytes": 3825,
+    "excerpt_characters": {},
+    "answers": null
+  },
+  {
+    "scenario": "worker-incarnation-1",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-1/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-1/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.227297"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "afk",
+      "agent-skill-trigger-index",
+      "ahoy",
+      "ask-user-authority",
+      "away-quiet-supervision",
+      "bearings",
+      "bootstrap-diagnostics",
+      "captain-hold-lifecycle",
+      "decision-hold-lifecycle",
+      "diagnostic-reasoning",
+      "firstmate-codexapp",
+      "firstmate-coding-guidelines",
+      "firstmate-orca",
+      "fmx-respond",
+      "harness-adapters",
+      "operational-home-layout",
+      "process-event-sources",
+      "project-management",
+      "quiet",
+      "quota-array-dispatch",
+      "scout-completion",
+      "secondmate-provisioning",
+      "session-start-recovery",
+      "ship-landing",
+      "stow",
+      "stuck-crewmate-recovery",
+      "updatefirstmate",
+      "validation-supervision"
+    ],
+    "task": "Review a small integer-limit helper for correctness, boundary cases, consumer regression examples and operator documentation consistency. The deliverable is a read-only diagnostic report in a disposable local lab.\n\n",
+    "wire_bytes": 23170,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.56
+      },
+      "skill_afk": {
+        "type": "noul",
+        "noul": 0.07
+      },
+      "skill_agent-skill-trigger-index": {
+        "type": "noul",
+        "noul": 0.34
+      },
+      "skill_ahoy": {
+        "type": "noul",
+        "noul": 0.16
+      },
+      "skill_ask-user-authority": {
+        "type": "noul",
+        "noul": 0.25
+      },
+      "skill_away-quiet-supervision": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_bearings": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_bootstrap-diagnostics": {
+        "type": "noul",
+        "noul": 0.17
+      },
+      "skill_captain-hold-lifecycle": {
+        "type": "noul",
+        "noul": 0.24
+      },
+      "skill_decision-hold-lifecycle": {
+        "type": "noul",
+        "noul": 0.13
+      },
+      "skill_diagnostic-reasoning": {
+        "type": "noul",
+        "noul": 0.78
+      },
+      "skill_firstmate-codexapp": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_firstmate-coding-guidelines": {
+        "type": "noul",
+        "noul": 0.51
+      },
+      "skill_firstmate-orca": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_fmx-respond": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_harness-adapters": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_operational-home-layout": {
+        "type": "noul",
+        "noul": 0.43
+      },
+      "skill_process-event-sources": {
+        "type": "noul",
+        "noul": 0.15
+      },
+      "skill_project-management": {
+        "type": "noul",
+        "noul": 0.13
+      },
+      "skill_quiet": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_quota-array-dispatch": {
+        "type": "noul",
+        "noul": 0.06
+      },
+      "skill_scout-completion": {
+        "type": "noul",
+        "noul": 0.16
+      },
+      "skill_secondmate-provisioning": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_session-start-recovery": {
+        "type": "noul",
+        "noul": 0.14
+      },
+      "skill_ship-landing": {
+        "type": "noul",
+        "noul": 0.12
+      },
+      "skill_stow": {
+        "type": "noul",
+        "noul": 0.15
+      },
+      "skill_stuck-crewmate-recovery": {
+        "type": "noul",
+        "noul": 0.11
+      },
+      "skill_updatefirstmate": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_validation-supervision": {
+        "type": "noul",
+        "noul": 0.3
+      }
+    }
+  },
+  {
+    "scenario": "worker-incarnation-1",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-1/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-1/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.146544"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "diagnostic-reasoning",
+      "firstmate-coding-guidelines",
+      "operational-home-layout"
+    ],
+    "task": "Review a small integer-limit helper for correctness, boundary cases, consumer regression examples and operator documentation consistency. The deliverable is a read-only diagnostic report in a disposable local lab.\n\n",
+    "wire_bytes": 5056,
+    "excerpt_characters": {
+      "diagnostic-reasoning": 700,
+      "firstmate-coding-guidelines": 700,
+      "operational-home-layout": 700
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.63
+      },
+      "skill_diagnostic-reasoning": {
+        "type": "noul",
+        "noul": 0.61
+      },
+      "skill_firstmate-coding-guidelines": {
+        "type": "noul",
+        "noul": 0.3
+      },
+      "skill_operational-home-layout": {
+        "type": "noul",
+        "noul": 0.23
+      }
+    }
+  },
+  {
+    "scenario": "worker-incarnation-2",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-2/request-1.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-2/response-1.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.203923"
+    },
+    "model": "jev-1.13.0",
+    "stage": "rank",
+    "catalog_ids": [
+      "afk",
+      "agent-skill-trigger-index",
+      "ahoy",
+      "ask-user-authority",
+      "away-quiet-supervision",
+      "bearings",
+      "bootstrap-diagnostics",
+      "captain-hold-lifecycle",
+      "decision-hold-lifecycle",
+      "diagnostic-reasoning",
+      "firstmate-codexapp",
+      "firstmate-coding-guidelines",
+      "firstmate-orca",
+      "fmx-respond",
+      "harness-adapters",
+      "operational-home-layout",
+      "process-event-sources",
+      "project-management",
+      "quiet",
+      "quota-array-dispatch",
+      "scout-completion",
+      "secondmate-provisioning",
+      "session-start-recovery",
+      "ship-landing",
+      "stow",
+      "stuck-crewmate-recovery",
+      "updatefirstmate",
+      "validation-supervision"
+    ],
+    "task": "Review a small integer-limit helper for correctness, boundary cases, consumer regression examples and operator documentation consistency. The deliverable is a read-only diagnostic report in a disposable local lab.\n\n",
+    "wire_bytes": 23170,
+    "excerpt_characters": {},
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.58
+      },
+      "skill_afk": {
+        "type": "noul",
+        "noul": 0.07
+      },
+      "skill_agent-skill-trigger-index": {
+        "type": "noul",
+        "noul": 0.37
+      },
+      "skill_ahoy": {
+        "type": "noul",
+        "noul": 0.15
+      },
+      "skill_ask-user-authority": {
+        "type": "noul",
+        "noul": 0.28
+      },
+      "skill_away-quiet-supervision": {
+        "type": "noul",
+        "noul": 0.09
+      },
+      "skill_bearings": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_bootstrap-diagnostics": {
+        "type": "noul",
+        "noul": 0.17
+      },
+      "skill_captain-hold-lifecycle": {
+        "type": "noul",
+        "noul": 0.24
+      },
+      "skill_decision-hold-lifecycle": {
+        "type": "noul",
+        "noul": 0.11
+      },
+      "skill_diagnostic-reasoning": {
+        "type": "noul",
+        "noul": 0.78
+      },
+      "skill_firstmate-codexapp": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_firstmate-coding-guidelines": {
+        "type": "noul",
+        "noul": 0.51
+      },
+      "skill_firstmate-orca": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_fmx-respond": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_harness-adapters": {
+        "type": "noul",
+        "noul": 0.19
+      },
+      "skill_operational-home-layout": {
+        "type": "noul",
+        "noul": 0.41
+      },
+      "skill_process-event-sources": {
+        "type": "noul",
+        "noul": 0.15
+      },
+      "skill_project-management": {
+        "type": "noul",
+        "noul": 0.13
+      },
+      "skill_quiet": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_quota-array-dispatch": {
+        "type": "noul",
+        "noul": 0.05
+      },
+      "skill_scout-completion": {
+        "type": "noul",
+        "noul": 0.16
+      },
+      "skill_secondmate-provisioning": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_session-start-recovery": {
+        "type": "noul",
+        "noul": 0.15
+      },
+      "skill_ship-landing": {
+        "type": "noul",
+        "noul": 0.12
+      },
+      "skill_stow": {
+        "type": "noul",
+        "noul": 0.14
+      },
+      "skill_stuck-crewmate-recovery": {
+        "type": "noul",
+        "noul": 0.1
+      },
+      "skill_updatefirstmate": {
+        "type": "noul",
+        "noul": 0.08
+      },
+      "skill_validation-supervision": {
+        "type": "noul",
+        "noul": 0.32
+      }
+    }
+  },
+  {
+    "scenario": "worker-incarnation-2",
+    "request_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-2/request-2.json",
+    "response_file": "/Users/charlesabrooker/.no-mistakes/evidence/01M49BAACZ1ZHY95W7KK1JRVBK/worker-incarnation-2/response-2.json",
+    "transport": {
+      "returncode": 0,
+      "http_and_time": "200 0.172313"
+    },
+    "model": "jev-1.13.0",
+    "stage": "recheck",
+    "catalog_ids": [
+      "diagnostic-reasoning",
+      "firstmate-coding-guidelines",
+      "operational-home-layout"
+    ],
+    "task": "Review a small integer-limit helper for correctness, boundary cases, consumer regression examples and operator documentation consistency. The deliverable is a read-only diagnostic report in a disposable local lab.\n\n",
+    "wire_bytes": 5056,
+    "excerpt_characters": {
+      "diagnostic-reasoning": 700,
+      "firstmate-coding-guidelines": 700,
+      "operational-home-layout": 700
+    },
+    "answers": {
+      "need": {
+        "type": "noul",
+        "noul": 0.61
+      },
+      "skill_diagnostic-reasoning": {
+        "type": "noul",
+        "noul": 0.6
+      },
+      "skill_firstmate-coding-guidelines": {
+        "type": "noul",
+        "noul": 0.31
+      },
+      "skill_operational-home-layout": {
+        "type": "noul",
+        "noul": 0.25
+      }
+    }
+  }
+]

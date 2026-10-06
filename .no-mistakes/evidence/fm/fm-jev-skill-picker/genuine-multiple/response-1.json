@@ -1,0 +1,1 @@
+{"model":"jev-1.13.0","answers":{"need":{"type":"noul","noul":0.92},"skill_boundary-check":{"type":"noul","noul":0.93},"skill_doc-audit":{"type":"noul","noul":0.19},"skill_frontend-layout":{"type":"noul","noul":0.03},"skill_release-coordination":{"type":"noul","noul":0.03},"skill_review-patch":{"type":"noul","noul":0.94}},"usage":{"input_tokens":795,"output_tokens":118}}

@@ -1,0 +1,1 @@
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/data/jev-live-probe/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})

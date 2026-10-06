@@ -1,0 +1,67 @@
+[
+  {
+    "scenario": "guard-ancestor",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-child",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-child-link",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-file-link",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-malformed-metadata",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"private-hidden\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/guard-malformed-metadata/catalog/bad/SKILL.md\"\n    \"safety\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-missing-key",
+    "product_output": "skill-advice:\n  status: off\n  reason: \"TypeSafe key unavailable\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-oversized",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"task exceeds 4 KiB; supply minimal permitted text\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-policy-ancestor",
+    "product_output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-policy-directive",
+    "product_output": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[2]{id,path}:\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-root",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-root-link",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-hidden\",null\n    \"review-patch\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/review-patch/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "guard-utf8-wire-budget",
+    "product_output": "skill-advice:\n  status: fallback\n  reason: \"request exceeds 96 KiB\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/wire-budget/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  },
+  {
+    "scenario": "private-named-withholding",
+    "product_output": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[3]{id,path}:\n    \"private-home\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/home/.agents/skills/private-home/SKILL.md\"\n    \"private-selected\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/private-selected/SKILL.md\"\n    \"safety\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.live-skill-lab/catalog/safety/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "forwarded_requests": 0
+  }
+]

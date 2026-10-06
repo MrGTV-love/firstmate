@@ -1,0 +1,109 @@
+
+                                                      ████████████
+                                                         ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                         ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                         ▒▒  ██                  █
+                                                             ██       v18.6.3
+
+                                                        Tip: Please use nerdfont 😭.
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ You are the actual primary for a disposable live test, not the operator fleet. FM_HOME is
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home, marked by bin/fm-lab-home.sh;
+ TREEHOUSE_ROOT is the separate disposable worktree-local pool. Use only this named private tmux server already inherited through TMUX. No
+ Herdr, shared daemon, shared pool, other repository or no-mistakes pipeline operations are authorized. No edits to product source or
+ memory/configuration outside this lab. Run /bin/bash
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/launch.sh once through your ordinary
+ bash tool, observe its output and exit code, then report it and wait for a supervisor message. This script calls the real supported scout
+ spawn for a read-only test fixture and records its output. Do not run alternative launch flags, approvals, or pipeline controls. Do not
+ read or export credentials; the test transport transparently obtains its separately authorized key within the picker process.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/launch.sh                 │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ fm-gate-refuse: gate agent lifecycle permitted only against lab home                                                                     │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home                                  │
+│ spawned jev-live-probe harness=omp kind=scout window=primary:fm-jev-live-probe                                                           │
+│ worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/pool/.treehouse/worker-probe │
+│ -f15ca2/1/worker-probe                                                                                                                   │
+│ ⟦Wall: 7.66s | Timeout: 300s⟧                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the launch script ran once and exited successfully (exit code 0).
+
+ Its output included a lifecycle refusal restricting operations to the lab home, followed by confirmation that the read-only scout
+ jev-live-probe spawned in the disposable pool.
+
+ I took no further action and am waiting for the supervisor message.
+
+
+ The isolated worker completed its first report. Now run /bin/bash
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/relaunch.sh once through your ordinary
+ bash tool. This is the supported transactional control-plane relaunch, retaining the same fixture worktree and source intent and
+ regenerating genuine Jev advice. Only this marked home and inherited named private tmux socket are authorized; no Herdr, pipeline or
+ shared-pool commands. Observe and report the script output and exit code, then wait. Do not modify the script or product source.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/relaunch.sh               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (5 earlier lines, showing 10 of 15) ⟦⌃O: Expand⟧                                                                                       │
+│ ●  WATCHER DOWN - SUPERVISION IS OFF                                                                                                     │
+│ ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).                                                │
+│ ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.                                       │
+│ ●  This is a supervision warning only; the guarded operation WILL still run.                                                             │
+│ ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.     │
+│ ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                                                                 │
+│ relaunched jev-live-probe harness=omp from=omp model=openai-codex/gpt-6.1-sol effort=low backend=tmux endpoint=primary:fm-jev-live-probe │
+│                                                                                                                                          │
+│ worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/pool/.treehouse/worker-probe │
+│ -f15ca2/1/worker-probe                                                                                                                   │
+│ ⟦Wall: 16.48s | Timeout: 300s⟧                                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the relaunch script ran once and exited successfully (exit code 0).
+
+ Output reported:
+ - Two lifecycle refusals restricting operations to the marked lab home.
+ - A warning that monitoring was inactive for the one running task; the warning did not prevent the operation.
+ - Successful relaunch of jev-live-probe, retaining the same fixture location.
+
+ I made no modifications or additional calls and am waiting for the supervisor message.
+
+
+ The disposable worker completed both required reports. Run /bin/bash
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/cleanup.sh once through your ordinary
+ bash tool to perform supported exact-task exit and teardown for jev-live-probe, with no force flags. The fixture report and isolated
+ completion gate are complete. Only this marked home, its own private pool slot and inherited private tmux socket are authorized. Do not
+ touch shared sessions, Herdr, pipeline state or another pool. Observe exit/teardown output and report the result, then remain idle. Do not
+ sign in, change credentials or modify the script.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/cleanup.sh                │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (12 earlier lines, showing 10 of 22) ⟦⌃O: Expand⟧                                                                                      │
+│                                                                                                                                          │
+│ 🌳 Worktree returned to pool.                                                                                                            │
+│ teardown jev-live-probe complete (window primary:fm-jev-live-probe, worktree                                                             │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/pool/.treehouse/worker-probe-f15ca2/1 │
+│ /worker-probe)                                                                                                                           │
+│ Backlog: jev-live-probe just finished (this home keeps no markdown backlog at                                                            │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/data/backlog.md). Update         │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/data/backlog.md - move           │
+│ jev-live-probe to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is  │
+│ due.                                                                                                                                     │
+│ ⟦Wall: 12.96s | Timeout: 300s⟧                                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Running authorized lab cleanup
+
+❯
+ ⠴ 19s · ◔ GPT-6.1-Sol 👁 · 🌳 32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK · ⑂ detached ?1 · ◫ 6.1%/272K ⟲ · S0.05 + 👁 0.03          🆔 01a11365
