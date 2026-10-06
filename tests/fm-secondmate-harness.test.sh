@@ -690,15 +690,43 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# The --add-dir grant a Claude secondmate launch carries between its
-# permission flag and --settings: only the PARENT home's state/<id>.inbox,
-# real-path resolved the way the spawn's claude_add_dirs_flag resolves it.
-# Prints a trailing space so callers can drop it straight into an expected
-# command.
-sm_claude_add_dir() {  # <world> <id>
-  local real
-  real=$(cd "$1/home/state" && pwd -P)
-  printf "%s " "--add-dir '$real/$2.inbox'"
+# Execute the captured launch against a stub and inspect argument boundaries,
+# not the shell quoting used to serialize the command.
+sm_assert_claude_launch() {  # <world> <home> <launch> <model> <effort> <permission>
+  local home=$2 launch=$3 model=$4 effort=$5 permission=$6
+  local fakebin="$1/tmux-sm/fakebin" envlog="$1/claude.env" arg i flag value expected count
+  local -a args=()
+  fm_fake_claude_recording "$fakebin"
+  fm_eval_launch "$launch" "$home" "$fakebin" \
+    "FM_FAKE_CLAUDE_ENV_LOG=$envlog" \
+    || fail "Claude secondmate captured launch failed"
+  [ -f "$envlog.args" ] || fail "Claude secondmate launch did not execute the stub"
+  while IFS= read -r -d '' arg; do args+=("$arg"); done < "$envlog.args"
+  assert_grep "CLAUDE_CODE_SEND_FEEDBACK=0" "$envlog" \
+    "Claude secondmate launch did not disable feedback drafts"
+  for flag in --model --effort --permission-mode --dangerously-skip-permissions; do
+    case "$flag" in
+      --model) expected=$model ;;
+      --effort) expected=$effort ;;
+      --permission-mode) expected=; [ "$permission" != auto ] || expected=auto ;;
+      --dangerously-skip-permissions) expected=; [ "$permission" != bypass ] || expected=present ;;
+    esac
+    count=0
+    for ((i=0; i<${#args[@]}; i++)); do
+      [ "${args[$i]}" = "$flag" ] || continue
+      count=$((count + 1))
+      if [ "$flag" != --dangerously-skip-permissions ]; then
+        value=${args[$((i + 1))]:-}
+        [ "$value" = "$expected" ] \
+          || fail "Claude secondmate $flag value '$value', expected '$expected'"
+      fi
+    done
+    if [ -n "$expected" ]; then
+      [ "$count" -eq 1 ] || fail "Claude secondmate must carry exactly one $flag"
+    else
+      [ "$count" -eq 0 ] || fail "Claude secondmate must not carry $flag"
+    fi
+  done
 }
 
 # spawn_secondmate_capture <world> <id> <home> <launchlog> [extra fm-spawn.sh args...]
@@ -781,10 +809,7 @@ test_spawn_bare_harness_no_model_effort_flag() {
   [ "$(meta_field "$meta" model)" = default ] || fail "bare-tokens: meta model not default (got '$(meta_field "$meta" model)')"
   [ "$(meta_field "$meta" effort)" = default ] || fail "bare-tokens: meta effort not default (got '$(meta_field "$meta" effort)')"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "CLAUDE_CODE_SEND_FEEDBACK=0 claude" \
-    "bare-tokens: Claude secondmate launch did not disable feedback drafts"
-  assert_not_contains "$launch" "--model" "bare-tokens: launch must not carry a --model flag"
-  assert_not_contains "$launch" "--effort" "bare-tokens: launch must not carry an --effort flag"
+  sm_assert_claude_launch "$w" "$sm" "$launch" "" "" bypass
   pass "C2 spawn: a bare harness-only secondmate-harness file launches with no model/effort flag (backward-compat)"
 }
 
@@ -806,9 +831,7 @@ test_spawn_secondmate_harness_model_token() {
   [ "$(meta_field "$meta" model)" = opus ] || fail "model-token: meta model not opus (got '$(meta_field "$meta" model)')"
   [ "$(meta_field "$meta" effort)" = default ] || fail "model-token: meta effort not default (got '$(meta_field "$meta" effort)')"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "claude --dangerously-skip-permissions $(sm_claude_add_dir "$w" sm)--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' --model 'opus'" \
-    "model-token: launch did not carry --model opus"
-  assert_not_contains "$launch" "--effort" "model-token: launch must not carry an --effort flag"
+  sm_assert_claude_launch "$w" "$sm" "$launch" opus "" bypass
   pass "C3 spawn: config/secondmate-harness's model token threads --model into the launch and meta"
 }
 
@@ -828,8 +851,7 @@ test_spawn_secondmate_harness_model_and_effort_tokens() {
   [ "$(meta_field "$meta" model)" = opus ] || fail "model-effort-tokens: meta model not opus"
   [ "$(meta_field "$meta" effort)" = high ] || fail "model-effort-tokens: meta effort not high (got '$(meta_field "$meta" effort)')"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "claude --dangerously-skip-permissions $(sm_claude_add_dir "$w" sm)--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' --model 'opus' --effort 'high'" \
-    "model-effort-tokens: launch did not carry both --model opus and --effort high"
+  sm_assert_claude_launch "$w" "$sm" "$launch" opus high bypass
   pass "C4 spawn: config/secondmate-harness's model+effort tokens thread into the launch and meta"
 }
 
@@ -850,8 +872,7 @@ test_spawn_explicit_model_overrides_secondmate_harness_token() {
     || fail "explicit-model: meta model not sonnet (got '$(meta_field "$meta" model)'), explicit flag did not win over file token"
   [ "$(meta_field "$meta" effort)" = high ] || fail "explicit-model: file's effort token should still apply"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "--model 'sonnet'" "explicit-model: launch did not use the explicit --model"
-  assert_not_contains "$launch" "--model 'opus'" "explicit-model: launch leaked the file's model token"
+  sm_assert_claude_launch "$w" "$sm" "$launch" sonnet high bypass
   pass "C5 spawn: an explicit --model overrides config/secondmate-harness's model token; the file's effort token still applies"
 }
 
@@ -872,8 +893,7 @@ test_spawn_explicit_effort_overrides_secondmate_harness_token() {
   [ "$(meta_field "$meta" effort)" = low ] \
     || fail "explicit-effort: meta effort not low (got '$(meta_field "$meta" effort)'), explicit flag did not win over file token"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "--effort 'low'" "explicit-effort: launch did not use the explicit --effort"
-  assert_not_contains "$launch" "--effort 'high'" "explicit-effort: launch leaked the file's effort token"
+  sm_assert_claude_launch "$w" "$sm" "$launch" opus low bypass
   pass "C6 spawn: an explicit --effort overrides config/secondmate-harness's effort token; the file's model token still applies"
 }
 
@@ -1447,9 +1467,7 @@ test_spawn_secondmate_claude_permission_mode_auto() {
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = claude ] || fail "permmode: meta harness not claude"
   launch=$(cat "$launchlog")
-  assert_contains "$launch" "claude --permission-mode auto $(sm_claude_add_dir "$w" sm)--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' --model 'opus'" \
-    "permmode: secondmate launch did not swap the permission flag while keeping --model"
-  assert_not_contains "$launch" "--dangerously-skip-permissions" "permmode: secondmate launch must not request bypass mode"
+  sm_assert_claude_launch "$w" "$sm" "$launch" opus "" auto
   pass "C2b spawn: config/claude-permission-mode=auto reaches a Claude secondmate launch"
 }
 
