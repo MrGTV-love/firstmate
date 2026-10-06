@@ -400,6 +400,7 @@ It retains each child's durable identity unless that exact pane returns structur
 
 The deferred backlog close or captain-held retention marker is not published until owned-process cleanup and the final session/endpoint/generation gates pass.
 A refusal at those gates cannot create a replay-authoritative marker that a later session start could use to erase the retained task record or transition its backlog item.
+Replay arguments and a non-authoritative marker are staged before owned-process cleanup; the previous authoritative marker is cleared, and a pre-publication refusal retires the stage through the existing cleanup trap.
 Accepted legacy generations are stamped only at that publication boundary; a failed marker write retains the existing stamp rollback behavior.
 Once those gates pass, the marker is still written before the pane close and subsequent destructive cleanup, preserving interrupted-cleanup replay.
 

@@ -1603,6 +1603,40 @@ The recovery regression's scenarios and the Herdr family's 20-minute step timeou
 The outer executor must publish through the active pipeline, perform native current-base revalidation, and inspect the resulting real CI log for this exact recovery script completing with `exit=0` and `gate_skip=false` on a green mergeable head.
 No new-head CI execution or Linux timing measurement is claimed by these local checks.
 
+The next required Herdr run (`37521752809`, job `112468697923`) did execute this regression (`gate_skip=false`), but failed after held conclusion with “released cleanup presentation mutations lost exact session-lock ownership”.
+The fixture audited explicit `pane close` calls but omitted the focus-safe shell-death route, which sends HUP to the verified lone idle shell instead.
+The audit now observes both routes, including same-shell KILL escalation, without counting ordinary worktree-process reaping as a presentation mutation or changing production close behavior.
+An executable signal smoke proved live-owner recording for HUP and escalation, ordinary TERM exclusion, and refusal of an unlocked HUP while its generated target remained alive.
+
+Base `3db901238a6b389ea0ea33e336b98bcbb43d10c7` was integrated in merge commit `7d44ebf2`, preserving the recorded no-history-rewrite decision.
+Its non-authoritative backlog staging and pre-signal process audit coexist with split custody: staging and owned cleanup precede exact Herdr reacquisition; legacy stamping and authoritative publication follow it; refusal retires the stage through the existing trap.
+The offline inventory fixture now supplies the generated project/state context and existing backlog audit library required by that updated reaper.
+
+Verified on 2026-10-06 on macOS aarch64 using the checkout-local official Herdr 0.7.4 pin (protocol 16):
+
+```sh
+bin/fm-install-herdr.sh "$PWD/.ci-herdr-bin"
+env PATH="$PWD/.ci-herdr-bin:$PATH" bin/fm-test-run.sh \
+  --fail-on-gate-skip 'herdr not found' \
+  --fail-on-gate-skip 'tasks-axi not found' \
+  --json "$PWD/.ci-recovery-timing.json" \
+  tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+bin/fm-lint.sh bin/fm-teardown.sh tests/fm-teardown.test.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+actionlint .github/workflows/ci.yml
+```
+
+The exact recovery script completed with `exit=0`, `duration_ms=1793668`, and `gate_skip=false`; the runner reported `total=1`, `failed=0`, and `skipped_gate=0`.
+All allocation, return, deliberately held conclusion/reaping, forced-secondmate recursion, fresh/reclaimed abort, replaced-generation refusal, close/retain bootstrap replay, structured-dead, inventory-isolation, sibling-custody and exact-focus scenarios passed.
+Guarded lab cleanup preserved the default-fleet tripwire, and no shared pool operation was invoked.
+Canonical pinned ShellCheck 0.11.0 full extended analysis and actionlint passed.
+This is local macOS evidence, not a new-head Linux CI timing measurement; the required family timeout and all existing scenarios remain unchanged.
+
+The merged teardown suite also passed through the public runner with a separate generated `FM_HOME` and the suite's ordinary temporary root outside the code root:
+`env FM_HOME="$PWD/.ci-verification-home" bin/fm-test-run.sh --json "$PWD/.ci-teardown-timing.json" tests/fm-teardown.test.sh`.
+It completed with `exit=0`, `duration_ms=2617651`, and `gate_skip=false` (`failed=0`, `skipped_gate=0`), including staged-marker replay/refusal, legacy stamp rollback, descendant custody, durable pre-signal audit and process-birth identity coverage.
+An earlier invocation placing this suite's removable homes under checkout-local `TMPDIR` correctly reached the code-root removal refusal before the expected child-source refusal; no guard or assertion was changed to accommodate that placement.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
+
 ### Workspace-removal focus safety
 
 The focus-flash regression ran on 2026-08-05 against both Herdr 0.7.5 protocol 17 and Herdr 0.8.0 protocol 19 on macOS aarch64, with the 0.7.5 run using the pinned upstream release binary first on `PATH`:

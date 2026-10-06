@@ -277,6 +277,8 @@ pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
 (
   . "$ROOT/bin/fm-nm-run-lib.sh"
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
@@ -295,6 +297,25 @@ echo "# herdr $(lab status --json | jq -r '.server.version') recovery custody la
 . "$ROOT/bin/fm-wake-lib.sh"
 TEST_SESSION_LOCK=$(fm_backend_herdr_presentation_session_lock_path "$HERDR_LAB_SESSION")
 export TEST_SESSION_LOCK
+# The focus-safe close may end a proved idle shell instead of issuing pane
+# close. Audit that real signal route too, including its same-shell escalation;
+# ordinary worktree reaping uses TERM/KILL and must remain outside this audit.
+kill() {
+  local owner
+  if [ "${1:-}" = -HUP ] \
+     || { [ "${1:-}" = -KILL ] && [ -n "${AUDITED_DEATH_PID:-}" ] && [ "${2:-}" = "$AUDITED_DEATH_PID" ]; }; then
+    owner=$(cat "$TEST_SESSION_LOCK/pid") || exit 1
+    builtin kill -0 "$owner" || exit 1
+    printf '%s\tpane death %s\n' "$owner" "$*" >> "$TEST_DIR/mutation-owners"
+    if [ "$1" = -HUP ]; then
+      AUDITED_DEATH_PID=$2
+    else
+      unset AUDITED_DEATH_PID
+    fi
+  fi
+  builtin kill "$@"
+}
+export -f kill
 write_brief() { # <home> <task-id>
   mkdir -p "$1/data/$2"
   cat > "$1/data/$2/brief.md" <<EOF
