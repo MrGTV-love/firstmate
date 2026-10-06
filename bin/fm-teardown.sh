@@ -3699,7 +3699,6 @@ teardown_legacy_stamp_rollback() {
   fi
   BACKLOG_CLOSE_STAGE=
   BACKLOG_CLOSED=1
-  META_SPAWN_GEN=$TEARDOWN_META_SPAWN_GEN
 fi
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
