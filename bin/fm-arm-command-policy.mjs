@@ -211,7 +211,7 @@ export class Lexer {
       }
       const redirection = this.readRedirection();
       if (redirection) {
-        const token = { type: "redir", value: redirection.value, inlineTarget: redirection.inlineTarget, fd: redirection.fd };
+        const token = { type: "redir", value: redirection.value, inlineTarget: redirection.inlineTarget, duplicationTarget: redirection.duplicationTarget, fd: redirection.fd };
         this.tokens.push(token);
         if (redirection.value === "<<" || redirection.value === "<<-") this.expectHeredoc = { token, stripTabs: redirection.value === "<<-" };
         continue;
@@ -301,14 +301,15 @@ export class Lexer {
 
   readRedirection() {
     const remaining = this.source.slice(this.index);
-    const match = remaining.match(/^(\d+)?(<<<|<<-|<<|>>|<>|>&|<&|>|<)(?:&?[0-9-]+)?/);
+    const match = remaining.match(/^(\d+)?(<<<|<<-|<<|>>|<>|>&|<&|>|<)/);
     if (!match) return "";
     this.index += match[0].length;
-    const inlineTarget = /(?:>&|<&)[0-9-]+$/.test(match[0]);
-    let normalized = match[0].replace(/^\d+/, "");
-    if (inlineTarget) normalized = normalized.replace(/[0-9-]+$/, "");
+    const duplication = ["<&", ">&"].includes(match[2])
+      ? this.source.slice(this.index).match(/^(\d+-?|-)(?=$|[\s;&|<>()])/)
+      : null;
+    if (duplication) this.index += duplication[0].length;
     const fd = match[1] === undefined ? (match[2].startsWith("<") ? 0 : 1) : Number(match[1]);
-    return { value: normalized, inlineTarget, fd };
+    return { value: match[2], inlineTarget: Boolean(duplication), duplicationTarget: duplication?.[0], fd };
   }
 
   readWord() {
@@ -427,7 +428,8 @@ export class Lexer {
           this.index += 2;
           continue;
         }
-        word.value += this.source[this.index + 1];
+        const escaped = this.source[this.index + 1];
+        word.value += /[$`"\\]/.test(escaped) ? escaped : `\\${escaped}`;
         this.index += 2;
         continue;
       }
@@ -523,6 +525,57 @@ const WRAPPER_LONG_OPTIONS = {
   timeout: { noArgument: new Set(["foreground", "preserve-status", "verbose", "help", "version"]), takesArgument: new Set(["kill-after", "signal"]) },
 };
 
+function splitEnvLiteral(source) {
+  const words = [];
+  let value = "";
+  let started = false;
+  let quote = "";
+  const finish = () => {
+    if (started) words.push({ type: "word", value, literal: true, subs: [], quoted: false, unquotedExpansion: false });
+    value = "";
+    started = false;
+  };
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    if ((char === "'" || char === '"') && (!quote || quote === char)) {
+      quote = quote ? "" : char;
+      started = true;
+      continue;
+    }
+    if (!quote && /[ \t\n\v\f\r]/.test(char)) {
+      finish();
+      continue;
+    }
+    if (char === "#" && !started) break;
+    if (char === "$" && quote !== "'") return null;
+    if (char === "\\" && (quote !== "'" || source[i + 1] === "\\" || source[i + 1] === "'")) {
+      const escape = source[++i];
+      if (escape === undefined) return null;
+      if (escape === "_") {
+        if (quote === '"') value += " ";
+        else {
+          finish();
+          continue;
+        }
+      } else if (escape === "c") {
+        if (quote) return null;
+        finish();
+        return words;
+      } else {
+        const escapes = { f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", '"': '"', "#": "#", "$": "$", "'": "'", "\\": "\\" };
+        if (!Object.hasOwn(escapes, escape)) return null;
+        value += escapes[escape];
+      }
+    } else {
+      value += char;
+    }
+    started = true;
+  }
+  if (quote) return null;
+  finish();
+  return words;
+}
+
 function consumeWrapperOptions(name, words, index) {
   const optionOwner = name === "gtimeout" ? "timeout" : name;
   const short = WRAPPER_OPTIONS[optionOwner];
@@ -542,9 +595,9 @@ function consumeWrapperOptions(name, words, index) {
       if (!long.takesArgument.has(option)) return { index: next, unresolved: true };
       if (equals !== -1) {
         if (name === "env" && option === "split-string") {
-          const split = new Lexer(value.slice(equals + 1)).tokenize();
-          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
-          words.splice(next, 1, ...split.tokens);
+          const split = words[next].literal && words[next].subs.length === 0 ? splitEnvLiteral(value.slice(equals + 1)) : null;
+          if (!split) return { index: next, unresolved: true };
+          words.splice(next, 1, ...split);
           return consumeWrapperOptions(name, words, next);
         }
         next += 1;
@@ -552,9 +605,9 @@ function consumeWrapperOptions(name, words, index) {
       }
       if (!words[next + 1]) return { index: next, unresolved: true };
       if (name === "env" && option === "split-string") {
-        const split = new Lexer(words[next + 1].value).tokenize();
-        if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
-        words.splice(next, 2, ...split.tokens);
+        const split = words[next + 1].literal && words[next + 1].subs.length === 0 ? splitEnvLiteral(words[next + 1].value) : null;
+        if (!split) return { index: next, unresolved: true };
+        words.splice(next, 2, ...split);
         return consumeWrapperOptions(name, words, next);
       }
       next += 2;
@@ -568,17 +621,17 @@ function consumeWrapperOptions(name, words, index) {
       if (offset + 1 === value.length) {
         if (!words[next + 1]) return { index: next, unresolved: true };
         if (name === "env" && option === "S") {
-          const split = new Lexer(words[next + 1].value).tokenize();
-          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
-          words.splice(next, 2, ...split.tokens);
+          const split = words[next + 1].literal && words[next + 1].subs.length === 0 ? splitEnvLiteral(words[next + 1].value) : null;
+          if (!split) return { index: next, unresolved: true };
+          words.splice(next, 2, ...split);
           return consumeWrapperOptions(name, words, next);
         }
         next += 2;
       } else {
         if (name === "env" && option === "S") {
-          const split = new Lexer(value.slice(offset + 1)).tokenize();
-          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
-          words.splice(next, 1, ...split.tokens);
+          const split = words[next].literal && words[next].subs.length === 0 ? splitEnvLiteral(value.slice(offset + 1)) : null;
+          if (!split) return { index: next, unresolved: true };
+          words.splice(next, 1, ...split);
           return consumeWrapperOptions(name, words, next);
         }
         next += 1;
@@ -712,18 +765,28 @@ export function shellInvocation(position) {
 
 export function shellStdinPayload(tokens, position) {
   if (shellInvocation(position)?.kind !== "stdin") return null;
-  let payload = null;
+  const descriptors = new Map();
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
-    if (token.type !== "redir" || token.fd !== 0) continue;
-    payload = null;
-    if (typeof token.heredoc === "string") payload = token.heredoc;
-    if (token.value === "<<<") {
-      const target = tokens[i + 1];
-      if (target?.type === "word" && target.literal && target.subs.length === 0) payload = target.value;
+    if (token.type !== "redir") continue;
+    const target = token.inlineTarget ? null : tokens[i + 1];
+    if (token.value === "<&" || token.value === ">&") {
+      const duplication = token.inlineTarget ? token.duplicationTarget
+        : target?.type === "word" && target.literal && target.subs.length === 0 && !target.unquotedExpansion ? target.value : null;
+      if (duplication !== null && /^\d+-?$/.test(duplication)) {
+        const source = Number(duplication.replace(/-$/, ""));
+        descriptors.set(token.fd, descriptors.get(source) ?? null);
+        if (duplication.endsWith("-")) descriptors.set(source, null);
+      } else {
+        descriptors.set(token.fd, null);
+      }
+      continue;
     }
+    let payload = typeof token.heredoc === "string" ? token.heredoc : null;
+    if (token.value === "<<<" && target?.type === "word" && target.literal && target.subs.length === 0) payload = target.value;
+    descriptors.set(token.fd, payload);
   }
-  return payload;
+  return descriptors.get(0) ?? null;
 }
 
 function sourcedScript(position) {

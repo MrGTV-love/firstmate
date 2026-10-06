@@ -136,13 +136,13 @@ const cloudOptionValues = {
 
 function cloudOperations(name, args) {
   const options = optionWords(args);
-  const words = operands(options, new Set(cloudOptionValues[name === 'flyctl' ? 'fly' : name]));
+  const words = operands(args, new Set(cloudOptionValues[name === 'flyctl' ? 'fly' : name]));
   const verb = words[0];
   const operations = [];
   if (name === 'kubectl') {
     if (verb === 'delete') operations.push('delete');
     if (verb === 'apply') operations.push('deploy');
-    if (['get', 'describe'].includes(verb) && /^(?:secrets?)(?:\/|$)/.test(words[1] || '')) operations.push('secret_read');
+    if (['get', 'describe'].includes(verb) && words.slice(1).some(value => value.split(',').some(resource => /^(?:secrets?)(?:\/|$)/.test(resource)))) operations.push('secret_read');
   } else if (name === 'helm') {
     if (['uninstall', 'delete'].includes(verb)) operations.push('delete');
     if (['install', 'upgrade'].includes(verb)) operations.push('deploy');
@@ -162,33 +162,71 @@ function cloudOperations(name, args) {
   }));
 }
 
+function multipartSecret(value) {
+  const equals = value.indexOf('=');
+  if (equals < 0 || !['@', '<'].includes(value[equals + 1])) return false;
+  const multiple = value[equals + 1] === '@';
+  let file = '';
+  let quoted = false;
+  for (let i = equals + 2; i < value.length; i++) {
+    const char = value[i];
+    if (quoted && char === '\\' && ['\\', '"'].includes(value[i + 1])) file += value[++i];
+    else if (char === '"') quoted = !quoted;
+    else if (!quoted && char === ';') break;
+    else if (!quoted && multiple && char === ',') {
+      if (secretPath(file)) return true;
+      file = '';
+    } else file += char;
+  }
+  return secretPath(file);
+}
+
 function secretUpload(name, args) {
   const files = name === 'curl'
-    ? new Set(['--data', '--data-binary', '--data-urlencode', '--json', '--upload-file', '--form', '-d', '-T', '-F'])
+    ? new Set(['--data', '--data-ascii', '--data-binary', '--data-urlencode', '--json', '--upload-file', '--form', '-d', '-T', '-F'])
     : new Set(['--post-file', '--body-file']);
-  const options = optionWords(args);
-  for (let i = 0; i < options.length; i++) {
-    let option = options[i];
+  const paths = name === 'curl'
+    ? new Set(['--netrc-file', '--key', '--cert', '-E', '--cacert', '--proxy-key', '--proxy-cert', '--proxy-cacert', '--config', '-K', '--cookie', '-b'])
+    : new Set(['--config', '--load-cookies', '--private-key', '--certificate', '--ca-certificate']);
+  const ignored = name === 'curl'
+    ? new Set(['--output', '-o', '--output-dir', '--dump-header', '-D', '--cookie-jar', '-c', '--write-out', '-w', '--libcurl', '--trace', '--trace-ascii', '--stderr', '--etag-save', '--data-raw', '--form-string', '--user', '-u', '--proxy-user', '-U', '--proxy', '-x', '--request', '-X', '--user-agent', '-A', '--referer', '-e', '--max-time', '-m'])
+    : new Set(['--output-document', '-O', '--output-file', '-o', '--append-output', '-a', '--save-cookies', '--warc-file', '--post-data', '--body-data', '--user', '--password', '--http-user', '--http-password', '--proxy-user', '--proxy-password', '--directory-prefix', '-P', '--user-agent', '-U', '--referer', '--method']);
+  const headers = new Set(name === 'curl' ? ['-H', '--header', '--proxy-header'] : ['--header']);
+  let ended = false;
+  for (let i = 0; i < args.length; i++) {
+    let option = args[i];
+    if (option === '--' && !ended) { ended = true; continue; }
+    if (ended || !option.startsWith('-')) {
+      if (/^file:\/\//i.test(option) && secretPath(option)) return true;
+      continue;
+    }
     let value;
     if (option.startsWith('--') && option.includes('=')) {
       const equals = option.indexOf('=');
       value = option.slice(equals + 1);
       option = option.slice(0, equals);
-    } else if (name === 'curl' && /^-[dTFH].+/.test(option)) {
+    } else if (/^-[^-].+/.test(option) && [files, paths, ignored, headers].some(set => set.has(option.slice(0, 2)))) {
       value = option.slice(2);
       option = option.slice(0, 2);
     }
-    if (!files.has(option) && !['-H', '--header'].includes(option)) continue;
-    value ??= options[++i] || '';
-    if (['-H', '--header'].includes(option)) {
-      if (/^(?:authorization:|cookie:)/i.test(value)) return true;
-      continue;
-    }
-    if (['--upload-file', '-T', '--post-file', '--body-file'].includes(option)) {
+    if (![files, paths, ignored, headers].some(set => set.has(option)) && !(name === 'curl' && option === '--url')) continue;
+    value ??= args[++i] || '';
+    if (ignored.has(option)) continue;
+    if (option === '--url') {
+      if (/^file:\/\//i.test(value) && secretPath(value)) return true;
+    } else if (headers.has(option)) {
+      if (/^(?:authorization:|cookie:)/i.test(value) || name === 'curl' && value.startsWith('@') && secretPath(value.slice(1))) return true;
+    } else if (paths.has(option)) {
+      if (['--cookie', '-b'].includes(option) && value.includes('=')) continue;
+      if (['--cert', '-E', '--proxy-cert'].includes(option)) value = value.replace(/:[^/\\]*$/, '');
       if (secretPath(value)) return true;
+    } else if (['--upload-file', '-T', '--post-file', '--body-file'].includes(option)) {
+      if (secretPath(value)) return true;
+    } else if (['--form', '-F'].includes(option)) {
+      if (multipartSecret(value)) return true;
     } else {
       const at = value.indexOf('@');
-      if (at >= 0 && (at === 0 || ['--data-urlencode', '--form', '-F'].includes(option)) && secretPath(value.slice(at + 1))) return true;
+      if (at >= 0 && (at === 0 || option === '--data-urlencode' && !value.slice(0, at).includes('=')) && secretPath(value.slice(at + 1))) return true;
     }
   }
   return false;
