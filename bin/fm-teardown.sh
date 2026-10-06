@@ -12,22 +12,10 @@
 # the one site where --force overrides it, and bin/fm-backend.sh's
 # fm_backend_kill owns what each backend can prove about its own close - an
 # already-exited endpoint is not a failure and stays silent.
-# Removing state/<id>.meta and landing the backlog transition are one step, not
-# two: bin/fm-backlog-transition-lib.sh owns that invariant, and both halves run
-# under the task's own meta lock before this script reports success. Because the
-# completion links (the PR, the report path, a local-main note) live only in the
-# record being removed, the intended transition is recorded in
-# state/<id>.backlog-close after exact-task process cleanup succeeds and before
-# worktree or endpoint removal, so a process killed between the halves leaves
-# the next session start enough to finish it; a landed close removes that record.
-# A close that fails is fatal and loud, preserves its pending-close record, and
-# is retried by the next session start. The transition is skipped on a
-# config/backlog-backend=manual home and in a markdown home that keeps no
-# data/backlog.md; those cases print the manual follow-up. A configured
-# non-markdown adapter remains active without a markdown file; any active
-# automatic backend without compatible tasks-axi refuses before cleanup.
-# None of this loosens the landed-work gates below: the transition runs only on
-# the paths that already proceed to remove the record.
+# bin/fm-backlog-transition-lib.sh owns the fused metadata/backlog transition,
+# its exemptions, and the pending-close lifecycle in its CRASH RECOVERY header.
+# Teardown reports manual follow-up for exempt homes; an automatic transition
+# failure is fatal and loud rather than reporting cleanup success.
 # The close - and only the close - is replaced by `tasks-axi reopen` with the
 # deliverable recorded while the backlog item is still an open captain call
 # (bin/fm-captain-hold.sh `open` owns that predicate), because the policy holds
@@ -294,8 +282,12 @@
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
-#     with printf %q. This audit survives task-record retirement; a failed write
-#     refuses signalling. Idempotent: nothing left to find is a silent no-op.
+#     with printf %q. This audit survives task-record retirement and records
+#     signal intent, not proof of delivery: an immediate birth-identity recheck
+#     can still skip the signal. Failed command/start collection skips the target
+#     only when a changed birth identity or kernel ESRCH proves it replaced or
+#     vanished; a live matching target or uncertain result refuses, as do authorization
+#     and write failures. Idempotent: nothing left to find is a silent no-op.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -2292,11 +2284,7 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     "$start" "$cwd" "$cwd" >> "$record") || return 1
 }
 
-# Reap processes rooted by cwd under this task's worktree or tasktmp. A match
-# inside a registered nested worktree lane refuses cleanup without signalling.
-# TERM first, then KILL after a short grace period; every signal requires a
-# durable identity audit and a fresh birth-identity check. A missing lsof or
-# any other scan error refuses destructive teardown.
+# Fix 2 in the script header owns exact-root custody and pre-signal auditing.
 reap_task_worktree_processes() {  # <label> <dir>...
   local label=$1 pids pid identity current_pids i pass=1 max_passes=3
   local -a tracked_pids tracked_identities remaining_pids remaining_identities

@@ -40,12 +40,18 @@
 #
 # CRASH RECOVERY. Only teardown needs a durable record: it removes the meta and
 # with it the completion links, so a process killed between the two halves would
-# leave nothing to reconstruct the close from. It writes
-# `state/<id>.backlog-close` first, and removes it once the close lands.
-# The writer and replay share one complete-record validator, and teardown stages
-# that record before destructive cleanup, so it never publishes or acts on a close
-# replay would reject. The validator pins the data path to this home's configured
-# root before any recovery mutation, then re-runs exactly that close.
+# leave nothing to reconstruct the close from. Teardown stages and validates the
+# transition before process cleanup, but that temporary file has no replay
+# authority. Before its process gates, every attempt clears any previously
+# published `state/<id>.backlog-close`, even when this attempt is exempt from an
+# automatic transition; failure to clear it refuses process cleanup.
+# Only after exact-task process cleanup succeeds does teardown publish the new
+# marker, before worktree or endpoint removal, and a landed transition removes it.
+# Thus a process-custody or audit refusal cannot authorize bootstrap to retire
+# the preserved task. The writer and replay share one complete-record validator,
+# so teardown never publishes or acts on a close replay would reject.
+# The validator pins the data path to this home's configured root before any
+# recovery mutation, then re-runs exactly that close.
 # `tasks-axi done` on an already-closed task backfills links
 # without moving the close date, so replay is idempotent. Spawn needs no marker:
 # it publishes the meta first, so a crash

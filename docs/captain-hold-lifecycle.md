@@ -147,9 +147,7 @@ It remains on the appropriate Captain's Call or Charted Next decision surface in
 
 ### Interrupted cleanup
 
-Teardown already stages a pending-close record before destructive cleanup.
-That record carries the retention intent as a `mode=retain` line.
-An interrupted cleanup therefore replays the retention at the next session start through the same record, validator, and lock as an ordinary close, and never closes the row.
+The interrupted close/retention marker's publication and replay safety gates are owned by [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh)'s CRASH RECOVERY header.
 
 If the captain answers before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
 Replay then retires the record.
