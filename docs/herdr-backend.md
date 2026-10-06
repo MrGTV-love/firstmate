@@ -604,7 +604,7 @@ That comparison ignores whitespace and U+2063, the invisible mark that starts op
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
-They skip it because their paste placeholders and composer shapes are not live-verified.
+Their pre-Enter typed-payload proof has not been live-verified; composer classification evidence is recorded separately in the [Composer classification matrix](verification/runtime-backends.md#composer-classification-matrix).
 
 ### Submit confirmation
 
@@ -667,6 +667,7 @@ The adapter is a thin capture.
 It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier in `bin/fm-composer-lib.sh`, which owns every shape:
 
 - Bordered boxes.
+- omp's rounded box, with its status in the top border and its last input row folded into the bottom border.
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
 - opencode's left bar.
 - The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.
@@ -683,6 +684,11 @@ Identity stays a lazy read, consulted only when a separator pair or a composer r
 ANSI capture preserves de-emphasized placeholder style.
 `bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
 For the Herdr-specific exception, see [Claude composer proof](#claude-composer-proof).
+
+omp's box has no prompt glyph, so typed `>`, `❯`, and `─` remain draft text and read `pending`, not `empty`.
+Its last-row `⇧⇥ to change thinking effort` hint proves emptiness only when styling distinguishes the dim hint from typed text.
+A plain capture of those exact bytes stays `unknown` and preserves them during content extraction; a bright typed copy stays `pending` even in a styled capture.
+The verified shape and live exit/relaunch refresh command are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.

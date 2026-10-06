@@ -9,13 +9,10 @@
 # or make its composer unreadable to bin/fm-composer-lib.sh. Verified against
 # omp 18.1.11's own settings schema (`omp config list`).
 composer:
-  # Renders a bare `❯` (U+276F) row, a glyph the shared composer classifier
-  # already reads; the shipped default `band` and five other shapes are not in
-  # its catalogue, and the shape is otherwise a captain-level setting. `box`
-  # (the captain's own setting) is also read, as the fallback a running session
-  # drops to because omp live-reloads every overlay file it was started with:
-  # removing a key from a tracked overlay changes sessions already running on
-  # that path (verified, omp 18.6.3; docs/verification/runtime-backends.md).
+  # Pins the bare `❯` (U+276F) row for predictable worker rendering.
+  # omp live-reloads this overlay, so removing the pin also changes sessions
+  # already running on this path; see the omp box-composer evidence in
+  # docs/verification/runtime-backends.md for the verified fallback behavior.
   shape: borderless
 plan:
   # `plan.defaultOnStartup: true` opens every session read-only; a worker that

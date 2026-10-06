@@ -123,7 +123,7 @@
 # glyph deliberately outside the agent set, so no opencode shape recorded here
 # can prove a left-bar envelope and open a zone under it.
 #
-# THE SAFETY RULE for glyphs: a bare shell prompt glyph (`>` `$` `%` `#`) -
+# THE SAFETY RULE for prompt-bearing shapes: a bare shell glyph (`>` `$` `%` `#`) -
 # what a pane shows once its agent has exited to a plain login shell - is a
 # genuine empty agent composer ONLY inside a bordered container. On a bare row
 # it is a dead-shell prompt and classifies `unknown` (never a safe injection
@@ -457,10 +457,9 @@ fm_busy_lines_match() {  # [harness]
   [ -n "$regex" ] && printf '%s' "$lines" | grep -qiE "$regex"
 }
 
-# The prompt glyphs, each declared exactly once (see THE SAFETY RULE above).
-# AGENT glyphs are a genuine empty agent composer on any row, bordered or bare.
-# SHELL glyphs are one only INSIDE a composer container; on a bare row they are
-# a dead-shell prompt and must never read `empty`. Newline-separated and
+# The prompt glyphs for prompt-bearing shapes, each declared exactly once.
+# See THE SAFETY RULE above; omp's glyphless box does not consume these lists.
+# Newline-separated and
 # consumed by `read` rather than word splitting, so `$`, `%`, and `#` stay
 # literal and no entry is ever exposed to pathname expansion.
 FM_COMPOSER_AGENT_PROMPT_GLYPHS=$(printf '%s\n' '❯' '›' '⟩' '→' '❭')
@@ -510,11 +509,9 @@ FM_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
 # a middle dot. It is consulted only as the boundary BELOW a bare composer,
 # never on the composer row itself.
 FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:]]|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]([[:space:]]|$)|[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K'
-# omp's `box` composer shape (`composer.shape: box`, the shipped setting of the
-# captain's own config, and what a running session falls back to when it
-# live-reloads an overlay file that no longer pins `borderless`) carries its
-# status line IN the top border and folds the editor's last row into the bottom
-# border (verified live through Herdr on omp 18.6.3):
+# omp's `box` composer shape carries its status line IN the top border and
+# folds the editor's last row into the bottom border (verified live through
+# Herdr on omp 18.6.3; docs/verification/runtime-backends.md):
 #   ╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 path > ⑂ branch > … ──╮
 #   ╰─ typed text                                       ─╯
 # The status opens with the same identity cell as the borderless status row,
