@@ -685,6 +685,30 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
 
+## omp worker memory posture
+
+Verified 2026-10-06 on macOS arm64 with omp 18.6.3.
+`omp config list --json` reports `mnemopi.noEmbeddings` as a boolean forcing deterministic FTS-only recall, with `memory.backend` still `mnemopi`.
+Real RPC sessions using `google-antigravity/gemini-3.1-flash-lite` received `{"type":"prompt","message":"Reply exactly OK. Do not use tools."}` and completed their turns.
+The common launch arguments were:
+
+```sh
+OMP_SKIP_SETUP=1 omp --mode rpc --no-session --no-extensions --no-rules \
+  --no-skills --no-title --no-tools \
+  --model google-antigravity/gemini-3.1-flash-lite --thinking low \
+  --cwd <isolated-smoke-directory> --config <overlay>
+```
+
+`ps -axo pid=,ppid=,rss=,command=` supplied the process tree, restricted recursively to each smoke session's descendants.
+The unchanged overlay produced helper PID 21400 under session PID 19021, with RSS 753456 KiB at the first 15-second sample.
+The worker launch, layering `--config .omp/fm-session-overlay.yml --config .omp/fm-worker-overlay.yml`, produced zero embedding helpers in 30 one-second samples, including after `prompt_result` reported `status=completed` and `sessionSettled=true`.
+The lane launch, using only `--config .omp/fm-session-overlay.yml`, produced helper PID 6825 under session PID 4578 with RSS 1134320 KiB at 15 seconds.
+RSS is not physical footprint; these samples prove helper presence and scope rather than a fixed per-session saving.
+Only the three smoke sessions were stopped; existing sessions and the user's configuration were untouched.
+Refresh this measurement after an omp upgrade by repeating both overlay combinations and submitting the RPC prompt above.
+`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks worker/scout versus secondmate overlay routing without model credentials.
+The overlay is applied before backend launch, so its memory effect is backend-independent; other harness launch paths are unchanged.
+
 ## Codex hook trust
 
 Verified 2026-09-16 on codex-cli 0.151.0, macOS arm64, in a fresh linked worktree of this repository.
