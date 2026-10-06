@@ -568,21 +568,20 @@ poll_retry_delay() {
   printf '%s\n' "$delay"
 }
 
-poll_iteration_started() {
-  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
-    'printf "%.6f\\n", clock_gettime(CLOCK_MONOTONIC)'
-}
-
-poll_iteration_floor_wait() {
+# Back off after the preceding attempt finishes. Timing from before routing and
+# CLI startup lets their variable latency compress neighboring poll starts.
+poll_retry_wait() {  # <minimum-seconds>
   perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
-    my ($started, $floor) = @ARGV;
-    my $remaining = $floor - (clock_gettime(CLOCK_MONOTONIC) - $started);
-    sleep($remaining) if $remaining > 0;
-  ' "$1" "$2"
+    my $deadline = clock_gettime(CLOCK_MONOTONIC) + $ARGV[0];
+    while (my $remaining = $deadline - clock_gettime(CLOCK_MONOTONIC)) {
+      last if $remaining <= 0;
+      sleep($remaining);
+    }
+  ' "$1"
 }
 
 cmd_poll() {
-  local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc iteration_started
+  local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc
   local pipeline_status reply_file=''
   local reply_text='' reply_pending=0 store_attempt=0
   [ -n "$artifact" ] || usage
@@ -607,7 +606,6 @@ cmd_poll() {
     trap "$cleanup_command; trap - $signal; kill -$signal $$" "$signal"
   done
   while :; do
-    iteration_started=$(poll_iteration_started) || die "cannot start the poll rate governor"
     [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
       || die "artifact is no longer a readable file: $artifact"
     apply_session_host "$artifact"
@@ -621,7 +619,7 @@ cmd_poll() {
         [ "$store_attempt" -lt "$POLL_RETRY_LIMIT" ] \
           || die "cannot resolve the board server from its Lavish session: $artifact"
         store_attempt=$((store_attempt + 1))
-        poll_iteration_floor_wait "$iteration_started" "$delay" \
+        poll_retry_wait "$delay" \
           || die "cannot enforce the poll rate governor"
         continue
         ;;
@@ -654,7 +652,7 @@ cmd_poll() {
       10)
         if [ "$attempt" -lt "$POLL_RETRY_LIMIT" ]; then
           attempt=$((attempt + 1))
-          poll_iteration_floor_wait "$iteration_started" "$delay" \
+          poll_retry_wait "$delay" \
             || die "cannot enforce the poll rate governor"
         else
           cat -- "$response"

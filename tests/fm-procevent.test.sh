@@ -1755,9 +1755,9 @@ cat > "$LAVISH_SCRIPTED_BIN/lavish-axi" <<'SH'
 # names the response for each successive poll, one word per poll, and its last
 # word repeats forever. `interrupt` is the exact transient response the server
 # returns while the board's marks stay available. LAVISH_TIMES, when set,
-# collects the wall-clock time each poll began.
+# collects the monotonic time each poll began.
 [ -z "${LAVISH_TIMES-}" ] \
-  || perl -MTime::HiRes=time -e 'printf "%.6f\n", time' >> "$LAVISH_TIMES"
+  || perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.6f\n", clock_gettime(CLOCK_MONOTONIC)' >> "$LAVISH_TIMES"
 n=$(cat "$LAVISH_COUNT" 2>/dev/null || echo 0)
 n=$((n + 1))
 printf '%s\n' "$n" > "$LAVISH_COUNT"
@@ -1821,11 +1821,9 @@ printf '<h1>default rate</h1>\n' > "$DEFAULT_RATE_ART"
 lavish_session "$DEFAULT_RATE_ART"
 DEFAULT_RATE_COUNT="$TMP_ROOT/default-rate-count"
 DEFAULT_RATE_TIMES="$TMP_ROOT/default-rate-times"
-# Every attempt starts after launch and at least the shipped delay after the
-# attempt before it, so poll k can never begin before launch + (k - 1) * 5s. A
-# slow host only makes polls later, so wait for three real polls - a stop in
-# progress is the poller exiting or going quiet - then check each one's start.
-default_rate_launched=$(perl -MTime::HiRes=time -e 'printf "%.6f\n", time')
+# Initial scheduling can be arbitrarily late; it does not buy credit for later
+# retries. Observe three real poll starts within the existing progress bound,
+# then require the shipped minimum between EVERY neighboring pair.
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" LAVISH_COUNT="$DEFAULT_RATE_COUNT" LAVISH_SCRIPT=interrupt \
   LAVISH_TIMES="$DEFAULT_RATE_TIMES" FM_LAVISH_POLL_RETRY_DELAY='' \
   "$ROOT/bin/fm-procevent-lavish.sh" poll "$DEFAULT_RATE_ART" >/dev/null 2>&1 &
@@ -1840,15 +1838,15 @@ wait "$DEFAULT_RATE_PID" 2>/dev/null || true
 [ "$default_rate_progress" -eq 1 ] \
   || fail "the default poll governor stopped an instantly returning source from making progress"
 early_poll=$(perl -e '
-  my ($launched, $delay) = splice @ARGV, 0, 2;
+  my $delay = shift @ARGV;
   my @starts = <>;
-  for my $k (0 .. $#starts) {
-    my $offset = $starts[$k] - $launched;
-    if ($offset < $k * $delay) { printf "%d at %.2fs", $k + 1, $offset; last }
+  for my $k (1 .. $#starts) {
+    my $gap = $starts[$k] - $starts[$k - 1];
+    if ($gap < $delay) { printf "%d after %.6fs", $k + 1, $gap; last }
   }
-' "$default_rate_launched" 5 "$DEFAULT_RATE_TIMES")
+' 5 "$DEFAULT_RATE_TIMES")
 [ -z "$early_poll" ] \
-  || fail "the shipped poll governor started poll $early_poll after launch, inside its 5s delay"
+  || fail "the shipped poll governor started poll $early_poll, inside its 5s neighboring-poll minimum"
 pass "the shipped poll governor bounds an instantly returning source"
 
 # A bounded test override keeps the retry policy's real bound under test without
@@ -5022,9 +5020,9 @@ pass "a group whose leader died to something else is still refused, not signalle
 kill -KILL -"$CRASH_PID" 2>/dev/null || true
 
 # The deadline-crossing stamp read must leave the runner unclaimed. During the
-# final read, take another absent snapshot, release the real runner, and prove
-# its ownership before returning that snapshot. A final ownership proof taken
-# before this external work would still report a live source absent.
+# second final stamp read, retain an absent snapshot, release the real runner,
+# and prove its ownership before returning that snapshot. The ownership proof
+# must follow BOTH stamp reads, not just the first final read.
 # Reconcile and arm must preserve their polling window and one-owner checks.
 confirm_live_at_boundary() {
   local operation=$1 BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ rc=0 output
@@ -5057,7 +5055,7 @@ case "$*" in
         printf '%s' "$snapshot"
         exit "$rc"
       fi
-      if [ "$n" -eq "$((BOUNDARY_READ + 1))" ]; then
+      if [ "$n" -eq "$((BOUNDARY_READ + 2))" ]; then
         rc=0; snapshot=$("$REAL_CAT" "$@" 2>/dev/null) || rc=$?
         : > "$BOUNDARY/release"
         for _ in $(seq 1 600); do
@@ -5126,19 +5124,108 @@ SH
 confirm_live_at_boundary reconcile
 confirm_live_at_boundary arm
 
-# A runner holds the source lock for its whole claim. On a loaded host that
-# claim outlasted the default confirm window, and the final read skipped the
-# held lock, so arm and reconcile reported a listener absent the moment before
-# it was owned. The shim holds the real runner inside its claim, at its first
-# argv read, past the default 3 s window and the whole-second clock's 1 s.
-confirm_held_claim() {
+# A confirmation reader must not become the obstacle to publication. Release
+# the real runner at a post-launch stamp read, and make a reader-owned mutex
+# publication return slowly. It is a real lock, not a claimed/readiness marker;
+# taking it just to inspect an absent claim would make this healthy launch fail.
+confirm_without_absent_reader_contention() {
+  local operation=$1 CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK
+  local REAL_CAT REAL_LN rc=0 output owner
+  local -a command=()
+  CONTENDED="$TMP_ROOT/absent-reader-$operation"
+  CONTENDED_ID="absent-reader-$operation"
+  CONTENDED_CORE="$ROOT/bin/fm-procevent.sh"
+  CONTENDED_CLAIM="$FM_PROCEVENT_CLAIM_ROOT/$CONTENDED_ID.claim"
+  CONTENDED_LOCK="$FM_PROCEVENT_CLAIM_ROOT/$CONTENDED_ID.lock"
+  REAL_CAT=$(command -v cat)
+  REAL_LN=$(command -v ln)
+  mkdir -p "$CONTENDED/bin" "$CONTENDED/home/state"
+  pe_register "$CONTENDED/home" lavish "$CONTENDED_ID" -- \
+    "$STARTED_BLOCKER" "$CONTENDED/started" "$BLOCKER" "$CONTENDED/release" "done" >/dev/null
+  export CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK REAL_CAT REAL_LN
+  cat > "$CONTENDED/bin/bash" <<'SH'
+#!/bin/bash
+case "${1-}" in
+  "$CONTENDED_CORE")
+    case "${2-}" in
+      reconcile|ensure-listening) printf '%s\n' "$$" > "$CONTENDED/reader-pid" ;;
+      _start)
+        while [ ! -e "$CONTENDED/post-launch-read" ]; do
+          [ "$SECONDS" -lt 120 ] || exit 75
+          /bin/sleep 0.01
+        done
+        ;;
+    esac
+    ;;
+esac
+exec /bin/bash "$@"
+SH
+  cat > "$CONTENDED/bin/cat" <<'SH'
+#!/bin/bash
+last=; for arg in "$@"; do last=$arg; done
+case "$last" in
+  *"/$CONTENDED_ID."*.last-launch)
+    n=0; [ ! -e "$CONTENDED/stamp-reads" ] || read -r n < "$CONTENDED/stamp-reads"
+    n=$((n + 1)); printf '%s\n' "$n" > "$CONTENDED/stamp-reads"
+    "$REAL_CAT" "$@"; rc=$?
+    [ "$n" -lt 3 ] || : > "$CONTENDED/post-launch-read"
+    exit "$rc"
+    ;;
+esac
+exec "$REAL_CAT" "$@"
+SH
+  cat > "$CONTENDED/bin/ln" <<'SH'
+#!/bin/bash
+last=; for arg in "$@"; do last=$arg; done
+if [ "$last" = "$CONTENDED_LOCK" ] && [ -e "$CONTENDED/post-launch-read" ] \
+  && [ ! -e "$CONTENDED_CLAIM" ] && [ ! -e "$CONTENDED/reader-hold-applied" ]; then
+  reader=; [ ! -e "$CONTENDED/reader-pid" ] || read -r reader < "$CONTENDED/reader-pid"
+  if [ "$PPID" = "$reader" ]; then
+    "$REAL_LN" "$@" || exit $?
+    : > "$CONTENDED/reader-hold-applied"
+    /bin/sleep 5
+    exit 0
+  fi
+fi
+exec "$REAL_LN" "$@"
+SH
+  chmod +x "$CONTENDED/bin/bash" "$CONTENDED/bin/cat" "$CONTENDED/bin/ln"
+  command=("$CONTENDED_CORE" "$operation")
+  [ "$operation" = reconcile ] || command+=("$CONTENDED_ID")
+  PATH="$CONTENDED/bin:$PATH" FM_HOME="$CONTENDED/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
+    "${command[@]}" > "$CONTENDED/out" 2> "$CONTENDED/err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "$operation delayed a healthy claim while inspecting absent ownership: $(cat "$CONTENDED/err")"
+  wait_for "$CONTENDED/started" || fail "$operation did not launch the actual source command"
+  owner=$(pe "$CONTENDED/home" list | awk -v id="$CONTENDED_ID" '$1 == id { print $3 }')
+  [ "$owner" = live ] || fail "$operation accepted an unproved owner: $owner"
+  assert_contains "$(pe "$CONTENDED/home" start "$CONTENDED_ID")" "already owned" \
+    "$operation failed to retain exclusive live ownership"
+  if [ "$operation" = reconcile ]; then
+    output=$(cat "$CONTENDED/out")
+    assert_contains "$output" "started=1" "reconcile did not confirm the healthy launch"
+    assert_contains "$output" "failed=0" "reconcile falsely reported the healthy launch failed"
+    [ "$(launch_failed_wake_count "$CONTENDED/home" "$CONTENDED_ID")" -eq 0 ] \
+      || fail "reconcile published a false failure while obstructing claim publication"
+  fi
+  : > "$CONTENDED/release"
+  pe "$CONTENDED/home" retire "$CONTENDED_ID" >/dev/null 2>&1 || true
+  unset CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK REAL_CAT REAL_LN
+  pass "$operation confirms a healthy default-window launch without obstructing claim publication"
+}
+confirm_without_absent_reader_contention reconcile
+confirm_without_absent_reader_contention ensure-listening
+
+# Holding the source lock is not a claim: argv is read before the claim file is
+# written. Keep a live runner at that read beyond the default 3 s window and
+# clock granularity, and require refusal rather than waiting for it to claim.
+confirm_unclaimed_at_boundary() {
   local operation=$1 HELD HELD_ID REAL_SED rc=0 output
   local -a command=()
-  HELD="$TMP_ROOT/held-claim-$operation"
+  HELD="$TMP_ROOT/held-unclaimed-$operation"
   mkdir -p "$HELD/bin" "$HELD/home/state"
   REAL_SED=$(command -v sed)
   if [ "$operation" = reconcile ]; then
-    HELD_ID=held-claim-src
+    HELD_ID=held-unclaimed-src
     pe_register "$HELD/home" lavish "$HELD_ID" -- \
       "$STARTED_BLOCKER" "$HELD/started" "$BLOCKER" "$HELD/poll-release" "done" >/dev/null
     command=("$ROOT/bin/fm-procevent.sh" reconcile)
@@ -5153,7 +5240,7 @@ done
 printf 'session:\n  status: ended\n'
 SH
     chmod +x "$HELD/bin/lavish-axi"
-    printf '<h1>held claim</h1>\n' > "$HELD/board.html"
+    printf '<h1>held unclaimed runner</h1>\n' > "$HELD/board.html"
     lavish_session "$HELD/board.html"
     HELD_ID=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$HELD/board.html")
     fm_test_track_procevent_home "$HELD/home"
@@ -5165,6 +5252,10 @@ SH
 case "$*" in
   "-n s/^argc=//p "*"/$HELD_ID.source")
     if mkdir "$HELD/held" 2>/dev/null; then
+      pgid=$(ps -o pgid= -p $$ | tr -d '[:space:]')
+      if [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] && kill -0 "$pgid" 2>/dev/null; then
+        printf 'alive-unclaimed\n' > "$HELD/preclaim"
+      fi
       sleep 5
     fi
     ;;
@@ -5172,29 +5263,33 @@ esac
 exec "$REAL_SED" "$@"
 SH
   chmod +x "$HELD/bin/sed"
-  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" \
+  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
     "${command[@]}" > "$HELD/out" 2> "$HELD/err" || rc=$?
-  [ -d "$HELD/held" ] || fail "held-claim fixture never held the $operation runner's claim"
+  [ "$(cat "$HELD/preclaim" 2>/dev/null)" = alive-unclaimed ] \
+    || fail "fixture did not hold a live unclaimed $operation runner"
   output=$(cat "$HELD/out")
-  [ "$rc" -eq 0 ] || fail "$operation reported a runner holding its claim absent ($rc): $output $(cat "$HELD/err")"
-  assert_not_contains "$(cat "$HELD/err")" "error:" "$operation printed an error for a runner that claimed"
+  [ "$rc" -ne 0 ] || fail "$operation waited for a genuinely unclaimed runner beyond its default confirmation window"
   if [ "$operation" = reconcile ]; then
-    assert_contains "$output" "started=1" "reconcile lost a launch whose claim outlasted the window"
-    assert_contains "$output" "failed=0" "reconcile reported a launch whose claim outlasted the window failed"
-    [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 0 ] \
-      || fail "reconcile published a false launch-failure event for a slow claim"
+    assert_contains "$output" "started=0" "reconcile confirmed a runner that remained unclaimed in its window"
+    assert_contains "$output" "failed=1" "reconcile lost the unconfirmed launch"
+    [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 1 ] \
+      || fail "reconcile did not publish the unconfirmed launch"
   else
-    assert_contains "$output" "armed: $HELD_ID" "arm lost a listener whose claim outlasted the window"
+    assert_contains "$(cat "$HELD/err")" "listener is not running: $HELD_ID" \
+      "arm did not explain its unconfirmed listener"
+    assert_not_contains "$output" "armed:" "arm advertised an unclaimed listener as ready"
   fi
-  wait_for "$HELD/started" || fail "the $operation listener never ran after its slow claim"
-  assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
-    "a slow claim did not leave exactly one owner"
+  if [ "$operation" = reconcile ]; then
+    wait_for "$HELD/started" || fail "the retained runner never ran after its delayed claim"
+    assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
+      "a delayed claim did not retain exactly one owner"
+  fi
   : > "$HELD/poll-release"
   pe "$HELD/home" retire "$HELD_ID" >/dev/null 2>&1 || true
-  pass "$operation waits out a runner's claim that outlasts the default confirm window"
+  pass "$operation refuses a live unclaimed runner at the unchanged default confirmation boundary"
 }
-confirm_held_claim reconcile
-confirm_held_claim arm
+confirm_unclaimed_at_boundary reconcile
+confirm_unclaimed_at_boundary arm
 
 # --- arm reports ready only once this registration's listener is running ----
 # The public arm path used to print armed as soon as registration was stored.
