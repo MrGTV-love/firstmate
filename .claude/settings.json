@@ -24,6 +24,16 @@
             "command": "[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}\" ] || exit 0; exec \"$CLAUDE_PROJECT_DIR\"/bin/fm-cd-pretool-check.sh --claude"
           }
         ]
+      },
+      {
+        "matcher": "^(Bash|Read)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}${FM_TASK_ID:-}\" ] || exit 0; exec node \"$CLAUDE_PROJECT_DIR\"/bin/fm-jev-guardrail.mjs hook --host claude",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

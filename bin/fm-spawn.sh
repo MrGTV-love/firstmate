@@ -4567,6 +4567,15 @@ if [ "$KIND" != secondmate ]; then
     ;;
   esac
   case "$HARNESS" in
+  claude* | omp)
+    guardrail_config=$CONFIG
+    case "$guardrail_config" in
+    /*) ;;
+    *) guardrail_config="$PWD/$guardrail_config" ;;
+    esac
+    ;;
+  esac
+  case "$HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
     # a turn; Stop (normal completion), StopFailure (API-error turn end),
@@ -4584,8 +4593,9 @@ if [ "$KIND" != secondmate ]; then
     j_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
+    j_guardrail=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guardrail_config") FM_STATE_OVERRIDE=$(shell_quote "$STATE_REAL") node $(shell_quote "$FM_ROOT/bin/fm-jev-guardrail.mjs") hook --host claude")
     cat >"$WT/.claude/settings.local.json" <<EOF
-{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"^(Bash|Read)$","hooks":[{"type":"command","command":"$j_guardrail","timeout":5}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"$j_submit"}]}],"Stop":[{"hooks":[{"type":"command","command":"$j_stop"}]}],"StopFailure":[{"hooks":[{"type":"command","command":"$j_stopfail"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$j_sessionend"}]}]}}
 EOF
     exclude_path '.claude/settings.local.json'
     ;;
@@ -4730,6 +4740,8 @@ EOF
     # has no trust gate, yet its cwd-only extension auto-discovery would load a
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
+    guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
+      '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events + turn-end notification for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -4745,6 +4757,7 @@ EOF
 // inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
 // never current-state truth.
 import { execFile } from "node:child_process";
+import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -4753,6 +4766,7 @@ const busyEvent = (state: string, event: string) =>
     ], () => resolve());
   });
 export default function (pi: any) {
+  installGuardrail(pi, $guardrail_context);
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;

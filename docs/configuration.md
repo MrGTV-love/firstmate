@@ -746,7 +746,7 @@ Enabled primary-session turn-end guard integrations are tracked as repo-level ho
 Kimi remains outside the primary turn-end guard integrations; [`docs/turnend-guard.md`](turnend-guard.md#compatibility-limits) owns its separate captain-approved crew wake hook.
 Primary-session watcher wake protocols are rendered at session start by [`bin/fm-supervision-instructions.sh`](../bin/fm-supervision-instructions.sh) from [`docs/supervision-protocols/`](supervision-protocols/).
 
-Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses its own two tracked `.omp/extensions/` files with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
+Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses two tracked supervision extensions under `.omp/extensions/` with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
 
 ### Choose the worker harness
 
@@ -1353,6 +1353,69 @@ Firstmate passes its profile line unless it states a reason to override, such as
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
+
+## Jev command screening (shadow only)
+
+`bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
+The tracked project registrations screen native `Bash`/`Read` on Claude and `bash`/`read` on omp in primary and secondmate sessions; tracked callers skip `FM_TASK_ID` task contexts, and the Claude registration also skips Grok compatibility hooks.
+`fm-spawn.sh` installs the generated task caller for new Claude and omp fleet workers, including Firstmate task worktrees, so the tracked copy does not screen a task twice.
+Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
+Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
+The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
+Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
+
+The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
+It does not grant account, billing, egress, command, or secret-access authority.
+No key means `missing_key`, not a synthetic judgment.
+Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
+
+Selection reuses Firstmate's read-only shell parser, with shadow-only parsing extensions kept inside the Jev hook; deterministic guard policies and their parser behavior remain unchanged.
+Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access candidates call Jev; ordinary reader arguments without sensitive-looking tokens and printed command examples do not.
+For delete/deploy operations, production scope takes precedence over a secret-shaped target.
+Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
+Native `Read`/`read` paths select secret-shaped targets without opening the file.
+Selection policy cohort 8 conservatively checks every argument token of `cat`, `head`, `tail`, `less`, `more`, `ls`, `find`, `jq`, `grep`, `rg`, `sed`, `awk`, `base64` and `xxd` for sensitive-looking evidence: `.env`, `.ssh`/`.aws`/`.gnupg`, `.pem`/`.key`, `id_*`, keychain, credentials/secrets, `~/.config/vernant` and `auth.json`.
+This is token evidence, not a claim that a file is read: patterns, programs and attached or separate option values intentionally qualify, including `rg --max-columns 120 '.env' README.md` and `rg -C 2 --context-separator .env needle README.md`.
+The `secret_read` operation enum therefore also denotes a sensitive-token candidate; native `Read`/`read` remains path-specific.
+Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
+Wrapper parsing preserves ordered `env -S` child arguments and literal env quoting/escapes, including trailing argv and `env -P` search paths; unsupported or environment-dependent split strings remain uncertain without expanding variables.
+`command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
+Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
+SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
+Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
+Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options.
+Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
+`printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
+Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
+This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
+
+Only closed structural operation/scope enums and booleans enter Jev state.
+Arbitrary arguments, paths, URLs, command text, customer content, environment values, file bodies and tool-result bodies are never sent or logged.
+The existing `config/dispatch-never-send` list additionally withholds matching native inputs locally; unreadable or non-regular lists withhold rather than send.
+The key is removed from child environments and passed to `curl` through its stdin header pipe (`-H @-`), not argv or a reopened `/dev/fd` path.
+Only the closed structural JSON request body is passed in `--data-binary` argv; this transport works with Node's socket-backed stdio on Linux as well as macOS.
+
+The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
+An interrupted attempt or unavailable usage remains unknown, not zero.
+Records require a private regular file and a complete UTF-8 row write; if attempt accounting cannot be fully written, no model request starts.
+The current integration screens pre-tool inputs only; it does not register completion hooks or correlate native success, failure or denial outcomes.
+The script header and `--help` own invocation mechanics.
+
+`metrics` reports descriptive counts, p95 selected-command overhead and all-attempt known/unknown spend.
+Labelled counts, risky recall and routine would-block rates appear only in separate `historical_september30` and `synthetic` objects, never as pooled or duplicated top-level quality fields.
+The top-level `unclassified_labelled` count reports old labelled records without a recognized dataset; those labels cannot contribute to either dataset's quality.
+`evaluate` consumes labelled native inputs without executing their commands; every new case requires `dataset: "historical_september30"` or `dataset: "synthetic"`, and provenance and independent labels remain the evaluator's responsibility.
+If any case result or required attempt cannot be fully persisted, evaluation stops with an explicit error and nonzero exit instead of printing success metrics.
+Existing bytes remain intact without retries or ledger repair; a partial row can prevent `metrics` from parsing the ledger.
+Only authentic September 30 command/decision receipts may be labelled `historical_september30`; proposal examples, later synthetic observations and reconstructed commands belong to neither historical evidence nor its counts.
+The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
+The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.
+Until real receipts are available, the historical labelled count remains zero and historical quality rates remain `null`, even when synthetic quality is measurable.
+Historical labels and attempt records retain their original meaning; cohort 8 does not relabel prior evaluations or turn synthetic examples into historical receipts.
+Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
+The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
+This implementation cannot enable blocking or reset that date.
 
 ## Toolchain
 

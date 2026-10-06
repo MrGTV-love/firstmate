@@ -62,7 +62,7 @@ Coordinate any workflow rollback with its required-check names so a retired chec
   A local `config/backlog-backend=manual` opt-out forces firstmate's routine backlog updates to hand-editing and stays gitignored; validated secondmate handoffs still delegate through `tasks-axi mv`.
   A local `config/backend` file explicitly overrides runtime auto-detection for new task endpoints and stays gitignored; spawn-supported values are `tmux`, `herdr` (which has its own required CI lane), and `zellij`, `orca`, and `cmux`, which remain experimental with no dedicated real-backend CI lane, while `codex-app` is documented only in `docs/codex-app-backend.md`.
   It does not make `data/` tracked.
-- Helper scripts in `bin/` are plain bash.
+- Shell helper scripts in `bin/` are plain bash.
   Each starts with a usage header comment; keep it accurate when you change behavior.
   Test scripts and helpers in `tests/` are plain bash too.
   Teardown real-process regressions use the suite-local fixture helpers in `tests/fm-teardown.test.sh`; preserve their identity-checked cleanup, replacement-readiness synchronization, audit-collection exit/live-failure controls, and exempt-retry close-replay checks when extending those cases.
