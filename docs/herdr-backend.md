@@ -138,9 +138,9 @@ Being present in the native agent inventory proves detection, but does not prove
 
 ### Moving an existing tmux fleet
 
-Changing backend configuration affects new spawns only.
-The control plane's [`relaunch`](agent-control.md#transactional-relaunch) preserves the task's recorded backend and worktree; it cannot convert a tmux endpoint into a Herdr endpoint.
-Use that control plane for supported agent relaunches, but do not present a relaunch as backend migration or edit endpoint metadata to simulate one.
+Changing backend configuration does not move existing live endpoints.
+For the control plane's narrow exception when a tmux endpoint is proven gone, see the [reclaim policy](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone).
+Use the control plane for supported agent relaunches; never edit endpoint metadata to simulate backend migration.
 
 The supported gradual transition is to select Herdr for future work, let existing tmux workers finish through their ordinary delivery path, and launch subsequent work on Herdr.
 Keep active worktrees, uncommitted changes, and task records intact throughout that transition.
@@ -196,8 +196,7 @@ Rename it manually before expecting new tasks or recovery to use it.
 ### Recovery and existing tasks
 
 Recovery and list-live still scan the first workspace matching the home label, because they address panes they already recorded rather than choosing where new work goes.
-The one recovery that does place new work is the control plane's reclaim of a destroyed endpoint.
-It mints a replacement tab through this section's ordinary placement rules while pinning the herdr session the task's record names ([`agent-control.md`](agent-control.md) "Reclaiming a task whose endpoint is gone").
+Control-plane reclaim places replacement tabs through this section's ordinary placement rules; the [reclaim policy](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns its backend and session constraints.
 
 Existing task operations use recorded endpoint ids and do not move a live task when labels change.
 The per-home workspace is reused while it has task tabs.
@@ -583,20 +582,26 @@ Typed-plane text is typed once; only Enter is retried.
 When native `agent get` identity is Claude, the adapter types only into an empty composer.
 A Claude composer that already holds text, or cannot be read, before the send is refused with nothing typed.
 Before that Enter, the adapter continues only when the selected composer shows the typed payload, or only Claude paste placeholders with no literal remainder.
+The payload is typed once.
+While the selected composer is empty, shows a strict prefix of the payload, or cannot be read, the proof keeps reading it for up to `FM_BACKEND_HERDR_PROOF_WAIT` seconds (default 30), because a loaded host renders it well after the settle.
+A strict prefix is treated as still rendering even when it also matches a suffix.
+If that wait expires without proof, the submit reports `send-failed` without Enter or clearing the composer.
+Only a proven head-truncated suffix of the payload, alone or after leading paste placeholders, authorizes immediate Ctrl+U cleanup.
+For that owned suffix, the adapter presses Ctrl+U until the shared classifier reads the composer as empty, then reports `send-failed` so a resend starts from a clean composer.
+If that clear cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
+For any other text, ownership is unproven, so it is refused on that read, never cleared, and reported `send-failed`, because Enter was never pressed.
+That includes a strict infix of the payload and any other literal beside a placeholder: either may be a human's typing, so the send leaves it in the composer rather than risk deleting it.
+Ctrl+C is not used for clearing, because Claude documents it as interrupting a running operation.
+Every Herdr composer read of a pane whose native identity is Claude retains normal-intensity truecolor text regardless of its luminance, because recognized slash commands can be dark blue or muted grey.
+The lifecycle pre-send guard, the payload proof, and post-Enter confirmation therefore agree about a colored draft, and the guard refuses it by name.
+Dim or faint suggestions are still removed, and other harnesses retain their existing placeholder policy.
+`fm_backend_herdr_composer_ghost_luma` owns that policy; a state read consults identity for it only when the two policies strip the selected composer rows differently.
+A submission reuses the identity it already probed for its post-Enter confirmation and clear reads, so a failed later probe cannot turn a swallowed colored command into a reported delivery; a Pi status is still read live, because only a live idle or done status proves its composer.
 Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
-Dated measurement: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup".
+Dated measurements: [Claude exit behind the slash-command popup](verification/runtime-backends.md#claude-exit-behind-the-slash-command-popup) and [Colored Claude slash commands](verification/runtime-backends.md#colored-claude-slash-commands).
 
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
-
-A composer that holds a shorter suffix, or a placeholder plus a literal remainder, does not receive Enter.
-Instead:
-
-1. The adapter presses Ctrl+U until the shared classifier reads the composer as empty.
-2. It then reports `send-failed`, so a resend starts from a clean composer.
-
-Ctrl+C is not used for this, because Claude documents it as interrupting a running operation.
-If the composer cannot be verified empty again, the submit reports `unknown` instead, because text may still be in the composer.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
 They skip it because their paste placeholders and composer shapes are not live-verified.
@@ -671,12 +676,13 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 A blocked Pi is parked on an interactive prompt, so its blank composer region is a menu's and not a free composer's.
 That state defers instead of proving emptiness.
 A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
-Identity stays a lazy second read, consulted only when a separator pair could change the verdict.
+Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
 
 ### Placeholder and ghost text
 
 ANSI capture preserves de-emphasized placeholder style.
 `bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
+For the Herdr-specific exception, see [Claude composer proof](#claude-composer-proof).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.

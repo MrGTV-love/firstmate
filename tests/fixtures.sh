@@ -359,6 +359,78 @@ fm_test_run_spawn() {
     "$ROOT/bin/fm-spawn.sh" "$@" 2>&1
 }
 
+# --- TeamClaude launcher stubs ----------------------------------------------
+
+# The proxy URL and CA path the fake `teamclaude env` exports, so assertions
+# name exactly what only that command could have put in a worker's environment.
+FM_TEST_TEAMCLAUDE_PROXY=http://127.0.0.1:13456
+FM_TEST_TEAMCLAUDE_CA=/fm-test/teamclaude-ca.pem
+
+# fm_test_fake_teamclaude <fakebin>
+# Stubs the TeamClaude CLI and a recording claude for config/claude-launcher
+# cases. `teamclaude status` exits FM_FAKE_TEAMCLAUDE_STATUS (default 0);
+# `teamclaude env` prints the forward-proxy export lines the real command prints.
+# teamclaude appends its environment to FM_FAKE_TEAMCLAUDE_ENV_LOG, and claude
+# to FM_FAKE_CLAUDE_ENV_LOG (and its arguments to <that>.args), when those are
+# set.
+fm_test_fake_teamclaude() {
+  local fakebin=$1
+  cat > "$fakebin/teamclaude" <<SH
+#!/usr/bin/env bash
+[ -z "\${FM_FAKE_TEAMCLAUDE_ENV_LOG:-}" ] || env >> "\$FM_FAKE_TEAMCLAUDE_ENV_LOG"
+case "\${1:-}" in
+  status) exit "\${FM_FAKE_TEAMCLAUDE_STATUS:-0}" ;;
+  env)
+    for name in HTTPS_PROXY HTTP_PROXY https_proxy http_proxy; do
+      printf 'export %s=%s\n' "\$name" '$FM_TEST_TEAMCLAUDE_PROXY'
+    done
+    printf '%s\n' "export NODE_EXTRA_CA_CERTS='$FM_TEST_TEAMCLAUDE_CA'" 'unset ANTHROPIC_BASE_URL'
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  cat > "$fakebin/claude" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FM_FAKE_CLAUDE_ENV_LOG:-}" ] || {
+  env >> "$FM_FAKE_CLAUDE_ENV_LOG"
+  printf '%s\n' "$@" >> "$FM_FAKE_CLAUDE_ENV_LOG.args"
+}
+exit 0
+SH
+  chmod +x "$fakebin/teamclaude" "$fakebin/claude"
+}
+
+# fm_test_teamclaude_launch_env <fakebin> <launch-command> <env-out>
+# Runs one recorded launch command as a pane would, but in a clean
+# non-interactive /bin/sh: no inherited proxy environment and no shell aliases,
+# so any proxy setting the recording claude reports came from the launch itself.
+# The fake teamclaude's own environment lands in <env-out>.teamclaude.
+fm_test_teamclaude_launch_env() {
+  local fakebin=$1 launch=$2 out=$3 bash_dir
+  bash_dir=$(fm_test_bash_only_dir "$(dirname "$out")")
+  : > "$out"
+  : > "$out.teamclaude"
+  env -i HOME="$(dirname "$fakebin")" PATH="$fakebin:$bash_dir:/usr/bin:/bin" \
+    FM_FAKE_CLAUDE_ENV_LOG="$out" FM_FAKE_TEAMCLAUDE_ENV_LOG="$out.teamclaude" \
+    /bin/sh -c "$launch" </dev/null >/dev/null 2>&1
+}
+
+# fm_test_assert_teamclaude_launch <fakebin> <launch-command> <label>
+# Asserts the launch starts Firstmate's TeamClaude launcher and that running it
+# hands claude the proxy and CA variables `teamclaude env` exported.
+fm_test_assert_teamclaude_launch() {
+  local fakebin=$1 launch=$2 label=$3 out
+  out="$(dirname "$fakebin")/claude-env.$RANDOM"
+  assert_contains "$launch" "$ROOT/bin/fm-teamclaude-launch.sh' " \
+    "$label: the Claude launch must start Firstmate's TeamClaude launcher"
+  fm_test_teamclaude_launch_env "$fakebin" "$launch" "$out" \
+    || fail "$label: the recorded launch command failed: $launch"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$out" \
+    || fail "$label: claude did not receive HTTPS_PROXY from teamclaude: $(cat "$out")"
+  grep -Fqx "NODE_EXTRA_CA_CERTS=$FM_TEST_TEAMCLAUDE_CA" "$out" \
+    || fail "$label: claude did not receive the TeamClaude CA from teamclaude: $(cat "$out")"
+}
+
 # --- send-world stubs -------------------------------------------------------
 
 # make_stubs <dir>
