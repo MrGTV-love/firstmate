@@ -1718,7 +1718,7 @@ stranded_leaderless_detail() {  # <source-id>
 
 cmd_reconcile() {
   local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token identity claim_state stop_state task_pending
-  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry
+  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry confirmation_blocked=0
   local -a launched=()
   # Rejected before anything is launched, and by name. A window this command
   # cannot use makes every launch unconfirmable, so validating it later would
@@ -1861,8 +1861,15 @@ cmd_reconcile() {
       rest=${entry#*$'\t'}
       launch_identity=${rest%%$'\t'*}
       launch_mark=${rest#*$'\t'}
-      if ! fm_procevent_source_lock_acquire "$id"; then
-        uncertain=$((uncertain + 1))
+      # Confirmation is bounded; finalization must not wait behind a runner
+      # that holds the publisher's lock but has not yet claimed.
+      if ! fm_procevent_source_lock_try_acquire "$id"; then
+        if launch_entry_listed "$entry" "$unconfirmed"; then
+          uncertain=$((uncertain + 1))
+          confirmation_blocked=1
+        else
+          started=$((started + 1))
+        fi
         continue
       fi
       current_identity=
@@ -1900,7 +1907,7 @@ cmd_reconcile() {
   fi
   printf 'reconciled: published=%s started=%s stopped=%s uncertain=%s failed=%s\n' \
     "$published" "$started" "$stopped" "$uncertain" "$failed"
-  [ "$failed" -eq 0 ]
+  [ "$failed" -eq 0 ] && [ "$confirmation_blocked" -eq 0 ]
 }
 
 launch_entry_listed() {  # <entry> <newline-separated entries>
