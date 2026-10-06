@@ -52,8 +52,8 @@
 #            once at its boundary without waiting for a still-unproved claim.
 #            No proof is a nonzero result. Exit 3 means a
 #            live listener from another registration generation still held the
-#            source when the window ended, so this generation cannot start until
-#            it is retired.
+#            source when the window ended. Replacement-registration adoption
+#            follows the relisten rule below.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
 #            drains its owned process group in EXIT cleanup, unless
