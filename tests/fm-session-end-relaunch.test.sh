@@ -338,7 +338,8 @@ test_backlog_hold_is_skipped() {
 }
 
 test_claude_debug_is_off_unless_asked() {
-  local case_dir home proj wt fakebin id=debug-off out launch status sm form
+  local case_dir home proj wt fakebin id=debug-off out launch status sm form probe env_log arg debug_count
+  local -a argv
   case_dir="$TMP_ROOT/debug-off"
   home="$case_dir/home"
   proj="$case_dir/project"
@@ -353,9 +354,21 @@ test_claude_debug_is_off_unless_asked() {
   out=$(cat "$case_dir/spawn.out")
   expect_code 0 "$status" "a default claude spawn should succeed: $out"
   launch=$(cat "$case_dir/launch.log")
-  assert_not_contains "$launch" '--debug' "claude debug was on without --claude-debug: $launch"
-  assert_not_contains "$launch" 'CLAUDE_CODE_DIAGNOSTICS_FILE' \
-    "claude diagnostics were on without --claude-debug: $launch"
+  probe="$case_dir/claude-probe"
+  env_log="$case_dir/claude.env"
+  mkdir -p "$probe"
+  fm_fake_claude_recording "$probe"
+  (unset CLAUDE_CODE_DIAGNOSTICS_FILE
+    fm_eval_launch "$launch" "$wt" "$probe" HOME="$home" \
+      FM_FAKE_CLAUDE_ENV_LOG="$env_log"
+  ) || fail "the default Claude launch failed to execute"
+  argv=()
+  while IFS= read -r -d '' arg; do argv+=("$arg"); done < "$env_log.args"
+  for arg in "${argv[@]}"; do
+    [ "$arg" != --debug ] || fail "claude debug was on without --claude-debug"
+  done
+  assert_no_grep 'CLAUDE_CODE_DIAGNOSTICS_FILE=' "$env_log" \
+    "claude diagnostics were on without --claude-debug"
 
   # The relaunch needs the recorded window listed with a bare shell in it.
   mkdir -p "$case_dir/stopped"
@@ -374,9 +387,19 @@ SH
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch --claude-debug > "$case_dir/relaunch.out" || status=$?
   expect_code 0 "$status" "a --relaunch --claude-debug spawn should succeed: $(cat "$case_dir/relaunch.out")"
   launch=$(cat "$case_dir/launch.log")
-  assert_contains "$launch" '--debug ' "claude debug was not enabled when asked: $launch"
-  assert_contains "$launch" "CLAUDE_CODE_DIAGNOSTICS_FILE='$(cd "$home/state" && pwd -P)/$id.claude-diagnostics.jsonl' " \
-    "the claude launch did not name the diagnostics file that records the stop signal: $launch"
+  (unset CLAUDE_CODE_DIAGNOSTICS_FILE
+    fm_eval_launch "$launch" "$wt" "$probe" HOME="$home" \
+      FM_FAKE_CLAUDE_ENV_LOG="$env_log"
+  ) || fail "the debug Claude relaunch failed to execute"
+  argv=()
+  while IFS= read -r -d '' arg; do argv+=("$arg"); done < "$env_log.args"
+  debug_count=0
+  for arg in "${argv[@]}"; do
+    if [ "$arg" = --debug ]; then debug_count=$((debug_count + 1)); fi
+  done
+  [ "$debug_count" -eq 1 ] || fail "claude debug was not enabled exactly once when asked"
+  assert_grep "CLAUDE_CODE_DIAGNOSTICS_FILE=$(cd "$home/state" && pwd -P)/$id.claude-diagnostics.jsonl" "$env_log" \
+    "the claude launch did not name the diagnostics file that records the stop signal"
 
   cp "$home/state/$id.meta" "$case_dir/meta.before"
   status=0

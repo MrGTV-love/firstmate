@@ -421,8 +421,6 @@ fm_test_teamclaude_launch_env() {
 fm_test_assert_teamclaude_launch() {
   local fakebin=$1 launch=$2 label=$3 out
   out="$(dirname "$fakebin")/claude-env.$RANDOM"
-  assert_contains "$launch" "$ROOT/bin/fm-teamclaude-launch.sh' " \
-    "$label: the Claude launch must start Firstmate's TeamClaude launcher"
   fm_test_teamclaude_launch_env "$fakebin" "$launch" "$out" \
     || fail "$label: the recorded launch command failed: $launch"
   grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$out" \

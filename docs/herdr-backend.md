@@ -380,10 +380,10 @@ So degraded behavior is never worse than the pre-mitigation sub-second restore.
 
 Ordinary non-projected task removal:
 
-- Serializes through the same session lock.
+- Serializes through the same session lock, waiting for a competing presentation transaction to release it without a cleanup timeout.
 - Applies the same focus-safe plan when its close would empty a non-focused workspace.
 - Keeps the legitimate plain close when the target is the active tab.
-- Refuses an unlocked close if the lock cannot be acquired.
+- Refuses an unlocked close if the session lock's identity cannot be resolved.
 
 Task cleanup first admits the exact endpoint read-only under its named-session presentation lock.
 A contended or ambiguous admission refuses while the copy, durable records, and endpoint are still intact.

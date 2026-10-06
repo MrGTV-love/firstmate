@@ -579,6 +579,19 @@ SH
   chmod +x "$fakebin/claude"
 }
 
+# fm_fake_claude_recording <fakebin>
+# Records the harness's actual environment and argv after the pane evaluates a
+# launch. NUL separators preserve argument boundaries, including prompt newlines.
+fm_fake_claude_recording() {
+  local fakebin=$1
+  cat > "$fakebin/claude" <<'SH'
+#!/bin/sh
+env > "${FM_FAKE_CLAUDE_ENV_LOG:?}"
+printf '%s\0' "$@" > "$FM_FAKE_CLAUDE_ENV_LOG.args"
+SH
+  chmod +x "$fakebin/claude"
+}
+
 # fm_eval_launch <launch-command> <pane-path> <fakebin> [VAR=val ...]
 # Runs a captured launch command the way the destination pane would: from the
 # pane's cwd with the fakebin on PATH and any extra environment assignments.

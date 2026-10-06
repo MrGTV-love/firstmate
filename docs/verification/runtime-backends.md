@@ -444,6 +444,56 @@ Removing the `--force` arm makes the forced generic case refuse; honoring `--for
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
+## Fresh acquisition abort
+
+`bin/fm-spawn.sh`'s header owns abort cleanup for fresh Treehouse-backed launches.
+Reverified on 2026-10-06 on macOS arm64:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-backend-herdr.test.sh tests/fm-spawn-acquisition-cleanup.test.sh tests/fm-spawn-acquisition-herdr-e2e.test.sh
+```
+
+The regression runs the real spawn entrypoint and real terminals with a fake `treehouse get` that holds a process lease until its shell exits.
+Caller sleeps are accelerated except for the contended cleanup wait; the fake get uses real sleeps and, in the slow-refusal case, receives permission only after spawn has refused.
+The tests observe the released lease, the vanished get process, and surviving unrelated panes and a previously successful acquisition.
+The caller runs from an ordinary checkout carrying its own origin, while the acquired clean copies remain origin-less; successful launch therefore also proves that relative Git config paths are resolved against the acquired checkout rather than the caller.
+The foreign-copy case reaches Claude's existing workspace-trust refusal, while a separate dirty-copy case refuses after successful discovery.
+No real Treehouse pool or model session is used.
+Herdr runs both flat and projected layouts in generated lab sessions through `bin/fm-herdr-lab.sh`, whose teardown verifies the default-session tripwire.
+Both terminal shells and the fake get's interactive child use lab-private history files.
+
+The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
+After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
+The refused spawn remained blocked in endpoint cleanup until the projected spawn released the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
+Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
+The companion `tests/fm-backend-herdr.test.sh` checks unresolved-lock refusal without any pane-close mutation.
+Projected abort cleanup confirms its exact acquisition pane is gone before releasing the presentation lock and retires that pane's generic cleanup target, avoiding a second close outside the original transaction.
+
+Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
+
+```text
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+```
+
+Focused verification passed all three scripts with no failures or gate skips.
+
+This command exercised tmux and Herdr; Zellij and cmux were not exercised.
+
+The CI repair also passed `tests/fm-spawn-pool-base-freshen.test.sh` and `tests/fm-backend-herdr-presentation-e2e.test.sh`.
+Real-Herdr verification used Herdr 0.9.1 in an ephemeral, short-path test namespace with a private default server; generated lab teardown retained the default-session tripwire.
+A throwaway public-spawn before/after smoke reproduced the caller-origin contamination on the original code and proved the corrected origin-less launch made no fetch.
+
 ## TeamClaude launcher
 
 Verified 2026-09-29 on TeamClaude 1.1.21-affinity.0 with its proxy running in its default forward-proxy mode.
@@ -684,6 +734,29 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 ```
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
+
+## omp worker memory posture
+
+Verified 2026-10-06 on macOS arm64 with omp 18.6.3.
+`omp config list --json` reports `mnemopi.noEmbeddings` as a boolean forcing deterministic FTS-only recall, with `memory.backend` still `mnemopi`.
+Real RPC sessions using `google-antigravity/gemini-3.1-flash-lite` received `{"type":"prompt","message":"Reply exactly OK. Do not use tools."}` and completed their turns.
+The common launch arguments were:
+
+```sh
+OMP_SKIP_SETUP=1 omp --mode rpc --no-session --no-extensions --no-rules \
+  --no-skills --no-title --no-tools \
+  --model google-antigravity/gemini-3.1-flash-lite --thinking low \
+  --cwd <isolated-smoke-directory> --config <overlay>
+```
+
+`ps -axo pid=,ppid=,rss=,command=` supplied the process tree, restricted recursively to each smoke session's descendants.
+The pre-change posture overlay produced an embedding helper with RSS 753456 KiB at the first 15-second sample.
+The worker launch, layering `--config .omp/fm-session-overlay.yml --config .omp/fm-worker-overlay.yml`, produced zero embedding helpers in 30 one-second samples, including after `prompt_result` reported `status=completed` and `sessionSettled=true`.
+The lane launch, using only `--config .omp/fm-session-overlay.yml`, produced an embedding helper with RSS 1134320 KiB at 15 seconds.
+RSS is not physical footprint; these samples prove helper presence and scope rather than a fixed per-session saving.
+Refresh this measurement after an omp upgrade by repeating both overlay combinations and submitting the RPC prompt above.
+`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks worker/scout versus secondmate overlay routing without model credentials.
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns launch routing and memory scope.
 
 ## Codex hook trust
 

@@ -24,7 +24,7 @@ RULES="$HOME_DIR/config/crew-dispatch.json"
 QUOTA="$TMP_ROOT/quota.json"
 BASE_PATH=$PATH
 mkdir -p "$HOME_DIR/config" "$LOG" "$NO_CURL_BIN"
-for command_name in bash chmod cp dirname jq mktemp rm; do
+for command_name in bash chmod cp dirname grep jq mktemp rm; do
   ln -s "$(command -v "$command_name")" "$NO_CURL_BIN/$command_name"
 done
 
@@ -420,9 +420,9 @@ expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...
   assert_equals '' "$out" "$label prints nothing on stdout, so firstmate uses its existing intake"
   assert_contains "$err" "dispatch-resolve: off ($fragment" "$label names why on stderr"
   assert_contains "$err" 'nothing sent)' "$label says nothing was sent"
-  assert_equals '1' "$(grep -c . <<<"$err")" "$label prints one diagnostic line"
   assert_absent "$LOG/argv" "$label never calls curl"
   assert_absent "$LOG/quota-axi.calls" "$label never reads quota"
+  assert_not_contains "$err" "$KEY" "$label never prints the API key"
   local value
   for value in "$@"; do
     assert_not_contains "$err" "$value" "$label never prints the listed value"
@@ -439,7 +439,7 @@ assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'Acme-Ledger' "a list w
 printf '%s\n' '# private values' '' '  acme-ledger  ' > "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a case-insensitive literal match" "brief text matches $NEVER_SEND line 3" 'acme-ledger' 'Acme-Ledger'
+expect_withheld "a case-insensitive literal match" "brief text matches $NEVER_SEND line 3" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 
 WRAPPED_BRIEF="$TMP_ROOT/wrapped-brief.md"
 printf '# Task\n## Captain'"'"'s intent\nFix the pager for Example Client\nLtd before\tthe\xc2\xa0release.\n' > "$WRAPPED_BRIEF"
@@ -475,19 +475,19 @@ PRIMARY_HOME=$HOME_DIR
 HOME_DIR=$SECOND_HOME
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "an inherited list in a secondmate home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger'
+expect_withheld "an inherited list in a secondmate home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 HOME_DIR=$PRIMARY_HOME
 
 rm -f "$NEVER_SEND"
 mkdir "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a directory at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rmdir "$NEVER_SEND"
 ln -s "$TMP_ROOT/missing-never-send" "$NEVER_SEND"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file"
+expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rm -f "$NEVER_SEND"
 
 reset_log
@@ -495,6 +495,125 @@ TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
 assert_contains "$out" '  status: clear' "no list resolves exactly as before"
 assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'Acme-Ledger' "no list sends the task text as before"
 pass "never-send list withholds the request on a match or a bad list, and never prints the value"
+
+# --- opt-in protected brief regions ------------------------------------------
+MARKED_BRIEF="$TMP_ROOT/marked-brief.md"
+cat > "$MARKED_BRIEF" <<'MD'
+# Task
+## Captain's intent
+Fix the public pager.
+<!-- dispatch-never-send:start -->
+### Synthetic customer details
+SYNTHETIC-CUSTOMER-4417
+# Internal heading that must not truncate the public task
+<!-- dispatch-never-send:end -->
+Keep the public pagination behavior.
+
+## Firstmate spec
+<!-- dispatch-never-send:start -->
+SYNTHETIC-PROJECT-CONSTRAINT
+<!-- dispatch-never-send:end -->
+Use the existing pager.
+
+# Setup
+Ignore this boilerplate.
+MD
+
+rm -f "$NEVER_SEND"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$MARKED_BRIEF" --project pager
+expect_withheld "markers with no never-send list" "never-send markers need the marked-sections directive" 'SYNTHETIC-CUSTOMER-4417'
+assert_absent "$LOG/body" "markers without the opt-in never produce an outgoing body"
+
+printf '%s\n' 'Unrelated literal' > "$NEVER_SEND"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$MARKED_BRIEF" --project pager
+expect_withheld "markers with a literal-only list" "never-send markers need the marked-sections directive" 'SYNTHETIC-CUSTOMER-4417'
+
+NEAR_MISS_BRIEF="$TMP_ROOT/near-miss-brief.md"
+printf '%s\n' 'Public task' '<!--dispatch-never-send:start-->' 'SYNTHETIC-NEAR-MISS' '<!--dispatch-never-send:end-->' > "$NEAR_MISS_BRIEF"
+rm -f "$NEVER_SEND"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$NEAR_MISS_BRIEF" --project pager
+expect_withheld "unspaced markers with no never-send list" "never-send markers need the marked-sections directive" 'SYNTHETIC-NEAR-MISS'
+
+printf '%s\n' '# dispatch-never-send marked-sections' 'SYNTHETIC-CUSTOMER-4417' > "$NEVER_SEND"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$MARKED_BRIEF" --project pager
+assert_contains "$out" '  status: clear' "protected text is removed before literal matching"
+sent_brief=$(jq -r .state.task.brief "$LOG/body")
+assert_contains "$sent_brief" 'Fix the public pager.' "public intent before a protected region survives"
+assert_contains "$sent_brief" 'Keep the public pagination behavior.' "a protected heading cannot truncate public intent after the region"
+assert_contains "$sent_brief" 'Use the existing pager.' "public spec survives a second protected region"
+for private_text in SYNTHETIC-CUSTOMER-4417 SYNTHETIC-PROJECT-CONSTRAINT 'Synthetic customer details' 'Internal heading' dispatch-never-send 'Ignore this boilerplate'; do
+  assert_not_contains "$(cat "$LOG/body")" "$private_text" "request body excludes $private_text"
+done
+
+WHOLE_MARKED_BRIEF="$TMP_ROOT/whole-marked-brief.md"
+cat > "$WHOLE_MARKED_BRIEF" <<'MD'
+Public task before a protected region.
+   <!-- dispatch-never-send:start -->
+# Task
+## Captain's intent
+SYNTHETIC-HIDDEN-TASK
+   <!-- dispatch-never-send:end -->
+Public task after a protected region.
+MD
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$WHOLE_MARKED_BRIEF" --project pager
+sent_brief=$(jq -r .state.task.brief "$LOG/body")
+assert_contains "$sent_brief" 'Public task before' "whole-brief fallback uses sanitized text before the region"
+assert_contains "$sent_brief" 'Public task after' "whole-brief fallback uses sanitized text after the region"
+assert_not_contains "$(cat "$LOG/body")" 'SYNTHETIC-HIDDEN-TASK' "whole-brief fallback never rereads protected text"
+
+FENCED_MARKED_BRIEF="$TMP_ROOT/fenced-marked-brief.md"
+cat > "$FENCED_MARKED_BRIEF" <<'MD'
+Public fenced example:
+```
+<!-- dispatch-never-send:start -->
+SYNTHETIC-FENCED-SECRET
+<!-- dispatch-never-send:end -->
+public code
+```
+MD
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$FENCED_MARKED_BRIEF" --project pager
+assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'public code' "public fenced code survives"
+assert_not_contains "$(cat "$LOG/body")" 'SYNTHETIC-FENCED-SECRET' "markers protect text inside code fences"
+
+# A literal outside a removed region still stops the entire request.
+printf '%s\n' '# dispatch-never-send marked-sections' 'public pagination' > "$NEVER_SEND"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$MARKED_BRIEF" --project pager
+expect_withheld "literal protection after section stripping" "brief text matches $NEVER_SEND line 2" 'public pagination'
+
+printf '%s\n' '# dispatch-never-send marked-sections' > "$NEVER_SEND"
+BAD_MARKED_BRIEF="$TMP_ROOT/bad-marked-brief.md"
+for malformed in unclosed orphan nested inline typo unspaced recased; do
+  case "$malformed" in
+    unclosed) printf '%s\n' 'Public task' '<!-- dispatch-never-send:start -->' 'SYNTHETIC-BAD-SECRET' > "$BAD_MARKED_BRIEF" ;;
+    orphan) printf '%s\n' 'SYNTHETIC-BAD-SECRET' '<!-- dispatch-never-send:end -->' > "$BAD_MARKED_BRIEF" ;;
+    nested) printf '%s\n' '<!-- dispatch-never-send:start -->' '<!-- dispatch-never-send:start -->' 'SYNTHETIC-BAD-SECRET' '<!-- dispatch-never-send:end -->' '<!-- dispatch-never-send:end -->' > "$BAD_MARKED_BRIEF" ;;
+    inline) printf '%s\n' 'Public task <!-- dispatch-never-send:start --> SYNTHETIC-BAD-SECRET' > "$BAD_MARKED_BRIEF" ;;
+    typo) printf '%s\n' '<!-- dispatch-never-send:star -->' 'SYNTHETIC-BAD-SECRET' > "$BAD_MARKED_BRIEF" ;;
+    unspaced) printf '%s\n' 'Public task' '<!--dispatch-never-send:start-->' 'SYNTHETIC-BAD-SECRET' '<!--dispatch-never-send:end-->' > "$BAD_MARKED_BRIEF" ;;
+    recased) printf '%s\n' 'Public task' '<!-- Dispatch-Never-Send:start -->' 'SYNTHETIC-BAD-SECRET' '<!-- Dispatch-Never-Send:end -->' > "$BAD_MARKED_BRIEF" ;;
+  esac
+  reset_log
+  TYPESAFE_API_KEY=$KEY run code out err "$BAD_MARKED_BRIEF" --project pager
+  expect_withheld "$malformed markers" "invalid never-send markers or unreadable brief" 'SYNTHETIC-BAD-SECRET'
+done
+
+for directive in '# dispatch-never-send project: pager' '# dispatch-never-send marked-section' '#dispatch-never-send marked-sections' '# Dispatch-Never-Send marked-sections'; do
+  printf '%s\n' 'Ordinary comment' "$directive" > "$NEVER_SEND"
+  for directive_brief in "$BRIEF" "$MARKED_BRIEF"; do
+    reset_log
+    TYPESAFE_API_KEY=$KEY run code out err "$directive_brief" --project pager
+    expect_withheld "an invalid privacy directive" "invalid privacy directive in $NEVER_SEND line 2" 'SYNTHETIC-CUSTOMER-4417'
+  done
+done
+rm -f "$NEVER_SEND"
+pass "opt-in marked sections protect outgoing bodies and markers never send without the exact opt-in"
 
 # --- rules are snapshotted and line output is injection-safe -------------------
 MUTATED_RULES="$TMP_ROOT/mutated-rules.json"

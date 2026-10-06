@@ -205,12 +205,15 @@
 #   markers (omp publishes none of its own), sets the Firstmate-owned
 #   FM_OMP_HARNESS=omp detection marker, suppresses the first-run provider
 #   wizard with OMP_SKIP_SETUP=1, forces --auto-approve, pins the working
-#   directory with --cwd, and passes the tracked worker posture overlay
-#   .omp/fm-worker-overlay.yml through --config. That overlay pins composer
+#   directory with --cwd, and passes the tracked session posture overlay
+#   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
-#   policy for the one session only (--auto-approve alone owns approval); the
-#   captain's own ~/.omp/agent/config.yml (model roles, providers, theme) is
-#   never written.
+#   policy for the one session only (--auto-approve alone owns approval,
+#   forcing tools.approvalMode: yolo for the session).
+#   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
+#   text-only recall without loading a separate embedding model per session.
+#   Secondmate lanes keep their memory settings; the captain's own
+#   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
 #   A model written as <provider>/<id> is validated against `omp models --json`
 #   only when that provider appears in the listing; a provider absent from the
 #   listing (an extension-registered provider such as claude-bridge, which omp
@@ -251,6 +254,10 @@
 #   itself a linked worktree of the project repository still launches. A pane
 #   that never reaches an isolated worktree refuses at the end of that wait,
 #   naming the last path seen and why it was rejected.
+#   A pre-launch refusal of a fresh Treehouse-backed spawn closes only the
+#   endpoint created by this attempt, ending its get process lease even if
+#   allocation completes after the isolation deadline. Relaunches and adopted
+#   endpoints are untouched.
 #   That placement is proven only at launch. Every ship or scout pane therefore
 #   also receives `export FM_TASK_ID=<task-id>` before the launch command, on
 #   the same channel as GOTMPDIR, and bin/fm-test-run.sh refuses to execute the
@@ -294,9 +301,10 @@
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
 # Launch environment (config/launch-env-allowlist):
-#   Absent means unchanged ambient inheritance. A present readable regular file
-#   opts every launch (ship, scout, secondmate, raw command, and relaunch) into
-#   /usr/bin/env -i followed by /bin/sh -c of the existing launch command.
+#   Absent leaves ambient inheritance subject to harness-specific shedding.
+#   A present readable regular file opts every launch (ship, scout, secondmate,
+#   raw command, and relaunch) into /usr/bin/env -i followed by /bin/sh -c of the
+#   existing launch command.
 #   Each line is one POSIX environment name, never a value or shell expression;
 #   blank lines and lines beginning with # are ignored. Invalid input refuses
 #   before launch, as do path inspection errors such as inaccessible config
@@ -314,11 +322,11 @@
 #   pins to 1 with a literal assignment so it survives the cleared environment
 #   even on a host that never had it set.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
-#   assignments still apply inside the filtered environment. Raw commands must
-#   be POSIX sh compatible under this opt-in; the absent-file path is unchanged.
+#   assignments still apply inside the filtered environment.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
-#   See docs/configuration.md for provider/Git setup and supported limits.
+#   See docs/configuration.md for provider/Git setup, raw-command shell
+#   compatibility, and supported limits.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -375,7 +383,8 @@
 #     __OMPEXT__   absolute path to state/<task-id>.omp-ext.ts (omp busy-state and
 #                  turn-end extension, written by this script; outside the worktree so
 #                  omp's cwd-only auto-discovery cannot load it a second time)
-#     __OMPWORKERCFG__ absolute path to the tracked .omp/fm-worker-overlay.yml posture overlay
+#     __OMPSESSIONCFG__ absolute path to the tracked .omp/fm-session-overlay.yml posture overlay
+#     __OMPWORKERCFG__ absolute path to the tracked .omp/fm-worker-overlay.yml memory overlay
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
 #     __BRIEFDOORBELL__ quoted printable doorbell naming the launch-brief record this
 #                  script published into the receiving home's operational inbox
@@ -551,24 +560,11 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
-if ! LAUNCH_ENV_ENABLED=$(fm_config_source_present "$CONFIG/launch-env-allowlist"); then
-  exit 1
-fi
-LAUNCH_ENV_NAMES=
-if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  if [ ! -f "$CONFIG/launch-env-allowlist" ] || [ ! -r "$CONFIG/launch-env-allowlist" ]; then
-    echo "error: config/launch-env-allowlist must be a readable regular file" >&2
-    exit 1
-  fi
-  if ! LAUNCH_ENV_NAMES=$(jq -Rrs '
-    split("\n") | map(select(. != "" and (startswith("#") | not))) |
-    if all(.[]; test("^[A-Za-z_][A-Za-z0-9_]*$")) then .[]
-    else error("expected environment names only") end
-  ' "$CONFIG/launch-env-allowlist" 2>/dev/null); then
-    echo "error: config/launch-env-allowlist must contain one environment name per line, blank lines, or # comments" >&2
-    exit 1
-  fi
-fi
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
+fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
+LAUNCH_ENV_ENABLED=$FM_API_KEY_LAUNCH_ENV_ENABLED
+LAUNCH_ENV_NAMES=$FM_API_KEY_LAUNCH_ENV_NAMES
 # config/claude-permission-mode (header above): resolved once per spawn or
 # relaunch, before any mutation, so a malformed file refuses instead of
 # launching a worker on a permission posture the captain did not choose.
@@ -1242,6 +1238,7 @@ CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
+SPAWN_TREEHOUSE_ABORT_TARGET=
 
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
@@ -1309,10 +1306,39 @@ spawn_abort_cleanup() {
       "$HERDR_PROJECTION_ABORT_SESSION" \
       "$HERDR_PROJECTION_ABORT_TASK_PANE" \
       "$HERDR_PROJECTION_ABORT_SEEDED_PANE" || true
+    # Projection cleanup already owns this exact pane under the held lock.
+    # Retire the generic target only after proving the process endpoint is gone.
+    if [ "$SPAWN_TREEHOUSE_ABORT_TARGET" = "$HERDR_PROJECTION_ABORT_SESSION:$HERDR_PROJECTION_ABORT_TASK_PANE" ] &&
+      fm_backend_herdr_endpoint_confirmed_gone "$SPAWN_TREEHOUSE_ABORT_TARGET"; then
+      SPAWN_TREEHOUSE_ABORT_TARGET=
+    fi
   fi
   if [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" = 1 ]; then
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
     fm_lock_release "$HERDR_PRESENTATION_ORDER_LOCK" || true
+  fi
+  # The get process owns the pool lease, not the cwd we happened to observe.
+  # Closing this attempt's endpoint also cancels a get still preparing a slot;
+  # returning a guessed path here could release somebody else's allocation.
+  if [ -n "$SPAWN_TREEHOUSE_ABORT_TARGET" ] && [ "$KIND" != secondmate ] &&
+    [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
+    if [ "$BACKEND" = tmux ]; then
+      # Use the creation-time window id, never a name a later pane could reuse.
+      tmux kill-window -t "$SPAWN_TREEHOUSE_ABORT_TARGET" || {
+        echo "error: could not close this attempt's Treehouse acquisition window $SPAWN_TREEHOUSE_ABORT_TARGET" >&2
+        status=1
+      }
+    else
+      if ! fm_backend_kill "$BACKEND" "$SPAWN_TREEHOUSE_ABORT_TARGET" \
+        "${ZELLIJ_TAB_ID:-}" "$W"; then
+        echo "error: could not close this attempt's Treehouse acquisition endpoint $SPAWN_TREEHOUSE_ABORT_TARGET" >&2
+        status=1
+      elif [ "$BACKEND" = herdr ] &&
+        ! fm_backend_herdr_endpoint_confirmed_gone "$SPAWN_TREEHOUSE_ABORT_TARGET"; then
+        echo "error: Treehouse acquisition pane $SPAWN_TREEHOUSE_ABORT_TARGET was not confirmed closed; reconcile this attempt before retrying" >&2
+        status=1
+      fi
+    fi
   fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
@@ -2080,11 +2106,11 @@ launch_template() {
   # naming them with -e as well loads each twice (verified), doubling every
   # session_stop continuation.
   omp)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPWORKERCFG__ --auto-approve --cwd __WORKTREE__'
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
       printf '%s' ' __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
-      printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' ' --config __OMPWORKERCFG__ __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
   # agy (Antigravity CLI): --prompt-interactive "<brief>" starts the supervised
@@ -2361,11 +2387,16 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
+  OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
   OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
-  [ -f "$OMP_WORKER_CFG" ] || {
-    echo "error: omp worker posture overlay missing at $OMP_WORKER_CFG; a worker launched without it can park on the captain's own approval or plan-mode settings" >&2
+  [ -f "$OMP_SESSION_CFG" ] || {
+    echo "error: omp session posture overlay missing at $OMP_SESSION_CFG; a session launched without it can park on the captain's own approval or plan-mode settings" >&2
     exit 1
   }
+  if [ "$KIND" != secondmate ] && [ ! -f "$OMP_WORKER_CFG" ]; then
+    echo "error: omp worker memory overlay missing at $OMP_WORKER_CFG" >&2
+    exit 1
+  fi
   ;;
 agy)
   AGY_BIN=$(resolve_pi_executable agy) || {
@@ -2438,74 +2469,9 @@ fi
 # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
 # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
 # refuse when a pin is active: the key cannot reach the worker.
-if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
-  if [ -z "$WORKER_ACCOUNT" ]; then
-    # No pin shed: determine whether each variable would reach the worker.
-    if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-      route_text=' through config/launch-env-allowlist'
-    else
-      route_text=' through ambient environment inheritance'
-    fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      would_reach=1
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
-        esac
-      fi
-      if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-        echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-      fi
-    done
-  fi
-  # Also check the environment a new tmux window gives the worker. The window
-  # inherits the tmux session environment layered over the tmux global
-  # environment, which can hold a key the spawning process no longer has (the
-  # server started while the shell exported it). A session entry wins, and a
-  # session removal marker (-NAME) means unset; otherwise the global value
-  # applies. The global environment is checked even before the target session
-  # exists, because a session created later inherits it. The pin shed
-  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
-  # Pane rc files and direnv .envrc exports are not detected by this check.
-  if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
-    tmux_session=
-    if [ -n "${TMUX:-}" ]; then
-      tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
-    elif tmux has-session -t firstmate 2>/dev/null; then
-      tmux_session=firstmate
-    fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) continue ;;  # Allowlist filters it out at launch time
-        esac
-      fi
-      tmux_env_scope=
-      if [ -n "$tmux_session" ] \
-         && tmux_env_entry=$(tmux show-environment -t "$tmux_session" "$check_var" 2>/dev/null); then
-        case "$tmux_env_entry" in
-        "$check_var"=?*) tmux_env_scope=session ;;
-        esac
-      elif tmux_env_entry=$(tmux show-environment -g "$check_var" 2>/dev/null); then
-        case "$tmux_env_entry" in
-        "$check_var"=?*) tmux_env_scope=global ;;
-        esac
-      fi
-      case "$tmux_env_scope" in
-      session)
-        echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      global)
-        echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      esac
-    done
-  fi
+if ! fm_api_key_guard "$HARNESS" "$ALLOW_API_KEY" "$WORKER_ACCOUNT" \
+  "$LAUNCH_ENV_ENABLED" "$LAUNCH_ENV_NAMES" "$BACKEND"; then
+  exit 1
 fi
 
 secondmate_registry_value() {
@@ -3424,6 +3390,7 @@ spawn_worktree_has_origin_config() { # <worktree>
   git -C "$worktree" config --get-regexp '^remote\.origin\.' >/dev/null 2>&1 && return 0
   while IFS=$'\t' read -r origin key; do
     case $origin in file:*) config=${origin#file:} ;; *) continue ;; esac
+    case $config in /*) ;; *) config="$worktree/$config" ;; esac
     [ -f "$config" ] || continue
     case $seen in *$'\n'"$config"$'\n'*) continue ;; esac
     seen+="$config"$'\n'
@@ -3704,6 +3671,7 @@ else
     # stays $T (the name form), which is safe now that rename is disabled.
     WID=$(fm_backend_tmux_create_task "$SES" "$W" "$PROJ_ABS") || exit 1
     WT_TARGET="$WID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$WID
     ;;
   herdr)
     # fm_backend_herdr_workspace_label resolves the target workspace from
@@ -3768,6 +3736,7 @@ else
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=""
+            SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
             # Reclaim has finished every focus-sensitive mutation and
             # published its exact replacement binding. Task/meta locks still
             # protect this incarnation; allocation and harness setup need no
@@ -3835,6 +3804,7 @@ else
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=$FM_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
+            SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
             fm_backend_herdr_projection_order_best_effort \
               "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_PARENT_LABEL" "$HERDR_PARENT_WORKSPACE_ID"
             HERDR_HOME_ID=$(fm_backend_herdr_projection_home_identity "$HERDR_LABEL_HOME" 2>/dev/null || true)
@@ -3874,6 +3844,7 @@ else
       read -r HERDR_TAB_ID HERDR_PANE_ID <<EOF
 $HERDR_TASK_IDS
 EOF
+      SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
     fi
     if [ -z "$HERDR_TAB_ID" ] || [ -z "$HERDR_PANE_ID" ]; then
       echo "error: herdr did not return a tab/pane id for $W" >&2
@@ -3892,6 +3863,7 @@ EOF
       exit 1
     fi
     T="$ZELLIJ_SES:$ZELLIJ_PANE_ID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$T
     ;;
   cmux)
     fm_backend_cmux_container_ensure || exit 1
@@ -3904,6 +3876,7 @@ EOF
       exit 1
     fi
     T="$CMUX_WORKSPACE_ID:$CMUX_SURFACE_ID"
+    SPAWN_TREEHOUSE_ABORT_TARGET=$T
     ;;
   orca)
     set +e
@@ -4396,7 +4369,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree within 60s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); inspect window $T" >&2
+    echo "error: treehouse get did not enter an isolated worktree within 60s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
     exit 1
   fi
 
@@ -4416,7 +4389,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # through metadata publication, so no other spawn or return sees a half-claim.
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
+      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own" >&2
       exit 1
     fi
     SPAWN_SLOT_CLAIMED=1
@@ -4447,9 +4420,8 @@ spawn_assert_agent_worktree
 # for this id; a refusal blocks the spawn rather than launching a worker that
 # would wedge. Refusing here rather than beside the
 # arm keeps this in the same class as the two worktree refusals just above: no
-# temp root, no retired relaunch wiring and no busy record exists yet to strand,
-# so the refusal names the endpoint the same way they do and leaves nothing else
-# behind.
+# temp root, no retired relaunch wiring and no busy record exists yet to strand.
+# The header owns cleanup of a fresh acquisition endpoint on pre-launch refusal.
 # agy gates a fresh worktree behind its own folder-trust dialog and honours a
 # trustedWorkspaces entry written ahead of launch (bin/fm-agy-trust.sh), so the
 # same pre-registration removes the dialog for it. Unlike claude's dialog, agy's
@@ -4467,7 +4439,7 @@ claude*)
     spawn_trust_args=("$WT" "$PROJ_ABS")
   fi
   if ! "$FM_ROOT/bin/fm-claude-trust.sh" "${spawn_trust_args[@]}" >/dev/null; then
-    echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog; inspect window $T" >&2
+    echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog" >&2
     exit 1
   fi
   ;;
@@ -5140,6 +5112,7 @@ sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
 sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
+sq_ompsessioncfg=$(shell_quote "${OMP_SESSION_CFG:-$FM_ROOT/.omp/fm-session-overlay.yml}")
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
@@ -5192,6 +5165,7 @@ LAUNCH=${LAUNCH//__PITURNEND__/$sq_piturnend}
 LAUNCH=${LAUNCH//__PIWATCH__/$sq_piwatch}
 LAUNCH=${LAUNCH//__OMPEXT__/$sq_ompext}
 LAUNCH=${LAUNCH//__OMPWORKERCFG__/$sq_ompcfg}
+LAUNCH=${LAUNCH//__OMPSESSIONCFG__/$sq_ompsessioncfg}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 case "$HARNESS" in
 pi | pi-signed) LAUNCH=${LAUNCH//__PIBIN__/"$(shell_quote "$PI_BIN")"} ;;
@@ -5234,6 +5208,9 @@ claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo 
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
+if [ "$HARNESS" = claude ] && { [ "$ALLOW_API_KEY" -eq 0 ] || [ -n "$WORKER_ACCOUNT" ]; }; then
+  LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
+fi
 # Crewmate panes are created by a long-lived tmux/herdr daemon that does not
 # inherit firstmate's current environment, so a bare `claude` in the pane falls
 # back to the default ~/.claude store even when firstmate itself runs under a
@@ -5259,6 +5236,12 @@ if [ -n "$WORKER_ACCOUNT" ]; then
   esac
 elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
+fi
+# A pre-existing pane may have captured credentials absent from the spawning
+# process and tmux server. Shed both variables for a non-opt-in Claude worker;
+# a worker-account pin already applies the same shed to its launch command.
+if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ] && [ -z "$WORKER_ACCOUNT" ]; then
+  LAUNCH="env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN $LAUNCH"
 fi
 # The pane's environment comes from the tmux/herdr daemon, not this process, so
 # a TeamClaude launch hands its wrapper the configuration its --check above
@@ -5505,13 +5488,13 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
-SPAWN_LAUNCH_SENT=1
 spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   HERDR_PROJECTION_ABORT_CLEANUP=0
 fi
 spawn_send_key "$T" Enter
+SPAWN_LAUNCH_SENT=1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
     kimi_spawn_fail "$KIMI_READY_FAILURE_DETAIL"

@@ -14,6 +14,16 @@
 # charters still use a single `{TASK}` charter fill. Firstmate may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
+# Jev privacy markers: to keep project- or customer-sensitive brief text out of
+# bin/fm-dispatch-resolve.sh requests, wrap it in these exact standalone lines:
+#   <!-- dispatch-never-send:start -->
+#   <!-- dispatch-never-send:end -->
+# They need the exact opt-in line `# dispatch-never-send marked-sections` in
+# config/dispatch-never-send. Missing opt-in or malformed markers with the
+# reserved `dispatch-never-send` prefix stop the request; arbitrary spelling
+# mistakes are not detected. The local brief and the worker's instructions
+# keep the marked text; docs/configuration.md "Never-send list" owns the full
+# contract.
 # Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--forge <none|gerrit> [--shape squash]] [--herdr-lab]
 #        fm-brief.sh <task-id> <repo-name> --scout [--herdr-lab]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
