@@ -52,8 +52,8 @@
 #            source when the window ended, so this generation cannot start until
 #            it is retired.
 # start      Claim the source, run its child to completion, durably capture the
-#            output, and publish normalized wakes for pending results. It then
-#            drains its owned process group before releasing the claim, unless
+#            output, and publish normalized wakes for that capture. It then
+#            drains its owned process group in EXIT cleanup, unless
 #            the adapter's `relisten` command says to poll again in this same
 #            runner. It blocks for as long as the source blocks and is meant
 #            to run as a supervised background process, never in a conversational
