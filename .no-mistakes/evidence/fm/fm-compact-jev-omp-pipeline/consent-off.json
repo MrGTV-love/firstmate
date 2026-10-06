@@ -1,0 +1,37 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "consent-off",
+  "observations": {
+    "expected": "no Jev request or eager compaction without explicit opt-in and acknowledged auto consent",
+    "result": "pass"
+  },
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791316712698
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316712893,
+      "waitMs": 3
+    },
+    {
+      "event": "checkpoint-ineligible",
+      "at": 1791316712894,
+      "reason": "configuration",
+      "contextTokens": 50000
+    }
+  ],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316712.880668,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    }
+  ],
+  "persistedCompactions": []
+}

@@ -1,0 +1,75 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "pending-new-input",
+  "observations": {
+    "expected": "new input or native model switch invalidates pending positive request; no stale native compaction",
+    "result": "pass",
+    "consentWithdrawnAfterRequest": "prevents a distinct follow-up request; pending-invalidated event must still prove lifecycle/identity cancellation"
+  },
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791316817686
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316817858,
+      "waitMs": 3
+    },
+    {
+      "event": "judge-start",
+      "at": 1791316817860
+    },
+    {
+      "event": "pending-invalidated",
+      "at": 1791316818186
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316818216,
+      "waitMs": 2
+    },
+    {
+      "event": "checkpoint-ineligible",
+      "at": 1791316818216,
+      "reason": "configuration",
+      "contextTokens": 50000
+    }
+  ],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316817.842737,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    },
+    {
+      "surface": "Jev fixture",
+      "at": 1791316817.8613272,
+      "coverage": {
+        "omittedUserMessages": 0,
+        "olderMessagesOmitted": 19,
+        "recentTextTruncated": false,
+        "hasImages": false,
+        "redacted": false,
+        "unknownContext": false,
+        "transcriptRecoverable": true
+      },
+      "requestBytes": 5994,
+      "secretLeaked": false,
+      "mode": "positive"
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316818.2118819,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 85
+    }
+  ],
+  "persistedCompactions": []
+}

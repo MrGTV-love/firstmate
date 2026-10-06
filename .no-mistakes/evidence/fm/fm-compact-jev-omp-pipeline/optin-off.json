@@ -1,0 +1,21 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "optin-off",
+  "observations": {
+    "expected": "no Jev request or eager compaction without explicit opt-in and acknowledged auto consent",
+    "result": "pass"
+  },
+  "metrics": [],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316710.075787,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    }
+  ],
+  "persistedCompactions": []
+}

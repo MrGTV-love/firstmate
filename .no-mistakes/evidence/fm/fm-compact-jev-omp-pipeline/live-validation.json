@@ -1,0 +1,90 @@
+{
+  "targetCommit": "dd801cffe63eaa42cb063f3213becb36a9234979",
+  "productVersion": "omp/18.6.3",
+  "scope": "Timing-only Jev integration in native omp compaction; not a three-arm compaction-quality assessment",
+  "baselineCommands": [
+    "bash bin/fm-test-run.sh tests/fm-omp-jev-pipeline.test.sh",
+    "FM_JEV_ADVISER_DIR=\"$PWD/.fm-adviser-root/node_modules/compact-adviser\" bash bin/fm-test-run.sh tests/fm-omp-jev-pipeline.test.sh"
+  ],
+  "baselineObserved": "Both targeted invocations passed; first skips optional real-helper redaction, second exercises it. No full suite, lint, formatter or static analysis run.",
+  "dependencyArtifactSHA256": "d19924fa542a777179c2143ef023ddd6f08a207a2216fb06a79a6ac8f3a39cf3",
+  "liveSetup": {
+    "primaryCommand": "omp --no-extensions --no-rules --no-skills --no-title --no-tools --no-lsp --no-pty --model lab/fixture-a --thinking off --config \"$LAB/overlay.yml\" --resume \"$LAB/session.jsonl\" -e \"$PWD/.fm-adviser-root/omp-jev-entry.mjs\" --mode rpc --no-ui",
+    "tuiDifference": "omit --mode rpc --no-ui; private tmux primary is 180x50; idle threshold 40000, idle timeout 60 seconds",
+    "toolLoopDifference": "replace --no-tools with --tools read",
+    "isolation": "Marked worktree-local lab created by bin/fm-lab-home.sh create, private socket from tmux-dir, inherited path/gate overrides unset, FM_HOME/HOME/PI_CODING_AGENT_DIR assigned only to lab",
+    "fixtureEndpoints": "Loopback HTTP model and TypeSafe wire-compatible responses; actual compiled omp, actual static extension and actual adapted helper package; no real credentials/network model calls",
+    "cleanup": "For each primary, same private socket tmux -L fm-lab kill-server; bin/fm-lab-home.sh teardown; remove lab. Stop HTTP endpoint and remove .fm-adviser-root materialized only for this phase."
+  },
+  "reports": [
+    {
+      "scenario": "near-window-precedence",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/near-window-precedence.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/near-window-precedence-product.txt"
+    },
+    {
+      "scenario": "positive",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/positive.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/positive-product.txt"
+    },
+    {
+      "scenario": "consent-off",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/consent-off.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/consent-off-product.txt"
+    },
+    {
+      "scenario": "bounded-tool-loop",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/bounded-tool-loop.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/bounded-tool-loop-product.txt"
+    },
+    {
+      "scenario": "tui-idle",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/tui-idle.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/tui-idle-product.txt"
+    },
+    {
+      "scenario": "failed-terminal",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/failed-terminal.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/failed-terminal-product.txt"
+    },
+    {
+      "scenario": "pending-new-input",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/pending-new-input.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/pending-new-input-product.txt"
+    },
+    {
+      "scenario": "timeout-native",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/timeout-native.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/timeout-native-product.txt"
+    },
+    {
+      "scenario": "optin-off",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/optin-off.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/optin-off-product.txt"
+    },
+    {
+      "scenario": "incomplete-native",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/incomplete-native.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/incomplete-native-product.txt"
+    },
+    {
+      "scenario": "pending-model-switch",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/pending-model-switch.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/pending-model-switch-product.txt"
+    },
+    {
+      "scenario": "redacted-coverage",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/redacted-coverage.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/redacted-coverage-product.txt"
+    },
+    {
+      "scenario": "healthy-overflow",
+      "report": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/healthy-overflow.json",
+      "productTranscript": "/Users/charlesabrooker/.no-mistakes/evidence/01M49C3HQSKS56S7YCKMMW32FM/healthy-overflow-product.txt"
+    }
+  ],
+  "limitations": [
+    "Fixture judgments and summary model responses prove integration/policy mechanics, not real Jev accuracy or native summary fidelity/downstream task performance. Numeric fixture usage is not paid usage.",
+    "No UI layout/copy was changed; genuine TUI behavior is retained as terminal transcript/metrics/persisted native entries, not presented as visual screenshot evidence."
+  ]
+}

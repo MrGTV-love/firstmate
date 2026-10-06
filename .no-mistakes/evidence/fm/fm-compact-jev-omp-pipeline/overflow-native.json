@@ -1,0 +1,87 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "overflow-native",
+  "observations": {
+    "expected": "native overflow error classifier reaches recovery, never advisory veto",
+    "result": "pass",
+    "scope": "initial probe without acknowledged consent; qualified healthy-policy overflow proof captured separately"
+  },
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791316862286
+    },
+    {
+      "event": "native-precedence",
+      "at": 1791316862543,
+      "reason": "overflow"
+    },
+    {
+      "event": "native-persisted",
+      "at": 1791316862550,
+      "tokensBefore": 50030,
+      "tokensAfter": 31217,
+      "fromExtension": false,
+      "method": "soft"
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316862681,
+      "waitMs": 1
+    }
+  ],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316862.536593,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316862.5459452,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316862.548214,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316862.6766279,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 76
+    }
+  ],
+  "persistedCompactions": [
+    {
+      "type": "compaction",
+      "id": "cf987d91",
+      "parentId": "15747131",
+      "timestamp": "2026-10-06T20:01:02.549Z",
+      "summary": "No prior history.\n\n---\n\n**Turn Context (split turn):**\n\n## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "shortSummary": "## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "firstKeptEntryId": "52f9d53f",
+      "tokensBefore": 50030,
+      "tokensAfter": 31217,
+      "method": "soft",
+      "details": {
+        "readFiles": [],
+        "modifiedFiles": []
+      },
+      "fromExtension": false
+    }
+  ]
+}

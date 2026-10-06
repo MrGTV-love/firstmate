@@ -1,0 +1,36 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "redacted-coverage",
+  "observations": {
+    "expected": "structured secret-bearing context cannot authorize eager compaction or trigger any Jev request",
+    "result": "pass",
+    "secrets": "synthetic sentinel values only"
+  },
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791316860086
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316860353,
+      "waitMs": 1
+    },
+    {
+      "event": "coverage-ineligible",
+      "at": 1791316860355
+    }
+  ],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316860.346554,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    }
+  ],
+  "persistedCompactions": []
+}

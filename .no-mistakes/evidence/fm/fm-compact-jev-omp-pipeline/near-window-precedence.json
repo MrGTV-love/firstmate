@@ -1,0 +1,170 @@
+{
+  "product": "installed omp/18.6.3",
+  "isolation": "marked disposable FM_HOME; private fm-lab tmux socket; isolated HOME and PI_CODING_AGENT_DIR; real product and native compactor, fixture model and Jev HTTP endpoints only",
+  "name": "near-window-precedence",
+  "observations": {
+    "expected": "at >=90% native window, unfinished Jev must not veto automatic native compaction",
+    "result": "pass"
+  },
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791316857598
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316857845,
+      "waitMs": 1
+    },
+    {
+      "event": "judge-start",
+      "at": 1791316857848
+    },
+    {
+      "event": "judge-result",
+      "at": 1791316857849,
+      "apiMs": 1,
+      "inputTokens": 1234,
+      "outputTokens": 20,
+      "estimatedCostUsd": 5.1828000000000006e-05,
+      "inputUsdPerMillion": 0.042,
+      "model": "jev-1.13.0"
+    },
+    {
+      "event": "judgment",
+      "at": 1791316857850,
+      "finished": false
+    },
+    {
+      "event": "native-persisted",
+      "at": 1791316858088,
+      "tokensBefore": 260030,
+      "tokensAfter": 14660,
+      "fromExtension": false,
+      "method": "soft"
+    },
+    {
+      "event": "native-persisted",
+      "at": 1791316858143,
+      "tokensBefore": 260030,
+      "tokensAfter": 14146,
+      "fromExtension": false,
+      "method": "soft"
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791316858145,
+      "waitMs": 2
+    }
+  ],
+  "providerTraffic": [
+    {
+      "surface": "model fixture",
+      "at": 1791316857.8405051,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 83
+    },
+    {
+      "surface": "Jev fixture",
+      "at": 1791316857.849461,
+      "coverage": {
+        "omittedUserMessages": 0,
+        "olderMessagesOmitted": 19,
+        "recentTextTruncated": false,
+        "hasImages": false,
+        "redacted": false,
+        "unknownContext": false,
+        "transcriptRecoverable": true
+      },
+      "requestBytes": 6010,
+      "secretLeaked": false,
+      "mode": "negative"
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.085506,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.087273,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.136012,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": false,
+      "messageCount": 75
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.141137,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.141501,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    },
+    {
+      "surface": "model fixture",
+      "at": 1791316858.1424499,
+      "path": "/v1/chat/completions",
+      "model": "fixture-a",
+      "summaryRequest": true,
+      "messageCount": 2
+    }
+  ],
+  "persistedCompactions": [
+    {
+      "type": "compaction",
+      "id": "9cca986e",
+      "parentId": "03ba1d90",
+      "timestamp": "2026-10-06T20:00:58.088Z",
+      "summary": "No prior history.\n\n---\n\n**Turn Context (split turn):**\n\n## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "shortSummary": "## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "firstKeptEntryId": "3e97c8be",
+      "tokensBefore": 260030,
+      "tokensAfter": 14660,
+      "method": "soft",
+      "details": {
+        "readFiles": [],
+        "modifiedFiles": []
+      },
+      "fromExtension": false
+    },
+    {
+      "type": "compaction",
+      "id": "23836c81",
+      "parentId": "9c6a2f0b",
+      "timestamp": "2026-10-06T20:00:58.143Z",
+      "summary": "## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.\n\n---\n\n**Turn Context (split turn):**\n\n## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "shortSummary": "## Goal\nComplete isolated test checkpoint.\n## Progress\nCheckpoint completed. Preserve this summary and recent native tail.\n## Next Steps\nWait for the user.",
+      "firstKeptEntryId": "03ba1d90",
+      "tokensBefore": 260030,
+      "tokensAfter": 14146,
+      "method": "soft",
+      "details": {
+        "readFiles": [],
+        "modifiedFiles": []
+      },
+      "fromExtension": false
+    }
+  ]
+}
