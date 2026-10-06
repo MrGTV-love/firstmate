@@ -1,0 +1,65 @@
+[
+  {
+    "product": "base guard executable",
+    "tool": "Agent",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work (blocked tool: Agent, delegation-shaped on \\\"agent\\\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception.\"}\n"
+  },
+  {
+    "product": "base guard executable",
+    "tool": "Monitor",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work (blocked tool: Monitor, delegation-shaped on \\\"monitor\\\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception.\"}\n"
+  },
+  {
+    "product": "base guard executable",
+    "tool": "TaskCreate",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "product": "base guard executable",
+    "tool": "ScheduleWakeup",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work (blocked tool: ScheduleWakeup, delegation-shaped on \\\"schedul\\\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception.\"}\n"
+  },
+  {
+    "product": "base guard executable",
+    "tool": "SendMessage",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work (blocked tool: SendMessage, delegation-shaped on \\\"sendmessage\\\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception.\"}\n"
+  },
+  {
+    "product": "base guard executable",
+    "tool": "Workflow",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work (blocked tool: Workflow, delegation-shaped on \\\"workflow\\\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception.\"}\n"
+  },
+  {
+    "product": "target cwd guard executable",
+    "command": "cd projects/demo",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).\"}\n"
+  },
+  {
+    "product": "target cwd guard executable",
+    "command": "(cd projects/demo && pwd)",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "product": "target cwd guard executable",
+    "command": "printf FM_CWD_SAFE",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]
