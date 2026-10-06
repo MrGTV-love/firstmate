@@ -276,7 +276,12 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
       enabled=$(fm_session_launch_policy_enabled "$config") || exit 1
       [ "$enabled" = 1 ] || exit 0
       harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || exit 1
-      fm_session_launch_policy_check "$config" "$harness"
+      fm_session_launch_policy_check "$config" "$harness" || exit 1
+      if [ -z "$(fm_meta_get "$meta" remote_host)" ]; then
+        home=$(fm_meta_get "$meta" home)
+        [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
+        fm_session_launch_policy_converge_child "$config" "$home" "$id"
+      fi
     } 2>&1
   ); then
     FM_SM_LIVE_STATUS=skipped

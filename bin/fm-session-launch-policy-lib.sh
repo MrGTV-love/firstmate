@@ -39,3 +39,45 @@ fm_session_launch_policy_check() {  # <config-dir> <harness> [raw=0|1]
   printf 'help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded\n' >&2
   return 1
 }
+
+fm_session_launch_policy_check_child() {
+  local enabled child_enabled
+  enabled=$(fm_session_launch_policy_enabled "$1") || return 1
+  [ "$enabled" = 1 ] || return 0
+  child_enabled=$(fm_session_launch_policy_enabled "$2") || return 1
+  [ "$child_enabled" = 1 ] && return 0
+  printf 'error: secondmate config/session-launch-policy must be enabled at %s before launch\n' "$2" >&2
+  return 1
+}
+
+fm_session_launch_policy_converge_child() (
+  local config=$1 home=$2 id=$3 enabled lock dir
+  enabled=$(fm_session_launch_policy_enabled "$config") || return 1
+  [ "$enabled" = 1 ] || return 0
+  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+    if [ -z "$home" ] || [ "$(cat "$home/.fm-secondmate-home" 2>/dev/null)" != "$id" ]; then
+      printf 'error: cannot converge session-launch-policy into an unseeded secondmate home: %s\n' "$home" >&2
+      return 1
+    fi
+    if [ ! -d "$home/state" ]; then
+      printf 'error: cannot converge session-launch-policy without secondmate state directory: %s\n' "$home" >&2
+      return 1
+    fi
+    for dir in "$home/state" "$home/config"; do
+      if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
+        printf 'error: cannot converge session-launch-policy through an unsafe secondmate directory: %s\n' "$dir" >&2
+        return 1
+      fi
+    done
+    lock=$(fm_config_inherit_lock_path "$home") || return 1
+    fm_lock_try_acquire "$lock" || {
+      printf 'error: cannot acquire secondmate session-launch-policy inheritance lock: %s\n' "$home" >&2
+      return 1
+    }
+    trap 'fm_lock_release "$lock" || true' EXIT
+    FM_INHERITABLE_CONFIG=session-launch-policy \
+      propagate_inheritable_config "$config" "$home/config" ||
+      printf 'warning: secondmate %s session-launch-policy inheritance failed for %s\n' "$id" "$home" >&2
+  fi
+  fm_session_launch_policy_check_child "$config" "$home/config"
+)

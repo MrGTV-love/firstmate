@@ -786,7 +786,8 @@ The optional local, gitignored `config/session-launch-policy` contains exactly `
 The shared template leaves this restriction off by default: absence preserves existing launch behavior, including standalone Codex launches.
 Enabling it in each captain home is the operator's responsibility; Main owns that activation for the captain's fleet.
 An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
-The setting is inherited through the existing local and remote secondmate configuration contract.
+The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
+Local recovery converges this setting before checkpointing or stopping the old endpoint and refuses if the child restriction cannot be established, while unrelated inheritance remains best-effort.
 
 This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
 Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.

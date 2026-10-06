@@ -1075,7 +1075,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line
+  local exit_result state note_line secondmate_home
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1134,6 +1134,11 @@ do_relaunch() {
     esac
   fi
   safe_checkpoint
+  if [ "$KIND" = secondmate ]; then
+    secondmate_home=$(fm_meta_get "$META" home)
+    [ -n "$secondmate_home" ] || secondmate_home=$WT
+    fm_session_launch_policy_converge_child "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$secondmate_home" "$ID" || return 1
+  fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
   journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"
