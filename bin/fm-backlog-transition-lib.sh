@@ -11,7 +11,9 @@
 # same process, under the per-task meta lock it already holds, before it reports
 # success. Nothing else - not a later agent turn, not a printed reminder - is
 # load-bearing for the pairing.
-#   bin/fm-spawn.sh      meta published => `tasks-axi start`
+#   bin/fm-spawn.sh      ordinary dispatch publishes meta => `tasks-axi start`;
+#                        reconciliation-only replacement rechecks admission
+#                        through fm_backlog_relaunch_admission without mutation
 #   bin/fm-teardown.sh   meta removed => `tasks-axi done`, or `tasks-axi reopen`
 #                        with the deliverable recorded when the row is still an
 #                        open captain call (bin/fm-captain-hold.sh `open`), so
@@ -53,9 +55,9 @@
 # The validator pins the data path to this home's configured root before any
 # recovery mutation, then re-runs exactly that close.
 # `tasks-axi done` on an already-closed task backfills links
-# without moving the close date, so replay is idempotent. Spawn needs no marker:
-# it publishes the meta first, so a crash
-# leaves the meta itself as the evidence that the row is owed a start.
+# without moving the close date, so replay is idempotent. Ordinary dispatch needs
+# no marker: it publishes the meta first, so a crash leaves the meta itself as
+# the evidence that the row is owed a start.
 # A captain-held row uses the same record with a `mode=retain` line: replay then
 # records the deliverable and reopens the row instead of closing it, and never
 # closes a row that reads as an open captain call. An answer that closes the row
@@ -776,6 +778,38 @@ fm_backlog_row_dispatchable() {
     in_flight\ no\ no|queued\ no\ no) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Replacement admission is read-only and shared by control's pre-stop check and
+# spawn's launch/commit checks. Reconciliation restores an existing instruction
+# owner, not permission to advance the task: only an In-flight row qualifies,
+# and no hold, dependency, or row transition is ever changed.
+fm_backlog_relaunch_admission() {  # <config> <data> <kind> <id> <reconcile-only: 0|1>
+  local config=$1 data=$2 kind=$3 id=$4 reconcile=$5 gate_status
+  FM_BACKLOG_TRANSITION_ERROR=
+  if fm_backlog_transition_applies "$config" "$data" "$kind"; then
+    if ! fm_backlog_row_probe "$data" "$id"; then
+      FM_BACKLOG_TRANSITION_ERROR="backlog item $id could not be read ($FM_BACKLOG_ROW_RESULT: $FM_BACKLOG_ROW_ERROR)"
+      return 1
+    fi
+    if [ "$reconcile" = 1 ]; then
+      case "$FM_BACKLOG_ROW_STATE" in
+        in_flight\ no\ no|in_flight\ yes\ no|in_flight\ no\ yes|in_flight\ yes\ yes) return 0 ;;
+      esac
+      FM_BACKLOG_TRANSITION_ERROR="reconciliation-only recovery requires an existing In-flight backlog item; $id reads $FM_BACKLOG_ROW_STATE"
+    elif fm_backlog_row_dispatchable "$FM_BACKLOG_ROW_STATE"; then
+      return 0
+    else
+      FM_BACKLOG_TRANSITION_ERROR="backlog item $id is not dispatchable in state $FM_BACKLOG_ROW_STATE"
+    fi
+    return 1
+  else
+    gate_status=$?
+    [ "$gate_status" != 2 ] || return 1
+    [ "$reconcile" = 1 ] || return 0
+    FM_BACKLOG_TRANSITION_ERROR="reconciliation-only recovery requires a readable automatic backlog ($FM_BACKLOG_TRANSITION_SKIP)"
+    return 1
+  fi
 }
 
 fm_backlog_dispatch_transition() {
