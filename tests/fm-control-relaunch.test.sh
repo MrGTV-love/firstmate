@@ -998,6 +998,48 @@ test_model_index_resolves_and_refuses_before_stop() {
   pass "fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop"
 }
 
+test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account() {
+  local dir out rc id=rl-context model
+  dir=$(new_case model-context "$id")
+  add_ship_task "$dir" "$id" pi
+  printf pi > "$dir/fake/command"
+  printf pi > "$dir/fake/becomes"
+  mkdir -p "$dir/home/config" "$dir/supervisor" "$dir/pane"
+  : > "$dir/home/config/launch-env-allowlist"
+  printf 'openai  supervisor-only  272K  32K  yes  no\n' > "$dir/supervisor/listed"
+  printf 'openai  pane-only  272K  32K  yes  no\n' > "$dir/pane/listed"
+  cat > "$dir/fakebin/pi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = --list-models ]; then
+  printf '%s\n' "\${PI_CODING_AGENT_DIR-unset}" >> '$dir/catalog-calls'
+  printf 'provider model context\n'
+  cat "\$PI_CODING_AGENT_DIR/listed"
+  exit
+fi
+printf 'Options: --tui-mode\n'
+SH
+  chmod +x "$dir/fakebin/pi"
+  for model in pane-only supervisor-only; do
+    printf '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/%s"}}},"retired":[]}\n' "$model" > "$dir/home/config/model-index.json"
+    out=$(PI_CODING_AGENT_DIR="$dir/supervisor" run_control "$dir" "$id" relaunch \
+      --model role:chosen --note "replace without supervisor catalog evidence"); rc=$?
+    expect_code 0 "$rc" "an unknown replacement context must not refuse from the supervisor catalog: $out"
+    assert_contains "$out" "effective worker account context is not established" "pre-stop and spawn checks must disclose unknown context"
+    assert_absent "$dir/catalog-calls" "neither pre-stop nor replacement spawn may query the supervisor Pi catalog"
+    [ "$(meta_field "$dir" "$id" model)" = "openai/$model" ] || fail "the replacement must retain its chosen model"
+  done
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  cp "$dir/fake/literal" "$dir/literal-before"
+  printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/supervisor-only"}}},"retired":["supervisor-only"]}' > "$dir/home/config/model-index.json"
+  out=$(PI_CODING_AGENT_DIR="$dir/supervisor" run_control "$dir" "$id" relaunch --note "retired selector"); rc=$?
+  expect_code 1 "$rc" "unknown context must still refuse offline retirement before stopping"
+  assert_contains "$out" "retired model" "retirement must remain authoritative"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "an offline refusal must preserve metadata"
+  cmp -s "$dir/literal-before" "$dir/fake/literal" || fail "an offline refusal must not send lifecycle input"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "an offline refusal must leave the running agent alone"
+  pass "unpinned indexed relaunch discloses unknown context before stopping without supervisor catalog evidence"
+}
+
 # A fake claude that answers `claude auth status` the way the real runner
 # does: signed in only when the selected config root holds a stored login.
 make_claude_auth_stub() {  # <case-dir>
@@ -3723,6 +3765,7 @@ test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
 test_model_index_resolves_and_refuses_before_stop
+test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch
 test_recorded_api_key_opt_in_follows_the_relaunch

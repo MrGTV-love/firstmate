@@ -66,6 +66,7 @@ case "\${1:-}" in
     exit 1
     ;;
   --list-models)
+    printf '%s\n' "\$root" >> '$dir/pi-catalogs'
     printf 'provider  model  context\n'
     [ ! -f "\$root/listed" ] || cat "\$root/listed"
     exit 0
@@ -75,6 +76,7 @@ esac
   printf 'PI_CODING_AGENT_DIR=%s\n' "\${PI_CODING_AGENT_DIR-unset}"
   printf 'ARGS=%s\n' "\$*"
 } > '$dir/pi-worker'
+cat "\$root/listed" > '$dir/pi-worker-catalog' 2>/dev/null || :
 SH
   chmod +x "$fakebin/claude" "$fakebin/pi"
 }
@@ -119,6 +121,7 @@ run_pane() {
     CLAUDE_CONFIG_DIR="$CASE/ambient-claude" ANTHROPIC_API_KEY=ambient-pane-key \
     CLAUDE_CODE_OAUTH_TOKEN=ambient-pane-token CLAUDE_CODE_USE_BEDROCK=1 \
     PI_CODING_AGENT_DIR="$CASE/ambient-pi" OPENAI_API_KEY=ambient-pane-openai \
+    CODEX_HOME="$CASE/pane-codex" \
     bash -c "$(cat "$CASE/launch.log")" || fail "the recorded launch failed in the synthetic pane"
 }
 
@@ -430,6 +433,127 @@ test_model_index_catalog_follows_the_pinned_account() {
   pass "a pinned worker's model-index verdict comes from its pinned account's catalog, not the ambient one"
 }
 
+test_unpinned_model_index_never_uses_the_supervisor_catalog() {
+  local harness filter model out rc id pane_root
+  for harness in codex pi; do
+    for filter in absent empty; do
+      for model in pane-only supervisor-only; do
+        id="acct-context-$harness-$filter-$model"
+        new_case "$id" "$harness"
+        mkdir -p "$CASE/supervisor" "$CASE/ambient-pi" "$HOME_DIR/user-home/.pi/agent" "$CASE/pane-codex" "$HOME_DIR/user-home/.codex"
+        printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$CASE/supervisor/models_cache.json"
+        printf 'openai  supervisor-only  272K  32K  yes  no\n' > "$CASE/supervisor/listed"
+        printf '%s\n' '{"models":[{"slug":"pane-only"}]}' > "$CASE/pane-codex/models_cache.json"
+        cp "$CASE/pane-codex/models_cache.json" "$HOME_DIR/user-home/.codex/models_cache.json"
+        printf 'openai  pane-only  272K  32K  yes  no\n' > "$CASE/ambient-pi/listed"
+        cp "$CASE/ambient-pi/listed" "$HOME_DIR/user-home/.pi/agent/listed"
+        cat > "$FAKEBIN/codex" <<SH
+#!/usr/bin/env bash
+printf 'CODEX_HOME=%s\n' "\${CODEX_HOME-unset}" > '$CASE/codex-worker'
+cat "\${CODEX_HOME:-\$HOME/.codex}/models_cache.json" > '$CASE/codex-worker-catalog'
+SH
+        chmod +x "$FAKEBIN/codex"
+        [ "$filter" != empty ] || : > "$HOME_DIR/config/launch-env-allowlist"
+        if [ "$harness" = pi ]; then
+          printf '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/%s"}}},"retired":[]}\n' "$model" > "$HOME_DIR/config/model-index.json"
+        else
+          printf '{"version":1,"roles":{"chosen":{"codex":{"model":"%s"}}},"retired":[]}\n' "$model" > "$HOME_DIR/config/model-index.json"
+        fi
+        out=$(CODEX_HOME="$CASE/supervisor" PI_CODING_AGENT_DIR="$CASE/supervisor" \
+          spawn_ship "$id" --model role:chosen); rc=$?
+        expect_code 0 "$rc" "an unknown worker context must not use supervisor catalog evidence: $out"
+        assert_contains "$out" "effective worker account context is not established" "unknown context must be disclosed even when the supervisor lists the id"
+        assert_contains "$out" "not validated" "unknown context must never claim catalog validation"
+        assert_absent "$CASE/pi-catalogs" "an unpinned selected check must never query the supervisor Pi catalog"
+        run_pane
+        if [ "$harness" = pi ]; then
+          pane_root=$CASE/ambient-pi
+          [ "$filter" != empty ] || pane_root=$HOME_DIR/user-home/.pi/agent
+          assert_grep "pane-only" "$CASE/pi-worker-catalog" "the actual Pi worker must see the pane catalog, not the supervisor catalog"
+          if [ "$filter" = empty ]; then
+            assert_grep "PI_CODING_AGENT_DIR=unset" "$CASE/pi-worker" "an empty allowlist must not forward the supervisor or pane Pi root"
+          else
+            assert_grep "PI_CODING_AGENT_DIR=$pane_root" "$CASE/pi-worker" "an unpinned Pi worker must retain the pane root"
+          fi
+        else
+          assert_grep "pane-only" "$CASE/codex-worker-catalog" "the actual Codex worker must see the pane catalog, not the supervisor catalog"
+          if [ "$filter" = empty ]; then
+            assert_grep "CODEX_HOME=unset" "$CASE/codex-worker" "an empty allowlist must not forward the supervisor or pane Codex root"
+          else
+            assert_grep "CODEX_HOME=$CASE/pane-codex" "$CASE/codex-worker" "an unpinned Codex worker must retain the pane root"
+          fi
+        fi
+      done
+    done
+  done
+  pass "unpinned Codex and Pi selected checks disclose unknown context and never use supervisor catalogs"
+}
+
+test_ordinary_claude_catalog_context_is_unavailable() {
+  local out rc id=acct-ordinary-index
+  new_case ordinary-index claude
+  printf 'ordinary\n' > "$HOME_DIR/config/claude-account"
+  signed_in_claude_root "$HOME_DIR/user-home/.claude"
+  signed_in_claude_root "$CASE/pane-home/.claude"
+  printf 'supervisor-only\n' > "$HOME_DIR/user-home/.claude/catalog"
+  printf 'pane-only\n' > "$CASE/pane-home/.claude/catalog"
+  printf '%s\n' '{"version":1,"roles":{"chosen":{"claude":{"model":"pane-only"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+  out=$(spawn_ship "$id" --model role:chosen); rc=$?
+  expect_code 0 "$rc" "an ordinary pin must not refuse using the supervisor HOME catalog: $out"
+  assert_contains "$out" "effective worker account context is not established" "ordinary root unset does not establish the destination HOME"
+  assert_absent "$CASE/claude-catalogs" "an ordinary pin must not query the supervisor default account catalog"
+  env -i HOME="$CASE/pane-home" PATH="$FAKEBIN:$PATH" TERM=xterm \
+    CLAUDE_CONFIG_DIR="$CASE/ambient-claude" ANTHROPIC_API_KEY=ambient-pane-key \
+    bash -c "$(cat "$CASE/launch.log")" || fail "ordinary pinned launch must still execute"
+  assert_grep "CLAUDE_CONFIG_DIR=unset" "$CASE/claude-worker" "ordinary launch must still unset the pane root"
+  assert_grep "ANTHROPIC_API_KEY=unset" "$CASE/claude-worker" "ordinary launch must retain credential shedding"
+  printf '%s\n' '{"version":1,"roles":{"chosen":{"claude":{"model":"pane-only"}}},"retired":["pane-only"]}' > "$HOME_DIR/config/model-index.json"
+  out=$(spawn_ship "$id-retired" --model role:chosen); rc=$?
+  expect_code 1 "$rc" "unknown ordinary context must still refuse offline retirement"
+  assert_refused_before_launch "$id-retired" "$out" "retired model"
+  printf '%s\n' '{"version":1,"roles":[],"retired":[]}' > "$HOME_DIR/config/model-index.json"
+  out=$(spawn_ship "$id-malformed" --model role:chosen); rc=$?
+  expect_code 1 "$rc" "unknown ordinary context must still refuse malformed schema"
+  assert_refused_before_launch "$id-malformed" "$out" "malformed index"
+  pass "ordinary Claude pins retain launch semantics without treating supervisor HOME as catalog proof"
+}
+
+test_indexed_native_catalog_guards_use_the_shared_boundary() {
+  local harness executable model out rc id
+  for harness in cursor omp; do
+    id="acct-native-$harness"
+    new_case "$id" "$harness"
+    executable=$harness
+    [ "$harness" != cursor ] || executable=cursor-agent
+    model=pane-only
+    [ "$harness" != omp ] || model=openai/pane-only
+    cat > "$FAKEBIN/$executable" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  --list-models|models)
+    printf '%s\n' "\$*" >> '$CASE/native-catalogs'
+    case '$harness' in
+      omp) printf '%s\n' '{"models":[{"provider":"openai","selector":"openai/supervisor-only"}]}' ;;
+      cursor) printf 'supervisor-only - Supervisor model\n' ;;
+    esac
+    ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$FAKEBIN/$executable"
+    jq -n --arg h "$harness" --arg m "$model" \
+      '{version:1,roles:{chosen:{($h):{model:$m}}},retired:[]}' > "$HOME_DIR/config/model-index.json"
+    out=$(spawn_ship "$id" --model role:chosen); rc=$?
+    expect_code 0 "$rc" "an indexed $harness model must not refuse through a native supervisor catalog guard: $out"
+    assert_contains "$out" "effective worker account context is not established" "the shared indexed boundary must disclose unknown $harness context"
+    assert_absent "$CASE/native-catalogs" "the legacy $harness precheck must not query a supervisor catalog for an indexed selection"
+  done
+  pass "indexed Cursor and omp selected checks have no alternate supervisor catalog refusal path"
+}
+
+test_indexed_native_catalog_guards_use_the_shared_boundary
+test_ordinary_claude_catalog_context_is_unavailable
+test_unpinned_model_index_never_uses_the_supervisor_catalog
 test_model_index_catalog_follows_the_pinned_account
 test_absent_pin_keeps_the_launch_unchanged
 test_claude_pin_selects_the_root_and_sheds_ambient_credentials

@@ -295,6 +295,19 @@ fm_worker_account_run() {
   "${prefix[@]}" "$@"
 }
 
+fm_worker_account_check_entry() {
+  local selection=$1 checker=$2 harness=$3 model=$4 context=${5:-selected} root
+  if [ -n "$selection" ]; then
+    root=${selection#*$'\t'}
+    root=${root%%$'\t'*}
+    [ "$harness" != claude ] || [ -n "$root" ] || context=unavailable
+    fm_worker_account_run "$harness" "$root" \
+      env "FM_MODEL_CATALOG_CONTEXT=$context" "$checker" check "$harness" "$model"
+  else
+    FM_MODEL_CATALOG_CONTEXT=unavailable "$checker" check "$harness" "$model"
+  fi
+}
+
 # fm_worker_account_claude_shed
 # Prints the `env` launch prefix that unsets the environment credentials Claude
 # ranks above a pinned root's stored login. The caller appends the root

@@ -550,6 +550,16 @@ propagate_secondmate_inheritance() {
   return "$rc"
 }
 
+fm_config_inherit_source() {
+  local config=$1 item=$2
+  case "$item" in
+    model-index.json|crew-dispatch.json)
+      config=${FM_CONFIG_INHERIT_PAIR_DIR:-$config}
+      ;;
+  esac
+  printf '%s/%s\n' "$config" "$item"
+}
+
 propagate_inheritable_config() {
   local src_config=$1 dest_config=$2 item src dest source_present reason rc
   [ -n "$src_config" ] || return 1
@@ -563,7 +573,7 @@ propagate_inheritable_config() {
       record_inheritable_config_result "$item" unchanged "session-scoped"
       continue
     fi
-    src="$src_config/$item"
+    src=$(fm_config_inherit_source "$src_config" "$item") || return 1
     dest="$dest_config/$item"
     if ! source_present=$(fm_config_source_present "$src"); then
       reason="cannot inspect primary source"

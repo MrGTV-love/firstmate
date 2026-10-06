@@ -57,7 +57,7 @@ while IFS= read -r rel; do
     esac
   fi
   case "$rel" in
-    config/*) source="$CONFIG/${rel#config/}" ;;
+    config/*) source=$(fm_config_inherit_source "$CONFIG" "${rel#config/}") ;;
     data/*) source="$DATA/${rel#data/}" ;;
   esac
   source_present=$(fm_config_source_present "$source") || exit 1

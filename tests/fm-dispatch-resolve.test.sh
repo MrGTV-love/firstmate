@@ -1580,4 +1580,46 @@ rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/claude-account" "$FAKEB
 cp "$BASE_RULES" "$RULES"
 pass "typed intake checks the chosen id against the pinned worker account's catalog"
 
+mkdir -p "$TMP_ROOT/supervisor-account"
+printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$TMP_ROOT/supervisor-account/models_cache.json"
+printf 'openai-codex  supervisor-only  272K  32K  yes  no\n' > "$TMP_ROOT/supervisor-account/listed"
+cat > "$FAKEBIN/pi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\${PI_CODING_AGENT_DIR-unset}" >> '$TMP_ROOT/unpinned-catalog-calls'
+printf 'provider model context\n'
+cat "\$PI_CODING_AGENT_DIR/listed"
+SH
+chmod +x "$FAKEBIN/pi"
+: > "$HOME_DIR/config/launch-env-allowlist"
+for context_harness in codex pi; do
+  for context_model in pane-only supervisor-only; do
+    context_id=$context_model
+    [ "$context_harness" != pi ] || context_id="openai-codex/$context_model"
+    jq -n --arg h "$context_harness" --arg m "$context_id" \
+      '{version:1,roles:{chosen:{($h):{model:$m}}},retired:[]}' > "$HOME_DIR/config/model-index.json"
+    jq -n --arg h "$context_harness" \
+      '{rules:[{when:"Indexed work.",use:{harness:$h,role:"chosen",provider:"codex"}}]}' > "$RULES"
+    reset_log
+    CODEX_HOME="$TMP_ROOT/supervisor-account" PI_CODING_AGENT_DIR="$TMP_ROOT/supervisor-account" \
+      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+    expect_code 0 "$code" "unknown chosen context keeps intake available"
+    assert_contains "$out" '  status: clear' "supervisor listing or omission must not decide the chosen entry: $err"
+    assert_contains "$out" "--model '$context_id'" "the chosen profile must retain the indexed model"
+    assert_contains "$err" "effective worker account context is not established" "chosen context uncertainty must be precise"
+    assert_contains "$err" "not validated" "a matching supervisor listing must not imply validation"
+    assert_absent "$TMP_ROOT/unpinned-catalog-calls" "chosen Pi must not query the supervisor catalog"
+  done
+done
+mkdir -p "$TMP_ROOT/context-exports"
+printf '%s\n' '{"models":[{"id":"openai-codex/supervisor-only","resolved_id":"retired-target"}]}' > "$TMP_ROOT/context-exports/pi.json"
+jq '.retired = ["retired-target"]' "$HOME_DIR/config/model-index.json" > "$TMP_ROOT/context-index.json"
+cp "$TMP_ROOT/context-index.json" "$HOME_DIR/config/model-index.json"
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/context-exports" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+assert_contains "$out" '  status: error' "an authoritative export must still refuse an alias resolved to a retired id"
+assert_not_contains "$out" '  profile:' "an export-backed retirement must not publish a profile"
+assert_contains "$err" "absent or retired in pi catalog" "explicit export evidence remains authoritative despite unknown pane context"
+rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/launch-env-allowlist" "$FAKEBIN/pi"
+cp "$BASE_RULES" "$RULES"
+pass "chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks"
+
 printf '# all fm-dispatch-resolve tests passed\n'

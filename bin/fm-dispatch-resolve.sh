@@ -642,14 +642,13 @@ if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
   IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
   chosen_account=$(fm_worker_account_resolve "$chosen_harness" "$CONFIG") \
     || emit_error "worker account pin for $chosen_harness does not resolve"
-  chosen_root=${chosen_account#*$'\t'}
-  chosen_root=${chosen_root%%$'\t'*}
-  if [ -n "$chosen_account" ]; then
-    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_run "$chosen_harness" "$chosen_root" \
-      "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
-  else
-    FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" check "$chosen_harness" "$chosen_model"
-  fi || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
+  chosen_context=selected
+  if [ "$chosen_harness" = claude ] && { [ -e "$CONFIG/claude-launcher" ] || [ -L "$CONFIG/claude-launcher" ]; }; then
+    chosen_context=unavailable
+  fi
+  FM_CONFIG_OVERRIDE="$MODEL_CONFIG" fm_worker_account_check_entry "$chosen_account" \
+    "$SCRIPT_DIR/fm-model-index.sh" "$chosen_harness" "$chosen_model" "$chosen_context" \
+    || emit_error "model index: chosen $chosen_harness model $chosen_model failed its catalog check"
 fi
 
 TEXT=$(jq -r '

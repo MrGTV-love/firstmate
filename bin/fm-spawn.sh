@@ -2503,7 +2503,7 @@ cursor)
   # missing install a loud spawn refusal instead of a pane that dies with a
   # command-not-found the supervisor would read as a wedged worker.
   CURSOR_BIN=$(fm_cursor_resolve_binary) || exit 1
-  if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  if [ "$MODEL_INDEXED" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
     if CURSOR_MODELS=$(fm_cursor_list_models "$CURSOR_BIN"); then
       if ! printf '%s\n' "$CURSOR_MODELS" | fm_cursor_catalog_has_model "$MODEL"; then
         echo "error: Cursor model '$MODEL' is not available from '$CURSOR_BIN --list-models'; choose an id listed by that command or omit --model" >&2
@@ -2545,10 +2545,10 @@ if [ "$EFFORT" = ultra ]; then
     exit 1
   }
 fi
-if [ "$HARNESS" = omp ]; then
+if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
 fi
-if [ "$HARNESS" = agy ]; then
+if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
 fi
 # Worker account pin (header above): resolved before any endpoint, worktree, or
@@ -2570,15 +2570,12 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   fi
 fi
 
-# The selected index entry is checked against the catalog of the account the
-# worker launches under: a pinned Claude root with its outranking credentials
-# shed, or a pinned Pi root. Unpinned workers inherit this environment.
 if [ "$MODEL_INDEXED" = 1 ]; then
-  if [ -n "$WORKER_ACCOUNT" ]; then
-    fm_worker_account_run "$HARNESS" "$WORKER_ACCOUNT_ROOT" "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
-  else
-    "$SCRIPT_DIR/fm-model-index.sh" check "$HARNESS" "$MODEL" || exit 1
+  MODEL_CATALOG_CONTEXT=selected
+  if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
+    MODEL_CATALOG_CONTEXT=unavailable
   fi
+  fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API

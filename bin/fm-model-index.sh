@@ -141,6 +141,10 @@ validate_catalog() {
 }
 check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   local role=$1 h=$2 m=$3 f="$TMP/catalog-$2.json"
+  if [ "${FM_MODEL_CATALOG_CONTEXT:-}" = unavailable ] && [ -z "${FM_MODEL_CATALOG_DIR:-}" ]; then
+    notice "$h catalog unavailable (effective worker account context is not established); '$m' (role '$role') not validated"
+    return 0
+  fi
   if [ ! -f "$f" ] && [ ! -f "$f.none" ]; then
     { catalog "$h" > "$f" 2>/dev/null </dev/null && validate_catalog "$f"; } || { rm -f "$f"; : > "$f.none"; }
   fi

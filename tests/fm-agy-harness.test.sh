@@ -887,6 +887,41 @@ test_agy_spawn_arms_no_busy_wiring() {
   pass "fm-spawn: agy arms no busy wiring and writes no sidecar"
 }
 
+test_agy_indexed_selection_never_queries_the_supervisor_catalog() {
+  local id rec out rc model
+  for model in gemini-pane-only gemini-supervisor-only; do
+    id="agy-index-$model-$$"
+    rec=$(make_agy_spawn_case "index-$model" "$id")
+    read_agy_spawn_record "$rec"
+    cat > "$FAKEBIN_DIR/agy" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = models ]; then
+  printf '%s\n' "\$*" >> '$CASE_DIR/catalog-calls'
+  printf 'gemini-supervisor-only\tSupervisor model\n'
+  exit 0
+fi
+echo "fake agy must never execute" >&2
+exit 9
+SH
+    chmod +x "$FAKEBIN_DIR/agy"
+    printf '{"version":1,"roles":{"chosen":{"agy":{"model":"%s"}}},"retired":[]}\n' "$model" \
+      > "$HOME_DIR/config/model-index.json"
+    out=$(run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" \
+      --model role:chosen); rc=$?
+    expect_code 0 "$rc" "an indexed agy spawn must not refuse from supervisor catalog listing or omission: $out"
+    assert_contains "$out" "spawned $id harness=agy" "the indexed agy selection must complete its ordinary launch"
+    assert_contains "$out" "effective worker account context is not established" "the agy selected-entry check must disclose precise context uncertainty"
+    assert_contains "$out" "not validated" "a matching supervisor catalog must not imply worker validation"
+    assert_absent "$CASE_DIR/catalog-calls" "neither legacy nor selected-entry agy checks may query the supervisor catalog"
+    [ -s "$CASE_DIR/launch.log" ] || fail "an indexed agy spawn must publish a launch command"
+    assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the ordinary agy launch must carry the selected indexed model"
+    [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the indexed agy spawn must reach the existing fixture's processing turn"
+    assert_agy_trusted "$HOME_DIR/.gemini/antigravity-cli/settings.json" "$WT_DIR" \
+      "the indexed agy launch must retain normal worktree trust registration"
+  done
+  pass "fm-spawn: indexed agy selections launch into a processing turn without supervisor catalog evidence"
+}
+
 test_agy_ancestry_detects_the_native_command_name
 test_agy_ancestry_rejects_unrelated_mentions
 test_agy_claims_no_inherited_launcher_marker
@@ -910,6 +945,7 @@ test_agy_trust_registers_the_logical_and_resolved_worktree_paths
 test_agy_trust_creates_a_missing_store
 test_agy_trust_refuses_out_of_scope_paths
 test_agy_fresh_worktree_is_pre_trusted_and_launches_without_a_dialog
+test_agy_indexed_selection_never_queries_the_supervisor_catalog
 test_agy_dialog_despite_registration_is_answered_once
 test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered
 test_agy_unregistered_path_without_a_dialog_fails_the_spawn

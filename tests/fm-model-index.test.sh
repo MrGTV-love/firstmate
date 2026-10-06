@@ -207,6 +207,7 @@ printf '%s\n' .fm-secondmate-home data/ state/ config/ projects/ > "$PUSH/root/.
 printf 'instructions\n' > "$PUSH/root/AGENTS.md"
 mkdir -p "$PUSH/root/bin"
 printf 'echo spawn\n' > "$PUSH/root/bin/fm-spawn.sh"
+cp "$ROOT/bin/fm-remote-inherit.sh" "$PUSH/root/bin/fm-remote-inherit.sh"
 touch "$PUSH/home/state/.last-watcher-beat"
 git -C "$PUSH/root" add -A
 git -C "$PUSH/root" commit -qm initial
@@ -267,6 +268,116 @@ config_push "$CATALOGS"
 assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid empty index with role-free dispatch profiles must push'
 cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'a valid empty index was not pushed'
 cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'role-free dispatch profiles were not pushed with the empty index'
+printf '%s\n' '{"version":1,"roles":{"stable":{"codex":{"model":"current"}}},"retired":[]}' > "$PUSH/safe-index.json"
+for source_route in local remote; do
+  if [ "$source_route" = remote ]; then
+    printf 'window=firstmate:fm-remote\nkind=secondmate\nhome=%s\nremote_host=inherit-host\n' "$PUSH/remote" > "$PUSH/home/state/remote.meta"
+  fi
+  for unsafe_source in symlink hardlink directory; do
+  cp "$PUSH/sm/config/model-index.json" "$PUSH/before-stage-index.json"
+  cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/before-stage-dispatch.json"
+  rm "$PUSH/home/config/model-index.json"
+  case "$unsafe_source" in
+    symlink) ln -s "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json" ;;
+    hardlink) ln "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json" ;;
+    directory) mkdir "$PUSH/home/config/model-index.json" ;;
+  esac
+  printf '%s\n' "$unsafe_source" > "$PUSH/home/config/dispatch-never-send"
+  config_push "$CATALOGS"
+  if [ "$source_route" = local ] && [ "$unsafe_source" != directory ]; then
+    assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "local $unsafe_source regular target must still stage"
+    [ "$(FM_HOME="$PUSH/sm" "$TOOL" model codex role:stable)" = current ] || fail "local $unsafe_source target did not reach real consumer"
+  else
+    assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' "unsafe $source_route $unsafe_source staging must withhold the pair"
+    cmp -s "$PUSH/before-stage-index.json" "$PUSH/sm/config/model-index.json" || fail "unsafe $unsafe_source staging changed destination index"
+    cmp -s "$PUSH/before-stage-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "unsafe $unsafe_source staging changed destination dispatch"
+  fi
+  cmp -s "$PUSH/home/config/dispatch-never-send" "$PUSH/sm/config/dispatch-never-send" || fail "unsafe $unsafe_source staging blocked unrelated config"
+  if [ "$unsafe_source" = directory ]; then
+    rmdir "$PUSH/home/config/model-index.json"
+  else
+    rm "$PUSH/home/config/model-index.json"
+  fi
+  cp "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json"
+  done
+  [ "$source_route" != remote ] || rm "$PUSH/home/state/remote.meta"
+done
+cp "$PUSH/sm/config/model-index.json" "$PUSH/before-stage-index.json"
+cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/before-stage-dispatch.json"
+rm "$PUSH/home/config/model-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"stable"}}' > "$PUSH/home/config/crew-dispatch.json"
+config_push "$CATALOGS"
+assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' 'removed index cannot publish an unresolved role dispatch'
+cmp -s "$PUSH/before-stage-index.json" "$PUSH/sm/config/model-index.json" || fail 'unresolved role dispatch removed destination index'
+cmp -s "$PUSH/before-stage-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'unresolved role dispatch changed destination dispatch'
+printf '%s\n' '{"default":{"harness":"codex","model":"current"}}' > "$PUSH/home/config/crew-dispatch.json"
+config_push "$CATALOGS"
+assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'removed index with literal dispatch must retain compatibility'
+[ ! -e "$PUSH/sm/config/model-index.json" ] || fail 'staged index absence was not propagated'
+[ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] || fail 'literal dispatch without index no longer resolves'
+mkdir -p "$PUSH/remote/config" "$PUSH/remote/state" "$PUSH/remote/data"
+printf 'window=firstmate:fm-remote\nkind=secondmate\nhome=%s\nremote_host=inherit-host\n' "$PUSH/remote" > "$PUSH/home/state/remote.meta"
+printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+  "$ROOT" "$PUSH/remote" > "$PUSH/home/data/secondmates.md"
+cat > "$PUSH/jqbin/inherit-ssh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
+done
+[ "$#" -eq 6 ] && [ "$1" = inherit-host ] && [ "$2" = fm-remote-entrypoint.sh ] && [ "$3" = 1 ] || exit 91
+remote_root=$(printf '%s' "$4" | base64 --decode)
+remote_home=$(printf '%s' "$5" | base64 --decode)
+args=()
+while IFS= read -r -d '' arg; do args+=("$arg"); done < <(printf '%s' "$6" | base64 --decode)
+[ "${args[0]}" = fm-remote-inherit.sh ] || exit 92
+FM_HOME="$remote_home" FM_STATE_OVERRIDE="$remote_home/state" \
+  exec "$remote_root/bin/${args[0]}" "${args[@]:1}"
+SH
+cat > "$PUSH/jqbin/omp" <<'SH'
+#!/usr/bin/env bash
+set -eu
+cp "$MODEL_RACE_INDEX" "$MODEL_RACE_CONFIG/model-index.json"
+cp "$MODEL_RACE_DISPATCH" "$MODEL_RACE_CONFIG/crew-dispatch.json"
+printf 'mutated\n' > "$MODEL_RACE_MARKER"
+printf '%s\n' '{"models":[{"provider":"provider","id":"current","selector":"provider/current"}]}'
+SH
+chmod +x "$PUSH/jqbin/omp" "$PUSH/jqbin/inherit-ssh"
+printf '%s\n' '{"version":1,"roles":{"later":{"omp":{"model":"provider/absent"}}},"retired":[]}' > "$PUSH/later-index.json"
+printf '%s\n' '{"default":{"harness":"omp","role":"later"}}' > "$PUSH/later-dispatch.json"
+for dispatch_presence in present absent; do
+  printf '%s\n' '{"version":1,"roles":{"stable":{"omp":{"model":"provider/current"}}},"retired":[]}' > "$PUSH/home/config/model-index.json"
+  cp "$PUSH/home/config/model-index.json" "$PUSH/staged-index.json"
+  printf '%s\n' '{"default":{"harness":"omp","role":"stable"}}' > "$PUSH/staged-dispatch.json"
+  if [ "$dispatch_presence" = present ]; then
+    cp "$PUSH/staged-dispatch.json" "$PUSH/home/config/crew-dispatch.json"
+  else
+    rm -f "$PUSH/home/config/crew-dispatch.json"
+  fi
+  rm -f "$PUSH/race-marker"
+  MODEL_RACE_CONFIG="$PUSH/home/config" MODEL_RACE_INDEX="$PUSH/later-index.json" \
+    MODEL_RACE_DISPATCH="$PUSH/later-dispatch.json" MODEL_RACE_MARKER="$PUSH/race-marker" \
+    FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" config_push ''
+  [ -s "$PUSH/race-marker" ] || fail 'native catalog lookup did not mutate the original pair'
+  cmp -s "$PUSH/later-index.json" "$PUSH/home/config/model-index.json" || fail 'original index did not change during lookup'
+  cmp -s "$PUSH/later-dispatch.json" "$PUSH/home/config/crew-dispatch.json" || fail 'original dispatch did not change during lookup'
+  assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "staged pair was refused after original mutation: $(cat "$TMP_ROOT/push.out")"
+  for destination in "$PUSH/sm" "$PUSH/remote"; do
+    [ -f "$destination/config/model-index.json" ] || fail "index payload never reached $destination: $(cat "$TMP_ROOT/push.out")"
+    cmp -s "$PUSH/staged-index.json" "$destination/config/model-index.json" || fail "source mutation reached $destination: $(cat "$TMP_ROOT/push.out")"
+    [ "$(FM_HOME="$destination" "$TOOL" model omp role:stable)" = provider/current ] || fail "real consumer did not resolve staged index in $destination: $(cat "$TMP_ROOT/push.out")"
+    if [ "$dispatch_presence" = present ]; then
+      [ -f "$destination/config/crew-dispatch.json" ] || fail "dispatch payload never reached $destination: $(cat "$TMP_ROOT/push.out")"
+      [ "$(FM_HOME="$destination" "$TOOL" profiles "$destination/config/crew-dispatch.json" | jq -r '.default.model')" = provider/current ] \
+        || fail "real consumer did not resolve staged pair in $destination: $(cat "$TMP_ROOT/push.out")"
+    else
+      [ ! -e "$destination/config/crew-dispatch.json" ] || fail "late dispatch appearance reached $destination: $(cat "$TMP_ROOT/push.out")"
+    fi
+  done
+done
+rm "$PUSH/home/state/remote.meta" "$PUSH/jqbin/omp"
+printf '%s\n' '{"default":{"harness":"codex","model":"current"}}' > "$PUSH/home/config/crew-dispatch.json"
+pass 'real local and remote inheritance consume the frozen pair after native catalog mutation, including staged dispatch absence'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0
