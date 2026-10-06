@@ -173,7 +173,10 @@ case "${1:-}" in
             : > "$FM_FAKE_CWD_RACE_READY"
             deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
             while [ ! -e "$FM_FAKE_CWD_RACE_RELEASE" ]; do
-              [ "$SECONDS" -lt "$deadline" ] || exit 1
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                : > "$FM_FAKE_CWD_RACE_READY.expired"
+                exit 1
+              fi
               /bin/sleep 0.05
             done
           fi
@@ -1778,7 +1781,7 @@ test_launch_failure_keeps_the_prior_record_and_reports_it() {
 }
 
 test_prepublication_failure_keeps_concurrent_durable_metadata() {
-  local dir control_pid link_out rc deadline
+  local dir control_pid link_pid link_out rc deadline
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
@@ -1797,13 +1800,20 @@ test_prepublication_failure_keeps_concurrent_durable_metadata() {
     wait "$control_pid" 2>/dev/null || true
     fail "relaunch did not reach its pre-publication endpoint check: $(cat "$dir/control.out")"
   }
-  link_out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  # The publisher can finish only after spawn releases its metadata lock.
+  # Start it concurrently, then release spawn before waiting for publication.
+  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
-      --carry-platform x --carry-max 280 2>&1); rc=$?
+      --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &
+  link_pid=$!
   : > "$dir/cwd-race-release"
+  wait "$link_pid"; rc=$?
+  link_out=$(cat "$dir/link.out")
   expect_code 0 "$rc" "concurrent durable metadata publication should succeed"$'\n'"$link_out"
   wait "$control_pid"; rc=$?
   expect_code 1 "$rc" "the staged pre-publication launch failure should fail closed"
+  assert_absent "$dir/cwd-race-ready.expired" \
+    "the concurrent metadata race must finish by release, not by fixture timeout"
   [ "$(meta_field "$dir" rl30 x_request)" = request-30 ] \
     || fail "rollback erased the concurrent X request"
   [ "$(meta_field "$dir" rl30 x_followups)" = 2 ] \
