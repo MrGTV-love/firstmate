@@ -2415,15 +2415,12 @@ for race_index in $(seq 1 24); do
   pe "$HR" start race-src > "$TMP_ROOT/race-contender-$race_index.out" 2>&1 &
   race_pids+=("$!")
 done
-# Wait for the blocked winner and every loser to observe its claim before
-# releasing it; a settle sleep lets slow contenders arrive only after the
-# winner exits and no longer tests contention. The winner blocks until the
+# Wait for every loser to observe the winning claim before starting the source
+# marker deadline: the winner must reacquire the same source lock for its launch
+# floor after the contenders' expensive claim reads. The winner blocks until the
 # trigger, so every other contender finishing is the loser's own completion,
-# not a clock; a second runner also blocks, and stops this wait on its start.
-if ! wait_for "$RACE_LOG" 300; then
-  cat "$TMP_ROOT"/race-contender-*.out >&2
-  fail "no contender acquired the stale claim"
-fi
+# not a settle sleep that lets late contenders arrive after ownership is released.
+# A second runner also blocks, and stops this wait on its second start marker.
 race_expected_losers=$((${#race_pids[@]} - 1))
 while :; do
   race_running=0
@@ -2431,9 +2428,13 @@ while :; do
     kill -0 "$race_pid" 2>/dev/null && race_running=$((race_running + 1))
   done
   [ "$race_running" -le 1 ] && break
-  [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
+  [ ! -e "$RACE_LOG" ] || [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
   sleep 0.1
 done
+if ! wait_for "$RACE_LOG" 300; then
+  cat "$TMP_ROOT"/race-contender-*.out >&2
+  fail "no contender acquired the stale claim"
+fi
 race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
   "$TMP_ROOT"/race-contender-*.out)
 if [ "$race_losers" -ne "$race_expected_losers" ]; then
@@ -5073,13 +5074,14 @@ kill -KILL -"$CRASH_PID" 2>/dev/null || true
 # must follow BOTH stamp reads, not just the first final read.
 # Reconcile and arm must preserve their polling window and one-owner checks.
 confirm_live_at_boundary() {
-  local operation=$1 BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ rc=0 output
+  local operation=$1 BOUNDARY_HOLD=${2:-0} window=1 BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ rc=0 output
   local -a command=()
-  BOUNDARY="$TMP_ROOT/boundary-$operation"
+  BOUNDARY="$TMP_ROOT/boundary-$operation-$BOUNDARY_HOLD"
+  [ "$BOUNDARY_HOLD" -eq 0 ] || window=''
   mkdir -p "$BOUNDARY/bin" "$BOUNDARY/home/state"
   REAL_CAT=$(command -v cat); REAL_PS=$(command -v ps)
   BOUNDARY_ROOT=$ROOT
-  export BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ
+  export BOUNDARY REAL_CAT REAL_PS BOUNDARY_ROOT BOUNDARY_ID BOUNDARY_READ BOUNDARY_HOLD
   cat > "$BOUNDARY/bin/ps" <<'SH'
 #!/usr/bin/env bash
 if [ -n "${FM_PROCEVENT_RUNNER_GROUP:-}" ]; then
@@ -5099,7 +5101,7 @@ case "$*" in
       n=$((n + 1)); printf '%s\n' "$n" > "$BOUNDARY/reads"
       if [ "$n" -eq "$BOUNDARY_READ" ]; then
         rc=0; snapshot=$("$REAL_CAT" "$@" 2>/dev/null) || rc=$?
-        sleep 2
+        if [ "$BOUNDARY_HOLD" -eq 1 ]; then sleep 4; else sleep 2; fi
         printf '%s' "$snapshot"
         exit "$rc"
       fi
@@ -5114,6 +5116,33 @@ case "$*" in
         done
         [ "$owner" = live ] || exit 76
         printf verified-live > "$BOUNDARY/verified"
+        if [ "$BOUNDARY_HOLD" -eq 1 ]; then
+          # The real command has started, so its generation's stamp exists.
+          # Hold the ownership lock while returning the earlier absent snapshot:
+          # confirmation must refresh that stamp after its failed ownership read.
+          for _ in $(seq 1 600); do
+            [ -s "$BOUNDARY/polls" ] && break
+            sleep 0.1
+          done
+          [ -s "$BOUNDARY/polls" ] || exit 78
+          FM_HOME="$BOUNDARY/home" /bin/bash -c '
+            . "$1/bin/fm-pr-lib.sh"
+            . "$1/bin/fm-wake-lib.sh"
+            . "$1/bin/fm-procevent-lib.sh"
+            fm_procevent_source_lock_acquire "$2" || exit 1
+            trap "fm_procevent_source_lock_release \"$2\"" EXIT
+            printf ready > "$3/held"
+            while [ ! -e "$3/unlock" ]; do
+              [ "$SECONDS" -lt 120 ] || exit 75
+              sleep 0.05
+            done
+          ' _ "$BOUNDARY_ROOT" "$BOUNDARY_ID" "$BOUNDARY" >/dev/null 2>&1 &
+          for _ in $(seq 1 600); do
+            [ -s "$BOUNDARY/held" ] && break
+            sleep 0.1
+          done
+          [ -s "$BOUNDARY/held" ] || exit 77
+        fi
         sleep 2
         printf '%s' "$snapshot"
         exit "$rc"
@@ -5136,7 +5165,7 @@ SH
   if [ "$operation" = reconcile ]; then
     BOUNDARY_ID=boundary-src; BOUNDARY_READ=2
     pe_register "$BOUNDARY/home" lavish "$BOUNDARY_ID" -- \
-      "$BLOCKER" "$BOUNDARY/poll-release" "done" >/dev/null
+      "$STARTED_BLOCKER" "$BOUNDARY/polls" "$BLOCKER" "$BOUNDARY/poll-release" "done" >/dev/null
     command=("$ROOT/bin/fm-procevent.sh" reconcile)
   else
     printf '<h1>boundary</h1>\n' > "$BOUNDARY/board.html"
@@ -5147,8 +5176,9 @@ SH
     fm_test_track_procevent_home "$BOUNDARY/home"
     command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$BOUNDARY/board.html")
   fi
-  PATH="$BOUNDARY/bin:$PATH" FM_HOME="$BOUNDARY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+  PATH="$BOUNDARY/bin:$PATH" FM_HOME="$BOUNDARY/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$window" \
     "${command[@]}" > "$BOUNDARY/out" 2> "$BOUNDARY/err" || rc=$?
+  : > "$BOUNDARY/unlock"
   if [ ! -s "$BOUNDARY/verified" ]; then
     cat "$BOUNDARY/out" "$BOUNDARY/err" "$BOUNDARY/reads" >&2
     fail "boundary fixture never verified live ownership"
@@ -5167,10 +5197,16 @@ SH
     "a boundary confirmation lost the one-owner claim"
   : > "$BOUNDARY/poll-release"
   pe "$BOUNDARY/home" retire "$BOUNDARY_ID" >/dev/null 2>&1 || true
-  pass "$operation proves ownership after the final stamp read at the unchanged confirmation boundary"
+  if [ "$BOUNDARY_HOLD" -eq 1 ]; then
+    pass "$operation refreshes a late launch stamp after contended final ownership at the default boundary"
+  else
+    pass "$operation proves ownership after the final stamp read at the unchanged confirmation boundary"
+  fi
 }
 confirm_live_at_boundary reconcile
 confirm_live_at_boundary arm
+confirm_live_at_boundary reconcile 1
+confirm_live_at_boundary arm 1
 
 # A confirmation reader must not become the obstacle to publication. Release
 # the real runner at a post-launch stamp read, and make a reader-owned mutex
