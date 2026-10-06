@@ -377,12 +377,12 @@ So degraded behavior is never worse than the pre-mitigation sub-second restore.
 
 Ordinary non-projected task removal:
 
-- Serializes through the same session lock.
+- Serializes through the same session lock, waiting for a competing presentation transaction to release it without a cleanup timeout.
 - Applies the same focus-safe plan when its close would empty a non-focused workspace.
 - Keeps the legitimate plain close when the target is the active tab.
-- Refuses an unlocked close if the lock cannot be acquired.
+- Refuses an unlocked close if the session lock's identity cannot be resolved.
 
-Task cleanup acquires that session lock before the task's isolated copy is returned.
+Task teardown separately preflights that session lock before the task's isolated copy is returned.
 So a contended lock refuses up front while the copy, every durable record, and the endpoint are all intact for a plain rerun.
 
 Forced secondmate cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
