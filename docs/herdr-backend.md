@@ -385,13 +385,23 @@ Ordinary non-projected task removal:
 - Keeps the legitimate plain close when the target is the active tab.
 - Refuses an unlocked close if the lock cannot be acquired.
 
-Task cleanup acquires that session lock before the task's isolated copy is returned.
-So a contended lock refuses up front while the copy, every durable record, and the endpoint are all intact for a plain rerun.
-Cleanup closes the pane right after concluding the task's own run and reaping its processes, then releases the lock before the remote sweep, worktree return, and record removal.
-A slow return therefore cannot starve another spawn's abort cleanup of the session lock.
+Task cleanup first admits the exact endpoint read-only under its named-session presentation lock.
+A contended or ambiguous admission refuses while the copy, durable records, and endpoint are still intact.
+Admission records the validated endpoint metadata, its `spawn_gen` (including an absent legacy field), and the exact session lock identity.
+Cleanup then releases session custody while concluding the task's own run and reaping its owned processes; task and metadata exclusion remain held throughout.
+Before closing the pane, cleanup reacquires the admitted session identity and revalidates the endpoint metadata and generation exactly.
+A later refusal can therefore leave owned processes stopped, but does not close a substituted endpoint or return the isolated copy.
+The pane close remains serialized, and session custody is released before worktree return, home removal, and record cleanup.
+A slow owned-process cleanup or return therefore cannot starve another spawn's abort cleanup of the session lock.
 
-Forced secondmate cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
-It then retains each child's durable identity unless that exact pane returns structured not-found after its close.
+Forced secondmate cleanup recursively admits every Herdr child endpoint under the affected named-session locks before mutating any child, while retaining descendant task-set, task, and metadata exclusion.
+It releases session custody before child cleanup, reacquires and exactly revalidates each admitted child immediately before its close, then releases custody before recursion, worktree return, or home removal.
+It retains each child's durable identity unless that exact pane returns structured not-found after its close.
+
+The deferred backlog close or captain-held retention marker is not published until owned-process cleanup and the final session/endpoint/generation gates pass.
+A refusal at those gates cannot create a replay-authoritative marker that a later session start could use to erase the retained task record or transition its backlog item.
+Accepted legacy generations are stamped only at that publication boundary; a failed marker write retains the existing stamp rollback behavior.
+Once those gates pass, the marker is still written before the pane close and subsequent destructive cleanup, preserving interrupted-cleanup replay.
 
 ### When task records are erased
 
@@ -399,6 +409,7 @@ Durable task records are erased only once the exact pane is confirmed gone throu
 After every close path, only a structured not-found response counts as gone.
 A present or unknown result retains every record with a visible, retryable error.
 Missing or malformed endpoint identity and missing confirmation machinery are ambiguity, never proof of a gone pane, and refuse record removal the same way.
+After marker publication, a later close or cleanup failure retains records for the current invocation, but an applicable pending backlog transition remains authoritative for session-start replay; that retention is not a promise across a restart.
 If lock, snapshot, pane identity, or restoration is ambiguous, cleanup warns and preserves the journal for manual inspection.
 Once the exact pane is confirmed gone, teardown retires the task's own journal when it binds that same pane, or when it is a version 1 attempt whose token-bearing projected workspace is itself confirmed gone, because nothing then remains for the session-start sweep to correlate; a journal bound to any other pane, or a version 1 attempt whose workspace is still present or unreadable, stays for that sweep.
 

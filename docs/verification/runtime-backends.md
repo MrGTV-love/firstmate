@@ -1438,34 +1438,57 @@ Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pa
 
 ### Cross-home recovery custody
 
-Verified on 2026-10-01 on macOS aarch64 with Herdr 0.9.1 and Bash 3.2, using the guarded named-session helpers:
+Verified on 2026-10-06 on macOS aarch64 with Herdr 0.9.1 and Bash 3.2.57, using the guarded named-session helpers and a checkout-local runner `TMPDIR`:
 
 ```sh
-bash bin/fm-test-run.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+bash bin/fm-test-run.sh --fail-on-gate-skip 'not found' --json .fm-review-verification/timing.json tests/fm-backend-herdr-recovery-lock-e2e.test.sh
 ```
 
-Observed output:
+Selected observed output:
 
 ```text
+ok - offline executable inventory and reaper remove only generated owned processes before Herdr provisioning
 # herdr 0.9.1 recovery custody lab
 ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
 ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
 ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=268195
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned conclude, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned reap, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside a held forced-secondmate recursive child return, preserving descendant task/meta custody and exact sibling focus
+ok - owned conclude refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - conclude pre-mutation refusal survives actual startup; admitted deferred close replays only its exact generation
+ok - owned reap refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - reap pre-mutation refusal survives actual startup; admitted deferred retain replays only its exact generation
+FM_TEST_END 2026-10-06T17:15:17Z tests/fm-backend-herdr-recovery-lock-e2e.test.sh exit=0 duration_ms=505266 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=505707
 ```
 
-The primary recovery remains blocked at generated-copy allocation until the secondmate recovery has completed, so the verdict cannot depend on the allocation finishing within the session-lock acquisition window.
-Both homes replace only their exact old husks in their original workspaces, advance distinct generations, retain their projection tokens and home bindings, publish matching journal and metadata endpoints, and preserve the exact focused workspace and tab.
-A duplicate primary invocation refuses while its original process still owns the per-task lock, and every intercepted presentation mutation observes a live session-lock owner.
-A fresh projected spawn is then held at its own generated-copy allocation while a reclaimed recovery from the other home fails setup and a later recovery from that home completes.
-The failed recovery closes its exact replacement pane without the session-lock refusal warning, leaves its metadata unpublished and its journal on that replacement, and leaves the fresh projection's pane untouched.
-The later recovery reclaims its exact husk, and the fresh spawn then publishes metadata matching its exact journal binding and parent, with focus unchanged.
-With the pinned pre-fix `bin/fm-spawn.sh`, the abort cleanup reports the session-lock refusal warning and the later recovery fails while the fresh allocation is held.
-A fresh projected spawn is then held at its generated-copy allocation while a teardown from the other home is held inside its intercepted generated-copy return, after its own pane close.
-The fresh setup then fails, and its abort cleanup closes the exact bound pane without the session-lock refusal warning while the teardown is still held, leaving no metadata and its journal on that pane.
-The teardown then completes, returns exactly its own generated copy, removes its record, and leaves both homes' other live projections and focus unchanged.
-With the pre-fix `bin/fm-teardown.sh`, which held the session lock through its worktree return, the abort cleanup reports the session-lock refusal warning.
-The fixture proves submitted and literal allocation interception and exact generated-copy return interception before provisioning, refuses unmatched commands and foreign paths, and never calls the shared Treehouse allocator.
+Before provisioning Herdr, the fixture proves submitted and literal allocation interception, exact generated-copy return interception, and refusal of unmatched commands and foreign paths.
+It executes the production cwd inventory and reaper against generated native processes through a PID- and birth-identity-scoped `lsof` boundary, removes only the owned process, and requires an unrelated process to survive.
+No shared Treehouse allocation or return is invoked.
+Generated homes, copies, process fixtures, and evidence stay in the checkout, and task IDs include the unique lab-session identity to isolate the production commands' incidental temporary namespaces.
+The regression invokes the original public spawn and teardown executables without transforming them.
+
+The original allocation and return contention scenarios remain covered.
+Both homes replace only their exact old husks in their original workspaces, advance distinct generations, retain projection tokens and home bindings, publish matching journal and metadata endpoints, and preserve the exact focused workspace and tab.
+A duplicate invocation refuses while its original process retains task custody.
+Reclaimed and fresh failed-setup cleanup require structured `dead` for their exact panes; arbitrary inspection failures cannot satisfy removal assertions.
+
+The owned-cleanup cases separately hold conclusion during branch/head attribution after a controlled `no-mistakes axi status` that takes at least one second inside the unchanged command deadline, and hold the actual reaper's cwd inventory.
+Conclusion uses generated run output and an executable Git timing boundary, then requires the exact owned `axi abort --run` and terminal readback; no real no-mistakes pipeline is controlled.
+While each phase remains held, full cross-home recovery and fresh/reclaimed abort cleanup complete.
+Task/control and metadata lock owners remain live, independent acquisition proves session custody is released, intercepted presentation mutations have the exact expected lock owners, and sibling metadata, journals, panes, and focus remain unchanged.
+After release, native signaling reaps the owned processes without touching the unrelated sentinel, and teardown removes its exact pane and record.
+
+Forced secondmate cleanup descends through a generated nested home and holds its Herdr grandchild's intercepted, registered Git-worktree return after the exact pane is confirmed dead.
+Full unrelated recovery and both abort forms complete while the parent retains descendant task-set, control, and metadata locks but no session custody.
+After release, all three exact endpoints and the generated homes are removed, with exactly one owned grandchild return.
+The removal fixture uses a generated code-root directory pointing to the original binaries, separate from removable worktree/home siblings, because the production guard refuses descendant deletion inside its code root.
+
+Wrong endpoint and replaced-generation refusals carry an applicable markdown backlog in both ordinary close and captain-held retain modes.
+Actual bootstrap reconciliation preserves their records, journals, exact pane presence, and isolated copy HEAD, with no copy return or pending-close marker.
+After admission succeeds, a controlled backlog-transition interruption leaves the existing deferred marker, and actual bootstrap replay consumes it to close only the ordinary row or retain the captain-held row and deliverable.
+The guarded lab teardown and default-fleet tripwire also complete successfully.
 
 ### Workspace-removal focus safety
 
