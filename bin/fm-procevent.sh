@@ -1972,6 +1972,11 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
         continue
       fi
+      # A failed try-lock can outlast the stamp snapshot while the runner
+      # publishes its launch. Refresh that durable proof after ownership work.
+      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
+        continue
+      fi
       remaining+=("$entry")
     done
     pending=("${remaining[@]+"${remaining[@]}"}")
