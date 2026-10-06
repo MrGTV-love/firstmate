@@ -279,7 +279,6 @@ The registrations in detail:
   Cursor also loads `<project>/.claude/settings.json`, so the tracked Claude-shaped supervision entrypoints whose events Cursor covers stand down on a Cursor-delivered payload through `bin/fm-hook-host-lib.sh`.
   That predicate reads the delivered payload's own `cursor_version`, never the environment.
   Cursor exports `CURSOR_INVOKED_AS`, `CURSOR_PROJECT_DIR`, and `CURSOR_VERSION` into every child process, so an environment guard would also disable the hooks of a Claude session started by hand from a Cursor pane, which is the hazard the `GROK_SESSION_ID` exclusion below records.
-  The guarded supervision entrypoints are session start, the two Bash command protections, the turn-end guard and auto-arm, and the Claude-only process-event `PostToolUse` notice.
   [`.claude/settings.json`](../.claude/settings.json) owns the tracked registrations; the Claude-only [process-event tool-boundary notice](configuration.md#process-to-event-sources-stateprocevent) also stands down on Cursor payloads.
   Cursor 2026.08.11-e8db854 does not fire the Claude-shaped `Stop` entry at all, but it is guarded anyway because Cursor has no `asyncRewake`.
   If a later build did fire it, `bin/fm-claude-stop-autoarm.sh` would run synchronously inside Cursor's stop step and hold that turn open for its declared multi-hour timeout, exactly the wedge grok 1.0.0 produced.
