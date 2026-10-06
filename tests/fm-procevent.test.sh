@@ -4535,7 +4535,9 @@ pass "a stop the guard cannot prove is retried until the expired runner is reape
 # they only hold together.
 #
 # Earlier fixtures include TERM-resistant children and deliberately kept-alive
-# leaders. The cases below also exercise escalation after TERM ends the leader.
+# leaders. Below, an opted-in child kills its own recorded runner upon group
+# TERM, forcing absent/zombie transitions even when runner cleanup drains children.
+# The stop must retain its verified ownership proof and escalate the survivor.
 
 # Millisecond clock for supplementary retirement and stop-window measurements;
 # the healthy-stop verdict below requires attached-start status 143 (TERM).
@@ -4551,7 +4553,19 @@ cat > "$SIGNAL_PROOF_STUB" <<'SH'
 # never having been signalled at all. The wait stays bounded so an escaped stub
 # cannot outlive the suite.
 marker=$1
-trap 'printf "signalled\n" >> "$marker.signals"' TERM INT HUP
+on_signal() {
+  printf 'signalled\n' >> "$marker.signals"
+  # Only the absent/zombie fixtures opt in, after startup records ownership.
+  # The child removes its own runner only after the stop delivers group TERM;
+  # other users retain the ordinary TERM-resistant shutdown behavior.
+  if [ -s "$marker.kill-leader" ]; then
+    read -r leader < "$marker.kill-leader"
+    [ "$leader" = "$PPID" ] || exit 76
+    kill -KILL "$leader"
+  fi
+}
+trap on_signal TERM
+trap 'printf "signalled\n" >> "$marker.signals"' INT HUP
 printf '%s\n' "$$" > "$marker.child"
 while [ ! -e "$marker.trigger" ]; do
   [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
@@ -4594,6 +4608,9 @@ PL
   PROOF_PID=$(cat "$HPROOF/state/procevent/proof-src.runner")
   wait_for "$PROOF_MARKER.child" || fail "the signal-proof child never started"
   PROOF_CHILD=$(cat "$PROOF_MARKER.child")
+  [ "$(ps -o ppid= -p "$PROOF_CHILD" | tr -d '[:space:]')" = "$PROOF_PID" ] \
+    || fail "the signal-proof child is not owned by its recorded runner"
+  printf '%s\n' "$PROOF_PID" > "$PROOF_MARKER.kill-leader"
   FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
     pe "$HPROOF" retire proof-src >"$HPROOF/retire.log" 2>&1 &
   PROOF_STOP=$!
