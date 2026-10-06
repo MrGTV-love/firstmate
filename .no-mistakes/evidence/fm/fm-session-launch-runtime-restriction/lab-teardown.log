@@ -1,0 +1,4 @@
+Owned Herdr lab: fm-lab-policy-acp-65373-16257
+Command: bash bin/fm-herdr-lab.sh teardown fm-lab-policy-acp-65373-16257
+Exit: 0
+Default-session fleet-state tripwire verification succeeded.

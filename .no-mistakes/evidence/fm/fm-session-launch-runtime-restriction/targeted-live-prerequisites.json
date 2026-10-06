@@ -1,0 +1,23 @@
+{
+  "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "scenarios": [
+    {
+      "name": "Absent-policy genuine standalone Codex/Claude compatibility",
+      "result": "untested",
+      "live": false,
+      "reason": "Explicitly forbidden real session validation. Existing accepted deterministic executable coverage is not a live-session pass; live authorization is unavailable."
+    },
+    {
+      "name": "Supported native tc run model session",
+      "result": "untested",
+      "live": false,
+      "reason": "No tc executable on PATH and no verified production native tc run adapter. Canonical policy admission refuses proxy/plain Claude substitution; installation and adapter duplication not authorized."
+    },
+    {
+      "name": "OpenCode pending refusal replay",
+      "live": false,
+      "result": "fixture-only",
+      "reason": "Only actual omp ACP lifecycle authorized in this targeted turn; earlier deterministic OpenCode consumer proof remains fixture evidence, not live vendor proof."
+    }
+  ]
+}

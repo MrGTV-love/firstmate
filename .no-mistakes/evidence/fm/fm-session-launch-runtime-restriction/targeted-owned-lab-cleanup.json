@@ -1,0 +1,9 @@
+{
+  "private_tmux_server_stop_exit": 0,
+  "short_socket_helper_teardown_exit": 0,
+  "remaining_owned_processes": [],
+  "native_worker_stop": "Successful real fm-control exit",
+  "lab_artifacts_removed": true,
+  "transient_task_scratch_removed": "/tmp/fm-native-policy-worker",
+  "cleanup_setup_correction": "Made only owned generated read-only hook directories writable for removal, without following symlinks"
+}

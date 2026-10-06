@@ -1,0 +1,44 @@
+{
+  "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "route": "acp:omp",
+  "model": "openai-codex/gpt-6.1-sol",
+  "generated_pending": {
+    "version": 2,
+    "pending": [
+      {
+        "version": 1,
+        "token": "37196-1791325606049-1",
+        "message": "supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes",
+        "predecessorArmPid": "49744"
+      }
+    ]
+  },
+  "actual_user_message_refusal_count": 1,
+  "actual_refusal_user_events": [
+    {
+      "event": "message_start",
+      "value": {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\nwatcher: FAILED - omp extension could not verify a ready successor watcher\nwatcher: FAILED - omp extension could not restore watcher continuity after 5 retries\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+            }
+          ],
+          "attribution": "user",
+          "timestamp": 1791325615816
+        }
+      }
+    }
+  ],
+  "pending_consumed_before_close": true,
+  "pending_retained_after_close": false,
+  "host_log_before_replay": "1791325202\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325484\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325605\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n",
+  "host_log_after_replay": "1791325202\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325484\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325605\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n",
+  "host_log_after_configuration_removal": "1791325202\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325484\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n1791325605\tpolicy-refusal\tno permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude)\n",
+  "watcher_lock_exists": false,
+  "enabled_policy_retained": true,
+  "result": "qualified; ordinary monitoring ownership remains blocked by existing lab guard"
+}

@@ -1,0 +1,53 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                        Tip: Start your prompt with `!` to run it as bash — `!!` runs it without
+                                              adding the output to context
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: This is an owned disposable Firstmate lab, not an operational fleet home. Only verify
+ these actions, no other commands: run bash bin/fm-spawn.sh forbidden-child "$PWD" --scout --harness codex and report
+ the policy refusal; do not ever invoke codex or claude. Write worker-proof.json containing the exact policy file
+ contents and observed refusal exit code using the normal write tool. Then reply NATIVE_OMP_WORKER_PROVED and wait. Do
+ not spawn agents, activate a supervision host, change configurations, call upstream/pipeline commands, or touch files
+ outside this lab home. Preserve unpublished and validation files.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bash bin/fm-spawn.sh forbidden-child "$PWD" --scout --harness codex                                                │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently    │
+│ supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper         │
+│ help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp    │
+│ --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded         │
+│ ⟦Wall: 0.19s | Timeout: 30s | Exit: 1⟧                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ ● Read config/session-launch-policy:raw
+
+╭─── ✎ Write: 🧾 worker-proof.json · 7 lines ──────────────────────────────────────────────────────────────────────────╮
+│   1 {                                                                                                                │
+│   2   "policy_file": "config/session-launch-policy",                                                                 │
+│   3   "policy_contents": "omp-or-tc\n",                                                                              │
+│   4   "refusal_exit_code": 1,                                                                                        │
+│   5   "refusal": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp       │
+│ adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a  │
+│ proxy wrapper"                                                                                                       │
+│   6 }                                                                                                                │
+│ … 1 more line ⟦⌃O: Expand⟧                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Recording worker refusal proof
+
+❯
+ ⠹ 8s · ◔ GPT-6.1-Sol 👁 · 📁 …5ANWST7WZR3J/.test-live-targeted/worker · ⑂ main · ◫ 7.5%/272K ⟲ · S0.05 + 👁 0.02

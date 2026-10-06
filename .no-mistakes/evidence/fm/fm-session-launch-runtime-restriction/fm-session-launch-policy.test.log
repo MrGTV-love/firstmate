@@ -1,4 +1,3 @@
-$ /bin/bash tests/fm-session-launch-policy.test.sh
 ok - restricted fresh codex launch refuses before resources
 ok - restricted fresh claude launch refuses before resources
 ok - restricted fresh pi launch refuses before resources
@@ -18,5 +17,4 @@ ok - unlanded tc run prerequisite refuses plain Claude without a fallback
 ok - inherited policy enforces future descendant launches
 ok - absent policy preserves codex launch (fixture executable only)
 ok - absent policy preserves claude launch (fixture executable only)
-
-exit=0
+not ok - publication fixture was not reached

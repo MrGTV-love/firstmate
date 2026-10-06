@@ -1,0 +1,62 @@
+{
+  "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "route": "canonical omp native adapter",
+  "model": "openai-codex/gpt-6.1-sol",
+  "fresh_and_replacement": "pass",
+  "native_worker_version": "18.6.3",
+  "inherited_child_policy": "omp-or-tc",
+  "child_consumer_refusal": "Actual native worker invoked production fm-spawn scout admission and received policy refusal without creating a task",
+  "retained_work_custody_charter_hashes": {
+    "worker/unpublished": "b3abd6d4fddf40cb33dca8b0b9deb21bdd264cea1838a1a434a204569d0abc06",
+    "parent/state/native-policy-worker.validation": "f7deefa72e3db4ef4bb1dffb0e04384bb8a5613ec7abfbce39b0c6362da07116",
+    "worker/data/charter.md": "3cc58d081f282ca292c3c3219ff58d9c1af7a449f4d82ae464d8cb54e10a8de6"
+  },
+  "before": {
+    "window": "firstmate:fm-native-policy-worker",
+    "endpoint_task_id": "native-policy-worker",
+    "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "harness": "omp",
+    "kind": "secondmate",
+    "mode": "secondmate",
+    "yolo": "off",
+    "tasktmp": "/tmp/fm-native-policy-worker",
+    "model": "openai-codex/gpt-6.1-sol",
+    "effort": "low",
+    "spawn_gen": "s1791325078.11120.10787",
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "projects": "alpha"
+  },
+  "after": {
+    "window": "firstmate:fm-native-policy-worker",
+    "endpoint_task_id": "native-policy-worker",
+    "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "harness": "omp",
+    "kind": "secondmate",
+    "mode": "secondmate",
+    "yolo": "off",
+    "tasktmp": "/tmp/fm-native-policy-worker",
+    "model": "openai-codex/gpt-6.1-sol",
+    "effort": "low",
+    "spawn_gen": "s1791325166.5132.28060",
+    "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker",
+    "projects": "alpha",
+    "control_relaunch_tx": "91449.20261006T221924Z.23896"
+  },
+  "fresh_proof": {
+    "policy_file": "config/session-launch-policy",
+    "policy_contents": "omp-or-tc\n",
+    "command": "bash bin/fm-spawn.sh forbidden-child /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker --scout --harness codex",
+    "refusal_exit_code": 1,
+    "observed_refusal": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work needs to be discarded\n",
+    "policy_refusal_observed": true
+  },
+  "replacement_proof": {
+    "policy_file": "config/session-launch-policy",
+    "policy_contents": "omp-or-tc\n",
+    "refusal_exit_code": 1,
+    "refusal": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper"
+  },
+  "replacement_control_exit": 0
+}

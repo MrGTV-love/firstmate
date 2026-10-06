@@ -1,0 +1,60 @@
+{
+  "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "phase": "targeted Test only",
+  "source_changes": "none",
+  "verdict": "inconclusive",
+  "scenarios": [
+    {
+      "name": "Automatic secondmate recovery admission with real lab endpoint",
+      "result": "pass",
+      "live": true,
+      "evidence": "targeted-live-recovery.json",
+      "scope": "Actual production owner and real private tmux shell endpoint with forbidden executable sentinels; no negative model session."
+    },
+    {
+      "name": "Actual omp pending engine-selection refusal replay",
+      "result": "partial",
+      "live": true,
+      "evidence": "targeted-live-replay.json and targeted-actual-omp-lifecycle-events.json",
+      "observed": "Current-head production-generated pending record persisted at real ACP session close; replacement delivered one refusal user message; real message_start consumption removed it; later shutdown did not republish it; unchanged host refusal log proves no denied host retry. Removing lab supervision-host preserved enabled launch policy and did not invoke host.",
+      "blocker": "Actual watcher successor readiness failed after the owning extension retry bound; no ordinary watcher lock or beacon established.",
+      "diagnosis": "The current-head extension sets FM_ROOT_OVERRIDE and FM_CONFIG_OVERRIDE when spawning ordinary watch-arm. bin/fm-watch-arm.sh refuses disposable /.no-mistakes/worktrees/ invocations unless fm_gate_lab_permitted succeeds, whose owner rejects every nonempty FM_*_OVERRIDE. This phase permits only worktree-local source changes and does not authorize bypassing or changing protection.",
+      "prerequisite": "Authorize a supported lab source checkout outside the disposable gate path, or separately approve an owning isolation-contract correction. No protection was bypassed."
+    },
+    {
+      "name": "Native canonical omp secondmate fresh launch and explicit replacement",
+      "result": "pass",
+      "live": true,
+      "evidence": "targeted-native-worker.json and native surface/control evidence",
+      "observed": "Real omp 18.6.3 used authorized openai-codex/gpt-6.1-sol; same endpoint/worktree, new generation; inherited enabled child policy; actual worker spawn consumer refused Codex; preserved work, validation custody and charter."
+    },
+    {
+      "name": "Absent-policy genuine Codex/plain Claude compatibility",
+      "result": "untested",
+      "live": false,
+      "reason": "Live-session authorization explicitly unavailable; accepted deterministic fixture coverage remains non-live evidence."
+    },
+    {
+      "name": "Native tc run session",
+      "result": "untested",
+      "live": false,
+      "reason": "tc absent from PATH and no verified production native tc run adapter; no installation, proxy substitution or adapter duplication authorized."
+    }
+  ],
+  "setup_errors_fixed": [
+    "Python ACP default 64 KiB frame buffer rejected the model-catalog response; larger buffer allowed real ACP handshake/session lifecycle.",
+    "Removed unsupported session/set_model request; CLI model selection independently observed in current model config option.",
+    "Initial native-worker negative request omitted required scout/ship arguments; corrected via real fm-send inbox and then verified actual policy refusal.",
+    "Pending handoff is persisted on real session shutdown, not during in-flight restoration; generation capture corrected to real session-close boundary."
+  ],
+  "prohibited_work_not_run": [
+    "complete suite",
+    "lint/format/static analysis",
+    "unrelated known timing failure",
+    "CI/push/PR/pipeline control",
+    "real standalone Codex/plain Claude",
+    "tc proxy substitution"
+  ],
+  "earlier_evidence": "Preserved all preexisting evidence; did not rerun already evidenced scenarios or remote transport timing tests.",
+  "cleanup": "Real fm-control exit stopped native worker; only private tmux server killed; fm-lab-home teardown succeeded; no owned processes remained; all newly created worktree scaffolds and native launch scratch removed. Dependencies from commands.prepare untouched."
+}

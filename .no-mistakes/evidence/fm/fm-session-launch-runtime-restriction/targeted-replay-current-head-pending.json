@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "pending": [
+    {
+      "version": 1,
+      "token": "37196-1791325606049-1",
+      "message": "supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes",
+      "predecessorArmPid": "49744"
+    }
+  ]
+}

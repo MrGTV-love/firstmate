@@ -1,0 +1,176 @@
+[
+  {
+    "event": "session_start",
+    "value": {
+      "type": "session_start"
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "This is an isolated marked lab. Run only bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/product/bin/fm-lock.sh and call fm_watch_arm_omp once; do not run any other tools or launch runtimes. Reply ARMED."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "This is an isolated marked lab. Run only bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/product/bin/fm-lock.sh and call fm_watch_arm_omp once; do not run any other tools or launch runtimes. Reply ARMED."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325473754
+      }
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\nwatcher: FAILED - omp extension could not verify a ready successor watcher\nwatcher: FAILED - omp extension could not restore watcher continuity after 5 retries\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\nwatcher: FAILED - omp extension could not verify a ready successor watcher\nwatcher: FAILED - omp extension could not restore watcher continuity after 5 retries\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325492205
+      }
+    }
+  },
+  {
+    "event": "session_shutdown",
+    "value": {
+      "type": "session_shutdown"
+    }
+  },
+  {
+    "event": "session_start",
+    "value": {
+      "type": "session_start"
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "This is an isolated marked lab. Run only bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/product/bin/fm-lock.sh and call fm_watch_arm_omp once; do not run any other tools or launch runtimes. Reply ARMED."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "This is an isolated marked lab. Run only bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/product/bin/fm-lock.sh and call fm_watch_arm_omp once; do not run any other tools or launch runtimes. Reply ARMED."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325596892
+      }
+    }
+  },
+  {
+    "event": "session_shutdown",
+    "value": {
+      "type": "session_shutdown"
+    }
+  },
+  {
+    "event": "session_start",
+    "value": {
+      "type": "session_start"
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "Without running tools, report any FIRSTMATE WATCHER WAKE supervision-host refusal and watcher restoration failure already delivered in your context. Do not repair or re-arm. Reply NO_NOTIFICATION if none."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Without running tools, report any FIRSTMATE WATCHER WAKE supervision-host refusal and watcher restoration failure already delivered in your context. Do not repair or re-arm. Reply NO_NOTIFICATION if none."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325622481
+      }
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\nwatcher: FAILED - omp extension could not verify a ready successor watcher\nwatcher: FAILED - omp extension could not restore watcher continuity after 5 retries\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: supervision-host: launch policy refused: no permitted supervision engine: config/supervision-host names 'omp', which is not a verified supervision engine (verified: claude); predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\nwatcher: FAILED - omp extension could not verify a ready successor watcher\nwatcher: FAILED - omp extension could not restore watcher continuity after 5 retries\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325615816
+      }
+    }
+  },
+  {
+    "event": "session_shutdown",
+    "value": {
+      "type": "session_shutdown"
+    }
+  },
+  {
+    "event": "session_start",
+    "value": {
+      "type": "session_start"
+    }
+  },
+  {
+    "event": "before_agent_start",
+    "prompt": "Reply CONFIGURATION_TRANSITION. Do not use tools or repair supervision."
+  },
+  {
+    "event": "message_start",
+    "value": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Reply CONFIGURATION_TRANSITION. Do not use tools or repair supervision."
+          }
+        ],
+        "attribution": "user",
+        "timestamp": 1791325642033
+      }
+    }
+  },
+  {
+    "event": "session_shutdown",
+    "value": {
+      "type": "session_shutdown"
+    }
+  }
+]

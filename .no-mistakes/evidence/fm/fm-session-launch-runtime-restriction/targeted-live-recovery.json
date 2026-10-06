@@ -1,0 +1,21 @@
+{
+  "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "scenario": "Automatic secondmate recovery admission",
+  "result": "pass",
+  "live": true,
+  "scope": "Real private tmux endpoint, production recovery owner, deterministic forbidden executable sentinels; no negative model session",
+  "probe": {
+    "status": "relaunchable",
+    "state": "dead",
+    "kill": 1
+  },
+  "recovery": {
+    "exit": 1,
+    "status": "skipped",
+    "reason": "config/session-launch-policy=omp-or-tc refuses launch 'claude'"
+  },
+  "endpoint_before_and_after": "@1 %1 3875",
+  "attempt_count": 0,
+  "forbidden_executable_invocations": 0,
+  "work_and_custody": "SHA-256 sets identical before and after"
+}

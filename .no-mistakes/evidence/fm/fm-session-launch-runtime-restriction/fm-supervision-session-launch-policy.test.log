@@ -1,20 +1,25 @@
-$ /bin/bash tests/fm-supervision-session-launch-policy.test.sh
 ok - direct resumed engine refusal exit=127 invocations=0 process-custody=unchanged result=unchanged
 ok - omp-primary host refusal invocations=0 predecessor=alive host-record=identical turn-custody=unchanged
 ok - Claude Stop delivers policy refusal to main with and without predecessor; invocations=0 predecessor-custody=unchanged
 ok - configured supervision engine remains unavailable under launch restriction
 ok - absent policy preserves configured Claude engine and direct turn (fixture executable only)
-ok - omp published initial denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp published initial removed: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp published successor denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp published successor removed: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp failed initial denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp failed initial removed: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp failed successor denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - omp failed successor removed: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - opencode published initial denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - opencode published successor denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - opencode failed initial denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-ok - opencode failed successor denied: refusal delivered once per owner, current-policy monitoring, unchanged custody
-
-exit=0
+ok - omp published initial denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial removed claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published successor denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published successor removed claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp failed initial denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp failed initial removed claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp failed successor denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp failed successor removed claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - opencode published initial denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - opencode published successor denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - opencode failed initial denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - opencode failed successor denied claude: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial denied empty: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial removed empty: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial denied default: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial removed default: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial denied unverified: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial removed unverified: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial denied extra: refusal delivered once per owner, current-policy monitoring, unchanged custody
+ok - omp published initial removed extra: refusal delivered once per owner, current-policy monitoring, unchanged custody

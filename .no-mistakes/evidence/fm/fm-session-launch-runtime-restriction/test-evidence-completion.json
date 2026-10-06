@@ -1,0 +1,79 @@
+{
+  "tested_head_sha": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "verdict": "inconclusive",
+  "summary": "Ordinary monitoring restoration proved through actual Omp ACP; tc and OpenCode runtime prerequisites remain unavailable. No source or permanent test changes.",
+  "resolved_findings": [
+    "test-monitoring-proof"
+  ],
+  "findings": [
+    {
+      "id": "test-2",
+      "severity": "warning",
+      "action": "ask-user",
+      "description": "Individual command -v tc and command -v opencode checks returned exit 1 with no output. No repository-local executable paths were supplied. Native tc output/production adapter admission and authenticated OpenCode replacement remain unproved. Provide supported native tc executable/adapter and already authenticated OpenCode runtime. Genuine absent-policy standalone Codex/Claude launches remain forbidden by the human decision. No installation, host search, credentials inspection/change, login, forbidden runtime, proxy substitute or CI waiver."
+    }
+  ],
+  "monitoring": {
+    "result": "pass",
+    "live": true,
+    "route": "acp:omp",
+    "model": "openai-codex/gpt-6.1-sol",
+    "evidence": "monitoring-restoration-result.json",
+    "ready_phases": [
+      [
+        "unchanged denied engine configuration",
+        true
+      ],
+      [
+        "after actual model prompt",
+        true
+      ],
+      [
+        "after legitimate host configuration removal",
+        true
+      ],
+      [
+        "transitioned watcher after actual model prompt",
+        true
+      ]
+    ],
+    "actual_refusal_delivery_count": 1,
+    "pending_consumed_after_close": true,
+    "no_denied_host_retries": true,
+    "no_forbidden_engine_invocations": true,
+    "enabled_policy_retained": true,
+    "provenance": "Unchanged retained current-head production-generated targeted-replay-current-head-pending.json; actual current-head extension loaded through authorized external disposable checkout, stock-layout marked home, and helper-owned short tmux socket. No fabricated pending record, wrapper normalization, isolation change or override bypass."
+  },
+  "setup_diagnosis": [
+    "Preserved attempt1 unsupported session/set_model; corrected client to supported session/set_config_option and asserted authorized model before prompting.",
+    "Preserved attempt2 unanswered ACP permission request; implemented actual scoped one-shot protocol response only for exact owned fm-lock.sh command.",
+    "Preserved attempt3 aborted on unrelated wake-drain permission although watcher ready; corrected client to reject unrelated tool requests while letting actual model finish.",
+    "Preserved attempt4 fixture sampled incomplete successor lock publication; replaced file-existence readiness with production fm_watcher_healthy identity/home/path/PID/fresh-beacon contract. No production deadline or behavior changed.",
+    "Final focused live lifecycle proof passed. Real assistant events identify only openai-codex/gpt-6.1-sol."
+  ],
+  "cleanup": {
+    "head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+    "all_newly_owned_scratch_paths": [
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M48YHW4X1N5R5ANWST7WZR3J/monitoring-scratch-7pl84g6d",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M48YHW4X1N5R5ANWST7WZR3J/monitoring-scratch-ciky_vht",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M48YHW4X1N5R5ANWST7WZR3J/monitoring-scratch-sklzv2t6",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M48YHW4X1N5R5ANWST7WZR3J/monitoring-scratch-4vepltwu",
+      "/Users/charlesabrooker/.no-mistakes/evidence/01M48YHW4X1N5R5ANWST7WZR3J/monitoring-scratch-x5fcsftn"
+    ],
+    "remaining_paths": [],
+    "remaining_processes": [],
+    "cleanup_complete": true
+  },
+  "artifacts": [
+    "monitoring-restoration-result.json",
+    "monitoring-restoration-acp.jsonl",
+    "monitoring-restoration-events.jsonl",
+    "monitoring-restoration-driver.py",
+    "monitoring-restoration-final-cleanup.json",
+    "monitoring-restoration-setup-attempt1-result.json",
+    "monitoring-restoration-setup-attempt2-result.json",
+    "monitoring-restoration-setup-attempt3-result.json",
+    "monitoring-restoration-setup-attempt4-result.json"
+  ],
+  "scope": "Evidence-only. Prior same-run recovery/native-worker/CLI proofs and qualified baselines preserved unchanged; no broad tests, prior scenario reruns, known failing timing tests, lint/static analysis/formatting/builds, push or CI phases. Real absent-policy Codex/Claude launches remain prohibited. Fixture evidence is not live vendor proof. Remote CI remains mandatory."
+}

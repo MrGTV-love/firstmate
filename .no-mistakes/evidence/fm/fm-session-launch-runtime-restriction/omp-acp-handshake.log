@@ -1,0 +1,6 @@
+charlesabrooker@Mac-Studio 01M48YHW4X1N5R5ANWST7WZR3J % env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE omp acp --no-session --session-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-phase-disposable/live-home/omp-sessions
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":true,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"firstmate-policy-test","version":"1"}}}
+omp acp: ACP server speaking JSON-RPC over stdio.
+This command is meant to be spawned by an ACP client (e.g. Zed's "agent_servers" config), not run directly.
+Waiting for protocol frames on stdin; logs: ~/.omp/logs/
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"omp","title":"omp","version":"18.6.3"},"authMethods":[{"id":"agent","name":"Use existing local credentials","description":"Authenticate via the provider keys/OAuth state already configured under ~/.omp."}],"agentCapabilities":{"loadSession":true,"mcpCapabilities":{"http":true,"sse":true},"promptCapabilities":{"embeddedContext":true,"image":true},"sessionCapabilities":{"list":{},"fork":{},"resume":{},"close":{}}}}}

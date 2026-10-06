@@ -1,0 +1,2 @@
+stopped native-policy-worker harness=omp backend=tmux endpoint=firstmate:fm-native-policy-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent

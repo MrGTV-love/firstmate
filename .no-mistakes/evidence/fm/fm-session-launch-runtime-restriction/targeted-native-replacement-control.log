@@ -1,0 +1,5 @@
+relaunched native-policy-worker harness=omp from=omp model=openai-codex/gpt-6.1-sol effort=low backend=tmux endpoint=firstmate:fm-native-policy-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: secondmate native-policy-worker sync skipped before launch: primary default-branch commit cannot be resolved

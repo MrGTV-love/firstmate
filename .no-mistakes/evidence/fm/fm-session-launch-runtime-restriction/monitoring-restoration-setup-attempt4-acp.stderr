@@ -1,0 +1,3 @@
+omp acp: ACP server speaking JSON-RPC over stdio.
+This command is meant to be spawned by an ACP client (e.g. Zed's "agent_servers" config), not run directly.
+Waiting for protocol frames on stdin; logs: ~/.omp/logs/

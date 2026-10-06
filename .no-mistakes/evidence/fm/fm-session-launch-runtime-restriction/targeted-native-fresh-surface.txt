@@ -1,0 +1,128 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                           Tip: Type `/` at the start of your prompt to browse every command
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: This is an owned disposable Firstmate lab, not an operational fleet home. Only verify
+ these actions, no other commands: run bash bin/fm-spawn.sh forbidden-child --harness codex and report the policy
+ refusal; do not ever invoke codex or claude. Write worker-proof.json containing the exact policy file contents and
+ observed refusal exit code using the normal write tool. Then reply NATIVE_OMP_WORKER_PROVED and wait. Do not spawn
+ agents, activate a supervision host, change configurations, call upstream/pipeline commands, or touch files outside
+ this lab home. Preserve unpublished and validation files.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bash bin/fm-spawn.sh forbidden-child --harness codex                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ error: ship spawns require --mode <no-mistakes|direct-PR|local-only>; resolve it at intake from the captain's        │
+│ instruction and the project's registered posture in data/projects.md                                                 │
+│ ⟦Wall: 0.20s | Timeout: 30s | Exit: 1⟧                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ 🔍 Find: "policy file restricting worker spawning codex claude in disposable lab" 11 hits · 20 files read · τ 0.20 · 1
+ ├─ ━━━━━─ 0.91 bin/fm-session-launch-policy-lib.sh 83 lines judged
+ │    └─ :1-83 0.91 #!/usr/bin/env bash
+ ├─ ━━━━━─ 0.78 docs/configuration.md 159 lines judged, partial
+ │    └─ :736-804 0.78 The verified adapter evidence - each harness's busy-state source, interrupt and exit behavior, s
+ ├─ ━━━━━─ 0.75 bin/fm-spawn.sh 2098 lines judged, partial
+ │    └─ :298-1096 0.75 #   task teardown removes only the current home's launch namespace.
+ ├─ ━━━━── 0.71 tests/fm-session-launch-policy.test.sh 605 lines judged
+ │    └─ :1-605 0.71 #!/usr/bin/env bash
+ ├─ ━━━─── 0.58 tests/fm-supervision-session-launch-policy.test.sh 267 lines judged, partial
+ │    └─ :1-267 0.58 #!/usr/bin/env bash
+ └─ … 6 more hits
+
+ • Read (2)
+   ├─ bin/fm-session-launch-policy-lib.sh:1-83
+   └─ config/session-launch-policy:raw
+
+╭─── ✎ Write: 🧾 worker-proof.json · 9 lines ──────────────────────────────────────────────────────────────────────────╮
+│   1 {                                                                                                                │
+│   2   "policy_file": "config/session-launch-policy",                                                                 │
+│   3   "policy_contents": "omp-or-tc\n",                                                                              │
+│   4   "command": "bash bin/fm-spawn.sh forbidden-child --harness codex",                                             │
+│   5   "refusal_exit_code": 1,                                                                                        │
+│   6   "observed_refusal": "error: ship spawns require --mode <no-mistakes|direct-PR|local-only>; resolve it at       │
+│ intake from the captain's instruction and the project's registered posture in data/projects.md",                     │
+│ … 3 more lines ⟦⌃O: Expand⟧                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ NATIVE_OMP_WORKER_PROVED
+
+ The command exited with code 1 because --mode was missing; it did not reach the policy refusal. Recorded this
+ distinction and the policy contents in worker-proof.json. Neither codex nor claude was invoked.
+
+
+ : Firstmate instruction waiting: list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/stat
+ e/native-policy-worker.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/stat
+ e/native-policy-worker.inbox'/handled/.
+
+
+ 🔍 Glob: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/par
+ └─ ⌘ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/
+
+ ● Read
+~/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/state/native-policy-worker.i
+nbox/001.msg
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bash bin/fm-spawn.sh forbidden-child                                                                               │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker     │
+│ --scout --harness codex                                                                                              │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently    │
+│ supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper         │
+│ help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp    │
+│ --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded         │
+│ ⟦Wall: 0.25s | Timeout: 30s | Exit: 1⟧                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭─── ✎ Write: 🧾 worker-proof.json · 9 lines ──────────────────────────────────────────────────────────────────────────╮
+│   1 {                                                                                                                │
+│   2   "policy_file": "config/session-launch-policy",                                                                 │
+│   3   "policy_contents": "omp-or-tc\n",                                                                              │
+│   4   "command": "bash bin/fm-spawn.sh forbidden-child                                                               │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/worker     │
+│ --scout --harness codex",                                                                                            │
+│   5   "refusal_exit_code": 1,                                                                                        │
+│   6   "observed_refusal": "error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical  │
+│ omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude   │
+│ or a proxy wrapper\nhelp: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id>       │
+│ relaunch --harness omp --model <omp-model-id> --effort <level> --note \"<progress>\"; no previous agent or work      │
+│ needs to be discarded\n",                                                                                            │
+│ … 3 more lines ⟦⌃O: Expand⟧                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ mv                                                                                                                 │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/sta │
+│ te/native-policy-worker.inbox/001.msg                                                                                │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-live-targeted/parent/sta │
+│ te/native-policy-worker.inbox/handled/                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                          │
+│ ⟦Wall: 0.00s | Timeout: 30s⟧                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ NATIVE_OMP_WORKER_PROVED
+
+ Observed the policy refusing the codex launch with exit code 1. Updated worker-proof.json with the exact diagnostic
+ and inherited policy contents, and moved the handled instruction to handled/. Neither codex nor claude was invoked.
+
+❯
+ π · ◔ GPT-6.1-Sol 🙈 · 📁 …5ANWST7WZR3J/.test-live-targeted/worker · ⑂ main ?1 · ◫ 8.8%/272K ⟲ · S0.13 + 👁 0.10
+
+

@@ -1,0 +1,96 @@
+{
+  "route": "acp:omp",
+  "runtime_version": "18.6.3",
+  "model": "openai-codex/gpt-6.1-sol",
+  "initialize": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "omp",
+        "title": "omp",
+        "version": "18.6.3"
+      },
+      "authMethods": [
+        {
+          "id": "agent",
+          "name": "Use existing local credentials",
+          "description": "Authenticate via the provider keys/OAuth state already configured under ~/.omp."
+        }
+      ],
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        }
+      }
+    }
+  },
+  "host_command": {
+    "sessionUpdate": "tool_call_update",
+    "toolCallId": "call_UAH8o6Mo4zE7g6yYYBrWq7CZ|fc_0763f08c016c2951016ac566334a2087d19c0f3f02d25ce2a5",
+    "status": "failed",
+    "rawOutput": {
+      "content": [
+        {
+          "type": "text",
+          "text": "lock acquired: harness pid 76803\nsupervision-host: launch policy refused: no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\n\nWall time: 0.96 seconds\n\nCommand exited with code 1"
+        }
+      ],
+      "details": {
+        "timeoutSeconds": 300,
+        "wallTimeMs": 956.2856250000186,
+        "exitCode": 1
+      },
+      "isError": true
+    },
+    "content": [
+      {
+        "type": "content",
+        "content": {
+          "type": "text",
+          "text": "$ bash bin/fm-lock.sh && bash bin/fm-supervision-host.sh park --restart"
+        }
+      },
+      {
+        "type": "content",
+        "content": {
+          "type": "text",
+          "text": "lock acquired: harness pid 76803\nsupervision-host: launch policy refused: no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes\n\n\nWall time: 0.96 seconds\n\nCommand exited with code 1"
+        }
+      }
+    ]
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 6,
+    "result": {
+      "stopReason": "end_turn",
+      "usage": {
+        "inputTokens": 836,
+        "outputTokens": 216,
+        "totalTokens": 38684,
+        "cachedReadTokens": 37632
+      }
+    }
+  },
+  "session_lock_pid": "76803\n",
+  "host_activated": false,
+  "watch_lock_created": false,
+  "setup_attempts": {
+    "initial_model": "google-antigravity/gemini-3.8-flash returned HTTP 429 quota exhaustion; changed only this disposable ACP session model",
+    "initial_host_call": "without lock: stood down; public fm-lock.sh established real omp ownership"
+  }
+}
