@@ -1,0 +1,39 @@
+{
+  "session": "fm-lab-owned-status-12962-31255",
+  "helper": "/Users/charlesabrooker/firstmate/bin/fm-herdr-lab.sh",
+  "guarded_teardown_exit": 0,
+  "stdout": "",
+  "stderr": "",
+  "before_default_tripwire": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "after_default_tripwire": {
+    "name": "default",
+    "default": true,
+    "running": true,
+    "socket_path": "/Users/charlesabrooker/.config/herdr/herdr.sock"
+  },
+  "named_session_absent": true,
+  "resources_removed": [
+    {
+      "path": "/tmp/fm-owned-live-exact",
+      "absent": true
+    },
+    {
+      "path": "/tmp/fm-owned-live-exact+9b4f3f5845076e060efadc4928707bc6802911062c77fda8c7571d7d79d09b0d",
+      "absent": true
+    },
+    {
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live-test-lab",
+      "absent": true
+    },
+    {
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.targeted-test-tmp",
+      "absent": true
+    }
+  ],
+  "cleanup_permission_resolution": "Restored owner write permission on disposable generated hook directory before deletion."
+}

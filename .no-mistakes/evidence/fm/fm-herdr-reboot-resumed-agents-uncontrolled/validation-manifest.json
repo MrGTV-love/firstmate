@@ -1,0 +1,28 @@
+{
+  "session": "fm-lab-owned-status-12962-31255",
+  "product_versions": {
+    "omp": "18.6.3",
+    "private_herdr_server": "0.9.1",
+    "protocol": 22
+  },
+  "composer_scenarios_passed": true,
+  "actual_root_cursor_proofs_passed": true,
+  "personal_recovery_refusals_passed": true,
+  "legitimate_direct_recovery_passed": true,
+  "legitimate_sweep_recovery_and_managed_noop_passed": true,
+  "focused_regression_exit_codes": [
+    0,
+    0,
+    0
+  ],
+  "transient_resources_removed": true,
+  "lab_session_absent": true,
+  "default_tripwire_unchanged": true,
+  "source_changes": "none; existing attribution correction was already present and validated",
+  "execution_notes": [
+    "Authorized external helper rejected provision after explicit prepare; guarded teardown removed the unused claim, then provision performed its own prepare.",
+    "Disposable positive-recovery fixture was corrected to the required brief headings and genuine linked worktree after setup refusals.",
+    "Initial composer-file invocation exceeded the runner deadline after its owned-status group passed; isolated execution of that maintained group completed with exit 0.",
+    "Terminal visual evidence is rendered HTML of actual product captures, paired with ANSI/plain captures; no native desktop screenshot was taken."
+  ]
+}

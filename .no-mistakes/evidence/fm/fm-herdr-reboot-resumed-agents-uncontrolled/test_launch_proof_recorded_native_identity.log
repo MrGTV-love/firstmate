@@ -1,0 +1,6 @@
+ok - live process environment distinguishes managed, missing, mismatched, and gone launches
+ok - native resume proof requires exact recorded harness, endpoint, cwd, bare argv and persisted startup provenance
+ok - foreground agent ancestry owns launch proof, independently of shells, helpers and executable packaging
+ok - legacy recovery is limited to exact compiled omp equals-form resume with recorded task startup provenance
+ok - versioned and legacy provenance reject generic, foreign, malformed and personal sessions while preserving exact secondmate startup
+ok - env-v1 unmanaged recovery requires recorded native startup while matching pins remain managed for every harness

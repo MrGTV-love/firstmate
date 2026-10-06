@@ -1,0 +1,80 @@
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mto the exact task paths named by this brief.[0m[48;2;15;18;22m                                                [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mWhen this task works on Firstmate itself, the repository root [0m[38;2;0;255;136m[48;2;15;18;22mAGENTS.md[0m[38;2;229;229;231m[48;2;15;18;22m (also imported by   [0m
+[0m[48;2;15;18;22m [0m[38;2;0;255;136m[48;2;15;18;22mCLAUDE.md[0m[38;2;229;229;231m[48;2;15;18;22m) is project content and the supervisor contract for the firstmate managing you:   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mfollow this brief instead of that supervisor contract.[0m[48;2;15;18;22m                                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mProject instructions still govern the work wherever they do not conflict with this worker   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22midentity, including [0m[38;2;0;255;136m[48;2;15;18;22mCONTRIBUTING.md[0m[38;2;229;229;231m[48;2;15;18;22m and [0m[38;2;0;255;136m[48;2;15;18;22mfirstmate-coding-guidelines[0m[38;2;229;229;231m[48;2;15;18;22m for Firstmate changes.[0m[48;2;15;18;22m  [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[4m[38;2;229;229;231m[48;2;15;18;22mTask[0m[48;2;15;18;22m                                                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mCaptain's intent[0m[48;2;15;18;22m                                                                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis is an isolated lifecycle verification, not a project implementation. Reply only        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m"Recovery lab ready." then wait.[0m[48;2;15;18;22m                                                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mFirstmate spec[0m[48;2;15;18;22m                                                                              [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mDo not inspect or modify files, delegate, supervise, run tools, create a pipeline, or       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mchange any user/system state.[0m[48;2;15;18;22m                                                               [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mProgress note (2026-10-06T19:59:00Z)[0m[48;2;15;18;22m                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis task was relaunched. Continue from here; the local copy and every[0m[48;2;15;18;22m                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22muncommitted change are exactly as the previous worker left them.[0m[48;2;15;18;22m                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirst, check your instruction inbox: list                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-test-lab/home/state/owned-live-exact.inbox/*.msg, act on[0m[48;2;15;18;22m                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                               [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-test-lab/home/state/owned-live-exact.inbox/handled/. A steer sent before the relaunch      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22msurvives there.[0m[48;2;15;18;22m                                                                             [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mHerdr restored the previous agent without Firstmate's launch settings. This relaunch        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mrestores the recorded profile in the same local copy and pane, preserving all work. Read    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthe latest task status and instruction inbox before continuing. Respect completed outcomes  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mand outstanding decisions or external waits; do not repeat finished work.[0m[48;2;15;18;22m                   [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mProgress note (2026-10-06T19:59:33Z)[0m[48;2;15;18;22m                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis task was relaunched. Continue from here; the local copy and every[0m[48;2;15;18;22m                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22muncommitted change are exactly as the previous worker left them.[0m[48;2;15;18;22m                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirst, check your instruction inbox: list                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-test-lab/home/state/owned-live-exact.inbox/*.msg, act on[0m[48;2;15;18;22m                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                               [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-test-lab/home/state/owned-live-exact.inbox/handled/. A steer sent before the relaunch      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22msurvives there.[0m[48;2;15;18;22m                                                                             [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mHerdr restored the previous agent without Firstmate's launch settings. This relaunch        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mrestores the recorded profile in the same local copy and pane, preserving all work. Read    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthe latest task status and instruction inbox before continuing. Respect completed outcomes  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mand outstanding decisions or external waits; do not repeat finished work.[0m[48;2;15;18;22m                   [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[4m[38;2;229;229;231m[48;2;15;18;22mCurrent no-mistakes intent contract[0m[48;2;15;18;22m                                                         [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis section supersedes every earlier brief instruction about constructing [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m, but    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mnot later clarifications actually supplied by the captain.[0m[48;2;15;18;22m                                  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mUse everything under [0m[38;2;0;255;136m[48;2;15;18;22m## Captain intent authorized for --intent[0m[38;2;229;229;231m[48;2;15;18;22m through the end of this      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mbrief, including any nested subheadings but excluding that heading, plus any later words    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthe captain actually supplied as [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m; never include Firstmate specification or other   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mmixed Task content.[0m[48;2;15;18;22m                                                                         [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mPreserve those words without adding speaker labels or direct address.[0m[48;2;15;18;22m                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirstmate-authored constraints, acceptance criteria, implementation details, decisions, and [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mtradeoffs are specification, not captain intent.[0m[48;2;15;18;22m                                            [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThe Definition of done's rule that [0m[38;2;0;255;136m[48;2;15;18;22m--intent[0m[38;2;229;229;231m[48;2;15;18;22m must be self-sufficient still governs the       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mstring you pass: resolve any report, decision, or PR the intent below refers to into its    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22msubstance rather than passing the pointer.[0m[48;2;15;18;22m                                                  [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mCaptain intent authorized for --intent[0m[48;2;15;18;22m                                                      [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis is an isolated lifecycle verification, not a project implementation. Reply only        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m"Recovery lab ready." then wait.[0m[48;2;15;18;22m                                                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+
+ Recovery lab ready.                                                                         
+
+❯                                                                                            
+ [0m[38;2;107;114;128mπ[0m [0m[38;2;42;48;56m·[0m [0m[38;2;0;180;255m◔ GPT-6.1-Sol[0m[38;2;0;255;136m 🙈[0m [0m[38;2;42;48;56m·[0m [0m[38;2;232;236;244m🌳 …tree[0m [0m[38;2;42;48;56m·[0m [0m[38;2;255;179;71m⑂ fm/owned-live-exact [0m[38;2;156;163;176m?1[0m [0m[38;2;42;48;56m·[0m ◫ [0m[38;2;156;163;176m7.1%/272K[0m [0m[38;2;156;163;176m⟲[0m [0m[38;2;42;48;56m·[0m [0m[38;2;212;192;144mS0.03 + 👁 0.02[0m 

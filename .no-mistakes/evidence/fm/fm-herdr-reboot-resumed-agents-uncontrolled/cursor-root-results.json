@@ -1,0 +1,23 @@
+[
+  {
+    "name": "header",
+    "root_row": 10,
+    "cursor_root_verdict": "pending",
+    "live_cursorless_api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e \u2570\u2500 \u2500\u256f",
+    "pass": true
+  },
+  {
+    "name": "body",
+    "root_row": 11,
+    "cursor_root_verdict": "pending",
+    "live_cursorless_api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2502 text \u00b7 15.4%/272K \u2502 \u2570\u2500 \u2500\u256f",
+    "pass": true
+  },
+  {
+    "name": "floor",
+    "root_row": 10,
+    "cursor_root_verdict": "pending",
+    "live_cursorless_api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f",
+    "pass": true
+  }
+]

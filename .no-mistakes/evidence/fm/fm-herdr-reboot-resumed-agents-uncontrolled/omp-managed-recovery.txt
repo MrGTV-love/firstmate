@@ -1,0 +1,80 @@
+ to the exact task paths named by this brief.
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by
+ CLAUDE.md) is project content and the supervisor contract for the firstmate managing you:
+ follow this brief instead of that supervisor contract.
+ Project instructions still govern the work wherever they do not conflict with this worker
+ identity, including CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+
+ Task
+
+ Captain's intent
+
+ This is an isolated lifecycle verification, not a project implementation. Reply only
+ "Recovery lab ready." then wait.
+
+ Firstmate spec
+
+ Do not inspect or modify files, delegate, supervise, run tools, create a pipeline, or
+ change any user/system state.
+
+ Progress note (2026-10-06T19:59:00Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live
+ -test-lab/home/state/owned-live-exact.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live
+ -test-lab/home/state/owned-live-exact.inbox/handled/. A steer sent before the relaunch
+ survives there.
+
+ Herdr restored the previous agent without Firstmate's launch settings. This relaunch
+ restores the recorded profile in the same local copy and pane, preserving all work. Read
+ the latest task status and instruction inbox before continuing. Respect completed outcomes
+ and outstanding decisions or external waits; do not repeat finished work.
+
+ Progress note (2026-10-06T19:59:33Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live
+ -test-lab/home/state/owned-live-exact.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4926TBV59JP6Y0KMTN63PFR/.live
+ -test-lab/home/state/owned-live-exact.inbox/handled/. A steer sent before the relaunch
+ survives there.
+
+ Herdr restored the previous agent without Firstmate's launch settings. This relaunch
+ restores the recorded profile in the same local copy and pane, preserving all work. Read
+ the latest task status and instruction inbox before continuing. Respect completed outcomes
+ and outstanding decisions or external waits; do not repeat finished work.
+
+ Current no-mistakes intent contract
+
+ This section supersedes every earlier brief instruction about constructing --intent, but
+ not later clarifications actually supplied by the captain.
+ Use everything under ## Captain intent authorized for --intent through the end of this
+ brief, including any nested subheadings but excluding that heading, plus any later words
+ the captain actually supplied as --intent; never include Firstmate specification or other
+ mixed Task content.
+ Preserve those words without adding speaker labels or direct address.
+ Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and
+ tradeoffs are specification, not captain intent.
+ The Definition of done's rule that --intent must be self-sufficient still governs the
+ string you pass: resolve any report, decision, or PR the intent below refers to into its
+ substance rather than passing the pointer.
+
+ Captain intent authorized for --intent
+
+ This is an isolated lifecycle verification, not a project implementation. Reply only
+ "Recovery lab ready." then wait.
+
+
+ Recovery lab ready.
+
+❯
+ π · ◔ GPT-6.1-Sol 🙈 · 🌳 …tree · ⑂ fm/owned-live-exact ?1 · ◫ 7.1%/272K ⟲ · S0.03 + 👁 0.02

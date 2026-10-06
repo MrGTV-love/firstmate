@@ -1,0 +1,26 @@
+[
+  {
+    "name": "empty-unowned-footer",
+    "api": "state=emptycontent=",
+    "capture": "\n                               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n                                  \u2588\u2588  \u2588\u2588       \u2584\u2580\u2580\u2584 \u2588\u2580\u2584\u2580\u2584 \u2588\u2580\u2580\u2584\n                                  \u2588\u2588  \u2588\u2588       \u2580\u2584\u2584\u2580 \u2588 \u2588 \u2588 \u2588\u2584\u2584\u2580\n                                  \u2592\u2592  \u2588\u2588                  \u2588\n                                      \u2588\u2588       v18.6.3\n\n                       Tip: Spaghetti code? Try complaining with /omfg\n\n\n\u276f                                                                \u21e7\u21e5 to change thinking effort\n \u03c0 \u00b7 \u25d2 Gemini 3.8 Flash \ud83d\udc41 \u00b7 \ud83c\udf33 \u2026926TBV59JP6Y0KMTN63PFR \u00b7 \u2442 detached ?1 \u00b7 \u25eb 2.4%/1M \u27f2 \u00b7 (sub)\n",
+    "pass": true
+  },
+  {
+    "name": "header",
+    "api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e \u2570\u2500 \u2500\u256f",
+    "expected": "\u256d\u2500\u2500 \u03c0 > model > path \u00b7 15.4%/272K \u2500\u256e \u2570\u2500 \u2500\u256f",
+    "pass": true
+  },
+  {
+    "name": "body",
+    "api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2502 text \u00b7 15.4%/272K \u2502 \u2570\u2500 \u2500\u256f",
+    "expected": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2502 text \u00b7 15.4%/272K \u2502 \u2570\u2500 \u2500\u256f",
+    "pass": true
+  },
+  {
+    "name": "floor",
+    "api": "state=pendingcontent=\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f",
+    "expected": "\u256d\u2500\u2500 \u03c0 > model > path \u2500\u256e \u2570\u2500 text \u00b7 15.4%/272K \u2500\u256f",
+    "pass": true
+  }
+]
