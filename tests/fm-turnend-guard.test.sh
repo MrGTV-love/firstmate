@@ -900,7 +900,7 @@ exit 1
 SH
     chmod +x "$home/bin/fm-watch-arm.sh"
   done
-  "$dir/fakebin/claude" -c 'node - "$@" "$$"; status=$?; exit "$status"' _ \
+  "$dir/fakebin/claude" -c "node - \"\$@\" \"\$\$\"; status=\$?; exit \"\$status\"" _ \
     "$mode" "$ROOT/.claude/settings.json" "$dir" "$task" <<'JS' \
     || fail "tracked Claude configuration failed its $mode behavioral contract"
 const assert = require('node:assert/strict');
