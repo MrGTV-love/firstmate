@@ -880,8 +880,8 @@ test_grok_adapter_missing_jq_and_no_supervision_allow() {
 # GROK_AGENT alone, which a grok 1.0.0 HOOK process does not carry, so the
 # Claude-only Stop auto-arm ran synchronously under Grok, foregrounded the
 # watcher, and wedged the Grok turn for its declared 28800-second timeout.
-# Every tracked Claude entry has a native Grok counterpart and must be inert
-# under Grok's Claude-compatible settings loading.
+# Every tracked Claude entry must be inert under Grok's compatibility loading;
+# docs/turnend-guard.md owns the supervision and mirror applicability boundary.
 test_tracked_claude_entries_inert_under_grok() {
   local dir cmd script target guarded=0
   command -v jq >/dev/null 2>&1 || fail "test host must provide jq"

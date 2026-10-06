@@ -5,9 +5,8 @@ There is no tool-name guard or required opt-in for `Agent`, `Monitor`, `TaskCrea
 The tracked Claude `PreToolUse` hooks in `.claude/settings.json` apply only to `Bash` commands and retain their separate watcher-arm and directory-change protections.
 
 The boundary is the work, not the tool name.
-`AGENTS.md` sections 1 and 7 require project-specific coding, investigation, planning, bug reproduction, and audits to be delegated through the fleet, even when read-only; `bin/fm-brief.sh` and `bin/fm-spawn.sh` provide the task's instructions, durable record, isolated project copy, and supervision.
-The primary does not write to a project itself outside the concrete captain-approved exceptions in `AGENTS.md` section 1.
-A helper agent does not substitute for that project-work process merely because its tool is available.
+[`AGENTS.md`](../AGENTS.md) sections 1 and 7 own project-work delegation and its captain-approved exceptions, including the fleet requirement for project-specific investigation, planning, bug reproduction, and audits even when read-only.
+A harness helper call does not itself create a fleet task record or a supervised worker session, so helper availability is not a substitute for that project-work process.
 
 The prior `bin/fm-subagent-pretool-check.sh` classified tool names by stems rather than by the work requested.
 It could block a read-only report consolidation and unrelated session tools while leaving project changes through an unclassified shell command untouched.

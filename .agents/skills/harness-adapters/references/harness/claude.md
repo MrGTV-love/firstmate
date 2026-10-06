@@ -89,6 +89,4 @@ Claude's PreToolUse seatbelt blocks directly, and its deny is honored only with 
 ### Helper agents
 
 Claude's helper agents and session tools remain available to the primary for work that is not project-specific, such as consolidating firstmate-private reports.
-Project-specific coding, investigation, planning, bug reproduction, and audits still go to fleet workers under `../../../AGENTS.md` sections 1 and 7, even when read-only.
-`../../../docs/subagent-guard.md` owns the boundary between that work and project tasks delegated through the fleet.
-The tracked `PreToolUse` hooks protect Bash commands, not delegation-shaped tool names.
+[`Primary helper agents and durable project work`](../../../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
