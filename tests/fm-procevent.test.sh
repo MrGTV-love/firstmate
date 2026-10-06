@@ -223,14 +223,9 @@ hold_source_lock_then_handle() {  # <home> <source-id> <sequence> <ready-file> <
 
 test_launch_episodes() {
 # --- a launch that cannot confirm is announced once per failure episode ------
-# `bin/fm-watch.sh` discards reconcile's `failed=` count and exit status, so a
-# runner that dies before claiming - for any cause, not only the claim wedge -
-# would be relaunched and reported failed every cycle with nobody told: armed
-# in appearance, a dead drop in fact. The episode is keyed by the registration
-# identity the launch ran under and ends when a launch of that source confirms,
-# so the registration below is damaged and repaired IN PLACE to keep that
-# identity fixed across the whole sequence. The wake changes nothing about the
-# launch: every failing cycle below still relaunches and still reports failed.
+# docs/configuration.md "Report launch failures" owns the episode contract.
+# Damage and repair this registration IN PLACE to keep its identity fixed:
+# recovery must allow a fresh episode without relying on registration replacement.
 HEP="$TMP_ROOT/hep"; new_home "$HEP"
 EP_SOURCE_CMD="$TMP_ROOT/episode-source.sh"
 cat > "$EP_SOURCE_CMD" <<'SH'

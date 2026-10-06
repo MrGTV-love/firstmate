@@ -1593,19 +1593,9 @@ report_stranded_source() {  # <source-id> <claim-token> <why-and-recovery>
 
 # Announce a launch that reconcile could not confirm, once per failure episode.
 #
-# A launch that never proves it took the claim - a runner that died before
-# claiming on unreadable argv, a missing adapter binary or a guard that refused
-# to start, or one merely too slow under load - is relaunched every supervision
-# cycle and reported `failed=` to a stdout that cycle discards: armed in
-# appearance, a dead drop in fact, which is the incident with a different cause.
-# Confirmation observes only that no claim and no launch stamp appeared inside
-# the window, so this says exactly that and no more about why. An episode is
-# keyed by the registration identity the launch ran under and ends when a later
-# cycle finds the source owned or a launch confirms, so a second failure inside
-# one episode announces nothing, a slow runner that arms later closes its own
-# episode without a retraction, and a source that recovers and then fails again
-# announces a new one. Nothing here changes what reconcile does about the launch
-# itself: it keeps relaunching exactly as before, and this only says so once.
+# docs/configuration.md "Report launch failures" owns the episode contract.
+# The caller holds the source lock after revalidating the registration and
+# launch evidence, through marker publication, wake append and rollback.
 #
 # The queue key carries a nonce beyond the episode: the watcher remembers every
 # key it has surfaced for good, so a key made of the registration identity alone
