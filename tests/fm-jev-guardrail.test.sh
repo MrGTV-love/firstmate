@@ -18,9 +18,14 @@ delete env.TYPESAFE_API_KEY_PRIVATE;
 writeFileSync(resolve(fakebin, 'curl'), `#!/usr/bin/env node
 const fs = require('node:fs');
 if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(9);
-const request = fs.readFileSync(0, 'utf8');
+const assert = require('node:assert/strict');
+assert.equal(process.argv[2], '-q');
+assert.ok(process.argv.some((arg, index) => arg === '-H' && process.argv[index + 1] === '@-'));
+const request = process.argv[process.argv.indexOf('--data-binary') + 1];
+JSON.parse(request);
+const authorization = fs.readFileSync(0, 'utf8');
+assert.ok(!process.argv.some(arg => arg.includes(authorization.trim().slice('Authorization: Bearer '.length))));
 fs.writeFileSync(process.env.LOG_REQUEST, request);
-const authorization = fs.readFileSync(3, 'utf8');
 fs.appendFileSync(process.env.LOG_TRANSPORT, JSON.stringify({ authorization }) + '\\n');
 if (process.env.REPLY === 'timeout') process.exit(28);
 if (process.env.REPLY === 'malformed') { process.stdout.write(JSON.stringify({model:'jev-1.13.0', usage:{input_tokens:100,output_tokens:1},answers:{risk:{choice:'evil secret response'}}})+'\\n200'); process.exit(0); }
@@ -670,8 +675,12 @@ mkdirSync(env.FM_CONFIG_OVERRIDE);
 writeFileSync(resolve(fakebin, 'curl'), `#!/usr/bin/env node
 const fs = require('node:fs');
 if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(9);
-fs.readFileSync(0, 'utf8');
-fs.readFileSync(3, 'utf8');
+const assert = require('node:assert/strict');
+assert.ok(process.argv.some((arg, index) => arg === '-H' && process.argv[index + 1] === '@-'));
+JSON.parse(process.argv[process.argv.indexOf('--data-binary') + 1]);
+const authorization = fs.readFileSync(0, 'utf8');
+assert.equal(authorization, 'Authorization: Bearer synthetic-persistence-key\\n');
+assert.ok(!process.argv.some(arg => arg.includes('synthetic-persistence-key')));
 fs.appendFileSync(process.env.TRANSPORT_TRACE, 'request\\n');
 if (process.argv[2] !== '-q') process.exit(9);
 if (process.env.REPLY === 'timeout') process.exit(28);
@@ -913,8 +922,8 @@ const server = createServer((request, response) => {
       : validResponse));
   });
 });
-const run = (executable, args, env, input = '', header) => new Promise((resolveRun, reject) => {
-  const child = spawn(executable, args, { cwd: lab, env, stdio: ['pipe', 'pipe', 'pipe', ...(header === undefined ? [] : ['pipe'])] });
+const run = (executable, args, env, input = '') => new Promise((resolveRun, reject) => {
+  const child = spawn(executable, args, { cwd: lab, env, stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   const deadline = setTimeout(() => child.kill('SIGKILL'), 15000);
   child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk; });
@@ -923,7 +932,6 @@ const run = (executable, args, env, input = '', header) => new Promise((resolveR
   child.once('close', (status, signal) => { clearTimeout(deadline); resolveRun({ status, signal, stdout, stderr }); });
   child.stdin.on('error', () => {});
   child.stdin.end(input);
-  if (header !== undefined) { child.stdio[3].on('error', () => {}); child.stdio[3].end(header); }
 });
 const records = () => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) : [];
 const values = stdout => Object.fromEntries(stdout.trim().split('\n').map(line => {
@@ -951,20 +959,24 @@ try {
     server.listen(0, '127.0.0.1', resolveListen);
   });
   const endpoint = `http://127.0.0.1:${server.address().port}/v1/systemone`;
-  const control = await run(actualCurl, ['-sS', '--max-time', '2', '-X', 'POST', endpoint, '-H', '@/dev/fd/3', '--data-binary', '@-'], env, '{}', `Authorization: Bearer ${syntheticKey}\n`);
+  const control = await run(actualCurl, ['-sS', '--max-time', '2', '-X', 'POST', endpoint, '-H', '@-', '--data-binary', '{}'], env, `Authorization: Bearer ${syntheticKey}\n`);
   assert.equal(control.status, 0);
   assert.equal(control.stderr, '');
   assert.equal(received.length, 4, 'isolated curlrc retry=3 must cause four real requests');
   assert.ok(received.every(request => request.authorized));
+  assert.ok(received.every(request => request.method === 'POST' && request.url === '/v1/systemone' && request.body === '{}'), 'control must send its argv body on every retry');
   assert.ok(readFileSync(trace, 'utf8').includes(`Authorization: Bearer ${syntheticKey}`), 'isolated curlrc must expose the synthetic authorization in its trace');
   rmSync(trace);
   received.length = 0;
   console.log('ok - real curl control honors isolated trace-ascii and hidden HTTP 503 retries');
 
   writeFileSync(resolve(fakebin, 'curl'), `#!/bin/bash
+[ -z "\${TYPESAFE_API_KEY:-}" ] && [ -z "\${TYPESAFE_API_KEY_PRIVATE:-}" ] || exit 92
+[ "$1" = '-q' ] || exit 93
 args=("$@")
 matched=0
 for index in "\${!args[@]}"; do
+  case "\${args[$index]}" in *${syntheticKey}*) exit 94 ;; esac
   case "\${args[$index]}" in
     https://api.typesafe.ai/v1/systemone) args[$index]=${shellQuote(endpoint)}; matched=$((matched + 1)) ;;
     http://*|https://*) exit 90 ;;

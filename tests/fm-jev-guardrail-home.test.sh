@@ -126,8 +126,12 @@ make_transport() {
 #!/usr/bin/env node
 const fs = require('node:fs');
 if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(9);
-const request = JSON.parse(fs.readFileSync(0, 'utf8'));
-const header = fs.readFileSync(3, 'utf8');
+const assert = require('node:assert/strict');
+assert.equal(process.argv[2], '-q');
+assert.ok(process.argv.some((arg, index) => arg === '-H' && process.argv[index + 1] === '@-'));
+const request = JSON.parse(process.argv[process.argv.indexOf('--data-binary') + 1]);
+const header = fs.readFileSync(0, 'utf8');
+assert.ok(!process.argv.some(arg => arg.includes(header.trim().slice('Authorization: Bearer '.length))));
 fs.appendFileSync(process.env.FM_TEST_TRANSPORT, JSON.stringify({ request, header }) + '\n', { mode: 0o600 });
 if (process.env.FM_TEST_REPLY === 'failure') process.exit(28);
 process.stdout.write(JSON.stringify({ model: 'jev-1.13.0', usage: { input_tokens: 100, output_tokens: 1 }, answers: { risk: { type: 'choice', choice: 'risky', confidence: 0.9, probabilities: { risky: 0.9, routine: 0.05, uncertain: 0.05 } } } }) + '\n200');
