@@ -2265,15 +2265,23 @@ EOF
 }
 
 task_record_process_signal() {  # <pid> <birth-identity> <signal>
-  local pid=$1 identity=$2 signal=$3 command start cwd="" i record epoch
+  local pid=$1 identity=$2 signal=$3 command start cwd="" i record epoch current
   record="$STATE/$ID.teardown-processes"
   for i in "${!TASK_SCAN_PIDS[@]}"; do
     [ "${TASK_SCAN_PIDS[$i]}" != "$pid" ] || { cwd=${TASK_PID_CWDS[$i]}; break; }
   done
   [ -n "$cwd" ] || return 1
-  command=$(LC_ALL=C ps -ww -p "$pid" -o command= 2>/dev/null) || return 1
-  start=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) || return 1
-  [ -n "$command" ] && [ -n "$start" ] || return 1
+  if ! command=$(LC_ALL=C ps -ww -p "$pid" -o command= 2>/dev/null) \
+     || ! start=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) \
+     || [ -z "$command" ] || [ -z "$start" ]; then
+    if current=$(task_process_identity "$pid") && [ "$current" != "$identity" ]; then
+      return 2
+    fi
+    if perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+      return 2
+    fi
+    return 1
+  fi
   epoch=$(date +%s) || return 1
   fm_backlog_record_parent_authorized "$record" "teardown process audit" "$STATE" || return 1
   if [ -e "$record" ] || [ -L "$record" ]; then
@@ -2335,7 +2343,10 @@ EOF
       identity=${tracked_identities[$i]}
       if task_pid_list_contains "$current_pids" "$pid" \
          && task_process_identity_matches "$pid" "$identity"; then
-        if ! task_record_process_signal "$pid" "$identity" TERM; then
+        if task_record_process_signal "$pid" "$identity" TERM; then
+          :
+        else
+          [ "$?" -ne 2 ] || continue
           echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it." >&2
           return 1
         fi
@@ -2372,7 +2383,10 @@ EOF
         identity=${remaining_identities[$i]}
         if task_pid_list_contains "$current_pids" "$pid" \
            && task_process_identity_matches "$pid" "$identity"; then
-          if ! task_record_process_signal "$pid" "$identity" KILL; then
+          if task_record_process_signal "$pid" "$identity" KILL; then
+            :
+          else
+            [ "$?" -ne 2 ] || continue
             echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without force-killing it." >&2
             return 1
           fi
@@ -3611,16 +3625,16 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
     exit 1
   fi
   BACKLOG_CLOSE_STAGE="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
-  if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
-    echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
-    exit 1
-  fi
 else
   if [ "$CLEANUP_RECOVERY" = orca ]; then
     BACKLOG_SKIP_REASON="Orca cleanup recovery is not a launched backlog worker"
   else
     BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
   fi
+fi
+if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
+  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
+  exit 1
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped

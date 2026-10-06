@@ -4167,6 +4167,291 @@ SH
   pass "process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay"
 }
 
+test_exempt_retry_clears_prior_close_replay_authority() {
+  local scenario case_dir pid birth other_pid other_birth rc real_rm target_alive other_alive
+  real_rm=$(command -v rm)
+  for scenario in manual missing-backlog; do
+    case_dir=$(make_case "exempt-retry-$scenario")
+    mkdir -p "$case_dir/home/state" "$case_dir/unrelated"
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    seed_backlog_in_flight "$case_dir"
+    fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+    cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ -f "$case_dir/state/task-x1.backlog-close" ] || exit 79
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 1
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
+fi
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/initial.stdout" 2> "$case_dir/initial.stderr" || rc=$?
+    printf 'initial_rc=%s\n' "$rc" > "$case_dir/initial.observations"
+    expect_code 1 "$rc" "exempt-retry-$scenario: initial return must fail"
+    assert_present "$case_dir/treehouse.log" "exempt-retry-$scenario: initial teardown did not publish before return"
+    assert_present "$case_dir/state/task-x1.backlog-close" "exempt-retry-$scenario: initial failure did not retain close authority"
+    cp "$case_dir/state/task-x1.backlog-close" "$case_dir/close.before"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: initial failure changed incarnation metadata"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: initial failure closed backlog"
+    rm -f "$case_dir/treehouse.log" "$case_dir/endpoint-close.log"
+    case "$scenario" in
+      manual) printf '%s\n' manual > "$case_dir/config/backlog-backend" ;;
+      missing-backlog) mv "$case_dir/data/backlog.md" "$case_dir/backlog.before" ;;
+    esac
+    mkdir "$case_dir/wt/dist"
+    teardown_fixture_start "$case_dir/wt/dist" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    birth=$(teardown_fixture_birth "$pid") || fail "exempt-retry-$scenario: missing target birth"
+    teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+    other_pid=$TEARDOWN_FIXTURE_PID
+    other_birth=$(teardown_fixture_birth "$other_pid") || fail "exempt-retry-$scenario: missing unrelated birth"
+    cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  [ "\$arg" != "$case_dir/state/task-x1.backlog-close" ] || exit 1
+done
+exec "$real_rm" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/rm"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/clear.stdout" 2> "$case_dir/clear.stderr" || rc=$?
+    printf 'clear_rc=%s target_pid=%s target_birth=%s unrelated_pid=%s unrelated_birth=%s\n' \
+      "$rc" "$pid" "$birth" "$other_pid" "$other_birth" > "$case_dir/clear.observations"
+    expect_code 1 "$rc" "exempt-retry-$scenario: failed invalidation must refuse"
+    assert_grep "pending-close record could not be removed" "$case_dir/clear.stderr" \
+      "exempt-retry-$scenario: failed invalidation did not reach shared boundary"
+    cmp "$case_dir/close.before" "$case_dir/state/task-x1.backlog-close" \
+      || fail "exempt-retry-$scenario: failed invalidation changed old marker"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: failed invalidation changed metadata"
+    assert_absent "$case_dir/treehouse.log" "exempt-retry-$scenario: failed invalidation returned worktree"
+    assert_absent "$case_dir/endpoint-close.log" "exempt-retry-$scenario: failed invalidation closed endpoint"
+    assert_absent "$case_dir/state/task-x1.teardown-processes" "exempt-retry-$scenario: failed invalidation audited signal"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: failed invalidation changed target"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: failed invalidation changed unrelated process"
+    rm -f "$case_dir/fakebin/rm"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "exempt-retry-$scenario: descendant process must refuse"
+    assert_grep "REFUSED: process $pid" "$case_dir/stderr" "exempt-retry-$scenario: process gate not reached"
+    assert_absent "$case_dir/state/task-x1.backlog-close" "exempt-retry-$scenario: exempt retry retained old authority"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: process refusal changed same-incarnation metadata"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: refusal changed target"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: refusal changed unrelated process"
+    case "$scenario" in
+      manual) rm -f "$case_dir/config/backlog-backend" ;;
+      missing-backlog) mv "$case_dir/backlog.before" "$case_dir/data/backlog.md" ;;
+    esac
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: refused backlog changed before replay"
+    FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_close_marker_replay "$2/state" "$2/state/task-x1.backlog-close" "$2/data"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/replay.stdout" 2> "$case_dir/replay.stderr" \
+      || fail "exempt-retry-$scenario: supported replay failed after restoration"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: retry or replay changed same-incarnation metadata"
+    cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+      || fail "exempt-retry-$scenario: unrelated metadata changed"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: replay closed refused task"
+    assert_present "$case_dir/wt" "exempt-retry-$scenario: worktree removed"
+    assert_present "$case_dir/wt/dist" "exempt-retry-$scenario: descendant root removed"
+    assert_absent "$case_dir/treehouse.log" "exempt-retry-$scenario: refusal returned worktree"
+    assert_absent "$case_dir/endpoint-close.log" "exempt-retry-$scenario: refusal closed endpoint"
+    assert_absent "$case_dir/state/task-x1.teardown-processes" "exempt-retry-$scenario: refusal audited signal"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: target PID/birth changed"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: unrelated PID/birth changed"
+    target_alive=0
+    other_alive=0
+    teardown_fixture_live "$pid" "$birth" && target_alive=1
+    teardown_fixture_live "$other_pid" "$other_birth" && other_alive=1
+    printf 'mode=%s rc=%s target_pid=%s target_birth=%s target_alive=%s unrelated_pid=%s unrelated_birth=%s unrelated_alive=%s term_audit=0 kill_audit=0\n' \
+      "$scenario" "$rc" "$pid" "$birth" "$target_alive" "$other_pid" "$other_birth" "$other_alive" \
+      > "$case_dir/observations"
+    teardown_fixture_stop "$pid"
+    teardown_fixture_stop "$other_pid"
+  done
+  pass "manual and missing-backlog retries revoke old close authority before process refusal and restored replay"
+}
+
+test_process_audit_collection_exit_races() {
+  local signal field outcome case_dir pid birth other_pid other_birth journal rc i term_audit kill_audit target_alive other_alive
+  for signal in TERM KILL; do
+    for field in command lstart; do
+      for outcome in exit live-failure uncertain-live-failure control; do
+        [ "$outcome" != uncertain-live-failure ] || [ "$field" = lstart ] || continue
+        [ "$outcome" != control ] || { [ "$signal" = TERM ] && [ "$field" = command ]; } || continue
+        case_dir=$(make_case "audit-collection-$signal-$field-$outcome")
+        mkdir -p "$case_dir/home/state" "$case_dir/unrelated"
+        write_meta "$case_dir" no-mistakes ship
+        land_shippable_commit "$case_dir"
+        journal="$case_dir/state/task-x1.teardown-processes"
+        cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+        teardown_fixture_start "$case_dir/wt" KILL perl -e '
+          my ($ready, $exit, $journal, $seen) = @ARGV;
+          $SIG{TERM} = sub {
+            open my $in, "<", $journal or die "TERM without durable audit";
+            local $/; my $audit = <$in>; close $in;
+            open my $out, ">", $seen or die "signal observation";
+            print {$out} $audit; close $out;
+          };
+          open my $f, ">", $ready or die "ready"; close $f;
+          until (-e $exit) { select undef, undef, undef, 0.01; }
+        ' "$case_dir/ready" "$case_dir/finite-exit" "$journal" "$case_dir/term-observed"
+        pid=$TEARDOWN_FIXTURE_PID
+        birth=$(teardown_fixture_birth "$pid") || fail "audit-collection: missing target birth"
+        i=0
+        while [ ! -f "$case_dir/ready" ] && [ "$i" -lt 1000 ]; do sleep 0.01; i=$((i + 1)); done
+        [ -f "$case_dir/ready" ] || fail "audit-collection: finite process not ready"
+        teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+        other_pid=$TEARDOWN_FIXTURE_PID
+        other_birth=$(teardown_fixture_birth "$other_pid") || fail "audit-collection: missing unrelated birth"
+        fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+        cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+        cat > "$case_dir/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+args=" $* "
+boundary=0
+if [[ "$args" == *" -p $FM_AUDIT_TARGET "* ]]; then
+  if [[ "$args" == *" -o lstart= "* ]] && [ -f "$FM_AUDIT_CASE/lstart-failed" ]; then
+    exit 1
+  fi
+  if [[ "$args" == *" -o command= "* ]]; then
+    n=0
+    [ ! -f "$FM_AUDIT_CASE/command-count" ] || read -r n < "$FM_AUDIT_CASE/command-count"
+    n=$((n + 1))
+    printf '%s\n' "$n" > "$FM_AUDIT_CASE/command-count"
+    round=1
+    [ "$FM_AUDIT_SIGNAL" != KILL ] || round=2
+    if [ "$n" -eq "$round" ]; then
+      if [ "$FM_AUDIT_FIELD" = command ]; then
+        boundary=1
+      else
+        command_output=$(LC_ALL=C "$REAL_PS_FOR_TEST" "$@") || exit 76
+        [ -n "$command_output" ] || exit 77
+        : > "$FM_AUDIT_CASE/lstart-armed"
+        printf '%s\n' "$command_output"
+        exit 0
+      fi
+    fi
+  elif [[ "$args" == *" -o lstart= "* ]] && [ -f "$FM_AUDIT_CASE/lstart-armed" ]; then
+    rm -f "$FM_AUDIT_CASE/lstart-armed"
+    boundary=1
+  fi
+fi
+if [ "$boundary" -eq 1 ]; then
+  teardown_fixture_live "$FM_AUDIT_TARGET" "$FM_AUDIT_BIRTH" || exit 78
+  printf '%s\t%s\t%s\n' "$FM_AUDIT_SIGNAL" "$FM_AUDIT_FIELD" "$FM_AUDIT_BIRTH" \
+    >> "$FM_AUDIT_CASE/boundary.log"
+  case "$FM_AUDIT_OUTCOME" in
+    live-failure) exit 1 ;;
+    uncertain-live-failure) : > "$FM_AUDIT_CASE/lstart-failed"; exit 1 ;;
+    exit)
+      : > "$FM_AUDIT_CASE/finite-exit"
+      for ((i=0; i<1000; i++)); do
+        state=$("$REAL_PS_FOR_TEST" -p "$FM_AUDIT_TARGET" -o stat= 2>/dev/null) || break
+        [ -n "$state" ] || break
+        sleep 0.01
+      done
+      [ "$i" -lt 1000 ] || exit 79
+      printf 'exited\n' >> "$FM_AUDIT_CASE/exit-confirmed"
+      ;;
+  esac
+fi
+exec "$REAL_PS_FOR_TEST" "$@"
+SH
+        cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf 'returned\n' >> "$case_dir/treehouse.log"
+exit 0
+SH
+        chmod +x "$case_dir/fakebin/ps" "$case_dir/fakebin/treehouse"
+        rc=0
+        FM_HOME="$case_dir/home" FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
+        FM_AUDIT_CASE="$case_dir" FM_AUDIT_TARGET="$pid" FM_AUDIT_BIRTH="$birth" \
+        FM_AUDIT_SIGNAL="$signal" FM_AUDIT_FIELD="$field" FM_AUDIT_OUTCOME="$outcome" \
+          run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        term_audit=0
+        kill_audit=0
+        if [ -f "$journal" ]; then
+          grep -q $'\tTERM\t'"$pid"$'\t' "$journal" && term_audit=1
+          grep -q $'\tKILL\t'"$pid"$'\t' "$journal" && kill_audit=1
+        fi
+        target_alive=0
+        other_alive=0
+        teardown_fixture_live "$pid" "$birth" && target_alive=1
+        teardown_fixture_live "$other_pid" "$other_birth" && other_alive=1
+        printf 'signal=%s field=%s outcome=%s rc=%s target_pid=%s target_birth=%s target_alive=%s unrelated_pid=%s unrelated_birth=%s unrelated_alive=%s term_audit=%s kill_audit=%s\n' \
+          "$signal" "$field" "$outcome" "$rc" "$pid" "$birth" "$target_alive" \
+          "$other_pid" "$other_birth" "$other_alive" "$term_audit" "$kill_audit" \
+          > "$case_dir/observations"
+        assert_grep "$signal"$'\t'"$field"$'\t'"$birth" "$case_dir/boundary.log" \
+          "audit-collection-$signal-$field-$outcome: collection boundary not reached with original birth"
+        case "$outcome" in
+          live-failure|uncertain-live-failure)
+            expect_code 1 "$rc" "audit-collection-$signal-$field: live collection failure must refuse"
+            teardown_fixture_live "$pid" "$birth" || fail "audit-collection-$signal-$field: live failure signalled target"
+            cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+              || fail "audit-collection-$signal-$field: live failure changed task metadata"
+            assert_present "$case_dir/wt" "audit-collection-$signal-$field: live failure removed worktree"
+            assert_absent "$case_dir/treehouse.log" "audit-collection-$signal-$field: live failure returned worktree"
+            assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" \
+              "audit-collection-$signal-$field: live failure did not name audit refusal"
+            ;;
+          exit|control)
+            expect_code 0 "$rc" "audit-collection-$signal-$field-$outcome: cleanup should complete"
+            if teardown_fixture_live "$pid" "$birth"; then
+              fail "audit-collection-$signal-$field-$outcome: target survived"
+            fi
+            assert_absent "$case_dir/state/task-x1.meta" "audit-collection-$signal-$field-$outcome: task metadata retained"
+            assert_present "$case_dir/treehouse.log" "audit-collection-$signal-$field-$outcome: worktree return not reached"
+            [ "$outcome" != exit ] || assert_present "$case_dir/exit-confirmed" \
+              "audit-collection-$signal-$field: wrapper did not synchronize natural exit"
+            ;;
+        esac
+        if [ "$outcome" = control ]; then
+          [ "$term_audit" -eq 1 ] && [ "$kill_audit" -eq 1 ] \
+            || fail "audit-collection-$signal-$field: control lacks durable TERM/KILL"
+        else
+          [ "$kill_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited KILL"
+          if [ "$signal" = TERM ]; then
+            [ "$term_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited TERM"
+            assert_absent "$case_dir/term-observed" "audit-collection-$signal-$field-$outcome: TERM reached target"
+          else
+            [ "$term_audit" -eq 1 ] || fail "audit-collection-KILL-$field-$outcome: prior TERM was not audited"
+          fi
+        fi
+        if [ "$term_audit" -eq 1 ]; then
+          assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/term-observed" \
+            "audit-collection-$signal-$field-$outcome: TERM preceded durable audit"
+        fi
+        teardown_fixture_live "$other_pid" "$other_birth" \
+          || fail "audit-collection-$signal-$field-$outcome: unrelated PID/birth changed"
+        cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+          || fail "audit-collection-$signal-$field-$outcome: unrelated metadata changed"
+        teardown_fixture_stop "$pid"
+        teardown_fixture_stop "$other_pid"
+      done
+    done
+  done
+  pass "TERM and KILL audit collection tolerates synchronized real exits, refuses live failures, and preserves unrelated identities"
+}
+
 test_process_audit_failure_refuses_before_signal() {
   local case_dir rc pid survived=0
   case_dir=$(make_case process-audit-failure)
@@ -4800,6 +5085,7 @@ test_forced_child_missing_adapter_sibling_refuses_before_cleanup
 test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
 test_process_refusal_has_no_close_replay_authority
+test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_fork_remote_allows
 test_teardown_closes_the_backlog_item_itself
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
@@ -4889,6 +5175,7 @@ test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
+test_process_audit_collection_exit_races
 test_nested_registered_worktree_process_is_not_reaped
 test_sibling_clone_nested_lane_process_is_not_reaped
 test_registered_lane_missing_git_process_is_not_reaped
