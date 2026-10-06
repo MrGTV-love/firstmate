@@ -433,7 +433,7 @@ The replacement is allowed only when all of these agree:
 
 The replacement tab and pane are created and verified before the old pane is rechecked and closed.
 Then the journal advances atomically to the replacement endpoint before metadata publication.
-Exact reclaim releases the session presentation lock after that verified journal advancement, before worktree allocation and harness setup; the task and metadata locks still protect the launch incarnation, and abort cleanup reacquires the session lock before closing any pane.
+Exact reclaim releases the session presentation lock after that verified journal advancement; [Presentation journal](#presentation-journal) owns the subsequent unlocked launch and abort-cleanup custody.
 The reclaim path never moves, closes, deletes, or renames a workspace and never touches a parent, sibling, captain, or foreign pane.
 A failed replacement rolls back only the exact response-derived new pane when focus-safe verification permits it.
 
@@ -529,6 +529,7 @@ Any of these preserves the candidate and lets session startup continue with at m
 | Test | What it covers |
 | --- | --- |
 | `tests/fm-backend-herdr-presentation-e2e.test.sh` | Multi-home ordering, concurrency, lock contention, legacy coexistence, focus preservation, exact same-identity restart replacement, ambiguous bindings and tokens, and exact-pane cleanup through the guarded lab path. |
+| `tests/fm-backend-herdr-recovery-lock-e2e.test.sh` | [Cross-home recovery custody evidence](verification/runtime-backends.md#cross-home-recovery-custody). |
 | `tests/fm-herdr-session-cleanup.test.sh` | Every discovery, ownership, topology, process, locking, revalidation, focus, retirement, and continue-on-error boundary. |
 | `tests/fm-herdr-session-cleanup-e2e.test.sh` | The restored-shell cleanup in a guarded non-default named lab. |
 | `tests/fm-backend-herdr-focus-flash-e2e.test.sh` | Reproduces the raw explicit-close focus steal on the installed release, and proves the focus-safe emptying-close plan removes a doomed workspace with no wrong-focus interval. |

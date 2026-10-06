@@ -146,8 +146,9 @@
 #   fresh projection, or verified endpoint replacement and journal advancement
 #   for an exact resume. Worktree allocation and harness setup run outside it,
 #   under the task and metadata locks. Abort cleanup reacquires it before any
-#   exact-pane close. Lock contention warns and falls back to the ordinary flat
-#   layout before any projection mutation. The exact response-derived new
+#   exact-pane close. Fresh-create lock contention warns and falls back to the
+#   ordinary flat layout before any projection mutation; exact resume refuses
+#   the launch instead. The exact response-derived new
 #   workspace is inserted immediately after its owning parent (firstmate or
 #   2ndmate-<id>) contiguous child block. Ordering never authorizes lifecycle
 #   cleanup, and any unavailable, ambiguous, or failed move warns while the

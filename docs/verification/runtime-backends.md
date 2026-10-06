@@ -1424,7 +1424,7 @@ ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session
 ```
 
 The projected spawn in that run used the historical empty opt-in file, so a home that had already enabled the projection keeps it without any migration step.
-One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention is a deliberate hard refusal rather than a flat fallback, which default-on now makes reachable from any Herdr home.
+The current concurrent-recovery and abort-cleanup evidence is owned by [Cross-home recovery custody](#cross-home-recovery-custody).
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
 The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
@@ -1632,7 +1632,9 @@ tests/fm-teardown.test.sh
 tests/fm-backend-herdr.test.sh
 ```
 
-Observed guarantees: a contended presentation lock refused the teardown before the isolated copy was returned, with the task branch, every durable record, and the endpoint intact and no pane close attempted; the retry after the contention cleared returned the copy, closed the pane under the lock, and removed the records; an unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit; and every presence-gate mode accepted only a structured not-found as gone.
+Observed guarantees: admission contention retained the task branch, isolated copy, every durable record, and endpoint without attempting a pane close; cleanup completed after contention cleared.
+An unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit, and every presence-gate mode accepted only structured not-found as gone.
+[Cross-home recovery custody](#cross-home-recovery-custody) owns the current evidence for split cleanup custody and refusal followed by session-start replay.
 
 The same fixtures verified three further boundaries on 2026-07-29: missing or malformed endpoint identity and an unparseable pane presence refused record removal with everything retained; the SIGKILL escalation re-read the exact pane's process information and refused to signal when a different shell pid owned the pane, falling back to the plain close with the original process untouched; and a reposition whose removal then failed on every path restored the exact original workspace order through a second verified move and reported the close as failed.
 
