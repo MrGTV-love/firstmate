@@ -5096,21 +5096,22 @@ test_task_teardown_preserves_another_homes_abandoned_worker() {
   mkdir -p "$foreign_root/bin"
   cat > "$foreign_root/bin/fm-remote-job-worker.sh" <<'SH'
 #!/usr/bin/env bash
+trap 'kill "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; exit' TERM
+sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS" &
+child=$!
 printf '%s\n' ready > "$FM_FOREIGN_WORKER_READY"
-while :; do sleep 1; done
+wait "$child"
 SH
-  FM_FOREIGN_WORKER_READY="$case_dir/foreign-ready" \
+  teardown_fixture_start "$case_dir" TERM env FM_FOREIGN_WORKER_READY="$case_dir/foreign-ready" \
     perl -e 'setpgrp(0, 0); exec @ARGV' \
-    "$BASH" "$foreign_root/bin/fm-remote-job-worker.sh" --serve &
-  pid=$!
+    "$BASH" "$foreign_root/bin/fm-remote-job-worker.sh" --serve
+  pid=$TEARDOWN_FIXTURE_PID
   local tries=0
   while [ ! -e "$case_dir/foreign-ready" ] && [ "$tries" -lt 100 ]; do
     sleep 0.05
     tries=$((tries + 1))
   done
   if [ ! -e "$case_dir/foreign-ready" ]; then
-    kill -TERM "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
     fail "caller-confinement: foreign worker did not start"
   fi
   rm -rf "$foreign_root"
@@ -5128,11 +5129,9 @@ SH
   rc=0
   run_copied_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if ! kill -0 "$pid" 2>/dev/null; then
-    wait "$pid" 2>/dev/null || true
     fail "caller-confinement: task teardown killed another home's abandoned worker"
   fi
-  kill -TERM "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
   expect_code 0 "$rc" "caller-confinement: ordinary task teardown should complete"
   assert_absent "$case_dir/state/task-x1.meta" \
     "caller-confinement: ordinary task cleanup did not complete"
