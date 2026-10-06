@@ -1360,6 +1360,7 @@ The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`]
 The tracked project registrations cover Firstmate sessions; `fm-spawn.sh` installs the same caller for new Claude and omp fleet workers in other projects.
 Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
 Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
+The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
 The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
@@ -1372,13 +1373,14 @@ Deletes, deploy/apply/publish operations, force pushes, destructive git and secr
 For delete/deploy operations, production scope takes precedence over a secret-shaped target.
 Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
 Native `Read`/`read` paths select secret-shaped targets without opening the file.
+Grep/rg patterns and sed/awk programs are not file inputs; selection checks positional filenames and file-backed patterns/scripts such as `-f`, while excluding non-file option values.
 Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
 Wrapper parsing preserves ordered `env -S` child arguments and literal env quoting/escapes, including trailing argv and `env -P` search paths; unsupported or environment-dependent split strings remain uncertain without expanding variables.
 `command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
 Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
 SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
 Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
-Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl's existing value-taking short options retain their meaning when bundled, while ordinary file reads, literal form data and output-only paths remain excluded.
+Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options. Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
 `printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.

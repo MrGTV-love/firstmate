@@ -18,7 +18,7 @@ let parser;
 let ShadowLexer;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const home = process.env.FM_HOME || root;
+const home = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
 const config = process.env.FM_CONFIG_OVERRIDE || resolve(home, 'config');
 const defaultLog = resolve(process.env.FM_STATE_OVERRIDE || resolve(home, 'state'), 'jev-guardrail.jsonl');
 const privateKey = process.env.TYPESAFE_API_KEY || '';
@@ -59,6 +59,73 @@ function operands(args, takesValue = new Set()) {
     else if (takesValue.has(value)) i++;
   }
   return result;
+}
+
+const readerOptionRoles = {
+  grep: {
+    file: new Set(['-f', '--file', '--exclude-from']),
+    program: new Set(['-e', '--regexp']),
+    value: new Set(['-A', '-B', '-C', '-m', '-d', '-D', '--after-context', '--before-context', '--context', '--max-count', '--directories', '--devices', '--label', '--include', '--exclude', '--exclude-dir', '--binary-files']),
+    flags: 'EFGIPivwxcLlnHhsoqRsrazZybUu',
+  },
+  rg: {
+    file: new Set(['-f', '--file', '--ignore-file']),
+    program: new Set(['-e', '--regexp']),
+    value: new Set(['-A', '-B', '-C', '-m', '-j', '-g', '-t', '-T', '-r', '--after-context', '--before-context', '--context', '--max-count', '--threads', '--glob', '--iglob', '--type', '--type-not', '--type-add', '--type-clear', '--replace', '--encoding', '--max-depth', '--max-filesize', '--sort', '--sortr', '--color', '--colors', '--path-separator', '--engine', '--hostname-bin', '--pre', '--pre-glob']),
+    flags: 'FivwxclLnHhsoqazUPSu.',
+  },
+  sed: {
+    file: new Set(['-f', '--file']),
+    program: new Set(['-e', '--expression']),
+    value: new Set(['-i', '--in-place']),
+    flags: 'nErszu',
+  },
+  awk: {
+    file: new Set(['-f', '--file', '-E', '--exec', '--include', '-i']),
+    program: new Set(['-e', '--source']),
+    value: new Set(['-F', '-v', '-W', '--field-separator', '--assign']),
+    flags: 'bcPOS',
+  },
+};
+
+function readerFiles(name, args) {
+  const roles = readerOptionRoles[name];
+  if (!roles) return operands(args);
+  const files = [];
+  const positional = [];
+  let explicitProgram = false;
+  for (let i = 0; i < args.length; i++) {
+    const word = args[i];
+    if (word === '--') { positional.push(...args.slice(i + 1)); break; }
+    if (!word.startsWith('-') || word === '-') { positional.push(word); continue; }
+    let option = word;
+    let value;
+    if (word.startsWith('--')) {
+      const equals = word.indexOf('=');
+      if (equals >= 0) { option = word.slice(0, equals); value = word.slice(equals + 1); }
+    } else {
+      for (let offset = 1; offset < word.length; offset++) {
+        const short = `-${word[offset]}`;
+        if ([roles.file, roles.program, roles.value].some(set => set.has(short))) {
+          option = short;
+          value = word.slice(offset + 1) || undefined;
+          break;
+        }
+        if (!roles.flags.includes(word[offset])) break;
+      }
+    }
+    if (![roles.file, roles.program, roles.value].some(set => set.has(option))) continue;
+    if (name === 'sed' && roles.value.has(option)) {
+      if (option === '-i' && value === undefined && process.platform === 'darwin') i++;
+      continue;
+    }
+    value ??= args[++i] || '';
+    if (roles.file.has(option)) files.push(value);
+    if (['-f', '--file', '-E', '--exec'].includes(option) || roles.program.has(option)) explicitProgram = true;
+  }
+  if (!explicitProgram) positional.shift();
+  files.push(...positional.filter(value => name !== 'awk' || !/^[a-zA-Z_]\w*=/.test(value)));
+  return files;
 }
 
 function sshInvocation(args) {
@@ -191,9 +258,10 @@ function secretUpload(name, args) {
     ? new Set(['--netrc-file', '--key', '--cert', '-E', '--cacert', '--proxy-key', '--proxy-cert', '--proxy-cacert', '--config', '-K', '--cookie', '-b'])
     : new Set(['--config', '--load-cookies', '--private-key', '--certificate', '--ca-certificate']);
   const ignored = name === 'curl'
-    ? new Set(['--output', '-o', '--output-dir', '--dump-header', '-D', '--cookie-jar', '-c', '--write-out', '-w', '--libcurl', '--trace', '--trace-ascii', '--stderr', '--etag-save', '--data-raw', '--form-string', '--user', '-u', '--proxy-user', '-U', '--proxy', '-x', '--request', '-X', '--user-agent', '-A', '--referer', '-e', '--max-time', '-m'])
+    ? new Set(['--output', '-o', '--output-dir', '--dump-header', '-D', '--cookie-jar', '-c', '--write-out', '-w', '--libcurl', '--trace', '--trace-ascii', '--stderr', '--etag-save', '--data-raw', '--form-string', '--user', '-u', '--proxy-user', '-U', '--proxy', '-x', '--request', '-X', '--user-agent', '-A', '--referer', '-e', '--max-time', '-m', '--time-cond', '-z'])
     : new Set(['--output-document', '-O', '--output-file', '-o', '--append-output', '-a', '--save-cookies', '--warc-file', '--post-data', '--body-data', '--user', '--password', '--http-user', '--http-password', '--proxy-user', '--proxy-password', '--directory-prefix', '-P', '--user-agent', '-U', '--referer', '--method']);
   const headers = new Set(name === 'curl' ? ['-H', '--header', '--proxy-header'] : ['--header']);
+  const curlNoValue = 'aBfgiIklnLNOpqRsSvVZGJ012346#';
   let ended = false;
   for (let i = 0; i < args.length; i++) {
     let option = args[i];
@@ -210,7 +278,10 @@ function secretUpload(name, args) {
     } else if (name === 'curl' && /^-[^-]/.test(option)) {
       for (let offset = 1; offset < option.length; offset++) {
         const short = `-${option[offset]}`;
-        if (![files, paths, ignored, headers].some(set => set.has(short))) continue;
+        if (![files, paths, ignored, headers].some(set => set.has(short))) {
+          if (curlNoValue.includes(option[offset])) continue;
+          break;
+        }
         value = option.slice(offset + 1) || undefined;
         option = short;
         break;
@@ -688,7 +759,7 @@ function describe(command, depth = 0) {
     } else if (Object.hasOwn(cloudOptionValues, name) || name === 'flyctl') features.push(...cloudOperations(name, args));
     else if (name === 'security' && operands(args).some(v => /^find-(?:generic|internet)-password$/.test(v))) add('secret_read', [], { scope: 'secret' });
     else if (name === 'printenv' && !optionWords(args).some(v => v === '--help' || v === '--version') && (!operands(args).length || operands(args).some(secretName))) add('secret_read', [], { scope: 'secret' });
-    else if (readers.has(name) && operands(args).some(secretPath)) add('secret_read', [], { scope: 'secret' });
+    else if (readers.has(name) && readerFiles(name, args).some(secretPath)) add('secret_read', [], { scope: 'secret' });
     else if (['curl', 'wget'].includes(name) && secretUpload(name, args)) add('secret_read', [], { scope: 'secret' });
     else if (['python', 'python3', 'node', 'ruby', 'perl'].includes(name) && args.some(v => /^-(?:c|e)$/.test(v)) && args.some(v => /(?:remove|unlink|rmtree|delete|secret|credential|\.env|deploy)/i.test(v))) add('opaque_execution', [], { scope: 'unknown' });
   }
