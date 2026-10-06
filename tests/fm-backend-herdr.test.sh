@@ -4840,25 +4840,25 @@ herdr_wrapped_composer() {  # <text> <width> <drop>
   done
 }
 
-# herdr_popup_composer_screen: a Claude Code 2.1.283-shaped screen after a
-# typed slash command, with the command popup rendered BETWEEN the composer
+# herdr_popup_composer_screen: a Claude Code 2.1.291-shaped screen after a
+# typed slash command, with the selected command popup rendered BETWEEN the composer
 # and the pane bottom. Verified live: the popup is ~19 menu rows, so the
 # composer row lands outside a 20-row tail window - a bounded tail read
 # reports the composer as empty while it holds typed text, which broke
 # fm-control exit (the typed /exit was judged unsent and cleared). The
 # composer reads capture the full visible viewport instead. The composer
 # sits inside a solid-rule pair (rule above, rule below), exactly as live
-# Claude draws it, with the menu rows below the closing rule; the rules are
-# structural edge rows, so the composer's content block ends there and the
-# menu rows never read as typed text.
+# Claude draws it, with the menu rows below the closing rule. The selected
+# menu choice repeats Claude's prompt glyph, indented farther than the composer;
+# extraction must still prove the typed command, not the selected description.
 herdr_popup_composer_screen() {  # <typed-text>
   local i typed=$1 rule
   rule=$(printf '%0.s\xe2\x94\x80' $(seq 1 60))
-  printf ' \xe2\x95\xad\xe2\x94\x80\xe2\x94\x80 Claude Code v2.1.283 \xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n'
+  printf ' \xe2\x95\xad\xe2\x94\x80\xe2\x94\x80 Claude Code v2.1.291 \xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n'
   printf '  %s\n' "$rule"
   printf '  \xe2\x9d\xaf %s\n' "$typed"
   printf '  %s\n' "$rule"
-  printf '  %s    Exit the CLI\n' "$typed"
+  printf '    \xe2\x9d\xaf %s    Exit the CLI\n' "$typed"
   for ((i = 0; i < 21; i++)); do
     printf '  /skill-%02d    A skill description long enough to read as a popup row\n' "$i"
   done

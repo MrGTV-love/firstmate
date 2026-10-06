@@ -1017,6 +1017,70 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   pass "fm_composer_extract_selected_content: scopes user content and excludes furniture"
 }
 
+test_claude_selected_slash_menu_extracts_only_the_composer() {
+  # Claude Code 2.1.291's captured /exit viewport, retaining its exact composer
+  # and menu rows (only the launch transcript and warning above are omitted).
+  local screen prefix out caps
+  screen=$' ▐▛███▛█   Claude Code v2.1.291\n▝▜██████▀  Haiku 4.5 · Claude Max\n\n─────────────────────────────────────────────────────────────────────────────────────────────\n❯'"$NBSP"$'/exit\n─────────────────────────────────────────────────────────────────────────────────────────────\n  ❯ /exit                       Exit the CLI\n    /context                    Visualize current context usage as a colored grid\n    /usage-credits              Configure usage credits or request them from your admin\n                                when you hit a limit'
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    out=$(fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = /exit ] || fail "selected /exit popup must extract exactly /exit, got '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+    [ "$out" = /exit ] || fail "selected /exit popup under LC_ALL=C must extract exactly /exit, got '$out'"
+  done
+  assert_screen "selected /exit popup on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "selected /exit popup on plain backends retains degradation" unknown "$CAPS_PLAIN" "$screen"
+  # A selected completion is not the typed command: preserve a nonempty prefix,
+  # also when both the composer and popup are indented by the pane renderer.
+  prefix=$'  ────────────────────────\n  ❯ /ex\n  ────────────────────────\n    ❯ /exit                       Exit the CLI\n      /extra                      Another matching command'
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    out=$(fm_composer_extract_selected_content "$caps" "$prefix")
+    [ "$out" = /ex ] || fail "selected completion must preserve the typed /ex prefix, got '$out'"
+    out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$prefix")
+    [ "$out" = /ex ] || fail "selected completion under LC_ALL=C must preserve /ex, got '$out'"
+  done
+  assert_screen "nonempty slash prefix on styled backends" pending "$CAPS_STYLED_NOID" "$prefix"
+  assert_screen "nonempty slash prefix on plain backends" unknown "$CAPS_PLAIN" "$prefix"
+  pass "Claude selected slash-menu rows do not replace the actual command or prefix"
+}
+
+test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
+  local pair menu screen want out caps scenario
+  pair=$'────────────────────────\n❯ /exit\n────────────────────────'
+  menu='  ❯ /exit                       Exit the CLI'
+  for scenario in unindented same-indent draft unpadded mismatch empty slash-only unproven blank activity; do
+    want='/exit Exit the CLI'
+    case "$scenario" in
+      unindented) screen="$pair"$'\n❯ /exit                       Exit the CLI' ;;
+      same-indent) screen=$'  ────────────────────────\n  ❯ /exit\n  ────────────────────────\n'"$menu" ;;
+      draft) screen="$pair"$'\n  ❯ my typed draft'; want='my typed draft' ;;
+      unpadded) screen="$pair"$'\n  ❯ /exit my typed draft'; want='/exit my typed draft' ;;
+      mismatch) screen=$'────────────────────────\n❯ /context\n────────────────────────\n'"$menu" ;;
+      empty) screen=$'────────────────────────\n❯\n────────────────────────\n'"$menu" ;;
+      slash-only) screen=$'────────────────────────\n❯ /\n────────────────────────\n'"$menu" ;;
+      unproven) screen=$'❯ /exit\n────────────────────────\n'"$menu" ;;
+      blank) screen="$pair"$'\n\n'"$menu" ;;
+      activity) screen="$pair"$'\nWorking on request...\n'"$menu" ;;
+    esac
+    for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      out=$(fm_composer_extract_selected_content "$caps" "$screen")
+      [ "$out" = "$want" ] || fail "$scenario lower candidate must keep winning, expected '$want', got '$out'"
+      out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen")
+      [ "$out" = "$want" ] || fail "$scenario lower candidate under LC_ALL=C must keep winning, got '$out'"
+    done
+    assert_screen "$scenario lower candidate on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "$scenario lower candidate on plain backends" unknown "$CAPS_PLAIN" "$screen"
+  done
+  screen="$pair"$'\n'"$menu"$'\n$ live shell'
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+      fail "a lower shell must still invalidate popup extraction, got '$out'"
+    fi
+    assert_screen "lower shell below slash menu" unknown "$caps" "$screen"
+  done
+  pass "slash-menu demotion cannot select an empty parent or replace a real lower draft or shell"
+}
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
@@ -1055,6 +1119,8 @@ test_incomplete_lower_box_invalidates_stale_candidate
 test_titled_bottom_requires_matching_width
 test_cursor_on_proven_box_bottom_classifies_content
 test_selected_content_is_composer_scoped_and_wrap_normalized
+test_claude_selected_slash_menu_extracts_only_the_composer
+test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells
 
 test_queued_enter_verdict_busy_pending_is_empty() {
   local out
