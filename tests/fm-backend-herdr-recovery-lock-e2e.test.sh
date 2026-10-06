@@ -277,11 +277,11 @@ pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
 (
   . "$ROOT/bin/fm-nm-run-lib.sh"
+  # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
-  ID=offline-owned BACKEND=herdr
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
-  reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
+  ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline post-reap inventory failed"
   [ -z "$TASK_PIDS" ] || fail "offline owned process survived reaping"
 ) >"$TEST_DIR/offline.out" 2>"$TEST_DIR/offline.err" || fail "offline executable inventory/reaper failed: $(cat "$TEST_DIR/offline.err")"

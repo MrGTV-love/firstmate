@@ -1490,6 +1490,24 @@ Actual bootstrap reconciliation preserves their records, journals, exact pane pr
 After admission succeeds, a controlled backlog-transition interruption leaves the existing deferred marker, and actual bootstrap replay consumes it to close only the ordinary row or retain the captain-held row and deliverable.
 The guarded lab teardown and default-fleet tripwire also complete successfully.
 
+#### CI regression follow-up
+
+Verified on 2026-10-06 on macOS aarch64:
+
+```sh
+bash bin/fm-lint.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh tests/fm-teardown.test.sh
+FM_HOME="$PWD/.ci-verification/home" bash bin/fm-test-run.sh --json .ci-verification/teardown-timing.json tests/fm-teardown.test.sh
+```
+
+The generated `FM_HOME` was separate from the fixtures, and the teardown suite used its standard temporary directory outside the code root so the production home-removal safety guard remained in force.
+Full extended analysis passed with pinned ShellCheck 0.11.0.
+The teardown suite completed with `exit=0`, `failed=0`, and `gate_skip=false` (434180 ms), including all four flat-task prerequisite refusals and forced-secondmate child admission refusal.
+Those cases assert preserved copies, branches, records, and endpoints rather than the obsolete diagnostic phrase “nothing was changed”; the shared admission helpers also run after owned-process cleanup, when that phrase would be misleading.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
+
+A checkout-local throwaway smoke separately executed the recovery fixture's production inventory/reaper boundary, including its command-scoped `ID` and `BACKEND` inputs: the generated owned process was removed and the unrelated process remained alive.
+No Herdr session was provisioned in this CI follow-up; the native named-lab evidence above is unchanged.
+
 ### Workspace-removal focus safety
 
 The focus-flash regression ran on 2026-08-05 against both Herdr 0.7.5 protocol 17 and Herdr 0.8.0 protocol 19 on macOS aarch64, with the 0.7.5 run using the pinned upstream release binary first on `PATH`:
