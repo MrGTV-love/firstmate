@@ -28,6 +28,21 @@ RULES="$HOME_DIR/config/crew-dispatch.json"
 QUOTA="$TMP_ROOT/quota.json"
 BASE_PATH=$PATH
 mkdir -p "$HOME_DIR/config" "$LOG" "$NO_CURL_BIN"
+export FM_BACKEND=tmux
+unset BACKEND TMUX
+export FM_AUTH_DESTINATION="$TMP_ROOT/tmux-auth"
+cat > "$FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  has-session) exit 0 ;;
+  show-environment)
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
+    [ -f "$FM_AUTH_DESTINATION" ] || exit 1
+    cat "$FM_AUTH_DESTINATION" ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$FAKEBIN/tmux"
 for command_name in bash chmod cp dirname grep jq mktemp rm; do
   ln -s "$(command -v "$command_name")" "$NO_CURL_BIN/$command_name"
 done
@@ -1058,6 +1073,7 @@ pass "provider-wide and exact quota rows combine into one limiting candidate"
 # --- alternate credentials bind only when forwarded to the Claude launch -------
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   export "$credential=synthetic-alternate-auth"
+  printf '%s=synthetic-alternate-auth\n' "$credential" > "$FM_AUTH_DESTINATION"
   for policy in inherited retained stripped; do
     case "$policy" in
       inherited) rm -f "$HOME_DIR/config/launch-env-allowlist" ;;
@@ -1082,8 +1098,11 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
     pass "$credential $policy resolves against the effective Claude launch credentials"
   done
   unset "$credential"
+  rm "$FM_AUTH_DESTINATION"
 done
 rm "$HOME_DIR/config/launch-env-allowlist"
+ANTHROPIC_API_KEY=caller-only TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$EXHAUSTED_WIDE" run code out err "$BRIEF"
+assert_contains "$out" '-> not eligible: runway exhausted_now at all_models' "caller-only API auth does not conceal destination native exhaustion"
 
 # --- default choice ------------------------------------------------------------
 reset_log

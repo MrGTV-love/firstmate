@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # Output globals are read by the watcher tick and tests.
-# fm-session-end-relaunch-lib.sh - relaunch an in-flight ship or scout whose
-# SessionEnd busy record says the worker is gone.
+# fm-session-end-relaunch-lib.sh - relaunch an in-flight ship or scout after
+# SessionEnd, OMP quota exhaustion, or a quota transaction's proven-dead partial failure.
 #
 # The watcher tick is the only driver. This is not a supervisor, daemon, or
 # state machine. Eligibility, the deliberate-exit skip, the pause and hold
@@ -13,12 +13,12 @@
 #   - kind is ship or scout (a secondmate keeps its own liveness path)
 #   - state/<id>.meta and the recorded worktree still exist, and
 #     state/<id>.backlog-close is absent
-#   - the current busy record is event=session-end, or quota-exhausted for omp
+#   - the current busy record is event=session-end or quota-exhausted for omp,
+#     or the control journal binds a failed quota replacement to this incarnation
 #   - the latest status verb is not done or failed
 #   - no declared pause or captain-held status line
-#   - fm_backend_agent_state is dead for session-end, or alive for quota
-#     recovery; a missing endpoint is left to the supervisor, because
-#     fm-control relaunch cannot prove it gone on every backend
+#   - fm_backend_agent_state is dead for session-end and journal recovery,
+#     or alive for a current quota event; missing endpoints are not retried here
 #   - fm-captain-hold.sh open reports no open captain call (exit 1); an open
 #     call or an answer it cannot establish skips the lane
 #   - state/<id>.control-exit does not name this busy generation
@@ -155,6 +155,63 @@ fm_session_end_identity() {  # <state-dir> <id>
   printf '%s %s\n' "$gen" "$r_seq"
 }
 
+fm_session_end_quota_journal_identity() {
+  local state=$1 id=$2 meta=$3 journal="$1/$2.control-relaunch"
+  local gen seq phase rollback current_gen current_record expected_gen tx backend kind value
+  [ -f "$journal" ] && [ ! -L "$journal" ] && [ -r "$journal" ] || return 1
+  [ "$(fm_meta_get "$journal" task)" = "$id" ] || return 1
+  [ "$(fm_meta_get "$journal" worktree)" = "$(fm_meta_get "$meta" worktree)" ] || return 1
+  kind=$(fm_meta_get "$meta" kind)
+  [ "$(fm_meta_get "$journal" kind)" = "${kind:-ship}" ] || return 1
+  gen=$(fm_meta_get "$journal" quota_gen)
+  seq=$(fm_meta_get "$journal" quota_seq)
+  fm_busy_token_valid "$gen" || return 1
+  case "$seq" in ''|*[!0-9]*) return 1 ;; esac
+  [ -n "$(fm_meta_get "$journal" relaunch_tx)" ] || return 1
+  phase=$(fm_meta_get "$journal" phase)
+  rollback=$(fm_meta_get "$journal" rollback)
+  case "$phase:$rollback" in
+    failed:checkpoint:instructions-restored|failed:noted:instructions-restored|failed:stopping:prior-record-kept-agent-dead|failed:exited:prior-record-kept|failed:launching:prior-record-kept)
+      backend=$(fm_meta_get "$meta" backend)
+      [ "$(fm_meta_get "$journal" backend)" = "${backend:-tmux}" ] || return 1
+      [ "$(fm_meta_get "$journal" endpoint)" = "$(fm_meta_get "$meta" window)" ] || return 1
+      value=$(fm_meta_get "$meta" busy_gen)
+      [ "$(fm_meta_get "$journal" from_busy_gen)" = "${value:--}" ] || return 1
+      case "$value" in
+        ''|-) expected_gen=$gen ;;
+        *) fm_busy_token_valid "$value" || return 1; expected_gen=$value ;;
+      esac
+      value=$(fm_meta_get "$meta" control_relaunch_tx)
+      [ "$(fm_meta_get "$journal" from_relaunch_tx)" = "${value:--}" ] || return 1
+      [ "$(fm_meta_get "$journal" from_harness)" = "$(fm_meta_get "$meta" harness)" ] || return 1
+      value=$(fm_meta_get "$meta" model)
+      [ "$(fm_meta_get "$journal" from_model)" = "${value:-default}" ] || return 1
+      value=$(fm_meta_get "$meta" effort)
+      [ "$(fm_meta_get "$journal" from_effort)" = "${value:-default}" ] || return 1
+      ;;
+    failed:launching:none-new-record-kept)
+      tx=$(fm_meta_get "$journal" relaunch_tx)
+      [ -n "$tx" ] && [ "$tx" = "$(fm_meta_get "$meta" control_relaunch_tx)" ] || return 1
+      expected_gen=$(fm_meta_get "$meta" busy_gen)
+      fm_busy_token_valid "$expected_gen" || return 1
+      ;;
+    *) return 1 ;;
+  esac
+  if [ -e "$state/$id.busy-gen" ] || [ -L "$state/$id.busy-gen" ]; then
+    [ ! -L "$state/$id.busy-gen" ] || return 1
+    current_gen=$(fm_busy_current_gen "$state" "$id") || return 1
+    [ "$current_gen" = "$expected_gen" ] || return 1
+    [ ! -L "$state/$id.busy-state" ] || return 1
+    current_record=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 1
+    if [ "$current_gen" = "$gen" ]; then
+      [[ "$current_record" = "idle "*" quota-exhausted $seq" ]] || return 1
+    fi
+  elif [ -e "$state/$id.busy-state" ] || [ -L "$state/$id.busy-state" ]; then
+    return 1
+  fi
+  printf '%s %s\n' "$gen" "$seq"
+}
+
 fm_session_end_note() {
   printf '%s' "The previous worker session ended while this task was still open. The local copy and every uncommitted change were left as the previous worker left them. Continue from the instructions and the instruction inbox."
 }
@@ -185,7 +242,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   local identity gen seq last verb hold_rc marker marker_gen
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
-  local bin out rc=0 reason key which quota_event busy_record
+  local bin out rc=0 reason key which quota_event busy_record journal_retry current_gen
   local timeout=$FM_SESSION_END_TIMEOUT launch_wait=$FM_SESSION_END_LAUNCH_WAIT
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
@@ -203,19 +260,26 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   esac
   wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
   [ -n "$wt" ] && [ -d "$wt" ] || return 0
-  identity=$(fm_session_end_identity "$state" "$id") || return 0
+  quota_event=0
+  journal_retry=0
+  if identity=$(fm_session_end_quota_journal_identity "$state" "$id" "$meta"); then
+    quota_event=1
+    journal_retry=1
+  else
+    identity=$(fm_session_end_identity "$state" "$id") || return 0
+    busy_record=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 0
+    if [[ "$busy_record" == *" quota-exhausted "* ]]; then
+      [ "$(fm_meta_get "$meta" harness)" = omp ] || return 0
+      quota_event=1
+    fi
+  fi
   gen=${identity%% *}
   seq=${identity#* }
-  quota_event=0
-  busy_record=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 0
-  if [[ "$busy_record" == *" quota-exhausted "* ]]; then
-    [ "$(fm_meta_get "$meta" harness)" = omp ] || return 0
-    quota_event=1
-  fi
   marker="$state/$id.control-exit"
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
-    [ "$marker_gen" != "$gen" ] || return 0
+    current_gen=$(fm_meta_get "$meta" busy_gen)
+    [ "$marker_gen" != "$gen" ] && { [ "$journal_retry" = 0 ] || [ "$marker_gen" != "$current_gen" ]; } || return 0
   fi
   recent=0 day=0
   if [ "$quota_event" = 0 ]; then
@@ -261,7 +325,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   window=$(fm_meta_get "$meta" window 2>/dev/null || true)
   [ -n "$window" ] || return 0
   agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
-  if [ "$quota_event" = 1 ]; then
+  if [ "$quota_event" = 1 ] && [ "$journal_retry" = 0 ]; then
     [ "$agent" = alive ] || return 0
   else
     [ "$agent" = dead ] || return 0
@@ -321,6 +385,8 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   touch "$state/.last-watcher-beat" 2>/dev/null || true
   out=$(fm_run_timed "$timeout" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
     FM_CONTROL_LAUNCH_WAIT="$launch_wait" \
+    FM_CONTROL_QUOTA_GEN="$(if [ "$quota_event" = 1 ]; then printf '%s' "$gen"; fi)" \
+    FM_CONTROL_QUOTA_SEQ="$(if [ "$quota_event" = 1 ]; then printf '%s' "$seq"; fi)" \
     "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions using the permitted matrix fallback.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1

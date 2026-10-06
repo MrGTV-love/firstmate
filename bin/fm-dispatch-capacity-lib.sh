@@ -21,6 +21,8 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-backend.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-backend.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -68,7 +70,10 @@ fm_omp_codex_capacity() {
 
 fm_dispatch_claude_quota_unbound() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  local name names present scope session=${2:-}
+  local name names present value session=${2:-} backend=${BACKEND:-}
+  if [ -z "$backend" ]; then
+    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 0
+  fi
   if [ -n "${CLAUDE_CONFIG_DIR:-}" ] ||
     [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
     { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }; then
@@ -78,15 +83,24 @@ fm_dispatch_claude_quota_unbound() {
   if [ "$present" = 1 ]; then
     names=$(fm_config_launch_env_names "$config") || return 0
   fi
-  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-    if [ "$present" = 1 ]; then
-      case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac
-    fi
-    [ -z "${!name:-}" ] || return 0
-    if [ "${BACKEND:-}" = tmux ]; then
-      scope=$(fm_worker_account_tmux_env_scope "$name" "$session")
-      [ -z "$scope" ] || return 0
-    fi
+  [ "$backend" = tmux ] || return 0
+  fm_worker_account_tmux_env '' "$session" readable || return 0
+  value=$(fm_worker_account_tmux_filtered_env CLAUDE_CONFIG_DIR "$session" "$present" "${names:-}")
+  [ -z "$value" ] || return 0
+  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+    value=$(fm_worker_account_tmux_filtered_env "$name" "$session" "$present" "${names:-}")
+    case "$name" in
+      CLAUDE_CODE_USE_*)
+        case "$value" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) return 0 ;; esac
+        ;;
+      ANTHROPIC_FEDERATION_RULE_ID)
+        if [ -n "$value" ]; then
+          value=$(fm_worker_account_tmux_filtered_env ANTHROPIC_ORGANIZATION_ID "$session" "$present" "${names:-}")
+          [ -z "$value" ] || return 0
+        fi
+        ;;
+      *) [ -z "$value" ] || return 0 ;;
+    esac
   done
   return 1
 }

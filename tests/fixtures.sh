@@ -124,6 +124,7 @@ case "${1:-}" in
     ;;
   has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
   show-environment)
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
     knob=FM_FAKE_TMUX_ENV_
     for a in "$@"; do
       [ "$a" = -g ] && knob=FM_FAKE_TMUX_GLOBAL_ENV_

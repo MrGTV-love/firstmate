@@ -124,8 +124,10 @@ case "${1:-}" in
   show-environment)
     if [ "${2:-}" = -t ]; then
       printf '%s\n' "${3:-}" >> "$D/env-sessions"
+      [ "$#" -ne 3 ] || exit 0
       cat "$D/tmux-env-${3:-}-${4:-}" 2>/dev/null
     elif [ "${2:-}" = -g ]; then
+      [ "$#" -ne 2 ] || exit 0
       cat "$D/tmux-env-global-${3:-}" 2>/dev/null
     else
       exit 1
@@ -436,6 +438,13 @@ if [ -n "${FM_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" ]; then
     fi
   done
 fi
+if [ -n "${FM_FAKE_JOURNAL_PHASE_MV_FAIL:-}" ]; then
+  for path in "$@"; do
+    if [ -f "$path" ] && grep -Fqx "phase=$FM_FAKE_JOURNAL_PHASE_MV_FAIL" "$path"; then
+      exit 1
+    fi
+  done
+fi
 if [ -n "${FM_FAKE_META_PUBLISH_MV_FAIL:-}" ]; then
   for path in "$@"; do
     [ "$path" != "$FM_FAKE_META_PUBLISH_MV_FAIL" ] || exit 1
@@ -698,7 +707,7 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
   local dir id credential policy out rc expected_harness expected_model expected_effort launch
   local -a pane_env
   for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-    for policy in ambient retained filtered flag-only target-session; do
+    for policy in ambient retained filtered flag-only target-session caller-only; do
       id="rl-auth-$credential-$policy"
       dir=$(new_case "$id" "$id")
       add_ship_task "$dir" "$id" claude
@@ -714,11 +723,20 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
       esac
       expected_harness=claude expected_model=default expected_effort=default
       case "$policy" in
-        filtered|flag-only)
+        filtered|flag-only|caller-only)
           expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
           ;;
         target-session)
           printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
+          ;;
+      esac
+      case "$policy" in
+        ambient|retained|filtered)
+          printf '%s\n' "$credential=synthetic-launch-credential" > "$dir/fake/tmux-env-fmses-$credential"
+          ;;
+        caller-only)
+          printf '%s\n' "-$credential" > "$dir/fake/tmux-env-fmses-$credential"
+          printf '%s\n' "$credential=unrelated-global-credential" > "$dir/fake/tmux-env-global-$credential"
           ;;
       esac
       printf '%s' "$expected_harness" > "$dir/fake/becomes"
@@ -752,7 +770,9 @@ test_claude_relaunch_binds_only_forwarded_api_credentials() {
       pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
         -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
         -u CLAUDE_CONFIG_DIR HOME="$dir/user-home")
-      [ "$policy" = flag-only ] || pane_env+=("$credential=synthetic-launch-credential")
+      if [ "$policy" != flag-only ] && [ "$policy" != caller-only ]; then
+        pane_env+=("$credential=synthetic-launch-credential")
+      fi
       fm_eval_launch "$launch" "$dir/wt" "$dir/fakebin" "${pane_env[@]}" \
         > "$dir/worker.out" 2>&1 || fail "$credential $policy staged replacement could not be consumed"
       case "$policy" in
@@ -1337,6 +1357,7 @@ test_recorded_api_key_opt_in_follows_the_relaunch() {
   dir=$(new_case apikey "$id")
   add_ship_task "$dir" "$id" claude
   printf 'api_key=allow\n' >> "$dir/home/state/$id.meta"
+  printf 'ANTHROPIC_API_KEY=sk-ant-relaunch-test\n' > "$dir/fake/tmux-env-fmses-ANTHROPIC_API_KEY"
   out=$(ANTHROPIC_API_KEY=sk-ant-relaunch-test \
     run_control "$dir" "$id" relaunch --note "deliberate API billing"); rc=$?
   expect_code 0 "$rc" "a relaunch of a task that opted in to API billing should carry the opt-in"$'\n'"$out"
@@ -4181,32 +4202,30 @@ if fm_tasks_axi_compatible; then
 else
   echo "skip - recovery admission fixtures require compatible tasks-axi"
 fi
-test_quota_exhaustion_relaunches_only_a_permitted_route() {
-  local dir model id meta out rc
-  for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
-    id=rl-pool
-    dir=$(new_case pooled-quota "$id")
-    add_ship_task "$dir" "$id" omp
-    printf omp > "$dir/fake/command"
-    printf omp > "$dir/fake/becomes"
-    printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
-    meta=$(cat "$dir/home/state/$id.meta")
-    meta=${meta/model=default/model=$model}
-    if [ "$model" = openai-codex/gpt-6.1-sol ]; then
-      meta=${meta/effort=default/effort=high}
-    fi
-    printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
-    mkdir -p "$dir/home/config"
-    jq -n --arg model "$model" '{rules:[{when:"assigned work",
-      use:({harness:"omp",model:$model,provider:"codex"} +
-        (if $model=="openai-codex/gpt-6.1-sol" then {effort:"high"} else {} end)),
-      fallback:(if $model=="openai-codex/gpt-6-luna" then
-        [{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
-    jq -n --argjson now "$(date +%s)" '{reports:[
-      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
-      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
-    ]}' > "$dir/usage.json"
-    cat > "$dir/fakebin/omp" <<'SH'
+
+add_quota_recovery_task() {
+  local dir=$1 id=$2 model=${3:-openai-codex/gpt-6-luna} meta
+  add_ship_task "$dir" "$id" omp
+  printf omp > "$dir/fake/command"
+  printf omp > "$dir/fake/becomes"
+  printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
+  meta=$(cat "$dir/home/state/$id.meta")
+  meta=${meta/model=default/model=$model}
+  if [ "$model" = openai-codex/gpt-6.1-sol ]; then
+    meta=${meta/effort=default/effort=high}
+  fi
+  printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config"
+  jq -n --arg model "$model" '{rules:[{when:"assigned work",
+    use:({harness:"omp",model:$model,provider:"codex"} +
+      (if $model=="openai-codex/gpt-6.1-sol" then {effort:"high"} else {} end)),
+    fallback:(if $model=="openai-codex/gpt-6-luna" then
+      [{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
+  ]}' > "$dir/usage.json"
+  cat > "$dir/fakebin/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   usage) cat "$FM_FAKE_DIR/../usage.json" ;;
@@ -4214,8 +4233,204 @@ case "$1" in
   *) exit 0 ;;
 esac
 SH
-    chmod +x "$dir/fakebin/omp"
-    "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+  chmod +x "$dir/fakebin/omp"
+  "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+}
+
+test_quota_recovery_retries_real_stop_then_failed_launch() {
+  local dir failure id out rc gen seq record now attempt_count literal_before
+  local real_mv
+  real_mv=$(command -v mv)
+  for failure in prelaunch stopping exited postarm; do
+    id="rl-quota-$failure"
+    dir=$(new_case quota-partial "$id")
+    add_quota_recovery_task "$dir" "$id"
+    gen=$(cat "$dir/home/state/$id.busy-gen")
+    record=$(cat "$dir/home/state/$id.busy-state")
+    seq=${record#*seq=}
+    seq=${seq%% *}
+    now=$(date +%s)
+    printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' "$now" "$((now - 1900))" "$((now - 4000))" \
+      > "$dir/home/state/.session-end-relaunch-$id"
+    printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$dir/home/state/.session-end-handled-$id"
+    case "$failure" in
+      prelaunch)
+        printf '%s' "$dir/proj" > "$dir/fake/cwd"
+        out=$(run_session_end_scan "$dir"); rc=$?
+        ;;
+      stopping)
+        out=$(FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 run_session_end_scan "$dir"); rc=$?
+        ;;
+      exited)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$real_mv" FM_FAKE_JOURNAL_PHASE_MV_FAIL=launching run_session_end_scan "$dir"); rc=$?
+        ;;
+      postarm)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$real_mv" FM_FAKE_META_PUBLISH_MV_FAIL="$dir/home/state/$id.meta" run_session_end_scan "$dir"); rc=$?
+        ;;
+    esac
+    expect_code 0 "$rc" "the scan must record a failed real quota transaction: $out"
+    assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "$failure must fail after the real stop"
+    assert_equals zsh "$(cat "$dir/fake/command")" "$failure must leave no running worker"
+    assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "$failure must retain the quota generation"
+    assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "$failure must retain the quota sequence"
+    if [ "$failure" = stopping ]; then
+      assert_equals failed:stopping "$(journal_field "$dir" "$id" phase)" "stop transport rollback must retain its phase"
+      assert_equals prior-record-kept-agent-dead "$(journal_field "$dir" "$id" rollback)" "stop transport rollback must prove death"
+    else
+      assert_absent "$dir/home/state/$id.busy-gen" "$failure must not resurrect the stopped generation"
+      assert_absent "$dir/home/state/$id.busy-state" "$failure must not synthesize a retry busy record"
+      assert_equals prior-record-kept "$(journal_field "$dir" "$id" rollback)" "$failure must keep the durable record"
+      if [ "$failure" = exited ]; then
+        assert_equals failed:exited "$(journal_field "$dir" "$id" phase)" "failed launch journal advancement must retain exited"
+      fi
+    fi
+    printf 'x_request=preserved-%s\n' "$id" >> "$dir/home/state/$id.meta"
+    printf '%s' "$dir/wt" > "$dir/fake/cwd"
+    out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+    expect_code 0 "$rc" "the next scan must retry a dead partial quota transaction: $out"
+    assert_contains "$out" 'auto-relaunched after quota exhaustion' "$failure must recover despite the attempt caps"
+    assert_equals complete "$(journal_field "$dir" "$id" phase)" "$failure retry must complete"
+    assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "$failure retry must retain the original identity"
+    assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "$failure retry must retain the original sequence"
+    assert_equals "$(printf '%s\t%s\trelaunched' "$gen" "$seq")" \
+      "$(cat "$dir/home/state/.session-end-handled-$id")" "$failure retry must handle the stable identity"
+    assert_equals "preserved-$id" "$(meta_field "$dir" "$id" x_request)" "retry must retain concurrent metadata"
+    assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "retry must retain work"
+    [ "$(cat "$dir/home/state/$id.busy-gen")" != "$gen" ] || fail "retry resurrected the retired generation"
+    attempt_count=$(awk -F '\t' '$2 == "attempt" {n++} END {print n}' "$dir/home/state/.session-end-relaunch-$id")
+    assert_equals 5 "$attempt_count" "failed transaction and successful retry must both be ledgered"
+    literal_before=$(cat "$dir/fake/literal")
+    out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+    expect_code 0 "$rc" "the post-success scan must succeed"
+    assert_equals '' "$out" "the handled quota transaction must not wake again"
+    assert_equals "$literal_before" "$(cat "$dir/fake/literal")" "the handled quota transaction must not launch again"
+  done
+  pass "quota recovery retries proven-dead real stopping, exited, launching and post-arm failures without resurrecting busy state"
+}
+
+test_quota_published_failure_retries_only_its_dead_transaction() {
+  local dir id=rl-quota-published out rc gen seq record tx literal_before
+  dir=$(new_case quota-published "$id")
+  add_quota_recovery_task "$dir" "$id"
+  gen=$(cat "$dir/home/state/$id.busy-gen")
+  record=$(cat "$dir/home/state/$id.busy-state")
+  seq=${record#*seq=}
+  seq=${seq%% *}
+  out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "postpublication quota failure must be recorded: $out"
+  assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "the transport seam must fail the transaction"
+  assert_equals none-new-record-kept "$(journal_field "$dir" "$id" rollback)" "the published replacement must remain recorded"
+  tx=$(meta_field "$dir" "$id" control_relaunch_tx)
+  assert_equals "$tx" "$(journal_field "$dir" "$id" relaunch_tx)" "rollback must retain its publication transaction"
+  literal_before=$(cat "$dir/fake/literal")
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "a live published replacement must be skipped"
+  assert_equals '' "$out" "a failed journal alone must not stop a live replacement"
+  assert_equals "$literal_before" "$(cat "$dir/fake/literal")" "a live replacement must not receive lifecycle input"
+  printf zsh > "$dir/fake/command"
+  printf 'control_relaunch_tx=superseding\n' >> "$dir/home/state/$id.meta"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "an unrelated dead publication must be skipped"
+  assert_equals '' "$out" "a stale transaction must not authorize recovery"
+  printf 'control_relaunch_tx=%s\nx_request=published-concurrent\n' "$tx" >> "$dir/home/state/$id.meta"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the matching dead published quota replacement must recover: $out"
+  assert_contains "$out" 'auto-relaunched after quota exhaustion' "a matching dead publication must retry"
+  assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "retry must resolve the current published fallback"
+  assert_equals published-concurrent "$(meta_field "$dir" "$id" x_request)" "retry must preserve published concurrent metadata"
+  assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "published retry must retain the quota origin"
+  assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "published retry must retain the quota sequence"
+  assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "published retry must preserve work"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "a completed published recovery must be skipped"
+  assert_equals '' "$out" "completed recovery must deduplicate"
+  pass "published quota recovery requires transaction match and a dead endpoint while retaining current metadata"
+}
+
+test_quota_retry_preserves_identity_after_pre_stop_failure() {
+  local dir publication rejected_phase id out rc gen seq record current_gen tx real_mv expected_phase
+  real_mv=$(command -v mv)
+  for publication in unpublished published; do
+    for rejected_phase in noted stopping; do
+      id="rl-quota-retry-$publication-$rejected_phase"
+      dir=$(new_case quota-retry "$id")
+      add_quota_recovery_task "$dir" "$id"
+      gen=$(cat "$dir/home/state/$id.busy-gen")
+      record=$(cat "$dir/home/state/$id.busy-state")
+      seq=${record#*seq=}
+      seq=${seq%% *}
+      if [ "$publication" = unpublished ]; then
+        printf '%s' "$dir/proj" > "$dir/fake/cwd"
+        out=$(run_session_end_scan "$dir"); rc=$?
+        printf '%s' "$dir/wt" > "$dir/fake/cwd"
+      else
+        out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 run_session_end_scan "$dir"); rc=$?
+        printf zsh > "$dir/fake/command"
+      fi
+      expect_code 0 "$rc" "the initial quota transaction must record its partial failure: $out"
+      assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "the initial transaction must fail"
+      current_gen=$(meta_field "$dir" "$id" busy_gen)
+      tx=$(meta_field "$dir" "$id" control_relaunch_tx)
+      make_mv_failure_stub "$dir"
+      out=$(FM_REAL_MV="$real_mv" FM_FAKE_JOURNAL_PHASE_MV_FAIL="$rejected_phase" \
+        run_session_end_scan "$dir"); rc=$?
+      expect_code 0 "$rc" "the journal-backed retry must record its pre-stop failure: $out"
+      assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "the journal-backed retry must reach the phase seam"
+      if [ "$rejected_phase" = noted ]; then expected_phase=checkpoint; else expected_phase=noted; fi
+      assert_equals "failed:$expected_phase" "$(journal_field "$dir" "$id" phase)" "retry must record the last durable phase"
+      assert_equals instructions-restored "$(journal_field "$dir" "$id" rollback)" "pre-stop failure must retain its prior instructions"
+      assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "failed retry must retain the quota origin"
+      assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "failed retry must retain the quota sequence"
+      assert_equals "${current_gen:--}" "$(journal_field "$dir" "$id" from_busy_gen)" "retry must bind its current incarnation separately"
+      assert_equals "${tx:--}" "$(journal_field "$dir" "$id" from_relaunch_tx)" "retry must retain the current publication binding"
+      if [ "$publication" = unpublished ]; then
+        assert_absent "$dir/home/state/$id.busy-gen" "unpublished failed retries must not resurrect busy state"
+      else
+        [ -n "$current_gen" ] && [ "$current_gen" != "$gen" ] || fail "published retry fixture did not arm a replacement generation"
+        assert_equals "$current_gen" "$(cat "$dir/home/state/$id.busy-gen")" "failed retry must preserve the current replacement generation"
+      fi
+      printf 'x_request=retry-concurrent\n' >> "$dir/home/state/$id.meta"
+      out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+      expect_code 0 "$rc" "a failed pre-stop retry must remain retryable: $out"
+      assert_contains "$out" 'auto-relaunched after quota exhaustion' "the next scan must recover the same quota transaction"
+      assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "successful retry must retain the original generation"
+      assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "successful retry must retain the original sequence"
+      assert_equals retry-concurrent "$(meta_field "$dir" "$id" x_request)" "successful retry must retain concurrent metadata"
+      assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "successful retry must retain work"
+      out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+      expect_code 0 "$rc" "the successful repeated recovery must deduplicate"
+      assert_equals '' "$out" "the successfully handled quota origin must not relaunch again"
+    done
+  done
+  pass "unpublished and published quota retries survive checkpoint/noted rollback with separate stable origin and current incarnation bindings"
+}
+
+test_quota_confirmed_replacement_is_not_retried() {
+  local dir id=rl-quota-confirmed out rc real_mv literal_before
+  dir=$(new_case quota-confirmed "$id")
+  add_quota_recovery_task "$dir" "$id"
+  real_mv=$(command -v mv)
+  make_mv_failure_stub "$dir"
+  out=$(FM_REAL_MV="$real_mv" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "the scan must record the failed completion journal: $out"
+  assert_equals none-new-agent-confirmed "$(journal_field "$dir" "$id" rollback)" "a confirmed replacement must remain confirmed"
+  literal_before=$(cat "$dir/fake/literal")
+  printf zsh > "$dir/fake/command"
+  out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "a confirmed transaction must be skipped even when its endpoint later dies"
+  assert_equals '' "$out" "confirmed replacement must not be retried from its old quota journal"
+  assert_equals "$literal_before" "$(cat "$dir/fake/literal")" "confirmed transaction must not launch again"
+  pass "quota journal recovery never retries a confirmed replacement after completion persistence fails"
+}
+
+test_quota_exhaustion_relaunches_only_a_permitted_route() {
+  local dir model id out rc
+  for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
+    id=rl-pool
+    dir=$(new_case pooled-quota "$id")
+    add_quota_recovery_task "$dir" "$id" "$model"
     mkdir -p "$dir/user-home"
     out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
       -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
@@ -4278,8 +4493,42 @@ test_retiring_omp_removes_only_its_generated_configuration() {
 }
 
 test_retiring_omp_removes_only_its_generated_configuration
+test_ordinary_partial_failure_keeps_its_attempt_caps() {
+  local dir id=rl-ordinary-partial out rc now
+  dir=$(new_case ordinary-partial "$id")
+  add_ship_task "$dir" "$id" claude
+  arm_session_end "$dir" "$id"
+  printf zsh > "$dir/fake/command"
+  printf '%s' "$dir/proj" > "$dir/fake/cwd"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "ordinary partial launch failure must be recorded: $out"
+  assert_contains "$out" 'auto-relaunch failed after session-end' "ordinary launch must fail at the real endpoint gate"
+  assert_equals '' "$(journal_field "$dir" "$id" quota_gen)" "ordinary recovery must not acquire quota provenance"
+  printf '%s' "$dir/wt" > "$dir/fake/cwd"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "ordinary recent failure must remain capped"
+  assert_equals '' "$out" "ordinary failed handling must suppress an immediate retry"
+  now=$(date +%s)
+  printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' "$((now - 1900))" "$((now - 4000))" "$((now - 8000))" \
+    > "$dir/home/state/.session-end-relaunch-$id"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "ordinary daily cap must remain enforced"
+  assert_contains "$out" 'auto-relaunch paused after 3 attempts' "ordinary recovery must retain its daily cap"
+  printf '%s\tattempt\n' "$((now - 90000))" > "$dir/home/state/.session-end-relaunch-$id"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "ordinary recovery must remain retryable under its existing cap policy"
+  assert_contains "$out" 'auto-relaunched after session-end' "ordinary recovery must succeed after its caps expire"
+  assert_equals '' "$(journal_field "$dir" "$id" quota_gen)" "ordinary retry must remain ordinary"
+  pass "ordinary partial recovery retains its recent and daily caps and existing retry policy"
+}
+
 
 test_quota_exhaustion_relaunches_only_a_permitted_route
+test_quota_recovery_retries_real_stop_then_failed_launch
+test_quota_published_failure_retries_only_its_dead_transaction
+test_quota_confirmed_replacement_is_not_retried
+test_quota_retry_preserves_identity_after_pre_stop_failure
+test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_no_dispatch_non_omp_relaunch_does_not_require_jq

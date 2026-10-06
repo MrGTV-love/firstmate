@@ -777,6 +777,10 @@ NOTE_FILE="$JOURNAL.note"
 RELAUNCH_META_PUBLISHED=0
 RELAUNCH_AGENT_CONFIRMED=0
 RELAUNCH_TX=
+RELAUNCH_QUOTA_GEN=
+RELAUNCH_QUOTA_SEQ=
+RELAUNCH_FROM_BUSY_GEN=
+RELAUNCH_FROM_TX=
 RELAUNCH_BRIEF=
 PRIOR_HARNESS=$HARNESS
 PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
@@ -809,6 +813,13 @@ journal_write() {  # <phase> [extra-line]...
     echo "to_harness=$TARGET_HARNESS"
     echo "to_model=$TARGET_MODEL"
     echo "to_effort=$TARGET_EFFORT"
+    echo "relaunch_tx=$RELAUNCH_TX"
+    if [ -n "$RELAUNCH_QUOTA_GEN" ]; then
+      echo "quota_gen=$RELAUNCH_QUOTA_GEN"
+      echo "quota_seq=$RELAUNCH_QUOTA_SEQ"
+      echo "from_busy_gen=$RELAUNCH_FROM_BUSY_GEN"
+      echo "from_relaunch_tx=$RELAUNCH_FROM_TX"
+    fi
     local line
     for line in "$@"; do
       echo "$line"
@@ -1122,7 +1133,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home
+  local exit_result state note_line secondmate_home quota_identity quota_record
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1180,6 +1191,28 @@ do_relaunch() {
       *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;
     esac
   fi
+  if [ -n "${FM_CONTROL_QUOTA_GEN:-}" ]; then
+    # shellcheck source=bin/fm-session-end-relaunch-lib.sh
+    . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
+    quota_identity=$(fm_session_end_quota_journal_identity "$STATE" "$ID" "$META" 2>/dev/null || true)
+    if [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ]; then
+      [ "$(agent_state)" = dead ] || die "quota recovery journal no longer names a proven-dead agent for $ID"
+    else
+      quota_identity=$(fm_session_end_identity "$STATE" "$ID" 2>/dev/null || true)
+      quota_record=$(fm_busy_record_read "$STATE" "$ID" 2>/dev/null || true)
+      [ "$RECORDED_HARNESS" = omp ] \
+        && [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ] \
+        && [[ "$quota_record" = "idle "*" quota-exhausted ${FM_CONTROL_QUOTA_SEQ:-}" ]] \
+        || die "quota recovery identity no longer names the current event for $ID"
+    fi
+    RELAUNCH_QUOTA_GEN=$FM_CONTROL_QUOTA_GEN
+    RELAUNCH_QUOTA_SEQ=$FM_CONTROL_QUOTA_SEQ
+    RELAUNCH_FROM_BUSY_GEN=$(fm_meta_get "$META" busy_gen)
+    RELAUNCH_FROM_BUSY_GEN=${RELAUNCH_FROM_BUSY_GEN:--}
+    RELAUNCH_FROM_TX=$(fm_meta_get "$META" control_relaunch_tx)
+    RELAUNCH_FROM_TX=${RELAUNCH_FROM_TX:--}
+  fi
+  RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   safe_checkpoint
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
@@ -1206,8 +1239,7 @@ do_relaunch() {
 
   # The launch owner (fm-spawn --relaunch) clears the previous incarnation's
   # per-task harness wiring before arming the new one, so nothing to do here.
-  RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
-  journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
+  journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)

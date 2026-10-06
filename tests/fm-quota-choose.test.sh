@@ -60,6 +60,21 @@ trap cleanup EXIT
 
 mkdir -p "$FAKEBIN"
 mkdir -p "$LAB/home/config"
+export FM_BACKEND=tmux
+unset BACKEND TMUX
+export FM_AUTH_DESTINATION="$LAB/tmux-auth"
+cat > "$FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  has-session) exit 0 ;;
+  show-environment)
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
+    [ -f "$FM_AUTH_DESTINATION" ] || exit 1
+    cat "$FM_AUTH_DESTINATION" ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$FAKEBIN/tmux"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 [ "$1" = usage ] || exit 2
@@ -375,6 +390,7 @@ jq '(.providers[] | select(.provider == "claude").quotaSemantics.effectiveAvaila
   (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$LAB/captured.json" > "$CLAUDE_EXHAUSTED"
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   export "$credential=synthetic-alternate-auth"
+  printf '%s=synthetic-alternate-auth\n' "$credential" > "$FM_AUTH_DESTINATION"
   for policy in inherited retained stripped; do
     case "$policy" in
       inherited) rm -f "$LAB/home/config/launch-env-allowlist" ;;
@@ -398,8 +414,11 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
     ok "$credential $policy uses only quota mapped to the launch environment"
   done
   unset "$credential"
+  rm "$FM_AUTH_DESTINATION"
 done
 rm "$LAB/home/config/launch-env-allowlist"
+out=$(ANTHROPIC_API_KEY=caller-only call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+[ "$out" = "claude default" ] || fail "caller-only key concealed destination native headroom: $out"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi

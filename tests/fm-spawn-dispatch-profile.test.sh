@@ -176,12 +176,12 @@ SH
 #!/usr/bin/env bash
 case "${1:-}" in
   models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
-  *) printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env" ;;
+  *) printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-}" > "${0%/*}/worker.env" ;;
 esac
 SH
   cat > "$fakebin/claude" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" > "${0%/*}/worker.env"
+printf '%s\n' "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-}" > "${0%/*}/worker.env"
 SH
   chmod +x "$fakebin/quota-axi" "$fakebin/omp" "$fakebin/claude"
 }
@@ -190,14 +190,14 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
   local rec id credential policy out status expected_harness expected_model expected_effort launch
   local -a args pane_env
   for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-    for policy in ambient retained filtered flag-only; do
+    for policy in ambient retained filtered flag-only caller-only destination-only; do
       id="profile-auth-$credential-$policy"
       rec=$(make_spawn_case "$id" claude "$id")
       read_case_record "$rec"
       enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
       args=("$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
       case "$policy" in
-        ambient) args+=(--allow-api-key) ;;
+        ambient|destination-only) args+=(--allow-api-key) ;;
         retained)
           printf '%s\n' PATH "$credential" > "$HOME_DIR/config/launch-env-allowlist"
           args+=(--allow-api-key)
@@ -207,14 +207,17 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
       esac
       out=$(
         unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
-        if [ "$policy" != flag-only ]; then export "$credential=synthetic-launch-credential"; fi
+        if [ "$policy" != flag-only ] && [ "$policy" != destination-only ]; then export "$credential=synthetic-launch-credential"; fi
+        if [ "$policy" != flag-only ] && [ "$policy" != caller-only ]; then
+          export "FM_FAKE_TMUX_ENV_$credential=synthetic-launch-credential"
+        fi
         run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "${args[@]}"
       )
       status=$?
       expect_code 0 "$status" "$credential $policy dispatch spawn must succeed: $out"
       expected_harness=claude expected_model=default expected_effort=default
       case "$policy" in
-        filtered|flag-only)
+        filtered|flag-only|caller-only)
           expected_harness=omp expected_model=openrouter/z-ai/glm-5.3-flash expected_effort=high
           assert_grep "fallback launched omp" "$HOME_DIR/state/$id.status" "$credential $policy did not disclose the permitted fallback"
           ;;
@@ -227,11 +230,11 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
       pane_env=(-u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN
         -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
         -u CLAUDE_CONFIG_DIR HOME="$HOME_DIR/user-home")
-      [ "$policy" = flag-only ] || pane_env+=("$credential=synthetic-launch-credential")
+      case "$policy" in flag-only|caller-only) ;; *) pane_env+=("$credential=synthetic-launch-credential") ;; esac
       fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
         > "$CASE_DIR/worker.out" 2>&1 || fail "$credential $policy staged launch could not be consumed"
       case "$policy" in
-        ambient|retained)
+        ambient|retained|destination-only)
           grep -Fxq "$credential=synthetic-launch-credential" "$FAKEBIN_DIR/worker.env" || fail "$credential did not reach the Claude worker"
           grep -Fxq 'api_key=allow' "$HOME_DIR/state/$id.meta" || fail "$credential lost the deliberate billing opt-in"
           ;;
@@ -1167,17 +1170,51 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   id=profile-claude-cfgdir-z17
   rec=$(make_spawn_case profile-claude-cfgdir claude "$id")
   read_case_record "$rec"
+  printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
+  enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
 
   # A creatable path: this spawn now pre-registers workspace trust in that store
   # (bin/fm-claude-trust.sh), so an unwritable directory is a genuine blocker.
   out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
-    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
   launch=$(cat "$LAUNCH_LOG")
-  [ "$(claude_launch_arg "$launch" config-dir "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-claude")" = "$CASE_DIR/claude-work" ] \
+  fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-claude" \
+    > "$CASE_DIR/worker.out" 2>&1 || fail "filtered root launch could not be consumed"
+  grep -Fxq "CLAUDE_CONFIG_DIR=$CASE_DIR/claude-work" "$FAKEBIN_DIR/worker.env" \
     || fail "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
   pass "claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store"
+}
+
+test_claude_dispatch_destination_root() {
+  local policy rec id out status launch expected
+  for policy in ambient retained filtered; do
+    id="profile-destination-root-$policy"
+    rec=$(make_spawn_case "$id" claude "$id")
+    read_case_record "$rec"
+    enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
+    case "$policy" in
+      retained) printf '%s\n' PATH CLAUDE_CONFIG_DIR > "$HOME_DIR/config/launch-env-allowlist" ;;
+      filtered) printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+    esac
+    out=$(FM_FAKE_TMUX_ENV_CLAUDE_CONFIG_DIR="$CASE_DIR/destination-root" \
+      run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "$policy destination root spawn failed: $out"
+    expected="$CASE_DIR/destination-root"
+    if [ "$policy" = filtered ]; then
+      expected=
+      assert_meta_profile "$HOME_DIR/state/$id.meta" omp openrouter/z-ai/glm-5.3-flash high
+    else
+      assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
+    fi
+    launch=$(cat "$LAUNCH_LOG")
+    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-root" \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "$policy destination root launch could not be consumed"
+    grep -Fxq "CLAUDE_CONFIG_DIR=$expected" "$FAKEBIN_DIR/worker.env" || fail "$policy destination root disagrees with selected capacity"
+  done
 }
 
 test_lavish_server_address_is_exported_to_worker_launch() {
@@ -1964,6 +2001,7 @@ test_pi_signed_missing_binary_refuses_before_endpoint_or_metadata
 test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity
 test_batch_forwards_shared_profile_flags
 test_claude_forwards_firstmate_config_dir_when_set
+test_claude_dispatch_destination_root
 test_lavish_server_address_is_exported_to_worker_launch
 test_lavish_absent_config_preserves_destination_ambient
 test_claude_permission_mode_auto_swaps_only_the_permission_flag

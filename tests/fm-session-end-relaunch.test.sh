@@ -28,7 +28,9 @@ case "${1:-}" in
   display-message)
     for a in "$@"; do
       case "$a" in
-        *pane_current_command*) printf '%s\n' "$cmd"; exit 0 ;;
+        *pane_current_command*)
+          [ "${FM_FAKE_TMUX_READ_FAIL:-0}" != 1 ] || exit 1
+          printf '%s\n' "$cmd"; exit 0 ;;
         *cursor_y*) printf '0\n'; exit 0 ;;
       esac
     done
@@ -59,8 +61,9 @@ set -u
 [ -n "${FM_HOME:-}" ] || { echo "error: FM_HOME is not set" >&2; exit 1; }
 printf '%s\n' "$*" >> "${FM_SESSION_END_CONTROL_LOG:?}"
 [ -z "${FM_SESSION_END_CONTROL_ENV_LOG:-}" ] \
-  || printf 'FM_HOME=%s\nFM_STATE_OVERRIDE=%s\nFM_CONTROL_LAUNCH_WAIT=%s\n' \
-    "$FM_HOME" "${FM_STATE_OVERRIDE:-}" "${FM_CONTROL_LAUNCH_WAIT:-}" > "$FM_SESSION_END_CONTROL_ENV_LOG"
+  || printf 'FM_HOME=%s\nFM_STATE_OVERRIDE=%s\nFM_CONTROL_LAUNCH_WAIT=%s\nFM_CONTROL_QUOTA_GEN=%s\nFM_CONTROL_QUOTA_SEQ=%s\n' \
+    "$FM_HOME" "${FM_STATE_OVERRIDE:-}" "${FM_CONTROL_LAUNCH_WAIT:-}" \
+    "${FM_CONTROL_QUOTA_GEN:-}" "${FM_CONTROL_QUOTA_SEQ:-}" > "$FM_SESSION_END_CONTROL_ENV_LOG"
 if [ -n "${FM_SESSION_END_BEACON_REF:-}" ]; then
   date +%s > "$FM_SESSION_END_BEACON_REF.start"
   if [ "${FM_STATE_OVERRIDE:-}/.last-watcher-beat" -nt "$FM_SESSION_END_BEACON_REF" ]; then
@@ -605,6 +608,174 @@ SH
   pass "claude debug is off by default, on for a claude relaunch, and refused for another harness or a fresh spawn"
 }
 
+add_partial_quota_lane() {
+  local dir=$1 id=$2 gen record seq
+  add_lane "$dir" "$id" omp
+  gen=$(cat "$dir/state/$id.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" "$id" idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null || fail "quota event fixture failed"
+  record=$(cat "$dir/state/$id.busy-state")
+  seq=${record#*seq=}
+  seq=${seq%% *}
+  printf 'busy_gen=%s\n' "$gen" >> "$dir/state/$id.meta"
+  printf '%s\n' v1 "task=$id" phase=failed:launching rollback=prior-record-kept \
+    backend=tmux endpoint=firstmate:fm-lane "worktree=$dir/wt-$id" kind=ship \
+    from_harness=omp from_model=default from_effort=default \
+    "quota_gen=$gen" "quota_seq=$seq" "from_busy_gen=$gen" from_relaunch_tx=- \
+    relaunch_tx=fixture-tx > "$dir/state/$id.control-relaunch"
+  "$ROOT/bin/fm-busy-event.sh" retire "$dir/state" "$id" --current-gen >/dev/null \
+    || fail "quota retirement fixture failed"
+}
+
+test_partial_quota_retries_are_uncapped_and_deduplicated() {
+  local dir="$TMP_ROOT/partial-quota-retries" id=a-journal gen seq scan now
+  add_partial_quota_lane "$dir" "$id"
+  gen=$(fm_meta_get "$dir/state/$id.control-relaunch" quota_gen)
+  seq=$(fm_meta_get "$dir/state/$id.control-relaunch" quota_seq)
+  add_lane "$dir" b-session-end
+  now=$(date +%s)
+  printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' "$now" "$((now - 2000))" "$((now - 4000))" \
+    > "$dir/state/.session-end-relaunch-$id"
+  for scan in 1 2 3 4; do
+    FM_SESSION_END_CONTROL_FAIL_ID="$id" FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
+      || fail "partial quota failure scan $scan failed"
+    [ "$(cut -d' ' -f1 "$dir/control.log")" = "$(if [ "$scan" = 1 ]; then printf '%s\nb-session-end' "$id"; else printf '%s' "$id"; fi)" ] \
+      || fail "a partial quota retry was capped, starved the later lane, or repeated a success"
+    [ ! -e "$dir/state/$id.busy-gen" ] && [ ! -e "$dir/state/$id.busy-state" ] \
+      || fail "journal eligibility resurrected busy state"
+  done
+  grep -Fx "FM_CONTROL_QUOTA_GEN=$gen" "$dir/control-env.log" >/dev/null \
+    || fail "the stable quota generation was not passed to control"
+  grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
+    || fail "the stable quota sequence was not passed to control"
+  scan_lane "$dir" || fail "partial quota success scan failed"
+  [ "$FM_SESSION_END_WAKE" = "check: $id auto-relaunched after quota exhaustion" ] \
+    || fail "partial quota recovery did not remain eligible after repeated failures"
+  printf '%s\tattempt\n' "$((now - 90000))" > "$dir/state/.session-end-relaunch-$id"
+  scan_lane "$dir" || fail "handled partial quota scan failed"
+  [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+    || fail "the successfully handled journal identity duplicated after its ledger expired"
+  pass "journal-backed quota failures stay uncapped, advance to later lanes, and deduplicate their stable identity"
+}
+
+test_partial_quota_journal_guards_fail_closed() {
+  local dir variant journal meta gen before_gen before_record command read_fail missing replacement_gen lock_holder lock_deadline scan_rc
+  for variant in paused held done failed backlog-close deliberate lock captain-unreadable \
+    alive ambiguous unreadable missing active complete confirmed pre-stop stop-alive stop-unknown \
+    manual incomplete task worktree endpoint backend profile superseded-meta superseded-gen \
+    superseded-tx stale-sequence published-malformed published-symlink-state published-symlink-gen \
+    published-missing-record published-orphan-record published-superseded-gen; do
+    dir="$TMP_ROOT/partial-quota-guard-$variant"
+    add_partial_quota_lane "$dir" lane
+    journal="$dir/state/lane.control-relaunch"
+    meta="$dir/state/lane.meta"
+    gen=$(fm_meta_get "$journal" quota_gen)
+    command=zsh read_fail=0 missing=0
+    case "$variant" in
+      published-*)
+        "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state busy --source fm-spawn --event launch-brief >/dev/null
+        replacement_gen=$(cat "$dir/state/lane.busy-gen")
+        printf 'busy_gen=%s\ncontrol_relaunch_tx=fixture-current\n' "$replacement_gen" >> "$meta"
+        printf 'phase=failed:checkpoint\nrollback=instructions-restored\nfrom_busy_gen=%s\nfrom_relaunch_tx=fixture-current\n' \
+          "$replacement_gen" >> "$journal"
+        ;;
+    esac
+    case "$variant" in
+      paused) printf 'paused: waiting\n' > "$dir/state/lane.status" ;;
+      held) printf 'captain-held: waiting\n' > "$dir/state/lane.status" ;;
+      done) printf 'done: finished\n' > "$dir/state/lane.status" ;;
+      failed) printf 'failed: finished\n' > "$dir/state/lane.status" ;;
+      backlog-close) : > "$dir/state/lane.backlog-close" ;;
+      deliberate) printf 'gen=%s\n' "$gen" > "$dir/state/lane.control-exit" ;;
+      lock)
+        (
+          fm_lock_try_acquire "$dir/state/.control-lane.lock" || exit 1
+          trap 'fm_lock_release "$dir/state/.control-lane.lock"' EXIT
+          : > "$dir/control-lock-ready"
+          lock_deadline=$((SECONDS + 30))
+          while [ ! -e "$dir/control-lock-release" ] && [ "$SECONDS" -lt "$lock_deadline" ]; do
+            sleep 0.05
+          done
+        ) &
+        lock_holder=$!
+        lock_deadline=$((SECONDS + 5))
+        while [ ! -e "$dir/control-lock-ready" ] && [ "$SECONDS" -lt "$lock_deadline" ] && kill -0 "$lock_holder" 2>/dev/null; do
+          sleep 0.05
+        done
+        if [ ! -e "$dir/control-lock-ready" ]; then
+          : > "$dir/control-lock-release"
+          wait "$lock_holder" 2>/dev/null || true
+          fail "control lock fixture failed to acquire its foreign hold"
+        fi
+        ;;
+      captain-unreadable)
+        printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/data/backlog.md"
+        mkdir -p "$dir/fakebin"
+        printf '#!/bin/sh\nexit 1\n' > "$dir/fakebin/tasks-axi"
+        chmod +x "$dir/fakebin/tasks-axi"
+        ;;
+      alive) command=omp ;;
+      ambiguous) command=python ;;
+      unreadable) read_fail=1 ;;
+      missing) missing=1 ;;
+      active) printf 'phase=launching\n' >> "$journal" ;;
+      complete) printf 'phase=complete\n' >> "$journal" ;;
+      confirmed) printf 'rollback=none-new-agent-confirmed\n' >> "$journal" ;;
+      pre-stop) printf 'phase=failed:noted\nrollback=instructions-restored\n' >> "$journal"; command=omp ;;
+      stop-alive) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-alive\n' >> "$journal" ;;
+      stop-unknown) printf 'phase=failed:stopping\nrollback=instructions-restored-agent-state-unknown\n' >> "$journal" ;;
+      manual) printf 'quota_gen=\nquota_seq=\n' >> "$journal" ;;
+      incomplete) printf 'relaunch_tx=\nfrom_busy_gen=\n' >> "$journal" ;;
+      task) printf 'task=other\n' >> "$journal" ;;
+      worktree) printf 'worktree=%s\n' "$dir" >> "$journal" ;;
+      endpoint) printf 'endpoint=firstmate:fm-other\n' >> "$journal" ;;
+      backend) printf 'backend=herdr\n' >> "$journal" ;;
+      profile) printf 'harness=claude\n' >> "$meta" ;;
+      superseded-meta) printf 'busy_gen=newer-generation\n' >> "$meta" ;;
+      superseded-gen)
+        "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state idle --source fm-spawn --event launch-brief >/dev/null
+        ;;
+      superseded-tx) printf 'control_relaunch_tx=unrelated\n' >> "$meta" ;;
+      stale-sequence)
+        "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state idle --source omp-ext --event quota-exhausted >/dev/null
+        replacement_gen=$(cat "$dir/state/lane.busy-gen")
+        printf 'busy_gen=%s\n' "$replacement_gen" >> "$meta"
+        printf 'quota_gen=%s\nfrom_busy_gen=%s\n' "$replacement_gen" "$replacement_gen" >> "$journal"
+        ;;
+      published-malformed) printf 'malformed\n' > "$dir/state/lane.busy-state" ;;
+      published-symlink-state)
+        mv "$dir/state/lane.busy-state" "$dir/state/lane.busy-state-target"
+        ln -s "$dir/state/lane.busy-state-target" "$dir/state/lane.busy-state"
+        ;;
+      published-symlink-gen)
+        mv "$dir/state/lane.busy-gen" "$dir/state/lane.busy-gen-target"
+        ln -s "$dir/state/lane.busy-gen-target" "$dir/state/lane.busy-gen"
+        ;;
+      published-missing-record) rm "$dir/state/lane.busy-state" ;;
+      published-orphan-record) rm "$dir/state/lane.busy-gen" ;;
+      published-superseded-gen)
+        "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state busy --source fm-spawn --event launch-brief >/dev/null
+        ;;
+    esac
+    before_gen=$(cat "$dir/state/lane.busy-gen" 2>/dev/null || true)
+    before_record=$(cat "$dir/state/lane.busy-state" 2>/dev/null || true)
+    scan_rc=0
+    FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_TMUX_READ_FAIL="$read_fail" \
+      FM_FAKE_WINDOW_GONE="$missing" scan_lane "$dir" || scan_rc=$?
+    if [ "$variant" = lock ]; then
+      : > "$dir/control-lock-release"
+      wait "$lock_holder" || fail "control lock fixture failed to release its foreign hold"
+    fi
+    [ "$scan_rc" -eq 0 ] || fail "$variant journal scan failed"
+    [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+      || fail "$variant journal authorized an automatic replacement"
+    [ "$before_gen" = "$(cat "$dir/state/lane.busy-gen" 2>/dev/null || true)" ] \
+      && [ "$before_record" = "$(cat "$dir/state/lane.busy-state" 2>/dev/null || true)" ] \
+      || fail "$variant journal eligibility changed incarnation state"
+  done
+  pass "partial quota journals preserve shared skips and refuse unsafe, unrelated, manual, or superseded transactions"
+}
+
 test_session_end_relaunches_a_dead_lane_once
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
@@ -614,6 +785,8 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure
 test_quota_recovery_ignores_daily_cap_and_capped_handling
 test_failed_quota_recovery_does_not_starve_later_tasks
 test_failed_recovery_shares_the_scan_time_bound
+test_partial_quota_retries_are_uncapped_and_deduplicated
+test_partial_quota_journal_guards_fail_closed
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches
 test_one_relaunch_per_scan

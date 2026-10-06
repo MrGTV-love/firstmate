@@ -320,18 +320,44 @@ fm_worker_account_claude_shed() {
   printf '%s\n' "$shed"
 }
 
-fm_worker_account_tmux_env_scope() {
-  local name=$1 session=${2:-} entry
+fm_worker_account_tmux_env() {
+  local name=$1 session=${2:-} mode=${3:-scope} entry= scope=
   if [ -z "$session" ]; then
     if [ -n "${TMUX:-}" ]; then
-      session=$(tmux display-message -p '#S' 2>/dev/null) || session=
+      session=$(tmux display-message -p '#S' 2>/dev/null) || {
+        [ "$mode" != readable ] || return 1
+        session=
+      }
     elif tmux has-session -t firstmate 2>/dev/null; then
       session=firstmate
     fi
   fi
-  if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then
-    case "$entry" in "$name"=?*) printf 'session\n' ;; esac
-  elif entry=$(tmux show-environment -g "$name" 2>/dev/null); then
-    case "$entry" in "$name"=?*) printf 'global\n' ;; esac
+  if [ "$mode" = readable ]; then
+    tmux show-environment -g >/dev/null 2>&1 || return 1
+    [ -z "$session" ] || tmux show-environment -t "$session" >/dev/null 2>&1 || return 1
+    return 0
   fi
+  if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then
+    scope=session
+  elif entry=$(tmux show-environment -g "$name" 2>/dev/null); then
+    scope=global
+  fi
+  [ -n "$scope" ] || return 0
+  case "$entry" in
+    "$name"=?*)
+      if [ "$mode" = value ]; then
+        printf '%s\n' "${entry#*=}"
+      else
+        printf '%s\n' "$scope"
+      fi
+      ;;
+  esac
+}
+
+fm_worker_account_tmux_filtered_env() {
+  local name=$1 session=${2:-} filtered=${3:-0} names=${4:-}
+  if [ "$filtered" = 1 ]; then
+    case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) return 0 ;; esac
+  fi
+  fm_worker_account_tmux_env "$name" "$session" value
 }

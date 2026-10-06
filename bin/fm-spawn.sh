@@ -2713,7 +2713,7 @@ if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
         *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
         esac
       fi
-      if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
+      if [ "$BACKEND" != tmux ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
         echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
         exit 1
       fi
@@ -2744,7 +2744,7 @@ if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
         *) continue ;;  # Allowlist filters it out at launch time
         esac
       fi
-      tmux_env_scope=$(fm_worker_account_tmux_env_scope "$check_var" "$tmux_session")
+      tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session")
       case "$tmux_env_scope" in
       session)
         echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2

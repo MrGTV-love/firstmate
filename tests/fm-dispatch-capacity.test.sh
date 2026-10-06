@@ -11,6 +11,7 @@ mkdir -p "$TMP_ROOT/config"
 export FM_HOME="$TMP_ROOT" FM_CONFIG_OVERRIDE="$TMP_ROOT/config"
 export OMP_USAGE_FIXTURE="$TMP_ROOT/usage.json" QUOTA_FIXTURE="$TMP_ROOT/quota.json"
 unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN BACKEND TMUX
+export FM_BACKEND=tmux
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
@@ -25,6 +26,29 @@ cat "$QUOTA_FIXTURE"
 SH
 chmod +x "$FAKEBIN/omp" "$FAKEBIN/quota-axi"
 export PATH="$FAKEBIN:$PATH"
+cat > "$FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  has-session) exit 0 ;;
+  show-environment)
+    [ "${FM_FAKE_TMUX_UNREADABLE:-0}" != 1 ] || exit 1
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
+    if [ "$2" = -t ]; then
+      file="$FM_HOME/tmux-session-env"
+      [ "$3" != recorded ] || file="$FM_HOME/tmux-recorded-env"
+    else
+      file="$FM_HOME/tmux-global-env"
+    fi
+    [ -f "$file" ] || exit 1
+    name=${!#}
+    while IFS= read -r entry; do
+      case "$entry" in "$name="*|"-$name") printf '%s\n' "$entry"; exit 0 ;; esac
+    done < "$file"
+    exit 1 ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$FAKEBIN/tmux"
 write_pool() {
   jq -n --argjson at "$(date +%s)" --argjson remaining "$1" '
     {reports: [
@@ -165,6 +189,10 @@ mv "$TMP_ROOT/native-claude-zero.json" "$QUOTA_FIXTURE"
 native_primary='{"harness":"claude","model":"claude-sonnet-5-5","effort":"high"}'
 out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
 assert_equals exhausted "$(jq -r .status <<<"$out")" "native default exhaustion remains measured without alternate auth"
+out=$(FM_FAKE_TMUX_UNREADABLE=1 "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals unknown "$(jq -r .status <<<"$out")" "unavailable tmux destination does not establish native authentication"
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals exhausted "$(jq -r .status <<<"$out")" "readable empty destination restores measured native exhaustion"
 out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
 assert_equals true "$(jq -r .switched <<<"$out")" "native default exhaustion authorizes a permitted fallback"
 export CLAUDE_CONFIG_DIR="$TMP_ROOT/alternate-claude"
@@ -179,6 +207,7 @@ assert_equals exhausted "$(jq -r .status <<<"$out")" "an empty forwarded auth di
 unset CLAUDE_CONFIG_DIR
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   export "$credential=retained-routing-fixture"
+  printf '%s=retained-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-session-env"
   for forwarding in ambient allowlisted; do
     if [ "$forwarding" = allowlisted ]; then
       printf '%s\n' "$credential" > "$TMP_ROOT/config/launch-env-allowlist"
@@ -196,31 +225,15 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   assert_equals true "$(jq -r .switched <<<"$out")" "filtered $credential permits the declared exhaustion fallback"
   printf '%s\n' "$credential" > "$TMP_ROOT/config/launch-env-allowlist"
   export "$credential="
+  printf '%s=\n' "$credential" > "$TMP_ROOT/tmux-session-env"
   out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
   assert_equals exhausted "$(jq -r .status <<<"$out")" "an empty $credential is not alternate authentication"
   unset "$credential"
   rm "$TMP_ROOT/config/launch-env-allowlist"
+  rm "$TMP_ROOT/tmux-session-env"
 done
 pass "capacity and selection bind API authentication only when actually retained"
 
-cat > "$FAKEBIN/tmux" <<'SH'
-#!/usr/bin/env bash
-case "$1" in
-  has-session) exit 0 ;;
-  show-environment)
-    if [ "$2" = -t ]; then
-      file="$FM_HOME/tmux-session-env"
-      [ "$3" != recorded ] || file="$FM_HOME/tmux-recorded-env"
-      [ -f "$file" ] || exit 1
-      cat "$file"
-    else
-      [ -f "$FM_HOME/tmux-global-env" ] || exit 1
-      cat "$FM_HOME/tmux-global-env"
-    fi ;;
-  *) exit 1 ;;
-esac
-SH
-chmod +x "$FAKEBIN/tmux"
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   printf '%s=global-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-global-env"
   out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
@@ -244,6 +257,60 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   assert_equals true "$(jq -r .switched <<<"$out")" "the allowlist must strip destination $credential"
   rm "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
+for credential in $FM_WORKER_ACCOUNT_CLAUDE_SHED CLAUDE_CONFIG_DIR; do
+  value=destination-auth
+  case "$credential" in CLAUDE_CODE_USE_*) value=1 ;; esac
+  printf '%s=%s\n' "$credential" "$value" > "$TMP_ROOT/tmux-session-env"
+  if [ "$credential" = ANTHROPIC_FEDERATION_RULE_ID ]; then
+    printf 'ANTHROPIC_ORGANIZATION_ID=destination-org\n' >> "$TMP_ROOT/tmux-session-env"
+  fi
+  for backend_source in env config default; do
+    unset FM_BACKEND BACKEND
+    case "$backend_source" in
+      env) export FM_BACKEND=tmux ;;
+      config) printf 'tmux\n' > "$TMP_ROOT/config/backend" ;;
+      default) rm -f "$TMP_ROOT/config/backend" ;;
+    esac
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "$backend_source backend retains destination $credential"
+  done
+  printf '%s\n' "$credential" ANTHROPIC_ORGANIZATION_ID > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+  assert_equals unknown "$(jq -r .status <<<"$out")" "allowlist retains destination $credential"
+  printf '# filtered\n' > "$TMP_ROOT/config/launch-env-allowlist"
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+  assert_equals exhausted "$(jq -r .status <<<"$out")" "filter removes destination $credential"
+  rm "$TMP_ROOT/config/launch-env-allowlist"
+  case "$credential" in
+    CLAUDE_CODE_USE_*)
+      for value in 1 true yes on TrUe YeS ON; do
+        printf '%s=%s\n' "$credential" "$value" > "$TMP_ROOT/tmux-session-env"
+        out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+        assert_equals unknown "$(jq -r .status <<<"$out")" "enabled $credential=$value selects alternate auth"
+      done
+      for value in '' 0 false no off FALSE; do
+        printf '%s=%s\n' "$credential" "$value" > "$TMP_ROOT/tmux-session-env"
+        out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+        assert_equals exhausted "$(jq -r .status <<<"$out")" "disabled $credential=$value keeps native quota"
+      done ;;
+    ANTHROPIC_FEDERATION_RULE_ID)
+      printf '%s=destination-rule\n' "$credential" > "$TMP_ROOT/tmux-session-env"
+      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+      assert_equals exhausted "$(jq -r .status <<<"$out")" "federation rule without organization does not select federation"
+      ;;
+  esac
+  rm "$TMP_ROOT/tmux-session-env"
+done
+export ANTHROPIC_API_KEY=caller-only
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals exhausted "$(jq -r .status <<<"$out")" "caller-only key cannot reach tmux worker"
+unset ANTHROPIC_API_KEY
+printf '# filtered\n' > "$TMP_ROOT/config/launch-env-allowlist"
+out=$(CLAUDE_CONFIG_DIR="$TMP_ROOT/explicit-root" "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals unknown "$(jq -r .status <<<"$out")" "explicit caller root survives allowlist"
+rm "$TMP_ROOT/config/launch-env-allowlist"
+out=$(FM_BACKEND=herdr "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+assert_equals unknown "$(jq -r .status <<<"$out")" "unreadable daemon destination does not prove default auth"
 pass "destination tmux credential layering respects removal, emptiness, and filtering"
 printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
 out=$(fm_dispatch_capacity claude claude-opus-5-5)

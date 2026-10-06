@@ -182,9 +182,10 @@ The worktree and the task's records are unaffected either way.
 ### Failure and rollback
 
 - A refusal **before** the agent is stopped leaves the durable record and the instructions byte-identical.
-- A launch failure **after** the agent is stopped restores the prior durable record, keeps the progress note so a later recovery still has it, marks the journal `failed:launching`, and reports plainly that no agent is running and where the work is preserved.
+- A launch failure **after** the agent is stopped keeps the prior durable record, keeps the progress note so a later recovery still has it, marks the journal `failed:launching`, and reports plainly that no agent is running and where the work is preserved.
 - If the launch owner already published the new record but no running agent can be confirmed, the new record is kept: the task is recorded on the new harness with no agent confirmed, which is exactly what recovery reconciles.
   Rewriting it back to the old harness would be a second, worse inaccuracy.
+- Automatic quota recovery carries its original event identity across journal transitions and rollback, separately from the current incarnation and publication transaction; the session-end library validates those bindings for [retryable partial recovery](configuration.md#pooled-omp-capacity-and-declared-stand-ins).
 
 ## Fail-closed boundaries
 

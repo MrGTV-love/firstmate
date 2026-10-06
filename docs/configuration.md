@@ -1386,9 +1386,10 @@ A fresh usable sibling keeps the model available; an unmeasured sibling prevents
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
-Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a differently pinned account's capacity, an alternate store forwarded through `CLAUDE_CONFIG_DIR`, or an API route using a retained `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`.
+Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
-Credential binding uses the launch allowlist and, for tmux launches and relaunches, the destination session/global environment; filtered or empty API credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
+Credential binding resolves the launch backend and applies the launch allowlist to the destination tmux session/global environment, with explicit forwarded stores and account-pin credential shedding taking precedence; caller-only API credentials, filtered credentials, and empty credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
+An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established keeps native Claude quota unknown.
 
 Each fallback profile requires `harness`, `model`, and `effort`.
 An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
@@ -1405,6 +1406,7 @@ Omitted model and effort fields match their persisted `default` metadata values 
 OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
 An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
+After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
 A failed recovery does not prevent later eligible tasks from being considered within the scan's shared execution budget; each scan stops after its first successful relaunch.
 Launch and successful replacement append the selected route to task status.
 No account pin, saved reset, or global reviewer configuration is changed.
