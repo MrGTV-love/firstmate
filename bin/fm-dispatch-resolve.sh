@@ -24,12 +24,8 @@
 #   rule's declared `min_confidence` on that rule's probability, falling to the
 #   most probable other option that clears its own floor), the rule's declared
 #   `approval` and `floor`, each profile's declared `provider` and `floor`, the
-#   quota rows from ONE quota-axi --json snapshot (schema 5 or 6; each
-#   candidate binds to one row through quota_row in
-#   bin/fm-quota-axi-lib.sh, so a Pi lane such as openai-codex-work/...
-#   reads its own account's row and an expanded provider with no row for the
-#   candidate is unmeasured, never blocked), and the spendPriority argmax over
-#   the eligible candidates. The model never sees quota, catalogs, approvals,
+#   quota rows from ONE compatible quota-axi --json snapshot, and ranking under
+#   the operator contract below. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
@@ -47,13 +43,33 @@
 #   dispatch-resolve:
 #     status: clear | ambiguous | escalate | error
 #     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
+#     timings: api_ms/quota_ms/local_ms/total_ms
+#     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
+#   These diagnostics accompany normal resolution and structured errors, but
+#   no-rules results contain only status/reason; off paths have no stdout.
+#   api_ms and its latency_ms alias are curl's own time_total in whole
+#   milliseconds, so they carry no local helper overhead. Unknown api_ms prints
+#   null; unknown latency_ms prints -. Unattempted quota_ms prints null.
+#   quota_ms and total_ms include helper overhead; total is measured from
+#   opted-in setup through rendering, before printing diagnostics.
+#   local_ms is the nonnegative residual after subtracting known API and quota
+#   durations; unknown stages are not subtracted, so it can include their time.
+#   bin/fm-timing-lib.sh owns the epoch-clock implementation used by these stamps.
+#   Cost is an estimate at https://docs.typesafe.ai/models (2026-10-01):
+#   $0.042 per million input tokens, output free; unavailable usage prints null.
+#   model and returned_model accept only numeric Jev version ids, else unknown;
+#   returned_model survives quota failures alongside paid-call usage, without
+#   echoing arbitrary API text.
+#   Only numeric usage and the returned model id are observed, never request text
+#   or raw API error bodies, which may echo sensitive input.
 #     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
-#     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible | eligible, unranked: <reason> | not eligible: <reason>
+#     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible [warning: ..] | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>]     (status clear only)
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
-#   escalate  -> the rule requires captain approval, no candidate is rankable, or a genuine tie
+#   escalate  -> approval required, no candidate rankable, a genuine tie, or
+#                a winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, or quota-axi failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
@@ -92,6 +108,7 @@ CONFIDENCE_FLOOR=0.6
 TS_MODEL=jev-latest
 TS_BASE=https://api.typesafe.ai
 TS_TIMEOUT=5
+TS_INPUT_USD_PER_MILLION=0.042
 DEFAULT_WHEN="No listed rule applies to this task."
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
@@ -126,6 +143,9 @@ if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
   exit 0
 fi
+
+RUN_T0=$(fm_timing_now_ms)
+LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 
 # ---- inputs --------------------------------------------------------------------
 [ -n "$BRIEF" ] || die "brief file required (see --help)"
@@ -181,6 +201,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   elif any((.rules // [])[]; (profiles(.use) | length) == 0) then "each rule needs at least one use profile"
   elif any((.rules // [])[]; has("approval") and .approval != "captain") then "approval must be \"captain\" when present"
   elif any((.rules // [])[]; has("min_confidence") and ((.min_confidence | type) != "number" or .min_confidence < 0 or .min_confidence > 1)) then "min_confidence must be a number from 0 through 1 when present"
+  elif has("task_horizon_minutes") and ((.task_horizon_minutes | type) != "number" or .task_horizon_minutes <= 0) then "task_horizon_minutes must be a positive number when present"
   elif any((.rules // [])[]; has("select") and ((.select | type) != "string" or (.select | length) == 0)) then "select must be a non-empty string"
   elif any((.rules // [])[]; has("select") and .select != "quota-balanced") then
     "unknown select: " + ([.rules[] | select(has("select") and .select != "quota-balanced") | .select] | unique | join(", "))
@@ -226,10 +247,40 @@ done < <(jq -r '
 
 RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
 
+# Response model text is untrusted: only numeric Jev version ids are reported.
+JEV_MODEL_ID_JQ='
+  def jev_model_id:
+    if type == "string" and length <= 80 and test("\\Ajev-[0-9]+(\\.[0-9]+)*\\z")
+    then . else null end;'
+
+# Append diagnostics to both success and error results without changing routing.
+# Read only validated metadata; API errors can echo the key or private brief.
+emit_telemetry() {
+  local end total local_ms
+  end=$(fm_timing_now_ms)
+  total=$(( end - RUN_T0 ))
+  [ "$total" -ge 0 ] || total=0
+  local_ms=$(( total - ${LAT_MS/null/0} - ${QUOTA_MS/null/0} ))
+  [ "$local_ms" -ge 0 ] || local_ms=0
+  printf '  timings: api_ms=%s quota_ms=%s local_ms=%s total_ms=%s\n' \
+    "$LAT_MS" "$QUOTA_MS" "$local_ms" "$total"
+  if [ "$RESPONSE_VALID" -eq 1 ]; then
+    jq -r --argjson price "$TS_INPUT_USD_PER_MILLION" "$JEV_MODEL_ID_JQ"'
+      def count: if type == "number" and . >= 0 and . == floor then . else null end;
+      (.usage.input_tokens | count) as $input |
+      (.usage.output_tokens | count) as $output |
+      "  usage: input_tokens=\($input) output_tokens=\($output) jev_cost_usd=\(if $input == null then null else $input * $price / 1000000 end) jev_input_usd_per_million=\($price) returned_model=\(.model | jev_model_id)"
+    ' "$RESP_FILE" 2>/dev/null || true
+  else
+    printf '  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=%s returned_model=null\n' "$TS_INPUT_USD_PER_MILLION"
+  fi
+}
+
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
+  emit_telemetry
   exit 0
 }
 
@@ -355,7 +406,6 @@ if [ -n "$SECTIONS" ]; then
 else
   cp "$SEND_TEXT" "$TASK_TEXT" || die "could not read brief: $BRIEF"
 fi
-LAT_MS=null
 command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
     --arg none_criterion "$DEFAULT_WHEN" --slurpfile rules "$RULES" '
@@ -373,14 +423,18 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
       }
     }')
   never_send_check
-  T0=$(fm_timing_now_ms)
-  HTTP=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code}' \
+  curl_rc=0
+  CURL_WRITE=$(printf '%s' "$REQUEST" | curl -sS --max-time "$TS_TIMEOUT" -o "$RESP_FILE" -w '%{http_code} %{time_total}' \
     -X POST "$TS_BASE/v1/systemone" -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
-    --data-binary @- 2>/dev/null) || HTTP=000
-  T1=$(fm_timing_now_ms)
-  LAT_MS=$(( T1 - T0 ))
-  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms: $(head -c 200 "$RESP_FILE" 2>/dev/null | tr '\n' ' ')"
+    --data-binary @- 2>/dev/null) || curl_rc=$?
+  HTTP=${CURL_WRITE%% *}
+  [ "$curl_rc" -eq 0 ] || HTTP=000
+  LAT_MS=null
+  case "$CURL_WRITE" in
+    *' '*) LAT_MS=$(fm_timing_seconds_ms "${CURL_WRITE#* }") || LAT_MS=null ;;
+  esac
+  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
     (.answers.rule.choice | type) == "string" and
@@ -395,15 +449,23 @@ jq -e --slurpfile rules "$RULES" '
        (.usage.input_tokens | type) == "number" and
        (.usage.output_tokens | type) == "number"))' \
   "$RESP_FILE" >/dev/null 2>&1 || emit_error "response is not a rule Choice answer"
+RESPONSE_VALID=1
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
 command -v quota-axi >/dev/null 2>&1 || emit_error "quota-axi not installed"
-quota-axi --json > "$QUOTA" 2>/dev/null || emit_error "quota-axi --json failed"
+fm_quota_axi_compatible || emit_error "quota-axi requires >= $FM_QUOTA_AXI_MIN; installed version is older, unreadable, or unparseable"
+Q0=$(fm_timing_now_ms)
+quota_rc=0
+quota-axi --json > "$QUOTA" 2>/dev/null || quota_rc=$?
+Q1=$(fm_timing_now_ms)
+QUOTA_MS=$(( Q1 - Q0 ))
+[ "$QUOTA_MS" -ge 0 ] || QUOTA_MS=0
+[ "$quota_rc" -eq 0 ] || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
-  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ"'
+  --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   def prov($p; $lane): quota_row($q; $p; $lane);
@@ -430,8 +492,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
-  def evaluate($c):
-    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+  def horizon_seconds: (($cfg.task_horizon_minutes // 240) * 60);
+  def runway_class($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "through_reset" then "ok"
+    elif $s == "projected_exhaustion" and ($row.runway.projectionConfidence // "") == "established"
+      and (($row.runway.usableRunwaySeconds | type) == "number") then
+      (if $row.runway.usableRunwaySeconds < horizon_seconds then "short" else "ok" end)
+    else "warn" end;
+  def runway_note($row):
+    ($row.runway.status // "unknown") as $s |
+    if $s == "projected_exhaustion" then
+      "projected_exhaustion at \($row.scope) (usableRunwaySeconds=\($row.runway.usableRunwaySeconds // "unknown") projectionConfidence=\($row.runway.projectionConfidence // "unknown"))"
+    else "\($s) at \($row.scope)" end;
+  def assess($c; $p; $lane):
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
       {profile: $c, provider: $p, eligible: true, unranked: true,
@@ -442,18 +516,18 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       (applicable($p; $lane; ($c.model // ""))) as $rows |
       (evidence($rows)) as $bounds |
       (floor_state($c.floor; $p; $lane)) as $profile_floor_state |
-      if any($rows[]; (.runway.status // "") == "exhausted_now") then
-        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
-      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
-        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
-      elif $profile_floor_state == "below" then
+      if $profile_floor_state == "below" then
         ([rows($p; $lane)[] | select(
           .scope == $c.floor.scope and
           .effectivePercentRemaining < $c.floor.min_percent
         )] | first) as $floor_row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
+      elif any($rows[]; (.runway.status // "") == "exhausted_now") then
+        ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, reason: "runway exhausted_now at \($bad.scope)"}
+      elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
+        ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}
@@ -474,6 +548,22 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
          spendPriority: $limiting.selection.spendPriority, runway: $limiting.runway.status, eligible: true, reason: "ok"}
       end
     end;
+  def evaluate($c):
+    (provider_of($c)) as $p | (lane_of($c)) as $lane |
+    (assess($c; $p; $lane)) as $base |
+    (if $p == null then [] else applicable($p; $lane; ($c.model // "")) end) as $rows |
+    ($base.eligible and (($base.unranked // false) | not)) as $ranked |
+    ($c.harness == "omp" and $p == "codex") as $pooled |
+    ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
+    any($rows[]; runway_class(.) == "short") as $short |
+    if $pooled and floor_state($c.floor; $p; $lane) == "below" then $base
+    elif $pooled and ($base.eligible | not) then
+      {profile: $c, provider: $p, eligible: true, unranked: true,
+       reason: "omp Codex account pool is only lower-bounded by its visible account (\($base.reason))"}
+      + (if ($risks | length) > 0 then {warning: ($risks | join("; "))} else {} end)
+    elif $ranked and ($risks | length) > 0 then
+      $base + {warning: ($risks | join("; ")), short: $short}
+    else $base end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
       ($c | ltrimstr("rule_") | tonumber) as $n |
@@ -514,7 +604,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
    else {source: $choice, use: profiles($rule.use), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
-    model: $r.model, latency_ms: $lat, tokens: ($r.usage // null),
+    model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
     rule: $picked,
     rule_when: when_of($picked),
     confidence: $a.confidence, probabilities: $a.probabilities
@@ -538,6 +628,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       ($elig | max_by(.spendPriority)) as $best |
       ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
       if $ties > 1 then $ev + {status: "escalate", reason: "genuine spendPriority tie", note: $sel.note, candidates: $cands}
+      elif $best.short then
+        $ev + {status: "escalate", reason: "highest-ranked candidate \($best.profile.harness):\($best.profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
       else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $best}
         + (if ($unranked | length) > 0 then
              {unranked_note: "\($unranked | length) eligible candidate(s) unranked (\([$unranked[].provider] | unique | join(", ")))"}
@@ -563,9 +655,11 @@ TEXT=$(jq -r '
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
-      + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)),
+      + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
+      + (if .warning then " [warning: \(.warning | flat)]" else "" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
+emit_telemetry
 exit 0

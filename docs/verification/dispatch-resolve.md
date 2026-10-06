@@ -109,11 +109,32 @@ It proves the key is absent from child environments, never appears on `curl` arg
 It proves the request uses the fixed endpoint and model, carries only the project, the brief's task sections read by the shared brief-heading parser with a scout line only for a scout brief and never a ship brief's delivery mode (or the whole brief when it has neither section), and rule Choice with one option per rule plus the fixed neutral none option, and never carries `why`, `use`, or quota.
 It proves a declared `min_confidence` is checked against the rule's own probability both as the pick and as a runner-up, a picked rule below it falls to the most probable runner-up that clears its floor, is `ambiguous` when none does or two tie, and that a file without declared floors keeps the global 0.6 floor on confidence unchanged.
 It proves the clear, fixed-floor ambiguous with candidate evidence, escalate (approval with candidate evidence, unverifiable rule floor, tie, nothing rankable), known rule-floor fall-through, known and unverifiable profile-floor evidence, explicit-provider and provider-ID enforcement, authoritative Agy and explicit-provider Gemini routing, partial providers, eligible unranked candidates and their clear-result note, concrete quota vetoes and profile-floor shortfalls taking precedence over uncertainty, account-wide quota veto, limiting-bound ranking, schema-6 account-row binding with schema-5 compatibility, missing-curl and quota-axi failures, HTTP 429 and 500, transport failure, malformed usage, zero-mass or malformed probabilities or confidence, malformed or duplicate profile, invalid selector, removed-option rejection, and out-of-range rule ID paths behave as the contract states, with configuration errors exiting 2 before any network call.
-`tests/fm-bootstrap.test.sh` proves bootstrap ignores resolver-only fields without the typed key, validates each malformed shape when the environment or home `.env` activates typed resolution, and prevents an environment-provided key from reaching child processes.
+It proves runway is judged against the task horizon: an `established` projection shorter than the default 240-minute or a declared `task_horizon_minutes` horizon on any applicable bound of the highest-ranked candidate (including a non-limiting exact-model bound) escalates with no profile, while `through_reset`, an established projection covering the horizon (including exactly at it), an `early` or absent-confidence projection, and `unknown` runway clear with any non-passing bound named in a candidate warning; `exhausted_now` vetoes every candidate outside the `omp` Codex pool; a short winner is never replaced by a lower-ranked candidate in its rule, another rule, or the default array; and the horizon is never sent to the model.
+It proves an `omp` Codex pool ranks on its visible account through the same task-horizon classification (through-reset, established covering, early, and unknown readings clear, and an established short reading escalates rather than falling back to a lower-ranked candidate), an exhausted visible reading leaves the pool eligible but unranked with its warning and no veto, and a declared profile-floor shortfall still makes the pool not eligible.
+It proves an absent OpenRouter row and a credit-only OpenRouter row stay eligible but unranked, and that an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot is taken.
+It checks stage accounting in a successful call with known API and quota durations, API time from curl's own transfer time, and unknown API timing when curl reports none.
+It checks millisecond epoch stamps without `EPOCHREALTIME`; when Bash on PATH exposes that builtin, it also checks that the fast path starts no Perl.
+It checks that missing usage stays unknown rather than zero and a quota failure keeps the paid call's cost and returned Jev version.
+It checks that telemetry on clear and quota-error results, the `model:` line on clear results, and HTTP errors never echo the key, brief text, or arbitrary response model text.
+`tests/fm-bootstrap.test.sh` proves bootstrap ignores resolver-only fields without the typed key, accepts a positive `task_horizon_minutes` and rejects a nonpositive one, validates each malformed shape when the environment or home `.env` activates typed resolution, and prevents an environment-provided key from reaching child processes.
 
 ```console
 $ bash tests/fm-dispatch-resolve.test.sh | tail -1
 # all fm-dispatch-resolve tests passed
 ```
 
-A live run needs a key and is not part of the suite; rerun the table above by pointing the tool at a brief with the key injected for that one command.
+## Runway calibration replay
+
+Replayed 2026-09-30 offline, with no new model or quota call, from frozen inputs rather than fresh live quota: the recorded Jev answers for four real firstmate ship briefs, a `quota-axi --json` snapshot generated 2026-09-30T17:30:58.104Z, and a read-only copy of the live rules file.
+All four answers matched a rule whose only profile is an `omp` Codex-pool profile, at confidences 0.79, 0.92, 0.78, and 0.93.
+The snapshot's one Codex row read 60% remaining, `projected_exhaustion`, `usableRunwaySeconds` 80796 (about 22 hours), and `projectionConfidence` `early`.
+
+| Snapshot | clear | escalate |
+| --- | --- | --- |
+| Frozen snapshot as generated (early projection, 80796 seconds) | 4 | 0 |
+| Same snapshot with an `established` projection of 3600 seconds | 0 | 4 |
+
+Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, because early confidence is warning-only regardless of projected duration.
+Each escalation named the `omp` profile as the highest-ranked candidate with established runway shorter than the 240-minute task horizon and emitted no profile.
+
+A live run needs a key and is not part of the suite; rerun the live rule-match tables above by pointing the tool at a brief with the key injected for that one command.
