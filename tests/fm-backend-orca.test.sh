@@ -528,7 +528,8 @@ test_spawn_preserves_orca_metadata_when_pathless_worktree_cleanup_fails() {
 }
 
 test_spawn_writes_orca_metadata_and_launches_harness() {
-  local proj wt data state config id out log staged launch
+  local proj wt data state config id out log staged launch fakebin env_log arg i dir found permissions=0
+  local -a argv expected_dirs add_dirs
   id="orcaspawnz1"
   proj="$TMP_ROOT/spawn-project"
   wt="$TMP_ROOT/spawn-wt"
@@ -564,9 +565,40 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
   [ -n "$staged" ] && [ -f "$staged" ] \
     || fail "spawn did not send Orca a readable staged launch command"
   launch=$(cat "$staged")
-  add_dirs="--add-dir '$(cd "$state" && pwd -P)/operational-inbox' --add-dir '$(cd "$state" && pwd -P)/$id.inbox' --add-dir '$(cd "$data" && pwd -P)/$id' --add-dir '$(cd "$ROOT" && pwd -P)/.agents/skills'"
-  assert_contains "$launch" "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $add_dirs --settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
-    "the staged launch sent through Orca did not select the Claude harness"
+  fakebin="$TMP_ROOT/spawn-claude-probe"
+  env_log="$TMP_ROOT/spawn-claude.env"
+  mkdir -p "$fakebin"
+  fm_fake_claude_recording "$fakebin"
+  fm_eval_launch "$launch" "$wt" "$fakebin" HOME="$SPAWN_HOME" \
+    FM_FAKE_CLAUDE_ENV_LOG="$env_log" \
+    || fail "the staged launch sent through Orca failed to execute"
+  argv=()
+  while IFS= read -r -d '' arg; do argv+=("$arg"); done < "$env_log.args"
+  add_dirs=()
+  for ((i = 0; i < ${#argv[@]}; i++)); do
+    case "${argv[$i]}" in
+      --dangerously-skip-permissions) permissions=1 ;;
+      --add-dir) add_dirs+=("${argv[$((i + 1))]:-}") ;;
+    esac
+  done
+  [ "$permissions" -eq 1 ] || fail "the staged Orca Claude launch did not receive permission bypass"
+  expected_dirs=(
+    "$(cd "$state" && pwd -P)/operational-inbox"
+    "$(cd "$state" && pwd -P)/$id.inbox"
+    "$(cd "$data" && pwd -P)/$id"
+    "$(cd "$ROOT" && pwd -P)/.agents/skills"
+  )
+  for dir in "${expected_dirs[@]}"; do
+    found=0
+    for arg in "${add_dirs[@]}"; do
+      if [ "$arg" = "$dir" ]; then found=1; fi
+    done
+    [ "$found" -eq 1 ] || fail "the staged Orca Claude launch did not allow directory $dir"
+  done
+  assert_grep "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false" "$env_log" \
+    "the staged Orca Claude launch did not disable prompt suggestions"
+  assert_grep "CLAUDE_CODE_SEND_FEEDBACK=0" "$env_log" \
+    "the staged Orca Claude launch did not disable feedback"
   rm -rf "/tmp/fm-$id" "$(dirname "$staged")"
   pass "fm-spawn.sh --backend orca: reuses implicit terminal, records metadata, launches harness"
 }

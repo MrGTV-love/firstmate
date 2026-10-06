@@ -81,6 +81,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A ship or scout relaunch requires `--note`, because the replacement inherits the local copy but none of the conversation; the note is appended to the instructions it reads.
    A secondmate relaunch does not require one and never rewrites its standing charter.
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
+   Before the stop, a Claude replacement must pass the [Claude API key guard](configuration.md#claude-api-key-guard), so a relaunch whose replacement an Anthropic credential would reach refuses while the old agent and its instructions are untouched.
    The exit verb writes `state/<id>.control-exit` bound to the busy generation before it types the exit command.
    A known non-delivery (`send-failed`) removes that marker before refusing; this includes the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
    A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait, and `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads it.

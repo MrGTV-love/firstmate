@@ -925,7 +925,7 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
-With no file, ambient inheritance remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+With no file, ambient inheritance remains unfiltered except for harness-specific shedding, including the [Claude API key guard](#claude-api-key-guard); the provider, long-lived terminal daemon, and shell initialization determine the remaining inherited variables.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -977,7 +977,7 @@ Choose the minimum additions for the authentication method actually in use:
 ### Validation and security limits
 
 Verify the selected provider login and Git transport after opting in; Firstmate does not infer credentials from model names or install a secret manager.
-Raw launch commands run under noninteractive POSIX `sh` with this option and must use compatible syntax.
+Raw launch commands run under noninteractive POSIX `sh` and must use compatible syntax when this option is enabled, or when a Claude launch sheds credentials under the [Claude API key guard](#claude-api-key-guard) (without `--allow-api-key` or with a worker account pin).
 
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
 This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
@@ -1016,7 +1016,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-The same guard applies to raw launch commands whose harness resolves to `claude`.
+A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.
@@ -1029,8 +1029,11 @@ The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
 The same pin and allowlist exemptions apply.
 Variables that the pane shell's rc files or a direnv `.envrc` export after the window opens are not detected.
+Before stopping a worker, `fm-control.sh relaunch` checks the replacement harness, account pin, launch allowlist, and tmux environment against the same guard.
+A non-opt-in Claude launch also unsets both Anthropic credential variables before executing the entire launch expression, including every command in a compound raw launch, so keys captured by an existing pane cannot reach Claude even though the preflight cannot inspect that pane's private environment.
+Worker account pins likewise apply their credential shedding and selected account to the entire launch expression, even when `--allow-api-key` is passed or the launch allowlist retains either credential.
 
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the guard mechanics and `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
+[`bin/fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) owns the guard mechanics shared by `fm-spawn.sh` and `fm-control.sh`, and [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the `--allow-api-key` flag, with focused regression coverage in [`tests/fm-spawn-claude-api-key-guard.test.sh`](../tests/fm-spawn-claude-api-key-guard.test.sh).
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
