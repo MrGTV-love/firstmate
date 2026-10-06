@@ -34,10 +34,10 @@ Establish it from the tool's discovery surface and `quota-axi auth --json` per-p
 ## Discovery
 
 Treat model and provider knowledge as current discovery, not a permanent namespace or mapping.
-Use the selected tool reference's authoritative surface in the current authenticated environment because availability changes by version, account, and configuration.
+Use the selected tool reference's authoritative surface in the effective worker's authenticated environment because availability changes by version, account, and configuration.
 
 For an unfamiliar namespace, establish support and provider identity from that harness's CLI help, model listing, or current documentation.
-An account-reaching listing that omits a model is concrete unsupported evidence; block the candidate and quote it.
+Catalog verdicts follow the [fleet model-index evidence boundary](../../../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
 An unreachable surface establishes nothing; report uncertainty instead of a verdict.
 
 For a matched profile array, return to `quota-array-dispatch` only after establishing every candidate's harness support, provider relationship, and uncertainty.

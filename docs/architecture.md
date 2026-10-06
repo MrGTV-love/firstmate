@@ -315,9 +315,9 @@ The intake and authority contract in `AGENTS.md` owns when separate scout resear
 ## Dispatch profiles
 
 Crewmate and scout dispatch can stay on the static crewmate harness resolved by `config/crew-harness`, or it can use local dispatch profiles in `config/crew-dispatch.json`.
-Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing concrete launch axes to `fm-spawn.sh`.
+Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing the selected profile to `fm-spawn.sh` under the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson).
 Bootstrap and spawn validate configuration and verified harness/effort combinations; the optional [typed resolver](configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns its documented rule-matching and deterministic profile-selection boundary.
-The session-start bootstrap step keeps valid dispatch configuration silent unless verbose facts are enabled and surfaces a concise invalid-config line when validation fails.
+The [dispatch configuration owner](configuration.md#crew-dispatch-profiles-configcrew-dispatchjson) documents bootstrap validation and diagnostics.
 When the file exists, `fm-spawn.sh` refuses crewmate and scout launches without an explicit harness, so `config/crew-harness` is only automatic when no dispatch profile file is active.
 Secondmate launches are exempt because they resolve the secondmate harness and any optional secondmate model or effort tokens instead.
 Unsupported effort values are still recorded in task meta when passed to `fm-spawn.sh`, but the launch template omits any effort flag that the selected harness does not accept.

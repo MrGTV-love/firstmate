@@ -69,7 +69,7 @@ Outside those documented mappings, deterministic shell must not infer a provider
 You establish the remaining relations yourself, in the open, from the candidate's own authoritative catalog (`harness-adapters` owns the per-harness discovery surface) plus the one intake snapshot.
 
 Confirm the catalog lists the candidate's model and record the provider family it reports.
-A model the catalog does not list is concrete contradictory evidence: block that candidate and quote the catalog result.
+Apply the [fleet model-index catalog-evidence boundary](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson) before treating an omitted model as contradictory evidence; block a proven-unsupported candidate and quote the authoritative catalog result.
 Apply quota at the granularity the vendor actually supplies.
 A provider-level or `all_models`/`all_products` scope bounds every model you established in that family within the candidate's matched account, including one with no window of its own.
 A named-model or named-product scope is an additional bound for that model alone.

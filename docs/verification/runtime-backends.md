@@ -71,7 +71,8 @@ ok - agy 1.2.14: catalog id accepted; absent id refused
 ```
 
 Refresh with `bash bin/fm-test-run.sh tests/fm-model-index-live-e2e.test.sh` after a harness upgrade.
-An absent executable is reported explicitly; an installed adapter's malformed catalog or accepted absent id fails with its harness and version.
+An absent executable is reported explicitly; an adapter whose own listing yields no model is skipped by default but fails with its harness and version when the guard is explicitly enabled.
+Once a listed model is available, an unreadable adapter catalog or an accepted absent id fails with its harness and version.
 
 ## Harness detection precedence
 
