@@ -150,7 +150,7 @@ append() {
   printf '%s\n' "$line" >> "$LEDGER"
 }
 
-# The status-line grammar belongs to bin/fm-classify-lib.sh; this only projects it.
+# The status-line grammar belongs to bin/fm-status-decision-lib.sh; this only projects it.
 append_status() { # <task> <status-line>
   local task=$1 line=$2 verb key text
   status_line_verb "$line" verb

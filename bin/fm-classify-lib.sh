@@ -1,31 +1,25 @@
 #!/usr/bin/env bash
-# Shared wake classifier: the common source of truth for captain-relevant status
-# tests, declared-external-wait vocabulary, and the working/paused absorb
-# classification that makes no-verb signal and stale-pane wakes safe to absorb.
+# Shared wake classifier composing the status APIs below with working/paused
+# absorb classification, which makes no-verb signal and stale-pane wakes safe
+# to absorb.
 # Sourced by BOTH the always-on watcher
 # (bin/fm-watch.sh) and the away-mode daemon (bin/fm-supervise-daemon.sh) so the
 # overlapping triage policy lives in one place instead of two copies that can
 # drift apart.
+#
+# Status contracts have separate owners: fm-status-record-lib.sh owns emission
+# metadata and retry identity; fm-status-decision-lib.sh owns keyed folds and
+# line parsing; fm-status-event-lib.sh owns event vocabulary and declared waits;
+# fm-status-io-lib.sh owns file reads, identity, and marker parsing;
+# fm-status-wake-lib.sh owns span classification, reported-state markers, and append ledgers;
+# fm-utc-lib.sh owns portable UTC parsing. This classifier composes those APIs
+# with crew-state reconciliation and absorb policy.
 #
 # Most functions are pure, side-effect-free reads of status files: each takes
 # what it needs as arguments and touches no globals beyond the optional
 # FM_CAPTAIN_RE override. Consumers layer their own dedup/marker state on top (the
 # daemon keeps its escalation-digest seen-markers; the watcher keeps its .seen-*
 # signatures).
-# Status-span classification captures one file endpoint and reports every
-# actionable event through that endpoint before the endpoint may be committed.
-# An absent status file is a successful empty span, while an existing status
-# object that cannot be read or identified is a classification failure with no
-# committable endpoint.
-# A presentation marker independently stores the last reported file signature
-# and the last successfully classified position.
-# Successful classification advances both facts through the captured endpoint;
-# after a failure is reported, only the reported signature advances, so the same
-# observed state alarms once while every unclassified byte remains for recovery.
-# The reported signature includes path type, mode, symlink target, and observable
-# failure kind, so a readability change is a new state that triggers another read.
-# A missing, malformed, identity-mismatched, or past-end classified position reads
-# from byte 0, preferring a bounded duplicate over a lost event.
 #
 # There are four documented exceptions. The absorb classification
 # (crew_absorb_class and its working/paused wrappers) is NOT a pure status-file
@@ -38,8 +32,8 @@
 # cursor and folded open-set as a side effect, so a per-drain fleet-wide scan
 # stays bounded by new appends instead of re-reading each task's whole lifetime
 # log every time. status_home_appends_record writes the per-task home-owned
-# append ledger (see "home-owned status-append ledger" below) so the wake scan
-# can treat this home's own bookkeeping bytes as already owned.
+# append ledger documented in fm-status-wake-lib.sh so the wake scan can treat
+# this home's own bookkeeping bytes as already owned.
 # crew_worktree_written_since reads the task's meta file and walks a bounded slice
 # of its worktree instead of a status file, so callers run it only at the moment
 # they would otherwise escalate.

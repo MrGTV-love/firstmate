@@ -288,7 +288,7 @@ if [ "$(uname)" = Darwin ]; then
 else
   stat_mtime() { stat -c %Y "$1" 2>/dev/null; }
 fi
-# bin/fm-classify-lib.sh owns status reported-state signatures and presentation
+# bin/fm-status-wake-lib.sh owns status reported-state signatures and presentation
 # markers, while bin/fm-wake-lib.sh owns their wake-facing routing, the legacy
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
@@ -2178,7 +2178,7 @@ run_check_capture() {
 
 # 0 when any signaled status file carries a captain-relevant event in the bytes
 # appended since this watcher last classified it. The start offset is the
-# classified-position field in that file's .seen-* marker, and fm-classify-lib.sh's
+# classified-position field in that file's .seen-* marker, and fm-status-wake-lib.sh's
 # status-span contract owns both that format and what counts as actionable in
 # the span. Reading the SPAN rather than the last line is what stops a later
 # routine append - a `working:` note landing inside SIGNAL_GRACE below - from

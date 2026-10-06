@@ -159,7 +159,7 @@
 # worker writing a matching resolved line. For ordinary keys the payload is
 # "resolved [key=<key>]: answered: <capped excerpt>" before the emission-time
 # handling owned by bin/fm-status-record-lib.sh. A reserved key
-# (pending-reply-* today; bin/fm-classify-lib.sh's reserved-key guard) is
+# (pending-reply-* today; bin/fm-status-decision-lib.sh's reserved-key guard) is
 # closed with the owning library's vocabulary note
 # (fm_pending_reply_close_note_for_key / fm_pending_reply_resolved_note), so
 # the fold actually drops it; a bare answered: note is not a reserved-key
@@ -196,7 +196,7 @@
 # the status ledger alone can no longer close.
 #
 # Each named key must therefore currently be open in ONE of the two ledgers: open
-# in this home's status log per status_open_decisions (bin/fm-classify-lib.sh), or
+# in this home's status log per status_open_decisions (bin/fm-status-decision-lib.sh), or
 # a still-open captain-held task resolved as above. A key in neither is refused
 # before sending, so a mistyped key cannot deliver an answer while silently
 # orphaning the decision. A failed or unconfirmed send never closes a key; a

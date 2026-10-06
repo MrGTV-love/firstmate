@@ -688,7 +688,7 @@ Other tests remain where they were:
 `tests/fm-watch-triage.test.sh` covers `bin/fm-watch.sh`'s side of the contract end to end:
 
 - Needs-decision, no-verb captain-held, and pending-reply second-mate escalation signal rows are marked `needs-decision:`.
-- A needs-decision whose key transition was rejected by the reserved-key vocabulary (`fm-classify-lib.sh`'s `reconciliation-required:` wrapper) is still marked.
+- A needs-decision whose key transition was rejected by the reserved-key vocabulary (`fm-status-wake-lib.sh`'s `reconciliation-required:` wrapper) is still marked.
 - Ordinary blocked or captain-relevant signals stay unmarked.
 
 ### Live guards

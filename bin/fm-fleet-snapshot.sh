@@ -61,7 +61,7 @@
 #     age derived from it is published here. A future event time leaves that age
 #     unknown rather than clamped to zero.
 #     hints.open_decisions is the keyed open-decision set returned by
-#     fm-classify-lib.sh's authoritative status_open_decisions fold and reconciled
+#     fm-status-decision-lib.sh's authoritative status_open_decisions fold and reconciled
 #     against current_state; hints.pending_decision and hints.blocked_event are
 #     booleans derived from that set.
 #     endpoint.exists is the cheap local backend endpoint-presence read.
@@ -797,7 +797,7 @@ task_json_lines() {
     )
 
     # Durable keyed open-decision set: fold the WHOLE status stream
-    # (fm-classify-lib.sh's status_open_decisions) so a later unrelated event can
+    # (fm-status-decision-lib.sh's status_open_decisions) so a later unrelated event can
     # never mask a still-open captain decision. The set is derived purely from the
     # keyed fold - never from report bodies or decision-like prose - and then
     # reconciled against the crew LIFECYCLE, which only clears a stale decision the

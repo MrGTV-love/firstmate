@@ -219,7 +219,7 @@ function statusLineVerb(line: string): string {
   return words.filter((word, index) => index === 0 || !/^corr=[0-9a-f]{16}$/i.test(word)).join(" ");
 }
 
-// bin/fm-classify-lib.sh's _fm_status_unstamped: drop every time-tag-shaped
+// bin/fm-status-record-lib.sh's _fm_status_unstamped: drop every time-tag-shaped
 // run before the head ends, so a readable stamp like [at=10:30] cannot move the
 // head/note separator the key and note readers below look for.
 function statusLineUnstamped(line: string): string {
@@ -309,7 +309,7 @@ function nonBlankLines(text: string): string[] {
   return text.split(/\r?\n/).filter((line) => /\S/.test(line));
 }
 
-// bin/fm-classify-lib.sh's _fm_open_decisions_file_ident, which stamps each
+// bin/fm-status-io-lib.sh's _fm_open_decisions_file_ident, which stamps each
 // row of state/.status-presentation-cursor. Any failure throws, and the caller
 // then reads the whole log.
 function statusFileIdentity(path: string): string {

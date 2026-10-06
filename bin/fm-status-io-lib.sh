@@ -9,6 +9,12 @@ _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] 
 _FM_CLASSIFY_UNAME_S=${_FM_UNAME:-$(uname -s 2>/dev/null)}
 
 
+# fm_run_timed supplies the shared hard bound for the worktree write probe in
+# bin/fm-classify-lib.sh. bin/fm-timeout-lib.sh owns bounded execution for this
+# repo, so nothing here re-derives the coreutils/BSD/perl selection. That library
+# declares `set -u` for its own hygiene, which a sourced sibling must not impose on
+# this library's consumers - several of them deliberately run without it - so the
+# caller's setting is restored around the source.
 case $- in *u*) _fm_classify_nounset=on ;; *) _fm_classify_nounset=off ;; esac
 # shellcheck source=bin/fm-timeout-lib.sh
 # shellcheck disable=SC1091

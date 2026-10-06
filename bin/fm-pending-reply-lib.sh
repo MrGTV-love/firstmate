@@ -67,7 +67,7 @@
 #   grace_secs=             bounded grace before recovery is eligible
 #
 # Escalation lifecycle: an escalation is not just a message, it OPENS a durable
-# keyed decision in the parent status log, and bin/fm-classify-lib.sh's fold is
+# keyed decision in the parent status log, and bin/fm-status-decision-lib.sh's fold is
 # the one owner of what closes it. So this library owns both ends of that
 # decision: fm_pending_reply_maybe_escalate opens it under a per-request key, and
 # fm_pending_reply_close_escalation closes it once the record resolves. Resolving
@@ -76,7 +76,7 @@
 # That per-request key lives in a namespace the fold reserves to this library, so
 # no other writer into the same status stream - a local mate appending directly,
 # or a remote mate's mirrored line - can take the key over or clear it; see the
-# reserved-key rule in bin/fm-classify-lib.sh.
+# reserved-key rule in bin/fm-status-decision-lib.sh.
 # The operator-facing close of that same keyed decision is still
 # fm-send --resolve-key (bin/fm-send.sh header): it must speak the close note
 # owned below (fm_pending_reply_resolved_note), because a bare answered: note is
@@ -1058,7 +1058,7 @@ fm_pending_reply_escalation_key() {  # <corr_id>
 }
 
 # Close-note body the reserved-key fold accepts as this library's resolution.
-# The fold's guard (bin/fm-classify-lib.sh _fm_decision_key_transition_allowed)
+# The fold's guard (bin/fm-status-decision-lib.sh _fm_decision_key_transition_allowed)
 # requires the note to begin with this namespace's vocabulary token; this is
 # that token plus the stable task/id/via fields both the record close and the
 # operator --resolve-key path write. Optional <extra> is appended after a space.
@@ -1131,7 +1131,7 @@ fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
 # Close the durable status decision a previous escalation opened for <corr_id>.
 # Idempotent, and safe to retry until it succeeds: it appends the closing line
 # only while that exact keyed decision is still open in
-# bin/fm-classify-lib.sh's fold. Records that never escalated are left untouched.
+# bin/fm-status-decision-lib.sh's fold. Records that never escalated are left untouched.
 fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
   # Serialized per correlation so a resolution and an escalation cannot interleave.
   # bin/fm-wake-lib.sh owns the lock primitives but assigns its own globals when

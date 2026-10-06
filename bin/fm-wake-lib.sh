@@ -2307,7 +2307,7 @@ fm_wake_rows_queued() {  # <seq>...
 # The watcher's per-file signal scan (bin/fm-watch.sh scan_signals) detects a
 # status or turn-ended change by comparing a file signature against a persisted
 # state/.seen-* marker.
-# fm-classify-lib.sh's header owns the status marker contract, including its
+# fm-status-wake-lib.sh's header owns the status marker contract, including its
 # independent reported signature and classified position.
 # These helpers own wake-facing marker routing, the legacy turn-ended signature,
 # drain-time staleness checks, and guarded bookkeeping writes.
@@ -2422,7 +2422,7 @@ fm_wake_status_mark_current() {  # <state> <status-file>
 # pending-reply escalation close, captain-held transfers). Such a close must
 # not wake the session that wrote it, so this appends one command's lines
 # together, records the exact appended byte range in the home-owned append
-# ledger (bin/fm-classify-lib.sh), and then advances the watcher's seen marker
+# ledger (bin/fm-status-wake-lib.sh), and then advances the watcher's seen marker
 # across the appended bytes and no byte this home has not already read. The
 # advance is provenance-gated and fails toward waking:
 #   - the marker advances only when this home already read every pre-append

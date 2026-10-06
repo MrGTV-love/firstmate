@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
+# Status-span classification captures one file endpoint and reports every
+# actionable event through that endpoint before the endpoint may be committed.
+# An absent status file is a successful empty span, while an existing status
+# object that cannot be read or identified is a classification failure with no
+# committable endpoint.
+# A presentation marker independently stores the last reported file signature
+# and the last successfully classified position.
+# Successful classification advances both facts through the captured endpoint;
+# after a failure is reported, only the reported signature advances, so the same
+# observed state alarms once while every unclassified byte remains for recovery.
+# The reported signature includes path type, mode, symlink target, and observable
+# failure kind, so a readability change is a new state that triggers another read.
+# A missing, malformed, identity-mismatched, or past-end classified position reads
+# from byte 0, preferring a bounded duplicate over a lost event.
 
 if ! command -v _fm_status_file_size >/dev/null 2>&1; then
   # shellcheck source=bin/fm-status-io-lib.sh
@@ -284,7 +298,7 @@ status_line_is_unread_surface() {  # <status-line>
 # An identity mismatch (file rotated) discards the ledger. Teardown deletes it.
 # Not a pure status-file read: status_home_appends_record writes this sidecar.
 # That read-merge-write serializes through bin/fm-wake-lib.sh's fm_lock_*
-# helpers, exactly as status_retire_presentation_task above does, so a caller
+# helpers, exactly as status_retire_presentation_task in bin/fm-classify-lib.sh does, so a caller
 # that touches this ledger must have sourced that library first.
 
 status_home_appends_path() {  # <status-file>

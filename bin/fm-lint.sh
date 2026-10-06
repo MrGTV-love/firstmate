@@ -27,6 +27,10 @@
 #     their static source annotations intentionally isolate adapter analysis.
 #     Unresolved runtime imports select possible callers on changed/deleted shell
 #     or known source inputs and disable cache reuse, regardless of annotations.
+#     Discovery recognizes source/. command words, balanced substitutions, and
+#     executable bash/sh -c and program-stdin heredocs. Source annotations remain
+#     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
+#     Quoted child positional arguments are resolved; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis

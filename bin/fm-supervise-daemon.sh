@@ -226,9 +226,8 @@ WEDGE_ALARM_NOTIFIER_PID=
 INJECT_LAST_FAILURE=
 # 1 once the latest delivery attempt reached the submit primitive.
 INJECT_SUBMIT_ATTEMPTED=0
-# The captain-relevant verb set and the status classifiers (last_status_line,
-# status_is_captain_relevant, window_to_task, and the status-span reader) now
-# live in bin/fm-classify-lib.sh, shared with the always-on watcher.
+# The shared classifier's header (bin/fm-classify-lib.sh) identifies the owners
+# of the captain-relevant verb set and status readers used with the watcher.
 # Composer-empty detection, submit acknowledgement, and the harness-scoped
 # supervisor-pane busy guard live in bin/fm-tmux-lib.sh.
 # FM_BUSY_REGEX also overrides Grok's isolated task-state fallback.
@@ -444,7 +443,7 @@ classify_stale() {  # <window> <state> [<span-record> <span-status>]
   declared=$(status_declared_wait_line "$state/$task.status")
   if [ -n "$declared" ] && status_is_paused_or_captain_held "$declared"; then
     # A DECLARED external-wait pause or a verified captain-held transfer
-    # (fm-classify-lib.sh owns which declarations qualify): an idle pane is
+    # (fm-status-event-lib.sh owns which declarations qualify): an idle pane is
     # EXPECTED, so this is not a wedge. The caller records a pause marker (long
     # re-surface cadence in housekeeping) rather than a wedge stale marker. Cheap:
     # a status-file read, no fm-crew-state.sh call, mirroring the

@@ -49,7 +49,7 @@ _FM_CLASSIFY_KEYLESS_PHASE=$'\036default'
 # The optional previous event is what this reader returned before the latest one
 # was appended, so a consumer can name the head it is superseding; asking for it
 # always reads the whole file, since a bounded window cannot bound two events.
-# This is an event read; status_current_line below reconciles open decisions.
+# This is an event read; status_current_line in bin/fm-classify-lib.sh reconciles open decisions.
 last_status_line() {  # <status-file> [<previous-event-var>]
   local f=$1 scan=''
   [ -f "$f" ] && [ -r "$f" ] || return 0

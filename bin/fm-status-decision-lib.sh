@@ -12,7 +12,7 @@ FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
 # --- durable keyed decisions ------------------------------------------------
 #
 # The status stream is an append-only EVENT log. Reading it last-event-wins
-# (last_status_line above) cannot represent "an earlier decision is still open
+# (last_status_line in bin/fm-status-event-lib.sh) cannot represent "an earlier decision is still open
 # after a later, unrelated event": a subsequent done/paused/working line silently
 # masks a still-open needs-decision. status_open_decisions is the ONE authoritative
 # statement of the status-fold contract that fixes this - a needs-decision/blocked
@@ -213,10 +213,10 @@ EOF
 }
 # Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
 # set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
-# rule status_open_decisions documents above. Pure text transform, no file I/O.
+# rule the status-fold contract above documents. Pure text transform, no file I/O.
 # This is the ONE place the per-line open/resolved rule is written; both the
 # whole-file fold (status_open_decisions) and the incremental cursor-backed fold
-# (status_open_decisions_incremental) below call this instead of re-deriving the
+# (status_open_decisions_incremental in bin/fm-classify-lib.sh) call this instead of re-deriving the
 # rule, so the two consumption strategies can never drift apart on semantics.
 # Reserved decision-key namespaces, and the rule that makes them mean something.
 #
@@ -285,7 +285,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # caller's own.
   _fm_status_unstamped "$line" unstamped
   # Declaration guard. A transition's verb ends at a colon, or - in the colonless
-  # form _fm_decision_key still accepts below - at a complete "[key=...]" token.
+  # form _fm_decision_key still accepts above - at a complete "[key=...]" token.
   # A line holding neither is continuation prose, a bare word, or blank, and can
   # never move the set. A `case` glob answers that in one pattern match; the
   # equivalent parameter expansion costs tens of milliseconds per line under bash
@@ -329,7 +329,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # FM_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
-# The scan_open_decisions wrapper below enumerates a whole directory rather than
+# The scan_open_decisions wrapper in bin/fm-classify-lib.sh enumerates a whole directory rather than
 # a single caller-chosen path, so a status file that is itself a symlink (e.g.
 # escaping the state directory) is rejected outright with a plain [ -L ] check
 # before any read - a cheap builtin, unlike fm_wake_latest_event's O_NOFOLLOW
