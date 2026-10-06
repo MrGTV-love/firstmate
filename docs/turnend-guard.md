@@ -120,7 +120,7 @@ The exception has these limits:
 ### Pull-warning verdict by supervision model
 
 `bin/fm-guard.sh`, the pull warning, instead uses the model-aware `fm_watcher_supervision_verdict` from `bin/fm-wake-lib.sh`.
-It needs a different verdict because it fires mid-turn, when the auto-arm model runs no watcher at all.
+It needs a different verdict because it fires mid-turn, when an auto-arm watcher may be absent.
 The verdict depends on the supervision model.
 
 #### Claude Stop auto-arm model
