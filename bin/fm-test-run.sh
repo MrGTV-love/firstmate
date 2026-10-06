@@ -1472,15 +1472,15 @@ families_for_changed_path() {
       printf '%s\n' secondmate
       printf '%s\n' session-bootstrap
       ;;
-    bin/fm-secondmate*|bin/fm-remote*|bin/fm-on.sh|bin/fm-home-seed.sh|\
-    bin/fm-backlog-handoff.sh|bin/fm-backlog-receive.sh|bin/fm-procevent-remote-reply.sh|\
-    bin/fm-config-inherit-lib.sh|bin/fm-shared*|\
-    bin/fm-stow-cascade.sh)
-      printf '%s\n' secondmate
-      ;;
-    bin/fm-config-push.sh)
+    bin/fm-config-inherit-lib.sh|bin/fm-remote-inherit-push.sh|bin/fm-config-push.sh)
       printf '%s\n' secondmate
       printf '%s\n' "__script__:fm-model-index.test.sh"
+      ;;
+    bin/fm-secondmate*|bin/fm-remote*|bin/fm-on.sh|bin/fm-home-seed.sh|\
+    bin/fm-backlog-handoff.sh|bin/fm-backlog-receive.sh|bin/fm-procevent-remote-reply.sh|\
+    bin/fm-shared*|\
+    bin/fm-stow-cascade.sh)
+      printf '%s\n' secondmate
       ;;
     bin/fm-session-start.sh|bin/fm-fleet-sync.sh|\
     bin/fm-sessionstart-nudge.sh|bin/fm-startup-network.sh|bin/fm-tangle*|bin/fm-update.sh|\

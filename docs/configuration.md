@@ -1181,10 +1181,10 @@ The Vernant steward lane owner must also run `FM_HOME="/path/to/lane-home" bin/f
 This read-only comparison writes nothing to Vernant; the command header and `--help` own its registry scanning and refusal semantics.
 `bin/fm-config-push.sh` runs the active-id catalog check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
 The push stages the index and inheritable dispatch document once, validates that staged pair, and sends those same bytes or absences through both local and remote propagation.
-Before either routing file is replaced or removed, local and remote inheritance preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
+Before either routing file is replaced or removed, local and remote inheritance validate the selected source index/dispatch pair offline and preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
 Remote live callers still notify unrelated successfully published inherited changes when a destination pair guard refuses, and pending sends still retry despite that guard.
 When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
-Spawn-time propagation and bootstrap do not run the full check.
+Spawn-time propagation and bootstrap run this offline coherence check, including when the primary removes its index, but do not fetch live catalogs.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
 Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id, under that harness's `config/claude-account` or `config/pi-account` pin when one is set.

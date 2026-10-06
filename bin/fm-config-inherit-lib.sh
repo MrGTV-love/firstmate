@@ -571,14 +571,38 @@ fm_config_inherit_source() {
   printf '%s/%s\n' "$config" "$item"
 }
 
+fm_config_inherit_pair_valid() {
+  local config=${FM_CONFIG_INHERIT_PAIR_DIR:-$1} item src present dispatch=/dev/null
+  for item in model-index.json crew-dispatch.json; do
+    src="$config/$item"
+    present=$(fm_config_source_present "$src") || return 1
+    [ "$present" = 1 ] || continue
+    if [ ! -f "$src" ] || [ ! -r "$src" ]; then
+      printf 'routing source is not a readable regular file: %s\n' "$src" >&2
+      return 1
+    fi
+    [ "$item" != crew-dispatch.json ] || dispatch=$src
+  done
+  FM_CONFIG_OVERRIDE="$config" \
+    "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles "$dispatch" >/dev/null
+}
+
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason=
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
   case " $FM_INHERITABLE_CONFIG " in
     *" model-index.json "*|*" crew-dispatch.json "*)
-      destination_allows_inherited_pair "$dest_config" || pair_allowed=0
+      if ! destination_allows_inherited_pair "$dest_config"; then
+        pair_allowed=0
+        pair_reason=$(inheritable_config_skip_reason)
+      elif pair_reason=$(fm_config_inherit_pair_valid "$src_config" 2>&1); then
+        :
+      else
+        pair_allowed=0
+        rc=1
+      fi
       ;;
   esac
   for item in $FM_INHERITABLE_CONFIG; do
@@ -592,7 +616,7 @@ propagate_inheritable_config() {
     case "$item" in
       model-index.json|crew-dispatch.json)
         if [ "$pair_allowed" = 0 ]; then
-          reason=$(inheritable_config_skip_reason)
+          reason=$pair_reason
           warn_inheritable_config_skip "$item" "$dest_config" "$reason"
           record_inheritable_config_result "$item" skipped "$reason"
           continue

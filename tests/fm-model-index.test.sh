@@ -261,7 +261,8 @@ set_pair_source() {
     both|index-only) cp "$TMP_ROOT/incoming-index.json" "$PAIR_SOURCE/model-index.json" ;;
   esac
   case "$presence" in
-    both|dispatch-only) cp "$TMP_ROOT/incoming-dispatch.json" "$PAIR_SOURCE/crew-dispatch.json" ;;
+    both) cp "$TMP_ROOT/incoming-dispatch.json" "$PAIR_SOURCE/crew-dispatch.json" ;;
+    dispatch-only) printf '%s\n' '{"default":{"harness":"codex","model":"current"}}' > "$PAIR_SOURCE/crew-dispatch.json" ;;
   esac
   printf '%s\n' "$presence" > "$PAIR_SOURCE/dispatch-never-send"
   printf 'retain-trailers\n' > "$PAIR_SOURCE/keep-ai-trailers"
@@ -317,7 +318,7 @@ for guarded in model-index.json crew-dispatch.json; do
           [ ! -e "$guard_home/config/$member" ] || fail 'allowed local pair absence did not converge'
         fi
       done
-      if [ "$presence" = both ]; then
+      if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
         [ "$(FM_HOME="$guard_home" "$TOOL" profiles "$guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
           || fail 'allowed local pair did not reach the destination profiles consumer'
       fi
@@ -359,6 +360,96 @@ for member in model-index.json crew-dispatch.json; do
   done
 done
 pass 'local pair propagation still safely replaces or removes destination symlinks and hardlinks'
+
+COHERENCE_SOURCE="$TMP_ROOT/coherence-source"
+COHERENCE_STAGE="$TMP_ROOT/coherence-stage"
+COHERENCE_CATALOGS="$TMP_ROOT/coherence-catalogs"
+mkdir -p "$COHERENCE_SOURCE/config" "$COHERENCE_SOURCE/data" "$COHERENCE_STAGE" "$COHERENCE_CATALOGS"
+printf '%s\n' '{"models":[{"id":"unrelated-catalog-entry"}]}' > "$COHERENCE_CATALOGS/codex.json"
+printf 'main-authoritative; read-only in secondmate homes; must not be edited there; edit in the main firstmate; document pointer\nshared preferences\n' \
+  > "$COHERENCE_SOURCE/data/captain-shared.md"
+printf 'on\n' > "$COHERENCE_SOURCE/config/trace-context"
+set_incoherent_source() { # <removed-role|missing-index> <source|staged>
+  local failure=$1 selection=$2 selected="$COHERENCE_SOURCE/config"
+  cp "$TMP_ROOT/incoming-index.json" "$COHERENCE_SOURCE/config/model-index.json"
+  cp "$TMP_ROOT/incoming-dispatch.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+  if [ "$selection" = staged ]; then selected=$COHERENCE_STAGE; fi
+  cp "$TMP_ROOT/retained-dispatch.json" "$selected/crew-dispatch.json"
+  case "$failure" in
+    removed-role) printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$selected/model-index.json" ;;
+    missing-index) rm -f "$selected/model-index.json" ;;
+  esac
+  printf '%s\n' "$failure-$selection" > "$COHERENCE_SOURCE/config/dispatch-never-send"
+}
+seed_coherent_destination() {
+  local home=$1
+  mkdir -p "$home/config"
+  cp "$TMP_ROOT/retained-index.json" "$home/config/model-index.json"
+  cp "$TMP_ROOT/retained-dispatch.json" "$home/config/crew-dispatch.json"
+  printf 'prior\n' > "$home/config/dispatch-never-send"
+  printf 'off\n' > "$home/config/trace-context"
+}
+assert_unrelated_coherence_material() { # <destination> <bootstrap|launch>
+  local home=$1 mode=$2 expected_trace=on
+  cmp -s "$COHERENCE_SOURCE/config/dispatch-never-send" "$home/config/dispatch-never-send" \
+    || fail 'incoherent routing pair blocked unrelated config convergence'
+  cmp -s "$COHERENCE_SOURCE/data/captain-shared.md" "$home/data/captain-shared.md" \
+    || fail 'incoherent routing pair blocked shared captain convergence'
+  [ "$mode" != bootstrap ] || expected_trace=off
+  [ "$(cat "$home/config/trace-context")" = "$expected_trace" ] \
+    || fail 'pair coherence changed the live versus launch inheritance mode'
+}
+for boundary_mode in bootstrap launch; do
+  for pair_selection in source staged; do
+    for failure in removed-role missing-index; do
+      coherence_home="$TMP_ROOT/local-coherence-$boundary_mode-$pair_selection-$failure"
+      seed_coherent_destination "$coherence_home"
+      git -C "$coherence_home" init -q
+      printf 'config/\n' > "$coherence_home/.gitignore"
+      set_incoherent_source "$failure" "$pair_selection"
+      : > "$TMP_ROOT/coherence-local-report"
+      boundary_code=0
+      (
+        unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
+        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
+        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_CONFIG_INHERIT_REPORT="$TMP_ROOT/coherence-local-report" \
+          propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$coherence_home"
+      ) > "$TMP_ROOT/coherence-local.out" 2>&1 || boundary_code=$?
+      [ "$boundary_code" = 1 ] || fail "local $boundary_mode accepted $failure from $pair_selection"
+      assert_retained_pair "$coherence_home" "local $boundary_mode $pair_selection $failure"
+      assert_unrelated_coherence_material "$coherence_home" "$boundary_mode"
+      assert_contains "$(cat "$TMP_ROOT/coherence-local.out")" 'role or stand-in not configured: codex:retained' \
+        'local boundary refusal must explain the unresolved retained dispatch role'
+      for member in model-index.json crew-dispatch.json; do
+        assert_contains "$(cat "$TMP_ROOT/coherence-local-report")" "$member"$'\t'"skipped"$'\t' \
+          'local boundary refusal must report both withheld routing members'
+      done
+      selected_pair="$COHERENCE_SOURCE/config"
+      if [ "$pair_selection" = staged ]; then
+        selected_pair=$COHERENCE_STAGE
+        printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$COHERENCE_SOURCE/config/model-index.json"
+        cp "$TMP_ROOT/retained-dispatch.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+      fi
+      cp "$TMP_ROOT/incoming-index.json" "$selected_pair/model-index.json"
+      cp "$TMP_ROOT/incoming-dispatch.json" "$selected_pair/crew-dispatch.json"
+      (
+        unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
+        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
+        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" \
+          propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$coherence_home"
+      ) > "$TMP_ROOT/coherence-local.out" 2>&1 \
+        || fail "local $boundary_mode refused a coherent offline pair: $(cat "$TMP_ROOT/coherence-local.out")"
+      for member in model-index.json crew-dispatch.json; do
+        cmp -s "$selected_pair/$member" "$coherence_home/config/$member" || fail 'local selected coherent pair did not converge'
+      done
+      [ "$(FM_HOME="$coherence_home" "$TOOL" profiles "$coherence_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+        || fail 'local boundary coherent update did not reach the real profiles consumer'
+    done
+  done
+done
+pass 'bootstrap and local launch refuse removed-role and missing-index pairs offline, preserve resolvable destination routing, and honor selected frozen pairs'
 
 # fm-config-push runs the full index check before the index reaches any home.
 fm_git_identity fmtest fmtest@example.invalid
@@ -623,7 +714,7 @@ for guarded in model-index.json crew-dispatch.json; do
           [ ! -e "$remote_guard_home/config/$member" ] || fail 'allowed remote pair absence did not converge'
         fi
       done
-      if [ "$presence" = both ]; then
+      if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
         [ "$(FM_HOME="$remote_guard_home" "$TOOL" profiles "$remote_guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
           || fail 'allowed remote pair did not reach the destination profiles consumer'
       fi
@@ -632,6 +723,62 @@ for guarded in model-index.json crew-dispatch.json; do
   done
 done
 pass 'remote sender and direct receiver guard both pair members for put and absent; refusal preserves unrelated propagation'
+
+for boundary_mode in bootstrap launch; do
+  for pair_selection in source staged; do
+    for failure in removed-role missing-index; do
+      coherence_home="$TMP_ROOT/remote-coherence-$boundary_mode-$pair_selection-$failure"
+      seed_coherent_destination "$coherence_home"
+      mkdir -p "$coherence_home/state"
+      printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+        "$ROOT" "$coherence_home" > "$COHERENCE_SOURCE/data/secondmates.md"
+      set_incoherent_source "$failure" "$pair_selection"
+      boundary_code=0
+      (
+        unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
+        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
+        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
+          FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
+          "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation"
+      ) > "$TMP_ROOT/coherence-remote.out" 2>&1 || boundary_code=$?
+      [ "$boundary_code" = 1 ] || fail "remote $boundary_mode accepted $failure from $pair_selection"
+      assert_retained_pair "$coherence_home" "remote $boundary_mode $pair_selection $failure"
+      assert_unrelated_coherence_material "$coherence_home" "$boundary_mode"
+      assert_contains "$(cat "$TMP_ROOT/coherence-remote.out")" 'skipped: config/model-index.json and config/crew-dispatch.json' \
+        'remote boundary refusal must report both withheld routing members'
+      assert_contains "$(cat "$TMP_ROOT/coherence-remote.out")" 'role or stand-in not configured: codex:retained' \
+        'remote boundary refusal must explain the unresolved retained dispatch role'
+      remote_generation=$((remote_generation + 1))
+      selected_pair="$COHERENCE_SOURCE/config"
+      if [ "$pair_selection" = staged ]; then
+        selected_pair=$COHERENCE_STAGE
+        printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$COHERENCE_SOURCE/config/model-index.json"
+        cp "$TMP_ROOT/retained-dispatch.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+      fi
+      cp "$TMP_ROOT/incoming-index.json" "$selected_pair/model-index.json"
+      cp "$TMP_ROOT/incoming-dispatch.json" "$selected_pair/crew-dispatch.json"
+      (
+        unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
+        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
+        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
+          FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
+          "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation"
+      ) > "$TMP_ROOT/coherence-remote.out" 2>&1 \
+        || fail "remote $boundary_mode refused a coherent offline pair: $(cat "$TMP_ROOT/coherence-remote.out")"
+      for member in model-index.json crew-dispatch.json; do
+        cmp -s "$selected_pair/$member" "$coherence_home/config/$member" || fail 'remote selected coherent pair did not converge'
+      done
+      [ "$(FM_HOME="$coherence_home" "$TOOL" profiles "$coherence_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+        || fail 'remote boundary coherent update did not reach the real profiles consumer'
+      assert_not_contains "$(cat "$TMP_ROOT/coherence-remote.out")" 'skipped: config/model-index.json and config/crew-dispatch.json' \
+        'remote boundary must not report coherent routing as refused'
+      remote_generation=$((remote_generation + 1))
+    done
+  done
+done
+pass 'bootstrap and remote launch refuse incoherent source routing while real receiver convergence continues, and publish valid selected pairs without live catalog checks'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0

@@ -46,12 +46,19 @@ PAIR_ALLOWED=1
 RC=0
 case " $FM_INHERITABLE_CONFIG " in
   *" model-index.json "*|*" crew-dispatch.json "*)
-    if pair_check=$("$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-inherit.sh check \
-      config/model-index.json 0 "$EMPTY_HASH" "$GENERATION" < /dev/null 2>&1); then
-      :
+    if pair_check=$(fm_config_inherit_pair_valid "$CONFIG" 2>&1); then
+      if pair_check=$("$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-inherit.sh check \
+        config/model-index.json 0 "$EMPTY_HASH" "$GENERATION" < /dev/null 2>&1); then
+        :
+      else
+        RC=$?
+        PAIR_ALLOWED=0
+      fi
     else
-      RC=$?
+      RC=1
       PAIR_ALLOWED=0
+    fi
+    if [ "$PAIR_ALLOWED" = 0 ]; then
       printf 'skipped: config/model-index.json and config/crew-dispatch.json (%s)\n' "$pair_check" >&2
     fi
     ;;
