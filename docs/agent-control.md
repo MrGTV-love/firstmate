@@ -50,7 +50,7 @@ muse is the one verified adapter that restores the cancelled prompt back into it
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
-The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, blank-boundary ambiguity, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, blank-boundary ambiguity, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -123,13 +123,17 @@ A ship or scout replacement receives a progress note directing it to reconcile c
 For a local secondmate, the note remains parent-side audit evidence; its unchanged charter and home records supply startup reconciliation.
 An already managed agent is left alone, including on repeated sweeps.
 
-`bin/fm-launch-proof-lib.sh` owns launch attribution.
+### Live Herdr task attribution
+
+`bin/fm-launch-proof-lib.sh` owns launch attribution, and every control-plane path to a live Herdr agent uses one shared positive task-attribution guard before lifecycle input or a task checkpoint, note, or record mutation.
+A recorded endpoint or matching cwd alone never proves live task ownership.
+Managed incarnations and positively attributable recorded bare native restores authorize ordinary interrupt, exit, busy-exit, and relaunch; recovery repairs only the latter and leaves managed launches untouched.
 New Herdr launches on every harness record `launch_proof=env-v1` and put the recorded `spawn_gen` into the agent's `FM_SPAWN_GEN` environment, **not** the persistent pane shell.
 The staged launch runs in a subshell of the destination pane shell, preserving its raw-command syntax without leaking the incarnation into later bare resumes.
 An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
-Readable kernel environment with a matching incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses.
+Readable kernel environment with a nonempty matching recorded incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
 A readable environment with a missing or mismatched incarnation proves unmanaged only for a recorded `harness=omp` with positively attributed native startup provenance.
 The foreground process must have executable basename `omp`, exactly `omp --resume=<file>` argv, and an actual cwd equal to the recorded worktree.
 The resumed native JSONL file must have that same cwd in its session header and an initial user message decoding through the operational-input protocol as `launch-brief`.
@@ -137,11 +141,11 @@ For a ship or scout, that initial body must begin with the complete current work
 For a local secondmate, that initial body must equal the recorded home's standing charter, or the recorded task brief only when that home has no charter, matching the ordinary launch source.
 Neither a generic launch phrase, an inbox path mentioned in unrelated prose, nor a current Herdr session registration supplies this recorded-task provenance.
 Every other recorded harness remains unknown with missing or mismatched pins.
-Foreign processes, personal native sessions, missing actual cwd, unreadable or malformed session files, and ambiguous foreground identity also remain unknown; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
-Older records with no launch-proof field require the same exact bare native startup provenance.
+Foreign processes, personal native sessions, missing actual cwd, unreadable or malformed session files, and ambiguous foreground identity also remain unknown; no control-plane path takes lifecycle action on unknown proof.
+Older records with no launch-proof field require either that matching recorded incarnation or the same exact bare native startup provenance.
 Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove native restoration; no installed-CLI symlink reconstruction is used.
-An ordinary or unproven legacy launch remains unchanged, and a present but unsupported launch-proof field never falls back to legacy recovery.
-After replacement, matching managed-launch proof is required before transaction completion.
+An unproven legacy launch remains unchanged by recovery, and a present but unsupported launch-proof field never falls back to legacy attribution.
+After a recovery replacement, matching managed-launch proof is required before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
 This recovery does not change Herdr's session-wide auto-resume setting.
@@ -233,6 +237,7 @@ The worktree and the task's records are unaffected either way.
   zellij, orca, and cmux are refused rather than reported as successful blind.
 - An ambiguous or unreadable endpoint state refuses.
   Only a positively classified state acts.
+- A live Herdr agent must pass the shared [live task-attribution guard](#live-herdr-task-attribution) before any lifecycle input or task checkpoint mutation.
 - `exit`'s composer-empty check, above, is itself a fail-closed boundary that `relaunch` inherits by stopping the old agent through `exit`.
 - `fm-spawn --relaunch` independently refuses unless the endpoint is positively agent-free - either a surviving `dead` endpoint or one proven gone by the shared absence proof - so a replacement can never join a live agent.
   An `alive`, `ambiguous`, or `unreadable` verdict refuses, as does any endpoint whose absence is unproven.
@@ -256,5 +261,6 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction, positive live Herdr ownership and personal-pane refusals across every lifecycle verb, attributable native restore and bounded copied-home recovery, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr no-server reclaim, refusal of other configured backends, and conservative process-read refusals.
+- `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, exact native startup attribution, and conservative foreground, process-environment, and conversation-provenance refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

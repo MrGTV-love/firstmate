@@ -115,6 +115,17 @@ PARENTS=$(printf '%s 999\n999 1\n2 %s\n' "$PID" "$PID")
 assert_proof managed 'a launcher shell must not hide the marked primary agent'
 INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_process_group_id = 2')
 assert_proof unknown 'a marked child must never authenticate an unreadable foreground leader'
+for harness in $(fm_control_harnesses) claude-custom; do
+  proof_meta "$harness"
+  printf 'spawn_gen=expected\n' >> "$META"
+  process '["node","/installed/agent.js"]' "$PID"
+  assert_proof managed "matching incarnation must attribute a legacy managed $harness launch"
+  proof_meta "$harness"
+  printf 'spawn_gen=different\n' >> "$META"
+  assert_proof unknown "mismatched incarnation must not attribute a legacy $harness interpreter launch"
+done
+proof_meta omp env-v2 expected
+assert_proof unknown 'matching incarnation must not bypass an unsupported proof boundary'
 kill "$PID"; wait "$PID" 2>/dev/null || true
 PID=
 PARENTS=

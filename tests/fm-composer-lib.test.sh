@@ -1153,6 +1153,39 @@ test_gutter_blockers_preserve_omp_literal_ambiguity() {
 }
 test_gutter_blockers_preserve_omp_literal_ambiguity
 
+test_captured_empty_native_roots_preserve_gutter_ambiguity() {
+  local blocker frame screen last caps cursor out
+  for blocker in '│ │' 'π · model' '⠂⠁'; do
+    for frame in $'  ╭── π > model > path ─╮\n  ╰─ ─╯' \
+                 $'  ╭── π > model > path ─╮\n  ╰─  ─╯' \
+                 $'  ╭── π > model > path ─╮\n  │ │\n  ╰─  ─╯' \
+                 '  ❯'; do
+      screen=$'❯\n  '"$blocker"$'\n'"$frame"
+      last=$(printf '%s\n' "$screen" | awk 'END {print NR - 1}')
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "captured empty root with '$blocker' and '$frame'" unknown "$caps" "$screen"
+        assert_extraction_refused "captured empty root with '$blocker' and '$frame'" "$caps" "$screen"
+      done
+      for cursor in 0 1 "$last"; do
+        assert_screen "captured empty root '$blocker' cursor $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor"
+      done
+      screen="$screen"$'\n  ❯\n  tail'
+      assert_screen "captured empty root keeps later prompt and tail ambiguous" unknown "$CAPS_STYLED_NOID" "$screen"
+      assert_screen "captured empty root tail cursor stays ambiguous" unknown "$CAPS_TMUX" "$screen" "$((last + 2))"
+      assert_extraction_refused "captured empty root prompt and tail" "$CAPS_STYLED_NOID" "$screen"
+    done
+  done
+  screen=$'❯\n  │ │\n  ╭── π > model > path ─╮\n  ╰─  ─╯'
+  for screen in "$screen"$'\n❯' "$screen"$'\n$ shell\n  ╭── π > model > path ─╮\n  ╰─  ─╯'; do
+    assert_screen "independent boundary ends captured-root ambiguity" empty "$CAPS_STYLED_NOID" "$screen"
+    out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+      || fail "captured-root independent boundary extraction refused"
+    [ -z "$out" ] || fail "captured-root independent boundary inherited draft: '$out'"
+  done
+  pass "capture-trimmed empty native roots retain gutter-backed draft ambiguity"
+}
+test_captured_empty_native_roots_preserve_gutter_ambiguity
+
 test_bare_draft_owns_indented_compact_omp_literal() {
   local floor screen expected caps cursor out status
   status=' π  · ◔ GPT-6-Astra · 🌳 …-workspace · ⑂ detached · ◫ 15.4%/272K ⟲ · (sub)'

@@ -125,15 +125,20 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   foreground=$(printf '%s' "$candidates" | jq -ec 'select(length == 1) | .[0]') \
     || { printf unknown; return; }
   proof=$(fm_meta_get "$meta" launch_proof)
-  if [ "$proof" = env-v1 ]; then
+  case "$proof" in
+    env-v1|'') ;;
+    *) printf unknown; return ;;
+  esac
+  gen=$(fm_meta_get "$meta" spawn_gen)
+  if [ "$proof" = env-v1 ] || [ -n "$gen" ]; then
     pid=$(printf '%s' "$foreground" | jq -er '.pid
       | select(type == "number" and . > 1) | floor' 2>/dev/null) \
       || { printf unknown; return; }
-    gen=$(fm_meta_get "$meta" spawn_gen)
     verdict=$(fm_launch_proof_pid "$pid" "$gen")
-    [ "$verdict" = unmanaged ] || { printf '%s' "$verdict"; return; }
-  else
-    [ -z "$proof" ] || { printf unknown; return; }
+    case "$verdict" in
+      managed) printf managed; return ;;
+      unknown) [ "$proof" != env-v1 ] || { printf unknown; return; } ;;
+    esac
   fi
   harness=$(fm_meta_get "$meta" harness)
   [ "$harness" = omp ] || { printf unknown; return; }

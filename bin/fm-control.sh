@@ -387,6 +387,12 @@ fm_control_harness_supported "$HARNESS" \
 
 fm_backend_validate "$BACKEND" || exit 1
 
+if [ "$BACKEND" = herdr ]; then
+  # shellcheck source=bin/fm-launch-proof-lib.sh
+  . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+  fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
 # --- shared helpers ---------------------------------------------------------
 
 agent_state() {
@@ -395,6 +401,28 @@ agent_state() {
 
 busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
+}
+
+LIVE_TASK_LAUNCH_PROOF=
+require_live_task_attribution() {
+  local state=${1:-} absence
+  LIVE_TASK_LAUNCH_PROOF=not-required
+  [ "$BACKEND" = herdr ] || return 0
+  [ -n "$state" ] || state=$(agent_state)
+  if [ "$state" = missing ]; then
+    absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+    state=${absence%%$'\t'*}
+  fi
+  case "$state" in
+    dead|gone) return 0 ;;
+    alive) ;;
+    *) return 1 ;;
+  esac
+  LIVE_TASK_LAUNCH_PROOF=$(fm_launch_proof_herdr "$META")
+  case "$LIVE_TASK_LAUNCH_PROOF" in
+    managed|unmanaged) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
@@ -580,6 +608,8 @@ verify_interrupt_running() {
 
 do_interrupt() {
   local proof cancel
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
@@ -639,6 +669,8 @@ do_exit() {
       ;;
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
@@ -1026,26 +1058,23 @@ do_relaunch() {
   require_state_verified_backend relaunch
   if [ "$RECOVER_LAUNCH" = 1 ]; then
     [ "$BACKEND" = herdr ] || die "--recover-launch is supported only for recorded Herdr endpoints"
-    # shellcheck source=bin/fm-launch-proof-lib.sh
-    . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
-    fm_backend_source herdr || die "could not load Herdr launch recovery"
     state=$(agent_state)
     case "$state" in
       dead|missing) echo "recovery-skipped $ID agent=$state"; return 0 ;;
       alive) ;;
       *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
     esac
-    state=$(fm_launch_proof_herdr "$META")
+    if ! require_live_task_attribution "$state"; then
+      if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+        echo "recovery-skipped $ID launch=legacy-unproven"
+        return 0
+      fi
+      die "launch recovery for $ID cannot prove its live launch settings"
+    fi
+    state=$LIVE_TASK_LAUNCH_PROOF
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
       unmanaged) ;;
-      unknown)
-        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
-          echo "recovery-skipped $ID launch=legacy-unproven"
-          return 0
-        fi
-        die "launch recovery for $ID cannot prove its live launch settings"
-        ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac
     if [ -e "$STATE/$ID.backlog-close" ] || [ -L "$STATE/$ID.backlog-close" ]; then
@@ -1092,6 +1121,9 @@ do_relaunch() {
     [ -n "$NEW_EFFORT" ] || NEW_EFFORT=default
     NOTE="Herdr restored the previous agent without Firstmate's launch settings. This relaunch restores the recorded profile in the same local copy and pane, preserving all work. Read the latest task status and instruction inbox before continuing. Respect completed outcomes and outstanding decisions or external waits; do not repeat finished work."
     NOTE_SET=1
+  else
+    require_live_task_attribution \
+      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   fi
   resolve_relaunch_profile
   if [ "$CLAUDE_DEBUG" = 1 ] && [ "$TARGET_HARNESS" != claude ]; then

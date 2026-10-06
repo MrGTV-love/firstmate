@@ -830,7 +830,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" "$pane")
       bare_indent=${bare_line%%[![:space:]]*}
       case "${bare_line#"$bare_indent"}" in
-        '❯ '*)
+        '❯'|'❯ '*)
           case "$indent" in
             "$bare_indent  "*)
               if ! fm_composer_row_has_edge "$trimmed" \
@@ -850,7 +850,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       bare_line=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_BARE_ROW" "$pane")
       bare_indent=${bare_line%%[![:space:]]*}
       case "${bare_line#"$bare_indent"}" in
-        '❯ '*)
+        '❯'|'❯ '*)
           case "$indent" in
             "$bare_indent  "*)
               if _fm_composer_wrap_region_ok "$pane" "$FM_COMPOSER_SCAN_BARE_ROW" "$((row - 1))"; then
@@ -1450,7 +1450,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
             && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
                  || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; }; }; then
       [ "$allow_blank" = 1 ] || return 1
-      case "${root#"$root_indent"}" in '❯ '*) ;; *) return 1 ;; esac
+      case "${root#"$root_indent"}" in '❯'|'❯ '*) ;; *) return 1 ;; esac
       indent=${line%%[![:space:]]*}
       case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
     fi

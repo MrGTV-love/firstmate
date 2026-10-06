@@ -108,6 +108,10 @@ if [ "$#" = 5 ] && [ "$1 $2 $3 $4" = '-Eww -o command= -p' ]; then
     printf '\n'
     exit 0
   fi
+  if [ -f "$D/herdr-managed-env-$pid" ]; then
+    cat "$D/herdr-managed-env-$pid"
+    exit 0
+  fi
 fi
 if [ -f "$D/herdr-agent-registration" ] \
   || { [ -f "$D/recovery-case-id" ] && [ ! -f "$D/herdr-agent-live" ]; }; then
@@ -2349,8 +2353,11 @@ case "${1:-} ${2:-}" in
       printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[]}}}\n' \
         "${4:-}"
     else
-      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
-        "${4:-}"
+      pane=${4:-}
+      case "${pane#%}" in ''|*[!0-9]*) exit 1 ;; esac
+      pid=$((2100000000 + ${pane#%}))
+      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"claude","argv":["claude"],"cmdline":"claude"}]}}}\n' \
+        "$pane" "$pid"
     fi
     exit 0 ;;
   'pane run')
@@ -2374,6 +2381,14 @@ case "${1:-} ${2:-}" in
     fi
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+        if [ ! -f "$D/recovery-case-id" ]; then
+          pane=${3:-}
+          case "${pane#%}" in ''|*[!0-9]*) exit 1 ;; esac
+          pid=$((2100000000 + ${pane#%}))
+          pin_pattern='export FM_SPAWN_GEN=[^[:alnum:]]*([[:alnum:].]+)'
+          [[ "$payload" =~ $pin_pattern ]] || exit 1
+          printf 'PATH=/test FM_SPAWN_GEN=%s\n' "${BASH_REMATCH[1]}" > "$D/herdr-managed-env-$pid"
+        fi
         printf '%s\n' "$payload" > "$D/launched-command"
         : > "$D/herdr-live-${3:-}"
         : > "$D/herdr-agent-live" ;;
@@ -2392,6 +2407,11 @@ case "${1:-} ${2:-}" in
     exit 0 ;;
   'pane send-keys')
     if [ -f "$D/recovery-case-id" ]; then
+      if [ "${4:-}" = escape ] && [ -f "$D/recovery-pending" ]; then
+        case "$(cat "$D/recovery-pending")" in
+          '!'*|'$'*) : > "$D/recovery-pending" ;;
+        esac
+      fi
       if [ "${4:-}" = ctrl+d ] \
         || { [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ]; }; then
         rm -f "$D/herdr-agent-live" "$D/exit-pending"
@@ -3043,6 +3063,17 @@ write_recovery_native_session() { # <path> <cwd> <initial-user-message>
     '{type:"message",message:{role:"user",content:[{type:"text",text:$text}]}}' >> "$1"
 }
 
+write_recovery_native_launch() { # <case-dir> <owning-home> <id> <kind>
+  local dir=$1 home=$2 id=$3 kind=$4 body message
+  if [ "$kind" = secondmate ]; then
+    body=$(cat "$dir/wt/data/charter.md")
+  else
+    body="$(fm_brief_worker_role "$home/state" "$id")"$'\n\n'"$(cat "$home/data/$id/brief.md")"
+  fi
+  fm_operational_input_encode launch-brief "$body" message || fail "could not generate native launch envelope"
+  write_recovery_native_session "$dir/wt/recorded-session.jsonl" "$dir/wt" "$message"
+}
+
 prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   local dir=$1 id=$2 kind=$3
   rm -f "$dir/fake/herdr-stopped"
@@ -3068,15 +3099,142 @@ SH
     printf '# test charter\n' > "$dir/wt/data/charter.md"
     printf 'mode=secondmate\nhome=%s\n' "$dir/wt" >> "$dir/home/state/$id.meta"
   fi
-  local body message
-  if [ "$kind" = secondmate ]; then
-    body=$(cat "$dir/wt/data/charter.md")
-  else
-    body="$(fm_brief_worker_role "$dir/home/state" "$id")"$'\n\n'"$(cat "$dir/home/data/$id/brief.md")"
-  fi
-  fm_operational_input_encode launch-brief "$body" message || fail "could not generate native launch envelope"
-  write_recovery_native_session "$dir/wt/recorded-session.jsonl" "$dir/wt" "$message"
+  write_recovery_native_launch "$dir" "$dir/home" "$id" "$kind"
   write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal task unrelated to Firstmate"
+}
+
+test_live_herdr_lifecycle_refuses_stale_personal_panes_without_mutation() {
+  local dir id proof action scenario out rc gen busy draft before head_before work_before suffix
+  local CONTROL="$ROOT/bin/fm-control.sh" preserved=()
+  for proof in env-v1 legacy; do
+    for action in exit busy-exit relaunch interrupt; do
+      for scenario in different-cwd same-cwd-personal; do
+        recovery_case_or_skip "ownership-$proof-$action-$scenario" "ownership-$proof-$action-$scenario" \
+          || fail "live lifecycle ownership regression requires jq"
+        dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+        prepare_herdr_recovery "$dir" "$id" ship
+        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
+        printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
+        if [ "$scenario" = different-cwd ]; then
+          printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd"
+          write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/proj" "personal task unrelated to Firstmate"
+        fi
+        busy=busy draft='!git diff'
+        if [ "$action" = exit ]; then busy=idle draft=; fi
+        printf '%s' "$draft" > "$dir/fake/recovery-pending"
+        gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" \
+          --state "$busy" --source omp-ext --event agent-start) || fail "could not arm lifecycle ownership fixture"
+        printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+        printf 'working: preserve the recorded task\n' > "$dir/home/state/$id.status"
+        preserved=("$dir/home/state/$id.meta" "$dir/home/state/$id.status"
+          "$dir/home/state/$id.busy-gen" "$dir/home/state/$id.busy-state"
+          "$dir/home/data/$id/brief.md" "$dir/fake/recovery-pending" "$dir/wt/unlanded.txt"
+          "$dir/wt/recorded-session.jsonl" "$dir/wt/personal-session.jsonl")
+        before=$(shasum -a 256 "${preserved[@]}")
+        head_before=$(git -C "$dir/wt" rev-parse HEAD)
+        work_before=$(git -C "$dir/wt" status --porcelain)
+        rc=0
+        case "$action" in
+          relaunch) out=$(run_control "$dir" "$id" relaunch --note "preserve the live task") || rc=$? ;;
+          busy-exit) out=$(run_control "$dir" "$id" exit) || rc=$? ;;
+          *) out=$(run_control "$dir" "$id" "$action") || rc=$? ;;
+        esac
+        expect_code 1 "$rc" "$proof/$action/$scenario must refuse personal lifecycle input"$'\n'"$out"
+        assert_contains "$out" "cannot positively attribute its live Herdr agent" "refusal must name missing live task ownership"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "personal pane must receive no lifecycle input"
+        assert_present "$dir/fake/herdr-agent-live" "personal agent must remain live"
+        [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
+          || fail "$proof/$action/$scenario changed draft, metadata, brief, status, busy records or work"
+        [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] \
+          && [ "$(git -C "$dir/wt" status --porcelain)" = "$work_before" ] \
+          || fail "$proof/$action/$scenario changed the task checkout"
+        for suffix in control-relaunch control-relaunch.note control-relaunch.meta-prior control-relaunch.brief-prior control-exit; do
+          assert_absent "$dir/home/state/$id.$suffix" "ownership refusal must leave no $suffix marker"
+        done
+        assert_absent "$dir/fake/exit-pending" "ownership refusal must not stage an exit"
+        assert_absent "$dir/fake/launched-command" "ownership refusal must not stage a replacement"
+        assert_absent "$dir/home/state/.control-$id.lock" "ownership refusal must release the control lock"
+      done
+    done
+  done
+  pass "all live Herdr lifecycle paths refuse different-cwd and same-cwd personal conversations without input or task mutation"
+}
+
+test_live_herdr_lifecycle_accepts_managed_and_attributable_native_launches() {
+  local dir id proof launch action out rc gen busy before head_before log meta_before brief_before status_before
+  local CONTROL="$ROOT/bin/fm-control.sh"
+  for proof in env-v1 legacy; do
+    for launch in managed native; do
+      for action in interrupt exit busy-exit relaunch; do
+        recovery_case_or_skip "owned-$proof-$launch-$action" "owned-$proof-$launch-$action" \
+          || fail "positive lifecycle ownership regression requires jq"
+        dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+        prepare_herdr_recovery "$dir" "$id" ship
+        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        if [ "$launch" = managed ]; then
+          printf old > "$dir/fake/recovery-spawn-gen"
+          printf node > "$dir/fake/recovery-harness"
+          printf '["node","/installed/agent.js"]' > "$dir/fake/recovery-process-argv"
+          printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd"
+        fi
+        busy=idle
+        [ "$action" != busy-exit ] || busy=busy
+        gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" \
+          --state "$busy" --source omp-ext --event agent-start) || fail "could not arm owned lifecycle fixture"
+        printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+        printf 'working: preserve task progress\n' > "$dir/home/state/$id.status"
+        before=$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/recorded-session.jsonl")
+        head_before=$(git -C "$dir/wt" rev-parse HEAD)
+        meta_before=$(shasum -a 256 "$dir/home/state/$id.meta")
+        brief_before=$(shasum -a 256 "$dir/home/data/$id/brief.md")
+        status_before=$(shasum -a 256 "$dir/home/state/$id.status")
+        rc=0
+        case "$action" in
+          relaunch) out=$(run_control "$dir" "$id" relaunch --note "continue owned work") || rc=$? ;;
+          busy-exit) out=$(run_control "$dir" "$id" exit) || rc=$? ;;
+          *) out=$(run_control "$dir" "$id" "$action") || rc=$? ;;
+        esac
+        expect_code 0 "$rc" "$proof/$launch/$action must accept positive task attribution"$'\n'"$out"
+        log=$(cat "$dir/fake/herdr-log")
+        [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] \
+          && [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/recorded-session.jsonl")" ] \
+          || fail "$proof/$launch/$action changed preserved task work"
+        [ "$status_before" = "$(shasum -a 256 "$dir/home/state/$id.status")" ] \
+          || fail "$proof/$launch/$action changed task status"
+        if [ "$action" = relaunch ]; then
+          [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "owned relaunch did not complete"
+          [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "owned relaunch kept the old incarnation"
+          [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "owned relaunch moved the pane"
+          [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "owned relaunch moved the local copy"
+          [ "$(meta_field "$dir" "$id" model)" = openai-codex/gpt-6-astra ] || fail "owned relaunch changed model"
+          [ "$(meta_field "$dir" "$id" effort)" = high ] || fail "owned relaunch changed effort"
+          assert_present "$dir/fake/herdr-agent-live" "owned relaunch must leave a live replacement"
+          assert_present "$dir/fake/launched-command" "owned relaunch must deliver its replacement"
+        else
+          [ "$meta_before" = "$(shasum -a 256 "$dir/home/state/$id.meta")" ] \
+            && [ "$brief_before" = "$(shasum -a 256 "$dir/home/data/$id/brief.md")" ] \
+            || fail "$proof/$launch/$action changed task identity or instructions"
+          assert_absent "$dir/home/state/$id.control-relaunch" "ordinary lifecycle action must not checkpoint"
+          if [ "$action" = interrupt ]; then
+            assert_contains "$out" interrupt-delivered "owned interrupt must report delivery"
+            assert_present "$dir/fake/herdr-agent-live" "owned interrupt must leave the agent live"
+            assert_contains "$log" "pane send-keys %7 escape" "owned interrupt must deliver Escape"
+          else
+            assert_contains "$out" "stopped $id" "owned exit must report a confirmed stop"
+            assert_absent "$dir/fake/herdr-agent-live" "owned exit must stop its agent"
+            assert_present "$dir/home/state/$id.control-exit" "owned exit must record its deliberate stop"
+            if [ "$action" = busy-exit ]; then
+              assert_contains "$log" "pane send-keys %7 escape" "owned busy exit must interrupt first"
+            else
+              assert_not_contains "$log" "pane send-keys %7 escape" "owned idle exit must not interrupt"
+            fi
+          fi
+        fi
+      done
+    done
+  done
+  pass "managed versioned and legacy launches plus attributable bare native resumes retain interrupt, exit, busy-exit and same-pane relaunch"
 }
 
 test_reboot_recovery_requires_recorded_native_identity() {
@@ -3107,7 +3265,6 @@ test_reboot_recovery_requires_recorded_native_identity() {
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
             ;;
           managed)
-            [ "$proof" != legacy ] || continue
             printf old > "$dir/fake/recovery-spawn-gen"
             printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd"
             printf '["omp","personal prompt"]' > "$dir/fake/recovery-process-argv"
@@ -3623,7 +3780,7 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
   prepare_herdr_recovery "$dir" "$id" ship
   ln -s "$ROOT/bin" "$dir/home/bin"
   mkdir -p "$dir/user-home" "$dir/home/.agents/skills" "$dir/home/.omp"
-  cp "$ROOT/.omp/fm-worker-overlay.yml" "$dir/home/.omp/fm-worker-overlay.yml"
+  cp "$ROOT/.omp/fm-session-overlay.yml" "$ROOT/.omp/fm-worker-overlay.yml" "$dir/home/.omp/"
   before=$(shasum -a 256 "$dir/wt/unlanded.txt")
   # shellcheck disable=SC2031 # The session-end scan's PATH override is confined to its subshell.
   out=$(env -u FM_HOME -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
@@ -3682,6 +3839,7 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   cp "$a/home/state/$id_a.meta" "$b/home/state/$id_a.meta"
   mkdir -p "$b/home/data/$id_a" "$b/fake/herdr-sessions" "$b/fake/herdr-pids"
   cp "$a/home/data/$id_a/brief.md" "$b/home/data/$id_a/brief.md"
+  write_recovery_native_launch "$a" "$b/home" "$id_a" ship
   printf '%s\n' "$a/fake" > "$b/fake/herdr-sessions/fmlab-a"
   printf '%s\n' "$a/fake" > "$b/fake/herdr-pids/2000000001"
   printf 'unfinished a\n' > "$a/wt/unlanded.txt"
@@ -3692,6 +3850,7 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 1 "$rc" "first tick must refuse pending a"$'\n'"$out"
+  assert_contains "$out" "recovery composer state is 'pending'" "copied a must reach its pending-composer refusal with destination-home ownership"
   [ "$(meta_field "$b" "$id_b" spawn_gen)" = old ] || fail 'one tick attempted a second repair'
   [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
     || fail 'pending refusal changed a or its work'
@@ -3710,6 +3869,7 @@ test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 1 "$rc" "rotation must revisit still-pending a"$'\n'"$out"
+  assert_contains "$out" "recovery composer state is 'pending'" "rotation must still positively attribute copied a before refusing its draft"
   [ "$(meta_field "$b" "$id_b" spawn_gen)" = "$gen_b" ] || fail 'rotation replaced an already managed b'
   [ "$before_a" = "$(shasum -a 256 "$b/home/state/$id_a.meta" "$a/fake/recovery-pending" "$a/wt/unlanded.txt")" ] \
     || fail 'repeated recovery touched pending a or its work'
@@ -3737,6 +3897,7 @@ test_bounded_reboot_recovery_advances_after_interrupted_inspection() {
     cp "$dir/home/state/$id.meta" "$b/home/state/$id.meta"
     mkdir -p "$b/home/data/$id"
     cp "$dir/home/data/$id/brief.md" "$b/home/data/$id/brief.md"
+    write_recovery_native_launch "$dir" "$b/home" "$id" ship
     printf '%s\n' "$dir/fake" > "$b/fake/herdr-sessions/$session"
     printf '%s\n' "$dir/fake" > "$b/fake/herdr-pids/$(cat "$dir/fake/recovery-pid")"
   done
@@ -3886,3 +4047,5 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset
 test_reboot_recovery_refuses_busy_command_drafts_without_mutation
 test_recovery_fixture_claims_only_owned_temp_directories
 test_reboot_recovery_requires_recorded_native_identity
+test_live_herdr_lifecycle_refuses_stale_personal_panes_without_mutation
+test_live_herdr_lifecycle_accepts_managed_and_attributable_native_launches

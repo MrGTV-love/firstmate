@@ -28,6 +28,7 @@ pass() { printf 'ok - %s\n' "$1"; }
 
 command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (required by the herdr adapter)"; exit 0; }
+command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (required by the model-free worker)"; exit 0; }
 
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"
@@ -99,6 +100,8 @@ EOF
   echo "herdr_workspace_id=$WORKSPACE_ID"
   echo "herdr_tab_id=$TAB_ID"
   echo "herdr_pane_id=$PANE_ID"
+  echo "spawn_gen=smoke-$$"
+  echo "launch_proof=env-v1"
 } > "$HOME_DIR/state/hsmoke.meta"
 
 run_control() {
@@ -207,13 +210,11 @@ pass "real herdr: interrupt refuses when herdr's own agent registry reports no a
 # A registration alone no longer proves an agent (issue #4115): the adapter
 # verifies the pane's processes through the real `pane process-info` view. So
 # the registered agent is backed by a real agent-named foreground process - a
-# symlink to a long-running system binary named `claude`, the same construction
-# tests/fm-tmux-agent-liveness.test.sh uses (a copied platform binary fails code
-# signing on macOS arm64; the symlink name is what the kernel records as argv[0]).
+# symlink to a long-running Python interpreter named `claude`.
 AGENT_BIN="$SCRATCH/agentbin"
 mkdir -p "$AGENT_BIN"
-SLEEP_BIN=$(command -v sleep) || fail "sleep not found"
-ln -s "$SLEEP_BIN" "$AGENT_BIN/claude"
+PYTHON_BIN=$(command -v python3) || fail "python3 not found"
+ln -s "$PYTHON_BIN" "$AGENT_BIN/claude"
 printf -v AGENT_Q '%q' "$AGENT_BIN/claude"
 
 wait_process_state() {  # <expected> <tries>
@@ -227,7 +228,11 @@ wait_process_state() {  # <expected> <tries>
 }
 
 start_agent_process() {
-  fm_backend_herdr_send_text_line "$SESSION:$PANE_ID" "$AGENT_Q 900" \
+  local gen gen_q
+  gen=$(fm_meta_get "$HOME_DIR/state/hsmoke.meta" spawn_gen)
+  [ -n "$gen" ] || fail "the model-free worker has no recorded launch generation"
+  printf -v gen_q '%q' "$gen"
+  fm_backend_herdr_send_text_line "$SESSION:$PANE_ID" "FM_SPAWN_GEN=$gen_q $AGENT_Q -c 'import time; time.sleep(900)'" \
     || fail "could not start the agent-named foreground process in the task pane"
   wait_process_state agent 50 \
     || version_fail "a real agent-named foreground process reads '$(fm_backend_herdr_pane_process_state "$SESSION" "$PANE_ID")' rather than 'agent' through pane process-info"
@@ -307,7 +312,7 @@ awk -F= '$1 == "harness" {$0="harness=claude"} {print}' "$HOME_DIR/state/hsmoke.
 mv "$HOME_DIR/state/hsmoke.meta.tmp" "$HOME_DIR/state/hsmoke.meta"
 pass "real herdr: a stale registration no longer blocks relaunch, and the endpoint and local copy survive"
 
-# Last: the foreground process is a plain `sleep`, so the pane never draws any
+# Last: the foreground process is an inert Python worker, so the pane never draws any
 # recognized composer chrome. exit's composer-empty guard (bin/fm-control.sh)
 # therefore refuses before ever typing the exit command, rather than typing it
 # into a live agent that ignores it and reporting a stop that did not happen.
