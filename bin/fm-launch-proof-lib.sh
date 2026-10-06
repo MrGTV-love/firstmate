@@ -4,8 +4,8 @@
 # launch_proof=env-v1. This is an incarnation binding, not an auth credential.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Unknown never authorizes a relaunch.
-# Legacy records are recoverable only with exact bare compiled omp resume argv;
-# missing proof on an ordinary legacy launch is not evidence it is unmanaged.
+# Missing incarnation proof requires exact bare compiled omp resume argv, the
+# recorded cwd, and persisted task-owned initial launch provenance.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
 
 _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
@@ -15,6 +15,10 @@ _FM_LAUNCH_PROOF_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] 
 . "$_FM_LAUNCH_PROOF_DIR/fm-agent-process-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$_FM_LAUNCH_PROOF_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-dod-lib.sh
+. "$_FM_LAUNCH_PROOF_DIR/fm-dod-lib.sh"
+# shellcheck source=bin/fm-operational-input.sh
+. "$_FM_LAUNCH_PROOF_DIR/fm-operational-input.sh"
 
 fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
   local pid=$1 gen=$2 environment
@@ -32,10 +36,52 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
   fi
 }
 
+# The native conversation, not a current pane registration, binds a bare
+# restore to this task's delivered launch input. Read only the named file.
+fm_launch_proof_native_startup() { # <meta> <session-file> <worktree>
+  local meta=$1 ref=$2 worktree=$3 message kind body expected source state id data
+  [ -f "$ref" ] && [ -r "$ref" ] || return 1
+  message=$(jq -ern --arg cwd "$worktree" '
+    reduce inputs as $entry ({header:null, first:null, header_seen:false, user_seen:false};
+      if .header_seen == false then .header = $entry | .header_seen = true
+      elif .user_seen == false and $entry.type == "message" and $entry.message.role == "user"
+        then .first = $entry.message.content | .user_seen = true
+      else . end)
+    | select(.header.type == "session" and .header.cwd == $cwd and .first != null)
+    | .first
+    | if type == "string" then .
+      elif type == "array" and length > 0
+        and all(.[]; .type == "text" and (.text | type == "string"))
+        then map(.text) | join("")
+      else error("unreadable initial user input") end
+    | select(length > 0)' "$ref" 2>/dev/null) || return 1
+  fm_operational_generic_kind "$message" kind && [ "$kind" = launch-brief ] || return 1
+  fm_operational_input_body "$message" body || return 1
+  state=${meta%/*}
+  id=${meta##*/}; id=${id%.meta}
+  case "$(fm_meta_get "$meta" kind)" in
+    secondmate)
+      source="$worktree/data/charter.md"
+      if [ ! -e "$source" ] && [ ! -L "$source" ]; then
+        data=${FM_DATA_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$_FM_LAUNCH_PROOF_DIR/..}}/data}
+        source="$data/$id/brief.md"
+      fi
+      expected=$(cat "$source" 2>/dev/null) || return 1
+      [ -n "$expected" ] && [ "$body" = "$expected" ]
+      ;;
+    ship|scout|'')
+      expected=$(fm_brief_worker_role "$state" "$id") || return 1
+      case "$body" in "$expected"$'\n\n'?*) return 0 ;; esac
+      return 1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   local meta=$1 target session pane info foreground pid argv harness proof gen
   local candidates ids='' name argv0 parents group
-  local verdict process_family
+  local verdict worktree cwd ref
   target=$(fm_meta_get "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
@@ -86,21 +132,9 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
     gen=$(fm_meta_get "$meta" spawn_gen)
     verdict=$(fm_launch_proof_pid "$pid" "$gen")
     [ "$verdict" = unmanaged ] || { printf '%s' "$verdict"; return; }
-    harness=$(fm_meta_get "$meta" harness)
-    [ "$harness" = omp ] || { printf unknown; return; }
-    name=$(printf '%s' "$foreground" | jq -r '.name // ""')
-    argv0=$(printf '%s' "$foreground" | jq -r '.argv0 // .argv[0] // ""')
-    [ "$(fm_agent_process_classify "$name" "$argv0" '' "$pid")" = agent ] \
-      || { printf unknown; return; }
-    process_family=$(fm_control_harness_family "${name##*/}" 2>/dev/null \
-      || fm_harness_path_name "$name" 2>/dev/null \
-      || fm_control_harness_family "${argv0##*/}" 2>/dev/null \
-      || fm_harness_path_name "$argv0" 2>/dev/null) \
-      || { printf unknown; return; }
-    if [ "$process_family" = omp ]; then printf unmanaged; else printf unknown; fi
-    return
+  else
+    [ -z "$proof" ] || { printf unknown; return; }
   fi
-  [ -z "$proof" ] || { printf unknown; return; }
   harness=$(fm_meta_get "$meta" harness)
   [ "$harness" = omp ] || { printf unknown; return; }
   argv=$(printf '%s' "$foreground" | jq -ec '.argv
@@ -110,8 +144,15 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   argv0=$(printf '%s' "$foreground" | jq -r '.argv0 // .argv[0] // ""')
   [ "${name##*/}" = omp ] && [ "${argv0##*/}" = omp ] \
     || { printf unknown; return; }
-  if printf '%s' "$argv" | jq -e '
-    length == 2 and (.[0] | split("/") | last) == "omp"
-      and (.[1] | startswith("--resume=") and length > 9)
-  ' >/dev/null 2>&1; then printf unmanaged; else printf unknown; fi
+  ref=$(printf '%s' "$argv" | jq -er '
+    select(length == 2 and (.[0] | split("/") | last) == "omp"
+      and (.[1] | startswith("--resume=") and length > 9))
+    | .[1][9:]' 2>/dev/null) || { printf unknown; return; }
+  worktree=$(fm_meta_get "$meta" worktree)
+  cwd=$(printf '%s' "$foreground" | jq -er '.cwd | select(type == "string" and length > 0)' 2>/dev/null) \
+    || { printf unknown; return; }
+  [ -n "$worktree" ] && [ "$cwd" = "$worktree" ] \
+    && fm_launch_proof_native_startup "$meta" "$ref" "$worktree" \
+    && { printf unmanaged; return; }
+  printf unknown
 }

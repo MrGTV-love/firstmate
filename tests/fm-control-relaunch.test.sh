@@ -30,6 +30,10 @@ unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
 . "$ROOT/bin/fm-trace-context-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-tasks-axi-lib.sh"
+# shellcheck source=/dev/null
+. "$ROOT/bin/fm-dod-lib.sh"
+# shellcheck source=/dev/null
+. "$ROOT/bin/fm-operational-input.sh"
 
 CONTROL="$ROOT/bin/fm-control.sh"
 SPAWN="$ROOT/bin/fm-spawn.sh"
@@ -2295,7 +2299,14 @@ case "${1:-} ${2:-}" in
       kill -TERM "$(cat "$D/recovery-inspection-interrupt")"
       exit 1
     fi
-    if [ -f "$D/herdr-agent-registration" ]; then
+    if [ -f "$D/recovery-case-id" ] && [ -f "$D/herdr-agent-live" ] && [ ! -f "$D/recovery-registration-missing" ]; then
+      ref=$(cat "$D/recovery-session-ref")
+      agent=omp
+      [ ! -f "$D/recovery-registration-ref" ] || ref=$(cat "$D/recovery-registration-ref")
+      [ ! -f "$D/recovery-registration-agent" ] || agent=$(cat "$D/recovery-registration-agent")
+      jq -nc --arg agent "$agent" --arg ref "$ref" \
+        '{result:{agent:{agent:$agent,agent_status:"idle",agent_session:{kind:"path",value:$ref}}}}'
+    elif [ -f "$D/herdr-agent-registration" ]; then
       cat "$D/herdr-agent-registration"
     elif [ -f "$D/herdr-live-${3:-}" ] || { [ ! -f "$D/herdr-cwd-${3:-}" ] && [ -f "$D/herdr-agent-live" ]; }; then
       # The agent came back with its server. Nothing here is reclaimable.
@@ -2317,8 +2328,16 @@ case "${1:-} ${2:-}" in
         fi
         harness=omp
         [ ! -f "$D/recovery-harness" ] || harness=$(cat "$D/recovery-harness")
-        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"%s","argv":["%s"],"cmdline":"%s"}]}}}\n' \
-          "$(cat "$D/herdr-pane")" "$pid" "$harness" "$harness" "$harness"
+        cwd=$(cat "$D/cwd")
+        ref=$(cat "$D/recovery-session-ref")
+        [ ! -f "$D/recovery-process-cwd" ] || cwd=$(cat "$D/recovery-process-cwd")
+        [ ! -f "$D/recovery-process-ref" ] || ref=$(cat "$D/recovery-process-ref")
+        argv=$(jq -nc --arg harness "$harness" --arg ref "$ref" '[$harness,"--resume=" + $ref]')
+        [ ! -f "$D/recovery-process-argv" ] || argv=$(cat "$D/recovery-process-argv")
+        jq -nc --arg pane "$(cat "$D/herdr-pane")" --argjson pid "$pid" \
+          --arg harness "$harness" --arg cwd "$cwd" --argjson argv "$argv" \
+          '{result:{type:"pane_process_info",process_info:{pane_id:$pane,shell_pid:4242,
+            foreground_processes:[{pid:$pid,name:$harness,argv0:$harness,argv:$argv,cwd:$cwd}]}}}'
       else
         printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%7","shell_pid":4242,"foreground_processes":[]}}}\n'
       fi
@@ -3016,11 +3035,18 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
   pass "relaunch heals an item that drifted out of In flight while the task stayed live"
 }
 
+write_recovery_native_session() { # <path> <cwd> <initial-user-message>
+  jq -nc --arg cwd "$2" '{type:"session",version:3,id:"fixture-session",cwd:$cwd}' > "$1"
+  jq -nc --arg text "$3" \
+    '{type:"message",message:{role:"user",content:[{type:"text",text:$text}]}}' >> "$1"
+}
+
 prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   local dir=$1 id=$2 kind=$3
   rm -f "$dir/fake/herdr-stopped"
   printf '%s' "$id" > "$dir/fake/recovery-case-id"
   : > "$dir/fake/herdr-agent-live"
+  printf '%s' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-session-ref"
   printf 'harness=omp\nkind=%s\nlaunch_proof=env-v1\nspawn_gen=old\nmodel=openai-codex/gpt-6-astra\neffort=high\n' "$kind" \
     >> "$dir/home/state/$id.meta"
   cat > "$dir/fakebin/omp" <<'SH'
@@ -3040,6 +3066,124 @@ SH
     printf '# test charter\n' > "$dir/wt/data/charter.md"
     printf 'mode=secondmate\nhome=%s\n' "$dir/wt" >> "$dir/home/state/$id.meta"
   fi
+  local body message
+  if [ "$kind" = secondmate ]; then
+    body=$(cat "$dir/wt/data/charter.md")
+  else
+    body="$(fm_brief_worker_role "$dir/home/state" "$id")"$'\n\n'"$(cat "$dir/home/data/$id/brief.md")"
+  fi
+  fm_operational_input_encode launch-brief "$body" message || fail "could not generate native launch envelope"
+  write_recovery_native_session "$dir/wt/recorded-session.jsonl" "$dir/wt" "$message"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal task unrelated to Firstmate"
+}
+
+test_reboot_recovery_requires_recorded_native_identity() {
+  local dir id proof mode scenario out rc expected before head_before log failures=0 gen suffix
+  local personal personal_id personal_before personal_log CONTROL="$ROOT/bin/fm-control.sh"
+  local preserved=()
+  for proof in env-v1 legacy; do
+    for mode in direct sweep; do
+      for scenario in different-cwd different-resume updated-registration header-only exact managed; do
+        recovery_case_or_skip "native-$proof-$mode-$scenario" "native-$proof-$mode-$scenario" \
+          || fail "native identity regression requires jq"
+        dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+        prepare_herdr_recovery "$dir" "$id" ship
+        [ "$proof" != legacy ] || printf 'launch_proof=\n' >> "$dir/home/state/$id.meta"
+        : > "$dir/fake/recovery-pending"
+        gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id") || fail "could not arm native identity fixture"
+        printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+        printf 'working: preserve recorded task\n' > "$dir/home/state/$id.status"
+        case "$scenario" in
+          different-cwd) printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd" ;;
+          different-resume) printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref" ;;
+          updated-registration)
+            printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
+            printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
+            ;;
+          header-only)
+            jq -nc --arg cwd "$dir/wt" '{type:"session",version:3,id:"personal",cwd:$cwd}' > "$dir/wt/personal-session.jsonl"
+            printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
+            ;;
+          managed)
+            [ "$proof" != legacy ] || continue
+            printf old > "$dir/fake/recovery-spawn-gen"
+            printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd"
+            printf '["omp","personal prompt"]' > "$dir/fake/recovery-process-argv"
+            ;;
+        esac
+        # A second, unrecorded personal pane is available to the backend but
+        # never enters this home's task inventory.
+        recovery_case_or_skip "personal-$proof-$mode-$scenario" "personal-$proof-$mode-$scenario" personal \
+          || fail "personal pane fixture requires jq"
+        personal=$HERDR_CASE_DIR personal_id=$HERDR_CASE_ID
+        prepare_herdr_recovery "$personal" "$personal_id" ship
+        rm "$personal/home/state/$personal_id.meta"
+        printf 'personal draft\n' > "$personal/fake/recovery-pending"
+        mkdir -p "$dir/fake/herdr-sessions"
+        printf '%s\n' "$personal/fake" > "$dir/fake/herdr-sessions/personal"
+        personal_before=$(shasum -a 256 "$personal/fake/recovery-pending" "$personal/wt/unlanded.txt")
+        personal_log=$(cat "$personal/fake/herdr-log")
+        preserved=("$dir/home/state/$id.meta" "$dir/home/state/$id.status"
+          "$dir/home/state/$id.busy-gen" "$dir/home/state/$id.busy-state"
+          "$dir/home/data/$id/brief.md" "$dir/fake/recovery-pending" "$dir/wt/unlanded.txt")
+        before=$(shasum -a 256 "${preserved[@]}")
+        head_before=$(git -C "$dir/wt" rev-parse HEAD)
+        rc=0
+        if [ "$mode" = direct ]; then
+          CONTROL="$ROOT/bin/fm-control.sh"
+          out=$(run_control "$dir" "$personal_id" relaunch --recover-launch) || rc=$?
+          expect_code 1 "$rc" "unrecorded personal task must refuse"$'\n'"$out"
+          rc=0
+          out=$(run_control "$dir" "$id" relaunch --recover-launch) || rc=$?
+        else
+          CONTROL="$ROOT/bin/fm-reboot-recover.sh"
+          out=$(run_control "$dir" recover) || rc=$?
+        fi
+        log=$(cat "$dir/fake/herdr-log")
+        # Continue across divergent signals before the fix so evidence includes
+        # direct AND sweep failures for both record versions.
+        (
+          [ "$personal_before" = "$(shasum -a 256 "$personal/fake/recovery-pending" "$personal/wt/unlanded.txt")" ] \
+            || fail "$proof/$mode/$scenario changed personal draft or work"
+          [ "$personal_log" = "$(cat "$personal/fake/herdr-log")" ] \
+            || fail "$proof/$mode/$scenario inspected or acted on an unrecorded personal pane"
+          assert_present "$personal/fake/herdr-agent-live" "personal pane must remain alive"
+          assert_absent "$personal/fake/launched-command" "personal pane must not be replaced"
+          [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head_before" ] || fail "$proof/$mode/$scenario changed HEAD"
+          if [ "$scenario" = exact ]; then
+            expect_code 0 "$rc" "$proof/$mode exact native recovery must complete"$'\n'"$out"
+            [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "exact native recovery did not complete"
+            assert_present "$dir/fake/launched-command" "exact native recovery must replace the bare agent"
+            [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] || fail "exact recovery moved its pane"
+            [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "exact recovery moved its worktree"
+            [ "$(meta_field "$dir" "$id" spawn_gen)" != old ] || fail "exact recovery kept its old incarnation"
+            assert_not_contains "$log" "tab create" "exact recovery must reuse its pane"
+            assert_not_contains "$log" "workspace create" "exact recovery must reuse its workspace"
+            [ "$(shasum -a 256 "$dir/wt/unlanded.txt")" = "$(printf '%s\n' "$before" | grep 'unlanded.txt$')" ] \
+              || fail "exact recovery changed unfinished work"
+          else
+            assert_not_contains "$log" "pane send-" "$proof/$mode/$scenario must send no lifecycle input"
+            expected=1
+            if [ "$proof" = legacy ]; then expected=0; fi
+            [ "$scenario" != managed ] || expected=0
+            expect_code "$expected" "$rc" "$proof/$mode/$scenario must not recover"$'\n'"$out"
+            [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] || fail "$proof/$mode/$scenario changed records, draft or work"
+            assert_present "$dir/fake/herdr-agent-live" "unattributed or managed pane must remain alive"
+            assert_absent "$dir/fake/exit-pending" "refusal must not deliver an exit"
+            assert_absent "$dir/fake/launched-command" "refusal must not launch a replacement"
+            for suffix in control-relaunch control-relaunch.note control-relaunch.meta-prior control-relaunch.brief-prior control-exit; do
+              assert_absent "$dir/home/state/$id.$suffix" "refusal must leave no $suffix transaction"
+            done
+          fi
+          assert_absent "$dir/home/state/.control-$id.lock" "recovery must release its control lock"
+          assert_absent "$dir/home/state/.secondmate-liveness-$id.lock" "recovery must leave no liveness lock"
+          assert_absent "$dir/home/state/.meta-$id.lock" "recovery must leave no metadata lock"
+          pass "$proof/$mode/$scenario preserves personal panes and binds lifecycle to recorded native identity"
+        ) || failures=$((failures + 1))
+      done
+    done
+  done
+  [ "$failures" = 0 ] || fail "$failures native identity scenarios failed"
 }
 
 test_reboot_recovery_refuses_busy_command_drafts_without_mutation() {
@@ -3634,6 +3778,11 @@ SH
 }
 
 
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_bounded_reboot_recovery_does_not_starve_after_a_pending_refusal
 test_bounded_reboot_recovery_advances_after_interrupted_inspection
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
@@ -3733,3 +3882,4 @@ test_reboot_recovery_keeps_backlog_exemptions_and_dispatchable_rows
 test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset
 test_reboot_recovery_refuses_busy_command_drafts_without_mutation
 test_recovery_fixture_claims_only_owned_temp_directories
+test_reboot_recovery_requires_recorded_native_identity

@@ -147,16 +147,34 @@ export PATH="$TMP/fakebin:$PATH"
 . "$ROOT/bin/fm-backend.sh"
 fm_backend_source herdr
 . "$ROOT/bin/fm-launch-proof-lib.sh"
-# A real empty session header lets native --resume launch without fabricating
-# the vendor's rendered surface or submitting a model prompt before recovery.
-REF="$TMP/empty-session.jsonl"
-python3 - "$REF" "$WT" <<'PY'
-import datetime, json, sys, uuid
+# Persist the task's actual initial launch envelope before native --resume.
+# This proves task attribution without submitting a model prompt before recovery.
+. "$ROOT/bin/fm-dod-lib.sh"
+seed_native_resume() { # <session-path> <launch-body-path>
+  local ref=$1 body=$2 message
+  message=$("$ROOT/bin/fm-operational-input.sh" encode launch-brief < "$body") \
+    || fail 'could not encode the native fixture launch brief'
+  printf '%s' "$message" > "$TMP/native-launch-input"
+  python3 - "$ref" "$WT" "$TMP/native-launch-input" <<'PY'
+import datetime, json, pathlib, sys, uuid
+now = datetime.datetime.now(datetime.timezone.utc)
 with open(sys.argv[1], 'w') as f:
     f.write(json.dumps({'type':'session','version':3,'id':str(uuid.uuid4()),
-                       'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                       'cwd':sys.argv[2]}) + '\n')
+                       'timestamp':now.isoformat(),'cwd':sys.argv[2]}) + '\n')
+    f.write(json.dumps({'type':'message','id':uuid.uuid4().hex[:8],'parentId':None,
+                       'timestamp':now.isoformat(),
+                       'message':{'role':'user','content':[{
+                           'type':'text','text':pathlib.Path(sys.argv[3]).read_text()}],
+                           'timestamp':int(now.timestamp() * 1000)}}) + '\n')
 PY
+}
+{
+  fm_brief_worker_role "$FM_STATE_OVERRIDE" "$TASK_ID"
+  printf '\n'
+  cat "$FM_DATA_OVERRIDE/$TASK_ID/brief.md"
+} > "$TMP/native-worker-brief"
+REF="$TMP/native-worker-session.jsonl"
+seed_native_resume "$REF" "$TMP/native-worker-brief"
 run pane send-text "$PANE" "OMP_SKIP_SETUP=1 omp --resume='$REF'"
 run pane send-keys "$PANE" Enter
 for _ in $(seq 1 60); do
@@ -247,6 +265,8 @@ printf 'window=child:child-pane\n' > "$WT/state/child.meta"
 SM_HASH=$(shasum -a 256 "$WT/data/charter.md" "$WT/state/child.meta" "$WT/unlanded.txt")
 printf 'kind=secondmate\nmode=secondmate\nhome=%s\n' "$WT" >> "$META"
 printf 'claude opus high\n' > "$FM_CONFIG_OVERRIDE/secondmate-harness"
+REF="$TMP/native-secondmate-session.jsonl"
+seed_native_resume "$REF" "$WT/data/charter.md"
 run pane send-text "$PANE" "OMP_SKIP_SETUP=1 omp --resume='$REF'"
 run pane send-keys "$PANE" Enter
 for _ in $(seq 1 60); do

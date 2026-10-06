@@ -1911,7 +1911,7 @@ FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
   bash bin/fm-test-run.sh tests/fm-launch-proof.test.sh tests/fm-omp-reboot-live-e2e.test.sh
 ```
 
-The live test starts actual `omp --resume=<ref>` with a valid empty native session header in an isolated named Herdr lab, not a mocked screen or a metadata-only agent.
+The live test starts actual `omp --resume=<ref>` with a valid native session header and a fixture-seeded initial user message carrying the public Firstmate launch-brief encoder's output in an isolated named Herdr lab, not a mocked screen or a metadata-only agent.
 It exercises the native command used by Herdr restoration, rather than rebooting the host or claiming a full OS-reboot test.
 All Herdr calls, including production-adapter calls through the test's session-pinning shim, use the guarded lab helper.
 The helper's default-session tripwire remains unchanged through cleanup.
@@ -1966,6 +1966,28 @@ The focused relaunch fixtures also passed with all five inherited state/data/con
 
 No remote secondmate, unrelated pane, shared worktree pool, or global Herdr configuration is modified.
 The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-restoration) owns the decision to retain global auto-resume and repair only the recorded fleet.
+
+#### Recorded-task attribution (2026-10-06)
+
+Focused executable regressions reproduced lifecycle input to stale recorded panes before the ownership correction, then passed after it:
+
+```bash
+TMPDIR="$PWD/state/.ownership-regression-tmp" \
+  FM_TEST_ONLY=test_reboot_recovery_requires_recorded_native_identity \
+  bash tests/fm-control-relaunch.test.sh
+TMPDIR="$PWD/state/.ownership-regression-tmp" \
+  FM_TEST_ONLY=test_launch_proof_recorded_native_identity \
+  bash tests/fm-launch-proof.test.sh
+```
+
+The first check failed 16 negative scenarios before the correction and passed all 22 scenarios afterward, covering direct and sweep recovery, versioned and legacy records, unrecorded personal panes, preserved work and drafts, legitimate recorded native recovery, and managed no-op behavior.
+The second check passed six groups covering native startup provenance, malformed and unrelated conversations, local-secondmate startup sources, kernel environments, and foreground ancestry.
+On actual omp 18.6.3 and Herdr 0.9.1 protocol 22, `fm_launch_proof_herdr "$meta"` returned `unmanaged` for a bare resume whose fixture-seeded native initial message contained the owner-generated task launch envelope, and `managed` for a process launched with the matching incarnation.
+These positive native records were generated protocol fixtures rendered by omp, not user messages emitted by a submitted model turn.
+Actual unrelated native resumes returned `unknown` both with a different cwd and with the same cwd but a different conversation.
+For both unrelated cases, `bin/fm-control.sh <id> relaunch --recover-launch` and `bin/fm-reboot-recover.sh recover` exited 1 without lifecycle input; foreground processes, visible ANSI, pending drafts, records, and fixture work remained identical.
+The guarded named-lab teardown succeeded with the default-session tripwire unchanged, removed the named runtime, and preceded removal of all owned transient worktree resources.
+This focused proof did not rerun the submitting recovery guard or claim a host-reboot test.
 
 ### Away-mode transport
 
@@ -2573,6 +2595,31 @@ Under the captain's `unicode` symbol preset the idle screen through Herdr was a 
 Before the status-row rule the shared classifier folded that row into the bare composer's wrap region and read the idle pane `pending`, so `bin/fm-send.sh` skipped its doorbell on the first live omp worker.
 After the rule, the same live Herdr capture read `empty`, a steer's doorbell landed, and the worker opened a turn on it.
 `tests/fm-composer-lib.test.sh` pins the unicode idle row, the nerd-preset idle row, the busy spinner row, and typed text over the same fixture in both locales.
+
+#### Owned frame status substrings (2026-10-06)
+
+On macOS arm64 with omp 18.6.3 and Herdr 0.9.1 (protocol 22), four separate real omp panes in a guarded named lab exercised the native borderless composer without submitting model input.
+Bracketed paste inserted a leading newline and a literal frame whose header, body, or floor contained `· 15.4%/272K`; the fourth pane remained untouched.
+Visible ANSI captures were classified and extracted with the shared public interfaces in both `LC_ALL=C` and `LC_ALL=en_US.UTF-8`:
+
+```bash
+source bin/fm-composer-lib.sh
+caps=$'styled=1\ncursor=0\nidentity=0\nrows=20'
+fm_composer_classify_screen "$caps" "$screen"
+fm_composer_extract_selected_content "$caps" "$screen"
+```
+
+The actual named-pane backend interfaces, `fm_backend_herdr_composer_state` and `fm_backend_herdr_composer_content`, returned the same results:
+
+| Actual input | State | Complete extracted content |
+| --- | --- | --- |
+| Untouched composer | `empty` | Empty |
+| Status substring in header | `pending` | `╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯` |
+| Status substring in body | `pending` | `╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯` |
+| Status substring in floor | `pending` | `╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯` |
+
+The real unowned status footer was excluded in every extraction, including the empty control.
+`bash tests/fm-composer-native-continuation.test.sh` contains the focused portable ownership regressions; repeating the named-lab capture with actual unsubmitted input refreshes this renderer evidence.
 
 ### Busy state and lifecycle
 

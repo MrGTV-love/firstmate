@@ -130,13 +130,17 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the proof; kernel ancestry excludes launcher shells and helper workers.
 Readable kernel environment with a matching incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses.
-A readable environment with a missing or mismatched incarnation proves unmanaged only for an exact recorded `harness=omp` whose foreground process is independently attributed to omp through the shared process and path identity helpers.
+A readable environment with a missing or mismatched incarnation proves unmanaged only for a recorded `harness=omp` with positively attributed native startup provenance.
+The foreground process must have executable basename `omp`, exactly `omp --resume=<file>` argv, and an actual cwd equal to the recorded worktree.
+The resumed native JSONL file must have that same cwd in its session header and an initial user message decoding through the operational-input protocol as `launch-brief`.
+For a ship or scout, that initial body must begin with the complete current worker role contract generated for this home's exact task-owned steering inbox, followed by a paragraph boundary.
+For a local secondmate, that initial body must equal the recorded home's standing charter, or the recorded task brief only when that home has no charter, matching the ordinary launch source.
+Neither a generic launch phrase, an inbox path mentioned in unrelated prose, nor a current Herdr session registration supplies this recorded-task provenance.
 Every other recorded harness remains unknown with missing or mismatched pins.
-Foreign Python, node, other harnesses, and unattributed foreground processes also remain unknown for recorded omp; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
-Unreadable or ambiguous proof never licenses lifecycle action.
-For older records with no launch-proof field, only a recorded `omp` harness running an executable with basename `omp` and exactly `omp --resume=<ref>` argv with a nonempty reference proves unmanaged restoration.
-Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove legacy native restoration; no installed-CLI symlink reconstruction is used.
-An ordinary legacy launch remains unchanged, and a present but unsupported launch-proof field never falls back to legacy argv.
+Foreign processes, personal native sessions, missing actual cwd, unreadable or malformed session files, and ambiguous foreground identity also remain unknown; neither the sweep nor direct recovery takes lifecycle action on unknown proof.
+Older records with no launch-proof field require the same exact bare native startup provenance.
+Split `--resume <ref>` arguments, extra arguments, non-omp harnesses, and interpreter entry points do not prove native restoration; no installed-CLI symlink reconstruction is used.
+An ordinary or unproven legacy launch remains unchanged, and a present but unsupported launch-proof field never falls back to legacy recovery.
 After replacement, matching managed-launch proof is required before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
