@@ -642,7 +642,7 @@ Repeat the live refresh after a Claude Code or omp upgrade; the scratch-project 
 
 ## Claude primary feedback
 
-The Claude Code 2.1.285 native mid-turn feedback check was verified on 2026-09-30; [`supervision.md`](supervision.md#claude-mid-turn-lavish-feedback-2026-09-30) owns its queued-answer, unpublished-capture and handled-answer evidence and refresh command.
+Claude Code 2.1.291 native feedback was revalidated through TeamClaude 1.1.21-affinity.0 on 2026-10-06; [`supervision.md`](supervision.md#claude-mid-turn-lavish-feedback-2026-09-30) owns the real-review, queued-answer, unpublished-capture, handled-answer and Stop-rewake evidence.
 
 ## Claude workspace trust
 

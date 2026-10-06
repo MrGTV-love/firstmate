@@ -204,6 +204,7 @@ SH
       ;;
     source-retires)
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
+printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
 printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
   "$(date +%s)" > "$FM_HOME/state/.wake-queue"
 rm -f "$FM_HOME/state/procevent/lavish-final.source"
