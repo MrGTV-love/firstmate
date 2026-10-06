@@ -591,6 +591,10 @@ Transport responses were local fixtures; no paid provider or native host activat
 The current offline reader matrix covers sensitive patterns and option values, routine reader tokens, wrapped/nested selection and command-query exclusions through both Claude and omp hook payloads with fake transport only; supplied command strings are not executed.
 The October 6 cohort 8 focused offline refresh, `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh`, passed: `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=56463`.
 That run exercised the correcting implementation through both hook input protocols, not native host activation or provider judgment.
+The October 6 isolated actual-curl transport refresh, `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh` with worktree-local `TMPDIR`, passed: `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=63674`.
+An isolated HOME with synthetic `trace-ascii` and `retry = 3` settings produced a credential-bearing trace and four loopback HTTP 503 requests in the unprotected control; the shared guardrail transport produced no trace and exactly one physical request per recorded attempt through both hook payload formats and evaluation.
+The local receiver also exercised successful, HTTP-error, timeout, malformed-response and missing-key paths, preserving closed request/log privacy and known/unknown usage accounting.
+Only synthetic credentials and loopback requests were used; this proves local transport behavior, not an observed real-key disclosure, native host activation or a real Jev judgment.
 
 **September 30 historical dataset source is unavailable.**
 The supplied `/Users/charlesabrooker/firstmate/data/fm-jev-implementation-review/report.md` (October 1, F8 and the guardrail promotion row) records a planned screen and promotion contract, with no hook measurement; its cited `/Users/charlesabrooker/firstmate/data/fm-jev-value-scout/report.md` (September 29, worker destructive-risk proposal) describes prospective fixture replay, not dated blocked/allowed command receipts.

@@ -807,7 +807,7 @@ async function screen(payload, host, log, label = null) {
     questions: { risk: { type: 'choice', instructions: 'Judge structural operations only. secret_read, force_push and destructive_git are ALWAYS risky irrespective of scope. deploy is risky in production; delete is risky in production, or when recursive/force and not local. opaque_execution is risky. A bounded local delete without production/secret scope is routine. Otherwise use uncertain for unresolved delete/deploy scope or syntax. Any risky operation makes the whole request risky. Shadow measurement only: do not infer permission or authorization.', criteria: { risky: 'Safety-sensitive operation requiring existing authority checks.', routine: 'Only bounded local or explicitly non-production operations.', uncertain: 'Unresolved scope for delete/deploy, without an always-risky operation.' } } },
   };
   const apiStart = clock();
-  const child = spawn('curl', ['-sS', '--max-time', '2', '-w', '\n%{http_code}', '-X', 'POST', 'https://api.typesafe.ai/v1/systemone', '-H', 'Content-Type: application/json', '-H', '@/dev/fd/3', '--data-binary', '@-'], { stdio: ['pipe', 'pipe', 'ignore', 'pipe'] });
+  const child = spawn('curl', ['-q', '-sS', '--max-time', '2', '-w', '\n%{http_code}', '-X', 'POST', 'https://api.typesafe.ai/v1/systemone', '-H', 'Content-Type: application/json', '-H', '@/dev/fd/3', '--data-binary', '@-'], { stdio: ['pipe', 'pipe', 'ignore', 'pipe'] });
   const result = await collect(child, JSON.stringify(request), `Authorization: Bearer ${credential}\n`);
   const api_ms = elapsed(apiStart);
   const index = result.output.lastIndexOf('\n');

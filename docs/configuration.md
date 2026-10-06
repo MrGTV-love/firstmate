@@ -1364,6 +1364,7 @@ The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRI
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
 The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
 It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
 Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.

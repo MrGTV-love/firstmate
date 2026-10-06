@@ -650,3 +650,192 @@ try {
   console.log('ok - synthetic evaluation and legacy labels never contribute to historical quality or native promotion volume');
 } finally { rmSync(lab, {recursive:true,force:true}); }
 JS
+guardrail_status=$?
+[ "$guardrail_status" -eq 0 ] || exit "$guardrail_status"
+
+node --input-type=module - "$ROOT" <<'JS'
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { accessSync, constants, mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync, existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { resolve } from 'node:path';
+const root = process.argv[2];
+const actualCurl = process.env.PATH.split(':').map(directory => resolve(directory || '.', 'curl')).find(candidate => {
+  try { accessSync(candidate, constants.X_OK); return true; } catch { return false; }
+});
+assert.ok(actualCurl, 'real curl must be installed');
+const lab = mkdtempSync(resolve(root, 'jev-real-curl-test-'));
+const tool = resolve(root, 'bin/fm-jev-guardrail.mjs');
+const log = resolve(lab, 'records.jsonl');
+const trace = resolve(lab, 'curl.trace');
+const fakebin = resolve(lab, 'fakebin');
+const syntheticKey = 'synthetic-real-curl-key';
+const privateCommand = 'synthetic-command-private';
+const privateResponse = 'synthetic-response-private';
+const received = [];
+let reply = 'http_error';
+const validResponse = {
+  model: 'jev-1.13.0', usage: { input_tokens: 100, output_tokens: 1 },
+  answers: { risk: { type: 'choice', choice: 'risky', confidence: 0.9, probabilities: { risky: 0.9, routine: 0.05, uncertain: 0.05 } } },
+  private: `${privateResponse}:${syntheticKey}`,
+};
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', chunk => { body += chunk; });
+  request.on('end', () => {
+    received.push({ authorized: request.headers.authorization === `Bearer ${syntheticKey}`, method: request.method, url: request.url, body });
+    if (reply === 'timeout') return;
+    response.writeHead(reply === 'http_error' ? 503 : 200, { 'Content-Type': 'application/json' });
+    response.end(reply === 'http_error' ? 'service unavailable' : JSON.stringify(reply === 'malformed_response'
+      ? { ...validResponse, answers: { risk: { type: 'choice', choice: privateResponse } } }
+      : validResponse));
+  });
+});
+const run = (executable, args, env, input = '', header) => new Promise((resolveRun, reject) => {
+  const child = spawn(executable, args, { cwd: lab, env, stdio: ['pipe', 'pipe', 'pipe', ...(header === undefined ? [] : ['pipe'])] });
+  let stdout = '', stderr = '';
+  const deadline = setTimeout(() => child.kill('SIGKILL'), 15000);
+  child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk; });
+  child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk; });
+  child.once('error', error => { clearTimeout(deadline); reject(error); });
+  child.once('close', (status, signal) => { clearTimeout(deadline); resolveRun({ status, signal, stdout, stderr }); });
+  child.stdin.on('error', () => {});
+  child.stdin.end(input);
+  if (header !== undefined) { child.stdio[3].on('error', () => {}); child.stdio[3].end(header); }
+});
+const records = () => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) : [];
+const values = stdout => Object.fromEntries(stdout.trim().split('\n').map(line => {
+  const colon = line.indexOf(':');
+  return [line.slice(0, colon), JSON.parse(line.slice(colon + 1).trim())];
+}));
+const payload = host => host === 'omp'
+  ? { toolName: 'bash', input: { command: `cat .env.${privateCommand}` } }
+  : { tool_name: 'Bash', tool_input: { command: `cat .env.${privateCommand}` } };
+const env = {
+  ...process.env, HOME: lab, TMPDIR: lab, FM_HOME: lab,
+  FM_CONFIG_OVERRIDE: resolve(lab, 'config'), FM_STATE_OVERRIDE: resolve(lab, 'state'),
+  TYPESAFE_API_KEY: syntheticKey,
+};
+for (const name of Object.keys(env)) {
+  if (/^(?:https?|all|no)_proxy$/i.test(name) || ['CURL_HOME', 'XDG_CONFIG_HOME', 'TYPESAFE_API_KEY_PRIVATE'].includes(name)) delete env[name];
+}
+env.NO_PROXY = '*';
+const shellQuote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+try {
+  mkdirSync(fakebin);
+  writeFileSync(resolve(lab, '.curlrc'), `trace-ascii = "${trace}"\nretry = 3\nretry-delay = 1\n`);
+  await new Promise((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolveListen);
+  });
+  const endpoint = `http://127.0.0.1:${server.address().port}/v1/systemone`;
+  const control = await run(actualCurl, ['-sS', '--max-time', '2', '-X', 'POST', endpoint, '-H', '@/dev/fd/3', '--data-binary', '@-'], env, '{}', `Authorization: Bearer ${syntheticKey}\n`);
+  assert.equal(control.status, 0);
+  assert.equal(control.stderr, '');
+  assert.equal(received.length, 4, 'isolated curlrc retry=3 must cause four real requests');
+  assert.ok(received.every(request => request.authorized));
+  assert.ok(readFileSync(trace, 'utf8').includes(`Authorization: Bearer ${syntheticKey}`), 'isolated curlrc must expose the synthetic authorization in its trace');
+  rmSync(trace);
+  received.length = 0;
+  console.log('ok - real curl control honors isolated trace-ascii and hidden HTTP 503 retries');
+
+  writeFileSync(resolve(fakebin, 'curl'), `#!/bin/bash
+args=("$@")
+matched=0
+for index in "\${!args[@]}"; do
+  case "\${args[$index]}" in
+    https://api.typesafe.ai/v1/systemone) args[$index]=${shellQuote(endpoint)}; matched=$((matched + 1)) ;;
+    http://*|https://*) exit 90 ;;
+  esac
+done
+[ "$matched" -eq 1 ] || exit 91
+exec ${shellQuote(actualCurl)} "\${args[@]}"
+`);
+  chmodSync(resolve(fakebin, 'curl'), 0o700);
+  env.PATH = `${fakebin}:${process.env.PATH}`;
+  const probe = async (host, status, credential = syntheticKey) => {
+    reply = status;
+    const beforeRequests = received.length;
+    const beforeRecords = records().length;
+    const overrides = { ...env, TYPESAFE_API_KEY: credential };
+    let result;
+    if (host === 'evaluation') {
+      const cases = resolve(lab, 'cases.json');
+      writeFileSync(cases, JSON.stringify([{ id: 'real-curl', expected: 'risky', dataset: 'synthetic', payload: payload('claude') }]));
+      result = await run(process.execPath, [tool, 'evaluate', '--cases', cases, '--log', log], overrides);
+      assert.equal(values(result.stdout).promotion_volume_met, false);
+    } else {
+      result = await run(process.execPath, [tool, 'hook', '--host', host, '--log', log], overrides, JSON.stringify(payload(host)));
+      assert.equal(result.stdout, '');
+    }
+    assert.equal(result.status, 0);
+    assert.equal(result.signal, null);
+    assert.equal(result.stderr, '');
+    assert.equal(existsSync(trace), false, `${host}/${status}: no curl trace may be created`);
+    const added = records().slice(beforeRecords);
+    assert.deepEqual(added.map(record => record.event), credential ? ['attempt', 'result'] : ['result']);
+    const record = added.at(-1);
+    assert.equal(record.host, host);
+    assert.equal(record.selected, true);
+    assert.equal(record.status, status);
+    if (credential) assert.equal(added[0].id, record.id);
+    assert.equal(received.length - beforeRequests, credential ? 1 : 0, `${host}/${status}: physical requests must match recorded attempts`);
+    if (credential) {
+      const request = received.at(-1);
+      assert.equal(request.authorized, true);
+      assert.equal(request.method, 'POST');
+      assert.equal(request.url, '/v1/systemone');
+      const body = JSON.parse(request.body);
+      assert.deepEqual(Object.keys(body).sort(), ['model', 'questions', 'state']);
+      assert.equal(body.model, 'jev-1.13.0');
+      assert.deepEqual(body.state, { operations: [{ operation: 'secret_read', scope: 'secret', recursive: false, force: false }], syntax_uncertain: false });
+      assert.deepEqual(Object.keys(body.questions), ['risk']);
+      assert.equal(body.questions.risk.type, 'choice');
+      for (const sentinel of [syntheticKey, privateCommand, '.env']) assert.ok(!request.body.includes(sentinel));
+    }
+    if (status === 'judged' || status === 'malformed_response') {
+      assert.equal(record.input_tokens, 100);
+      assert.equal(record.output_tokens, 1);
+      assert.equal(record.model, 'jev-1.13.0');
+      assert.equal(record.cost_source, 'typesafe_models_input_estimate');
+    } else {
+      assert.equal(record.input_tokens, null);
+      assert.equal(record.cost_source, 'unknown');
+    }
+    assert.equal(record.verdict, status === 'judged' ? 'risky' : null);
+    assert.equal(record.confidence, status === 'judged' ? 0.9 : null);
+    const persisted = readFileSync(log, 'utf8') + result.stdout + result.stderr;
+    for (const sentinel of [syntheticKey, privateCommand, privateResponse, '.env', 'Authorization']) assert.ok(!persisted.includes(sentinel));
+    const allowed = new Set(['version', 'policy', 'at', 'mode', 'event', 'id', 'host', 'case_id', 'expected', 'dataset', 'selected', 'status', 'latency_ms', 'verdict', 'confidence', 'input_tokens', 'output_tokens', 'model', 'estimated_usd', 'cost_source', 'api_ms']);
+    for (const item of added) assert.ok(Object.keys(item).every(name => allowed.has(name)), 'ledger must retain only closed structural/accounting fields');
+  };
+  for (const host of ['claude', 'omp', 'evaluation']) {
+    await probe(host, 'judged');
+    await probe(host, 'http_error');
+  }
+  await probe('claude', 'timeout');
+  await probe('omp', 'malformed_response');
+  await probe('claude', 'missing_key', '');
+  const report = await run(process.execPath, [tool, 'metrics', '--log', log], env);
+  assert.equal(report.status, 0);
+  assert.equal(report.stderr, '');
+  const accounting = values(report.stdout);
+  assert.equal(accounting.attempts, received.length);
+  assert.equal(accounting.attempts, 8);
+  assert.equal(accounting.incomplete_attempts, 0);
+  assert.equal(accounting.unknown_cost_attempts, 4);
+  assert.equal(accounting.known_input_tokens, 400);
+  assert.equal(accounting.known_output_tokens, 4);
+  assert.equal(accounting.judged, 3);
+  assert.equal(accounting.native_judged, 2);
+  assert.equal(accounting.promotion_volume_met, false);
+  for (const sentinel of [syntheticKey, privateCommand, privateResponse]) assert.ok(!report.stdout.includes(sentinel));
+  console.log('ok - isolated real curl preserves closed requests and redacted results with one physical request per claude, omp and evaluate attempt, including HTTP 503');
+  console.log('ok - real curl timeout, malformed response and missing key retain advisory output, privacy and all-attempt accounting');
+} finally {
+  server.closeAllConnections();
+  await new Promise(resolveClose => server.close(resolveClose));
+  rmSync(lab, { recursive: true, force: true });
+}
+JS
