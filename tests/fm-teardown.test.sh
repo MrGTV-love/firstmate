@@ -5086,6 +5086,60 @@ test_retained_sources_still_reach_the_ordinary_refusal() {
   pass "present required sources still reach the ordinary teardown refusal"
 }
 
+test_task_teardown_preserves_another_homes_abandoned_worker() {
+  local case_dir foreign_root pid rc
+  case_dir=$(make_case caller-confined-reaping)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  prepare_teardown_source_copy "$case_dir"
+  foreign_root="$case_dir/other-home"
+  mkdir -p "$foreign_root/bin"
+  cat > "$foreign_root/bin/fm-remote-job-worker.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' ready > "$FM_FOREIGN_WORKER_READY"
+while :; do sleep 1; done
+SH
+  FM_FOREIGN_WORKER_READY="$case_dir/foreign-ready" \
+    perl -e 'setpgrp(0, 0); exec @ARGV' \
+    "$BASH" "$foreign_root/bin/fm-remote-job-worker.sh" --serve &
+  pid=$!
+  local tries=0
+  while [ ! -e "$case_dir/foreign-ready" ] && [ "$tries" -lt 100 ]; do
+    sleep 0.05
+    tries=$((tries + 1))
+  done
+  if [ ! -e "$case_dir/foreign-ready" ]; then
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "caller-confinement: foreign worker did not start"
+  fi
+  rm -rf "$foreign_root"
+
+  # Bound the administrative reaper's account scan to our one real fixture
+  # process, never any actual account worker. Other ps queries stay native.
+  cat > "$case_dir/fakebin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -u ]; then
+  exec "$REAL_PS_FOR_TEST" -p "$pid" -o pid=,command=
+fi
+exec "$REAL_PS_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/ps"
+  rc=0
+  run_copied_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if ! kill -0 "$pid" 2>/dev/null; then
+    wait "$pid" 2>/dev/null || true
+    fail "caller-confinement: task teardown killed another home's abandoned worker"
+  fi
+  kill -TERM "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$rc" "caller-confinement: ordinary task teardown should complete"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "caller-confinement: ordinary task cleanup did not complete"
+  pass "task teardown completes without reaping another home's abandoned worker"
+}
+
+test_task_teardown_preserves_another_homes_abandoned_worker
 test_missing_startup_source_refuses_before_cleanup
 test_unreadable_startup_source_refuses_before_cleanup
 test_missing_adapter_sibling_refuses_before_cleanup
