@@ -345,7 +345,7 @@ test_compound_launch_credentials_and_account() {
       root="$CASE_DIR/auth-pin"
       if [ "$pin" = ordinary ]; then
         printf 'ordinary\n' > "$HOME_DIR/config/claude-account"
-        root=unset
+        root='unset'
       fi
     fi
     if [ "$allowlist" -eq 1 ]; then
@@ -366,8 +366,8 @@ test_compound_launch_credentials_and_account() {
     status=$?
     [ "$status" -eq 0 ] || fail "$scenario compound Claude spawn should succeed"$'\n'"$out"
     observe_launch
-    expected_key=unset
-    expected_token=unset
+    expected_key='unset'
+    expected_token='unset'
     if [ "$opt_in" -eq 1 ] && [ "$pin" = none ]; then
       expected_key=sk-ant-pane-only
       expected_token=sk-ant-pane-token
