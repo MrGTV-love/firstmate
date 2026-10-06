@@ -297,9 +297,9 @@ never_send_off() {
 NEVER_SEND_LIST='' MARKED_SECTIONS=0
 never_send_load() {
   local value n=0
+  fm_typesafe_policy_inspect "$NEVER_SEND_PATH" \
+    || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
   [ -e "$NEVER_SEND_PATH" ] || [ -L "$NEVER_SEND_PATH" ] || return 0
-  { [ -f "$NEVER_SEND_PATH" ] && [ -r "$NEVER_SEND_PATH" ]; } \
-    || never_send_off "$NEVER_SEND_PATH is not a readable regular file"
   NEVER_SEND_LIST=$(jq -Rr 'gsub("\\s+"; " ")' "$NEVER_SEND_PATH" 2>/dev/null) \
     || never_send_off "could not read $NEVER_SEND_PATH"
   while IFS= read -r value; do

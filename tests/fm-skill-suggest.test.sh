@@ -5,6 +5,8 @@ set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-skill-suggest)
+denied=
+trap '[ -z "$denied" ] || chmod 700 "$denied"; fm_test_cleanup' EXIT
 HOME_DIR="$TMP_ROOT/home"
 CATALOG="$TMP_ROOT/skills"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
@@ -165,6 +167,38 @@ assert_absent "$LOG/calls" "withheld task makes no live request"
 assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "withheld task never exposes keys to early children"
 rm "$HOME_DIR/config/dispatch-never-send"
 pass "privacy rules keep required identities local and withhold matching task text"
+
+printf 'Use gamma for Acme-Ledger.\n' > "$TASK"
+printf '# Skill selection input\nUse gamma for Acme-Ledger.\n' > "$BRIEF"
+printf 'Acme-Ledger\n' > "$HOME_DIR/config/dispatch-never-send"
+for input in --task-file --brief; do
+  if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+  for format in toon brief; do
+    reset
+    denied="$HOME_DIR/config"
+    chmod 400 "$denied"
+    [ ! -x "$denied" ] || fail "policy ancestor fixture must deny search"
+    out=$(run "$input" "$input_path" --required safety --format "$format")
+    chmod 700 "$denied"
+    denied=
+    assert_contains "$out" 'text withheld by dispatch-never-send policy' "$input $format refuses uninspectable policy ancestry"
+    if [ "$format" = toon ]; then
+      assert_contains "$out" "\"safety\",\"$CATALOG/safety/SKILL.md\"" "policy refusal retains caller requirement"
+      assert_contains "$out" "\"gamma\",\"$CATALOG/gamma/SKILL.md\"" "policy refusal retains recognized task requirement"
+    else
+      assert_contains "$out" "Required named skill: safety - read $CATALOG/safety/SKILL.md." "brief policy refusal retains caller requirement"
+      assert_contains "$out" "Required named skill: gamma - read $CATALOG/gamma/SKILL.md." "brief policy refusal retains recognized task requirement"
+    fi
+    assert_absent "$LOG/calls" "$input $format makes neither TypeSafe request"
+  done
+done
+rm "$HOME_DIR/config/dispatch-never-send"
+reset
+out=$(run --task-file "$TASK" --required safety)
+assert_contains "$out" 'source: live' "genuinely absent policy permits ordinary advice"
+assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "absent policy retains both advice stages"
+printf 'Perform a combined task.\n' > "$TASK"
+pass "inaccessible policy ancestors withhold requests without suppressing requirements"
 
 printf '# Skill selection input\nPerform a combined task.\n' > "$BRIEF"
 for directive in \
@@ -480,6 +514,65 @@ for discovery_root in home selected; do
   done
 done
 pass "filesystem discovery failures withhold both stages while retaining accessible requirements"
+for discovery_root in home selected; do
+  if [ "$discovery_root" = home ]; then
+    discovery_dir=$HOME_SKILLS
+    discovery_child="$discovery_dir/acme-private"
+    recognized="\"gamma\",\"$SPLIT_CODE/.agents/skills/gamma/SKILL.md\""
+  else
+    discovery_dir="$SPLIT_CODE/.agents/skills"
+    discovery_child="$discovery_dir/delta"
+    recognized="\"home-known\",\"$HOME_SKILLS/home-known/SKILL.md\""
+  fi
+  for shape in root child body; do
+    target_parent="$TMP_ROOT/link-target-$discovery_root-$shape"
+    mkdir -p "$target_parent"
+    case "$shape" in
+      root) link=$discovery_dir ;;
+      child) link=$discovery_child ;;
+      body) link="$discovery_child/SKILL.md" ;;
+    esac
+    target="$target_parent/entry"
+    mv "$link" "$target"
+    ln -s "$target" "$link"
+    for input in --task-file --brief; do
+      if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+      for format in toon brief; do
+        reset
+        denied=$target_parent
+        chmod 400 "$denied"
+        [ ! -x "$denied" ] || fail "$discovery_root $shape target fixture must deny search"
+        out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+          bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" "$input" "$input_path" \
+          --required acme-private --required safety --format "$format")
+        chmod 700 "$denied"
+        denied=
+        assert_contains "$out" 'unsupported skill metadata' "$discovery_root $shape withholds incomplete link inspection"
+        if [ "$format" = toon ]; then
+          assert_contains "$out" '"acme-private",' "$shape retains caller-required private identity"
+          assert_contains "$out" '"safety",' "$shape retains caller-required safety"
+          assert_contains "$out" "$recognized" "$shape retains recognized sibling-root requirement"
+          assert_contains "$out" 'suggestions[0]' "$shape offers no partial advice"
+        else
+          assert_contains "$out" 'Required named skill: acme-private -' "$shape preserves private identity in brief advice"
+          assert_contains "$out" 'Required named skill: safety -' "$shape preserves safety in brief advice"
+          assert_contains "$out" 'No optional suggestion (fallback:' "$shape restores ordinary selection in brief advice"
+        fi
+        assert_absent "$LOG/calls" "$discovery_root $shape $input $format makes neither request"
+      done
+    done
+    reset
+    out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+      bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" --task-file "$TASK" --required safety)
+    assert_contains "$out" 'status: off' "$discovery_root $shape readable links retain private-name withholding"
+    assert_contains "$out" '"acme-private","' "$discovery_root $shape readable links resolve the named private skill"
+    assert_not_contains "$out" 'unsupported skill metadata' "$discovery_root $shape readable links remain supported"
+    assert_absent "$LOG/calls" "$discovery_root $shape never discloses recognized private names"
+    rm "$link"
+    mv "$target" "$link"
+  done
+done
+pass "uninspectable root, child and body links withhold both stages and retain requirements"
 rm -rf "$HOME_SKILLS/acme-private" "$HOME_SKILLS/home-known"
 cp "$TMP_ROOT/split-task-save" "$TASK"
 pass "split-home private identities stay required and local across all public input and output paths"

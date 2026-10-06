@@ -38,15 +38,41 @@ fm_typesafe_post() {
   printf '%s' "$http"
 }
 
-# shellcheck disable=SC2034 # FM_TYPESAFE_WITHHELD_REASON is a caller-consumed result.
-fm_typesafe_permitted() {
-  local request=$1 path=$2 scratch=$3 list value n=0 rc
+fm_typesafe_policy_inspect() {
+  local path=$1 ancestor
   FM_TYPESAFE_WITHHELD_REASON=
+  case "$path" in
+    */*) ancestor=${path%/*}; [ -n "$ancestor" ] || ancestor=/ ;;
+    *) ancestor=. ;;
+  esac
+  while :; do
+    if [ -d "$ancestor" ]; then
+      if [ ! -x "$ancestor" ]; then
+        FM_TYPESAFE_WITHHELD_REASON="could not inspect $path"
+        return 1
+      fi
+    elif [ -e "$ancestor" ] || [ -L "$ancestor" ]; then
+      FM_TYPESAFE_WITHHELD_REASON="could not inspect $path"
+      return 1
+    fi
+    case "$ancestor" in
+      /|.) break ;;
+      */*) ancestor=${ancestor%/*}; [ -n "$ancestor" ] || ancestor=/ ;;
+      *) ancestor=. ;;
+    esac
+  done
   [ -e "$path" ] || [ -L "$path" ] || return 0
   if ! { [ -f "$path" ] && [ -r "$path" ]; }; then
     FM_TYPESAFE_WITHHELD_REASON="$path is not a readable regular file"
     return 1
   fi
+}
+
+# shellcheck disable=SC2034 # FM_TYPESAFE_WITHHELD_REASON is a caller-consumed result.
+fm_typesafe_permitted() {
+  local request=$1 path=$2 scratch=$3 list value n=0 rc
+  fm_typesafe_policy_inspect "$path" || return 1
+  [ -e "$path" ] || [ -L "$path" ] || return 0
   if ! jq -r '.. | strings | gsub("\\s+"; " ")' <<<"$request" > "$scratch" 2>/dev/null; then
     FM_TYPESAFE_WITHHELD_REASON="could not extract the request text to check"
     return 1

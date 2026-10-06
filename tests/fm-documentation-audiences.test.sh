@@ -135,7 +135,60 @@ MD
   pass "local links resolve while dates, versions, commands, and incident prose remain semantically reviewed"
 }
 
+test_nested_skill_reference_links() {
+  local repo="$TMP_ROOT/skill-fixture"
+  local reference=".agents/skills/harness-adapters/references/common/dispatch.md"
+  mkdir -p "$repo/docs" "$repo/.agents/skills/harness-adapters/references/common"
+  git -C "$repo" init -q
+  printf '%s\n' '[Setup](docs/setup.md) [Policy](docs/policy.md)' > "$repo/README.md"
+  printf '%s\n' '# Setup' '[Policy](policy.md#policy)' > "$repo/docs/setup.md"
+  printf '%s\n' '# Policy' > "$repo/docs/policy.md"
+  printf '%s\n' '# Evidence' > "$repo/docs/evidence.md"
+  printf '%s\n' '# Advisory skill selection' > "$repo/docs/configuration.md"
+  printf '%s\n' '# Harness adapters' '[Dispatch](references/common/dispatch.md#dispatch)' \
+    > "$repo/.agents/skills/harness-adapters/SKILL.md"
+  cat > "$repo/$reference" <<'MD'
+# Dispatch
+
+[Advisory skill selection](../../../docs/configuration.md#advisory-skill-selection)
+<a href="../../../docs/policy.md#policy">Policy</a>
+[Self](#dispatch)
+MD
+  write_fixture_inventory "$repo"
+  python3 - "$repo/docs/documentation-audiences.json" "$reference" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+for surface in ["docs/configuration.md", ".agents/skills/harness-adapters/SKILL.md", sys.argv[2]]:
+    data["surfaces"].append({"path": surface, "audience": "operator-current"})
+data["requiredOwnerPointers"].append({"source": sys.argv[2], "target": "docs/configuration.md"})
+path.write_text(json.dumps(data))
+PY
+  git -C "$repo" add README.md docs .agents
+  "$CHECK" --root "$repo" >/dev/null \
+    || fail "checker did not resolve nested references from the owning skill"
+
+  printf '%s\n' '# Different heading' > "$repo/docs/configuration.md"
+  run_expect_failure "unresolved local anchor in $reference" "$CHECK" --root "$repo"
+  printf '%s\n' '# Advisory skill selection' > "$repo/docs/configuration.md"
+  rm "$repo/docs/configuration.md"
+  run_expect_failure "owner-pointer target is missing: docs/configuration.md" "$CHECK" --root "$repo"
+  printf '%s\n' '# Advisory skill selection' > "$repo/docs/configuration.md"
+
+  printf '%s\n' '[Broken](../../../docs/missing.md)' >> "$repo/$reference"
+  run_expect_failure "unresolved local link in $reference" "$CHECK" --root "$repo"
+  printf '%s\n' '# Dispatch' '[Absolute](/docs/policy.md)' > "$repo/$reference"
+  run_expect_failure "absolute local link in $reference" "$CHECK" --root "$repo"
+  printf '%s\n' '# Dispatch' '[Escape](../../../../outside.md)' > "$repo/$reference"
+  run_expect_failure "local link escapes repository in $reference" "$CHECK" --root "$repo"
+  pass "nested skill references use their owner while ordinary links, anchors, and path boundaries remain enforced"
+}
+
 test_repository_inventory_passes
 test_duplicate_and_setup_classification_fail
 test_required_pointer_fails
 test_local_links_and_no_keyword_heuristic
+test_nested_skill_reference_links

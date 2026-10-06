@@ -134,13 +134,19 @@ for root in "${DISCOVERY_ROOTS[@]}"; do
     continue
   fi
   for child in "$root"/*; do
-    [ -d "$child" ] || continue
+    if [ ! -d "$child" ]; then
+      [ ! -L "$child" ] || DISCOVERY_FAILED=true
+      continue
+    fi
     if [ ! -r "$child" ] || [ ! -x "$child" ]; then
       DISCOVERY_FAILED=true
       continue
     fi
     file="$child/SKILL.md"
-    [ -f "$file" ] || continue
+    if [ ! -f "$file" ]; then
+      [ ! -L "$file" ] || DISCOVERY_FAILED=true
+      continue
+    fi
     if [ ! -r "$file" ]; then
       DISCOVERY_FAILED=true
       continue

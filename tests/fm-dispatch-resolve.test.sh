@@ -14,6 +14,8 @@ set -u
 
 TOOL="$ROOT/bin/fm-dispatch-resolve.sh"
 TMP_ROOT=$(fm_test_tmproot fm-dispatch-resolve)
+denied=
+trap '[ -z "$denied" ] || chmod 700 "$denied"; fm_test_cleanup' EXIT
 HOME_DIR="$TMP_ROOT/home"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 NO_CURL_BIN="$TMP_ROOT/no-curl-bin"
@@ -521,6 +523,28 @@ reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
 expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rm -f "$NEVER_SEND"
+
+POLICY_TARGET_DIR="$TMP_ROOT/policy-target"
+mkdir -p "$POLICY_TARGET_DIR"
+printf 'Acme-Ledger\n' > "$POLICY_TARGET_DIR/policy"
+ln -s "$POLICY_TARGET_DIR/policy" "$NEVER_SEND"
+reset_log
+denied=$POLICY_TARGET_DIR
+chmod 400 "$denied"
+[ ! -x "$denied" ] || fail "policy target fixture must deny ancestor search"
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+chmod 700 "$denied"
+denied=
+expect_withheld "a policy link with an inaccessible target ancestor" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+expect_withheld "a readable policy link" "brief text matches $NEVER_SEND line 1" 'Acme-Ledger' '4417-2290'
+printf 'Unlisted-Value\n' > "$POLICY_TARGET_DIR/policy"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+assert_contains "$out" '  status: clear' "readable nonmatching policy link permits normal dispatch"
+assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'Acme-Ledger' "readable policy target is checked without changing task text"
+rm "$NEVER_SEND"
 
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
