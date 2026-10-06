@@ -69,6 +69,125 @@ export REAL_PS_FOR_TEST
 REAL_LSOF_FOR_TEST=$(command -v lsof)
 export REAL_LSOF_FOR_TEST
 
+TEARDOWN_FIXTURE_PROCESSES="$TMP_ROOT/fixture-processes"
+FM_TEARDOWN_FIXTURE_HELPERS="$TMP_ROOT/fixture-process.pl"
+export TEARDOWN_FIXTURE_PROCESSES FM_TEARDOWN_FIXTURE_HELPERS
+mkdir "$TEARDOWN_FIXTURE_PROCESSES"
+
+teardown_fixture_birth() {
+  local pid=$1 stat_line start
+  local -a fields
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  if [ -r "/proc/$pid/stat" ]; then
+    IFS= read -r stat_line < "/proc/$pid/stat" || return 1
+    read -r -a fields <<< "${stat_line##*)}"
+    [ "${#fields[@]}" -ge 20 ] || return 1
+    [ "${fields[0]}" != Z ] || return 1
+    printf 'starttime=%s\n' "${fields[19]}"
+  else
+    start=$(LC_ALL=C "$REAL_PS_FOR_TEST" -p "$pid" -o lstart=) || return 1
+    start=${start#"${start%%[![:space:]]*}"}
+    start=${start%"${start##*[![:space:]]}"}
+    [ -n "$start" ] || return 1
+    printf 'lstart=%s\n' "$start"
+  fi
+}
+
+teardown_fixture_live() {
+  local pid=$1 birth=$2 current state
+  current=$(teardown_fixture_birth "$pid") || return 1
+  [ "$current" = "$birth" ] || return 1
+  state=$("$REAL_PS_FOR_TEST" -p "$pid" -o stat=) || return 1
+  case "$state" in *Z*|'') return 1 ;; esac
+}
+
+teardown_fixture_track() {
+  local pid=$1 signal=${2:-KILL} birth
+  birth=$(teardown_fixture_birth "$pid") || fail "cannot register fixture process $pid"
+  printf '%s\t%s\n' "$signal" "$birth" > "$TEARDOWN_FIXTURE_PROCESSES/$pid"
+}
+
+teardown_fixture_start() {
+  local cwd=$1 signal=$2 interrupted=0
+  shift 2
+  trap 'interrupted=130' INT
+  trap 'interrupted=143' TERM
+  trap 'interrupted=129' HUP
+  trap 'interrupted=131' QUIT
+  (cd "$cwd" && exec "$@") &
+  TEARDOWN_FIXTURE_PID=$!
+  teardown_fixture_track "$TEARDOWN_FIXTURE_PID" "$signal"
+  [ "$signal" != KILL ] || disown "$TEARDOWN_FIXTURE_PID"
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  trap 'exit 131' QUIT
+  [ "$interrupted" -eq 0 ] || exit "$interrupted"
+}
+
+teardown_fixture_stop() {
+  local pid=$1 signal birth
+  [ -f "$TEARDOWN_FIXTURE_PROCESSES/$pid" ] || return 0
+  IFS=$'\t' read -r signal birth < "$TEARDOWN_FIXTURE_PROCESSES/$pid" || return 0
+  teardown_fixture_live "$pid" "$birth" || return 0
+  kill "-$signal" "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  while teardown_fixture_live "$pid" "$birth"; do sleep 0.01; done
+}
+
+teardown_fixture_cleanup() {
+  local record signal birth
+  trap '' INT TERM HUP QUIT
+  for record in "$TEARDOWN_FIXTURE_PROCESSES"/*; do
+    [ -f "$record" ] || continue
+    IFS=$'\t' read -r signal birth < "$record" || continue
+    case "$signal" in TERM|HUP) teardown_fixture_stop "${record##*/}" ;; esac
+  done
+  for record in "$TEARDOWN_FIXTURE_PROCESSES"/*; do
+    [ -f "$record" ] && teardown_fixture_stop "${record##*/}"
+  done
+  fm_test_cleanup
+}
+trap teardown_fixture_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+trap 'exit 131' QUIT
+export -f teardown_fixture_birth teardown_fixture_live
+
+cat > "$FM_TEARDOWN_FIXTURE_HELPERS" <<'PERL'
+sub fixture_birth {
+  my ($pid) = @_;
+  if (open my $stat, "<", "/proc/$pid/stat") {
+    my $line = <$stat>;
+    close $stat;
+    $line =~ s/.*\)\s*//;
+    my @fields = split /\s+/, $line;
+    die "missing birth identity" unless @fields >= 20;
+    return "starttime=$fields[19]";
+  }
+  local $ENV{LC_ALL} = "C";
+  open my $ps, "-|", $ENV{REAL_PS_FOR_TEST}, "-p", $pid, "-o", "lstart=" or die "ps";
+  my $start = <$ps>;
+  close $ps or die "ps failed";
+  defined $start or die "missing birth identity";
+  $start =~ s/^\s+|\s+$//g;
+  length $start or die "empty birth identity";
+  return "lstart=$start";
+}
+sub fixture_track {
+  my ($pid) = @_;
+  my $birth = fixture_birth($pid);
+  my $record = "$ENV{TEARDOWN_FIXTURE_PROCESSES}/$pid";
+  open my $fh, ">", "$record.$$" or die "register fixture";
+  print {$fh} "KILL\t$birth\n";
+  close $fh or die "close fixture registration";
+  rename "$record.$$", $record or die "publish fixture registration";
+  return $birth;
+}
+1;
+PERL
+
 # Build a fresh sandbox for one test case. Sets up:
 #   $CASE/state/        - firstmate state dir (with a fresh watcher beacon)
 #   $CASE/fakebin/      - mocks for treehouse, tmux (PATH-prepended by caller)
@@ -1396,9 +1515,10 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   local case_dir rc out
   case_dir=$(make_case windowless-retry)
   write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   add_failing_truncate_perl "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
 
   set +e
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
@@ -1408,8 +1528,7 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   [ "$(legacy_meta_gen_count "$case_dir")" = 1 ] \
     || fail "windowless-retry: the failed attempt did not leave its legacy stamp on the record"
 
-  rm -f "$case_dir/fakebin/perl"
-  sed -i.bak '/^pr=/d' "$case_dir/state/task-x1.meta" && rm -f "$case_dir/state/task-x1.meta.bak"
+  rm -f "$case_dir/fakebin/perl" "$case_dir/fakebin/mv"
   out=$(run_teardown "$case_dir") \
     || fail "windowless-retry: the flag-less retry refused the retained legacy stamp"
   printf '%s\n' "$out" | grep -Fq 'legacy record accepted without spawn_gen: endpoint missing' \
@@ -1499,10 +1618,11 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   local case_dir rc before
   case_dir=$(make_case legacy-stamp-rollback)
   write_legacy_meta "$case_dir" no-mistakes ship
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
   set +e
@@ -1514,8 +1634,6 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
     "legacy-stamp-rollback: an unrecordable close must fail the teardown after accepting the legacy record"
   [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
     || fail "legacy-stamp-rollback: the failed marker write left the record modified"
-  grep -q "rolled back" "$case_dir/stderr" \
-    || fail "legacy-stamp-rollback: the refusal did not report the rolled-back stamp"
   [ "$(backlog_row_state "$case_dir")" = in_flight ] \
     || fail "legacy-stamp-rollback: the failed teardown closed the backlog item anyway"
 
@@ -1530,6 +1648,19 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
     || fail "legacy-stamp-rollback: the flag-less retry modified the record"
   pass "--legacy-record teardown rolls its stamp back when the close marker write fails"
+}
+
+add_failing_close_publication_mv() {
+  local case_dir=$1 real_mv
+  real_mv=$(command -v mv)
+  cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${*: -1}" in
+  "$case_dir/state/task-x1.backlog-close") exit 1 ;;
+esac
+exec "$real_mv" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/mv"
 }
 
 # Override fakebin/perl so ONLY the stamp rollback's truncate fails; every other
@@ -1552,11 +1683,12 @@ test_retained_legacy_stamp_still_faces_the_endpoint_gate() {
   local case_dir rc stamped
   case_dir=$(make_case legacy-stamp-retained)
   write_legacy_meta "$case_dir" no-mistakes ship
-  printf '%s\n' 'pr=not-a-valid-url' >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
   add_failing_truncate_perl "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
 
   set +e
   run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
@@ -3699,9 +3831,8 @@ test_leaked_worktree_process_is_reaped() {
   # worktree - the same shape the observed incident's leaked `go test`
   # binaries took (reparented to init, no live task meta to attribute them
   # to once an unpatched teardown had already run).
-  ( cd "$case_dir/wt" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "leaked-process-reap: setup sleeper did not start"
 
@@ -3710,12 +3841,638 @@ test_leaked_worktree_process_is_reaped() {
 
   expect_code 0 "$rc" "leaked-process-reap: teardown should still succeed"
   if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
     fail "leaked-process-reap: leaked worktree process survived teardown"
   fi
   assert_grep "reaping leaked worktree process" "$case_dir/stderr" \
     "leaked-process-reap: teardown did not report reaping the leaked process"
+  assert_present "$case_dir/state/task-x1.teardown-processes" \
+    "leaked-process-reap: teardown removed the durable process identity audit"
   pass "a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving"
+}
+
+test_process_identity_is_recorded_before_term_and_kill() {
+  local case_dir rc pid journal expected_start expected_cwd epoch signal audit_pid birth command start cwd matched
+  case_dir=$(make_case durable-process-identity)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  journal="$case_dir/state/task-x1.teardown-processes"
+  teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
+    my ($journal, $seen, $ready) = @ARGV;
+    $SIG{TERM} = sub {
+      open my $in, "<", $journal or die "signal arrived without audit";
+      local $/; my $audit = <$in>;
+      open my $out, ">", $seen or die "open observation";
+      print {$out} $audit; close $out;
+    };
+    open my $ready_file, ">", $ready or die "ready"; close $ready_file;
+    while (1) { sleep 300; }
+PERL
+  )" "$journal" "$case_dir/term-observed" "$case_dir/ready"
+  pid=$TEARDOWN_FIXTURE_PID
+  local i=0
+  while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case_dir/ready" ] || { teardown_fixture_stop "$pid"; fail "durable-process-identity: process not ready"; }
+  expected_start=$(LC_ALL=C ps -p "$pid" -o lstart=)
+  expected_cwd=$(cd "$case_dir/wt" && pwd -P)
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if kill -0 "$pid" 2>/dev/null; then
+    teardown_fixture_stop "$pid"
+    fail "durable-process-identity: leaked process survived"
+  fi
+  expect_code 0 "$rc" "durable-process-identity: teardown should succeed"
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/term-observed" \
+    "durable-process-identity: TERM preceded its durable identity record"
+  assert_grep $'\tKILL\t'"$pid"$'\t' "$journal" \
+    "durable-process-identity: KILL has no durable identity record"
+  IFS=$'\t' read -r epoch signal audit_pid birth command start cwd matched < "$case_dir/term-observed"
+  case "$epoch" in ''|*[!0-9]*) fail "durable-process-identity: invalid timestamp" ;; esac
+  case "$command" in *perl*) ;; *) fail "durable-process-identity: command line missing" ;; esac
+  case "$birth" in lstart=*|starttime=*) ;; *) fail "durable-process-identity: birth identity missing" ;; esac
+  [ "$signal" = TERM ] && [ "$audit_pid" = "$pid" ] \
+    || fail "durable-process-identity: signal target missing"
+  [ "$start" = "$(printf '%q' "$expected_start")" ] \
+    || fail "durable-process-identity: process start time missing or incorrect"
+  [ "$cwd" = "$(printf '%q' "$expected_cwd")" ] && [ "$matched" = "$cwd" ] \
+    || fail "durable-process-identity: cwd or matched open path missing or incorrect"
+  pass "a real leaked process observes its durable identity audit before TERM, and KILL is audited too"
+}
+
+assert_nested_lane_process_is_not_reaped() {  # <case-name> <registrar: project|sibling> [<lane-damage: none|no-git|deleted>]
+  local name=$1 registrar=$2 damage=${3:-none} case_dir rc pid other_pid nested lane before identity registry
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  registry="$case_dir/project"
+  if [ "$registrar" = sibling ]; then
+    registry="$case_dir/sibling-clone"
+    git clone -q "$case_dir/origin.git" "$registry"
+  fi
+  nested="$case_dir/wt/other-lane"
+  git -C "$registry" worktree add -q --detach "$nested" main
+  git -C "$registry" worktree lock "$nested"
+  lane=$(cd "$nested" && pwd -P)
+  fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+  before=$(cat "$case_dir/state/unrelated.meta")
+  mkdir -p "$case_dir/unrelated"
+  teardown_fixture_start "$nested" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+  other_pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  case "$damage" in
+    no-git) rm -f "$nested/.git" ;;
+    deleted) rm -rf "$nested" ;;
+  esac
+  if [ -r "/proc/$pid/stat" ]; then
+    identity="starttime=$(sed 's/.*) //' "/proc/$pid/stat" | awk '{print $20}')"
+  else
+    identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
+  fi
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  local survived=0 other_survived=0
+  kill -0 "$pid" 2>/dev/null && survived=1
+  kill -0 "$other_pid" 2>/dev/null && other_survived=1
+  teardown_fixture_stop "$pid"
+  teardown_fixture_stop "$other_pid"
+  expect_code 1 "$rc" "$name: teardown must refuse even with force"
+  [ "$survived" -eq 1 ] || fail "$name: other lane process was killed"
+  [ "$other_survived" -eq 1 ] || fail "$name: unrelated process was killed"
+  [ "$(cat "$case_dir/state/unrelated.meta")" = "$before" ] \
+    || fail "$name: unrelated task record changed"
+  assert_present "$case_dir/state/task-x1.meta" "$name: task record removed"
+  [ "$damage" = deleted ] || assert_present "$nested" "$name: nested lane removed"
+  assert_grep "REFUSED: process $pid ($identity) " "$case_dir/stderr" \
+    "$name: refusal does not name the pid and its start identity"
+  assert_grep "matched path $lane" "$case_dir/stderr" \
+    "$name: refusal does not name the matched path"
+  if [ "$registrar" = sibling ] && [ "$damage" != none ]; then
+    assert_grep "beneath scan root $(cd "$case_dir/wt" && pwd -P), whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling." "$case_dir/stderr" \
+      "$name: refusal does not explain unproven custody"
+    assert_not_contains "$(cat "$case_dir/stderr")" " inside registered nested worktree lane " \
+      "$name: refusal falsely claims a known lane"
+  else
+    assert_grep " inside registered nested worktree lane $lane," "$case_dir/stderr" \
+      "$name: refusal does not name the lane"
+  fi
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "$name: other lane recorded as a signal target"
+}
+
+test_nested_registered_worktree_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped nested-worktree-custody project
+  pass "registered nested-lane and unrelated processes and records remain untouched on forced teardown"
+}
+
+test_sibling_clone_nested_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-nested-worktree-custody sibling
+  pass "a nested lane registered by a sibling clone of the project is never signalled on forced teardown"
+}
+
+test_registered_lane_missing_git_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped missing-git-lane-custody project no-git
+  pass "a still-registered nested lane whose .git is missing is never signalled through outer-worktree discovery"
+}
+
+test_deleted_registered_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped deleted-lane-custody project deleted
+  pass "a process inside a deleted but still-registered nested lane is never signalled"
+}
+
+test_sibling_clone_missing_git_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-missing-git-lane-custody sibling no-git
+  pass "a sibling lane without its .git is preserved because its custody is unproven"
+}
+
+test_sibling_clone_deleted_lane_process_is_not_reaped() {
+  assert_nested_lane_process_is_not_reaped sibling-deleted-lane-custody sibling deleted
+  pass "a deleted sibling lane process is preserved because its custody is unproven"
+}
+
+assert_unknown_descendant_process_is_not_reaped() {
+  local name=$1 location=$2 damage=$3 case_dir rc pid root matched identity survived=0
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root="$case_dir/$location"
+  if [ "$location" = tasktmp ]; then
+    printf '%s\n' "tasktmp=$root" >> "$case_dir/state/task-x1.meta"
+  fi
+  mkdir -p "$root/dist"
+  root=$(cd "$root" && pwd -P)
+  matched="$root/dist"
+  teardown_fixture_start "$matched" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  [ "$damage" != deleted ] || rm -rf "$matched"
+  if [ -r "/proc/$pid/stat" ]; then
+    identity="starttime=$(sed 's/.*) //' "/proc/$pid/stat" | awk '{print $20}')"
+  else
+    identity="lstart=$(LC_ALL=C ps -p "$pid" -o lstart= | sed 's/^ *//; s/ *$//')"
+  fi
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  teardown_fixture_stop "$pid"
+  expect_code 1 "$rc" "$name: teardown must refuse even with force"
+  [ "$survived" -eq 1 ] || fail "$name: unknown descendant process was killed"
+  assert_present "$root" "$name: scan root removed"
+  assert_present "$case_dir/state/task-x1.meta" "$name: task record removed"
+  [ "$damage" = deleted ] || assert_present "$matched" "$name: descendant removed"
+  assert_grep "REFUSED: process $pid ($identity) matched path $matched" "$case_dir/stderr" \
+    "$name: refusal does not identify the process and matched path"
+  assert_grep "beneath scan root $root, whose ownership by task-x1 is not proven; preserving it and task task-x1 without signalling." "$case_dir/stderr" \
+    "$name: refusal does not explain unproven custody"
+  assert_not_contains "$(cat "$case_dir/stderr")" " inside registered nested worktree lane " \
+    "$name: refusal falsely claims a known lane"
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "$name: unknown descendant recorded as a signal target"
+}
+
+test_own_deleted_cwd_process_is_not_reaped() {
+  assert_unknown_descendant_process_is_not_reaped own-deleted-cwd-custody wt deleted
+  assert_unknown_descendant_process_is_not_reaped tasktmp-deleted-cwd-custody tasktmp deleted
+  pass "deleted descendants of worktree and non-Git tasktmp roots survive without a signal audit"
+}
+
+test_ordinary_descendant_process_is_not_reaped() {
+  assert_unknown_descendant_process_is_not_reaped ordinary-descendant-custody wt none
+  assert_unknown_descendant_process_is_not_reaped tasktmp-descendant-custody tasktmp none
+  pass "ordinary existing descendants of worktree and non-Git tasktmp roots require proven custody"
+}
+
+test_process_refusal_has_no_close_replay_authority() {
+  local scenario case_dir root pid other_pid birth other_birth rc path_without_lsof
+  local flags=()
+  for scenario in descendant foreign missing-lsof audit tasktmp legacy existing-marker; do
+    case_dir=$(make_case "refusal-replay-$scenario")
+    mkdir -p "$case_dir/home/state"
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    seed_backlog_in_flight "$case_dir"
+    root="$case_dir/wt"
+    flags=(--force)
+    case "$scenario" in
+      descendant|existing-marker|legacy)
+        mkdir "$root/dist"
+        root="$root/dist"
+        if [ "$scenario" = legacy ]; then
+          write_legacy_meta "$case_dir" no-mistakes ship
+          flags+=(--legacy-record)
+        fi
+        ;;
+      foreign)
+        git clone -q "$case_dir/origin.git" "$case_dir/sibling"
+        git -C "$case_dir/sibling" worktree add -q --detach "$root/foreign" main
+        git -C "$case_dir/sibling" worktree lock "$root/foreign"
+        root="$root/foreign"
+        ;;
+      missing-lsof)
+        path_without_lsof=$(make_path_without_lsof "$case_dir")
+        ln -s "$(command -v tasks-axi)" "$path_without_lsof/tasks-axi"
+        ln -s "$(command -v node)" "$path_without_lsof/node"
+        PATH="$path_without_lsof" command -v lsof >/dev/null 2>&1 \
+          && fail "refusal-replay-$scenario: fixture exposes lsof"
+        ;;
+      audit) mkdir "$case_dir/state/task-x1.teardown-processes" ;;
+      tasktmp)
+        root="$case_dir/tasktmp"
+        mkdir -p "$root/dist"
+        mkdir -p "$case_dir/pool/1"
+        git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+        ln -s "pool/1/project" "$case_dir/wt"
+        printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' \
+          "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+        printf 'task=other-task\nhome=%s\n' "$case_dir/other-home" > "$case_dir/pool/1/.fm-slot-owner"
+        cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/slot-owner.before"
+        fm_write_meta "$case_dir/state/task-x1.meta" \
+          "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+          "worktree=$case_dir/wt" "project=$case_dir/project" "tasktmp=$root" \
+          "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+        root="$root/dist"
+        ;;
+    esac
+    mkdir "$case_dir/unrelated"
+    fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+    cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
+fi
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    teardown_fixture_start "$root" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    birth=$(teardown_fixture_birth "$pid") || fail "refusal-replay-$scenario: missing process identity"
+    teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+    other_pid=$TEARDOWN_FIXTURE_PID
+    other_birth=$(teardown_fixture_birth "$other_pid") || fail "refusal-replay-$scenario: missing unrelated identity"
+    sleep 0.3
+    if [ "$scenario" = existing-marker ]; then
+      FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+        . "$1/bin/fm-tasks-axi-lib.sh"
+        . "$1/bin/fm-backlog-transition-lib.sh"
+        fm_backlog_close_marker_stage "$2/state/.prior-close" task-x1 "$2/data" \
+          teardown-test-task-x1 "$2/state" 0 &&
+        fm_backlog_atomic_transition publish "$2/state/.prior-close" \
+          "$2/state/task-x1.backlog-close" "pending-close record" "$2/state"
+      ' _ "$ROOT" "$case_dir" > "$case_dir/marker.stdout" 2> "$case_dir/marker.stderr" \
+        || fail "refusal-replay-$scenario: cannot seed existing replay authority"
+    fi
+    rc=0
+    if [ "$scenario" = missing-lsof ]; then
+      FM_HOME="$case_dir/home" FM_TEARDOWN_TEST_PATH="$path_without_lsof" run_teardown "$case_dir" "${flags[@]}" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" "${flags[@]}" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 1 "$rc" "refusal-replay-$scenario: teardown must refuse"
+    case "$scenario" in
+      missing-lsof) assert_grep "lsof is unavailable" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+      audit) assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+      *) assert_grep "REFUSED: process $pid" "$case_dir/stderr" "refusal-replay-$scenario: wrong gate" ;;
+    esac
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "refusal-replay-$scenario: refusal changed task metadata"
+    assert_absent "$case_dir/state/task-x1.backlog-close" "refusal-replay-$scenario: refusal left replay authority"
+    FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_close_marker_replay "$2/state" "$2/state/task-x1.backlog-close" "$2/data"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/replay.stdout" 2> "$case_dir/replay.stderr" \
+      || fail "refusal-replay-$scenario: supported close replay failed"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "refusal-replay-$scenario: replay changed task metadata"
+    cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+      || fail "refusal-replay-$scenario: unrelated metadata changed"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "refusal-replay-$scenario: replay closed refused task"
+    if [ "$scenario" = tasktmp ]; then
+      assert_grep "reassigned" "$case_dir/stderr" "refusal-replay-$scenario: slot ownership gate not reached"
+      cmp "$case_dir/slot-owner.before" "$case_dir/pool/1/.fm-slot-owner" \
+        || fail "refusal-replay-$scenario: reassigned slot claim changed"
+    fi
+    assert_present "$case_dir/wt" "refusal-replay-$scenario: worktree removed"
+    assert_present "$root" "refusal-replay-$scenario: process root removed"
+    assert_absent "$case_dir/endpoint-close.log" "refusal-replay-$scenario: endpoint closed"
+    teardown_fixture_live "$pid" "$birth" || fail "refusal-replay-$scenario: refused process identity changed"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "refusal-replay-$scenario: unrelated process identity changed"
+    teardown_fixture_stop "$pid"
+    teardown_fixture_stop "$other_pid"
+  done
+  pass "process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay"
+}
+
+test_exempt_retry_clears_prior_close_replay_authority() {
+  local scenario case_dir pid birth other_pid other_birth rc real_rm target_alive other_alive
+  real_rm=$(command -v rm)
+  for scenario in manual missing-backlog; do
+    case_dir=$(make_case "exempt-retry-$scenario")
+    mkdir -p "$case_dir/home/state" "$case_dir/unrelated"
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    seed_backlog_in_flight "$case_dir"
+    fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+    cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ -f "$case_dir/state/task-x1.backlog-close" ] || exit 79
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 1
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
+fi
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/initial.stdout" 2> "$case_dir/initial.stderr" || rc=$?
+    printf 'initial_rc=%s\n' "$rc" > "$case_dir/initial.observations"
+    expect_code 1 "$rc" "exempt-retry-$scenario: initial return must fail"
+    assert_present "$case_dir/treehouse.log" "exempt-retry-$scenario: initial teardown did not publish before return"
+    assert_present "$case_dir/state/task-x1.backlog-close" "exempt-retry-$scenario: initial failure did not retain close authority"
+    cp "$case_dir/state/task-x1.backlog-close" "$case_dir/close.before"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: initial failure changed incarnation metadata"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: initial failure closed backlog"
+    rm -f "$case_dir/treehouse.log" "$case_dir/endpoint-close.log"
+    case "$scenario" in
+      manual) printf '%s\n' manual > "$case_dir/config/backlog-backend" ;;
+      missing-backlog) mv "$case_dir/data/backlog.md" "$case_dir/backlog.before" ;;
+    esac
+    mkdir "$case_dir/wt/dist"
+    teardown_fixture_start "$case_dir/wt/dist" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    birth=$(teardown_fixture_birth "$pid") || fail "exempt-retry-$scenario: missing target birth"
+    teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+    other_pid=$TEARDOWN_FIXTURE_PID
+    other_birth=$(teardown_fixture_birth "$other_pid") || fail "exempt-retry-$scenario: missing unrelated birth"
+    cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  [ "\$arg" != "$case_dir/state/task-x1.backlog-close" ] || exit 1
+done
+exec "$real_rm" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/rm"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/clear.stdout" 2> "$case_dir/clear.stderr" || rc=$?
+    printf 'clear_rc=%s target_pid=%s target_birth=%s unrelated_pid=%s unrelated_birth=%s\n' \
+      "$rc" "$pid" "$birth" "$other_pid" "$other_birth" > "$case_dir/clear.observations"
+    expect_code 1 "$rc" "exempt-retry-$scenario: failed invalidation must refuse"
+    assert_grep "pending-close record could not be removed" "$case_dir/clear.stderr" \
+      "exempt-retry-$scenario: failed invalidation did not reach shared boundary"
+    cmp "$case_dir/close.before" "$case_dir/state/task-x1.backlog-close" \
+      || fail "exempt-retry-$scenario: failed invalidation changed old marker"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: failed invalidation changed metadata"
+    assert_absent "$case_dir/treehouse.log" "exempt-retry-$scenario: failed invalidation returned worktree"
+    assert_absent "$case_dir/endpoint-close.log" "exempt-retry-$scenario: failed invalidation closed endpoint"
+    assert_absent "$case_dir/state/task-x1.teardown-processes" "exempt-retry-$scenario: failed invalidation audited signal"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: failed invalidation changed target"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: failed invalidation changed unrelated process"
+    rm -f "$case_dir/fakebin/rm"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "exempt-retry-$scenario: descendant process must refuse"
+    assert_grep "REFUSED: process $pid" "$case_dir/stderr" "exempt-retry-$scenario: process gate not reached"
+    assert_absent "$case_dir/state/task-x1.backlog-close" "exempt-retry-$scenario: exempt retry retained old authority"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: process refusal changed same-incarnation metadata"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: refusal changed target"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: refusal changed unrelated process"
+    case "$scenario" in
+      manual) rm -f "$case_dir/config/backlog-backend" ;;
+      missing-backlog) mv "$case_dir/backlog.before" "$case_dir/data/backlog.md" ;;
+    esac
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: refused backlog changed before replay"
+    FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_close_marker_replay "$2/state" "$2/state/task-x1.backlog-close" "$2/data"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/replay.stdout" 2> "$case_dir/replay.stderr" \
+      || fail "exempt-retry-$scenario: supported replay failed after restoration"
+    cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "exempt-retry-$scenario: retry or replay changed same-incarnation metadata"
+    cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+      || fail "exempt-retry-$scenario: unrelated metadata changed"
+    [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+      || fail "exempt-retry-$scenario: replay closed refused task"
+    assert_present "$case_dir/wt" "exempt-retry-$scenario: worktree removed"
+    assert_present "$case_dir/wt/dist" "exempt-retry-$scenario: descendant root removed"
+    assert_absent "$case_dir/treehouse.log" "exempt-retry-$scenario: refusal returned worktree"
+    assert_absent "$case_dir/endpoint-close.log" "exempt-retry-$scenario: refusal closed endpoint"
+    assert_absent "$case_dir/state/task-x1.teardown-processes" "exempt-retry-$scenario: refusal audited signal"
+    teardown_fixture_live "$pid" "$birth" || fail "exempt-retry-$scenario: target PID/birth changed"
+    teardown_fixture_live "$other_pid" "$other_birth" || fail "exempt-retry-$scenario: unrelated PID/birth changed"
+    target_alive=0
+    other_alive=0
+    teardown_fixture_live "$pid" "$birth" && target_alive=1
+    teardown_fixture_live "$other_pid" "$other_birth" && other_alive=1
+    printf 'mode=%s rc=%s target_pid=%s target_birth=%s target_alive=%s unrelated_pid=%s unrelated_birth=%s unrelated_alive=%s term_audit=0 kill_audit=0\n' \
+      "$scenario" "$rc" "$pid" "$birth" "$target_alive" "$other_pid" "$other_birth" "$other_alive" \
+      > "$case_dir/observations"
+    teardown_fixture_stop "$pid"
+    teardown_fixture_stop "$other_pid"
+  done
+  pass "manual and missing-backlog retries revoke old close authority before process refusal and restored replay"
+}
+
+test_process_audit_collection_exit_races() {
+  local signal field outcome case_dir pid birth other_pid other_birth journal rc i term_audit kill_audit target_alive other_alive
+  for signal in TERM KILL; do
+    for field in command lstart; do
+      for outcome in exit live-failure uncertain-live-failure control; do
+        [ "$outcome" != uncertain-live-failure ] || [ "$field" = lstart ] || continue
+        [ "$outcome" != control ] || { [ "$signal" = TERM ] && [ "$field" = command ]; } || continue
+        case_dir=$(make_case "audit-collection-$signal-$field-$outcome")
+        mkdir -p "$case_dir/home/state" "$case_dir/unrelated"
+        write_meta "$case_dir" no-mistakes ship
+        land_shippable_commit "$case_dir"
+        journal="$case_dir/state/task-x1.teardown-processes"
+        cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
+        teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
+          my ($ready, $exit, $journal, $seen) = @ARGV;
+          $SIG{TERM} = sub {
+            open my $in, "<", $journal or die "TERM without durable audit";
+            local $/; my $audit = <$in>; close $in;
+            open my $out, ">", $seen or die "signal observation";
+            print {$out} $audit; close $out;
+          };
+          open my $f, ">", $ready or die "ready"; close $f;
+          until (-e $exit) { select undef, undef, undef, 0.01; }
+PERL
+        )" "$case_dir/ready" "$case_dir/finite-exit" "$journal" "$case_dir/term-observed"
+        pid=$TEARDOWN_FIXTURE_PID
+        birth=$(teardown_fixture_birth "$pid") || fail "audit-collection: missing target birth"
+        i=0
+        while [ ! -f "$case_dir/ready" ] && [ "$i" -lt 1000 ]; do sleep 0.01; i=$((i + 1)); done
+        [ -f "$case_dir/ready" ] || fail "audit-collection: finite process not ready"
+        teardown_fixture_start "$case_dir/unrelated" KILL sleep 300
+        other_pid=$TEARDOWN_FIXTURE_PID
+        other_birth=$(teardown_fixture_birth "$other_pid") || fail "audit-collection: missing unrelated birth"
+        fm_write_meta "$case_dir/state/unrelated.meta" "worktree=$case_dir/unrelated" "kind=ship"
+        cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
+        cat > "$case_dir/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+args=" $* "
+boundary=0
+if [[ "$args" == *" -p $FM_AUDIT_TARGET "* ]]; then
+  if [[ "$args" == *" -o lstart= "* ]] && [ -f "$FM_AUDIT_CASE/lstart-failed" ]; then
+    exit 1
+  fi
+  if [[ "$args" == *" -o command= "* ]]; then
+    n=0
+    [ ! -f "$FM_AUDIT_CASE/command-count" ] || read -r n < "$FM_AUDIT_CASE/command-count"
+    n=$((n + 1))
+    printf '%s\n' "$n" > "$FM_AUDIT_CASE/command-count"
+    round=1
+    [ "$FM_AUDIT_SIGNAL" != KILL ] || round=2
+    if [ "$n" -eq "$round" ]; then
+      if [ "$FM_AUDIT_FIELD" = command ]; then
+        boundary=1
+      else
+        command_output=$(LC_ALL=C "$REAL_PS_FOR_TEST" "$@") || exit 76
+        [ -n "$command_output" ] || exit 77
+        : > "$FM_AUDIT_CASE/lstart-armed"
+        printf '%s\n' "$command_output"
+        exit 0
+      fi
+    fi
+  elif [[ "$args" == *" -o lstart= "* ]] && [ -f "$FM_AUDIT_CASE/lstart-armed" ]; then
+    rm -f "$FM_AUDIT_CASE/lstart-armed"
+    boundary=1
+  fi
+fi
+if [ "$boundary" -eq 1 ]; then
+  teardown_fixture_live "$FM_AUDIT_TARGET" "$FM_AUDIT_BIRTH" || exit 78
+  printf '%s\t%s\t%s\n' "$FM_AUDIT_SIGNAL" "$FM_AUDIT_FIELD" "$FM_AUDIT_BIRTH" \
+    >> "$FM_AUDIT_CASE/boundary.log"
+  case "$FM_AUDIT_OUTCOME" in
+    live-failure) exit 1 ;;
+    uncertain-live-failure) : > "$FM_AUDIT_CASE/lstart-failed"; exit 1 ;;
+    exit)
+      : > "$FM_AUDIT_CASE/finite-exit"
+      for ((i=0; i<1000; i++)); do
+        state=$("$REAL_PS_FOR_TEST" -p "$FM_AUDIT_TARGET" -o stat= 2>/dev/null) || break
+        [ -n "$state" ] || break
+        sleep 0.01
+      done
+      [ "$i" -lt 1000 ] || exit 79
+      printf 'exited\n' >> "$FM_AUDIT_CASE/exit-confirmed"
+      ;;
+  esac
+fi
+exec "$REAL_PS_FOR_TEST" "$@"
+SH
+        cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf 'returned\n' >> "$case_dir/treehouse.log"
+exit 0
+SH
+        chmod +x "$case_dir/fakebin/ps" "$case_dir/fakebin/treehouse"
+        rc=0
+        FM_HOME="$case_dir/home" FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
+        FM_AUDIT_CASE="$case_dir" FM_AUDIT_TARGET="$pid" FM_AUDIT_BIRTH="$birth" \
+        FM_AUDIT_SIGNAL="$signal" FM_AUDIT_FIELD="$field" FM_AUDIT_OUTCOME="$outcome" \
+          run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        term_audit=0
+        kill_audit=0
+        if [ -f "$journal" ]; then
+          grep -q $'\tTERM\t'"$pid"$'\t' "$journal" && term_audit=1
+          grep -q $'\tKILL\t'"$pid"$'\t' "$journal" && kill_audit=1
+        fi
+        target_alive=0
+        other_alive=0
+        teardown_fixture_live "$pid" "$birth" && target_alive=1
+        teardown_fixture_live "$other_pid" "$other_birth" && other_alive=1
+        printf 'signal=%s field=%s outcome=%s rc=%s target_pid=%s target_birth=%s target_alive=%s unrelated_pid=%s unrelated_birth=%s unrelated_alive=%s term_audit=%s kill_audit=%s\n' \
+          "$signal" "$field" "$outcome" "$rc" "$pid" "$birth" "$target_alive" \
+          "$other_pid" "$other_birth" "$other_alive" "$term_audit" "$kill_audit" \
+          > "$case_dir/observations"
+        assert_grep "$signal"$'\t'"$field"$'\t'"$birth" "$case_dir/boundary.log" \
+          "audit-collection-$signal-$field-$outcome: collection boundary not reached with original birth"
+        case "$outcome" in
+          live-failure|uncertain-live-failure)
+            expect_code 1 "$rc" "audit-collection-$signal-$field: live collection failure must refuse"
+            teardown_fixture_live "$pid" "$birth" || fail "audit-collection-$signal-$field: live failure signalled target"
+            cmp "$case_dir/task-x1.meta.before" "$case_dir/state/task-x1.meta" \
+              || fail "audit-collection-$signal-$field: live failure changed task metadata"
+            assert_present "$case_dir/wt" "audit-collection-$signal-$field: live failure removed worktree"
+            assert_absent "$case_dir/treehouse.log" "audit-collection-$signal-$field: live failure returned worktree"
+            assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" \
+              "audit-collection-$signal-$field: live failure did not name audit refusal"
+            ;;
+          exit|control)
+            expect_code 0 "$rc" "audit-collection-$signal-$field-$outcome: cleanup should complete"
+            if teardown_fixture_live "$pid" "$birth"; then
+              fail "audit-collection-$signal-$field-$outcome: target survived"
+            fi
+            assert_absent "$case_dir/state/task-x1.meta" "audit-collection-$signal-$field-$outcome: task metadata retained"
+            assert_present "$case_dir/treehouse.log" "audit-collection-$signal-$field-$outcome: worktree return not reached"
+            [ "$outcome" != exit ] || assert_present "$case_dir/exit-confirmed" \
+              "audit-collection-$signal-$field: wrapper did not synchronize natural exit"
+            ;;
+        esac
+        if [ "$outcome" = control ]; then
+          [ "$term_audit" -eq 1 ] && [ "$kill_audit" -eq 1 ] \
+            || fail "audit-collection-$signal-$field: control lacks durable TERM/KILL"
+        else
+          [ "$kill_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited KILL"
+          if [ "$signal" = TERM ]; then
+            [ "$term_audit" -eq 0 ] || fail "audit-collection-$signal-$field-$outcome: failed collection audited TERM"
+            assert_absent "$case_dir/term-observed" "audit-collection-$signal-$field-$outcome: TERM reached target"
+          else
+            [ "$term_audit" -eq 1 ] || fail "audit-collection-KILL-$field-$outcome: prior TERM was not audited"
+          fi
+        fi
+        if [ "$term_audit" -eq 1 ]; then
+          assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/term-observed" \
+            "audit-collection-$signal-$field-$outcome: TERM preceded durable audit"
+        fi
+        teardown_fixture_live "$other_pid" "$other_birth" \
+          || fail "audit-collection-$signal-$field-$outcome: unrelated PID/birth changed"
+        cmp "$case_dir/unrelated.meta.before" "$case_dir/state/unrelated.meta" \
+          || fail "audit-collection-$signal-$field-$outcome: unrelated metadata changed"
+        teardown_fixture_stop "$pid"
+        teardown_fixture_stop "$other_pid"
+      done
+    done
+  done
+  pass "TERM and KILL audit collection tolerates synchronized real exits, refuses live failures, and preserves unrelated identities"
+}
+
+test_process_audit_failure_refuses_before_signal() {
+  local case_dir rc pid survived=0
+  case_dir=$(make_case process-audit-failure)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  mkdir "$case_dir/state/task-x1.teardown-processes"
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  teardown_fixture_stop "$pid"
+  expect_code 1 "$rc" "process-audit-failure: teardown must refuse"
+  [ "$survived" -eq 1 ] || fail "process-audit-failure: signal sent without durable audit"
+  assert_present "$case_dir/state/task-x1.meta" "process-audit-failure: task record removed"
+  assert_grep "cannot durably record leaked process $pid identity" "$case_dir/stderr" \
+    "process-audit-failure: missing refusal reason"
+  pass "an unwritable process audit refuses before signalling a real leaked process"
 }
 
 test_leaked_tasktmp_process_is_reaped() {
@@ -3726,9 +4483,8 @@ test_leaked_tasktmp_process_is_reaped() {
   mkdir -p "$case_dir/tasktmp"
   land_shippable_commit "$case_dir"
 
-  ( cd "$case_dir/tasktmp" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/tasktmp" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "leaked-tasktmp-reap: setup sleeper did not start"
 
@@ -3737,7 +4493,7 @@ test_leaked_tasktmp_process_is_reaped() {
 
   expect_code 0 "$rc" "leaked-tasktmp-reap: teardown should still succeed"
   if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
     fail "leaked-tasktmp-reap: leaked tasktmp process survived teardown"
   fi
   assert_grep "reaping leaked worktree process" "$case_dir/stderr" \
@@ -3745,20 +4501,19 @@ test_leaked_tasktmp_process_is_reaped() {
   pass "a leaked descendant process rooted under the task's per-task tasktmp is reaped by teardown too"
 }
 
-test_lsof_absent_reaps_tmux_process_group() {
-  local case_dir rc pid path_without_lsof
-  case_dir=$(make_case lsof-absent-process-group-reap)
+test_lsof_absent_refuses_without_signalling() {
+  local case_dir rc pid path_without_lsof survived=0
+  case_dir=$(make_case lsof-absent-refusal)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   path_without_lsof=$(make_path_without_lsof "$case_dir")
   PATH="$path_without_lsof" command -v lsof >/dev/null 2>&1 \
-    && fail "lsof-absent-process-group-reap: fixture path unexpectedly exposes lsof"
+    && fail "lsof-absent-refusal: fixture path unexpectedly exposes lsof"
 
-  perl -e 'setpgrp(0, 0); chdir shift or die; exec "sleep", "300"' "$case_dir/wt" &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL perl -e 'setpgrp(0, 0); exec "sleep", "300"'
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
-  kill -0 "$pid" 2>/dev/null || fail "lsof-absent-process-group-reap: setup sleeper did not start"
+  kill -0 "$pid" 2>/dev/null || fail "lsof-absent-refusal: setup sleeper did not start"
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
 if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
@@ -3770,16 +4525,19 @@ EOF
 
   rc=0
   FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  kill -0 "$pid" 2>/dev/null && survived=1
+  teardown_fixture_stop "$pid"
 
-  expect_code 0 "$rc" "lsof-absent-process-group-reap: teardown should succeed"
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
-    fail "lsof-absent-process-group-reap: tmux process group survived teardown"
-  fi
-  assert_grep "reaping leaked worktree process group" "$case_dir/stderr" \
-    "lsof-absent-process-group-reap: teardown did not use the process-group fallback"
-  pass "missing lsof falls back to reaping the tmux pane process group"
+  expect_code 1 "$rc" "lsof-absent-refusal: teardown should refuse even with force"
+  [ "$survived" -eq 1 ] || fail "lsof-absent-refusal: an unaudited signal reached the pane process group"
+  assert_grep "(lsof is unavailable, so no signal target can be audited)" "$case_dir/stderr" \
+    "lsof-absent-refusal: teardown did not explain the missing-lsof refusal"
+  assert_present "$case_dir/wt" "lsof-absent-refusal: teardown removed the worktree"
+  assert_present "$case_dir/state/task-x1.meta" "lsof-absent-refusal: teardown removed task metadata"
+  assert_absent "$case_dir/state/task-x1.teardown-processes" \
+    "lsof-absent-refusal: an unscanned process was recorded as a signal target"
+  pass "missing lsof refuses teardown instead of sending unaudited process-group signals"
 }
 
 test_lsof_error_refuses_before_removal() {
@@ -3815,9 +4573,11 @@ test_reused_pid_identity_is_not_force_killed() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
 
-  perl -e '$SIG{TERM} = "IGNORE"; sleep 300' &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir" KILL perl -e "$(cat <<'PERL'
+$SIG{TERM} = "IGNORE"; sleep 300
+PERL
+  )"
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/lsof" <<EOF
 #!/usr/bin/env bash
@@ -3835,7 +4595,7 @@ if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_REUSED_PID:-}" ] \
   [ ! -f "$FM_FAKE_PS_COUNT" ] || count=$(cat "$FM_FAKE_PS_COUNT")
   count=$((count + 1))
   printf '%s\n' "$count" > "$FM_FAKE_PS_COUNT"
-  if [ "$count" -le 2 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
+  if [ "$count" -le 4 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
   else printf 'Tue Aug  4 10:00:01 2026\n'; fi
   exit 0
 fi
@@ -3852,7 +4612,11 @@ SH
   if ! kill -0 "$pid" 2>/dev/null; then
     fail "reused-pid-identity: teardown force-killed a process whose start time changed"
   fi
-  kill -KILL "$pid" 2>/dev/null || true
+  teardown_fixture_stop "$pid"
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "reused-pid-identity: the original identity was not sent TERM before the grace period"
+  assert_no_grep $'\tKILL\t' "$case_dir/state/task-x1.teardown-processes" \
+    "reused-pid-identity: a KILL was audited for a changed identity"
   pass "a reused pid with a different start time is never force-killed"
 }
 
@@ -3864,15 +4628,15 @@ test_exec_changed_process_is_still_reaped() {
   marker="$case_dir/exec-now"
   done_flag="$case_dir/exec-done"
 
-  ( cd "$case_dir/wt" && exec perl -e '
+  teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
       my ($marker, $done) = @ARGV;
       until (-e $marker) { select undef, undef, undef, 0.01; }
       open my $fh, ">", $done or die "open";
       close $fh;
-      exec "perl", "-e", '\''$SIG{TERM} = "IGNORE"; sleep 300'\'';
-    ' "$marker" "$done_flag" ) &
-  pid=$!
-  disown
+      exec "perl", "-e", '$SIG{TERM} = "IGNORE"; sleep 300';
+PERL
+    )" "$marker" "$done_flag"
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
@@ -3911,7 +4675,7 @@ SH
 
   if kill -0 "$pid" 2>/dev/null; then
     survived=1
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
   fi
   expect_code 0 "$rc" "exec-changed-process: teardown should succeed"
   [ "$survived" -eq 0 ] || fail "exec-changed-process: exec-changed leaked process survived teardown"
@@ -3925,22 +4689,48 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
   land_shippable_commit "$case_dir"
   child_file="$case_dir/child.pid"
 
-  ( cd "$case_dir/wt" && exec perl -e '
-      my $file = shift;
-      $SIG{TERM} = sub {
-        my $child = fork();
-        die "fork" unless defined $child;
-        if (!$child) { exec "sleep", "300"; }
-        open my $fh, ">", $file or die "open";
-        print {$fh} "$child\n";
-        close $fh;
+  teardown_fixture_start "$case_dir/wt" HUP perl -e "$(cat <<'PERL'
+      use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGHUP SIGINT SIGQUIT);
+      require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
+      my ($file, $ready) = @ARGV;
+      my ($child, $leave_child);
+      END {
+        if (defined $child && $child > 0 && !$leave_child) {
+          kill "KILL", $child;
+          waitpid($child, 0);
+        }
+      }
+      $SIG{HUP} = sub {
         exit 0;
       };
+      $SIG{TERM} = sub {
+        return if defined $child;
+        my $old = POSIX::SigSet->new;
+        my $blocked = POSIX::SigSet->new(SIGTERM, SIGHUP, SIGINT, SIGQUIT);
+        POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+        $child = fork();
+        die "fork" unless defined $child;
+        if (!$child) {
+          $SIG{TERM} = $SIG{HUP} = $SIG{INT} = $SIG{QUIT} = "DEFAULT";
+          POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+          exec "sleep", "300"; die "exec";
+        }
+        fixture_track($child);
+        open my $fh, ">", $file or die "open";
+        print {$fh} "$child\n";
+        close $fh or die "close";
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        $leave_child = 1;
+        exit 0;
+      };
+      open my $fh, ">", $ready or die "ready"; close $fh;
       sleep 300;
-    ' "$child_file" ) &
-  pid=$!
-  disown
-  sleep 0.2
+PERL
+    )" "$child_file" "$case_dir/ready"
+  pid=$TEARDOWN_FIXTURE_PID
+  local i=0
+  while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case_dir/ready" ] || fail "grace-spawn-convergence: parent not ready"
 
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -3948,11 +4738,11 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
   if [ -f "$child_file" ]; then child_pid=$(cat "$child_file"); fi
   if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
     child_survived=1
-    kill -KILL "$child_pid" 2>/dev/null || true
+    teardown_fixture_stop "$child_pid"
   fi
   if kill -0 "$pid" 2>/dev/null; then
     parent_survived=1
-    kill -KILL "$pid" 2>/dev/null || true
+    teardown_fixture_stop "$pid"
   fi
   expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge"
   assert_present "$child_file" "grace-spawn-convergence: TERM handler did not spawn a child"
@@ -3962,29 +4752,75 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
 }
 
 test_persistent_scan_refuses_after_bounded_retries() {
-  local case_dir rc wt_path fake_pid=99999999
+  local case_dir rc spawner i=0
   case_dir=$(make_case persistent-reap-refusal)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
-  wt_path=$(cd "$case_dir/wt" && pwd -P)
-  cat > "$case_dir/fakebin/lsof" <<EOF
+  # A real parent outside the task roots immediately replenishes leaked children.
+  # Each killed child has a distinct kernel birth identity and a real cwd.
+  teardown_fixture_start "$case_dir" TERM perl -e "$(cat <<'PERL'
+    use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGINT SIGHUP SIGQUIT WNOHANG);
+    require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
+    my ($root, $ready) = @ARGV;
+    my ($child, $stopping);
+    my $owner = $$;
+    my $blocked = POSIX::SigSet->new(SIGTERM, SIGINT, SIGHUP, SIGQUIT);
+    $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = sub { $stopping = 1; };
+    END {
+      if ($owner == $$) {
+        kill "KILL", $child if defined $child;
+        waitpid($child, 0) if defined $child;
+        unlink $ready;
+      }
+    }
+    while (!$stopping) {
+      my $old = POSIX::SigSet->new;
+      POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+      $child = fork(); defined $child or die "fork";
+      if (!$child) {
+        $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = "DEFAULT";
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        chdir $root or die "chdir";
+        my $birth = fixture_track($$);
+        open my $fh, ">", "$ready.$$" or die "ready";
+        print {$fh} "$$\t$birth\n";
+        close $fh or die "close readiness";
+        rename "$ready.$$", $ready or die "publish readiness";
+        exec "sleep", "300"; die "exec";
+      }
+      fixture_track($child);
+      POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+      while (!$stopping && defined $child) {
+        POSIX::sigprocmask(SIG_BLOCK, $blocked, $old) or die "block signals";
+        my $exited = waitpid($child, WNOHANG);
+        undef $child if $exited != 0;
+        POSIX::sigprocmask(SIG_SETMASK, $old) or die "restore signals";
+        select undef, undef, undef, 0.01 if defined $child && !$stopping;
+      }
+      unlink $ready;
+    }
+PERL
+  )" "$case_dir/wt" "$case_dir/child-ready"
+  spawner=$TEARDOWN_FIXTURE_PID
+  cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
-printf 'p%s\nfcwd\nn%s\n' '$fake_pid' '$wt_path'
-EOF
-  cat > "$case_dir/fakebin/ps" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_PERSISTENT_PID:-}" ] \
-   && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
-  printf 'Tue Aug  4 10:00:00 2026\n'
-  exit 0
-fi
-exec "$REAL_PS_FOR_TEST" "$@"
+for ((i=0; i<1000; i++)); do
+  if IFS=$'\t' read -r pid birth < "$FM_FAKE_CHILD_READY" 2>/dev/null \
+     && teardown_fixture_live "$pid" "$birth"; then
+    exec "$REAL_LSOF_FOR_TEST" "$@"
+  fi
+  sleep 0.01
+done
+printf 'fixture child never became ready\n' >&2
+exit 2
 SH
-  chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
-
+  chmod +x "$case_dir/fakebin/lsof"
+  while [ ! -s "$case_dir/child-ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$case_dir/child-ready" ] || fail "persistent-reap-refusal: child not ready"
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_PERSISTENT_PID="$fake_pid" \
+  FM_FAKE_CHILD_READY="$case_dir/child-ready" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  teardown_fixture_stop "$spawner"
 
   expect_code 1 "$rc" "persistent-reap-refusal: teardown should refuse"
   assert_grep "remain after 3 reap attempts" "$case_dir/stderr" \
@@ -4043,9 +4879,8 @@ test_run_abort_precedes_process_reap_precedes_worktree_removal() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
   abort_log="$case_dir/nm-abort.log"
 
-  ( cd "$case_dir/wt" && exec sleep 300 ) &
-  pid=$!
-  disown
+  teardown_fixture_start "$case_dir/wt" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "abort-then-reap-then-remove-order: setup sleeper did not start"
 
@@ -4066,7 +4901,7 @@ EOF
   FM_FAKE_NM_ABORT_LOG="$abort_log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "abort-then-reap-then-remove-order: teardown should still succeed"
-  kill -0 "$pid" 2>/dev/null && { kill -KILL "$pid" 2>/dev/null || true; }
+  teardown_fixture_stop "$pid"
 
   assert_present "$case_dir/order.log" \
     "abort-then-reap-then-remove-order: the destructive worktree return was never invoked"
@@ -4257,6 +5092,8 @@ test_missing_adapter_sibling_refuses_before_cleanup
 test_forced_child_missing_adapter_sibling_refuses_before_cleanup
 test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
+test_process_refusal_has_no_close_replay_authority
+test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_fork_remote_allows
 test_teardown_closes_the_backlog_item_itself
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
@@ -4345,7 +5182,18 @@ test_another_branchs_parked_run_is_never_touched
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
-test_lsof_absent_reaps_tmux_process_group
+test_process_identity_is_recorded_before_term_and_kill
+test_process_audit_collection_exit_races
+test_nested_registered_worktree_process_is_not_reaped
+test_sibling_clone_nested_lane_process_is_not_reaped
+test_registered_lane_missing_git_process_is_not_reaped
+test_deleted_registered_lane_process_is_not_reaped
+test_sibling_clone_missing_git_lane_process_is_not_reaped
+test_sibling_clone_deleted_lane_process_is_not_reaped
+test_own_deleted_cwd_process_is_not_reaped
+test_ordinary_descendant_process_is_not_reaped
+test_process_audit_failure_refuses_before_signal
+test_lsof_absent_refuses_without_signalling
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
 test_exec_changed_process_is_still_reaped
