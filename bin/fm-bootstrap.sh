@@ -594,7 +594,7 @@ secondmate_sync() {
   # "move on to the next secondmate".
   secondmate_sync_remote_one() {  # <id> <home> <remote-host>
     local id=$1 _home=$2 remote_host=$3
-    local sync_out sync_rc inherit_out nudge_needed remote_marker remote_pending converged out remote_lock remote_generation
+    local sync_out sync_rc inherit_out inherit_ok nudge_needed remote_marker remote_pending converged out remote_lock remote_generation
     remote_lock=$(fm_remote_inherit_transaction_lock_path "$STATE" "$id" 2>/dev/null || true)
     if [ -z "$remote_lock" ] || ! fm_lock_acquire_wait "$remote_lock"; then
       echo "NUDGE_SECONDMATES: secondmate $id: send failed: cannot lock remote inheritance transaction"
@@ -630,11 +630,12 @@ secondmate_sync() {
     fi
     if inherit_out=$(FM_CONFIG_INHERIT_LIVE=1 \
       "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
-      if printf '%s\n' "$inherit_out" | grep -Eq '^(pushed|removed):'; then nudge_needed=1; fi
+      inherit_ok=1
     else
       echo "SECONDMATE_SYNC: secondmate $id: skipped: remote inheritance failed on $remote_host: $(remote_inherit_failure_reason "$inherit_out")"
-      converged=0
+      inherit_ok=0
     fi
+    if printf '%s\n' "$inherit_out" | grep -Eq '^(pushed|removed):'; then nudge_needed=1; fi
     [ "$remote_pending" -eq 0 ] || nudge_needed=1
     if [ "$converged" -eq 1 ] && [ "$nudge_needed" -eq 1 ]; then
       if out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
@@ -644,7 +645,7 @@ secondmate_sync() {
       else
         echo "NUDGE_SECONDMATES: secondmate $id: send failed: $(first_line "$out")"
       fi
-    elif [ "$converged" -eq 1 ]; then
+    elif [ "$converged" -eq 1 ] && [ "$inherit_ok" -eq 1 ]; then
       rm -f "$remote_marker"
     fi
     fm_lock_release "$remote_lock" || true

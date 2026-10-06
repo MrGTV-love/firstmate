@@ -41,20 +41,21 @@ listed_id() {
 }
 
 checked=0
+diagnostics=()
 for harness in codex claude omp pi pi-signed opencode cursor agy; do
   binary=$harness
   if [ "$harness" = cursor ]; then
     binary=$(fm_cursor_resolve_binary 2>/dev/null) || binary=''
   fi
   if [ -z "$binary" ] || ! command -v "$binary" >/dev/null 2>&1; then
-    printf 'skip - %s catalog adapter: executable absent\n' "$harness"
+    diagnostics+=("skip - $harness catalog adapter: executable absent")
     continue
   fi
   version=$("$binary" --version 2>&1) || version='version unavailable'
   model=$(listed_id "$harness" "$binary" 2>/dev/null || true)
   if [ -z "$model" ]; then
     [ "$forced" != 1 ] || fail "$harness $version: its own listing named no model"
-    printf 'skip - %s %s: no listed model (signed out or no catalog)\n' "$harness" "$version"
+    diagnostics+=("skip - $harness $version: no listed model (signed out or no catalog)")
     continue
   fi
   # One invocation queries the catalog once: the listed id comes first, so a
@@ -71,8 +72,16 @@ for harness in codex claude omp pi pi-signed opencode cursor agy; do
   checked=$((checked + 1))
 done
 if [ "$checked" = 0 ]; then
-  [ "$forced" != 1 ] || fail 'no installed native catalog adapter was checked'
+  if [ "$forced" = 1 ]; then
+    printf '%s\n' "${diagnostics[@]}"
+    fail 'no installed native catalog adapter was checked'
+  fi
   printf 'skip: live: no installed native adapter has an available catalog\n'
+fi
+if [ "${#diagnostics[@]}" -gt 0 ]; then
+  printf '%s\n' "${diagnostics[@]}"
+fi
+if [ "$checked" = 0 ]; then
   exit 0
 fi
 printf '# model-index live adapters checked: %s\n' "$checked"

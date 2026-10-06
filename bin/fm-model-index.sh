@@ -4,6 +4,7 @@
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
 #        fm-model-index.sh entry <harness> <concrete-model>
 #        fm-model-index.sh profiles <crew-dispatch.json>
+#        fm-model-index.sh check-registry <path-to-json>
 # Schema owner: docs/configuration.md "Fleet model index".
 # check with no arguments is the index-edit check: every active id, including
 # stand-ins, against its own harness catalog. check <harness> checks only that
@@ -20,6 +21,13 @@
 # model and profiles resolve offline and never fetch a catalog: a role
 # resolves once, profiles emits concrete JSON, model emits one id.
 # entry emits true or false for exact primary/stand-in membership, offline.
+# check-registry requires an index and exactly one readable JSON registry file.
+# It scans string values and object keys that are whole identifier tokens (no
+# whitespace or control characters), using the same retirement rule below;
+# it never matches a substring in prose. Every distinct retired identifier is
+# reported on stderr and makes the command fail; current-only registries pass.
+# Invalid JSON (including empty or multiple documents) refuses. This check is
+# offline and read-only: it fetches no catalog and writes neither input file.
 # Stand-ins are explicit selections, never automatic failure or quota fallbacks.
 # Literal models work without an index; with one they cannot name a retired id,
 # and a literal that is not an index entry for its harness draws a warning.
@@ -54,7 +62,7 @@ usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|check:1|check:2|model:2|entry:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+case "$VERB:$#" in check:0|check:1|check:2|check-registry:1|model:2|entry:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
   case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
   printf '%s\n' "$2"
@@ -69,6 +77,7 @@ if [ -e "$INDEX" ] || [ -L "$INDEX" ]; then
   cp "$INDEX" "$TMP/index.json" || die 'could not snapshot index'
   HAVE_INDEX=1
 else
+  [ "$VERB" != check-registry ] || die "index required: $INDEX"
   [ "$VERB" != check ] || [ "$#" = 2 ] || die "index required: $INDEX"
   printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$TMP/index.json"
 fi
@@ -93,6 +102,24 @@ LIB_JQ='
     any($idx[0].retired[]; . == $id or . == $base or . == ($base | split("/") | last));
   def entry($h; $m): any($idx[0].roles[] | .[$h] // empty | (.model, .stand_in // empty); . == $m);
 '
+if [ "$VERB" = check-registry ]; then
+  [ -f "$1" ] && [ -r "$1" ] || die "registry is not a readable regular file: $1"
+  jq -sr --slurpfile idx "$TMP/index.json" "$LIB_JQ"'
+    if length != 1 then error("registry must contain exactly one JSON document") else .[0] end |
+    [.. | (strings, (objects | keys[])) |
+      select(length > 0 and (test("[[:space:][:cntrl:]]") | not)) |
+      select(retired(.))] | unique[]' "$1" > "$TMP/registry-hits" \
+    || die "invalid or unreadable registry: $1"
+  if [ -s "$TMP/registry-hits" ]; then
+    while IFS= read -r id; do
+      printf "model-index: retired id '%s' in registry %s\n" "$id" "$1" >&2
+    done < "$TMP/registry-hits"
+    exit 2
+  fi
+  printf 'model-index: registry checked; no retired identifiers\n'
+  exit 0
+fi
+
 jq -r '.roles | to_entries[] | .key as $role | .value | to_entries[] |
   .key as $h | (.value.model, .value.stand_in // empty) | [$role,$h,.] | @tsv' "$TMP/index.json" > "$TMP/entries"
 

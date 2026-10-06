@@ -1264,6 +1264,139 @@ test_model_roles_preserve_offline_bootstrap() {
   pass "bootstrap resolves model roles offline and warns on literal profile ids beside an index"
 }
 
+test_remote_guarded_pair_notifications() {
+  local caller dir home primary remote fakebin marker out rc mode records
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required for remote notification tests"
+  for caller in fm-config-push.sh fm-bootstrap.sh; do
+    dir="$TMP_ROOT/guarded-notify-$caller"
+    home="$dir/home"
+    primary="$dir/primary"
+    remote="$dir/remote"
+    mkdir -p "$home/config" "$home/data" "$home/state" "$primary" "$remote/config" "$remote/state"
+    git init -q -b main "$primary"
+    printf 'primary\n' > "$primary/AGENTS.md"
+    mkdir -p "$primary/bin"
+    cp "$ROOT"/bin/fm-remote-*.sh "$primary/bin/"
+    git -C "$primary" add AGENTS.md bin
+    git -C "$primary" -c user.name=Test -c user.email=test@example.invalid commit -qm seed
+    printf 'retained index\n' > "$dir/index-target"
+    ln -s "$dir/index-target" "$remote/config/model-index.json"
+    printf 'retained dispatch\n' > "$remote/config/crew-dispatch.json"
+    printf 'codex\n' > "$home/config/crew-harness"
+    printf -- '- mate - remote fixture (host: host-mate; root: %s; home: %s; scope: test; projects: alpha; added 2026-08-02)\n' \
+      "$ROOT" "$remote" > "$home/data/secondmates.md"
+    fm_write_secondmate_meta "$home/state/mate.meta" "$remote"
+    printf 'remote_host=host-mate\n' >> "$home/state/mate.meta"
+    fakebin=$(make_fake_toolchain "$dir")
+    add_real_jq "$fakebin"
+    cat > "$fakebin/fake-ssh" <<'SH'
+#!/usr/bin/env bash
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
+done
+shift 2
+exec python3 -c '
+import base64, os, sys
+root = base64.b64decode(sys.argv[2]).decode()
+home = base64.b64decode(sys.argv[3]).decode()
+args = [p.decode() for p in base64.b64decode(sys.argv[4]).split(b"\0") if p]
+mode = os.environ.get("FM_TEST_NOTIFY_MODE", "")
+if args[0] == "fm-remote-inherit.sh":
+    os.environ["FM_HOME"] = home
+    os.execv(root + "/bin/" + args[0], args)
+if args[0] == "fm-remote-secondmate-control.sh":
+    if args[1] == "state":
+        print("alive")
+    elif args[1] == "sync":
+        if mode == "sync-fail":
+            print("tracked sync refused")
+            sys.exit(1)
+        print("current: fixture")
+    elif args[1] == "route":
+        print("backend=herdr")
+    elif args[1] == "send":
+        if mode == "send-fail":
+            print("inbox write refused", file=sys.stderr)
+            sys.exit(1)
+        with open(os.environ["FM_TEST_NOTIFY_LOG"], "a") as f:
+            f.write(args[3] + "\n")
+' "$@"
+SH
+    chmod +x "$fakebin/fake-ssh"
+    marker="$home/state/.secondmate-nudge-pending/mate.pending"
+    : > "$dir/notifications"
+    for mode in changed send-fail retry unchanged sync-fail sync-retry; do
+      case "$mode" in
+        send-fail) printf 'claude\n' > "$home/config/crew-harness" ;;
+        sync-fail)
+          [ "$caller" = fm-bootstrap.sh ] || continue
+          printf 'pi\n' > "$home/config/crew-harness"
+          ;;
+        sync-retry) [ "$caller" = fm-bootstrap.sh ] || continue ;;
+      esac
+      case "$mode" in
+        retry|sync-retry)
+          cmp -s "$home/config/crew-harness" "$remote/config/crew-harness" || fail "pending retry precondition: unrelated config changed"
+          ;;
+      esac
+      records=$(wc -l < "$dir/notifications" | tr -d ' ')
+      out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$primary" \
+        FM_BOOTSTRAP_NETWORK=only FM_SSH_BIN="$fakebin/fake-ssh" \
+        FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness' \
+        FM_TEST_NOTIFY_MODE="$mode" FM_TEST_NOTIFY_LOG="$dir/notifications" \
+        FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 \
+        "$ROOT/bin/$caller" 2>&1); rc=$?
+      if [ "$caller" = fm-config-push.sh ]; then
+        expect_code 1 "$rc" "guarded config push must remain nonzero"
+        assert_contains "$out" "skipped: config/model-index.json and config/crew-dispatch.json" \
+          "guarded config push lost its diagnostic"
+      else
+        expect_code 0 "$rc" "bootstrap must retain its diagnostic-only failure contract"
+        assert_contains "$out" "remote inheritance failed" "bootstrap lost its guard diagnostic"
+      fi
+      [ -L "$remote/config/model-index.json" ] || fail "guarded index symlink was replaced"
+      [ "$(readlink "$remote/config/model-index.json")" = "$dir/index-target" ] || fail "guarded index route changed"
+      [ "$(cat "$dir/index-target")" = 'retained index' ] || fail "guarded index bytes changed"
+      [ "$(cat "$remote/config/crew-dispatch.json")" = 'retained dispatch' ] || fail "guarded dispatch bytes changed"
+      cmp -s "$home/config/crew-harness" "$remote/config/crew-harness" || fail "unrelated config did not publish"
+      case "$mode" in
+        send-fail|sync-fail)
+          [ "$(wc -l < "$dir/notifications" | tr -d ' ')" -eq "$records" ] || fail "failed delivery unexpectedly notified"
+          assert_present "$marker" "failed delivery lost the retry marker"
+          assert_contains "$out" "failed" "failed delivery lost its diagnostic"
+          ;;
+        unchanged)
+          [ "$(wc -l < "$dir/notifications" | tr -d ' ')" -eq "$records" ] || fail "unchanged guarded config sent without pending intent"
+          ;;
+        *)
+          [ "$(wc -l < "$dir/notifications" | tr -d ' ')" -eq "$((records + 1))" ] || fail "guarded config did not notify or retry"
+          assert_absent "$marker" "successful notification retained its retry marker"
+          ;;
+      esac
+    done
+    rm -f "$remote/config/model-index.json"
+    for mode in ordinary ordinary-unchanged; do
+      records=$(wc -l < "$dir/notifications" | tr -d ' ')
+      out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$primary" \
+        FM_BOOTSTRAP_NETWORK=only FM_SSH_BIN="$fakebin/fake-ssh" \
+        FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness' \
+        FM_TEST_NOTIFY_MODE="$mode" FM_TEST_NOTIFY_LOG="$dir/notifications" \
+        FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 \
+        "$ROOT/bin/$caller" 2>&1); rc=$?
+      expect_code 0 "$rc" "ordinary remote inheritance must succeed"
+      if [ "$mode" = ordinary ]; then
+        records=$((records + 1))
+      fi
+      [ "$(wc -l < "$dir/notifications" | tr -d ' ')" -eq "$records" ] || fail "ordinary notification count changed"
+      assert_absent "$marker" "ordinary convergence retained a retry marker"
+      assert_absent "$remote/config/crew-dispatch.json" "ordinary absence did not remove dispatch"
+      [ "$(cat "$dir/index-target")" = 'retained index' ] || fail "ordinary convergence changed former symlink target"
+    done
+  done
+  pass "remote guarded pairs preserve routing while notifying unrelated writes and retrying pending delivery"
+}
+
+test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
 test_bootstrap_reporting
 test_no_mistakes_min_version

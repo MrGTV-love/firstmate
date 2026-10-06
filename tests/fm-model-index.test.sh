@@ -101,6 +101,49 @@ printf '%s\n' '{"models":[{"id":"opus","resolved_id":"claude-current"}]}' > "$CA
 cp "$BASE" "$INDEX"
 pass 'retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude ids match listed suffixed or base forms'
 
+REGISTRY="$TMP_ROOT/model_registry.json"
+cat > "$REGISTRY" <<'JSON'
+{"old":{"model":"current"},"models":["provider/old","old[1m]","provider/old[1m]","current"],"nested":{"provider/old[2m]":true},"description":"old is mentioned in prose","unrelated":"oldish"}
+JSON
+cp "$REGISTRY" "$TMP_ROOT/registry-before.json"
+cp "$INDEX" "$TMP_ROOT/index-before-registry.json"
+registry_status=0
+"$TOOL" check-registry "$REGISTRY" > "$TMP_ROOT/registry-out" 2> "$TMP_ROOT/registry-errors" || registry_status=$?
+[ "$registry_status" -ne 0 ] || fail 'registry with retired identifiers was accepted'
+for id in old provider/old 'old[1m]' 'provider/old[1m]' 'provider/old[2m]'; do
+  assert_contains "$(cat "$TMP_ROOT/registry-errors")" "retired id '$id'" 'every retired registry key and value must be reported'
+done
+[ "$(wc -l < "$TMP_ROOT/registry-errors" | tr -d ' ')" = 5 ] || fail 'registry scan reported prose or omitted a retired identifier'
+cmp -s "$REGISTRY" "$TMP_ROOT/registry-before.json" || fail 'refused registry was modified'
+cmp -s "$INDEX" "$TMP_ROOT/index-before-registry.json" || fail 'registry comparison modified the index'
+printf '%s\n' '{"current":{"models":["provider/current","current[1m]"]},"description":"old is mentioned in prose","unrelated":"oldish"}' > "$REGISTRY"
+cp "$REGISTRY" "$TMP_ROOT/registry-before.json"
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/no-registry-catalogs" "$TOOL" check-registry "$REGISTRY" > "$TMP_ROOT/registry-out" 2> "$TMP_ROOT/registry-errors" \
+  || fail 'current-only registry failed offline comparison'
+[ ! -s "$TMP_ROOT/registry-errors" ] || fail 'registry comparison attempted catalog checking or matched prose'
+cmp -s "$REGISTRY" "$TMP_ROOT/registry-before.json" || fail 'accepted registry was modified'
+cmp -s "$INDEX" "$TMP_ROOT/index-before-registry.json" || fail 'accepted registry comparison modified the index'
+refuses check-registry
+refuses check-registry "$REGISTRY" '.models'
+refuses check-registry "$TMP_ROOT/missing-registry.json"
+refuses check-registry "$TMP_ROOT"
+ln -s "$TMP_ROOT/missing-registry.json" "$TMP_ROOT/unreadable-registry.json"
+refuses check-registry "$TMP_ROOT/unreadable-registry.json"
+for malformed in '{' '' '{} {}'; do
+  printf '%s\n' "$malformed" > "$REGISTRY"
+  cp "$REGISTRY" "$TMP_ROOT/registry-before.json"
+  refuses check-registry "$REGISTRY"
+  cmp -s "$REGISTRY" "$TMP_ROOT/registry-before.json" || fail 'malformed registry was modified'
+done
+printf '%s\n' '{"current":true}' > "$REGISTRY"
+printf '%s\n' '{"version":1,"roles":{}}' > "$INDEX"
+cp "$INDEX" "$TMP_ROOT/malformed-index-before.json"
+refuses check-registry "$REGISTRY"
+cmp -s "$INDEX" "$TMP_ROOT/malformed-index-before.json" || fail 'malformed index was modified'
+FM_HOME="$TMP_ROOT/no-index" refuses check-registry "$REGISTRY"
+cp "$BASE" "$INDEX"
+pass 'registry comparison reports every retired token key and value offline, rejects invalid inputs and missing index, and leaves inputs unchanged'
+
 jq '.roles.strong.codex.model = "absent"' "$BASE" > "$INDEX"
 refuses check
 refuses check codex absent

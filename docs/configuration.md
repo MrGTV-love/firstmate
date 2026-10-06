@@ -1177,9 +1177,12 @@ A retired id also matches an id carrying a trailing context suffix, so retiring 
 Claude's catalog lists some ids only with or only without that suffix, so a Claude id is available when the catalog lists an id with the same base: `opus[1m]` when `opus` is listed, and `claude-sonnet-5-5` when only `claude-sonnet-5-5[1m]` is listed.
 
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.
-`bin/fm-config-push.sh` runs the same check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
+The Vernant steward lane owner must also run `FM_HOME="/path/to/lane-home" bin/fm-model-index.sh check-registry "/path/to/vernant-checkout/scripts/model_registry.json"` after every index edit and before every Vernant model change, replacing the placeholder paths with that lane's home and Vernant checkout.
+This read-only comparison writes nothing to Vernant; the command header and `--help` own its registry scanning and refusal semantics.
+`bin/fm-config-push.sh` runs the active-id catalog check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
 The push stages the index and inheritable dispatch document once, validates that staged pair, and sends those same bytes or absences through both local and remote propagation.
 Before either routing file is replaced or removed, local and remote inheritance preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
+Remote live callers still notify unrelated successfully published inherited changes when a destination pair guard refuses, and pending sends still retry despite that guard.
 When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap do not run the full check.
 Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json` to inspect concrete candidates without changing the source file.
