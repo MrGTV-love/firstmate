@@ -293,6 +293,9 @@ Creation proceeds in this order:
 2. After the new workspace converges to one exact task endpoint beneath one exact parent workspace id, the journal advances to a version 2 binding.
    That binding records the physical home, named session, endpoint, parent, and immutable expected labels.
 
+Creation releases the session presentation lock after create, prune, order, and binding publication, before worktree allocation and harness setup.
+The task and metadata locks still protect the launch incarnation, and abort cleanup reacquires the session lock before closing any pane.
+
 Another parent with the same presentation label does not prevent publication or participate in restart reclaim.
 
 The token is visible in the workspace title, because Herdr exposes no verified hidden persistent field.
@@ -382,11 +385,26 @@ Ordinary non-projected task removal:
 - Keeps the legitimate plain close when the target is the active tab.
 - Refuses an unlocked close if the session lock's identity cannot be resolved.
 
-Task teardown separately preflights that session lock before the task's isolated copy is returned.
-So a contended lock refuses up front while the copy, every durable record, and the endpoint are all intact for a plain rerun.
+Projected spawn aborts use the separate bounded cleanup contract owned by `bin/fm-spawn.sh`'s header, not the ordinary removal wait above.
 
-Forced secondmate cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
-It then retains each child's durable identity unless that exact pane returns structured not-found after its close.
+Task cleanup first admits the exact endpoint read-only under its named-session presentation lock.
+A contended or ambiguous admission refuses while the copy, durable records, and endpoint are still intact.
+Admission records the validated endpoint metadata, its `spawn_gen` (including an absent legacy field), and the exact session lock identity.
+Cleanup then releases session custody while concluding the task's own run and reaping its owned processes; task and metadata exclusion remain held throughout.
+Before closing the pane, cleanup reacquires the admitted session identity and revalidates the endpoint metadata and generation exactly.
+A later refusal can therefore leave owned processes stopped, but does not close a substituted endpoint or return the isolated copy.
+The pane close remains serialized, and session custody is released before worktree return, home removal, and record cleanup.
+A slow owned-process cleanup or return therefore cannot starve another spawn's abort cleanup of the session lock.
+
+Forced secondmate cleanup recursively admits every Herdr child endpoint under the affected named-session locks before mutating any child, while retaining descendant task-set, task, and metadata exclusion.
+It releases session custody before child cleanup, reacquires and exactly revalidates each admitted child immediately before its close, then releases custody before recursion, worktree return, or home removal.
+It retains each child's durable identity unless that exact pane returns structured not-found after its close.
+
+The deferred backlog close or captain-held retention marker is not published until owned-process cleanup and the final session/endpoint/generation gates pass.
+A refusal at those gates cannot create a replay-authoritative marker that a later session start could use to erase the retained task record or transition its backlog item.
+Replay arguments and a non-authoritative marker are staged before owned-process cleanup; the previous authoritative marker is cleared, and a pre-publication refusal retires the stage through the existing cleanup trap.
+Accepted legacy generations are stamped only at that publication boundary; a failed marker write retains the existing stamp rollback behavior.
+Once those gates pass, the marker is still written before the pane close and subsequent destructive cleanup, preserving interrupted-cleanup replay.
 
 ### When task records are erased
 
@@ -394,6 +412,7 @@ Durable task records are erased only once the exact pane is confirmed gone throu
 After every close path, only a structured not-found response counts as gone.
 A present or unknown result retains every record with a visible, retryable error.
 Missing or malformed endpoint identity and missing confirmation machinery are ambiguity, never proof of a gone pane, and refuse record removal the same way.
+After marker publication, a later close or cleanup failure retains records for the current invocation, but an applicable pending backlog transition remains authoritative for session-start replay; that retention is not a promise across a restart.
 If lock, snapshot, pane identity, or restoration is ambiguous, cleanup warns and preserves the journal for manual inspection.
 Once the exact pane is confirmed gone, teardown retires the task's own journal when it binds that same pane, or when it is a version 1 attempt whose token-bearing projected workspace is itself confirmed gone, because nothing then remains for the session-start sweep to correlate; a journal bound to any other pane, or a version 1 attempt whose workspace is still present or unreadable, stays for that sweep.
 
@@ -417,6 +436,7 @@ The replacement is allowed only when all of these agree:
 
 The replacement tab and pane are created and verified before the old pane is rechecked and closed.
 Then the journal advances atomically to the replacement endpoint before metadata publication.
+Exact reclaim releases the session presentation lock after that verified journal advancement; [Presentation journal](#presentation-journal) owns the subsequent unlocked launch and abort-cleanup custody.
 The reclaim path never moves, closes, deletes, or renames a workspace and never touches a parent, sibling, captain, or foreign pane.
 A failed replacement rolls back only the exact response-derived new pane when focus-safe verification permits it.
 
@@ -512,6 +532,7 @@ Any of these preserves the candidate and lets session startup continue with at m
 | Test | What it covers |
 | --- | --- |
 | `tests/fm-backend-herdr-presentation-e2e.test.sh` | Multi-home ordering, concurrency, lock contention, legacy coexistence, focus preservation, exact same-identity restart replacement, ambiguous bindings and tokens, and exact-pane cleanup through the guarded lab path. |
+| `tests/fm-backend-herdr-recovery-lock-e2e.test.sh` | [Cross-home recovery custody evidence](verification/runtime-backends.md#cross-home-recovery-custody). |
 | `tests/fm-herdr-session-cleanup.test.sh` | Every discovery, ownership, topology, process, locking, revalidation, focus, retirement, and continue-on-error boundary. |
 | `tests/fm-herdr-session-cleanup-e2e.test.sh` | The restored-shell cleanup in a guarded non-default named lab. |
 | `tests/fm-backend-herdr-focus-flash-e2e.test.sh` | Reproduces the raw explicit-close focus steal on the installed release, and proves the focus-safe emptying-close plan removes a doomed workspace with no wrong-focus interval. |

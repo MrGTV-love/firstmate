@@ -463,11 +463,39 @@ Herdr runs both flat and projected layouts in generated lab sessions through `bi
 Both terminal shells and the fake get's interactive child use lab-private history files.
 
 The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
-After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
-The refused spawn remained blocked in endpoint cleanup until the projected spawn released the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
-Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
+After both acquisitions release presentation custody, the fixture holds the session lock for ten actual seconds while the flat acquisition refuses at its unchanged isolation deadline.
+The refused spawn stays blocked in endpoint cleanup until the fixture releases the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
+Once custody is released and the projected acquisition is allowed to launch, the flat attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
 The companion `tests/fm-backend-herdr.test.sh` checks unresolved-lock refusal without any pane-close mutation.
-Projected abort cleanup confirms its exact acquisition pane is gone before releasing the presentation lock and retires that pane's generic cleanup target, avoiding a second close outside the original transaction.
+Projected spawn aborts instead follow the bounded contract in `bin/fm-spawn.sh`'s header.
+
+Focused projected-refusal verification on 2026-10-06 used the checksum-verified official CI Herdr 0.7.4 binary (protocol 16), generated checkout-local fixture homes, and the unchanged named-lab/default-fleet tripwire.
+With that binary on `PATH`, the selected executable scenarios were:
+
+```sh
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr off
+bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+```
+
+The public CLI acquired a generated dirty copy while the fixture held real session custody beyond all 50 existing abort acquisition probes.
+Before the correction it printed the custody refusal but remained waiting in generic cleanup, failing the bounded caller-exit assertion.
+After the correction it exited nonzero while the fixture still owned custody, leaving the exact journal, pane and get lease intact without publishing task metadata.
+Sibling metadata (including its spawn generation), journal, pane, process lease, parent, sentinel and exact workspace/tab focus stayed unchanged both before and after custody was released.
+The fixture then explicitly closed its retained endpoint and required structured `dead` plus actual process-lease cessation.
+
+```text
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+```
+
+The flat contention scenario also passed with both acquisition leases held during contention and cleanup releasing only the refused flat attempt after the projected launch.
+The projected-layout entrypoint also passed its ordinary successful acquisition and all four refusal/lease-cleanup paths (105.45 seconds total).
+The selector limits local execution; the default CI entrypoint still executes all acquisition cases in both layouts, including both contention paths.
 
 Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
 
@@ -1650,7 +1678,7 @@ ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session
 ```
 
 The projected spawn in that run used the historical empty opt-in file, so a home that had already enabled the projection keeps it without any migration step.
-One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention is a deliberate hard refusal rather than a flat fallback, which default-on now makes reachable from any Herdr home.
+The current concurrent-recovery and abort-cleanup evidence is owned by [Cross-home recovery custody](#cross-home-recovery-custody).
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
 The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
@@ -1661,6 +1689,134 @@ HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
 ```
 
 Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pane childless idle shell was closed after restoration while the exact non-target focus and default fleet session remained unchanged, and a repeat run was a no-op.
+
+### Cross-home recovery custody
+
+Verified on 2026-10-06 on macOS aarch64 with Herdr 0.9.1 and Bash 3.2.57, using the guarded named-session helpers and a checkout-local runner `TMPDIR`:
+
+```sh
+bash bin/fm-test-run.sh --fail-on-gate-skip 'not found' --json .fm-review-verification/timing.json tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+```
+
+Selected observed output:
+
+```text
+ok - offline executable inventory and reaper remove only generated owned processes before Herdr provisioning
+# herdr 0.9.1 recovery custody lab
+ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
+ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
+ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned conclude, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned reap, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside a held forced-secondmate recursive child return, preserving descendant task/meta custody and exact sibling focus
+ok - owned conclude refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - conclude pre-mutation refusal survives actual startup; admitted deferred close replays only its exact generation
+ok - owned reap refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - reap pre-mutation refusal survives actual startup; admitted deferred retain replays only its exact generation
+FM_TEST_END 2026-10-06T17:15:17Z tests/fm-backend-herdr-recovery-lock-e2e.test.sh exit=0 duration_ms=505266 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=505707
+```
+
+Before provisioning Herdr, the fixture proves submitted and literal allocation interception, exact generated-copy return interception, and refusal of unmatched commands and foreign paths.
+It executes the production cwd inventory and reaper against generated native processes through a PID- and birth-identity-scoped `lsof` boundary, removes only the owned process, and requires an unrelated process to survive.
+No shared Treehouse allocation or return is invoked.
+Generated homes, copies, process fixtures, and evidence stay in the checkout, and task IDs include the unique lab-session identity to isolate the production commands' incidental temporary namespaces.
+The regression invokes the original public spawn and teardown executables without transforming them.
+
+The original allocation and return contention scenarios remain covered.
+Both homes replace only their exact old husks in their original workspaces, advance distinct generations, retain projection tokens and home bindings, publish matching journal and metadata endpoints, and preserve the exact focused workspace and tab.
+A duplicate invocation refuses while its original process retains task custody.
+Reclaimed and fresh failed-setup cleanup require structured `dead` for their exact panes; arbitrary inspection failures cannot satisfy removal assertions.
+
+The owned-cleanup cases separately hold conclusion during branch/head attribution after a controlled `no-mistakes axi status` that takes at least one second inside the unchanged command deadline, and hold the actual reaper's cwd inventory.
+Conclusion uses generated run output and an executable Git timing boundary, then requires the exact owned `axi abort --run` and terminal readback; no real no-mistakes pipeline is controlled.
+While each phase remains held, full cross-home recovery and fresh/reclaimed abort cleanup complete.
+Task/control and metadata lock owners remain live, independent acquisition proves session custody is released, intercepted presentation mutations have the exact expected lock owners, and sibling metadata, journals, panes, and focus remain unchanged.
+After release, native signaling reaps the owned processes without touching the unrelated sentinel, and teardown removes its exact pane and record.
+
+Forced secondmate cleanup descends through a generated nested home and holds its Herdr grandchild's intercepted, registered Git-worktree return after the exact pane is confirmed dead.
+Full unrelated recovery and both abort forms complete while the parent retains descendant task-set, control, and metadata locks but no session custody.
+After release, all three exact endpoints and the generated homes are removed, with exactly one owned grandchild return.
+The removal fixture uses a generated code-root directory pointing to the original binaries, separate from removable worktree/home siblings, because the production guard refuses descendant deletion inside its code root.
+
+Wrong endpoint and replaced-generation refusals carry an applicable markdown backlog in both ordinary close and captain-held retain modes.
+Actual bootstrap reconciliation preserves their records, journals, exact pane presence, and isolated copy HEAD, with no copy return or pending-close marker.
+After admission succeeds, a controlled backlog-transition interruption leaves the existing deferred marker, and actual bootstrap replay consumes it to close only the ordinary row or retain the captain-held row and deliverable.
+The guarded lab teardown and default-fleet tripwire also complete successfully.
+
+#### CI regression follow-up
+
+Verified on 2026-10-06 on macOS aarch64:
+
+```sh
+bash bin/fm-lint.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh tests/fm-teardown.test.sh
+FM_HOME="$PWD/.ci-verification/home" bash bin/fm-test-run.sh --json .ci-verification/teardown-timing.json tests/fm-teardown.test.sh
+```
+
+The generated `FM_HOME` was separate from the fixtures, and the teardown suite used its standard temporary directory outside the code root so the production home-removal safety guard remained in force.
+Full extended analysis passed with pinned ShellCheck 0.11.0.
+The teardown suite completed with `exit=0`, `failed=0`, and `gate_skip=false` (434180 ms), including all four flat-task prerequisite refusals and forced-secondmate child admission refusal.
+Those cases assert preserved copies, branches, records, and endpoints rather than the obsolete diagnostic phrase “nothing was changed”; the shared admission helpers also run after owned-process cleanup, when that phrase would be misleading.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
+
+A checkout-local throwaway smoke separately executed the recovery fixture's production inventory/reaper boundary, including its command-scoped `ID` and `BACKEND` inputs: the generated owned process was removed and the unrelated process remained alive.
+No Herdr session was provisioned in this CI follow-up; the native named-lab evidence above is unchanged.
+
+The subsequent required-prerequisite CI correction was verified on 2026-10-06.
+Provider reads (`gh pr view`, `gh pr checks --json`, and the existing job log) succeeded without credential or configuration changes.
+Run `37512668073`, Herdr job `112437553561`, belongs to head `0aa309b273a5a3821687943679053fb5dad58acb`; its green result is not recovery-regression proof: the exact script reported `tasks-axi not found`, `exit=0`, and `gate_skip=true`.
+
+The Herdr job now installs tasks-axi using the existing npm convention before running the family.
+The existing `--fail-on-gate-skip` option accumulates repeated tokens, so this lane rejects both missing Herdr and missing tasks-axi at the shared serial/parallel result boundary.
+A throwaway executable smoke parsed the workflow and ran its actual npm installation command with a checkout-local prefix/cache; the installed CLI reported `0.2.6`.
+With tasks-axi deliberately absent from PATH, the original recovery entrypoint under the workflow's parsed required-skip options failed before provisioning (`exit=1`, `failed=1`, `skipped_gate=0`).
+An ordinary executable fixture under those same options passed with `gate_skip=false`.
+Shell syntax checks, pinned ShellCheck 0.11.0 full extended analysis of the changed shell files, and actionlint of the workflow passed.
+
+Current `origin/main` (`12609b8641addef89bf4ab980ad490644395daf5`) was merged without rewriting the task history.
+The merge retains the exact acquisition abort target and the approved release of presentation custody before allocation.
+Main's acquisition-contention fixture now proves that release, then uses the existing ownership-sensitive lock API to hold fixture-owned contention; it releases the lock before resuming allocation and before failure cleanup.
+The guarded acquisition entrypoint (`tests/fm-spawn-acquisition-herdr-e2e.test.sh`) passed through `fm-test-run.sh` with `exit=0`, `failed=0`, and `gate_skip=false` (306609 ms).
+Both flat and projected acquisition cases ran; the flat case also exercised fixture-held contention, preservation of both live leases, and exact cleanup of only the refused acquisition after the projected launch.
+The complete runner and workflow contract suites also passed through `fm-test-run.sh` (`total=2`, `failed=0`, `skipped_gate=0`): runner 693622 ms, workflow 12439 ms.
+The runner suite exercised singleton and repeated required-skip flags, both option forms and token ordering, ordinary skip accounting, serial/parallel result handling, and aggregate failure propagation.
+The recovery regression's scenarios and the Herdr family's 20-minute step timeout are unchanged.
+The outer executor must publish through the active pipeline, perform native current-base revalidation, and inspect the resulting real CI log for this exact recovery script completing with `exit=0` and `gate_skip=false` on a green mergeable head.
+No new-head CI execution or Linux timing measurement is claimed by these local checks.
+
+The next required Herdr run (`37521752809`, job `112468697923`) did execute this regression (`gate_skip=false`), but failed after held conclusion with “released cleanup presentation mutations lost exact session-lock ownership”.
+The fixture audited explicit `pane close` calls but omitted the focus-safe shell-death route, which sends HUP to the verified lone idle shell instead.
+The audit now observes both routes, including same-shell KILL escalation, without counting ordinary worktree-process reaping as a presentation mutation or changing production close behavior.
+An executable signal smoke proved live-owner recording for HUP and escalation, ordinary TERM exclusion, and refusal of an unlocked HUP while its generated target remained alive.
+
+Base `3db901238a6b389ea0ea33e336b98bcbb43d10c7` was integrated in merge commit `7d44ebf2`, preserving the recorded no-history-rewrite decision.
+Its non-authoritative backlog staging and pre-signal process audit coexist with split custody: staging and owned cleanup precede exact Herdr reacquisition; legacy stamping and authoritative publication follow it; refusal retires the stage through the existing trap.
+The offline inventory fixture now supplies the generated project/state context and existing backlog audit library required by that updated reaper.
+
+Verified on 2026-10-06 on macOS aarch64 using the checkout-local official Herdr 0.7.4 pin (protocol 16):
+
+```sh
+bin/fm-install-herdr.sh "$PWD/.ci-herdr-bin"
+env PATH="$PWD/.ci-herdr-bin:$PATH" bin/fm-test-run.sh \
+  --fail-on-gate-skip 'herdr not found' \
+  --fail-on-gate-skip 'tasks-axi not found' \
+  --json "$PWD/.ci-recovery-timing.json" \
+  tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+bin/fm-lint.sh bin/fm-teardown.sh tests/fm-teardown.test.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+actionlint .github/workflows/ci.yml
+```
+
+The exact recovery script completed with `exit=0`, `duration_ms=1793668`, and `gate_skip=false`; the runner reported `total=1`, `failed=0`, and `skipped_gate=0`.
+All allocation, return, deliberately held conclusion/reaping, forced-secondmate recursion, fresh/reclaimed abort, replaced-generation refusal, close/retain bootstrap replay, structured-dead, inventory-isolation, sibling-custody and exact-focus scenarios passed.
+Guarded lab cleanup preserved the default-fleet tripwire, and no shared pool operation was invoked.
+Canonical pinned ShellCheck 0.11.0 full extended analysis and actionlint passed.
+This is local macOS evidence, not a new-head Linux CI timing measurement; the required family timeout and all existing scenarios remain unchanged.
+
+The merged teardown suite also passed through the public runner with a separate generated `FM_HOME` and the suite's ordinary temporary root outside the code root:
+`env FM_HOME="$PWD/.ci-verification-home" bin/fm-test-run.sh --json "$PWD/.ci-teardown-timing.json" tests/fm-teardown.test.sh`.
+It completed with `exit=0`, `duration_ms=2617651`, and `gate_skip=false` (`failed=0`, `skipped_gate=0`), including staged-marker replay/refusal, legacy stamp rollback, descendant custody, durable pre-signal audit and process-birth identity coverage.
+An earlier invocation placing this suite's removable homes under checkout-local `TMPDIR` correctly reached the code-root removal refusal before the expected child-source refusal; no guard or assertion was changed to accommodate that placement.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
 
 ### Workspace-removal focus safety
 
@@ -1804,7 +1960,9 @@ tests/fm-teardown.test.sh
 tests/fm-backend-herdr.test.sh
 ```
 
-Observed guarantees: a contended presentation lock refused the teardown before the isolated copy was returned, with the task branch, every durable record, and the endpoint intact and no pane close attempted; the retry after the contention cleared returned the copy, closed the pane under the lock, and removed the records; an unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit; and every presence-gate mode accepted only a structured not-found as gone.
+Observed guarantees: admission contention retained the task branch, isolated copy, every durable record, and endpoint without attempting a pane close; cleanup completed after contention cleared.
+An unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit, and every presence-gate mode accepted only structured not-found as gone.
+[Cross-home recovery custody](#cross-home-recovery-custody) owns the current evidence for split cleanup custody and refusal followed by session-start replay.
 
 The same fixtures verified three further boundaries on 2026-07-29: missing or malformed endpoint identity and an unparseable pane presence refused record removal with everything retained; the SIGKILL escalation re-read the exact pane's process information and refused to signal when a different shell pid owned the pane, falling back to the plain close with the original process untouched; and a reposition whose removal then failed on every path restored the exact original workspace order through a second verified move and reported the close as failed.
 

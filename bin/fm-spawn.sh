@@ -146,12 +146,20 @@
 #   metadata are unchanged.
 #   A clean projected create or exact resume makes one bounded attempt to hold
 #   the one session-scoped presentation-order lock (keyed by named session plus
-#   canonical socket, outside any home's state/) through launch handoff. Lock
-#   contention warns and falls back to the ordinary flat layout before any
-#   projection mutation. The exact response-derived new workspace is inserted
-#   immediately after its owning parent (firstmate or 2ndmate-<id>) contiguous
-#   child block. Ordering never authorizes lifecycle cleanup, and any
-#   unavailable, ambiguous, or failed move warns while the spawn continues.
+#   canonical socket, outside any home's state/) through its last presentation
+#   mutation and journal publication: create, prune, order, and binding for a
+#   fresh projection, or verified endpoint replacement and journal advancement
+#   for an exact resume. Worktree allocation and harness setup run outside it,
+#   under the task and metadata locks. Abort cleanup reacquires it before any
+#   exact-pane close and never hands its projected endpoint to generic cleanup,
+#   even after custody or closure refusal; an unconfirmed endpoint keeps its
+#   exact journal for reconciliation. Fresh-create lock contention warns and
+#   falls back to the ordinary flat layout before any projection mutation;
+#   exact resume refuses the launch instead. The exact response-derived new
+#   workspace is inserted immediately after its owning parent (firstmate or
+#   2ndmate-<id>) contiguous child block. Ordering never authorizes lifecycle
+#   cleanup, and any unavailable, ambiguous, or failed move warns while the
+#   spawn continues.
 #   Every projected create, prune, and move captures and verifies the named
 #   session's exact active workspace and tab. A detected focus change restores
 #   only that exact tab id; an ambiguous pre-operation snapshot refuses the
@@ -1311,12 +1319,6 @@ spawn_abort_cleanup() {
       "$HERDR_PROJECTION_ABORT_SESSION" \
       "$HERDR_PROJECTION_ABORT_TASK_PANE" \
       "$HERDR_PROJECTION_ABORT_SEEDED_PANE" || true
-    # Projection cleanup already owns this exact pane under the held lock.
-    # Retire the generic target only after proving the process endpoint is gone.
-    if [ "$SPAWN_TREEHOUSE_ABORT_TARGET" = "$HERDR_PROJECTION_ABORT_SESSION:$HERDR_PROJECTION_ABORT_TASK_PANE" ] &&
-      fm_backend_herdr_endpoint_confirmed_gone "$SPAWN_TREEHOUSE_ABORT_TARGET"; then
-      SPAWN_TREEHOUSE_ABORT_TARGET=
-    fi
   fi
   if [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" = 1 ]; then
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
@@ -1325,7 +1327,11 @@ spawn_abort_cleanup() {
   # The get process owns the pool lease, not the cwd we happened to observe.
   # Closing this attempt's endpoint also cancels a get still preparing a slot;
   # returning a guessed path here could release somebody else's allocation.
+  # A projected endpoint belongs exclusively to the bounded exact cleanup above,
+  # even when custody or closure was refused; never queue a generic second close.
   if [ -n "$SPAWN_TREEHOUSE_ABORT_TARGET" ] && [ "$KIND" != secondmate ] &&
+    { [ "$BACKEND" != herdr ] ||
+      [ "$SPAWN_TREEHOUSE_ABORT_TARGET" != "$HERDR_PROJECTION_ABORT_SESSION:$HERDR_PROJECTION_ABORT_TASK_PANE" ]; } &&
     [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
     if [ "$BACKEND" = tmux ]; then
       # Use the creation-time window id, never a name a later pane could reuse.
@@ -3758,6 +3764,11 @@ else
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
             HERDR_PROJECTION_ABORT_SEEDED_PANE=""
             SPAWN_TREEHOUSE_ABORT_TARGET="$HERDR_SES:$HERDR_PANE_ID"
+            # Reclaim has finished every focus-sensitive mutation and
+            # published its exact replacement binding. Task/meta locks still
+            # protect this incarnation; allocation and harness setup need no
+            # session custody. Abort cleanup reacquires it before any close.
+            spawn_herdr_presentation_order_lock_release
             ;;
           2)
             spawn_herdr_presentation_order_lock_release
@@ -3837,6 +3848,7 @@ else
             else
               echo "warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart" >&2
             fi
+            spawn_herdr_presentation_order_lock_release
           fi
         else
           echo "warning: herdr presentation focus lock unavailable; using the ordinary flat layout without projection" >&2
@@ -5534,7 +5546,6 @@ spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   HERDR_PROJECTION_ABORT_CLEANUP=0
-  spawn_herdr_presentation_order_lock_release
 fi
 spawn_send_key "$T" Enter
 SPAWN_LAUNCH_SENT=1
