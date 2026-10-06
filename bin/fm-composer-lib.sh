@@ -64,6 +64,13 @@
 #                directly below its composer - omp's status row and
 #                braille-only animation rows (declared once below, next to
 #                the idle placeholders) - none of which is ever typed input.
+#   omp box    - omp's `composer.shape: box`: a rounded top border carrying
+#                omp's status line (`╭── π > … ──╮`), optional `│ … │` rows,
+#                and a folded last row that IS the bottom border (`╰─ text ─╯`).
+#                Proven only by omp's status identity in the top border (see
+#                FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT); not a bordered box
+#                because that rule needs a side-bordered row and an aligned
+#                top border.
 #   left-bar   - opencode: rows prefixed by a heavy left bar `┃` with no
 #                closing border, holding the idle hint, blank rows, and a
 #                mode/model footer line.
@@ -503,6 +510,25 @@ FM_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
 # a middle dot. It is consulted only as the boundary BELOW a bare composer,
 # never on the composer row itself.
 FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:]]|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]([[:space:]]|$)|[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K'
+# omp's `box` composer shape (`composer.shape: box`, the shipped setting of the
+# captain's own config, and what a running session falls back to when it
+# live-reloads an overlay file that no longer pins `borderless`) carries its
+# status line IN the top border and folds the editor's last row into the bottom
+# border (verified live through Herdr on omp 18.6.3):
+#   ╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 path > ⑂ branch > … ──╮
+#   ╰─ typed text                                       ─╯
+# The status opens with the same identity cell as the borderless status row,
+# then a `>` (or `·`) separator. That identity is the whole proof that a
+# rounded top border belongs to an omp composer; any other titled border stays
+# an ambiguous box. The ascii preset's `pi` and a busy spinner cell are left
+# out on purpose: an unverified shape must read `unknown`, never `empty`.
+FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT='^(π|󰵗)[[:space:]]+(>|·)[[:space:]]'
+# omp draws this hint, right-aligned, in the box shape's EMPTY last row until a
+# turn has completed. Its key glyphs are bright and its words dim, so a styled
+# read keeps `⇧⇥` and a plain read cannot tell the whole hint from typed text.
+# It is consulted only on an omp box's last row, never as a fleet-wide idle
+# placeholder.
+FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT='^⇧⇥ to change thinking effort$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
@@ -772,12 +798,15 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local top_inner top_spaces='' geometry_check=0 geometry_ambiguous=0
   local content_inner content_spaces bottom_inner bottom_spaces glyph
   local current_indent='' current_family='' row=0 top=-1 valid=0 content_rows=0
+  local top_omp=0 omp_indent_ok=1
   # Complete-box results: the box containing the cursor (cursor mode) or the
   # bottom-most complete box (no cursor).
   FM_COMPOSER_SCAN_BOX_TOP=-1
   FM_COMPOSER_SCAN_BOX_BOTTOM=-1
   FM_COMPOSER_SCAN_BOX_AMBIG=0
   FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
+  FM_COMPOSER_SCAN_OMPBOX_TOP=-1
+  FM_COMPOSER_SCAN_OMPBOX_BOTTOM=-1
   FM_COMPOSER_SCAN_UNSAFE=0
   FM_COMPOSER_SCAN_CURSOR_EDGE=0
   FM_COMPOSER_SCAN_BARE_ROW=-1
@@ -922,6 +951,11 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       box_glyph=''
       geometry_ambiguous=0
       geometry_check=1
+      top_omp=0
+      omp_indent_ok=1
+      if [ "$family" = rounded ] && _fm_composer_top_is_omp_box "$trimmed"; then
+        top_omp=1
+      fi
       top_inner=$trimmed
       case "$family" in
         rounded) top_inner=${top_inner#╭}; top_inner=${top_inner%╮}; top_spaces=${top_inner//─/ } ;;
@@ -933,6 +967,23 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       case "$top_spaces" in
         *[![:space:]]*) geometry_check=0; geometry_ambiguous=1 ;;
       esac
+    elif [ "$top_omp" = 1 ] && [ "$kind" = bottom ] && [ "$top" -ge 0 ] \
+         && [ "$family" = rounded ] && [ "$valid" = 1 ] && [ "$omp_indent_ok" = 1 ] \
+         && [ "$indent" = "$current_indent" ] && _fm_composer_omp_box_last_row "$trimmed"; then
+      # omp's box shape: the status-bearing top border proves the container and
+      # the closing `╰─ … ─╯` row IS the editor's last row (never a bare rule),
+      # so the box is complete with zero side-bordered rows above it.
+      if [ -z "$cy" ] || { [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; }; then
+        FM_COMPOSER_SCAN_OMPBOX_TOP=$top
+        FM_COMPOSER_SCAN_OMPBOX_BOTTOM=$row
+      fi
+      FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
+      top=-1
+      current_family=
+      current_indent=
+      valid=0
+      content_rows=0
+      top_omp=0
     elif [ "$kind" = bottom ] || { [ "$kind" = ascii ] && [ "$top" -ge 0 ]; }; then
       if [ "$top" -ge 0 ] && [ "$family" = "$current_family" ] \
          && [ "$valid" = 1 ] && [ "$content_rows" -gt 0 ]; then
@@ -988,6 +1039,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       current_indent=
       valid=0
       content_rows=0
+      top_omp=0
     elif [ "$top" -ge 0 ]; then
       side_family=
       case "$trimmed" in
@@ -1004,6 +1056,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
             box_glyph=$row_glyph
           fi
           [ "$indent" = "$current_indent" ] || geometry_ambiguous=1
+          [ "$indent" = "$current_indent" ] || omp_indent_ok=0
           if [ "$geometry_check" = 1 ]; then
             content_inner=$trimmed
             case "$side_family" in
@@ -1225,6 +1278,99 @@ _fm_composer_classify_bare_row() {  # <screen> <styled> <row>
 # below a bare composer and must bound its wrap region exactly as an edge does.
 _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
+}
+
+# _fm_composer_top_is_omp_box: 0 when the trimmed rounded top border carries
+# omp's status identity (FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT above), which is
+# the proof that the box below it is omp's own composer.
+_fm_composer_top_is_omp_box() {  # <trimmed-top-row>
+  local inner=$1
+  inner=${inner#╭}
+  inner=${inner%╮}
+  while [ "${inner#─}" != "$inner" ]; do inner=${inner#─}; done
+  fm_composer_normalize_trim_var inner
+  fm_composer_idle_matches "$inner" \
+    "${FM_COMPOSER_OMP_BOX_TOP_RE:-$FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT}" sensitive
+}
+
+# _fm_composer_omp_box_last_row: 0 when the trimmed row is an omp box's folded
+# last row: `╰─` then the editor's last row then `╯`. A bare rule (nothing
+# between the corners but `─`) is the separate bottom border omp draws only
+# around an unfinished IME composition; it carries no proof of an empty row, so
+# it never qualifies.
+_fm_composer_omp_box_last_row() {  # <trimmed-row>
+  local row=$1 rest
+  case "$row" in
+    '╰─'*'╯') ;;
+    *) return 1 ;;
+  esac
+  rest=${row#╰}
+  rest=${rest%╯}
+  [ -n "${rest//─/}" ]
+}
+
+# _fm_composer_ompbox_row_content: the editor text of one row of an omp box.
+# A side-bordered row is read like any other box row. The folded last row has
+# exactly one `─` after its `╰` and one before its `╯` (omp's own geometry), so
+# a typed leading or trailing `─` survives.
+_fm_composer_ompbox_row_content() {  # <raw-row> <styled> <last-row-flag> -> content on stdout
+  local raw=$1 styled=$2 last=$3 stripped
+  if [ "$last" != 1 ]; then
+    _fm_composer_row_content "$raw" "$styled"
+    return 0
+  fi
+  if [ "$styled" = 1 ]; then
+    stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
+  else
+    stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+  fi
+  fm_composer_normalize_trim_var stripped
+  case "$stripped" in '╰─'*) stripped=${stripped#╰─} ;; esac
+  stripped=${stripped%╯}
+  fm_composer_normalize_trim_var stripped
+  case "$stripped" in *'─') stripped=${stripped%─} ;; esac
+  fm_composer_normalize_trim_var stripped
+  printf '%s' "$stripped"
+}
+
+# _fm_composer_classify_ompbox: omp's box composer (rows <first-row> through
+# <last-row>, the last being the folded `╰─ … ─╯` row). Any editor text is
+# pending, never read through the shared prompt-glyph rules because omp's box
+# draws no prompt glyph, so a typed `>` or `❯` is text. The one exception is
+# omp's own empty-row hint (FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT): a styled read
+# proves it only as a strictly shorter remnant of the whole hint (the dim words
+# stripped, the bright key glyphs left), a plain read only by its position in
+# the last row, the same two proofs fm_composer_classify_content applies to
+# every other placeholder.
+_fm_composer_classify_ompbox() {  # <screen> <styled> <first-row> <last-row>
+  local screen=$1 styled=$2 first=$3 last=$4 row raw content plain is_last hint_re hint
+  hint_re=${FM_COMPOSER_OMP_BOX_HINT_RE:-$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT}
+  row=$first
+  while [ "$row" -le "$last" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    is_last=0
+    [ "$row" -ne "$last" ] || is_last=1
+    content=$(_fm_composer_ompbox_row_content "$raw" "$styled" "$is_last")
+    plain=$(_fm_composer_ompbox_row_content "$raw" 0 "$is_last")
+    if [ -n "$content" ]; then
+      hint=0
+      if [ "$is_last" = 1 ] && fm_composer_idle_matches "$plain" "$hint_re" sensitive; then
+        if [ "$styled" = 1 ]; then
+          if [ "${#content}" -lt "${#plain}" ]; then
+            case "$plain" in *"$content"*) hint=1 ;; esac
+          fi
+        else
+          hint=1
+        fi
+      fi
+      if [ "$hint" != 1 ]; then
+        printf 'pending'
+        return 0
+      fi
+    fi
+    row=$((row + 1))
+  done
+  printf 'empty'
 }
 
 # _fm_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
@@ -1467,6 +1613,12 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
     FM_COMPOSER_SELECTED_AMBIG=$FM_COMPOSER_SCAN_BOX_AMBIG
   fi
+  if [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -gt "$generic" ]; then
+    generic=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
+    FM_COMPOSER_SELECTED_KIND=ompbox
+    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_OMPBOX_TOP + 1))
+    FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
+  fi
   # A bare candidate standing in a proven envelope's footer zone is that
   # harness's own furniture, never a composer. The envelope it sits under is
   # what the screen actually shows, so when that envelope's proving glyph row
@@ -1530,10 +1682,13 @@ _fm_composer_select_cursorless() {
     done
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = box ] \
+     || [ "$FM_COMPOSER_SELECTED_KIND" = ompbox ] \
      || [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ]; then
     boundary=$FM_COMPOSER_SELECTED_LAST
     if [ "$FM_COMPOSER_SELECTED_KIND" = box ]; then
       boundary=$FM_COMPOSER_SCAN_BOX_BOTTOM
+    elif [ "$FM_COMPOSER_SELECTED_KIND" = ompbox ]; then
+      boundary=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
     else
       next=$((boundary + 1))
       raw=$(_fm_composer_screen_row "$next" "$plain")
@@ -1563,7 +1718,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1579,6 +1734,25 @@ EOF
     content=$(_fm_composer_row_content "$raw" "$styled")
     placeholder_position=0
     case "$FM_COMPOSER_SELECTED_KIND" in
+      ompbox)
+        # omp's box draws no prompt glyph, and its empty-row hint is dropped by
+        # the same two proofs the classifier applies (see
+        # _fm_composer_classify_ompbox); anything else is typed text.
+        is_last=0
+        [ "$row" -ne "$FM_COMPOSER_SELECTED_LAST" ] || is_last=1
+        content=$(_fm_composer_ompbox_row_content "$raw" "$styled" "$is_last")
+        if [ "$is_last" = 1 ] && [ -n "$content" ]; then
+          omp_plain=$(_fm_composer_ompbox_row_content "$raw" 0 1)
+          if fm_composer_idle_matches "$omp_plain" \
+               "${FM_COMPOSER_OMP_BOX_HINT_RE:-$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT}" sensitive; then
+            if [ "$styled" != 1 ]; then
+              content=
+            elif [ "${#content}" -lt "${#omp_plain}" ]; then
+              case "$omp_plain" in *"$content"*) content= ;; esac
+            fi
+          fi
+        fi
+        ;;
       bare)
         if [ "$row" -eq "$FM_COMPOSER_SELECTED_FIRST" ] \
            && fm_composer_leading_agent_glyph_var glyph "$content"; then
@@ -1665,6 +1839,11 @@ EOF
         "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))"
       return 0
     fi
+    if [ "$FM_COMPOSER_SCAN_OMPBOX_TOP" -ge 0 ]; then
+      _fm_composer_classify_ompbox "$screen" "$styled" \
+        "$((FM_COMPOSER_SCAN_OMPBOX_TOP + 1))" "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM"
+      return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
        && [ "$cy" -ge "$FM_COMPOSER_SCAN_LEFTBAR_START" ] \
        && [ "$cy" -le "$FM_COMPOSER_SCAN_LEFTBAR_END" ]; then
@@ -1736,6 +1915,10 @@ EOF
       else
         _fm_composer_classify_bare_row "$screen" "$styled" "$FM_COMPOSER_SELECTED_FIRST"
       fi
+      ;;
+    ompbox)
+      _fm_composer_classify_ompbox "$screen" "$styled" \
+        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
       ;;
     leftbar)
       _fm_composer_classify_leftbar "$screen" "$styled" \

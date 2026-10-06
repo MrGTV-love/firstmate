@@ -552,6 +552,105 @@ codex_cell() {
   printf '%s[38;2;%s;%s;%sm%s[48;2;57;57;57m%s%s[0m' "$ESC" "$1" "$1" "$1" "$ESC" "$2" "$ESC"
 }
 
+# omp's `box` composer shape: the status line rides the TOP border and the
+# editor's last row is folded into the bottom border (`╰─ text ─╯`). This is the
+# screen 11 idle omp workers drew after live-reloading an overlay file that no
+# longer pinned `borderless` (task fm-omp-composer-unknown-blocks-control);
+# every verdict read `unknown`, which stopped fm-control exit and relaunch.
+# The captured screen is the task's own capture; the rest are real omp 18.6.3
+# captures through Herdr (typed text, wrapped rows, the empty-row hint).
+omp_box_top() {
+  printf '%s' '╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 firstmate/firstmate > ⑂ fm/fm-model-index > S1.95 + 👁 1.11 ▶─────────────38%─────────╎──┃────272K─◀ ⚙ 1 < Implement fleet model index < 🆔 01a111e1 ──╮'
+}
+
+omp_box_last() {  # <editor text>
+  printf '╰─ %-176s ─╯' "$1"
+}
+
+test_matrix_omp_box_composer() {
+  local top captured typed multi hint styled_hint styled_typed
+  top=$(omp_box_top)
+  captured=$'⚠ Operation aborted
+
+ TODO
+  ├─ II. Validate · 0/1
+  │  └─ ☐ Drive no-mistakes through every gate to CI readiness
+  ├─ III. Deliver · 0/1
+  └─────
+
+  F5 to retry
+
+'"$top"$'
+╰─                                                                                                                                                                                 ─╯'
+  # The captured idle worker: an empty editor reads empty on every profile.
+  assert_screen "omp box idle on herdr" empty "$CAPS_STYLED" "$captured" '' probe-absent
+  assert_screen "omp box idle on zellij" empty "$CAPS_STYLED_NOID" "$captured"
+  assert_screen "omp box idle on cmux/orca" empty "$CAPS_PLAIN" "$captured"
+  # Typed text is pending (the plain profile cannot be fooled either: a bordered
+  # row reads pending without ghost proof).
+  typed=$'transcript\n\n'"$top"$'\n'"$(omp_box_last 'hello world typed text')"
+  assert_screen "omp box typed on herdr" pending "$CAPS_STYLED" "$typed" '' probe-absent
+  assert_screen "omp box typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  multi=$'transcript\n\n'"$top"$'\n│  first line'"$(printf '%*s' 160 '')"$'│\n'"$(omp_box_last '')"
+  assert_screen "omp box draft in an upper row" pending "$CAPS_STYLED" "$multi" '' probe-absent
+  # omp's box draws no prompt glyph, so a typed glyph is text, never an empty
+  # composer (the shared bordered rule would have read `>` as empty).
+  assert_screen "omp box typed >" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '>')" '' probe-absent
+  assert_screen "omp box typed ❯" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '❯')" '' probe-absent
+  assert_screen "omp box typed dash" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '─')" '' probe-absent
+  # The empty-row hint: whole-text on a plain read, `⇧⇥` remnant on a styled one
+  # (key glyphs bright, words dim italic), and the whole hint typed in full
+  # brightness stays pending because nothing proves it is ghost.
+  hint=$'transcript\n\n'"$top"$'\n╰─'"$(printf '%*s' 60 '')"$'⇧⇥ to change thinking effort ─╯'
+  assert_screen "omp box hint on plain backends" empty "$CAPS_PLAIN" "$hint"
+  styled_hint=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m$(printf '%*s' 60 '')${ESC}[0m${ESC}[38;2;0;180;255m⇧⇥${ESC}[0m${ESC}[38;2;229;229;231m ${ESC}[0m${ESC}[3m${ESC}[38;2;107;114;128mto change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
+  assert_screen "omp box styled hint" empty "$CAPS_STYLED" "$styled_hint" '' probe-absent
+  styled_typed=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
+  assert_screen "omp box whole hint typed bright" pending "$CAPS_STYLED" "$styled_typed" '' probe-absent
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled_hint")" = '' ] \
+    || fail "omp box extraction must drop the empty-row hint"
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$typed")" = 'hello world typed text' ] \
+    || fail "omp box extraction must return the typed text without its borders"
+  # Cursor mode (tmux): the cursor sits on the folded last row.
+  assert_screen "omp box idle on tmux" empty "$CAPS_TMUX" "$captured" 11 probe-absent
+  assert_screen "omp box typed on tmux" pending "$CAPS_TMUX" "$typed" 3 probe-absent
+  pass "matrix: omp's box composer (status in the top border, folded last row) reads empty, pending, and never a typed glyph as empty"
+}
+
+test_omp_box_requires_omp_identity_and_complete_shape() {
+  local top empty_last
+  top=$(omp_box_top)
+  empty_last=$(omp_box_last '')
+  # Only omp's own status identity proves the container; an arbitrary titled
+  # rounded border, a busy spinner status, or the ascii preset's `pi` stays
+  # an unprovable shape and reads unknown, never empty.
+  assert_screen "titled non-omp border" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── some other title ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "omp busy spinner status" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── ⠧ 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "omp ascii-preset status" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── pi - GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  # A bare rule closing the box is not the folded last row.
+  assert_screen "bare rule bottom" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n╰'"$(printf '─%.0s' $(seq 1 60))"$'╯' '' probe-absent
+  # A broken interior (blank row, shifted indent) is not a proven box.
+  assert_screen "blank row inside the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n\n'"$empty_last" '' probe-absent
+  assert_screen "shifted side-border indent" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n │'"$(printf '%*s' 60 '')"$'│\n'"$empty_last" '' probe-absent
+  # Anything live below the box makes it stale, and a newer shape outranks it.
+  assert_screen "activity below the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last"$'\nsome later activity' '' probe-absent
+  assert_screen "dead shell below the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last"$'\n$ ls -la' '' probe-absent
+  assert_screen "cursor outside the box" unknown "$CAPS_TMUX" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last" 0 probe-absent
+  pass "matrix: an omp box needs omp's status identity and a complete shape; every other variant reads unknown"
+}
+
 test_matrix_codex_idle_starfield_furniture() {
   # Real idle codex-cli 0.154.0 (gpt-6-astra, fast mode) captured byte-for-byte
   # through Herdr (`pane read --format ansi`) from the first codex second mate:
@@ -1037,6 +1136,8 @@ test_matrix_cursor_reverse_video_placeholder_remnant
 test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_omp_effort_hint_remnant
+test_matrix_omp_box_composer
+test_omp_box_requires_omp_identity_and_complete_shape
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_matrix_pi_dollar_status_footer_is_empty
