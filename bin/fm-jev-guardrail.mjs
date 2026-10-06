@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import { constants, openSync, closeSync, writeSync, readFileSync, mkdirSync, fstatSync, lstatSync } from 'node:fs';
 import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 let parser;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,7 +24,7 @@ const privateKey = process.env.TYPESAFE_API_KEY || '';
 delete process.env.TYPESAFE_API_KEY;
 delete process.env.TYPESAFE_API_KEY_PRIVATE;
 const model = 'jev-1.13.0';
-const policyVersion = 5;
+const policyVersion = 6;
 const clock = () => performance.now();
 const elapsed = start => Math.round((clock() - start) * 1000) / 1000;
 const secretPath = value => /(?:^|[/\\])(?:\.env(?:[.\w-]*)?|\.ssh|\.aws|\.gnupg|credentials(?:[.\w-]*)?|secrets?(?:[.\w-]*)?|id_(?:rsa|ed25519)|[^/]*\.(?:pem|key))(?:$|[/\\])/i.test(value);
@@ -32,10 +32,13 @@ const secretName = value => /(?:^|_)(?:token|secret|password|passwd|credentials?
 const production = value => /(?:^|[^a-z])(?:prod(?:uction)?|live)(?:$|[^a-z])/i.test(value);
 const shells = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);
 const readers = new Set(['cat', 'head', 'tail', 'less', 'more', 'grep', 'rg', 'sed', 'awk', 'base64', 'xxd']);
+const controlWords = new Set(['fi', 'for', 'case', 'esac', 'done', 'function']);
+const executionPrefixes = new Set(['if', 'then', 'else', 'elif', 'while', 'until', 'do', 'time', 'coproc', '!']);
+const riskyLiteral = /\b(?:rm|rmdir|unlink|shred|rmtree|delete|destroy|remove|drop|deploy|apply|upgrade|publish|release|push|reset|clean|secret\w*|credential\w*|printenv|env|find-(?:generic|internet)-password)\b|authorization:|cookie:|\.env|\.ssh|\.aws|\.gnupg|\.pem|\.key|id_(?:rsa|ed25519)/i;
 
 function targetScope(args) {
-  if (args.some(secretPath)) return 'secret';
   if (args.some(production)) return 'production';
+  if (args.some(secretPath)) return 'secret';
   const targets = args.filter(v => !v.startsWith('-'));
   if (targets.length && targets.every(v => /^(?:\.\.?\/|\/tmp\/|\/private\/tmp\/)/.test(v) && !/(?:^|\/)\.\.(?:\/|$)/.test(v.replace(/^\.\//, '')))) return 'local';
   return 'unknown';
@@ -60,7 +63,20 @@ function describe(command, depth = 0) {
       if (token.type === 'group') descend(token.content);
       for (const sub of token.subs || []) descend(sub.content);
     }
-    const position = parser.commandPosition(node);
+    for (let i = 0; i < node.length - 1; i++) if (node[i].type === 'redir' && node[i].value === '<' && secretPath(node[i + 1].value || '')) add('secret_read', [], { scope: 'secret' });
+    let position = parser.commandPosition(node);
+    while (executionPrefixes.has(position.command?.value)) {
+      unsupported = true;
+      const prefix = position.command.value;
+      let remaining = node.slice(node.indexOf(position.command) + 1);
+      if (prefix === 'time' && remaining[0]?.value === '-p') remaining = remaining.slice(1);
+      position = parser.commandPosition(remaining);
+    }
+    if (position.commandLookup) continue;
+    if (controlWords.has(position.command?.value)) {
+      unsupported = true;
+      if (position.words.some(word => riskyLiteral.test(word.value))) add('opaque_execution', []);
+    }
     for (const payload of position.wrapperPayloads) descend(payload);
     if (!position.command) {
       // The shared parser consumes env as a wrapper even when it has no
@@ -68,10 +84,7 @@ function describe(command, depth = 0) {
       // and informational options do not.
       if (position.wrappers.at(-1) === 'env' && !position.wrapperPayloads.length &&
           !position.words.some(word => word.value === '--help' || word.value === '--version')) {
-        const envIndex = position.words.findLastIndex(word => basename(word.value) === 'env');
-        const lookup = position.wrappers.includes('command') &&
-          position.words.some((word, index) => index < envIndex && /^-[^-]*[vV]/.test(word.value));
-        if (!lookup) add('secret_read', [], { scope: 'secret' });
+        add('secret_read', [], { scope: 'secret' });
       }
       continue;
     }
@@ -101,10 +114,8 @@ function describe(command, depth = 0) {
     else if (readers.has(name) && args.some(secretPath)) add('secret_read', [], { scope: 'secret' });
     else if (['curl', 'wget'].includes(name) && args.some(v => secretPath(v.replace(/^@/, '')) || /^(?:authorization:|cookie:)/i.test(v))) add('secret_read', [], { scope: 'secret' });
     else if (['python', 'python3', 'node', 'ruby', 'perl'].includes(name) && args.some(v => /^-(?:c|e)$/.test(v)) && args.some(v => /(?:remove|unlink|rmtree|delete|secret|credential|\.env|deploy)/i.test(v))) add('opaque_execution', [], { scope: 'unknown' });
-    // Input redirection reads are execution, unlike printed shell examples.
-    for (let i = 0; i < node.length - 1; i++) if (node[i].type === 'redir' && node[i].value === '<' && secretPath(node[i + 1].value || '')) add('secret_read', [], { scope: 'secret' });
   }
-  if (unsupported && /\b(?:rm|delete|deploy|push|secret|credential)\b|\.env/i.test(command) && features.length === 0) add('opaque_execution', []);
+  if (parsed.error && riskyLiteral.test(command)) add('opaque_execution', []);
   // Omitted operations can contain a secret read or destructive action.
   // Overflow is therefore opaque risk, never a reassuring truncated prefix.
   if (features.length > 32) return { features: [{ operation: 'opaque_execution', scope: 'unknown', recursive: false, force: false }], unsupported: true };
@@ -192,24 +203,11 @@ function usage(response) {
   };
 }
 
-function toolKey(payload) {
-  const id = payload?.tool_use_id ?? payload?.toolCallId;
-  return typeof id === 'string' && id.length <= 256 ? createHash('sha256').update(id).digest('hex') : null;
-}
-
-function outcome(payload, host, log) {
-  if (!payload || typeof payload !== 'object') return;
-  const key = toolKey(payload);
-  if (!key) return;
-  const failed = payload.hook_event_name === 'PostToolUseFailure' || payload.isError === true;
-  append(log, { event: 'outcome', tool_key: key, host, outcome: failed ? 'failed' : 'succeeded' });
-}
-
 async function screen(payload, host, log, label = null) {
   const start = clock();
   const id = randomUUID();
   const selection = select(payload);
-  const base = { id, host, tool_key: toolKey(payload), ...(label ? { case_id: label.id, expected: label.expected } : {}) };
+  const base = { id, host, ...(label ? { case_id: label.id, expected: label.expected, dataset: label.dataset } : {}) };
   const finish = (status, detail = {}) => {
     const record = { event: 'result', ...base, selected: selection.status === 'selected', status, latency_ms: elapsed(start), verdict: null, confidence: null, input_tokens: null, output_tokens: null, estimated_usd: null, cost_source: 'unknown', ...detail };
     append(log, record);
@@ -243,6 +241,19 @@ async function screen(payload, host, log, label = null) {
 }
 
 const percentile = values => values.length ? [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1] : null;
+function labelMetrics(labels) {
+  const risky = labels.filter(r => r.expected === 'risky');
+  const routine = labels.filter(r => r.expected === 'routine');
+  const tp = risky.filter(r => r.verdict === 'risky').length;
+  const fp = routine.filter(r => r.verdict === 'risky').length;
+  const screened = labels.filter(r => r.selected).length;
+  return {
+    labelled_risky: risky.length, risky_true_positives: tp, risky_recall: risky.length ? tp / risky.length : null,
+    labelled_routine: routine.length, would_false_block: fp, would_false_block_rate: routine.length ? fp / routine.length : null,
+    labelled_screened: screened, would_false_block_per_screened: screened ? fp / screened : null,
+    labelled_unavailable: labels.filter(r => r.selected && r.status !== 'judged').length,
+  };
+}
 function metrics(log) {
   let records;
   try { records = readFileSync(log, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)); }
@@ -253,12 +264,7 @@ function metrics(log) {
   const screened = results.filter(r => r.selected);
   const judged = screened.filter(r => r.status === 'judged');
   const labels = results.filter(r => ['risky', 'routine'].includes(r.expected));
-  const risky = labels.filter(r => r.expected === 'risky');
-  const routine = labels.filter(r => r.expected === 'routine');
-  const tp = risky.filter(r => r.verdict === 'risky').length;
-  const fp = routine.filter(r => r.verdict === 'risky').length;
   const finished = attempts.map(a => byId.get(a.id)).filter(Boolean);
-  const outcomes = new Map(records.filter(r => r.event === 'outcome').map(r => [r.tool_key, r.outcome]));
   const nativeJudged = judged.filter(r => ['claude', 'omp'].includes(r.host) && !r.case_id);
   const spanDays = rows => {
     if (!rows.length) return 0;
@@ -266,7 +272,6 @@ function metrics(log) {
     for (const row of rows) { first = Math.min(first, row.at); last = Math.max(last, row.at); }
     return (last - first) / 86400000;
   };
-  const labelledScreened = labels.filter(r => r.selected).length;
   return {
     mode: 'shadow', observations: results.length, screened: screened.length, judged: judged.length,
     policy_versions: [...new Set(records.map(r => Number.isSafeInteger(r.policy) ? r.policy : 1))].sort().join(','),
@@ -277,16 +282,11 @@ function metrics(log) {
     known_input_tokens: finished.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0),
     known_output_tokens: finished.reduce((sum, r) => sum + (r.output_tokens ?? 0), 0),
     p95_screen_ms: percentile(screened.map(r => r.latency_ms)),
-    labelled_risky: risky.length, risky_true_positives: tp, risky_recall: risky.length ? tp / risky.length : null,
-    labelled_routine: routine.length, would_false_block: fp, would_false_block_rate: routine.length ? fp / routine.length : null,
-    labelled_screened: labelledScreened,
-    would_false_block_per_screened: labelledScreened ? fp / labelledScreened : null,
-    labelled_unavailable: labels.filter(r => r.selected && r.status !== 'judged').length,
+    historical_september30: labelMetrics(labels.filter(r => r.dataset === 'historical_september30')),
+    synthetic: labelMetrics(labels.filter(r => r.dataset === 'synthetic')),
+    unclassified_labelled: labels.filter(r => !['historical_september30', 'synthetic'].includes(r.dataset)).length,
     abstentions: judged.filter(r => r.verdict === 'uncertain').length,
     shadow_blocks: 0,
-    observed_succeeded: screened.filter(r => outcomes.get(r.tool_key) === 'succeeded').length,
-    observed_failed: screened.filter(r => outcomes.get(r.tool_key) === 'failed').length,
-    underlying_outcome_unknown: screened.filter(r => !outcomes.has(r.tool_key)).length,
     observed_days: spanDays(results),
     native_judged: nativeJudged.length, native_observed_days: spanDays(nativeJudged),
     promotion_owner: 'fm-jev-guardrail-promote', promotion_due: '2026-10-14T09:00:00 America/Chicago',
@@ -295,16 +295,16 @@ function metrics(log) {
 }
 
 function toon(object) {
-  for (const [key, value] of Object.entries(object)) console.log(`${key}: ${typeof value === 'string' ? JSON.stringify(value) : value}`);
+  for (const [key, value] of Object.entries(object)) console.log(`${key}: ${JSON.stringify(value)}`);
 }
-const help = 'hook|outcome --host claude|omp < native-tool.json; metrics [--log <jsonl>]; evaluate --cases <json> [--log <jsonl>]';
+const help = 'hook --host claude|omp < native-tool.json; metrics [--log <jsonl>]; evaluate --cases <json> [--log <jsonl>]';
 async function main() {
   const [command = 'metrics', ...args] = process.argv.slice(2);
   if (['-v', '-V', '--version'].includes(command) && args.length === 0) { console.log('1.0.0'); return; }
-  if (command === '--help' && args.length === 0 || ['hook', 'outcome', 'metrics', 'evaluate'].includes(command) && args.length === 1 && args[0] === '--help') { console.log(help); return; }
+  if (command === '--help' && args.length === 0 || ['hook', 'metrics', 'evaluate'].includes(command) && args.length === 1 && args[0] === '--help') { console.log(help); return; }
   const options = {};
-  const allowed = ['hook', 'outcome'].includes(command) ? ['--host', '--log'] : command === 'evaluate' ? ['--cases', '--log'] : command === 'metrics' ? ['--log'] : [];
-  if (!['hook', 'outcome', 'metrics', 'evaluate'].includes(command)) throw new Error(`unknown command; use ${help}`);
+  const allowed = command === 'hook' ? ['--host', '--log'] : command === 'evaluate' ? ['--cases', '--log'] : command === 'metrics' ? ['--log'] : [];
+  if (!['hook', 'metrics', 'evaluate'].includes(command)) throw new Error(`unknown command; use ${help}`);
   for (let i = 0; i < args.length; i += 2) {
     if (!allowed.includes(args[i]) || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`invalid argument; use ${help}`);
     options[args[i]] = args[i + 1];
@@ -313,24 +313,23 @@ async function main() {
   if (['hook', 'evaluate'].includes(command)) parser = await import('./fm-arm-command-policy.mjs');
   if (process.argv.length === 2) toon({ bin: fileURLToPath(import.meta.url), description: 'Measure risky operations without changing command authority.' });
   if (command === 'metrics') return toon(metrics(log));
-  if (['hook', 'outcome'].includes(command)) {
-    if (!['claude', 'omp'].includes(options['--host'])) throw new Error('hook/outcome requires --host claude|omp');
+  if (command === 'hook') {
+    if (!['claude', 'omp'].includes(options['--host'])) throw new Error('hook requires --host claude|omp');
     let payload;
     try { payload = JSON.parse(readFileSync(0, 'utf8')); } catch { payload = {}; }
-    if (command === 'outcome') outcome(payload, options['--host'], log);
-    else await screen(payload, options['--host'], log);
+    await screen(payload, options['--host'], log);
     return; // Both streams empty, no permission output, always exit zero.
   }
   if (!options['--cases']) throw new Error('evaluate requires --cases <json>');
   let cases;
   try { cases = JSON.parse(readFileSync(options['--cases'], 'utf8')); } catch { throw new Error('invalid evaluation cases'); }
-  if (!Array.isArray(cases) || !cases.length || cases.some(c => !/^[a-z0-9_-]{1,64}$/.test(c.id) || !['risky', 'routine'].includes(c.expected) || !c.payload) || new Set(cases.map(c => c.id)).size !== cases.length) throw new Error('cases require unique safe id, risky|routine expected and native payload');
+  if (!Array.isArray(cases) || !cases.length || cases.some(c => !/^[a-z0-9_-]{1,64}$/.test(c.id) || !['risky', 'routine'].includes(c.expected) || !['historical_september30', 'synthetic'].includes(c.dataset) || !c.payload) || new Set(cases.map(c => c.id)).size !== cases.length) throw new Error('cases require unique safe id, risky|routine expected, historical_september30|synthetic dataset and native payload');
   for (const item of cases) await screen(item.payload, 'evaluation', log, item);
   toon(metrics(log));
 }
 main().catch(() => {
   // An advisory hook cannot become a new deterministic permission gate.
-  if (['hook', 'outcome'].includes(process.argv[2])) { append(defaultLog, { event: 'result', id: randomUUID(), host: 'unknown', selected: false, status: 'internal_error', latency_ms: 0 }); return; }
+  if (process.argv[2] === 'hook') { append(defaultLog, { event: 'result', id: randomUUID(), host: 'unknown', selected: false, status: 'internal_error', latency_ms: 0 }); return; }
   console.log(`error: invalid command or input\nhelp: ${help}`);
   process.exitCode = 2;
 });

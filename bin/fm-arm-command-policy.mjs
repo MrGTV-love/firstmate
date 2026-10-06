@@ -549,6 +549,7 @@ export function commandPosition(tokens) {
   const prefixAssignments = index;
   const wrappers = [];
   let unresolvedWrapperOption = false;
+  let commandLookup = false;
   const wrapperPayloads = [];
   let command = words[index];
   while (command) {
@@ -556,6 +557,7 @@ export function commandPosition(tokens) {
     if (name === "exec" || name === "command" || name === "sudo" || name === "nohup") {
       wrappers.push(name);
       const options = consumeWrapperOptions(name, words, index + 1);
+      if (name === "command") commandLookup ||= words.slice(index + 1, options.index).some(word => /^-[^-]*[vV]/.test(word.value));
       unresolvedWrapperOption ||= options.unresolved;
       wrapperPayloads.push(...options.embeddedPayloads);
       index = options.index;
@@ -592,7 +594,7 @@ export function commandPosition(tokens) {
     }
     break;
   }
-  return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, wrapperPayloads };
+  return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, wrapperPayloads, commandLookup };
 }
 
 const PROTECTED_SCRIPTS = [

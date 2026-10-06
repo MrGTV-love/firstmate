@@ -556,11 +556,12 @@ FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 ## Jev shadow native tool hooks
 
 The current behavior and privacy boundary are owned by [Jev command screening](../configuration.md#jev-command-screening-shadow-only).
+The retained observations below describe the prior implementation, not a fresh run or proof of the current pre-tool-only integration.
 Native hook observations used omp 18.6.1 on 2026-10-05 and Claude Code 2.1.291 through TeamClaude 1.1.21-affinity.0 on 2026-10-06.
 Both hosts executed the same five synthetic cases: ordinary file read, bounded local missing-file delete, allowed synthetic secret-shaped file read, independently denied synthetic secret-shaped file read, and missing synthetic secret-shaped file read.
-Matched native controls omitted only the shadow hook; both hosts retained exactly the same success, denial and path-not-found outcomes with shadow enabled, a missing Jev key, or explicitly injected timeout/malformed transport responses.
+External native-stream comparisons against matched controls that omitted only the shadow hook found the same success, denial and path-not-found outcomes with shadow enabled, a missing Jev key, or explicitly injected timeout/malformed transport responses.
 
-| Actual native observation | omp | Claude |
+| Prior native observation | omp | Claude |
 | --- | --- | --- |
 | Ordinary read | Excluded; no request | Excluded; no request |
 | Genuine Jev starts / returned judgments | 4 / 4 | 4 / 3, plus one genuine timeout with unknown usage/cost |
@@ -573,12 +574,30 @@ Matched native controls omitted only the shadow hook; both hosts retained exactl
 The timeout is retained rather than retried into a pass, and neither host's synthetic sample establishes fleet recall, seven-day/300-command volume, total task cost savings or blocking readiness.
 The Claude sample misses the separately owned 500ms promotion bar.
 Only closed structural operations reach Jev; native ledgers contain no fixture bodies, command text, paths or key sentinels.
-Native `PostToolUse`/`PostToolUseFailure` and omp `tool_result` observations correlate outcomes by hashed tool identifier; an independently denied call without a completion event remains unknown in metrics rather than being called successful.
+The prior implementation observed native `PostToolUse`/`PostToolUseFailure` and omp `tool_result` events; those completion registrations and outcome-correlation metrics are not part of the current integration.
+The unchanged native outcomes above come from the external stream comparisons, not a current ledger success/failure claim.
 Other harnesses have no guardrail caller in this slice, and these observations do not claim their coverage.
 
-The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh`; it proves selector, privacy, advisory-output and unavailable-usage boundaries, not native host activation.
-The actual native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
-Those private fixture ledgers and exact native invocations remain delivery evidence, not shipped fixtures or a claim that offline tests refresh native proof after a host upgrade.
+The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh`; it proves selector, privacy, advisory-output, unavailable-usage and generated owning-home boundaries, not native host activation or outcome correlation.
+The prior native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
+Those private fixture ledgers and exact native invocations remain prior delivery evidence, not shipped fixtures or a claim that offline tests refresh native proof after a host upgrade.
+
+The October 6 review correction exercised the selector/evaluation suite successfully (12 boundary groups, exit 0), including control syntax, executable queries, production/secret scope and separated quality datasets.
+The owning-home suite's first run stopped at an incomplete source fixture's missing skill directory; after supplying that required fixture directory, its focused run passed six generated/tracked Claude and omp scenarios (exit 0).
+Those scenarios executed emitted Claude hook commands and omp callbacks through filtered and hostile ambient environments, checked owner-key transport, withholding and private ledgers, and preserved secondmate ownership and advisory timeout behavior.
+Transport responses were local fixtures; no paid provider or native host activation was exercised in this review round.
+
+**September 30 historical dataset source is unavailable.**
+The supplied `/Users/charlesabrooker/firstmate/data/fm-jev-implementation-review/report.md` (October 1, F8 and the guardrail promotion row) records a planned screen and promotion contract, with no hook measurement; its cited `/Users/charlesabrooker/firstmate/data/fm-jev-value-scout/report.md` (September 29, worker destructive-risk proposal) describes prospective fixture replay, not dated blocked/allowed command receipts.
+The companion `data/fm-jev-value-scout/notes.md` inventories retained research material, but does not supply September 30 command/decision pairs either.
+The review's cited E7, `/Users/charlesabrooker/firstmate/data/backlog.md` (`fm-jev-guardrail-hook`), requires labelled September 30 blocked/allowed cases but supplies no command/decision receipts; its separate `fm-jev-guardrail-promote` entry retains the original owner, date and criteria.
+The missing source is the authentic September 30 blocked and allowed command inputs paired with their independently recorded decisions and dated provenance.
+Proposal narrative, subsequent native synthetic observations and reconstructed examples cannot replace that source.
+No historical placeholder rows are shipped; every row in `tests/fixtures/jev-guardrail-new-cases.json` is marked `dataset: "synthetic"`.
+New evaluation inputs require `historical_september30` or `synthetic` dataset ownership; metrics report labelled quality only in those separate objects, with no top-level quality aliases.
+Older labels without recognized dataset ownership contribute only to the top-level `unclassified_labelled` count, never dataset quality.
+The `historical_september30` object's labelled count remains zero and rates remain `null` until real historical receipts are supplied, regardless of synthetic results.
+This evidence gap does not change the existing promotion owner, date or criteria.
 
 ## Claude workspace trust
 

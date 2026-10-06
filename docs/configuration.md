@@ -1359,6 +1359,7 @@ The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`]
 `bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
 The tracked project registrations cover Firstmate sessions; `fm-spawn.sh` installs the same caller for new Claude and omp fleet workers in other projects.
 Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
+Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
 The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
@@ -1368,8 +1369,11 @@ Timeouts, HTTP errors, transport errors and malformed answers record their concr
 
 Selection reuses Firstmate's shell command-position parser, including nested groups, substitutions and literal shell payloads.
 Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access commands are candidates; ordinary reads and printed command examples do not call Jev.
+For delete/deploy operations, production scope takes precedence over a secret-shaped target.
+Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
 Native `Read`/`read` paths select secret-shaped targets without opening the file.
 Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
+`command -v`/`command -V` look up a candidate without executing it; substitutions and redirections still retain their own effects and are screened.
 `printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
@@ -1382,12 +1386,18 @@ The key is removed from child environments and passed to `curl` through a header
 The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
 An interrupted attempt or unavailable usage remains unknown, not zero.
 Records require a private regular file; if attempt accounting cannot be written, no model request starts.
-Native completion hooks record success/failure by hashed tool identifier, never result content; a missing completion or denied tool stays unknown rather than being called successful.
+The current integration screens pre-tool inputs only; it does not register completion hooks or correlate native success, failure or denial outcomes.
 The script header and `--help` own invocation mechanics.
 
-`metrics` reports descriptive counts, p95 selected-command overhead, all-attempt known/unknown spend and labelled recall/would-block rates.
-`evaluate` consumes labelled native inputs without executing their commands; label provenance and independent labels remain the evaluator's responsibility.
-Absent labels yield unknown quality, and evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
+`metrics` reports descriptive counts, p95 selected-command overhead and all-attempt known/unknown spend.
+Labelled counts, risky recall and routine would-block rates appear only in separate `historical_september30` and `synthetic` objects, never as pooled or duplicated top-level quality fields.
+The top-level `unclassified_labelled` count reports old labelled records without a recognized dataset; those labels cannot contribute to either dataset's quality.
+`evaluate` consumes labelled native inputs without executing their commands; every new case requires `dataset: "historical_september30"` or `dataset: "synthetic"`, and provenance and independent labels remain the evaluator's responsibility.
+Only authentic September 30 command/decision receipts may be labelled `historical_september30`; proposal examples, later synthetic observations and reconstructed commands belong to neither historical evidence nor its counts.
+The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
+The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.
+Until real receipts are available, the historical labelled count remains zero and historical quality rates remain `null`, even when synthetic quality is measurable.
+Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
 

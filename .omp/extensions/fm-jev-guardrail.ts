@@ -8,10 +8,15 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const registered = new WeakSet<object>();
 type API = { on: (name: string, handler: (event: unknown) => unknown) => void };
+type GuardrailContext = {
+  FM_HOME: string;
+  FM_CONFIG_OVERRIDE: string;
+  FM_STATE_OVERRIDE: string;
+};
 
-function observe(command: "hook" | "outcome", payload: object) {
+function observe(payload: object, context?: GuardrailContext) {
   return new Promise<void>((done) => {
-    const child = spawn("node", [resolve(root, "bin/fm-jev-guardrail.mjs"), command, "--host", "omp"], { stdio: ["pipe", "ignore", "ignore"] });
+    const child = spawn("node", [resolve(root, "bin/fm-jev-guardrail.mjs"), "hook", "--host", "omp"], { env: { ...process.env, ...context }, stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => done());
     child.on("close", () => done());
     child.stdin.on("error", () => {});
@@ -19,7 +24,7 @@ function observe(command: "hook" | "outcome", payload: object) {
   });
 }
 
-export function installGuardrail(pi: API) {
+export function installGuardrail(pi: API, context?: GuardrailContext) {
   // The generated worker adapter owns task registration, including Firstmate
   // task copies whose auto-discovered module has a different physical root.
   if (registered.has(pi)) return;
@@ -28,17 +33,7 @@ export function installGuardrail(pi: API) {
     if (!event || typeof event !== "object" || !("toolName" in event) ||
         typeof event.toolName !== "string" || !["bash", "read"].includes(event.toolName) ||
         !("input" in event)) return;
-    await observe("hook", {
-      toolName: event.toolName, input: event.input,
-      toolCallId: "toolCallId" in event ? event.toolCallId : undefined,
-    });
-  });
-  pi.on("tool_result", async (event) => {
-    if (!event || typeof event !== "object" || !("toolCallId" in event)) return;
-    await observe("outcome", {
-      toolCallId: event.toolCallId,
-      isError: "isError" in event && event.isError === true,
-    });
+    await observe({ toolName: event.toolName, input: event.input }, context);
   });
 }
 

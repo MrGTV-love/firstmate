@@ -36,28 +36,6 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "^(Bash|Read)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}${FM_TASK_ID:-}\" ] || exit 0; exec node \"$CLAUDE_PROJECT_DIR\"/bin/fm-jev-guardrail.mjs outcome --host claude"
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "^(Bash|Read)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}${FM_TASK_ID:-}\" ] || exit 0; exec node \"$CLAUDE_PROJECT_DIR\"/bin/fm-jev-guardrail.mjs outcome --host claude"
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
