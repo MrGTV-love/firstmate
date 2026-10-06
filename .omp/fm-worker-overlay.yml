@@ -1,5 +1,4 @@
-# Worker/scout-only memory posture, layered after fm-session-overlay.yml by
-# bin/fm-spawn.sh. Secondmate lanes keep their own memory settings unchanged.
+# Mnemopi text-only recall; bin/fm-spawn.sh's header owns launch scope.
 # Each local embedding helper loads one copy of the model per session (about
 # 1 GB); retain memory with text-only recall until upstream shares the model:
 # https://github.com/can1357/oh-my-pi/issues/9908

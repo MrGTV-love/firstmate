@@ -700,14 +700,13 @@ OMP_SKIP_SETUP=1 omp --mode rpc --no-session --no-extensions --no-rules \
 ```
 
 `ps -axo pid=,ppid=,rss=,command=` supplied the process tree, restricted recursively to each smoke session's descendants.
-The unchanged overlay produced helper PID 21400 under session PID 19021, with RSS 753456 KiB at the first 15-second sample.
+The pre-change posture overlay produced an embedding helper with RSS 753456 KiB at the first 15-second sample.
 The worker launch, layering `--config .omp/fm-session-overlay.yml --config .omp/fm-worker-overlay.yml`, produced zero embedding helpers in 30 one-second samples, including after `prompt_result` reported `status=completed` and `sessionSettled=true`.
-The lane launch, using only `--config .omp/fm-session-overlay.yml`, produced helper PID 6825 under session PID 4578 with RSS 1134320 KiB at 15 seconds.
+The lane launch, using only `--config .omp/fm-session-overlay.yml`, produced an embedding helper with RSS 1134320 KiB at 15 seconds.
 RSS is not physical footprint; these samples prove helper presence and scope rather than a fixed per-session saving.
-Only the three smoke sessions were stopped; existing sessions and the user's configuration were untouched.
 Refresh this measurement after an omp upgrade by repeating both overlay combinations and submitting the RPC prompt above.
 `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks worker/scout versus secondmate overlay routing without model credentials.
-The overlay is applied before backend launch, so its memory effect is backend-independent; other harness launch paths are unchanged.
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns launch routing and memory scope.
 
 ## Codex hook trust
 

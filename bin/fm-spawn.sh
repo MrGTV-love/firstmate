@@ -202,7 +202,8 @@
 #   directory with --cwd, and passes the tracked session posture overlay
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
-#   policy for the one session only (--auto-approve alone owns approval).
+#   policy for the one session only (--auto-approve alone owns approval,
+#   forcing tools.approvalMode: yolo for the session).
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own

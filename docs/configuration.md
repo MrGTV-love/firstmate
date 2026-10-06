@@ -791,7 +791,7 @@ The Kimi installer requires an existing regular non-symlink `~/.kimi-code/config
 Its `remove` action excises only the marker-delimited Firstmate region and removes Firstmate's hook files.
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 
-For omp secondmate launches, `fm-spawn.sh` passes no `-e` at all: omp auto-discovers the home's tracked `.omp/extensions/` with no trust gate, and naming a discovered file with `-e` as well loads it twice; every omp launch instead carries the tracked `.omp/fm-session-overlay.yml` posture overlay through `--config`, while workers and scouts additionally receive `.omp/fm-worker-overlay.yml`, as [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns.
+For omp session posture, worker-only memory scope, and safe secondmate extension loading, see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 
 ## Claude permission mode (config/claude-permission-mode)
 
