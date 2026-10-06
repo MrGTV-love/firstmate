@@ -1,0 +1,125 @@
+[
+  {
+    "command": [
+      "bash",
+      "bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home"
+    ],
+    "rc": 0,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-check-register.sh",
+      "slow"
+    ],
+    "rc": 0,
+    "stdout": "registered: state/slow.check.sh\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "-c",
+      ". \"$1\"; fm_watcher_healthy \"$2\" \"$3\" 6 \"$4\"; rc=$?; printf \"strict watcher health rc=%s\\n\" \"$rc\"; exit \"$rc\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-wake-lib.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home/state",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-watch.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home"
+    ],
+    "rc": 0,
+    "stdout": "strict watcher health rc=0\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "bounded slow check remains healthy beyond grace",
+    "watcher_pid": 12313,
+    "check_pid": "59384",
+    "samples": [
+      {
+        "elapsed": 1,
+        "age_seconds": 0.425,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 2,
+        "age_seconds": 1.609,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 3,
+        "age_seconds": 0.672,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 4,
+        "age_seconds": 1.814,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 5,
+        "age_seconds": 0.884,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 6,
+        "age_seconds": 2.021,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 7,
+        "age_seconds": 0.949,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 8,
+        "age_seconds": 0.166,
+        "watcher_alive": true,
+        "check_finished": false
+      },
+      {
+        "elapsed": 9,
+        "age_seconds": 1.337,
+        "watcher_alive": true,
+        "check_finished": false
+      }
+    ]
+  },
+  {
+    "command": [
+      "bash",
+      "-c",
+      ". \"$1\"; fm_watcher_healthy \"$2\" \"$3\" 6 \"$4\"; rc=$?; printf \"strict watcher health rc=%s\\n\" \"$rc\"; exit \"$rc\"",
+      "_",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-wake-lib.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home/state",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-watch.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home"
+    ],
+    "rc": 1,
+    "stdout": "strict watcher health rc=1\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "stopped main poll cannot publish liveness",
+    "beacon_age_seconds": 8.435,
+    "mtime_unchanged": true,
+    "check_still_unfinished": true
+  },
+  {
+    "scenario": "resumed poll delivers durable check wake",
+    "watcher_exit": 0,
+    "wake_queue": "1791319828\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home/state/slow.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/watch-home/state/slow.check.sh: slow-check-completed\n"
+  }
+]

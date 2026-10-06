@@ -1,0 +1,15 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/reply-home
+archive correlation=c02a735e4f0cca93; lock held by pid=58597
+pre-change held-archive tick native exit=124 (deadline 4s)
+target held-archive tick native exit=0 elapsed=10s
+pending reply phase=resolved; archive retained=yes; lock still held=yes
+done [corr=495544ee00cebf82]: live answer after archive
+already-closed retained reply unchanged with unterminated last-value field
+blocked [key=pending-reply-a53177ae442d1f01]: pending-reply-missed: task=owed pending-reply-id=a53177ae442d1f01 request=interrupted escalation close
+blocked [key=release]: unrelated captain decision
+resolved [key=pending-reply-a53177ae442d1f01] [at=1791319868]: pending-reply-resolved: task=owed pending-reply-id=a53177ae442d1f01 via=status
+
+open decisions after concurrent retry:
+release	blocked	unrelated captain decisionowed close durably recorded; unrelated decision preserved
+
+driver_exit=0

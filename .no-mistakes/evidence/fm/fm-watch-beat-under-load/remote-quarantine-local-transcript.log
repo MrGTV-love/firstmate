@@ -1,0 +1,10 @@
+Native Darwin execution with FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux; not a real Linux-host or SSH integration proof.
+serving_worker_pid=2196 command_group_pid=19469
+quarantine ownership record:
+active execution could not be confirmed stopped
+worker stderr:
+replacement_worker_exit=75
+command group proved live before explicit termination
+ok - failed shutdown quarantines ownership against replacement workers
+
+driver_exit=0

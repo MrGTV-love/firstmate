@@ -1,0 +1,68 @@
+{
+  "outer_deadline_seconds": 180,
+  "completed_fixture_states": [
+    {
+      "case": "check-timeout-0-010-0-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-010-0-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319757\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-010-0-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-010-0-complete/state/timeout.check.sh: check-completed\n"
+    },
+    {
+      "case": "check-timeout-0-2-0-expired",
+      "watch_stdout": "",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": false,
+      "sweep_finished": true,
+      "wake_queue": null
+    },
+    {
+      "case": "check-timeout-1-010-0-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-010-0-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319856\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-010-0-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-010-0-complete/state/timeout.check.sh: check-completed\n"
+    },
+    {
+      "case": "check-timeout-0-08-0-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-08-0-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319738\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-08-0-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-08-0-complete/state/timeout.check.sh: check-completed\n"
+    },
+    {
+      "case": "check-timeout-0-2-4-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-2-4-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319778\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-2-4-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-0-2-4-complete/state/timeout.check.sh: check-completed\n"
+    },
+    {
+      "case": "check-timeout-1-08-0-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-08-0-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319817\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-08-0-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-08-0-complete/state/timeout.check.sh: check-completed\n"
+    },
+    {
+      "case": "check-timeout-1-2-4-complete",
+      "watch_stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-2-4-complete/state/timeout.check.sh: check-completed\n",
+      "watch_stderr": "",
+      "check_started": true,
+      "check_finished": true,
+      "sweep_finished": true,
+      "wake_queue": "1791319884\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-2-4-complete/state/timeout.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/tmp/fm-watcher-lock-tests.dN8BRX/check-timeout-1-2-4-complete/state/timeout.check.sh: check-completed\n"
+    }
+  ]
+}

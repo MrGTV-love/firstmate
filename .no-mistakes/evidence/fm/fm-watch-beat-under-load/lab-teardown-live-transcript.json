@@ -1,0 +1,84 @@
+[
+  {
+    "command": [
+      "bash",
+      "bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/socket-home"
+    ],
+    "rc": 0,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/socket-home\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-lab-home.sh",
+      "tmux-dir",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/socket-home"
+    ],
+    "rc": 0,
+    "stdout": "/tmp/fml.NvGn7F\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "probe",
+      "-c",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T",
+      "sleep 120"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-lab-home.sh",
+      "teardown",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/socket-home"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "fm-lab-home: refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=0)\n"
+  },
+  {
+    "scenario": "live server refuses teardown with probe status",
+    "ownership_record_retained": true,
+    "socket_directory_retained": true
+  },
+  {
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bash",
+      "bin/fm-lab-home.sh",
+      "teardown",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/socket-home"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "confirmed stopped server permits teardown",
+    "socket_directory_removed": true,
+    "ownership_record_removed": true
+  }
+]

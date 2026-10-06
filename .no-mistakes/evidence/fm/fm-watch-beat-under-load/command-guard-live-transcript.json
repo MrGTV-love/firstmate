@@ -1,0 +1,58 @@
+[
+  {
+    "scenario": "read-only diagnostic and own PID stop",
+    "submitted_command": "if ps -p 80960 -o command= | grep -q fm-watch.sh; then kill -TERM 80960; fi",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "broad watcher pattern kill",
+    "submitted_command": "pkill -f fm-watch.sh",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "foreign PID with watcher diagnostic",
+    "submitted_command": "if pgrep -fl fm-watch.sh; then kill 7180; fi",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "multiple PID kill with watcher diagnostic",
+    "submitted_command": "if pgrep -fl fm-watch.sh; then kill 80960 7180; fi",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "opaque interpreter companion",
+    "submitted_command": "if python3 -c 'print(\"fm-watch.sh\")'; then kill 80960; fi",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "redirection companion",
+    "submitted_command": "if pgrep -fl fm-watch.sh > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/guard-home/capture; then kill 80960; fi",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "substitution target",
+    "submitted_command": "if pgrep -fl fm-watch.sh; then kill \"$(pgrep -f fm-watch.sh)\"; fi",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[broad-watcher-kill] a broad process kill targeting the firstmate watcher is forbidden\"}\n"
+  },
+  {
+    "scenario": "permitted command stops only the registered watcher",
+    "command_exit": 0,
+    "watcher_exit": -15,
+    "unrelated_process_alive": true,
+    "watcher_lock_removed": true
+  }
+]

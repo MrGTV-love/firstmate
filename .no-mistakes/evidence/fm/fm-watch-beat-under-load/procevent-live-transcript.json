@@ -1,0 +1,259 @@
+[
+  {
+    "home": "a",
+    "args": [
+      "register",
+      "lavish",
+      "episode-src",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/source.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/started",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/release"
+    ],
+    "rc": 0,
+    "stdout": "registered: episode-src (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "concurrent_reconcile_pid": 41951,
+    "rc": 1,
+    "stdout": "reconciled: published=0 started=0 stopped=0 uncertain=0 failed=1\n",
+    "stderr": ""
+  },
+  {
+    "concurrent_reconcile_pid": 42563,
+    "rc": 1,
+    "stdout": "reconciled: published=0 started=0 stopped=0 uncertain=0 failed=1\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "overlapping failure publication",
+    "wake_rows": [
+      "1791320025\t1\tcheck\tprocevent:episode-src:launch-failed:16777232-40715736-162282369\tcheck: process-event source episode-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start episode-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you."
+    ]
+  },
+  {
+    "home": "b",
+    "args": [
+      "register",
+      "lavish",
+      "episode-src",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/source.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/started",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/release"
+    ],
+    "rc": 0,
+    "stdout": "registered: episode-src (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "home": "b",
+    "args": [
+      "ensure-listening",
+      "episode-src"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "scenario": "foreign-home recovery during confirmation",
+    "rc": 0,
+    "stdout": "reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0\n",
+    "stderr": "",
+    "local_failure_marker_present": false
+  },
+  {
+    "home": "b",
+    "args": [
+      "retire",
+      "episode-src"
+    ],
+    "rc": 0,
+    "stdout": "retired: episode-src\n",
+    "stderr": ""
+  },
+  {
+    "home": "a",
+    "args": [
+      "reconcile"
+    ],
+    "rc": 1,
+    "stdout": "reconciled: published=0 started=0 stopped=0 uncertain=0 failed=1\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "fresh failure episode after foreign recovery",
+    "wake_rows": [
+      "1791320025\t1\tcheck\tprocevent:episode-src:launch-failed:16777232-40715736-162282369\tcheck: process-event source episode-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start episode-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.",
+      "1791320047\t2\tcheck\tprocevent:episode-src:launch-failed:16777232-40715736-3151413982\tcheck: process-event source episode-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start episode-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you."
+    ]
+  },
+  {
+    "home": "a",
+    "args": [
+      "retire",
+      "episode-src"
+    ],
+    "rc": 0,
+    "stdout": "retired: episode-src\n",
+    "stderr": ""
+  },
+  {
+    "home": "watch",
+    "args": [
+      "register",
+      "lavish",
+      "episode-src",
+      "--",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/source.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/started",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/pe/release"
+    ],
+    "rc": 0,
+    "stdout": "registered: episode-src (lavish)\n",
+    "stderr": ""
+  },
+  {
+    "scenario": "long confirmation does not block main watcher; single flight",
+    "samples": [
+      {
+        "sample": 0,
+        "age_seconds": 2.011,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 1,
+        "age_seconds": 0.655,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 2,
+        "age_seconds": 0.852,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 3,
+        "age_seconds": 0.304,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 4,
+        "age_seconds": 1.379,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 5,
+        "age_seconds": 0.011,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 6,
+        "age_seconds": 0.497,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 7,
+        "age_seconds": 3.262,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 8,
+        "age_seconds": 4.57,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      },
+      {
+        "sample": 9,
+        "age_seconds": 0.619,
+        "reconcile_children": [
+          {
+            "pid": 37886,
+            "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/bin/fm-procevent.sh reconcile"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "home": "watch",
+    "args": [
+      "sweep-home"
+    ],
+    "rc": 0,
+    "stdout": "retired: episode-src\nswept: attempted=1\n",
+    "stderr": ""
+  },
+  {
+    "home": "a",
+    "args": [
+      "sweep-home"
+    ],
+    "rc": 0,
+    "stdout": "swept: attempted=0\n",
+    "stderr": ""
+  },
+  {
+    "home": "b",
+    "args": [
+      "sweep-home"
+    ],
+    "rc": 0,
+    "stdout": "swept: attempted=0\n",
+    "stderr": ""
+  },
+  {
+    "home": "watch",
+    "args": [
+      "sweep-home"
+    ],
+    "rc": 0,
+    "stdout": "swept: attempted=0\n",
+    "stderr": ""
+  }
+]

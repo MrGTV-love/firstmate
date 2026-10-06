@@ -1,0 +1,42 @@
+[
+  {
+    "fallback": "0",
+    "configured_timeout": "02",
+    "runtime_seconds": "1",
+    "sweep_elapsed_seconds": 8.396,
+    "finished": true,
+    "wake_queue": "1791320100\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-0-runtime-1/state/timed.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-0-runtime-1/state/timed.check.sh: timed-check-completed\n",
+    "stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-0-runtime-1/state/timed.check.sh: timed-check-completed\n",
+    "stderr": ""
+  },
+  {
+    "fallback": "0",
+    "configured_timeout": "02",
+    "runtime_seconds": "4",
+    "sweep_elapsed_seconds": 7.113,
+    "finished": false,
+    "wake_queue": "",
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "fallback": "1",
+    "configured_timeout": "02",
+    "runtime_seconds": "1",
+    "sweep_elapsed_seconds": 26.884,
+    "finished": true,
+    "wake_queue": "1791320127\t1\tcheck\t/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-1-runtime-1/state/timed.check.sh\tcheck: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-1-runtime-1/state/timed.check.sh: timed-check-completed\n",
+    "stdout": "check: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49EFWAFD5KHQ0BH54TSPC8T/.live-validation/timeouts/fallback-1-runtime-1/state/timed.check.sh: timed-check-completed\n",
+    "stderr": ""
+  },
+  {
+    "fallback": "1",
+    "configured_timeout": "02",
+    "runtime_seconds": "4",
+    "sweep_elapsed_seconds": 45.393,
+    "finished": false,
+    "wake_queue": "",
+    "stdout": "",
+    "stderr": "bin/fm-watch.sh: line 2161: 21337 Killed: 9               ( FM_CHECK_OWNED_GROUP=1 run_check_process \"$@\" ) > \"$FM_CHECK_OUTPUT\" 2> /dev/null\n"
+  }
+]
