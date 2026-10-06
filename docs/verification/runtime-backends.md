@@ -534,11 +534,14 @@ The recovery-grade boundary remains tmux and Herdr; zellij, Orca, and cmux retai
 Secondmates retain their separate recovery owner rather than acquiring this ship/scout recovery option.
 The existing control, backlog-atomicity, and brief suites supply the unchanged capability, dispatch, and instruction-contract coverage.
 
-Verified on 2026-10-06 with stock Bash 3.2.57 and tasks-axi 0.2.6:
+Verified on 2026-10-06 with stock Bash 3.2.57, tasks-axi 0.2.6, and pinned ShellCheck 0.11.0:
 
 ```sh
+bash bin/fm-lint.sh bin/fm-control.sh tests/fm-control-relaunch.test.sh
 bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh
 ```
+
+The focused lint roots passed full source-aware extended analysis. The session-lock import resolves to its tracked library, and the parent-shell background PID captures retain their readiness, wait, and cleanup behavior.
 
 Observed focused results:
 
@@ -547,7 +550,7 @@ ok - held and dependency-blocked continuation authorization refuses ordinary adm
 ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
 ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
 ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=580695
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 ```
 
 ## Claude workspace trust

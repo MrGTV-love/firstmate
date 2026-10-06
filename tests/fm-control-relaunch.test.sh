@@ -3002,12 +3002,14 @@ test_continuation_authorization_requires_the_lock_owning_main() {
       missing) rm "$dir/home/state/.lock" ;;
       foreign)
         /bin/sleep 30 &
+        # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
         foreign_pid=$!
         printf '%s\n' "$foreign_pid" > "$dir/fake/foreign-pid"
         printf '%s\n' "$foreign_pid" > "$dir/home/state/.lock"
         ;;
       dead)
         /bin/sleep 0 &
+        # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
         foreign_pid=$!
         wait "$foreign_pid"
         printf '%s\n' "$foreign_pid" > "$dir/home/state/.lock"
@@ -3232,6 +3234,7 @@ test_continuation_authorization_excludes_control_and_direct_replacements() {
   pause_continuation_admission "$dir"
   FM_FAKE_ADMISSION_READY="$ready" FM_FAKE_ADMISSION_RELEASE="$release" \
     run_continuation_control "$dir" "$id" authorize-continuation > "$dir/authorize.out" &
+  # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
   auth_pid=$!
   await_fixture_ready "$ready" "$auth_pid" "continuation authorization" || {
     : > "$release"
@@ -3291,6 +3294,7 @@ test_control_and_direct_replacements_exclude_continuation_authorization() {
       FM_FAKE_TRACE_PREPARE="$ready" FM_FAKE_TRACE_RELEASE="$release" \
         run_spawn "$dir" "$id" --relaunch --harness claude > "$dir/replacement.out" &
     fi
+    # shellcheck disable=SC2031 # Both branches launch a child in this parent before reading $!.
     replacement_pid=$!
     await_fixture_ready "$ready" "$replacement_pid" "$entry replacement" || {
       : > "$release"

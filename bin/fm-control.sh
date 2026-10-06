@@ -373,6 +373,7 @@ if [ "$VERB" = authorize-continuation ]; then
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
   fm_lock_acquire_wait "$CONTROL_META_LOCK"
   CONTROL_META_LOCK_HELD=1
+  # shellcheck source=bin/fm-session-lock-lib.sh
   . "$SCRIPT_DIR/fm-session-lock-lib.sh"
   fm_session_lock_owned_by_self "$STATE" \
     || die "continuation authorization requires the actual lock-owning main Firstmate"
