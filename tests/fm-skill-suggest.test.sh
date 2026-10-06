@@ -645,6 +645,90 @@ rm -rf "$HOME_SKILLS"
 cp "$TMP_ROOT/split-task-save" "$TASK"
 pass "equivalent public split-home copies resolve locally without expanding remote projection"
 
+for linked_root in selected home; do
+  LINK_FIXTURE="$TMP_ROOT/readable-child-$linked_root"
+  LINK_CATALOG="$LINK_FIXTURE/catalog"
+  LINK_HOME="$LINK_FIXTURE/home"
+  LINK_TASK="$LINK_FIXTURE/task"
+  LINK_BRIEF="$LINK_FIXTURE/brief"
+  mkdir -p "$LINK_CATALOG" "$LINK_HOME/.agents/skills"
+  for id in alpha beta gamma safety; do
+    cp -R "$CATALOG/$id" "$LINK_CATALOG/"
+  done
+  git init -q "$LINK_CATALOG"
+  git -C "$LINK_CATALOG" add -- .
+  git init -q "$LINK_HOME"
+  if [ "$linked_root" = selected ]; then
+    LINK_CHILD="$LINK_CATALOG/acme-linked"
+    LINK_GIT=$LINK_CATALOG
+    LINK_INDEXED=acme-linked/SKILL.md
+  else
+    LINK_CHILD="$LINK_HOME/.agents/skills/acme-linked"
+    LINK_GIT=$LINK_HOME
+    LINK_INDEXED=.agents/skills/acme-linked/SKILL.md
+  fi
+  mkdir -p "$LINK_CHILD"
+  printf '%s\n' '---' 'name: acme-linked' 'description: LINK-PRIVATE-DESCRIPTION' \
+    '---' 'LINK-PRIVATE-OPENING' > "$LINK_CHILD/SKILL.md"
+  git -C "$LINK_GIT" add -- "$LINK_INDEXED"
+  mv "$LINK_CHILD" "$LINK_FIXTURE/private-target"
+  ln -s "$LINK_FIXTURE/private-target" "$LINK_CHILD"
+  git -C "$LINK_GIT" ls-files --error-unmatch -- "$LINK_INDEXED" >/dev/null \
+    || fail "$linked_root child body must remain lexically indexed"
+  [ -L "$LINK_CHILD" ] && [ -r "$LINK_CHILD/SKILL.md" ] \
+    || fail "$linked_root child link must remain locally readable"
+  printf 'Perform a combined task.\n' > "$LINK_TASK"
+  printf '# Skill selection input\nPerform a combined task.\n' > "$LINK_BRIEF"
+  for requirement in unnamed caller; do
+    LINK_ARGS=(--task-file "$LINK_TASK")
+    if [ "$requirement" = caller ]; then
+      LINK_ARGS=(--brief "$LINK_BRIEF" --required acme-linked --format brief)
+    fi
+    reset
+    out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$LINK_HOME" TYPESAFE_API_KEY="$KEY" \
+      bash "$TOOL" --catalog "$LINK_CATALOG" "${LINK_ARGS[@]}" --required safety)
+    if [ "$requirement" = unnamed ]; then
+      assert_contains "$out" 'suggestions[2]' "$linked_root child preserves public optional fits"
+      assert_contains "$out" "\"alpha\",\"$LINK_CATALOG/alpha/SKILL.md\",0.8" "$linked_root child retains selected public paths"
+      assert_contains "$out" 'opening-instruction recheck' "$linked_root child retains ambiguous recheck"
+    else
+      assert_contains "$out" "Required named skill: acme-linked - read $LINK_CHILD/SKILL.md." "$linked_root caller requirement resolves readable lexical body"
+      assert_contains "$out" 'Optional suggestion: alpha' "$linked_root private caller requirement preserves public advice"
+    fi
+    assert_equals '2' "$(wc -l < "$LOG/calls" | tr -d ' ')" "$linked_root $requirement makes exactly two public requests"
+    for stage in rank recheck; do
+      jq -e '.state.catalog | map(.id) == ["alpha","beta","gamma"]' "$LOG/$stage" >/dev/null \
+        || fail "$linked_root $requirement $stage must contain only public siblings"
+      for private_text in acme-linked LINK-PRIVATE-DESCRIPTION LINK-PRIVATE-OPENING; do
+        assert_not_contains "$(cat "$LOG/$stage")" "$private_text" "$linked_root $requirement $stage keeps linked fields local"
+      done
+    done
+  done
+  printf 'Use acme-linked for this task.\n' > "$LINK_TASK"
+  printf '# Skill selection input\nUse acme-linked for this task.\n' > "$LINK_BRIEF"
+  for input in --task-file --brief; do
+    if [ "$input" = --task-file ]; then input_path=$LINK_TASK; else input_path=$LINK_BRIEF; fi
+    reset
+    out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$LINK_HOME" TYPESAFE_API_KEY="$KEY" \
+      bash "$TOOL" --catalog "$LINK_CATALOG" "$input" "$input_path" --required safety)
+    assert_contains "$out" "\"acme-linked\",\"$LINK_CHILD/SKILL.md\"" "$linked_root $input retains named readable child body"
+    assert_contains "$out" 'status: off' "$linked_root $input withholds linked private task identity"
+    assert_absent "$LOG/calls" "$linked_root $input sends neither advice stage"
+  done
+  if [ "$linked_root" = home ]; then
+    mkdir -p "$LINK_CATALOG/acme-linked"
+    cp "$LINK_CHILD/SKILL.md" "$LINK_CATALOG/acme-linked/SKILL.md"
+    git -C "$LINK_CATALOG" add -- acme-linked/SKILL.md
+    reset
+    out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$LINK_HOME" TYPESAFE_API_KEY="$KEY" \
+      bash "$TOOL" --catalog "$LINK_CATALOG" --task-file "$LINK_TASK" --required acme-linked)
+    assert_contains "$out" '"acme-linked",null' "identical public and linked-private copies remain ambiguous"
+    assert_contains "$out" 'status: off' "linked-private duplicate task identity remains withheld"
+    assert_absent "$LOG/calls" "identical public copy cannot authorize linked-private identity disclosure"
+  fi
+done
+pass "readable indexed child links remain local across selected and active-home roots"
+
 for MODE in none recheck-none timeout malformed recheck-malformed wrong-model invalid-number missing-answer; do
   reset
   out=$(run --task-file "$TASK" --required safety)

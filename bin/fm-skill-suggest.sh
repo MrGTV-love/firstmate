@@ -152,7 +152,7 @@ for root in "${DISCOVERY_ROOTS[@]}"; do
       continue
     fi
     public=false
-    if [ ! -L "$file" ] && git --literal-pathspecs -C "$root" ls-files --error-unmatch -- "${file#"$root"/}" >/dev/null 2>&1; then
+    if [ ! -L "$child" ] && [ ! -L "$file" ] && git --literal-pathspecs -C "$root" ls-files --error-unmatch -- "${file#"$root"/}" >/dev/null 2>&1; then
       public=true
       jq -nc --arg path "$file" '$path' >> "$WORK/public-paths"
     fi
