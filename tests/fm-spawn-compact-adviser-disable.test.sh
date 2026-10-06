@@ -547,8 +547,8 @@ SH
           assert_equals unset "$(sort -u "$FAKEBIN_DIR/backend-env")" \
             "$name: the backend inherited the per-invocation emergency override"
           switch=0
-          hooks=unset
-          marker=unset
+          hooks='unset'
+          marker='unset'
           if [ "$policy" = emergency ]; then
             switch=1
           elif [ "$harness" = claude ]; then

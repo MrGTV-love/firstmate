@@ -412,6 +412,7 @@ if [ "${1:-}" = --sandbox-only ]; then
   mkdir -p "$SANDBOX_FALLBACK_HOME"
   printf '{"sandboxSentinel":true}\n' > "$SANDBOX_FALLBACK_HOME/.claude.json"
   make_project "$SANDBOX_PROJECT"
+  # shellcheck disable=SC2016 # positional params expand in the child shell.
   SANDBOX_WT=$(env -u TREEHOUSE_ROOT -u TREEHOUSE_WORKTREE_PATH \
     HOME="$SANDBOX_FALLBACK_HOME" bash -c \
     'cd "$1" && "$2" get --lease --no-fetch' \
