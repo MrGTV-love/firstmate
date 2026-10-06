@@ -526,7 +526,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     else "\($s) at \($row.scope)" end;
   def assess($c; $p; $lane):
     if $c.harness == "omp" and ($p == "codex" or (($c.model // "") | startswith("openai-codex/"))) then
-      ($omp_pools[$c.model] // {status: "unknown", accounts: []}) as $pool |
+      ($omp_pools[($c.model // "")] // {status: "unknown", accounts: []}) as $pool |
       {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
        exhausted: ($pool.status == "exhausted" and $c.floor == null), unranked: true,
        reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}

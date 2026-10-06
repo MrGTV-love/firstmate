@@ -794,6 +794,7 @@ TARGET_MODEL=
 TARGET_EFFORT=
 TARGET_DISPATCH_RULE=
 TARGET_DISPATCH_SWITCHED=false
+TARGET_DISPATCH_FALLBACK='[]'
 
 journal_write() {  # <phase> [extra-line]...
   local phase=$1
@@ -831,10 +832,32 @@ journal_write() {  # <phase> [extra-line]...
   return 1
 }
 
+relaunch_refresh_published_profile() {
+  [ -n "$RELAUNCH_TX" ] && [ "$(fm_meta_get "$META" control_relaunch_tx)" = "$RELAUNCH_TX" ] || return 0
+  RELAUNCH_META_PUBLISHED=1
+  local harness model effort
+  harness=$(fm_meta_get "$META" harness)
+  model=$(fm_meta_get "$META" model)
+  effort=$(fm_meta_get "$META" effort)
+  model=${model:-default}
+  effort=${effort:-default}
+  if [ -n "$TARGET_DISPATCH_RULE" ] && [ "$TARGET_DISPATCH_FALLBACK" != '[]' ] \
+     && { [ "$TARGET_HARNESS" != "$harness" ] || [ "$TARGET_MODEL" != "$model" ] || [ "$TARGET_EFFORT" != "$effort" ]; } \
+     && jq -e --arg h "$harness" --arg m "$model" --arg e "$effort" \
+       'any(.[]; .harness == $h and (.model // "default") == $m and (.effort // "default") == $e)' \
+       <<<"$TARGET_DISPATCH_FALLBACK" >/dev/null; then
+    TARGET_DISPATCH_SWITCHED=true
+  fi
+  TARGET_HARNESS=$harness
+  TARGET_MODEL=$model
+  TARGET_EFFORT=$effort
+}
+
 relaunch_rollback() {
   local state
   [ "$RELAUNCH_ACTIVE" = 1 ] || return 0
   [ "$RELAUNCH_PHASE" != complete ] || return 0
+  relaunch_refresh_published_profile
   RELAUNCH_ACTIVE=0
   case "$RELAUNCH_PHASE" in
     checkpoint|noted)
@@ -992,6 +1015,7 @@ resolve_relaunch_profile() {
         "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
       TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
       dispatch_fallback=$(jq -c .fallback <<<"$dispatch_set")
+      TARGET_DISPATCH_FALLBACK=$dispatch_fallback
     else
       TARGET_DISPATCH_RULE=
     fi
@@ -1253,6 +1277,7 @@ do_relaunch() {
       FM_CONFIG_INHERIT_PAIR_DIR="${RELAUNCH_PAIR_DIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" \
       "$SCRIPT_DIR/fm-spawn.sh" "${spawn_args[@]}" >/dev/null; then
     RELAUNCH_META_PUBLISHED=1
+    relaunch_refresh_published_profile
     # $T was resolved from the record before the launch. When the recorded
     # endpoint was gone, the launch owner created a fresh one and republished
     # the record pointing at it, so every postcondition below must be read from
@@ -1272,8 +1297,7 @@ do_relaunch() {
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
   else
-    [ "$(fm_meta_get "$META" control_relaunch_tx)" != "$RELAUNCH_TX" ] \
-      || RELAUNCH_META_PUBLISHED=1
+    relaunch_refresh_published_profile
     die "the replacement agent for $ID could not be launched on $TARGET_HARNESS"
   fi
 
@@ -1285,7 +1309,7 @@ do_relaunch() {
   journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
-    printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+    printf 'working [at=%s]: model-matrix fallback relaunched %s %s effort=%s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
   fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

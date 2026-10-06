@@ -2705,6 +2705,10 @@ if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
     else
       route_text=' through ambient environment inheritance'
     fi
+    caller_env_reaches=1
+    if [ "$BACKEND" = tmux ] && tmux show-environment -g >/dev/null 2>&1; then
+      caller_env_reaches=0
+    fi
     for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
       would_reach=1
       if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
@@ -2713,7 +2717,7 @@ if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
         *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
         esac
       fi
-      if [ "$BACKEND" != tmux ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
+      if [ "$caller_env_reaches" -eq 1 ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
         echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
         exit 1
       fi

@@ -1245,7 +1245,7 @@ A direct `fm-spawn.sh --relaunch` without the flag drops the line.
 
 When `config/launch-env-allowlist` is active, a variable name the allowlist does not list is filtered out of the worker environment; the guard does not refuse for a filtered-out variable, because it cannot reach the worker.
 
-On the tmux backend the guard also checks the environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment (for example, when the tmux server started while the shell still exported the key).
+On the tmux backend, creating a fresh server checks the caller credentials it will inherit; an existing server checks only the destination environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment.
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
 The global environment is checked even before the `firstmate` session exists.
 The refusal names the scope and the `tmux set-environment` command that clears it.
@@ -1378,13 +1378,14 @@ This section is the single owner of the canonical schema and its per-field seman
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
 | Rule `fallback` and top-level `default_fallback` | Optional ordered arrays of explicit stand-ins; an empty or absent list permits none. |
 
-**Pooled OMP capacity and declared stand-ins**
+### Pooled OMP capacity and declared stand-ins
 
 `bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports every pooled account as `usable`, `exhausted`, or `unknown`, without account identities or credentials.
 OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
@@ -1406,9 +1407,10 @@ Omitted model and effort fields match their persisted `default` metadata values 
 OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
 An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
+A failure before stopping the original worker remains retryable through its still-current quota event, even when checkpoint or note publication left a failed transaction journal.
 After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
 A failed recovery does not prevent later eligible tasks from being considered within the scan's shared execution budget; each scan stops after its first successful relaunch.
-Launch and successful replacement append the selected route to task status.
+Launch and successful replacement append the selected route to task status; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
 No account pin, saved reset, or global reviewer configuration is changed.
 
 

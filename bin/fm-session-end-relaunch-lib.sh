@@ -209,6 +209,11 @@ fm_session_end_quota_journal_identity() {
   elif [ -e "$state/$id.busy-state" ] || [ -L "$state/$id.busy-state" ]; then
     return 1
   fi
+  case "$phase" in
+    failed:checkpoint|failed:noted)
+      [ "$(fm_backend_agent_state "${backend:-tmux}" "$(fm_meta_get "$meta" window)" 2>/dev/null)" = dead ] || return 1
+      ;;
+  esac
   printf '%s %s\n' "$gen" "$seq"
 }
 

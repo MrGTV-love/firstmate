@@ -152,6 +152,10 @@ case "${1:-}" in
       case "$payload" in
         /exit|/quit)
           printf 'zsh' > "$D/command"
+          if [ -f "$D/../usage-after-stop.json" ]; then
+            cp "$FM_HOME/state/"*.control-relaunch "$D/../preflight-journal"
+            cp "$D/../usage-after-stop.json" "$D/../usage.json"
+          fi
           [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
@@ -677,6 +681,7 @@ SH
   assert_equals default "$(meta_field "$dir" "$id" effort)" "ordinary relaunch corrupted the durable effort"
   assert_equals complete "$(journal_field "$dir" "$id" phase)" "ordinary relaunch did not complete its transaction"
   assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "ordinary relaunch changed the worktree"
+  assert_no_grep 'model-matrix fallback' "$dir/home/state/$id.status" "ordinary relaunch must not invent matrix routing"
   pass "an ordinary non-OMP relaunch without crew-dispatch.json succeeds without required jq and preserves its durable profile"
 }
 
@@ -4237,6 +4242,96 @@ SH
   "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
 }
 
+test_live_quota_retries_after_initial_pre_stop_failure() {
+  local dir id rejected_phase recovery out rc gen seq record expected_phase before real_mv
+  real_mv=$(command -v mv)
+  for rejected_phase in noted stopping; do
+    for recovery in scan direct; do
+      id="rl-live-$rejected_phase-$recovery"
+      dir=$(new_case live-quota "$id")
+      add_quota_recovery_task "$dir" "$id"
+      gen=$(cat "$dir/home/state/$id.busy-gen")
+      record=$(cat "$dir/home/state/$id.busy-state")
+      seq=${record#*seq=}
+      seq=${seq%% *}
+      before=$(cat "$dir/home/data/$id/brief.md")
+      make_mv_failure_stub "$dir"
+      out=$(FM_REAL_MV="$real_mv" FM_FAKE_JOURNAL_PHASE_MV_FAIL="$rejected_phase" run_session_end_scan "$dir"); rc=$?
+      expect_code 0 "$rc" "the scan must record the initial live failure: $out"
+      assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "initial live retry must reach control"
+      if [ "$rejected_phase" = noted ]; then expected_phase=checkpoint; else expected_phase=noted; fi
+      assert_equals "failed:$expected_phase" "$(journal_field "$dir" "$id" phase)" "failure must retain its durable pre-stop phase"
+      assert_equals instructions-restored "$(journal_field "$dir" "$id" rollback)" "failure must restore instructions"
+      assert_equals "$before" "$(cat "$dir/home/data/$id/brief.md")" "live worker instructions must remain unchanged"
+      assert_equals omp "$(cat "$dir/fake/command")" "pre-stop failure must leave the original worker alive"
+      assert_equals "$gen" "$(cat "$dir/home/state/$id.busy-gen")" "pre-stop failure must preserve generation"
+      assert_equals "$record" "$(cat "$dir/home/state/$id.busy-state")" "pre-stop failure must preserve event sequence"
+      assert_no_grep /quit "$dir/fake/literal" "pre-stop failure must not stop the worker"
+      if [ "$recovery" = scan ]; then
+        out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+        assert_contains "$out" 'auto-relaunched after quota exhaustion' "scan must recover the still-current live event"
+      else
+        out=$(FM_REAL_MV="$real_mv" FM_CONTROL_QUOTA_GEN="$gen" FM_CONTROL_QUOTA_SEQ="$seq" \
+          run_control "$dir" "$id" relaunch --note "retry the original live quota event"); rc=$?
+        assert_contains "$out" "relaunched $id" "direct caller must recover the still-current live event"
+      fi
+      expect_code 0 "$rc" "live pre-stop recovery must succeed: $out"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "live retry must complete"
+      assert_equals "$gen" "$(journal_field "$dir" "$id" quota_gen)" "live retry must keep quota origin"
+      assert_equals "$seq" "$(journal_field "$dir" "$id" quota_seq)" "live retry must keep quota sequence"
+      assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "live retry must serve declared fallback"
+      assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "live retry must preserve work"
+      [ "$(cat "$dir/home/state/$id.busy-gen")" != "$gen" ] || fail "live retry revived the original generation"
+    done
+  done
+  pass "initial live checkpoint/noted quota rollback remains retryable by scan and direct control"
+}
+
+test_relaunch_reports_the_profile_spawn_actually_served() {
+  local dir id outcome out rc real_mv
+  real_mv=$(command -v mv)
+  for outcome in complete transport complete-journal; do
+    id="rl-served-$outcome"
+    dir=$(new_case served-profile "$id")
+    add_quota_recovery_task "$dir" "$id"
+    cp "$dir/usage.json" "$dir/usage-after-stop.json"
+    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
+      "$dir/usage-after-stop.json" > "$dir/usage.json"
+    make_mv_failure_stub "$dir"
+    case "$outcome" in
+      complete) out=$(FM_REAL_MV="$real_mv" run_control "$dir" "$id" relaunch --note "serve the current permitted profile"); rc=$? ;;
+      transport) out=$(FM_REAL_MV="$real_mv" FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
+        run_control "$dir" "$id" relaunch --note "retain published fallback"); rc=$? ;;
+      complete-journal) out=$(FM_REAL_MV="$real_mv" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
+        run_control "$dir" "$id" relaunch --note "retain confirmed fallback"); rc=$? ;;
+    esac
+    assert_grep 'to_model=openai-codex/gpt-6-luna' "$dir/preflight-journal" "preflight must still select Codex before the stop"
+    assert_grep 'phase=stopping' "$dir/preflight-journal" "usage change must happen between control preflight and spawn"
+    assert_equals omp "$(meta_field "$dir" "$id" harness)" "spawn must publish served harness"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "spawn must publish actual fallback model"
+    assert_equals high "$(meta_field "$dir" "$id" effort)" "spawn must publish actual fallback effort"
+    assert_equals omp "$(journal_field "$dir" "$id" to_harness)" "journal must name served harness"
+    assert_equals openrouter/z-ai/glm-5.3-flash "$(journal_field "$dir" "$id" to_model)" "journal must name served model"
+    assert_equals high "$(journal_field "$dir" "$id" to_effort)" "journal must name served effort"
+    assert_equals "$(meta_field "$dir" "$id" control_relaunch_tx)" "$(journal_field "$dir" "$id" relaunch_tx)" "published metadata must bind journal transaction"
+    if [ "$outcome" = complete ]; then
+      expect_code 0 "$rc" "served fallback must complete: $out"
+      assert_contains "$out" 'model=openrouter/z-ai/glm-5.3-flash effort=high' "success must report actual served profile"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "served fallback must complete journal"
+      assert_grep 'fallback relaunched omp openrouter/z-ai/glm-5.3-flash effort=high' "$dir/home/state/$id.status" "control must report actual served fallback effort"
+    else
+      expect_code 1 "$rc" "published failure must remain a failure: $out"
+      assert_equals failed:launching "$(journal_field "$dir" "$id" phase)" "published failure must retain durable phase"
+      if [ "$outcome" = transport ]; then
+        assert_equals none-new-record-kept "$(journal_field "$dir" "$id" rollback)" "transport failure must retain published profile"
+      else
+        assert_equals none-new-agent-confirmed "$(journal_field "$dir" "$id" rollback)" "complete journal failure must retain confirmed profile"
+      fi
+    fi
+  done
+  pass "control reports actual spawn fallback after preflight Codex availability changes, including published failure journals"
+}
+
 test_quota_recovery_retries_real_stop_then_failed_launch() {
   local dir failure id out rc gen seq record now attempt_count literal_before
   local real_mv
@@ -4528,6 +4623,8 @@ test_quota_recovery_retries_real_stop_then_failed_launch
 test_quota_published_failure_retries_only_its_dead_transaction
 test_quota_confirmed_replacement_is_not_retried
 test_quota_retry_preserves_identity_after_pre_stop_failure
+test_live_quota_retries_after_initial_pre_stop_failure
+test_relaunch_reports_the_profile_spawn_actually_served
 test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint

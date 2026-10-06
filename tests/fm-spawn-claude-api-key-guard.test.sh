@@ -16,6 +16,7 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
 TMP_ROOT=$(fm_test_tmproot fm-spawn-claude-api-key-guard)
 
 # make_case <name> <harness> <id>...
@@ -30,6 +31,7 @@ make_case() {
   launchlog="$case_dir/launch.log"
   panelog="$case_dir/pane.log"
   fakebin=$(fm_test_make_spawn_fakebin "$case_dir/fake")
+  install_tmux_environment_stub "$fakebin"
   fm_test_spawn_home "$home" "$harness"
   fm_git_worktree "$proj" "$wt" "wt-$name"
   for id in "$@"; do
@@ -59,11 +61,52 @@ SH
   printf '%s\n' "$CASE_DIR/auth-pin" > "$HOME_DIR/config/claude-account"
 }
 
+install_tmux_environment_stub() {
+  local fakebin=$1
+  cp "$fakebin/tmux" "$fakebin/tmux-base"
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+server=${FM_TEST_TMUX_SERVER:-fresh}
+state=${FM_TEST_TMUX_STATE:?}
+if [ -f "$state.server" ]; then
+  server=created
+  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    export "FM_FAKE_TMUX_GLOBAL_ENV_$name=${!name:-}"
+  done
+fi
+case "${1:-}" in
+  has-session)
+    [ "$server" = existing ] || [ -f "$state.session" ]
+    exit $?
+    ;;
+  show-environment)
+    [ "$server" != fresh ] || exit 1
+    if [ "${2:-}" = -t ]; then
+      [ "$server" = existing ] || [ -f "$state.session" ] || exit 1
+    fi
+    ;;
+  new-session)
+    [ "$server" != fresh ] || : > "$state.server"
+    : > "$state.session"
+    ;;
+esac
+exec "$(dirname "$0")/tmux-base" "$@"
+SH
+  chmod +x "$fakebin/tmux"
+}
+
 run_case_spawn() {
   : > "$LAUNCH_LOG"
   : > "$PANE_LOG"
+  mkdir -p "$HOME_DIR/user-home"
   FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_PANE_LOG="$PANE_LOG" \
-    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$@"
+    FM_TEST_TMUX_STATE="$CASE_DIR/tmux" FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
+    HOME="$HOME_DIR/user-home" CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
+    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX='' \
+    PATH="$FAKEBIN_DIR:$PATH" "$ROOT/bin/fm-spawn.sh" "$@" 2>&1
 }
 
 # --- tests ------------------------------------------------------------------
@@ -185,6 +228,7 @@ test_refuse_tmux_session_env() {
   rec=$(make_case refuse-tmux-session claude refuse-tmux-session-a1)
   read_case "$rec"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=sk-ant-session-key \
     run_case_spawn refuse-tmux-session-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -203,6 +247,7 @@ test_refuse_tmux_global_env() {
   rec=$(make_case refuse-tmux-global claude refuse-tmux-global-a1)
   read_case "$rec"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_AUTH_TOKEN=sk-ant-global-token \
     run_case_spawn refuse-tmux-global-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -220,6 +265,7 @@ test_succeed_tmux_session_removal_marker() {
   rec=$(make_case succeed-tmux-removed claude succeed-tmux-removed-a1)
   read_case "$rec"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=- \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-global-key \
     run_case_spawn succeed-tmux-removed-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
@@ -236,6 +282,7 @@ test_succeed_tmux_env_with_pin_shed() {
   read_case "$rec"
   install_signed_in_pin
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_ENV_ANTHROPIC_API_KEY=sk-ant-session-key \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_AUTH_TOKEN=sk-ant-global-token \
     run_case_spawn succeed-tmux-pin-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
@@ -252,12 +299,14 @@ test_tmux_env_follows_the_allowlist() {
   read_case "$rec"
   printf '%s\n' 'HOME' 'PATH' > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-global-key \
     run_case_spawn tmux-allowlist-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "claude spawn should succeed when the allowlist filters out the tmux key"$'\n'"$out"
   printf '%s\n' 'HOME' 'PATH' 'ANTHROPIC_API_KEY' > "$HOME_DIR/config/launch-env-allowlist"
   out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    FM_TEST_TMUX_SERVER=existing \
     FM_FAKE_TMUX_GLOBAL_ENV_ANTHROPIC_API_KEY=sk-ant-global-key \
     run_case_spawn tmux-allowlist-a2 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -434,6 +483,71 @@ test_teamclaude_launcher_keeps_the_api_key_guard() {
   pass "config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in"
 }
 
+test_existing_tmux_ignores_caller_credentials() {
+  local name server rec out status id
+  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    for server in existing existing-no-firstmate; do
+      id="caller-${name##*_}-$server"
+      rec=$(make_case "$id" claude "$id")
+      read_case "$rec"
+      out=$(export "$name=sk-ant-caller-only"
+        FM_TEST_TMUX_SERVER="$server" \
+          run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+      status=$?
+      [ "$status" -eq 0 ] || fail "existing tmux $server must ignore caller-only $name"$'\n'"$out"
+      assert_contains "$out" "spawned" "existing tmux should launch without destination credentials"
+    done
+  done
+  pass "existing tmux with or without firstmate ignores both caller-only credentials"
+}
+
+test_existing_tmux_without_firstmate_checks_global_credentials() {
+  local name rec out status id
+  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    id="global-${name##*_}"
+    rec=$(make_case "$id" claude "$id")
+    read_case "$rec"
+    out=$(export "FM_FAKE_TMUX_GLOBAL_ENV_$name=sk-ant-existing-global"
+      FM_TEST_TMUX_SERVER=existing-no-firstmate \
+        run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "existing tmux without firstmate must refuse global $name"$'\n'"$out"
+    assert_contains "$out" "$name is set in the tmux global environment" "the global credential must be checked before firstmate exists"
+    assert_not_contains "$out" "sk-ant-existing-global" "the refusal must not disclose credentials"
+    [ ! -s "$LAUNCH_LOG" ] || fail "a refused spawn must not send a launch"
+    assert_absent "$HOME_DIR/state/$id.meta" "a refused spawn must not create task metadata"
+  done
+  pass "existing tmux without firstmate checks both global credentials"
+}
+
+test_fresh_tmux_auth_token_exceptions() {
+  local variant rec out status id
+  for variant in filtered listed pin allowed; do
+    id="fresh-token-$variant"
+    rec=$(make_case "$id" claude "$id")
+    read_case "$rec"
+    case "$variant" in
+      filtered) printf 'HOME\nPATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+      listed) printf 'HOME\nPATH\nANTHROPIC_AUTH_TOKEN\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+      pin) install_signed_in_pin ;;
+    esac
+    if [ "$variant" = allowed ]; then
+      out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-fresh-token run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
+    else
+      out=$(ANTHROPIC_AUTH_TOKEN=sk-ant-fresh-token run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+    fi
+    status=$?
+    if [ "$variant" = listed ]; then
+      [ "$status" -ne 0 ] || fail "fresh tmux must refuse an allowlisted auth token"$'\n'"$out"
+      assert_contains "$out" "ANTHROPIC_AUTH_TOKEN" "the refusal must name the listed auth token"
+    else
+      [ "$status" -eq 0 ] || fail "fresh tmux must honor the $variant auth-token exception"$'\n'"$out"
+      assert_contains "$out" "spawned" "the auth-token exception must reach successful spawn"
+    fi
+  done
+  pass "fresh tmux honors auth-token filtering, pin shedding, and explicit opt-in"
+}
+
 test_refuse_api_key_no_allowlist
 test_refuse_auth_token_no_allowlist
 test_succeed_unset
@@ -452,3 +566,6 @@ test_launch_preserves_credentials_with_opt_in
 test_compound_launch_credentials_and_account
 test_non_tmux_guard
 test_teamclaude_launcher_keeps_the_api_key_guard
+test_existing_tmux_ignores_caller_credentials
+test_existing_tmux_without_firstmate_checks_global_credentials
+test_fresh_tmux_auth_token_exceptions

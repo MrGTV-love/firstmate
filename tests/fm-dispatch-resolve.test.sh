@@ -1357,6 +1357,55 @@ assert_contains "$out" '  status: escalate' "a positive OpenRouter credit balanc
 assert_contains "$out" 'eligible, unranked: provider openrouter unmeasured (unknown)' "credit-only evidence stays eligible but unranked"
 assert_not_contains "$out" '  profile:' "credit-only evidence never authorizes dispatch"
 
+OPTIONAL_OMP_RULES="$TMP_ROOT/optional-omp-rules.json"
+jq '.rules = [.rules[3]]
+  | .rules[0].use = [{harness:"omp",provider:"codex"},{harness:"cursor",model:"cursor-grok-4.6-medium"}]
+  | .default = .rules[0].use' "$BASE_RULES" > "$OPTIONAL_OMP_RULES"
+for optional_omp_case in rule default ambiguous declared-floor approval rule-floor fallback; do
+  cp "$OPTIONAL_OMP_RULES" "$RULES"
+  optional_omp_choice=rule_1
+  optional_omp_confidence=0.95
+  optional_omp_status=clear
+  case "$optional_omp_case" in
+    default) optional_omp_choice=default ;;
+    ambiguous) optional_omp_confidence=0.5; optional_omp_status=ambiguous ;;
+    declared-floor)
+      jq '.rules[0].min_confidence = 0.99' "$OPTIONAL_OMP_RULES" > "$RULES"
+      optional_omp_status=ambiguous ;;
+    approval)
+      jq '.rules[0].approval = "captain"' "$OPTIONAL_OMP_RULES" > "$RULES"
+      optional_omp_status=escalate ;;
+    rule-floor)
+      jq '.rules[0].floor = {provider:"absent",scope:"all_models",min_percent:20}' "$OPTIONAL_OMP_RULES" > "$RULES"
+      optional_omp_status=escalate ;;
+    fallback)
+      jq '.rules[0].floor = {provider:"claude",scope:"model:fable",min_percent:20}' "$OPTIONAL_OMP_RULES" > "$RULES" ;;
+  esac
+  cat > "$RESPONSE" <<JSON
+{"model":"jev-1.13.0","answers":{"rule":{"choice":"$optional_omp_choice","confidence":$optional_omp_confidence,"probabilities":{"rule_1":0.95,"default":0.05}}}}
+JSON
+  reset_log
+  TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+  expect_code 0 "$code" "optional OMP model $optional_omp_case resolves normally"
+  assert_equals '' "$err" "optional OMP model $optional_omp_case does not produce a jq error"
+  assert_contains "$out" "  status: $optional_omp_status" "optional OMP model preserves the $optional_omp_case outcome"
+  assert_contains "$out" 'candidate: omp:-  provider=codex  pool={"status":"unknown","accounts":[]}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority' "optional OMP model stays unknown and unranked in $optional_omp_case"
+  assert_contains "$out" 'candidate: cursor:cursor-grok-4.6-medium  provider=cursor' "optional OMP model retains measured sibling evidence in $optional_omp_case"
+  if [ "$optional_omp_status" = clear ]; then
+    optional_omp_profile=$(printf '%s\n' "$out" | grep '^  profile: ')
+    optional_omp_profile=${optional_omp_profile#'  profile: '}
+    optional_omp_args=()
+    eval "optional_omp_args=($optional_omp_profile)" || fail "optional OMP model emits usable profile arguments"
+    assert_equals --harness "${optional_omp_args[0]:-}" "selected profile declares its harness"
+    assert_equals cursor "${optional_omp_args[1]:-}" "optional OMP model selects the measured sibling harness"
+    assert_equals --model "${optional_omp_args[2]:-}" "selected profile declares its model"
+    assert_equals cursor-grok-4.6-medium "${optional_omp_args[3]:-}" "optional OMP model selects the measured sibling model"
+  else
+    assert_not_contains "$out" '  profile:' "optional OMP model does not bypass the $optional_omp_case gate"
+  fi
+done
+pass "optional OMP models preserve unknown pool evidence across rules, defaults, and gates"
+
 # An unreadable or older version is an error before snapshot interpretation.
 cp "$GUARD_RULES" "$RULES"
 for version in 0.1.50 'quota-axi development build'; do
