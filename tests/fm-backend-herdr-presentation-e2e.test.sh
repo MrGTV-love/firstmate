@@ -12,7 +12,9 @@ HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; cleanup_all; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
+if [ "${1:-}" != --sandbox-only ]; then
+  command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
+fi
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 command -v treehouse >/dev/null 2>&1 || { echo "skip: treehouse not found"; exit 0; }
 [ -x "$HERDR_LAB_HELPER" ] || { echo "skip: Herdr lab helper not executable at $HERDR_LAB_HELPER"; exit 0; }
@@ -20,7 +22,14 @@ command -v treehouse >/dev/null 2>&1 || { echo "skip: treehouse not found"; exit
 REAL_HERDR=$(command -v herdr)
 REAL_TREEHOUSE=$(command -v treehouse)
 HERDR_ORIGINAL_PATH=$PATH
-TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-presentation.XXXXXX")
+# Keep every disposable allocation inside this worktree, including a pane whose
+# daemon did not inherit the controller's TREEHOUSE_ROOT.
+mkdir -p "$ROOT/.no-mistakes/test-tmp"
+TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
+mkdir -p "$CLAUDE_CONFIG_DIR"
+# Ambient path templates can otherwise bypass even an explicitly confined root.
+unset TREEHOUSE_ROOT TREEHOUSE_WORKTREE_PATH
 FAKEBIN="$TMP_ROOT/fakebin"
 HERDR_CALL_LOG="$TMP_ROOT/herdr-calls.log"
 TREEHOUSE_CALL_LOG="$TMP_ROOT/treehouse-calls.log"
@@ -301,11 +310,6 @@ EOF
 }
 trap cleanup_all EXIT
 
-PATH="$HERDR_ORIGINAL_PATH" \
-  "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
-  || fail "could not provision the isolated Herdr lab"
-LAB_READY=1
-
 lab() {
   PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
 }
@@ -378,6 +382,10 @@ remember_meta_worktree() {  # <meta>
   local wt
   wt=$(grep '^worktree=' "$1" | cut -d= -f2-)
   [ -n "$wt" ] || fail "metadata did not record a worktree"
+  case "$wt" in
+    "$TMP_ROOT"/*) : ;;
+    *) fail "Treehouse allocated outside the disposable sandbox: $wt" ;;
+  esac
   RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   printf '%s' "$wt"
 }
@@ -387,11 +395,49 @@ make_project() {  # <dir>
   mkdir -p "$dir"
   git -C "$dir" init -q
   printf '# Herdr projection E2E fixture\n' > "$dir/README.md"
-  git -C "$dir" add README.md
+  printf 'root = "%s"\n' "$TMP_ROOT" > "$dir/treehouse.toml"
+  git -C "$dir" add README.md treehouse.toml
   git -C "$dir" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$dir" "$dir.origin.git"
   git -C "$dir" remote add origin "file://$dir.origin.git"
 }
+
+# Bounded behavioral regression: the same real allocator and pre-launch trust
+# interface used by spawn, without the unrelated presentation lifecycle cases.
+# Removing the project config regresses this assertion when the pane lacks the
+# controller's TREEHOUSE_ROOT; a private fallback HOME keeps that failure safe.
+if [ "${1:-}" = --sandbox-only ]; then
+  SANDBOX_PROJECT="$TMP_ROOT/sandbox-project"
+  SANDBOX_FALLBACK_HOME="$TMP_ROOT/alternate-root"
+  mkdir -p "$SANDBOX_FALLBACK_HOME"
+  printf '{"sandboxSentinel":true}\n' > "$SANDBOX_FALLBACK_HOME/.claude.json"
+  make_project "$SANDBOX_PROJECT"
+  SANDBOX_WT=$(env -u TREEHOUSE_ROOT -u TREEHOUSE_WORKTREE_PATH \
+    HOME="$SANDBOX_FALLBACK_HOME" bash -c \
+    'cd "$1" && "$2" get --lease --no-fetch' \
+    _ "$SANDBOX_PROJECT" "$REAL_TREEHOUSE") \
+    || fail "real sandbox allocation failed"
+  case "$SANDBOX_WT" in
+    "$TMP_ROOT"/*) : ;;
+    *) fail "Treehouse allocated outside the disposable sandbox: $SANDBOX_WT" ;;
+  esac
+  RECORDED_WORKTREES="${RECORDED_WORKTREES}${SANDBOX_WT}"$'\n'
+  case "$SANDBOX_WT" in
+    "$TMP_ROOT"/.treehouse/*) : ;;
+    *) fail "allocator without controller environment escaped configured pool: $SANDBOX_WT" ;;
+  esac
+  HOME="$SANDBOX_FALLBACK_HOME" "$ROOT/bin/fm-claude-trust.sh" \
+    "$SANDBOX_WT" "$SANDBOX_PROJECT" \
+    || fail "sandbox pre-launch Claude trust registration failed"
+  jq -e --arg wt "$SANDBOX_WT" --arg project "$SANDBOX_PROJECT" \
+    '.projects[$wt].hasTrustDialogAccepted == true and .projects[$project].hasTrustDialogAccepted == true' \
+    "$CLAUDE_CONFIG_DIR/.claude.json" >/dev/null \
+    || fail "pre-launch trust did not land in the isolated Claude store"
+  [ "$(cat "$SANDBOX_FALLBACK_HOME/.claude.json")" = '{"sandboxSentinel":true}' ] \
+    || fail "pre-launch trust mutated the fallback HOME store"
+  pass "real allocator stays in the configured sandbox without controller environment; pre-launch Claude trust uses its private store"
+  exit 0
+fi
 
 write_ship_brief() {  # <home> <id> [description]
   local home=$1 id=$2 description=${3:-Herdr presentation fixture $2}
@@ -503,6 +549,11 @@ assert_no_projection_mutation_since() {  # <line-count> <case-name>
     fail "$name performed a create, close, delete, rename, or lifecycle call during recovery inspection"
   fi
 }
+
+PATH="$HERDR_ORIGINAL_PATH" \
+  "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
+  || fail "could not provision the isolated Herdr lab"
+LAB_READY=1
 
 HOME_DIR="$TMP_ROOT/home"
 PROJECT_DIR="$TMP_ROOT/project"

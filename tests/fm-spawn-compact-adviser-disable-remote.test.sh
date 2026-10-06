@@ -105,6 +105,8 @@ printf 'codex\n' > "$PARENT/config/crew-harness"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$PARENT/data/backlog.md"
 printf '%s\n' "$$" > "$PARENT/state/.lock"
 
+# Model the remote account inside its independent checkout, not a temporary
+# parent directory that can inherit the caller's gate-worktree Git ancestry.
 remote_env() {
   FM_HOME="$PARENT" \
   FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
@@ -113,7 +115,7 @@ remote_env() {
   FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/fm-remote-entrypoint.sh" \
   FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  FM_FAKE_REMOTE_CWD="$REMOTE_ROOT" \
   FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 \
   "$@"
 }

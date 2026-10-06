@@ -518,6 +518,8 @@ Any of these preserves the candidate and lets session startup continue with at m
 | `tests/fm-backend-herdr-stale-active-tab-e2e.test.sh` | Proves a persisted-focused tab still closes when no foreground client is attached. |
 | `tests/fm-herdr-attached-viewer-live-e2e.test.sh` | Proves the other half against a real attached viewer, which `bin/fm-herdr-lab.sh viewer start` supplies over a pty sized before the fork. |
 
+Run `bash tests/fm-backend-herdr-presentation-e2e.test.sh --sandbox-only` to check real allocator confinement without inherited controller configuration and private pre-launch Claude trust registration, without starting a Herdr session.
+
 [`verification/runtime-backends.md`](verification/runtime-backends.md#workspace-removal-focus-safety) owns the active versioned evidence for the focus-flash test.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#attached-foreground-viewer) owns the active versioned evidence and the re-run trigger for the attached-viewer test.
 
