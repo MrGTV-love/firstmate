@@ -2153,18 +2153,13 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 **Open the Lavish artifact first**
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; each poll attempt derives its host and port from that session and refuses invalid session evidence before consuming a staged worker reply.
-A missing saved session instead produces the adapter's terminal `missing` result so its registration retires through the normal path.
-Lavish rewrites its session store in place, so a store that does not decode is re-read under the same bound as an interrupted poll, up to 12 times with attempts at least 5 seconds apart, and is refused only while it is still undecodable after that; it is never treated as a missing session.
+A valid session store with no saved session for the board instead produces the adapter's terminal `missing` result so its registration retires through the normal path.
+Lavish rewrites its session store in place, so an undecodable snapshot takes the adapter's bounded quiet retry rather than being treated as a missing session; the adapter header owns the routing and retry details.
 
 **Retry interrupted Lavish polls**
 
-That adapter, and only that adapter, retries the exact transient responses a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`, bare or followed by the one `help[2]:` footer lavish-axi 0.1.79 generates for it when its server restarts, and 0.1.79's three-line `error: Lavish Editor server did not start` response naming the board's own port, which a poll gets when another listener wins the race to auto-start that restarted server), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
-Each quiet retry waits at least five monotonic seconds after the preceding attempt finishes, so variable routing work, CLI startup, or an initially late poll cannot compress neighboring poll starts. The wait runs once per quiet retry; normal feedback and terminal responses do not wait for it.
-
-A poll whose `lavish-axi` process is killed by a signal before it prints anything exits 75, the runner's existing poll-again status, so the same runner relistens at once instead of waiting for reconciliation.
-
-Real feedback, ended and missing sessions, any other `SERVER_ERROR` or help text, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
-An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
+The [`bin/fm-procevent-lavish.sh` header](../bin/fm-procevent-lavish.sh) owns the exact transient response forms, completion-relative backoff, retry bound, delay override, and outputless killed-poll continuation.
+Real feedback, terminal responses, unknown errors or help text, and exhausted interruptions remain captured and announced rather than being suppressed.
 
 **Keep open Lavish reviews listening**
 
@@ -2200,7 +2195,8 @@ After opening the artifact as required above, the worker arms it with `bin/fm-pr
 
 - The confirmation is the same live claim or launch-stamp evidence `reconcile` already uses, bounded by `FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS`, and a failed confirmation retires a source that never started unless `retire` refuses because something may still own it, in which case the registration stays for `reconcile` or a human.
 - An earlier registration's listener that releases the board inside the confirm window lets the new registration start, and `arm` then reports `armed` as usual.
-- When a live listener from an earlier registration of the same board still holds it when the window ends, `arm` exits zero with `still-listening` instead of `armed`, because that earlier listener keeps serving the board and the new registration takes effect only after the source is retired and armed again.
+- When a live listener from an earlier registration of the same board still holds it when the window ends, `arm` exits zero with `still-listening` instead of `armed`, because that earlier listener keeps serving the board.
+  Replacement-registration adoption follows the same-command relisten rule in the `bin/fm-procevent.sh` header; changing the listener command requires retirement and a fresh arm.
 - The arm is refused unless that task id has valid, identity-matching endpoint metadata, because a board whose owner has no endpoint would collect feedback nobody can be told about.
 
 **Acknowledge a round by re-arming**
@@ -2371,8 +2367,9 @@ Ownership is machine-wide per canonical source, because separate homes can share
 - Every stop proves ownership before its first signal: the live runner's recorded process identity must match and it must still lead its process group.
 - Once that stop has proved ownership and sent TERM, its own escalation to KILL checks only whether the proved group still has members; it does not re-read the leader's identity or group membership, which can change or become unreadable as TERM ends the leader.
 - This proof belongs only to that stop's own escalation and cannot authorize another caller that encounters an unproved group.
-- A runner handling its own TERM, INT, HUP, or ordinary exit keeps its identity-matched leader alive while draining remaining group members, and releases its claim only after those descendants are gone.
+- EXIT cleanup for a runner's TERM, INT, HUP, or ordinary exit keeps its identity-matched leader alive while draining remaining group members, and releases any retained claim only after those descendants are gone.
   TERM-resistant descendants use that same proved KILL escalation; the killed runner leaves its claim for reconciliation after the whole generation is gone.
+  Adapter-terminal self-retirement can release the claim earlier, under the same lock that removes the registration; the subsequent EXIT cleanup still drains descendants, so the retained-claim ordering is not a universal terminal-path guarantee.
 
 **Recover orphaned claims**
 
@@ -2502,7 +2499,10 @@ The whole-second clock adds at most one second to that polling window, followed 
 - Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
 - The final read refreshes ownership after both last stamp reads, then refreshes the stamp after an unsuccessful ownership read, so a claim or launch stamp published during slow confirmation work is still observed without extending the polling deadline.
-  An absent claim or an unlocked snapshot whose full PID identity is not live leaves ownership unproved without taking the publisher's lock, so the confirmation reader does not delay the runner replacing an old stale claim. A live snapshot is only a hint to try that lock without waiting; readiness still requires a fresh locked read validating the full claim tuple and the snapshotted registration generation. Neither record presence nor the unlocked hint proves readiness. A runner takes that lock before it writes its claim, so a held lock is not evidence of ownership and cannot extend the confirmation window; a still-unclaimed runner remains unconfirmed.
+  An absent claim or an unlocked snapshot whose full PID identity is not live leaves ownership unproved without taking the publisher's lock, so the confirmation reader does not delay the runner replacing an old stale claim.
+  A live snapshot is only a hint to try that lock without waiting; readiness still requires a fresh locked read validating the full claim tuple and the snapshotted registration generation.
+  Neither record presence nor the unlocked hint proves readiness.
+  A runner takes that lock before it writes its claim, so a held lock is not evidence of ownership and cannot extend the confirmation window; a still-unclaimed runner remains unconfirmed.
 - A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
 - All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
 - A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.

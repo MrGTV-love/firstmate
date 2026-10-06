@@ -113,8 +113,8 @@
 # and use its host and port. Opening the board writes that URL; polling does not.
 # This is a routing lookup before the blocking call, not presence polling or a
 # second route record. Ambient/configured addresses must not retarget a reply.
-# An unreadable session stops before the staged reply is consumed; an absent
-# saved session emits NOT_FOUND for the runner's existing terminal retire path.
+# An unreadable session stops before the staged reply is consumed; a valid
+# store with no saved session for the board emits NOT_FOUND for terminal retirement.
 # Lavish rewrites that store in place, so a store that does not decode may be a
 # half-written snapshot: it is re-read under the quiet retry bound below, and is
 # refused only while still undecodable once that bound is spent.
@@ -161,18 +161,19 @@
 #
 # That is an internal retry, not news, so registering the raw poll made the
 # generic runner capture it and wake the whole fleet. `poll` therefore re-runs
-# the published poll up to POLL_RETRY_LIMIT times for that exact response, with
-# attempt starts at least POLL_RETRY_DELAY_DEFAULT seconds apart. The match is exact and
-# deliberately narrow: real feedback, ended and missing sessions, any other
-# SERVER_ERROR, and the same interruption still standing after the bound is
-# spent are all printed straight through and captured normally. The retry is a
-# Lavish fact, so the generic runner in bin/fm-procevent.sh stays
-# adapter-agnostic and learns nothing about it.
+# the published poll up to POLL_RETRY_LIMIT times for those exact responses.
+# Each quiet retry waits POLL_RETRY_DELAY_DEFAULT monotonic seconds after the
+# preceding attempt finishes, so delayed routing or CLI startup cannot buy
+# credit for later retries. The match is exact and deliberately narrow: real
+# feedback, ended and missing sessions, any other SERVER_ERROR or help text,
+# and the same interruption still standing after the bound is spent are all
+# printed straight through and captured normally. The retry is a Lavish fact,
+# so the generic runner in bin/fm-procevent.sh stays adapter-agnostic.
 #
 # A blocking poll whose lavish-axi process is killed by a signal before it
 # prints anything exits 75, the runner's existing poll-again status, so the same
-# runner relistens at once instead of leaving the source unowned until
-# reconciliation. Any output, or any other non-zero exit, is handled as before.
+# runner relistens after the quiet-round delay without awaiting reconciliation.
+# Any output, or any other non-zero exit, is handled as before.
 #
 # LOSS LIMITATION, stated plainly. The published poll destructively clears
 # feedback before returning it. A result lost after that clearing and before the
@@ -550,10 +551,10 @@ poll_response_filter() {  # <response-file>
   ' "$1"
 }
 
-# Minimum seconds between retry attempt starts. FM_LAVISH_POLL_RETRY_DELAY is a
-# bounded test override; a malformed or out-of-range value is refused rather than quietly
-# rounded, because silently changing a retry cadence is how a bound stops
-# meaning anything.
+# Minimum quiet-retry delay after the preceding attempt finishes.
+# FM_LAVISH_POLL_RETRY_DELAY is a bounded test override; malformed or out-of-range
+# values are refused rather than rounded, because silently changing a retry
+# cadence is how a bound stops meaning anything.
 poll_retry_delay() {
   local delay=${FM_LAVISH_POLL_RETRY_DELAY-}
   if [ -z "$delay" ]; then

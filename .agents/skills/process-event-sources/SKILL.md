@@ -43,7 +43,7 @@ Never arm a board that a live task hosts; follow the crew-hosted Lavish board co
 
 Registering a source is not the same fact as listening to it.
 Lavish `arm` waits until this registration's listener is confirmed running and does not report ready without that evidence; other adapters still record the source for the watcher's next reconcile.
-When an earlier registration's listener still holds the board as the confirm window ends, Lavish `arm` prints `still-listening` instead of `armed`; that listener keeps serving the board, and the new registration takes effect only after you retire the source and arm it again.
+The [Lavish readiness contract](../../../docs/configuration.md#crew-hosted-lavish-review-boards) owns `still-listening`; the `bin/fm-procevent.sh` header owns replacement-registration adoption.
 After arming by hand, confirm `bin/fm-procevent.sh list` reports that source as `live`, and run `bin/fm-procevent.sh reconcile` when it does not.
 **Confirm detached launches** and **Report launch failures** in [`docs/configuration.md`](../../../docs/configuration.md#process-to-event-sources-stateprocevent) own launch confirmation and failure reporting.
 If the source stays unowned, run `start` attached to read the runner's refusal, then inspect the source command and adapter binary named in the registration; `start` does not fix that refusal.
