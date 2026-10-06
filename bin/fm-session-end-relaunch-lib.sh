@@ -39,8 +39,9 @@
 # fm_session_end_relaunch_scan <state-dir> [<watcher-grace-secs>] sets FM_SESSION_END_WAKE to the first check
 # line that should be printed, or empty when this pass has nothing to say.
 # It also appends each check row to the durable wake queue. Failed attempts
-# advance to later lanes within the shared bound. It stops after the first
-# successful relaunch, so one watcher cycle replaces at most one worker.
+# advance to later lanes within the shared bound unless a replacement was
+# confirmed or published alive, even when control reports failure.
+# A successful relaunch also stops the scan, so one cycle replaces at most one worker.
 #
 # FM_SESSION_END_CONTROL overrides the control binary only when FM_TEST_SEAM=1.
 set -u
@@ -211,6 +212,38 @@ fm_session_end_quota_journal_identity() {
   printf '%s %s\n' "$gen" "$seq"
 }
 
+fm_session_end_exit_cancelled() {
+  local origin_gen=$3 current_gen=${4:-} marker="$1/$2.control-exit" marker_gen
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  marker_gen=$(fm_meta_get "$marker" gen)
+  fm_busy_token_valid "$marker_gen" || return 1
+  { fm_busy_token_valid "$origin_gen" && [ "$marker_gen" = "$origin_gen" ]; } \
+    || { fm_busy_token_valid "$current_gen" && [ "$marker_gen" = "$current_gen" ]; }
+}
+
+fm_session_end_replacement_bound() {
+  local id=$2 prior_tx=$3 wt=$4 kind=$5
+  local journal="$1/$2.control-relaunch" meta="$1/$2.meta" tx meta_kind
+  [ -f "$journal" ] && [ ! -L "$journal" ] \
+    && [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
+  tx=$(fm_meta_get "$journal" relaunch_tx)
+  [ -n "$tx" ] && [ "$tx" != "$prior_tx" ] \
+    && [ "$tx" = "$(fm_meta_get "$meta" control_relaunch_tx)" ] || return 1
+  if [ -n "${6:-}" ]; then
+    [ "$(fm_meta_get "$journal" quota_gen)" = "$6" ] \
+      && [ "$(fm_meta_get "$journal" quota_seq)" = "${7:-}" ] || return 1
+  fi
+  [ "$(fm_meta_get "$journal" task)" = "$id" ] \
+    && [ "$(fm_meta_get "$journal" worktree)" = "$wt" ] \
+    && [ "$(fm_meta_get "$meta" worktree)" = "$wt" ] \
+    && [ "$(fm_meta_get "$journal" kind)" = "$kind" ] || return 1
+  meta_kind=$(fm_meta_get "$meta" kind)
+  [ "${meta_kind:-ship}" = "$kind" ] || return 1
+  [ "$(fm_meta_get "$journal" rollback)" != none-new-agent-confirmed ] || return 0
+  fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1 || return 1
+  [ "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET" 2>/dev/null)" = alive ]
+}
+
 fm_session_end_note() {
   printf '%s' "The previous worker session ended while this task was still open. The local copy and every uncommitted change were left as the previous worker left them. Continue from the instructions and the instruction inbox."
 }
@@ -238,13 +271,14 @@ fm_session_end_queue_wake() {  # <key> <reason>
 # ledger or wake row could not be written.
 fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   local state=$1 id=$2 meta kind wt backend window agent harness policy_error config
-  local identity gen seq last verb hold_rc marker marker_gen
-  local journal phase lock recent day handled
+  local identity gen seq last verb hold_rc
+  local journal phase lock recent day handled prior_tx
   local handled_gen handled_seq handled_outcome
-  local bin out rc=0 reason key which quota_event busy_record journal_retry current_gen
+  local bin out rc=0 reason key which quota_event busy_record journal_retry
   local timeout=$FM_SESSION_END_TIMEOUT launch_wait=$FM_SESSION_END_LAUNCH_WAIT
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
+  FM_SESSION_END_REPLACEMENT_BOUND=0
   case "$id" in
     ''|*[!A-Za-z0-9._-]*) return 0 ;;
   esac
@@ -274,12 +308,8 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   fi
   gen=${identity%% *}
   seq=${identity#* }
-  marker="$state/$id.control-exit"
-  if [ -f "$marker" ] && [ ! -L "$marker" ]; then
-    marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
-    current_gen=$(fm_meta_get "$meta" busy_gen)
-    [ "$marker_gen" != "$gen" ] && { [ "$journal_retry" = 0 ] || [ "$marker_gen" != "$current_gen" ]; } || return 0
-  fi
+  fm_session_end_exit_cancelled "$state" "$id" "$gen" \
+    "$(if [ "$journal_retry" = 1 ]; then fm_meta_get "$meta" busy_gen; fi)" && return 0
   recent=0 day=0
   if [ "$quota_event" = 0 ]; then
     recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
@@ -381,6 +411,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   fm_session_end_ledger_add "$state" "$id" attempt || return 1
   bin=$(fm_session_end_control_bin)
   rc=0
+  prior_tx=$(fm_meta_get "$journal" relaunch_tx)
   touch "$state/.last-watcher-beat" 2>/dev/null || true
   out=$(fm_run_timed "$timeout" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
     FM_CONTROL_LAUNCH_WAIT="$launch_wait" \
@@ -388,6 +419,8 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_CONTROL_QUOTA_SEQ="$(if [ "$quota_event" = 1 ]; then printf '%s' "$seq"; fi)" \
     "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions using the permitted matrix fallback.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
+    FM_SESSION_END_REPLACEMENT_BOUND=1
+    FM_SESSION_END_ACTION=relaunch
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1
     if [ "$quota_event" = 1 ]; then
       reason="check: $id auto-relaunched after quota exhaustion"
@@ -397,16 +430,20 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     key="session-end-relaunch-$id-$gen-$seq"
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
-    FM_SESSION_END_ACTION=relaunch
     FM_SESSION_END_REASON=$reason
     return 0
   fi
+  if fm_session_end_replacement_bound "$state" "$id" "$prior_tx" "$wt" "$kind" \
+      "$(if [ "$quota_event" = 1 ]; then printf '%s' "$gen"; fi)" \
+      "$(if [ "$quota_event" = 1 ]; then printf '%s' "$seq"; fi)"; then
+    FM_SESSION_END_REPLACEMENT_BOUND=1
+  fi
+  FM_SESSION_END_ACTION=failed
   fm_session_end_ledger_add "$state" "$id" failed || return 1
   reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
   printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1
-  FM_SESSION_END_ACTION=failed
   FM_SESSION_END_REASON=$reason
   return 0
 }
@@ -432,9 +469,7 @@ fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
     if [ -n "$reason" ] && [ -z "$first" ]; then
       first=$reason
     fi
-    case "$FM_SESSION_END_ACTION" in
-      relaunch) break ;;
-    esac
+    [ "$FM_SESSION_END_REPLACEMENT_BOUND" = 0 ] || break
   done < <(
     for meta in "$state"/*.meta; do
       [ -e "$meta" ] || continue

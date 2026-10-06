@@ -1409,7 +1409,8 @@ An idle terminal quota error after native rotation is handled by recovery throug
 Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
 A failure before stopping the original worker remains retryable through its still-current quota event, even when checkpoint or note publication left a failed transaction journal.
 After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
-A failed recovery does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks, break timestamp ties by attempt count and task name, and stop after the first successful relaunch.
+A failed recovery without a replacement does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks and break timestamp ties by attempt count and task name.
+Each scan stops after one successful relaunch or a transaction-bound confirmed or published-alive replacement, retaining any control failure report.
 Launch and successful replacement append the selected route to task status; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
 No account pin, saved reset, or global reviewer configuration is changed.
 

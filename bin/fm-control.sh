@@ -1174,7 +1174,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home quota_identity quota_record
+  local exit_result state note_line secondmate_home quota_identity quota_record quota_current_gen=
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1238,6 +1238,7 @@ do_relaunch() {
     quota_identity=$(fm_session_end_quota_journal_identity "$STATE" "$ID" "$META" 2>/dev/null || true)
     if [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ]; then
       [ "$(agent_state)" = dead ] || die "quota recovery journal no longer names a proven-dead agent for $ID"
+      quota_current_gen=$(fm_meta_get "$META" busy_gen)
     else
       quota_identity=$(fm_session_end_identity "$STATE" "$ID" 2>/dev/null || true)
       quota_record=$(fm_busy_record_read "$STATE" "$ID" 2>/dev/null || true)
@@ -1245,6 +1246,9 @@ do_relaunch() {
         && [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ] \
         && [[ "$quota_record" = "idle "*" quota-exhausted ${FM_CONTROL_QUOTA_SEQ:-}" ]] \
         || die "quota recovery identity no longer names the current event for $ID"
+    fi
+    if fm_session_end_exit_cancelled "$STATE" "$ID" "$FM_CONTROL_QUOTA_GEN" "$quota_current_gen"; then
+      die "quota recovery cancelled by explicit exit for $ID"
     fi
     RELAUNCH_QUOTA_GEN=$FM_CONTROL_QUOTA_GEN
     RELAUNCH_QUOTA_SEQ=$FM_CONTROL_QUOTA_SEQ

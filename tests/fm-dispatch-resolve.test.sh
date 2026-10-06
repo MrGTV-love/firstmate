@@ -1535,6 +1535,34 @@ reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
 assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
+cp "$RULES" "$TMP_ROOT/exhausted-primary-rules.json"
+jq '.rules[3].use = [
+  {harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},
+  {harness:"cursor",model:"cursor-grok-4.6-medium"},
+  {harness:"kimi",model:"kimi-code/k3"}
+] | .default = .rules[3].use' "$BASE_RULES" > "$RULES"
+for summary_choice in rule_4 default; do
+  write_response "$RESPONSE" "$summary_choice" 0.9
+  jq --arg choice "$summary_choice" '.answers.rule.probabilities =
+    {rule_1:0.01,rule_2:0.01,rule_3:0.01,rule_4:0.01,default:0.01} |
+    .answers.rule.probabilities[$choice] = 0.96' "$RESPONSE" > "$TMP_ROOT/summary-response.json"
+  cp "$TMP_ROOT/summary-response.json" "$RESPONSE"
+  reset_log
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+  expect_code 0 "$code" "exhausted pool summary resolves for $summary_choice"
+  assert_contains "$out" '  status: clear' "measured capacity clears $summary_choice with an exhausted pool"
+  assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$summary_choice chooses the measured Cursor candidate"
+  summary_pool=$(printf '%s\n' "$out" | grep '^  candidate: omp:')
+  assert_contains "$summary_pool" '"status":"exhausted"' "$summary_choice retains exhausted pooled evidence"
+  assert_contains "$summary_pool" 'not eligible' "$summary_choice excludes the exhausted pool from eligibility"
+  summary_note=$(printf '%s\n' "$out" | grep '^  note: .*unranked')
+  assert_contains "$summary_note" 'kimi' "$summary_choice summarizes eligible unranked uncertainty"
+  assert_not_contains "$summary_note" 'codex' "$summary_choice does not summarize the ineligible pool as eligible unranked"
+  assert_not_contains "$summary_note" 'cursor' "$summary_choice does not summarize measured capacity as unranked"
+done
+cp "$TMP_ROOT/exhausted-primary-rules.json" "$RULES"
+write_response "$RESPONSE" rule_4 0.9
+pass "rules and defaults summarize only eligible unranked candidates beside exhausted OMP pools"
 for gate in profile rule; do
   jq --arg gate "$gate" '
     if $gate == "profile" then .rules[3].use.floor={scope:"all_models",min_percent:20}

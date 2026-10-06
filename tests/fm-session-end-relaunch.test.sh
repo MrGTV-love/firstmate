@@ -516,6 +516,29 @@ test_stale_exit_in_scrollback_still_relaunches() {
   pass "an old /exit in the pane and an older exit marker do not suppress a later session-end relaunch"
 }
 
+test_current_event_ignores_retired_metadata_exit_generation() {
+  local dir gen variant command
+  for variant in session-end quota-exhausted; do
+    dir=$(make_lane "retired-meta-$variant" omp)
+    gen=$(cat "$dir/state/lane.busy-gen")
+    printf 'busy_gen=%s-previous\n' "$gen" >> "$dir/state/lane.meta"
+    printf 'gen=%s-previous\n' "$gen" > "$dir/state/lane.control-exit"
+    command=zsh
+    if [ "$variant" = quota-exhausted ]; then
+      "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" \
+        --source omp-ext --event quota-exhausted >/dev/null || fail "quota event fixture failed"
+      command=omp
+    fi
+    FM_FAKE_TMUX_CURRENT_COMMAND="$command" scan_lane "$dir" \
+      || fail "$variant scan failed with retired metadata generation"
+    [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$FM_SESSION_END_REPLACEMENT_BOUND" = 1 ] \
+      || fail "retired metadata exit marker suppressed current $variant recovery"
+    [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+      || fail "current $variant was not relaunched exactly once"
+  done
+  pass "current events ignore an exit marker matching only the retired metadata generation"
+}
+
 test_one_relaunch_per_scan() {
   local dir="$TMP_ROOT/two-lanes" first
   add_lane "$dir" lane-a
@@ -827,6 +850,66 @@ test_partial_quota_journal_guards_fail_closed() {
   pass "partial quota journals preserve shared skips and refuse unsafe, unrelated, manual, or superseded transactions"
 }
 
+test_replacement_bound_requires_current_transaction_and_live_endpoint() {
+  local dir state meta journal fakebin variant tx prior_tx meta_tx task wt kind quota_gen quota_seq rollback command read_fail window expected rc
+  dir=$(make_lane replacement-bound omp)
+  state="$dir/state"
+  meta="$state/lane.meta"
+  journal="$state/lane.control-relaunch"
+  fakebin=$(make_tmux "$dir")
+  for variant in confirmed published stale-tx metadata-tx task worktree kind quota-gen quota-seq dead ambiguous invalid-endpoint; do
+    tx=new-tx prior_tx=old-tx meta_tx=new-tx task=lane wt="$dir/wt-lane" kind=ship
+    quota_gen=origin quota_seq=4 rollback=none-new-record-kept command=omp read_fail=0
+    window=firstmate:fm-lane expected=1
+    case "$variant" in
+      confirmed) rollback=none-new-agent-confirmed; command=zsh ;;
+      published) ;;
+      stale-tx) prior_tx=new-tx; expected=0 ;;
+      metadata-tx) meta_tx=other-tx; expected=0 ;;
+      task) task=other; expected=0 ;;
+      worktree) wt="$dir/other-wt"; expected=0 ;;
+      kind) kind=scout; expected=0 ;;
+      quota-gen) quota_gen=other; expected=0 ;;
+      quota-seq) quota_seq=5; expected=0 ;;
+      dead) command=zsh; expected=0 ;;
+      ambiguous) read_fail=1; expected=0 ;;
+      invalid-endpoint) window=firstmate:fm-other; expected=0 ;;
+    esac
+    printf 'window=%s\nkind=ship\nharness=omp\nbackend=tmux\nworktree=%s\nproject=%s\ncontrol_relaunch_tx=%s\n' \
+      "$window" "$dir/wt-lane" "$dir/project" "$meta_tx" > "$meta"
+    printf 'task=%s\nworktree=%s\nkind=%s\nrelaunch_tx=%s\nquota_gen=%s\nquota_seq=%s\nrollback=%s\n' \
+      "$task" "$wt" "$kind" "$tx" "$quota_gen" "$quota_seq" "$rollback" > "$journal"
+    rc=0
+    PATH="$fakebin:$PATH" FM_FAKE_TMUX_CURRENT_COMMAND="$command" FM_FAKE_TMUX_READ_FAIL="$read_fail" \
+      fm_session_end_replacement_bound "$state" lane "$prior_tx" "$dir/wt-lane" ship origin 4 || rc=$?
+    if [ "$expected" = 1 ]; then
+      [ "$rc" = 0 ] || fail "$variant replacement was not bound"
+    else
+      [ "$rc" != 0 ] || fail "$variant incorrectly bound a replacement to this call"
+    fi
+  done
+  pass "replacement binding rejects stale, unrelated, dead, ambiguous, and invalid published records"
+}
+
+test_successful_replacement_stops_on_report_write_failure() {
+  local dir="$TMP_ROOT/success-report-failure"
+  add_lane "$dir" lane-a
+  add_lane "$dir" lane-b
+  (
+    fm_session_end_queue_wake() { return 1; }
+    local rc=0
+    scan_lane "$dir" || rc=$?
+    [ "$rc" != 0 ] || fail "a required wake write failure was hidden"
+    [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$FM_SESSION_END_REPLACEMENT_BOUND" = 1 ] \
+      || fail "a reporting failure erased the successful replacement"
+    [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+      || fail "a reporting failure allowed a second replacement"
+    [ ! -e "$dir/state/.session-end-relaunch-lane-b" ] \
+      || fail "a reporting failure attempted the second lane"
+  ) || fail "successful replacement reporting failure guard failed"
+  pass "a successful replacement remains scan-bounding when its wake cannot be persisted"
+}
+
 test_session_end_relaunches_a_dead_lane_once
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
@@ -841,7 +924,10 @@ test_partial_quota_retries_are_uncapped_and_deduplicated
 test_partial_quota_journal_guards_fail_closed
 test_deliberate_exit_and_waits_are_skipped
 test_stale_exit_in_scrollback_still_relaunches
+test_current_event_ignores_retired_metadata_exit_generation
 test_one_relaunch_per_scan
+test_replacement_bound_requires_current_transaction_and_live_endpoint
+test_successful_replacement_stops_on_report_write_failure
 test_unreadable_hold_answer_is_skipped
 test_backlog_hold_is_skipped
 test_claude_debug_is_off_unless_asked

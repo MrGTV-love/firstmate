@@ -652,7 +652,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   else
     ($sel.use | map(evaluate(.))) as $cands |
     ([$cands[] | select(.eligible and ((.unranked // false) | not))]) as $elig |
-    ([$cands[] | select(.unranked)]) as $unranked |
+    ([$cands[] | select(.eligible and .unranked)]) as $unranked |
     if ([$cands[] | select(.eligible)] | length) == 1 and
        any($cands[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
     then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($cands[] | select(.eligible))}
