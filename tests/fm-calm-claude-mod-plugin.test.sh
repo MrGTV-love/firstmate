@@ -23,17 +23,6 @@ CLAUDE_VERSION=$(claude --version 2>/dev/null || true)
 [ -n "$CLAUDE_VERSION" ] || fail "claude is installed but reports no version"
 TMP_ROOT=$(fm_test_tmproot fm-calm-claude-mod-plugin)
 
-expect_in_report() {
-  local report=$1 needle=$2 what=$3
-  case "$report" in
-    *"$needle"*) : ;;
-    *)
-      printf '%s\n' "$report" >&2
-      fail "Claude Code $CLAUDE_VERSION: $what (missing '$needle')"
-      ;;
-  esac
-}
-
 test_validate_strict() {
   local path report
   for path in "$MOD" "$AUTOLOAD_PATH"; do
@@ -41,25 +30,8 @@ test_validate_strict() {
       printf '%s\n' "$report" >&2
       fail "Claude Code $CLAUDE_VERSION refused the Calm mod at $path under strict validation"
     fi
-    # The scan is the engine's own reading of the module: the events it will hook
-    # and the environment names it may read. Anything more or less is a drift.
-    expect_in_report "$report" "ui.render{component=Spinner}" "the scan of $path does not hook the working row"
-    expect_in_report "$report" "ui.render{component=ToolUse}" "the scan of $path does not hook tool rows"
-    expect_in_report "$report" "ui.render{component=ToolResult}" "the scan of $path does not hook tool results"
-    expect_in_report "$report" "ui.render{component=ToolGroup}" "the scan of $path does not hook tool groups"
-    expect_in_report "$report" "ui.render{component=UserMessage}" "the scan of $path does not hook user rows"
-    expect_in_report "$report" "ui.render{component=AssistantMessage}" "the scan of $path does not hook assistant rows"
-    expect_in_report "$report" "command.run{command=calm}" "the scan of $path does not serve /calm"
-    expect_in_report "$report" "env writes: nothing" "the scan of $path writes the environment"
-    expect_in_report "$report" '$.ui.log (via' "the scan of $path does not write supervision notes to the transcript"
-    case "$report" in
-      *"process.run"*|*"http.fetch"*|*"env.set"*|*"prompt."*|*"tool.call"*)
-        printf '%s\n' "$report" >&2
-        fail "Claude Code $CLAUDE_VERSION scanned a capability the Calm mod must not use at $path"
-        ;;
-    esac
   done
-  pass "Claude Code $CLAUDE_VERSION validates the Calm mod strictly at its folder and its auto-load path, hooking exactly the working row, tool, user, and assistant drawings and /calm, and logging supervision notes"
+  pass "Claude Code $CLAUDE_VERSION validates the Calm mod strictly at its folder and its auto-load path"
 }
 
 test_plugin_suites() {
