@@ -1,14 +1,7 @@
 // Experimental bake-off controller; omp-jev-entry.mjs owns explicit loading.
-// Opt in with FM_JEV_OMP_PIPELINE=1 after installing the dependency-complete adviser.
-// Reuses the dependency-complete adviser's judge, snapshot/redaction, profile,
-// key resolution and read-only ConfigStore, without invoking its factory.
-// Requires mode=auto and autoAcknowledged=true in the existing adviser config.
-// FM_JEV_PIPELINE_AGENT_DIR optionally selects an isolated existing adviser
-// config directory; otherwise omp's public getAgentDir() selects it.
-// FM_JEV_PIPELINE_METRICS optionally appends secret-free numeric JSONL evidence.
-// TYPESAFE_BASE follows compact-adviser's https/loopback-only endpoint policy.
-// Native retention and summaries remain untouched. Manual/overflow/incomplete
-// compactions never wait for Jev. No plugin factory or private host state is used.
+// Reuse adviser helpers without invoking its factory or accessing private host state.
+// See docs/configuration.md for opt-in configuration, endpoint safety, metrics
+// and the timing-only bake-off contract.
 import { appendFileSync } from "node:fs";
 
 const HEALTH_MS = 60000;
