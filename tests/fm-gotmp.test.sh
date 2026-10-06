@@ -72,6 +72,12 @@ SH
   # ownership are sourced by teardown.
   ln -s "$ROOT/bin/fm-control-lib.sh" "$fake/bin/fm-control-lib.sh"
   ln -s "$ROOT/bin/fm-classify-lib.sh" "$fake/bin/fm-classify-lib.sh"
+  ln -s "$ROOT/bin/fm-status-record-lib.sh" "$fake/bin/fm-status-record-lib.sh"
+  ln -s "$ROOT/bin/fm-status-decision-lib.sh" "$fake/bin/fm-status-decision-lib.sh"
+  ln -s "$ROOT/bin/fm-status-event-lib.sh" "$fake/bin/fm-status-event-lib.sh"
+  ln -s "$ROOT/bin/fm-status-wake-lib.sh" "$fake/bin/fm-status-wake-lib.sh"
+  ln -s "$ROOT/bin/fm-status-io-lib.sh" "$fake/bin/fm-status-io-lib.sh"
+  ln -s "$ROOT/bin/fm-utc-lib.sh" "$fake/bin/fm-utc-lib.sh"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.
   ln -s "$ROOT/bin/fm-timeout-lib.sh" "$fake/bin/fm-timeout-lib.sh"
@@ -177,6 +183,12 @@ SH
   ln -s "$ROOT/bin/fm-lease-lib.sh" "$fake/bin/fm-lease-lib.sh"
   ln -s "$ROOT/bin/fm-control-lib.sh" "$fake/bin/fm-control-lib.sh"
   ln -s "$ROOT/bin/fm-classify-lib.sh" "$fake/bin/fm-classify-lib.sh"
+  ln -s "$ROOT/bin/fm-status-record-lib.sh" "$fake/bin/fm-status-record-lib.sh"
+  ln -s "$ROOT/bin/fm-status-decision-lib.sh" "$fake/bin/fm-status-decision-lib.sh"
+  ln -s "$ROOT/bin/fm-status-event-lib.sh" "$fake/bin/fm-status-event-lib.sh"
+  ln -s "$ROOT/bin/fm-status-wake-lib.sh" "$fake/bin/fm-status-wake-lib.sh"
+  ln -s "$ROOT/bin/fm-status-io-lib.sh" "$fake/bin/fm-status-io-lib.sh"
+  ln -s "$ROOT/bin/fm-utc-lib.sh" "$fake/bin/fm-utc-lib.sh"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.
   ln -s "$ROOT/bin/fm-timeout-lib.sh" "$fake/bin/fm-timeout-lib.sh"

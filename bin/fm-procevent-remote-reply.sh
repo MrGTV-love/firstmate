@@ -411,7 +411,7 @@ normalize_payload() { # <source> <destination>
 }
 
 # Adapter-authored escalations and notes use exact-byte append suppression.
-# Their callers first apply fm-classify-lib.sh's retry contract and stamp only
+# Their callers first apply fm-status-record-lib.sh's retry contract and stamp only
 # the line they append. Mirrored payload lines keep their source time (or its
 # absence) and use their pre-rewrite source identity in stage_mirror_lines
 # instead, because delivery state can change between replays.

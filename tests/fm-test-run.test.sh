@@ -428,6 +428,70 @@ test_changed_dependency_selection_and_unmapped_failure() {
   pass "changed selection covers dependents, fails closed for live unmapped source, and accepts retired unconsumed source"
 }
 
+test_changed_status_owners_select_all_consuming_tests() {
+  local tmp repo listed expected family script owner
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-status-record.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cp -R "$ROOT/bin/." "$repo/bin/"
+  cp -R "$ROOT/tests/." "$repo/tests/"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm status-owner-fixture
+
+  for owner in \
+    fm-status-record-lib.sh \
+    fm-status-decision-lib.sh \
+    fm-status-event-lib.sh \
+    fm-status-wake-lib.sh \
+    fm-status-io-lib.sh \
+    fm-utc-lib.sh; do
+    printf '\n' >>"$repo/bin/$owner"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$owner owner-only change failed selection"
+    expected=$(
+      {
+        for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings; do
+          "$repo/bin/fm-test-run.sh" --list --family "$family"
+        done
+        printf '%s\n' \
+          tests/fm-afk-pi-herdr-return-e2e.test.sh \
+          tests/fm-backend-orca.test.sh \
+          tests/fm-backend-zellij.test.sh \
+          tests/fm-stat-shadowing.test.sh
+        if [ "$owner" = fm-utc-lib.sh ]; then
+          printf '%s\n' tests/fm-afk-launch.test.sh
+        fi
+      } | LC_ALL=C sort -u
+    )
+    [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+      || fail "$owner change must select exactly its nine consuming families and owner-specific scripts: $listed"
+    for script in \
+      fm-classify-corr-token.test.sh \
+      fm-pending-reply.test.sh \
+      fm-remote-transport-lanes.test.sh \
+      fm-afk-return.test.sh \
+      fm-gotmp.test.sh \
+      fm-pi-branch-extension.test.sh \
+      fm-send-resolve-key.test.sh \
+      fm-pr-merge.test.sh \
+      fm-pr-check-security.test.sh \
+      fm-fleet-snapshot-view.test.sh \
+      fm-afk-pi-herdr-return-e2e.test.sh \
+      fm-backend-orca.test.sh \
+      fm-backend-zellij.test.sh \
+      fm-stat-shadowing.test.sh; do
+      assert_contains "$listed" "tests/$script" "$owner change missed $script"
+    done
+    if [ "$owner" = fm-utc-lib.sh ]; then
+      assert_contains "$listed" "tests/fm-afk-launch.test.sh" "$owner change missed away-contract launch coverage"
+    fi
+    git -C "$repo" add "bin/$owner"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
+  done
+  rm -rf "$tmp"
+  pass "all six status and UTC owner-only changes select consuming families and exact additional consumers"
+}
+
 # A direct test reference is per-script evidence. Widening it to the referencing
 # test's whole family is what turned a one-line change to a shared helper into
 # every real-Herdr E2E, including scripts with no dependency on it at all.
@@ -1785,6 +1849,7 @@ test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
+test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs

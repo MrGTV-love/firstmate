@@ -468,6 +468,7 @@ test_fm_lint_default_path_catches_broken_ci_yml() {
   mkdir -p "$tmp/bin" "$tmp/.github/workflows"
   cp "$LINT" "$tmp/bin/fm-lint.sh"
   cp "$LINT_WF" "$tmp/bin/fm-lint-workflows.sh"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/bin/"
   chmod +x "$tmp/bin/fm-lint.sh" "$tmp/bin/fm-lint-workflows.sh"
   write_col0_heredoc_workflow "$tmp/.github/workflows/ci.yml"
 
@@ -480,7 +481,7 @@ case "$*" in
   "rev-parse --abbrev-ref HEAD") printf 'feature\n'; exit 0 ;;
   "rev-parse --verify -q origin/main") exit 0 ;;
   "merge-base "*) printf 'fakebase123\n'; exit 0 ;;
-  "diff --name-only --diff-filter=ACMR -z fakebase123 --")
+  "diff --name-only --no-renames -z fakebase123 --")
     [ -n "${FM_TEST_GIT_DIFF_FILE:-}" ] && cat "${FM_TEST_GIT_DIFF_FILE}"
     exit 0
     ;;

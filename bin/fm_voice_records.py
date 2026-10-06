@@ -124,7 +124,7 @@ DATE_TAG = re.compile(r"\((?:since|done) [0-9-]+\)")
 READ_SECTIONS = ("in flight", "queued")
 
 # The states a worker is asked to report, and the two more that close a decision.
-# bin/fm-brief.sh states the first six to every crewmate and bin/fm-classify-lib.sh
+# bin/fm-brief.sh states the first six to every crewmate and bin/fm-status-decision-lib.sh
 # owns resolved and captain-held; this module only recognises them.
 #
 # A CLOSED set, not a shape. A status line is free text appended by a crewmate,

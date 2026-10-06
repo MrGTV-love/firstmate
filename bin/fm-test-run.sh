@@ -1426,6 +1426,25 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' pure-contract-unit
       ;;
+    bin/fm-status-record-lib.sh|bin/fm-status-decision-lib.sh|\
+    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-utc-lib.sh)
+      printf '%s\n' pure-contract-unit
+      printf '%s\n' standalone
+      printf '%s\n' secondmate
+      printf '%s\n' session-bootstrap
+      printf '%s\n' afk
+      printf '%s\n' watcher-wake-lock
+      printf '%s\n' backend-dispatch
+      printf '%s\n' pr-forge
+      printf '%s\n' snapshot-bearings
+      printf '%s\n' "__script__:fm-afk-pi-herdr-return-e2e.test.sh"
+      printf '%s\n' "__script__:fm-backend-orca.test.sh"
+      printf '%s\n' "__script__:fm-backend-zellij.test.sh"
+      printf '%s\n' "__script__:fm-stat-shadowing.test.sh"
+      if [ "$path" = bin/fm-utc-lib.sh ]; then
+        printf '%s\n' "__script__:fm-afk-launch.test.sh"
+      fi
+      ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
       printf '%s\n' watcher-wake-lock

@@ -33,10 +33,18 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-marker-lib.sh
-. "$ROOT/bin/fm-marker-lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
-. "$ROOT/bin/fm-pending-reply-lib.sh"
+_fm_pending_test_source_marker() {
+  # shellcheck source=bin/fm-marker-lib.sh
+  . "$ROOT/bin/fm-marker-lib.sh"
+}
+
+_fm_pending_test_source_library() {
+  # shellcheck source=bin/fm-pending-reply-lib.sh
+  . "$ROOT/bin/fm-pending-reply-lib.sh"
+}
+
+_fm_pending_test_source_marker "$@"
+_fm_pending_test_source_library "$@"
 
 SEND="$ROOT/bin/fm-send.sh"
 REPORT="$ROOT/bin/fm-secondmate-report.sh"
@@ -154,7 +162,7 @@ test_normal_correlated_reply_resolves_once() {
 }
 
 test_completed_turn_no_report_triggers_one_recovery() {
-  local home state corr hook_log rec
+  local home state corr hook_log rec recovery_count
   home=$(setup_parent one-recovery)
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-hook.log"
@@ -184,8 +192,8 @@ test_completed_turn_no_report_triggers_one_recovery() {
   if fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
     fail "second recovery must refuse"
   fi
-  lines=$(wc -l < "$hook_log" | tr -d ' ')
-  [ "$lines" = 1 ] || fail "expected exactly one recovery send, got $lines"
+  recovery_count=$(wc -l < "$hook_log" | tr -d ' ')
+  [ "$recovery_count" = 1 ] || fail "expected exactly one recovery send, got $recovery_count"
   rec=$(fm_pending_reply_path "$state" "$corr")
   case "$(cat "$hook_log")" in
     *"corr=$corr"*) : ;;
@@ -622,7 +630,7 @@ test_delivery_confirmation_fallback_reconciles() {
     [ -f "$marker" ] || fail "delivery confirmation fallback marker should persist"
     [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
       || fail "failed primary commit should leave delivered_epoch empty"
-    . "$ROOT/bin/fm-pending-reply-lib.sh"
+    _fm_pending_test_source_library
     fm_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "watcher should reconcile the delivery marker"
     [ "$(fm_pending_reply_get "$rec" delivered_epoch)" = 5750 ] \
@@ -784,15 +792,17 @@ test_restart_preserves_expectation_and_parent_destination() {
   rec=$(fm_pending_reply_path "$state" "$corr")
   parent_status=$(fm_pending_reply_get "$rec" parent_status)
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
-  # Simulate process restart: re-source library and re-read the same record.
-  # shellcheck source=bin/fm-pending-reply-lib.sh
-  . "$ROOT/bin/fm-pending-reply-lib.sh"
-  [ -f "$rec" ] || fail "record must survive restart"
-  [ "$(fm_pending_reply_get "$rec" parent_status)" = "$parent_status" ] \
-    || fail "parent_status must be stable across restart"
-  [ "$(fm_pending_reply_get "$rec" parent_home)" = "$parent_home" ] \
-    || fail "parent_home must be stable across restart"
-  [ "$(phase_of "$state" "$corr")" = awaiting_report ] || fail "phase preserved"
+  # A real fresh process must recover these fields without inherited functions.
+  bash -c '
+    . "$1/bin/fm-pending-reply-lib.sh"
+    [ -f "$2" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_status)" = "$3" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_home)" = "$4" ] &&
+      [ "$(fm_pending_reply_get "$2" phase)" = awaiting_report ]
+  ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
+    || fail "fresh process must retain expectation and exact parent destination"
+  # Preserve the marker reinitialization performed by the old in-process reload.
+  _fm_pending_test_source_marker
   # Compaction-safe: destination is absolute path fields, not chat memory.
   case "$parent_status" in
     /*.status) : ;;
