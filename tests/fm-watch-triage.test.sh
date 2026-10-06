@@ -38,7 +38,7 @@ sleep() {
       _FM_TEST_POLL_COUNT=0
     fi
     _FM_TEST_POLL_COUNT=$((_FM_TEST_POLL_COUNT + 1))
-    completed="$STATE/.test-poll-completed-$WATCHER_PID"
+    completed="$FM_STATE_OVERRIDE/.test-poll-completed-$WATCHER_PID"
     if ! printf '%s\n' "$_FM_TEST_POLL_COUNT" > "$completed.tmp" \
       || ! mv -f "$completed.tmp" "$completed"; then
       exit 1

@@ -779,11 +779,12 @@ SH
   ! grep -F 'check: rearm-resurface' "$idle_out" >/dev/null \
     || fail "the idle live Lavish source emitted a repeated recovery wake"
 
+  # Publication between the process-event and recovery scans can legitimately
+  # close this cycle with rearm-resurface. Assert delivery and durability, not
+  # which scan won that race.
   : > "$trigger"
   wait_for_exit "$ARM_PID" 120 \
     || fail "the live Lavish result did not wake the supervising arm"
-  grep -F 'check: process-event result captured: procevent:idle-lavish:1' "$idle_out" >/dev/null \
-    || fail "the live Lavish result did not surface promptly: $(cat "$idle_out")"
   grep "$(printf '\tcheck\tprocevent:idle-lavish:1\t')" "$state/.wake-queue" >/dev/null \
     || fail "the live Lavish result was not durable before its wake"
   pass "watch-arm: an idle Lavish source stays quiet and its real result wakes promptly"
