@@ -6,7 +6,7 @@
 // Key: existing TYPESAFE_API_KEY, else fmx_env_get in FM_HOME/.env.
 // Endpoint/schema/key transport match fm-dispatch-resolve.sh; no SDK or retries.
 // Commands, paths, contents, response bodies and keys never enter records or state.
-// Records: selection; attempt (before HTTP); result (including unavailable usage).
+// Records: attempt (before HTTP); result (including selection and unavailable usage).
 // Interrupted attempts remain incomplete with unknown spend, never charged as zero.
 // Metrics are descriptive, not promotion authority; fm-jev-guardrail-promote owns it.
 import { spawn } from 'node:child_process';

@@ -1357,7 +1357,8 @@ The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`]
 ## Jev command screening (shadow only)
 
 `bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
-The tracked project registrations cover Firstmate sessions; `fm-spawn.sh` installs the same caller for new Claude and omp fleet workers in other projects.
+The tracked project registrations screen native `Bash`/`Read` on Claude and `bash`/`read` on omp in primary and secondmate sessions; tracked callers skip `FM_TASK_ID` task contexts, and the Claude registration also skips Grok compatibility hooks.
+`fm-spawn.sh` installs the generated task caller for new Claude and omp fleet workers, including Firstmate task worktrees, so the tracked copy does not screen a task twice.
 Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
 Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
 The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
