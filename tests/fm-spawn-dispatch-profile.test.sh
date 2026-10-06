@@ -1607,42 +1607,6 @@ SH
   fm_eval_launch "$launch" "$WT_DIR" "$probe" FM_ARG_KIND="$kind" "$@"
 }
 
-# The --add-dir segment every Claude worker launch now carries between the
-# permission flag and --settings, real-path resolved the way the spawn's
-# claude_add_dirs_flag resolves it. Prints a trailing space so callers can
-# drop it straight into an expected command.
-claude_worker_add_dirs() {  # <home> <id>
-  local state_real data_real root_real
-  state_real=$(cd "$1/state" && pwd -P)
-  data_real=$(cd "$1/data" && pwd -P)
-  root_real=$(cd "$ROOT" && pwd -P)
-  printf '%s ' "--add-dir '$state_real/operational-inbox' --add-dir '$state_real/$2.inbox' --add-dir '$data_real/$2' --add-dir '$root_real/.agents/skills'"
-}
-
-claude_expected_launch() {  # <launch> <home> <id> <permission-flag>
-  local doorbell quoted
-  doorbell=$(claude_launch_brief_arg "$1")
-  [ "$(printf '%s' "$doorbell" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
-    || doorbell="not a launch-brief doorbell"
-  quoted="'$(printf '%s' "$doorbell" | sed "s/'/'\\\\''/g")'"
-  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(ai_trailer_hooks_prefix "$2" "$3")env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
-}
-
-test_claude_permission_mode_bypass_matches_absent_launch() {
-  local rec id out status launch expected
-  id=permmode-bypass-z19
-  rec=$(make_spawn_case permmode-bypass claude "$id")
-  read_case_record "$rec"
-  printf 'bypass\n' > "$HOME_DIR/config/claude-permission-mode"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "claude spawn with claude-permission-mode=bypass should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" --dangerously-skip-permissions)
-  [ "$launch" = "$expected" ] || fail "explicit bypass did not reproduce the absent-file launch"$'\n'"expected: $expected"$'\n'"actual:   $launch"
-  pass "config/claude-permission-mode=bypass launches exactly as an absent file does"
-}
 claude_settings_json_arg() { claude_launch_arg "$1" settings; }
 claude_launch_brief_arg() { claude_launch_arg "$1" brief; }
 

@@ -5144,6 +5144,9 @@ claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo 
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
+if [ "$HARNESS" = claude ] && { [ "$ALLOW_API_KEY" -eq 0 ] || [ -n "$WORKER_ACCOUNT" ]; }; then
+  LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
+fi
 # Crewmate panes are created by a long-lived tmux/herdr daemon that does not
 # inherit firstmate's current environment, so a bare `claude` in the pane falls
 # back to the default ~/.claude store even when firstmate itself runs under a
