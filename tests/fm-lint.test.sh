@@ -1636,6 +1636,168 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SH
 }
 
+fm_lint_production_repo() {
+  local dir=$1 source
+  fm_lint_small_repo "$dir"
+  for source in "$ROOT"/bin/*.sh; do
+    [ "${source##*/}" = fm-lint-workflows.sh ] || cp "$source" "$dir/bin/"
+  done
+  cp "$ROOT"/bin/backends/*.sh "$dir/bin/backends/"
+}
+
+test_command_words_exclude_inert_source_text() {
+  local tmp repo fakebin diff_file listed out attempt
+  tmp=$(fm_test_tmproot fm-lint-inert-words)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  cat > "$repo/bin/inert.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'source bin/library.sh' ". bin/library.sh"
+"if" source bin/library.sh
+"X=literal" source bin/library.sh
+jq '. > 1 | . source' /dev/null
+awk '{ source = "."; print source }' /dev/null
+local_example() {
+  local source
+  source=literal
+  printf '%s\n' "$source"
+}
+[[ source == source ]]
+(( source > 1 ))
+case "${1:-}" in ''|.|..) : ;; esac
+cat <<'DATA'
+source bin/library.sh
+. "$unresolved"
+# shellcheck source=bin/library.sh
+DATA
+# source bin/library.sh
+SH
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "inert-text selection failed"
+  assert_not_contains "$listed" bin/inert.sh "inert source text selected a non-consumer"
+  for attempt in 1 2; do
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/inert.sh 2>&1) || fail "inert-word lint failed: $out"
+  done
+  assert_contains "$out" 'cache hit bin/inert.sh' "inert source text disabled successful-result reuse"
+  pass "inert quoted programs, prose, comments, conditionals, and heredocs are not imports"
+}
+
+test_child_shell_imports_select_and_invalidate_callers() {
+  local tmp repo fakebin diff_file listed root out attempt state
+  tmp=$(fm_test_tmproot fm-lint-child-imports)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  cat > "$repo/bin/child.sh" <<'SH'
+#!/usr/bin/env bash
+ROOT=$(pwd)
+bash -c '
+  . "$1/bin/library.sh"
+' _ "$ROOT"
+sh -c '. "$1"' _ "$ROOT/bin/library.sh"
+SH
+  cat > "$repo/bin/child-caller.sh" <<'SH'
+#!/usr/bin/env bash
+. bin/child.sh
+SH
+  cat > "$repo/bin/substitution.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$(source bin/library.sh; printf ok)" "`source bin/library.sh; printf ok`"
+SH
+  cat > "$repo/bin/nested.sh" <<'SH'
+#!/usr/bin/env bash
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/library.sh"
+SH
+  cat > "$repo/bin/nested-caller.sh" <<'SH'
+#!/usr/bin/env bash
+. bin/nested.sh
+SH
+  diff_file="$tmp/diff.nul"
+  for state in unchanged changed deleted; do
+    if [ "$state" = changed ]; then printf '\n' >> "$repo/bin/library.sh"; fi
+    if [ "$state" = deleted ]; then rm "$repo/bin/library.sh"; fi
+    fm_lint_write_diff_file "$diff_file" bin/library.sh
+    listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+      "$repo/bin/fm-lint.sh" --list-files) || fail "$state child import selection failed"
+    for root in bin/child.sh bin/child-caller.sh bin/substitution.sh bin/nested.sh bin/nested-caller.sh; do
+      assert_contains "$listed" "$root" "$state import did not select $root"
+      for attempt in 1 2; do
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+          "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
+        if [ "$attempt" -eq 1 ]; then
+          assert_not_contains "$out" "cache hit $root" "$state child import reused stale analysis"
+        else
+          assert_contains "$out" "cache hit $root" "resolved $state child import was not reusable"
+        fi
+      done
+    done
+  done
+  fm_lint_write_diff_file "$diff_file" unrelated-input
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "unrelated child selection failed"
+  assert_not_contains "$listed" bin/child.sh "unrelated input selected a resolved child import"
+  cat > "$repo/bin/unresolved-child.sh" <<'SH'
+#!/usr/bin/env bash
+bash -c '
+  . "$1"
+' _ "$runtime_target"
+SH
+  for attempt in 1 2; do
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/unresolved-child.sh 2>&1) || fail "unresolved child lint failed: $out"
+    assert_not_contains "$out" 'cache hit bin/unresolved-child.sh' "unresolved child import authorized reuse"
+  done
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "unresolved child selection failed"
+  assert_contains "$listed" bin/unresolved-child.sh "unresolved child import lost conservative selection"
+  pass "child-shell positional imports and executable substitutions govern selection and cache inputs"
+}
+
+test_production_nested_sources_and_pending_reply_cache() {
+  local tmp repo fakebin root attempt out
+  tmp=$(fm_test_tmproot fm-lint-production-closure)
+  repo="$tmp/repo"
+  fm_lint_production_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  for root in bin/fm-backlog-transition-lib.sh bin/fm-config-inherit-lib.sh \
+    bin/fm-ff-lib.sh bin/fm-arm-pretool-check.sh bin/fm-cd-pretool-check.sh \
+    bin/fm-vendor-auth-probe.sh bin/fm-worker-account-lib.sh; do
+    for attempt in 1 2; do
+      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/nested-cache" \
+        "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root lint failed: $out"
+    done
+    assert_contains "$out" "cache hit $root" "balanced production source words disabled reuse for $root"
+  done
+  if ! pinned_ready; then
+    pass "SKIP (ShellCheck $REQUIRED not resolved): real pending-reply closure cache regression"
+    return
+  fi
+  for attempt in 1 2; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/real-cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
+      || fail "production pending-reply check $attempt failed: $out"
+  done
+  assert_contains "$out" 'cache hit bin/fm-pending-reply-lib.sh' \
+    "unchanged successful production pending-reply closure was not reusable"
+  printf '\n' >> "$repo/bin/fm-composer-lib.sh"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/real-cache" \
+    "$repo/bin/fm-lint.sh" --jobs 1 bin/fm-pending-reply-lib.sh 2>&1) \
+    || fail "changed production source check failed: $out"
+  assert_not_contains "$out" 'cache hit bin/fm-pending-reply-lib.sh' \
+    "a real adapter source mutation reused stale pending-reply analysis"
+  pass "production nested source words reuse results and the real pending-reply closure invalidates on adapter sources"
+}
+
 test_changed_dependencies_and_deleted_sources_retain_findings() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): dependency finding regression"; return; }
   local tmp repo fakebin diff_file listed out rc
@@ -1714,10 +1876,15 @@ test_runtime_backend_changes_select_every_dispatcher_consumer() {
     done < "$selection"
     assert_contains "$listed" $'\n'"bin/backends/$backend.sh"$'\n' \
       "$backend change did not select its adapter root"
-    for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh; do
+    for caller in bin/fm-backend.sh bin/fm-spawn.sh bin/fm-send.sh bin/fm-watch.sh \
+      tests/fm-pending-reply.test.sh; do
       assert_contains "$listed" $'\n'"$caller"$'\n' \
         "$backend change did not select dispatcher consumer $caller"
     done
+    if [ "$backend" = herdr ]; then
+      assert_contains "$listed" $'\n''tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh'$'\n' \
+        "Herdr change omitted its real multiline child-shell consumer"
+    fi
   done
   fm_lint_write_diff_file "$diff_file" unrelated-input
   perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$selection" \
@@ -1730,20 +1897,11 @@ test_runtime_backend_inputs_invalidate_dispatcher_cache() {
   local tmp repo fakebin log backend root attempt state out
   tmp=$(fm_test_tmproot fm-lint-runtime-cache)
   repo="$tmp/repo"
-  fm_lint_small_repo "$repo"
-  cp "$ROOT/bin/fm-backend.sh" "$repo/bin/fm-backend.sh"
+  fm_lint_production_repo "$repo"
   cat >> "$repo/bin/consumer.sh" <<'SH'
 # shellcheck source=bin/fm-backend.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-backend.sh"
 SH
-  cat > "$tmp/adapter.sh" <<'SH'
-#!/usr/bin/env bash
-# shellcheck source=bin/library.sh
-. "$(dirname "${BASH_SOURCE[0]}")/../library.sh"
-SH
-  for backend in tmux herdr zellij orca cmux; do
-    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
-  done
   fakebin=$(fm_fakebin "$tmp")
   log="$tmp/shellcheck.log"
   fm_lint_stub_shellcheck "$fakebin" "$log"
@@ -1774,7 +1932,7 @@ SH
       [ "$(cat "$log")" = $'bin/fm-backend.sh\nbin/caller.sh' ] \
         || fail "$state $backend did not recheck dispatcher and transitive caller: $(cat "$log")"
     done
-    cp "$tmp/adapter.sh" "$repo/bin/backends/$backend.sh"
+    cp "$ROOT/bin/backends/$backend.sh" "$repo/bin/backends/$backend.sh"
   done
   pass "changes and deletions of every runtime backend invalidate dispatcher and caller caches"
 }
@@ -2238,6 +2396,9 @@ SH
   pass "unproved transitive runtime closures never reuse successful analysis"
 }
 
+test_command_words_exclude_inert_source_text
+test_child_shell_imports_select_and_invalidate_callers
+test_production_nested_sources_and_pending_reply_cache
 test_unresolved_runtime_sources_select_possible_callers
 test_unresolved_runtime_sources_refuse_cached_success
 test_source_spellings_keep_changed_and_cached_dataflow_findings

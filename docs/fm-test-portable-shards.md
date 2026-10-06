@@ -112,9 +112,9 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, reduced checks, or paid runner provisioning is part of this layout.
 
-Local branch selection includes changed shell files and their known transitive sourcing callers, including runtime-dispatched backend adapters; unchanged imported libraries are analyzed only through those callers.
+Local branch selection includes changed shell files and their known transitive sourcing callers, including runtime-dispatched backend adapters and imports in executable child-shell programs; unchanged imported libraries are analyzed only through those callers.
 For changed or deleted shell/source inputs, unresolved runtime imports conservatively select possible callers through known transitive closures, independently of ShellCheck source overrides.
-This safety fallback can select extra roots; it does not resolve arbitrary computed Bash imports precisely.
+Dependency discovery excludes inert quoted program text, comments, and heredoc data; its conservative fallback does not resolve arbitrary computed Bash imports precisely and can select extra roots.
 Successful analyses with proved closures are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
 Unproved runtime source closures are never reused from the successful-result cache.
 CI never reuses that cache.
@@ -127,7 +127,7 @@ Repeated imports retain their runtime initialization at each call while sharing 
 Parent-channel publication imports the small status-record owner instead of the complete classifier; the classifier consumes the same record owner for its own readers.
 The classifier composes canonical UTC, decision, event, status-I/O, and wake-presentation libraries.
 Pending-reply imports decision and status-I/O leaves, wake loads its presentation closure on demand, and the AFK contract imports only UTC; watcher and AFK-return consumers explicitly load the broader APIs they use.
-Changes to these status libraries select nine consuming test families, including backend-dispatch, pr-forge, and snapshot-bearings; `tests/fm-test-run.test.sh` verifies changed-owner selection through the runner.
+Changes to these status libraries retain nine consuming test families and select the relevant AFK-launch, AFK Pi/Herdr return, Orca, Zellij, and stat-shadowing scripts without widening their gated families; `tests/fm-test-run.test.sh` verifies each changed owner's selection through the runner.
 
 A same-host Darwin cold comparison on 2026-10-04 (UTC), using ShellCheck 0.11.0 with `/usr/bin/time -l "$SHELLCHECK" --norc --external-sources -- <root>`, recorded the following direct analyzer high-water RSS in bytes, wall seconds, and starting 1-minute load.
 The before source was the pre-partition implementation; the after source was the ownership-corrected working copy, not a committed-head or CI validation.

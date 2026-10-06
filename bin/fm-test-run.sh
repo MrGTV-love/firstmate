@@ -1432,6 +1432,13 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' pr-forge
       printf '%s\n' snapshot-bearings
+      printf '%s\n' "__script__:fm-afk-pi-herdr-return-e2e.test.sh"
+      printf '%s\n' "__script__:fm-backend-orca.test.sh"
+      printf '%s\n' "__script__:fm-backend-zellij.test.sh"
+      printf '%s\n' "__script__:fm-stat-shadowing.test.sh"
+      if [ "$path" = bin/fm-utc-lib.sh ]; then
+        printf '%s\n' "__script__:fm-afk-launch.test.sh"
+      fi
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)

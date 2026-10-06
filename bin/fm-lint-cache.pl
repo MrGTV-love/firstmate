@@ -11,6 +11,7 @@ use warnings;
 use Digest::SHA qw(sha256_hex);
 use Fcntl qw(:flock);
 use File::Path qw(make_path);
+use File::Basename qw(dirname basename);
 
 my ($mode, $root, @args) = @ARGV;
 my $cache;
@@ -21,11 +22,8 @@ if (defined $mode && $mode eq 'check') {
 die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
+my @source_candidates = @inventory;
 my (%text, %edges, %unknown);
-# ShellCheck recognizes escaped keywords and backslash-newline continuations.
-my $source_command = qr/(?:\\\n)*(?:\\?s(?:\\\n)*\\?o(?:\\\n)*\\?u(?:\\\n)*\\?r(?:\\\n)*\\?c(?:\\\n)*\\?e|\\?\.)(?:\\\n)*/;
-my $prefix_word = qr/(?:"(?:\\.|[^"\\])*"|'[^']*'|\$\([^)]*\)|\\(?:.|\n)|[^\s;()<>"'\\])+/;
-my $command_prefix = qr/(?:(?:if|then|elif|else|while|until|do|!|time(?:\s+-p)?|[A-Za-z_]\w*=$prefix_word|\d*(?:>>?|<<?|<&|>&|&>)\s*$prefix_word)\s+)*/;
 sub contents {
     my ($path) = @_;
     return $text{$path} if exists $text{$path};
@@ -36,9 +34,241 @@ sub contents {
 sub identity_path {
     my ($path) = @_;
     my $absolute = abs_path($path);
+    if (!defined $absolute) {
+        my $parent = abs_path(dirname($path));
+        $absolute = "$parent/" . basename($path) if defined $parent;
+    }
     return $path unless defined $absolute;
     $absolute =~ s{^\Q$root\E/}{};
     return $absolute;
+}
+sub balanced_text {
+    my ($body, $position, $open, $close, $subs) = @_;
+    my $start = $$position;
+    my $depth = 1;
+    while ($$position < length $body) {
+        my $char = substr($body, $$position, 1);
+        if ($char eq $open) { $depth++; $$position++; next; }
+        if ($char eq $close) {
+            $$position++;
+            return substr($body, $start, $$position - $start - 1) if --$depth == 0;
+            next;
+        }
+        if ($char =~ /[\s;&|<>]/) { $$position++; next; }
+        if ($char eq '#' && $open eq '(') {
+            my $end = index($body, "\n", $$position);
+            $$position = $end < 0 ? length($body) : $end;
+            next;
+        }
+        my $before = $$position;
+        my $word = shell_word($body, $position, {}, $close);
+        push @$subs, @{$word->{subs}} if defined $subs;
+        $$position++ if $$position == $before;
+    }
+    return substr($body, $start);
+}
+sub shell_word {
+    my ($body, $position, $parameters, $stop) = @_;
+    my ($value, $quote, @subs) = ('', '');
+    my $raw_start = $$position;
+    while ($$position < length $body) {
+        my $char = substr($body, $$position, 1);
+        last if !$quote && defined $stop && $char eq $stop;
+        last if !$quote && $char =~ /[\s;&|<>()]/ && substr($body, $$position, 2) !~ /^[<>]\(/;
+        if (!$quote && $char eq "'") {
+            my $end = index($body, "'", $$position + 1);
+            $end = length $body if $end < 0;
+            $value .= substr($body, $$position + 1, $end - $$position - 1);
+            $$position = $end < length($body) ? $end + 1 : $end;
+            next;
+        }
+        if ($char eq '"') { $quote = $quote ? '' : '"'; $$position++; next; }
+        if ($char eq '\\') {
+            my $next = substr($body, $$position + 1, 1);
+            $value .= '\\' if $quote && $next !~ /[\$`"\\\n]/;
+            $value .= $next unless $next eq "\n";
+            $$position += 2;
+            next;
+        }
+        if (substr($body, $$position, 2) eq '$(' || (!$quote && substr($body, $$position, 2) =~ /^[<>]\(/)) {
+            $$position += 2;
+            my $program = balanced_text($body, $position, '(', ')');
+            push @subs, $program unless $program =~ /^\(/;
+            $value .= "\x01";
+            next;
+        }
+        if ($char eq '`') {
+            $$position++;
+            my $program = '';
+            while ($$position < length $body) {
+                my $part = substr($body, $$position++, 1);
+                last if $part eq '`';
+                if ($part eq '\\' && substr($body, $$position, 1) =~ /[\$`\\]/) {
+                    $part = substr($body, $$position++, 1);
+                }
+                $program .= $part;
+            }
+            push @subs, $program;
+            $value .= "\x01";
+            next;
+        }
+        if ($char eq '$') {
+            pos($body) = $$position;
+            if ($body =~ /\G\$(?:\{([0-9]+)\}|([0-9]))/gc) {
+                my $number = defined $1 ? $1 : $2;
+                $$position = pos($body);
+                $value .= exists $parameters->{$number} ? $parameters->{$number} : "\x01";
+                next;
+            }
+            if ($body =~ /\G\$(?:[A-Za-z_]\w*|[?!#*@-])/gc) {
+                $$position = pos($body);
+                $value .= "\x01";
+                next;
+            }
+            if (substr($body, $$position, 2) eq '${') {
+                $$position += 2;
+                balanced_text($body, $position, '{', '}', \@subs);
+                $value .= "\x01";
+                next;
+            }
+        }
+        $value .= $char;
+        $$position++;
+    }
+    return {value => $value, raw => substr($body, $raw_start, $$position - $raw_start), subs => \@subs};
+}
+sub source_dependency {
+    my ($path, $word, $deps, $finite_backend) = @_;
+    unless (defined $word) { $unknown{$path} = 1; return; }
+    my $source = $word->{value};
+    return if $source eq '/dev/null';
+    if ($source =~ m{^\x01(/[^\x01\$`*?\[\\<>&|'"]+)\z}) {
+        my $suffix = $1;
+        $deps->{".$suffix"} = 1;
+        $deps->{dirname($path) . $suffix} = 1;
+        my ($base) = $source =~ m{([^/]+)$};
+        $deps->{$_} = 1 for grep { m{(?:^|/)\Q$base\E$} } @source_candidates;
+    } elsif ($source ne '' && $source !~ /[\x01\$`*?\[\\<>&|'"]/ && $source !~ /^-/) {
+        $source =~ s{^\./}{};
+        $deps->{$source} = 1;
+    } else {
+        return if $finite_backend && ($word->{raw} eq '"$adapter"' || $word->{raw} eq '$adapter');
+        $unknown{$path} = 1;
+    }
+}
+sub command_dependencies {
+    my ($path, $words, $deps, $finite_backend) = @_;
+    my @words = @$words;
+    while (@words) {
+        my $raw = $words[0]{raw} // $words[0]{value};
+        $raw =~ s/\\\n//g;
+        last unless $raw =~ /^(?:if|then|elif|else|while|until|do|!|time)$/ || $raw =~ /^[A-Za-z_]\w*=/;
+        my $prefix = shift @words;
+        shift @words if $prefix->{value} eq 'time' && @words && $words[0]{value} eq '-p';
+    }
+    return unless @words;
+    my $command = shift @words;
+    if ($command->{value} =~ /^(?:builtin|command)$/ && @words && $words[0]{value} =~ /^(?:source|\.)$/) {
+        $unknown{$path} = 1;
+        shift @words;
+        source_dependency($path, $words[0], $deps, $finite_backend);
+    } elsif ($command->{value} =~ /^(?:source|\.)$/) {
+        source_dependency($path, $words[0], $deps, $finite_backend);
+    } else {
+        while ($command->{value} =~ /^(?:exec|command|env)$/ && @words) {
+            shift @words while @words && ($words[0]{value} =~ /^-/ || $words[0]{value} =~ /^[A-Za-z_]\w*=/);
+            return unless @words;
+            $command = shift @words;
+        }
+        return unless $command->{value} =~ m{(?:^|/)(?:bash|sh)$};
+        while (@words) {
+            my $option = shift @words;
+            if ($option->{value} =~ /^-[A-Za-z]*c[A-Za-z]*$/) {
+                my $payload = shift @words;
+                return unless defined $payload;
+                if ($payload->{value} =~ /\x01/) { $unknown{$path} = 1; return; }
+                my %child_parameters;
+                $child_parameters{$_} = $words[$_]{value} for 0 .. $#words;
+                scan_program($path, $payload->{value}, $deps, $finite_backend, \%child_parameters);
+                return;
+            }
+            shift @words if $option->{value} =~ /^[-+][oO]$/;
+            last if $option->{value} !~ /^[-+]/;
+        }
+    }
+}
+sub scan_program {
+    my ($path, $body, $deps, $finite_backend, $parameters) = @_;
+    my ($position, @words, @heredocs, @cases);
+    $position = 0;
+    while ($position < length $body) {
+        pos($body) = $position;
+        if ($body =~ /\G(?:[ \t\r]+|\\\n)/gc) { $position = pos($body); next; }
+        if ($body =~ /\G(#[^\n]*)/gc) {
+            my $comment = $1;
+            $position = pos($body);
+            if ($comment =~ /^#\s*shellcheck\s+.*?\bsource=(?:"([^"]+)"|'([^']+)'|([^\s]+))/) {
+                my $source = defined $1 ? $1 : defined $2 ? $2 : $3;
+                $deps->{$source} = 1 unless $source eq '/dev/null';
+            }
+            $unknown{$path} = 1 if $comment =~ /^#\s*shellcheck\s+.*\bsource-path=/;
+            next;
+        }
+        if (substr($body, $position, 2) eq '[[' || substr($body, $position, 2) eq '((') {
+            my $close = substr($body, $position, 2) eq '[[' ? ']]' : '))';
+            $position += 2;
+            while ($position < length($body) && substr($body, $position, 2) ne $close) {
+                if (substr($body, $position, 1) =~ /[\s;&|<>()]/) { $position++; next; }
+                my $word = shell_word($body, \$position, $parameters);
+                scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$word->{subs}};
+            }
+            $position += 2;
+            push @words, {value => 'test'};
+            next;
+        }
+        if (substr($body, $position, 2) !~ /^[<>]\(/ && $body =~ /\G((?:[0-9]+)?(?:<<<|<<-|<<|>>|<&|>&|<>|>|<)|&>)/gc) {
+            my $operator = $1;
+            $position = pos($body);
+            $position++ while substr($body, $position, 1) =~ /[ \t]/;
+            my $target = shell_word($body, \$position, $parameters);
+            scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$target->{subs}};
+            push @heredocs, [$target->{value}, $operator =~ /<<-/] if $operator =~ /<<-?$/;
+            next;
+        }
+        if ($body =~ /\G([\n;(){}|&])/gc) {
+            my $separator = $1;
+            $position = pos($body);
+            if (@cases && $cases[-1] eq 'pattern') {
+                $cases[-1] = 'body' if $separator eq ')';
+            } else {
+                command_dependencies($path, \@words, $deps, $finite_backend);
+                $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
+            }
+            @words = ();
+            if ($separator eq "\n") {
+                for my $heredoc (@heredocs) {
+                    while ($position < length $body) {
+                        my $end = index($body, "\n", $position);
+                        $end = length $body if $end < 0;
+                        my $line = substr($body, $position, $end - $position);
+                        $position = $end < length($body) ? $end + 1 : $end;
+                        $line =~ s/^\t+// if $heredoc->[1];
+                        last if $line eq $heredoc->[0];
+                    }
+                }
+                @heredocs = ();
+            }
+            next;
+        }
+        my $word = shell_word($body, \$position, $parameters);
+        scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$word->{subs}};
+        if (!@words && $word->{raw} eq 'case') { push @cases, 'header'; next; }
+        if (@cases && $cases[-1] eq 'header') { $cases[-1] = 'pattern' if $word->{raw} eq 'in'; next; }
+        if (@cases && $word->{raw} eq 'esac' && !@words) { pop @cases; next; }
+        next if @cases && $cases[-1] eq 'pattern';
+        push @words, $word;
+    }
+    command_dependencies($path, \@words, $deps, $finite_backend);
 }
 sub dependencies {
     my ($path) = @_;
@@ -50,63 +280,7 @@ sub dependencies {
         $deps{"bin/backends/$_.sh"} = 1 for qw(tmux herdr zellij orca cmux);
     }
     if (defined $body) {
-        # Include every override, even one in a nested function or comment. This
-        # deliberately over-selects rather than relying on shell execution order.
-        while ($body =~ /^\s*#\s*shellcheck\s+[^\n]*?\bsource=(?:"([^"]+)"|'([^']+)'|([^\s]+))/mg) {
-            my $source = defined $1 ? $1 : defined $2 ? $2 : $3;
-            $deps{$source} = 1 unless $source eq '/dev/null';
-        }
-        # ShellCheck can resolve a literal source or strip one dynamic directory
-        # prefix ($dir/file -> ./file). Track both that path and repository-local
-        # basename candidates for runtime reverse-dependency selection.
-        my %recognized_sources;
-        while ($body =~ /(?:^\s*|[;({)]\s*|(?:&&|\|\|)\s*)$command_prefix($source_command)(?=\s|[<>]|&>)(?:\s*\d*(?:>>?|<<?|<&|>&|&>)\s*$prefix_word)*\s*(?:"((?:\$\([^)\n]*\)|[^"\n])+)"|'([^'\n]+)'|([^\s;\n]+))/mg) {
-            my $source = defined $2 ? $2 : defined $3 ? $3 : $4;
-            my $bare_word = defined $4;
-            my $offset = $-[1];
-            $recognized_sources{$offset} = 1;
-            my $word_end = $+[0];
-            if ($word_end < length($body) && substr($body, $word_end, 1) !~ /[\s;#&|(){}<>]/) {
-                $unknown{$path} = 1;
-                next;
-            }
-            my $line_prefix = substr($body, 0, $offset);
-            $line_prefix =~ s/.*\n//s;
-            next if $line_prefix =~ /^\s*#/;
-            next if $source eq '/dev/null';
-            # Joined quoted fragments without expansions name a literal path.
-            $source =~ s/"([^"\$`\\]*)"|'([^'\$]*)'/defined $1 ? $1 : $2/ge if $bare_word;
-            if ($source =~ /^\$/ && $source =~ m#^\$(?:[A-Za-z_]\w*|[0-9]|\{[^}]+\}|\([^)]*\))(/[^\$`*?\[\\<>&|'"]+)\z#) {
-                $deps{".$1"} = 1;
-                my ($base) = $source =~ m{([^/]+)$};
-                $deps{$_} = 1 for grep { m{(?:^|/)\Q$base\E$} } @inventory;
-            } elsif ($source !~ /[\$`*?\[\\<>&|'"]/ && $source !~ /^-/) {
-                $source =~ s{^\./}{};
-                $deps{$source} = 1;
-            } else {
-                next if $finite_backend && $source eq '$adapter';
-                $unknown{$path} = 1;
-            }
-        }
-        # A keyword-shaped source command outside the supported grammar may
-        # still import analysis inputs. Never let an unparsed command authorize
-        # reuse. The required token boundaries exclude case dot patterns such
-        # as ''|.|.. .
-        while ($body =~ /(?:^|[\s;({)&|<>])($source_command)(?=\s|[<>]|&>)/mg) {
-            next if $recognized_sources{$-[1]};
-            my $line_prefix = substr($body, 0, $-[1]);
-            $line_prefix =~ s/.*\n//s;
-            next if $line_prefix =~ /^\s*#/;
-            # Declaration arguments and comments after a function opener are
-            # not commands. In particular, a local variable named "source"
-            # must not disable reuse for every root importing that library.
-            # Reject substitution/operator syntax here rather than mistaking
-            # a source command inside an assignment for a declaration argument.
-            next if $line_prefix =~ /^\s*(?:local|declare|typeset|readonly|export)(?:\s+(?:-[A-Za-z]+|[A-Za-z_]\w*(?:=[^\s;()<>|&`"']*)?))*\s+\z/;
-            next if $line_prefix =~ /^\s*[A-Za-z_]\w*\(\)\s*\{\s*#/;
-            $unknown{$path} = 1;
-        }
-        $unknown{$path} = 1 if $body =~ /^\s*#\s*shellcheck\s+[^\n]*\bsource-path=/m;
+        scan_program($path, $body, \%deps, $finite_backend, {});
     }
     return @{$edges{$path} = [sort map { identity_path($_) } keys %deps]};
 }
@@ -119,6 +293,7 @@ if ($mode eq 'select') {
     local $/ = "\0";
     my %changed;
     while (<STDIN>) { chomp; s{^\./}{}; $changed{$_} = 1; }
+    push @source_candidates, keys %changed;
     my $policy_changed = grep { $changed{$_} } qw(bin/fm-lint.sh bin/fm-lint-cache.pl);
     my (%selected, %closures, %inputs);
     for my $path (@inventory) {
