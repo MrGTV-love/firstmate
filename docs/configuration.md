@@ -2512,6 +2512,7 @@ This section is the single owner of the runner's operating contract.
 - Process-event commands resolve the state root to its physical directory before validating it and deriving paths, so a home reached through a symlinked ancestor behaves like its physical spelling while an unsafe target directory remains refused.
 - Registration writes one private record under `state/procevent/`, and a completed result plus its immutable adapter identity are captured under `state/procevent-inbox/` before any announcement or event can reference it.
 - By default, results are published as ordinary `check` wakes carrying the source id and committed result sequence through the existing durable wake queue, so the runner adds no second notification control plane.
+- Each runner publishes its current capture without synchronously replaying unrelated pending results before relistening; `reconcile` owns global re-announcement of unhandled captures.
 - The self-announcing adapter exception and its fail-safe ordering are defined below.
 - The watcher delivers a queued result on its ordinary cycle by reporting it as an actionable `check` wake, so a default or fallback publication reaches firstmate through the same rewake path every other wake uses and never waits for a manual drain.
 - A queued `check` delivery is reported at most once per captured source and sequence while any records for that key remain queued.
@@ -2618,6 +2619,8 @@ Ownership is machine-wide per canonical source, because separate homes can share
 - Every stop proves ownership before its first signal: the live runner's recorded process identity must match and it must still lead its process group.
 - Once that stop has proved ownership and sent TERM, its own escalation to KILL checks only whether the proved group still has members; it does not re-read the leader's identity or group membership, which can change or become unreadable as TERM ends the leader.
 - This proof belongs only to that stop's own escalation and cannot authorize another caller that encounters an unproved group.
+- A runner handling its own TERM, INT, HUP, or ordinary exit keeps its identity-matched leader alive while draining remaining group members, and releases its claim only after those descendants are gone.
+  TERM-resistant descendants use that same proved KILL escalation; the killed runner leaves its claim for reconciliation after the whole generation is gone.
 
 **Recover orphaned claims**
 
