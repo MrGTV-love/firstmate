@@ -298,6 +298,7 @@ FM_CLAUDE_LIVE_E2E=1 bash bin/fm-test-run.sh tests/fm-claude-stop-autoarm-live-e
 ```
 
 The same command also revalidated the Stop-owned cycles and competing-session boundary.
+The live regression preflights and launches every native session through `bin/fm-teamclaude-launch.sh`, and its lab-local `open` shim logs blocked macOS opener calls to the test output before cleanup.
 Its arm fixture distinguishes a handling successor from a foreground arm, as the portable fixtures do: the successor confirms coverage but must not consume one of the two model-facing fixture events.
 
 The listener change was separately exercised against lavish-axi 0.1.79 and a real open browser review.
