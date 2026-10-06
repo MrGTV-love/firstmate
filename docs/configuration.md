@@ -2441,7 +2441,7 @@ After opening the artifact as required above, the worker arms it with `bin/fm-pr
 
 `arm` prints `armed` only after the process-event owner confirms this registration generation's listener is running, and otherwise returns nonzero without that line.
 
-- The confirmation is the same live claim or launch-stamp evidence `reconcile` already uses, bounded by `FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS`, and a failed confirmation retires a source that never started unless `retire` refuses because something may still own it, in which case the registration stays for `reconcile` or a human.
+- The confirmation is the same live claim or launch-stamp evidence `reconcile` already uses, bounded by `FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS`; a failed confirmation returns without waiting on cleanup and retains the registration for a delayed runner, a later `reconcile`, or guarded retirement.
 - An earlier registration's listener that releases the board inside the confirm window lets the new registration start, and `arm` then reports `armed` as usual.
 - When a live listener from an earlier registration of the same board still holds it when the window ends, `arm` exits zero with `still-listening` instead of `armed`, because that earlier listener keeps serving the board.
   Replacement-registration adoption follows the same-command relisten rule in the `bin/fm-procevent.sh` header; changing the listener command requires retirement and a fresh arm.
@@ -2751,6 +2751,7 @@ The whole-second clock adds at most one second to that polling window, followed 
   A live snapshot is only a hint to try that lock without waiting; readiness still requires a fresh locked read validating the full claim tuple and the snapshotted registration generation.
   Neither record presence nor the unlocked hint proves readiness.
   A runner takes that lock before it writes its claim, so a held lock is not evidence of ownership and cannot extend the confirmation window; a still-unclaimed runner remains unconfirmed.
+  Reconcile finalization also tries the lock without waiting: an already-confirmed launch remains `started=`, while an unconfirmed launch under contention returns nonzero with `uncertain=` and defers failure-marker and wake publication until a later locked observation.
 - A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
 - All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
 - A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.

@@ -5315,10 +5315,11 @@ confirm_without_unproved_reader_contention reconcile stale
 confirm_without_unproved_reader_contention ensure-listening stale
 
 # Holding the source lock is not a claim: argv is read before the claim file is
-# written. Keep a live runner at that read beyond the default 3 s window and
-# clock granularity, and require refusal rather than waiting for it to claim.
+# written. Keep the same live runner unclaimed until the consumer returns, and
+# require bounded refusal without publishing failure under the runner's lock.
 confirm_unclaimed_at_boundary() {
-  local operation=$1 HELD HELD_ID REAL_SED rc=0 output
+  local operation=$1 HELD HELD_ID HELD_ROOT=$ROOT REAL_SED rc=0 output began elapsed
+  local preclaim_state held_pid held_identity current_identity claim_home claim_pid claim_token claim_identity claim_before
   local -a command=()
   HELD="$TMP_ROOT/held-unclaimed-$operation"
   mkdir -p "$HELD/bin" "$HELD/home/state"
@@ -5345,44 +5346,102 @@ SH
     fm_test_track_procevent_home "$HELD/home"
     command=("$ROOT/bin/fm-procevent-lavish.sh" arm "$HELD/board.html")
   fi
-  export HELD HELD_ID REAL_SED
+  export HELD HELD_ID HELD_ROOT REAL_SED
   cat > "$HELD/bin/sed" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
   "-n s/^argc=//p "*"/$HELD_ID.source")
     if mkdir "$HELD/held" 2>/dev/null; then
       pgid=$(ps -o pgid= -p $$ | tr -d '[:space:]')
-      if [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] && kill -0 "$pgid" 2>/dev/null; then
-        printf 'alive-unclaimed\n' > "$HELD/preclaim"
+      identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$HELD_ROOT" "$pgid") \
+        || exit 75
+      if [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+        && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+        && [ -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" ] \
+        && kill -0 "$pgid" 2>/dev/null; then
+        printf 'alive-unclaimed\n%s\n%s\n' "$pgid" "$identity" > "$HELD/preclaim"
       fi
-      sleep 5
+      deadline=$((SECONDS + 30))
+      while [ ! -e "$HELD/runner-release" ]; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+          : > "$HELD/safety-expired"
+          break
+        fi
+        sleep 0.05
+      done
+      [ ! -e "$HELD/runner-release" ] || : > "$HELD/runner-released"
     fi
     ;;
 esac
 exec "$REAL_SED" "$@"
 SH
   chmod +x "$HELD/bin/sed"
+  began=$SECONDS
   PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
     "${command[@]}" > "$HELD/out" 2> "$HELD/err" || rc=$?
-  [ "$(cat "$HELD/preclaim" 2>/dev/null)" = alive-unclaimed ] \
+  elapsed=$((SECONDS - began))
+  [ "$elapsed" -lt 10 ] \
+    || fail "$operation exceeded the default-window completion bound (${elapsed}s): $(cat "$HELD/out") $(cat "$HELD/err")"
+  [ "$elapsed" -ge 3 ] || fail "$operation refused before the unchanged default 3 s confirmation window (${elapsed}s)"
+  [ -s "$HELD/preclaim" ] || fail "fixture did not hold a live unclaimed $operation runner"
+  {
+    IFS= read -r preclaim_state
+    IFS= read -r held_pid
+    IFS= read -r held_identity
+  } < "$HELD/preclaim" || fail "fixture did not record the held $operation runner's identity"
+  [ "$preclaim_state" = alive-unclaimed ] \
     || fail "fixture did not hold a live unclaimed $operation runner"
+  assert_absent "$HELD/runner-release" "$operation returned only after the runner was released"
+  assert_absent "$HELD/runner-released" "$operation waited for the runner's release"
+  assert_absent "$HELD/safety-expired" "$operation waited for the fixture's 30 s safety deadline"
+  kill -0 "$held_pid" 2>/dev/null || fail "$operation lost the real held runner before returning"
+  current_identity=$(bash -c '. "$1/bin/fm-wake-lib.sh"; fm_pid_identity "$2"' _ "$ROOT" "$held_pid") \
+    || fail "could not identify the held $operation runner after the consumer returned"
+  [ "$current_identity" = "$held_identity" ] \
+    || fail "$operation replaced the held runner before returning"
+  [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    || fail "$operation returned only after the held runner claimed"
+  assert_present "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.lock" "$operation returned after the held runner released its source lock"
+  assert_absent "$HELD/started" "$operation returned only after the actual source command started"
+  assert_present "$HELD/home/state/procevent/$HELD_ID.source" "$operation removed the held runner's registration"
+  assert_absent "$HELD/home/state/procevent/.$HELD_ID.launch-failed" \
+    "$operation published a launch-failure marker without the source lock"
+  [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 0 ] \
+    || fail "$operation published a launch-failure wake without the source lock"
   output=$(cat "$HELD/out")
-  [ "$rc" -ne 0 ] || fail "$operation waited for a genuinely unclaimed runner beyond its default confirmation window"
+  [ "$rc" -ne 0 ] || fail "$operation confirmed a genuinely unclaimed runner"
   if [ "$operation" = reconcile ]; then
     assert_contains "$output" "started=0" "reconcile confirmed a runner that remained unclaimed in its window"
-    assert_contains "$output" "failed=1" "reconcile lost the unconfirmed launch"
-    [ "$(launch_failed_wake_count "$HELD/home" "$HELD_ID")" -eq 1 ] \
-      || fail "reconcile did not publish the unconfirmed launch"
+    assert_contains "$output" "uncertain=1" "reconcile lost the contended unconfirmed launch"
+    assert_contains "$output" "failed=0" "reconcile classified lock contention as a confirmed launch failure"
   else
-    assert_contains "$(cat "$HELD/err")" "listener is not running: $HELD_ID" \
-      "arm did not explain its unconfirmed listener"
+    [ "$(cat "$HELD/err")" = "error: listener is not running: $HELD_ID" ] \
+      || fail "arm did not explain its unconfirmed listener: $(cat "$HELD/err")"
     assert_not_contains "$output" "armed:" "arm advertised an unclaimed listener as ready"
   fi
-  if [ "$operation" = reconcile ]; then
-    wait_for "$HELD/started" || fail "the retained runner never ran after its delayed claim"
-    assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
-      "a delayed claim did not retain exactly one owner"
-  fi
+  : > "$HELD/runner-release"
+  wait_for "$HELD/started" || fail "the retained $operation runner never ran after its delayed claim"
+  [ -f "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    && [ ! -L "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" ] \
+    || fail "the delayed $operation runner did not publish a real claim"
+  {
+    IFS= read -r claim_home
+    IFS= read -r claim_pid
+    IFS= read -r claim_token
+    IFS= read -r claim_identity
+  } < "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim" \
+    || fail "the delayed $operation runner's claim is unreadable"
+  [ "$claim_home" = "$HELD/home" ] && [ "$claim_pid" = "$held_pid" ] \
+    && [ "$claim_identity" = "$held_identity" ] && [ -n "$claim_token" ] \
+    || fail "$operation did not retain the same real runner through delayed claim publication"
+  [ "$(pe "$HELD/home" list | awk -v id="$HELD_ID" '$1 == id { print $3 }')" = live ] \
+    || fail "$operation did not retain a fully verified live owner"
+  claim_before=$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")
+  assert_contains "$(pe "$HELD/home" start "$HELD_ID")" "already owned" \
+    "the delayed $operation claim did not retain exactly one owner"
+  [ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$HELD_ID.claim")" = "$claim_before" ] \
+    || fail "a duplicate start replaced the delayed $operation runner's claim"
   : > "$HELD/poll-release"
   pe "$HELD/home" retire "$HELD_ID" >/dev/null 2>&1 || true
   pass "$operation refuses a live unclaimed runner at the unchanged default confirmation boundary"
@@ -5474,8 +5533,8 @@ PATH="$DELAY/bin:$PATH" FM_HOME="$DELAY/home" \
 pass "arm waits out a delayed listener start before reporting ready"
 
 # A claim path that is a directory can never be owned, so the runner dies before
-# the listener command. Arm must not print ready, and it must remove the
-# registration it just published.
+# the listener command. Arm must not print ready, and it must retain the
+# registration for a later reconcile after the claim obstruction is resolved.
 arm_blocked_claim() {  # <dir> <confirm-seconds>
   local dir=$1 secs=$2 art id began rc elapsed
   mkdir -p "$dir/bin" "$dir/home/state"
@@ -5501,9 +5560,9 @@ SH
   assert_not_contains "$(cat "$dir/arm.out")" "armed:" \
     "arm printed ready when no listener could claim ($dir)"
   [ ! -s "$READY_MARK" ] || fail "the listener command ran without a claim ($dir)"
-  # retire refuses a claim it cannot read, and arm must not override it.
+  # Missing readiness does not authorize arm to retire the registration.
   [ -e "$dir/home/state/procevent/$id.source" ] \
-    || fail "arm removed a registration that retire refused to remove ($dir)"
+    || fail "arm removed the registration after refusing listener readiness ($dir)"
   printf '%s\n' "$elapsed" > "$dir/elapsed"
   rmdir "$FM_PROCEVENT_CLAIM_ROOT/$id.claim" 2>/dev/null || true
   PATH="$dir/bin:$PATH" FM_HOME="$dir/home" \
@@ -5511,7 +5570,7 @@ SH
 }
 
 arm_blocked_claim "$TMP_ROOT/immediate-arm" 1
-pass "arm fails when the listener cannot claim, and leaves the registration retire refused"
+pass "arm fails when the listener cannot claim, and retains its registration"
 
 arm_blocked_claim "$TMP_ROOT/timeout-arm" 2
 tout_elapsed=$(cat "$TMP_ROOT/timeout-arm/elapsed")
