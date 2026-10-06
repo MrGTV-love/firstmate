@@ -16,7 +16,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-fm_live_gate opt-in FM_CLAUDE_LIVE_E2E claude
+fm_live_gate opt-in FM_CLAUDE_LIVE_E2E
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -41,17 +41,34 @@ fail() {
   exit 1
 }
 
+"$ROOT/bin/fm-teamclaude-launch.sh" --check || fail "TeamClaude launcher preflight failed"
+
 LAB="$ROOT/.claude-autoarm-live-e2e.$$"
 PROJECT="$LAB/project"
 HOME_DIR="$LAB/fmhome"
 LIVE_OWNER_HOME="$LAB/live-owner-home"
 TRANSCRIPT="$LAB/claude.jsonl"
-CLAUDE_VERSION=$(claude --version)
 
 cleanup() {
+  if [ -s "$LAB/opener.log" ]; then
+    cat "$LAB/opener.log"
+  fi
   rm -rf "$LAB"
 }
 trap cleanup EXIT
+
+mkdir -p "$LAB/fakebin"
+cat > "$LAB/fakebin/open" <<'SH'
+#!/usr/bin/env bash
+printf 'blocked macOS open:' >> "$FM_LIVE_OPEN_LOG"
+printf ' %q' "$@" >> "$FM_LIVE_OPEN_LOG"
+printf '\n' >> "$FM_LIVE_OPEN_LOG"
+SH
+chmod +x "$LAB/fakebin/open"
+export FM_LIVE_OPEN_LOG="$LAB/opener.log"
+export PATH="$LAB/fakebin:$PATH"
+printf 'live isolation: project=%s home=%s opener=%s\n' "$PROJECT" "$HOME_DIR" "$LAB/fakebin/open"
+CLAUDE_VERSION=$("$ROOT/bin/fm-teamclaude-launch.sh" --version) || fail "Claude version check through TeamClaude failed"
 
 test_posttool_delivery() {
 # Prove the native PostToolUse context channel against Claude, before any Stop
@@ -78,7 +95,7 @@ POST_PROMPT='This is a bounded hook-integration experiment, not project work. Fi
 (
   cd "$POST_PROJECT" || exit 1
   FM_HOME="$POST_HOME" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
-    claude -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
 ) > "$POST_TRANSCRIPT" 2>&1 || fail "Claude PostToolUse experiment failed"
 [ -f "$POST_HOME/state/procevent-inbox/lavish-midturn.1.handled" ] \
@@ -101,7 +118,7 @@ POST_UNPUBLISHED="$LAB/posttool-unpublished.jsonl"
   cd "$POST_PROJECT" || exit 1
   CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
     env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
-    claude -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
 ) > "$POST_UNPUBLISHED" 2>&1 || fail "Claude unpublished-capture experiment failed"
 [ -f "$POST_PROJECT/state/procevent-inbox/lavish-unpublished.2.handled" ] \
@@ -117,7 +134,7 @@ POST_NEGATIVE="$LAB/posttool-handled.jsonl"
   cd "$POST_PROJECT" || exit 1
   CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
     env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
-    claude -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
 ) > "$POST_NEGATIVE" 2>&1 || fail "Claude handled-review counterfactual failed"
 negative_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
@@ -210,7 +227,7 @@ PROMPT='After reading the complete session-start digest, reply with exactly CYCL
 (
   cd "$PROJECT" || exit 1
   FM_HOME="$HOME_DIR" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
-    claude -p "$PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    "$PROJECT/bin/fm-teamclaude-launch.sh" -p "$PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
 ) > "$TRANSCRIPT" 2>&1 || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
 
