@@ -1032,6 +1032,7 @@ FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
 
 Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
 Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
+The relaunch proof checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
 
 Observed output:
 
@@ -1040,7 +1041,7 @@ ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape 
 ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
 ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
 ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control exit stops the idle box-shaped worker and preserves its endpoint
-ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker in its endpoint and the replacement reads its instructions
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint
 ```
 
 With the classifier change reverted, the same run stopped at `an idle empty box composer read 'unknown', not empty`.

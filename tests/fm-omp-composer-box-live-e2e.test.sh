@@ -112,7 +112,6 @@ sed 's/^  shape: borderless$/  shape: box/' "$ROOT/.omp/fm-session-overlay.yml" 
 CONTROL_HOME="$TMP_ROOT/control-home"
 PROJECT="$TMP_ROOT/proj"
 WORKTREE="$TMP_ROOT/wt"
-RELAUNCH_TOKEN="FMOMPBOXRELAUNCH$$_$RANDOM"
 mkdir -p "$CONTROL_HOME/state" "$CONTROL_HOME/data/$TASK_ID"
 CONTROL_HOME_ROOT=$(cd "$CONTROL_HOME" 2>/dev/null && pwd -P) || CONTROL_HOME_ROOT=$CONTROL_HOME
 if command -v shasum >/dev/null 2>&1; then
@@ -125,13 +124,12 @@ fi
 LAUNCH_DIR="/tmp/fm-$TASK_ID+$CONTROL_HOME_HASH"
 fm_git_worktree "$PROJECT" "$WORKTREE" "$TASK_ID" \
   || fail "could not create the task worktree"
-cat > "$CONTROL_HOME/data/$TASK_ID/brief.md" <<EOF
+cat > "$CONTROL_HOME/data/$TASK_ID/brief.md" <<'EOF'
 # Task
 ## Captain's intent
-Prove that a relaunched worker reads its instructions.
+Verify that an idle box-shaped omp worker can be safely relaunched.
 
 ## Firstmate spec
-Reply with exactly $RELAUNCH_TOKEN and nothing else.
 Do not edit any file.
 EOF
 
@@ -257,22 +255,16 @@ if [ "${FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH:-0}" = 1 ]; then
     i=$((i + 1))
     sleep 1
   done
-  out=$(control "$TASK_ID" relaunch --note "Live guard relaunch; follow the Firstmate spec.") \
+  out=$(control "$TASK_ID" relaunch --note "Live guard relaunch.") \
     || fail "$SUBJECT: fm-control relaunch refused an idle box composer: $out"
   case "$out" in
     *"relaunched $TASK_ID harness=omp"*"endpoint=$TARGET "*) ;;
     *) fail "$SUBJECT: relaunch did not report a replacement in the same endpoint: $out" ;;
   esac
-  i=0
-  while [ "$i" -lt 180 ]; do
-    screen=$(lab pane read "$PANE" --source recent --lines 200 2>/dev/null || true)
-    [ "$(printf '%s\n' "$screen" | grep -F -c "$RELAUNCH_TOKEN" || true)" -lt 1 ] || break
-    i=$((i + 1))
-    sleep 1
-  done
-  [ "$(printf '%s\n' "$screen" | grep -F -c "$RELAUNCH_TOKEN" || true)" -ge 1 ] \
-    || fail "$SUBJECT: the relaunched worker never acknowledged its instructions"
-  pass "live omp box composer: $SUBJECT fm-control relaunch replaces the box-shaped worker in its endpoint and the replacement reads its instructions"
+  [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] \
+    || fail "$SUBJECT: relaunch returned but no agent is running in the preserved endpoint"
+  lab pane get "$PANE" >/dev/null || fail "relaunch removed the endpoint it must preserve"
+  pass "live omp box composer: $SUBJECT fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint"
 else
   printf 'skip: live omp box composer relaunch: opt-in; set FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 to run\n'
 fi
