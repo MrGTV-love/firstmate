@@ -602,7 +602,6 @@ The companion `data/fm-jev-value-scout/notes.md` inventories retained research m
 The review's cited E7, `/Users/charlesabrooker/firstmate/data/backlog.md` (`fm-jev-guardrail-hook`), requires labelled September 30 blocked/allowed cases but supplies no command/decision receipts; its separate `fm-jev-guardrail-promote` entry retains the original owner, date and criteria.
 The missing source is the authentic September 30 blocked and allowed command inputs paired with their independently recorded decisions and dated provenance.
 Proposal narrative, subsequent native synthetic observations and reconstructed examples cannot replace that source.
-No historical placeholder rows are shipped; every row in `tests/fixtures/jev-guardrail-new-cases.json` is marked `dataset: "synthetic"`.
 The [configuration owner](../configuration.md#jev-command-screening-shadow-only) defines evaluation dataset rules, legacy-label handling and the separate promotion boundary.
 
 ## Claude workspace trust

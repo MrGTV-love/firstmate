@@ -3,8 +3,8 @@
 // Usage: node bin/fm-jev-guardrail.mjs hook --host claude|omp < native-tool.json
 //        node bin/fm-jev-guardrail.mjs metrics [--log <jsonl>]
 //        node bin/fm-jev-guardrail.mjs evaluate --cases <json> [--log <jsonl>]
-// Key: existing TYPESAFE_API_KEY, else fmx_env_get in FM_HOME/.env.
-// Endpoint/schema/key transport match fm-dispatch-resolve.sh; no SDK or retries.
+// Key: existing TYPESAFE_API_KEY, else fmx_env_get in the resolved home/.env.
+// Uses the TypeSafe endpoint and Choice schema; no SDK or retries.
 // Commands, paths, contents, response bodies and keys never enter records or state.
 // Records: attempt (before HTTP); result (including selection and unavailable usage).
 // Interrupted attempts remain incomplete with unknown spend, never charged as zero.
