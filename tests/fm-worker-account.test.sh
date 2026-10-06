@@ -527,7 +527,7 @@ test_indexed_native_catalog_guards_use_the_shared_boundary() {
       new_case "$id" "$harness"
       executable=$harness
       [ "$harness" != cursor ] || executable=cursor-agent
-      model=pane-only
+      model="pane-only"
       [ "$harness" != omp ] || model=openai/pane-only
       cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash

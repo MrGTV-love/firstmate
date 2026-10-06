@@ -49,6 +49,7 @@ The [configuration contract](../configuration.md#fleet-model-index-configmodel-i
 The token-free live guard reads one id from each installed harness's own listing, then runs the public `check` once with that id and an intentionally absent id.
 The adapter must accept the listed id and refuse only the absent one, and that single run queries the catalog once instead of racing repeated account-catalog requests.
 The portable regression also exercises Claude SDK initialization through a timed runner whose background child does not inherit stdin.
+Run `bash bin/fm-test-run.sh --jobs 1 tests/fm-secondmate-harness.test.sh tests/fm-bootstrap.test.sh tests/fm-model-index.test.sh tests/fm-worker-account.test.sh` for portable inheritance and worker-account regression coverage alongside catalog discovery.
 
 Verified on 2026-09-30 with:
 
