@@ -1126,9 +1126,13 @@ _fm_composer_screen_row() {  # <n> <screen>
   printf '%s\n' "$2" | sed -n "$(($1 + 1))p"
 }
 
-# _fm_composer_row_content: extract the classification content of one raw row:
-# ghost-strip when styled, plain otherwise, normalize-trim, and strip one
-# matching pair of side border glyphs.
+# Shared row content keeps classification and selected-content extraction in
+# agreement. omp's bright effort keys survive ghost stripping; treat that
+# remnant as furniture only on a styled bare ❯ row ending in the exact hint,
+# when the hint's own ghost-stripped suffix is a nonempty proper substring of
+# its full text. Styling elsewhere on the row is not proof. Preserve preceding
+# draft text; plain, boxed, and fully bright typed copies gain no hint removal.
+# See tests/fm-composer-lib.test.sh's effort-hint regression.
 _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
   local raw=$1 styled=$2 stripped plain suffix hint='⇧⇥ to change thinking effort'
   if [ "$styled" = 1 ]; then

@@ -125,7 +125,8 @@
 # A remotely placed secondmate is refused by name: its agent runs on another
 # host, so no postcondition this plane verifies could be read for it here.
 #
-# Fail-closed boundaries:
+# Runtime lifecycle boundaries (metadata-only authorization follows
+# docs/agent-control.md "Recovering an exited instruction owner"):
 #   - An unverified harness, or a harness whose control mechanics are unknown,
 #     is refused rather than guessed at.
 #   - A backend that cannot deliver the harness's interrupt key is refused

@@ -44,15 +44,11 @@
 #   secondmate's charter.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
-#   --reconcile-only applies only to --relaunch and restores an agent-free
-#   ship/scout instruction owner with an existing automatic In-flight backlog
-#   row. It never starts a backlog item or changes a hold/dependency, and puts
-#   fm-dod-lib.sh's current reconciliation-only role above the old instructions.
-#   It records recovery=reconcile-only in metadata; every later replacement
-#   inherits that scope, even without the flag or after a dependency completes.
-#   This is instruction recovery, not authority to implement, validate, publish,
-#   merge, or infer continuation consent. Ordinary replacement admission and
-#   this read-only recovery admission share bin/fm-backlog-transition-lib.sh.
+#   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
+#   its admission limits, and fm-dod-lib.sh owns the restricted instruction role.
+#   Recorded recovery=reconcile-only is inherited while present; the clearance
+#   policy is in docs/agent-control.md "Recovering an exited instruction owner".
+#
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
@@ -3550,11 +3546,10 @@ herdr_projection_existing_meta_allows_flat() { # <meta>
   esac
 }
 
-# Backlog preflight (bin/fm-backlog-transition-lib.sh). This spawn is about to
-# become the sole owner of the row's In-flight transition, so prove the row is
-# transitionable BEFORE any endpoint, worktree, or record exists: a refusal here
-# costs nothing to unwind, while the same refusal after publication would strand
-# a live pane. The authoritative mutation still runs under the meta lock below.
+# Backlog preflight (bin/fm-backlog-transition-lib.sh). Prove admission before
+# allocating or publishing launch resources: refusal after publication could
+# strand a live pane. The final commit under the meta lock transitions ordinary
+# dispatch, but only rechecks read-only admission for reconciliation recovery.
 BACKLOG_TRANSITION=0
 BACKLOG_ROW_STATE=
 if fm_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
@@ -5048,11 +5043,11 @@ if [ "$RELAUNCH" -eq 0 ]; then
   SPAWN_META_TMP=
 fi
 
-# Fuse the backlog In-flight transition into the publication that just created
-# the record (bin/fm-backlog-transition-lib.sh owns the invariant). It runs under
-# this task's own meta lock, so a steer or teardown racing the same id stays
-# serialized exactly as before. The call itself is deferred to the final commit
-# point below so every earlier launch-delivery failure remains unwindable.
+# Commit ordinary dispatch's In-flight transition, or recheck reconciliation's
+# read-only admission (bin/fm-backlog-transition-lib.sh owns the invariant).
+# It runs under this task's own meta lock so a steer or teardown racing the same
+# id stays serialized. Defer it to the final commit point below so every earlier
+# launch-delivery failure remains unwindable.
 spawn_commit_backlog_transition() {
   [ "$BACKLOG_TRANSITION" = 1 ] || return 0
   if [ "$RECONCILE_ONLY" = 1 ]; then

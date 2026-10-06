@@ -100,7 +100,7 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 ### Recovering an exited instruction owner
 
 Restoring an exited owner to reconcile instructions is not permission to advance held or dependency-blocked work.
-The control and launch headers own the reconciliation-only option and its admission limits; [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns the replacement's current instruction contract, which supersedes historical execution instructions.
+The [`bin/fm-control.sh`](../bin/fm-control.sh) header owns the reconciliation-only option and its admission limits; [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns the replacement's current instruction contract, which supersedes historical execution instructions.
 The task's recorded recovery scope survives ordinary and automatic replacement, including a session-end replacement after a genuine dependency completes.
 The actual lock-owning main Firstmate must run `fm-control <task-id> authorize-continuation` after reconciling the real restrictions.
 This metadata-only operation holds the lifecycle lock before the metadata lock, revalidates the local regular task record and recovery field, requires readable automatic-backlog ordinary admission, and refuses a pending authoritative close.
@@ -177,6 +177,8 @@ The worktree and the task's records are unaffected either way.
   Rewriting it back to the old harness would be a second, worse inaccuracy.
 
 ## Fail-closed boundaries
+
+The runtime lifecycle verbs have the boundaries below; metadata-only authorization follows [the instruction-owner recovery policy](#recovering-an-exited-instruction-owner) without requiring a runtime endpoint read.
 
 - Targeting is exact.
   Only a bare task id with a `state/<id>.meta` record in this home is accepted, and that record must pass the shared endpoint-identity validation.

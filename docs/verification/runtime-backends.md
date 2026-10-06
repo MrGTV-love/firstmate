@@ -897,8 +897,7 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 The same live owner-recovery run above captured omp's otherwise empty borderless composer as a `❯` row followed by a right-side `⇧⇥ to change thinking effort` hint and the omp status row.
 The shortcut keys were `SGR 38;2;0;180;255`, followed by a normal-colour space and a muted explanation in `SGR 38;2;107;114;128`.
 The shared ghost extractor correctly kept the bright keys while dropping the explanation, so the first divergent stage was the remnant classification, not capture or ghost stripping.
-The shared row-content boundary removes the exact terminal hint and its corresponding ghost-stripped suffix only when the suffix itself provides a proper-substring styling proof on a bare `❯` row, so classification and selected-content extraction agree even beside a real draft.
-A bright typed copy, a plain capture, a boxed draft, and generic shortcut text do not acquire empty-composer authority.
+[`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh)'s shared row-content boundary owns the styled-hint proof used by both classification and selected-content extraction.
 The behavioral regressions in `tests/fm-composer-lib.test.sh` cover empty and draft-bearing extraction, wrapped drafts, human shortcut-like input, unrelated ghost text, and hint disappearance; `tests/fm-backend-zellij.test.sh` exercises public submission with the hint retained, disappeared, or beside wrapped payload text.
 Real typed copies remained `pending` and public exit refused without clearing them on both tmux and Herdr; busy drafts also read `pending`, and a real slash popup refused as `unknown` on tmux and `pending` on Herdr.
 The Herdr busy capture showed a native `Steering · 1` queue while the real model remained working; the queued reconciliation instruction did not change the owner's restricted authority.
