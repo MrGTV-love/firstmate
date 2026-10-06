@@ -88,4 +88,4 @@ Claude's PreToolUse seatbelt blocks directly, and its deny is honored only with 
 
 ### Helper agents
 
-[`Primary helper agents and durable project work`](../../../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
+[`Primary helper agents and durable project work`](../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
