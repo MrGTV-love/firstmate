@@ -288,9 +288,10 @@
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
 # Launch environment (config/launch-env-allowlist):
-#   Absent means unchanged ambient inheritance. A present readable regular file
-#   opts every launch (ship, scout, secondmate, raw command, and relaunch) into
-#   /usr/bin/env -i followed by /bin/sh -c of the existing launch command.
+#   Absent leaves ambient inheritance subject to harness-specific shedding.
+#   A present readable regular file opts every launch (ship, scout, secondmate,
+#   raw command, and relaunch) into /usr/bin/env -i followed by /bin/sh -c of the
+#   existing launch command.
 #   Each line is one POSIX environment name, never a value or shell expression;
 #   blank lines and lines beginning with # are ignored. Invalid input refuses
 #   before launch, as do path inspection errors such as inaccessible config
@@ -308,11 +309,11 @@
 #   pins to 1 with a literal assignment so it survives the cleared environment
 #   even on a host that never had it set.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
-#   assignments still apply inside the filtered environment. Raw commands must
-#   be POSIX sh compatible under this opt-in; the absent-file path is unchanged.
+#   assignments still apply inside the filtered environment.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
-#   See docs/configuration.md for provider/Git setup and supported limits.
+#   See docs/configuration.md for provider/Git setup, raw-command shell
+#   compatibility, and supported limits.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
