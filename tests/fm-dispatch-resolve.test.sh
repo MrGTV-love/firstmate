@@ -1552,6 +1552,45 @@ for gate in profile rule; do
   done
   cp "$TMP_ROOT/no-pool-floor.json" "$RULES"
 done
+for pooled_choice in direct runner-up; do
+  for pooled_use in object array; do
+    jq --arg choice "$pooled_choice" --arg use "$pooled_use" '
+      .rules = [.rules[3]]
+      | .rules[0].use = {harness:"omp",provider:"codex"}
+      | if $use == "array" then
+          .rules[0].use = [.rules[0].use,{harness:"cursor",model:"cursor-grok-4.6-medium"}]
+        else . end
+      | .rules[0].floor = {provider:"codex",scope:"all_models",min_percent:20}
+      | .rules[0].fallback = [{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]
+      | .default = {harness:"cursor",model:"cursor-grok-4.6-high"}
+      | if $choice == "runner-up" then
+          .rules[0].min_confidence = 0.2
+          | .rules += [{when:"Other work.",min_confidence:0.9,use:{harness:"cursor",model:"cursor-grok-4.6-low"}}]
+        else . end
+    ' "$BASE_RULES" > "$RULES"
+    if [ "$pooled_choice" = direct ]; then
+      write_response "$RESPONSE" rule_1 0.95
+      jq '.answers.rule.probabilities = {rule_1:0.95,default:0.05}' "$RESPONSE" > "$TMP_ROOT/pooled-response.json"
+    else
+      write_response "$RESPONSE" rule_2 0.95
+      jq '.answers.rule.probabilities = {rule_1:0.3,rule_2:0.65,default:0.05}' "$RESPONSE" > "$TMP_ROOT/pooled-response.json"
+    fi
+    cp "$TMP_ROOT/pooled-response.json" "$RESPONSE"
+    reset_log
+    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+    expect_code 0 "$code" "omitted OMP model floor resolves for $pooled_choice $pooled_use"
+    assert_equals '' "$err" "omitted OMP model floor has no jq error for $pooled_choice $pooled_use"
+    assert_contains "$out" '  status: escalate' "omitted OMP model floor gates $pooled_choice $pooled_use"
+    assert_contains "$out" 'rule rule_1 floor codex/all_models is unverifiable' "native account evidence cannot establish the pooled floor"
+    assert_contains "$out" 'candidate: omp:-  provider=codex  pool={"status":"unknown","accounts":[]}' "omitted selector keeps pool capacity unknown"
+    assert_not_contains "$out" 'candidate: cursor:cursor-grok-4.6-high' "unverifiable pooled floor does not evaluate the rankable default"
+    assert_not_contains "$out" 'candidate: omp:openrouter/deepseek/deepseek-v4-flash' "unverifiable pooled floor does not activate the declared stand-in"
+    assert_not_contains "$out" '  profile:' "unverifiable pooled floor authorizes no served route"
+  done
+done
+cp "$TMP_ROOT/no-pool-floor.json" "$RULES"
+write_response "$RESPONSE" rule_4 0.9
+pass "omitted-model OMP Codex rule floors gate picked and runner-up rules without default or stand-in routing"
 jq '.reports[1].fetchedAt=0' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/stale-pool.json"
 mv "$TMP_ROOT/stale-pool.json" "$OMP_USAGE_FIXTURE"
 reset_log

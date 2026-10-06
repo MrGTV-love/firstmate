@@ -491,6 +491,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def rows($p; $lane): (prov($p; $lane) | .quotaSemantics.effectiveAvailability // []);
   def bare($m): ($m | split("/") | last);
   def provider_of($c): ($c.provider // $pmap[$c.harness] // null);
+  def pooled_codex($c):
+    $c.harness == "omp" and (provider_of($c) == "codex" or (($c.model // "") | startswith("openai-codex/")));
   def lane_of($c): quota_lane($c.harness; $c.model);
   def measured($p; $lane):
     (prov($p; $lane) != null and (["known", "partial"] | index(prov($p; $lane).quotaSemantics.status)) != null);
@@ -525,7 +527,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       "projected_exhaustion at \($row.scope) (usableRunwaySeconds=\($row.runway.usableRunwaySeconds // "unknown") projectionConfidence=\($row.runway.projectionConfidence // "unknown"))"
     else "\($s) at \($row.scope)" end;
   def assess($c; $p; $lane):
-    if $c.harness == "omp" and ($p == "codex" or (($c.model // "") | startswith("openai-codex/"))) then
+    if pooled_codex($c) then
       ($omp_pools[($c.model // "")] // {status: "unknown", accounts: []}) as $pool |
       {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
        exhausted: ($pool.status == "exhausted" and $c.floor == null), unranked: true,
@@ -616,7 +618,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   (if $fb.to then $fb.to else $picked end) as $choice |
   (rule_at($choice)) as $rule |
   (if $rule == null then "none"
-   elif ($rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))) or
+   elif ($rule.floor.provider == "codex" and any(profiles($rule.use)[]; pooled_codex(.))) or
         ($rule.floor.provider == "claude" and $claude_quota_unbound and any(profiles($rule.use)[]; .harness == "claude"))
    then "unknown" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
   (if $choice != "default" and $rule == null then []

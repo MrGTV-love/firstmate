@@ -1581,6 +1581,7 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
   A fresh usable account keeps the pool usable; exhaustion requires every measured account to be exhausted with no unmeasured siblings.
   Unknown capacity stays eligible but unranked, and exhausted capacity is ineligible.
   The pool has no synthesized spendPriority or completion runway, and its profile and rule floors remain unverifiable.
+  An explicit `provider: "codex"` identifies an OMP pooled route even when the model is omitted; capacity then remains unknown, and an unverifiable rule floor escalates without selecting a measured default or declared stand-in.
   See "Pooled OMP capacity and declared stand-ins" above for exhaustion-only fallback and authentication-scope rules.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
