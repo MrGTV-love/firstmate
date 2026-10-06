@@ -164,14 +164,16 @@ control() {  # <fm-control arguments...>
     "$ROOT/bin/fm-control.sh" "$@" 2>&1
 }
 
-# The box shape is the proof's subject: wait until the idle composer is drawn
-# with its status in the top border, so a launch that still shows a splash or a
-# different shape fails here by name instead of passing vacuously.
+# Wait for both the box shape and Herdr's live-agent registration: omp can draw
+# its composer before the detector registers it. A splash, different shape, or
+# unregistered launch must never satisfy the guard's lifecycle precondition.
 i=0
 screen=
 while [ "$i" -lt 60 ]; do
   screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
-  if printf '%s\n' "$screen" | grep -Eq '^╭── (π|󰵗) [>·] '; then
+  if printf '%s\n' "$screen" | grep -Eq '^╭── (π|󰵗) [>·] ' \
+    && [ "$(fm_backend_herdr_composer_state "$TARGET")" = empty ] \
+    && [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ]; then
     break
   fi
   i=$((i + 1))
