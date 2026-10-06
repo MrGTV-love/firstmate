@@ -271,12 +271,6 @@ function hostLaunchRefused(message: string): boolean {
   return /^supervision-host: launch policy refused:/m.test(message);
 }
 
-function rememberPendingHostRefusal(pending: PendingActionableClose[]): void {
-  if (refusedHostConfiguration === null && pending.some((item) => hostLaunchRefused(item.message))) {
-    refusedHostConfiguration = hostConfigurationKey();
-  }
-}
-
 // The host-mode wake message: every "supervision-host:" line in order, wake
 // lines capped at eight, and the away note while the posture record exists.
 function hostWakeMessage(output: string): string {
@@ -766,7 +760,6 @@ export default function (pi: ExtensionAPI) {
           }
         };
         try {
-          rememberPendingHostRefusal([pending]);
           // A new restoration supersedes whatever became of the previous
           // successor; only a failure during this delivery is retried after it.
           owner.deferredClose = null;
@@ -960,6 +953,18 @@ export default function (pi: ExtensionAPI) {
     }
     const id = ++owner.seq;
     const hostConfiguration = hostConfigurationKey();
+    if (refusedHostConfiguration !== hostConfiguration &&
+      owner.pendingActionables.some((item) => hostLaunchRefused(item.message))) {
+      const result = spawnSync(
+        "bash",
+        ["-c", '. "$1"; fm_supervision_host_config "$2" omp; printf "%s\\n" "$FM_SUPERVISION_ENGINE_PROBLEM"', "_",
+          `${fmRoot}/bin/fm-supervision-engine-lib.sh`, config],
+        { cwd: fmRoot, encoding: "utf8", env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config } },
+      );
+      if (result.status === 0 && /^error: config\/session-launch-policy/m.test(result.stdout)) {
+        refusedHostConfiguration = hostConfiguration;
+      }
+    }
     const hostMode = existsSync(`${config}/supervision-host`) && refusedHostConfiguration !== hostConfiguration;
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -1090,7 +1095,6 @@ export default function (pi: ExtensionAPI) {
       enqueuePendingActionable(owner, actionable);
     }
     if (owner.pendingActionables.length > 0) {
-      rememberPendingHostRefusal(owner.pendingActionables);
       if (loadFailure) surfaceFailure(owner, loadFailure);
       const armResult = startArm(owner, owner.pendingActionables[0].predecessorArmPid);
       if (!armResult.ok) {

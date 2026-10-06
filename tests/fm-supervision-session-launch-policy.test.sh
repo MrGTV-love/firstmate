@@ -118,8 +118,8 @@ fm_supervision_engine_turn claude sonnet "$TMP_ROOT/prompt" "$TMP_ROOT/message" 
 pass 'absent policy preserves configured Claude engine and direct turn (fixture executable only)'
 
 test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor>
-  local consumer=$1 publication=$2 phase=$3 case_dir repo home out status
-  case_dir="$TMP_ROOT/$consumer-$publication-$phase"
+  local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} case_dir repo home out status
+  case_dir="$TMP_ROOT/$consumer-$publication-$phase-$replay_policy"
   repo="$case_dir/repo"
   home="$case_dir/home"
   mkdir -p "$repo/bin" "$repo/.omp/extensions" "$repo/.pi/extensions/lib" \
@@ -143,12 +143,19 @@ test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <i
   cp "$ROOT/.opencode/plugins/lib/fm-operational-input.js" "$repo/.opencode/plugins/lib/"
   cp "$ROOT/.opencode/plugins/package.json" "$repo/.opencode/plugins/"
   cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$ROOT/bin/fm-session-launch-policy-lib.sh" \
+    "$ROOT/bin/fm-config-inherit-lib.sh" "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$repo/bin/"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' \
     > "$repo/node_modules/typebox/index.js"
   cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'host=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
+if [ ! -e "$FM_HOME/config/session-launch-policy" ]; then
+  printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-%s\n' "$$" "$$"
+  trap 'exit 0' TERM INT
+  while :; do sleep 0.02; done
+fi
 if [ "$FM_POLICY_PHASE" = successor ] && [ ! -e "$FM_HOME/state/first-host" ]; then
   : > "$FM_HOME/state/first-host"
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
@@ -182,6 +189,7 @@ SH
   status=0
   out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" \
     FM_POLICY_ROOT="$ROOT" FM_POLICY_CONSUMER="$consumer" FM_POLICY_PUBLICATION="$publication" FM_POLICY_PHASE="$phase" \
+    FM_POLICY_REPLAY_POLICY="$replay_policy" \
     FM_OMP_ARM_READY_TIMEOUT_MS=1000 FM_OPENCODE_ARM_READY_TIMEOUT_MS=1000 \
     FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=1 \
     "$case_dir/$consumer" --eval "$(cat <<'JS'
@@ -193,6 +201,7 @@ const root = process.env.FM_ROOT_OVERRIDE;
 const consumer = process.env.FM_POLICY_CONSUMER;
 const phase = process.env.FM_POLICY_PHASE;
 const expectedHosts = phase === "successor" ? 2 : 1;
+const replayAllowed = process.env.FM_POLICY_REPLAY_POLICY === "removed";
 const records = [".supervision-host", ".supervision-host-turn", ".supervision-host-engine", "task.meta", "task.lease", "wakes.jsonl"];
 const before = records.map((name) => readFileSync(`${state}/${name}`, "utf8"));
 const rows = () => existsSync(`${state}/launches`) ? readFileSync(`${state}/launches`, "utf8").trim().split("\n") : [];
@@ -209,8 +218,10 @@ const api = {
   sendUserMessage(message) { record(message); },
 };
 function record(message) {
-  if (!plains().length || !rows().some((row) => row.startsWith("confirmed="))) {
-    throw new Error(`wake was delivered before ordinary monitoring and handling handoff: ${rows().join(" | ")}`);
+  const selected = existsSync(`${process.env.FM_HOME}/config/session-launch-policy`) ? plains().at(-1) : hosts().at(-1);
+  const pid = selected?.match(/^(?:host|plain)=([0-9]+)/)?.[1];
+  if (!pid || !rows().some((row) => row.startsWith("confirmed=") && row.endsWith(`watcher=${pid}`))) {
+    throw new Error(`wake was delivered before selected monitoring and handling handoff: ${rows().join(" | ")}`);
   }
   sent.push(message);
 }
@@ -264,17 +275,25 @@ try {
   if (sent.filter(ordinary).length !== 1 || sent.filter(refusal).length !== 1 || hosts().length !== expectedHosts) throw new Error(`ordinary close repeated denial or delivery: ${JSON.stringify({ sent, launches: rows() })}`);
   if (consumer === "omp") {
     await handlers.get("session_shutdown")({}, {});
+    if (replayAllowed) unlinkSync(`${process.env.FM_HOME}/config/session-launch-policy`);
     const replacement = await import(`${pathToFileURL(modulePath).href}?replacement=1`);
     replacement.default(api);
     await handlers.get("session_start")({}, {});
-    await until(() => sent.filter(refusal).length === 2 && plains().length === 3, "replacement did not replay its pending refusal with ordinary monitoring");
-    if (hosts().length !== expectedHosts) throw new Error(`replacement replay launched the denied host: ${rows().join(" | ")}`);
+    await until(() => sent.filter(refusal).length === 2 &&
+      (replayAllowed ? hosts().length === expectedHosts + 1 : plains().length === 3),
+      "replacement did not replay its pending refusal with currently permitted monitoring");
+    if (hosts().length !== expectedHosts + (replayAllowed ? 1 : 0) || plains().length !== (replayAllowed ? 2 : 3)) {
+      throw new Error(`replacement replay selected the wrong host or watcher: ${rows().join(" | ")}`);
+    }
     await consume();
     await handlers.get("session_shutdown")({}, {});
     await handlers.get("session_start")({}, {});
-    await until(() => plains().length === 4, "owning replacement did not retain ordinary monitoring");
+    await until(() => replayAllowed ? hosts().length === expectedHosts + 2 : plains().length === 4,
+      "owning replacement did not retain currently permitted monitoring");
     await arm();
-    if (hosts().length !== expectedHosts || sent.filter(refusal).length !== 2) throw new Error(`consumed replacement retried or redelivered the refusal: ${JSON.stringify({ sent, launches: rows() })}`);
+    if (hosts().length !== expectedHosts + (replayAllowed ? 2 : 0) || sent.filter(refusal).length !== 2) {
+      throw new Error(`consumed replacement selected wrong monitoring or redelivered refusal: ${JSON.stringify({ sent, launches: rows() })}`);
+    }
     if (existsSync(`${state}/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("consumed refusal remained in replacement handoff");
   }
   records.forEach((name, index) => {
@@ -295,9 +314,9 @@ try {
 process.exit(0);
 JS
 )" 2>&1) || status=$?
-  expect_code 0 "$status" "$consumer $publication $phase policy refusal public consumer: $out"
+  expect_code 0 "$status" "$consumer $publication $phase $replay_policy policy refusal public consumer: $out"
   [ -z "$out" ] || fail "$consumer policy consumer printed output: $out"
-  pass "$consumer $publication $phase: one terminal refusal, ordinary monitoring, unchanged custody, no denied restoration"
+  pass "$consumer $publication $phase $replay_policy: refusal delivered once per owner, current-policy monitoring, unchanged custody"
 }
 
 if command -v bun >/dev/null 2>&1; then
@@ -305,6 +324,9 @@ if command -v bun >/dev/null 2>&1; then
     for publication in published failed; do
       for phase in initial successor; do
         test_primary_consumer_policy_refusal "$consumer" "$publication" "$phase"
+        if [ "$consumer" = omp ]; then
+          test_primary_consumer_policy_refusal "$consumer" "$publication" "$phase" removed
+        fi
       done
     done
   done
