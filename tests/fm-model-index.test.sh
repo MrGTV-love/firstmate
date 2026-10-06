@@ -523,36 +523,57 @@ assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' 'a valid empty in
 cmp -s "$PUSH/home/config/model-index.json" "$PUSH/sm/config/model-index.json" || fail 'a valid empty index was not pushed'
 cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail 'role-free dispatch profiles were not pushed with the empty index'
 printf '%s\n' '{"version":1,"roles":{"stable":{"codex":{"model":"current"}}},"retired":[]}' > "$PUSH/safe-index.json"
+printf '%s\n' '{"default":{"harness":"codex","role":"stable"}}' > "$PUSH/safe-dispatch.json"
+{ cat "$PUSH/safe-index.json"; printf '%1048577s\n' ''; } > "$PUSH/oversize-index.json"
+{ cat "$PUSH/safe-dispatch.json"; printf '%1048577s\n' ''; } > "$PUSH/oversize-dispatch.json"
+for oversized in "$PUSH/oversize-index.json" "$PUSH/oversize-dispatch.json"; do
+  [ "$(wc -c < "$oversized")" -gt 1048576 ] || fail 'oversize fixture did not exceed the receiver limit'
+  jq -e . "$oversized" >/dev/null || fail 'oversize routing fixture must be valid JSON'
+done
 for source_route in local remote; do
   if [ "$source_route" = remote ]; then
     printf 'window=firstmate:fm-remote\nkind=secondmate\nhome=%s\nremote_host=inherit-host\n' "$PUSH/remote" > "$PUSH/home/state/remote.meta"
   fi
-  for unsafe_source in symlink hardlink directory; do
-  cp "$PUSH/sm/config/model-index.json" "$PUSH/before-stage-index.json"
-  cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/before-stage-dispatch.json"
-  rm "$PUSH/home/config/model-index.json"
-  case "$unsafe_source" in
-    symlink) ln -s "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json" ;;
-    hardlink) ln "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json" ;;
-    directory) mkdir "$PUSH/home/config/model-index.json" ;;
-  esac
-  printf '%s\n' "$unsafe_source" > "$PUSH/home/config/dispatch-never-send"
-  config_push "$CATALOGS"
-  if [ "$source_route" = local ] && [ "$unsafe_source" != directory ]; then
-    assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "local $unsafe_source regular target must still stage"
-    [ "$(FM_HOME="$PUSH/sm" "$TOOL" model codex role:stable)" = current ] || fail "local $unsafe_source target did not reach real consumer"
-  else
-    assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' "unsafe $source_route $unsafe_source staging must withhold the pair"
-    cmp -s "$PUSH/before-stage-index.json" "$PUSH/sm/config/model-index.json" || fail "unsafe $unsafe_source staging changed destination index"
-    cmp -s "$PUSH/before-stage-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "unsafe $unsafe_source staging changed destination dispatch"
-  fi
-  cmp -s "$PUSH/home/config/dispatch-never-send" "$PUSH/sm/config/dispatch-never-send" || fail "unsafe $unsafe_source staging blocked unrelated config"
-  if [ "$unsafe_source" = directory ]; then
-    rmdir "$PUSH/home/config/model-index.json"
-  else
-    rm "$PUSH/home/config/model-index.json"
-  fi
-  cp "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json"
+  for source_member in model-index.json crew-dispatch.json; do
+    for unsafe_source in symlink hardlink directory oversize; do
+      cp "$PUSH/sm/config/model-index.json" "$PUSH/before-stage-index.json"
+      cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/before-stage-dispatch.json"
+      cp "$PUSH/safe-index.json" "$PUSH/home/config/model-index.json"
+      cp "$PUSH/safe-dispatch.json" "$PUSH/home/config/crew-dispatch.json"
+      safe_payload="$PUSH/safe-index.json"
+      oversize_payload="$PUSH/oversize-index.json"
+      if [ "$source_member" = crew-dispatch.json ]; then
+        safe_payload="$PUSH/safe-dispatch.json"
+        oversize_payload="$PUSH/oversize-dispatch.json"
+      fi
+      rm "$PUSH/home/config/$source_member"
+      case "$unsafe_source" in
+        symlink) ln -s "$safe_payload" "$PUSH/home/config/$source_member" ;;
+        hardlink) ln "$safe_payload" "$PUSH/home/config/$source_member" ;;
+        directory) mkdir "$PUSH/home/config/$source_member" ;;
+        oversize) cp "$oversize_payload" "$PUSH/home/config/$source_member" ;;
+      esac
+      printf '%s\n' "$source_member-$unsafe_source" > "$PUSH/home/config/dispatch-never-send"
+      config_push "$CATALOGS"
+      if [ "$source_route" = local ] && [ "$unsafe_source" != directory ]; then
+        assert_not_contains "$(cat "$TMP_ROOT/push.out")" 'not pushed' "local $source_member $unsafe_source regular target must still stage"
+        [ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail "local $source_member $unsafe_source did not reach real consumer"
+      else
+        assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' "unsafe $source_route $source_member $unsafe_source staging must withhold the pair"
+        cmp -s "$PUSH/before-stage-index.json" "$PUSH/sm/config/model-index.json" || fail "unsafe $source_member $unsafe_source staging changed destination index"
+        cmp -s "$PUSH/before-stage-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "unsafe $source_member $unsafe_source staging changed destination dispatch"
+        [ "$(FM_HOME="$PUSH/sm" "$TOOL" profiles "$PUSH/sm/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail "unsafe $source_member $unsafe_source staging left an unresolvable retained pair"
+      fi
+      cmp -s "$PUSH/home/config/dispatch-never-send" "$PUSH/sm/config/dispatch-never-send" || fail "unsafe $source_member $unsafe_source staging blocked unrelated config"
+      if [ "$unsafe_source" = directory ]; then
+        rmdir "$PUSH/home/config/$source_member"
+      else
+        rm "$PUSH/home/config/$source_member"
+      fi
+      cp "$safe_payload" "$PUSH/home/config/$source_member"
+    done
   done
   [ "$source_route" != remote ] || rm "$PUSH/home/state/remote.meta"
 done
@@ -585,6 +606,19 @@ remote_home=$(printf '%s' "$5" | base64 --decode)
 args=()
 while IFS= read -r -d '' arg; do args+=("$arg"); done < <(printf '%s' "$6" | base64 --decode)
 [ "${args[0]}" = fm-remote-inherit.sh ] || exit 92
+if [ -n "${PAIR_SSH_LOG:-}" ]; then
+  printf '%s %s\n' "${args[1]}" "${args[2]}" >> "$PAIR_SSH_LOG"
+fi
+if [ "${args[1]}" = check ] && [ -n "${PAIR_RACE_MARKER:-}" ] && [ ! -e "$PAIR_RACE_MARKER" ]; then
+  for member in model-index.json crew-dispatch.json; do
+    if [ "$PAIR_RACE_ACTION" = remove ] && [ -e "$PAIR_RACE_SOURCE/$member" ]; then
+      rm "$PAIR_RACE_SOURCE/$member"
+    else
+      cp "$PAIR_RACE_LATER/$member" "$PAIR_RACE_SOURCE/$member"
+    fi
+  done
+  printf 'mutated\n' > "$PAIR_RACE_MARKER"
+fi
 FM_HOME="$remote_home" FM_STATE_OVERRIDE="$remote_home/state" \
   exec "$remote_root/bin/${args[0]}" "${args[@]:1}"
 SH
@@ -779,6 +813,263 @@ for boundary_mode in bootstrap launch; do
   done
 done
 pass 'bootstrap and remote launch refuse incoherent source routing while real receiver convergence continues, and publish valid selected pairs without live catalog checks'
+
+for source_member in model-index.json crew-dispatch.json; do
+  for unsafe_source in symlink hardlink directory oversize; do
+    source_guard_home="$TMP_ROOT/remote-source-$source_member-$unsafe_source"
+    seed_coherent_destination "$source_guard_home"
+    mkdir -p "$source_guard_home/state"
+    set_pair_source both
+    cp "$PAIR_SOURCE/model-index.json" "$COHERENCE_SOURCE/config/model-index.json"
+    cp "$PAIR_SOURCE/crew-dispatch.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+    printf '%s\n' "$source_member-$unsafe_source" > "$COHERENCE_SOURCE/config/dispatch-never-send"
+    source_payload="$TMP_ROOT/source-$source_member-$unsafe_source.json"
+    cp "$COHERENCE_SOURCE/config/$source_member" "$source_payload"
+    rm "$COHERENCE_SOURCE/config/$source_member"
+    case "$unsafe_source" in
+      symlink) ln -s "$source_payload" "$COHERENCE_SOURCE/config/$source_member" ;;
+      hardlink) ln "$source_payload" "$COHERENCE_SOURCE/config/$source_member" ;;
+      directory) mkdir "$COHERENCE_SOURCE/config/$source_member" ;;
+      oversize)
+        { cat "$source_payload"; printf '%1048577s\n' ''; } > "$COHERENCE_SOURCE/config/$source_member"
+        [ "$(wc -c < "$COHERENCE_SOURCE/config/$source_member")" -gt 1048576 ] || fail 'automatic source fixture is not oversized'
+        jq -e . "$COHERENCE_SOURCE/config/$source_member" >/dev/null || fail 'automatic oversized source is not valid JSON'
+        ;;
+    esac
+    printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+      "$ROOT" "$source_guard_home" > "$COHERENCE_SOURCE/data/secondmates.md"
+    : > "$TMP_ROOT/source-ssh.log"
+    source_code=0
+    FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
+      FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" PAIR_SSH_LOG="$TMP_ROOT/source-ssh.log" \
+      "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+      > "$TMP_ROOT/source-guard.out" 2>&1 || source_code=$?
+    [ "$source_code" -ne 0 ] || fail "automatic remote sender accepted $source_member $unsafe_source"
+    assert_retained_pair "$source_guard_home" "remote source $source_member $unsafe_source"
+    assert_unrelated_coherence_material "$source_guard_home" launch
+    for member in model-index.json crew-dispatch.json; do
+      assert_not_contains "$(cat "$TMP_ROOT/source-ssh.log")" "put config/$member" 'unsafe source must withhold both routing transfers'
+      assert_not_contains "$(cat "$TMP_ROOT/source-ssh.log")" "absent config/$member" 'unsafe source must withhold both routing removals'
+    done
+    if [ "$unsafe_source" = symlink ] || [ "$unsafe_source" = hardlink ]; then
+      local_source_home="$TMP_ROOT/local-source-$source_member-$unsafe_source"
+      seed_coherent_destination "$local_source_home"
+      git -C "$local_source_home" init -q
+      printf 'config/\n' > "$local_source_home/.gitignore"
+      propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$local_source_home" \
+        > "$TMP_ROOT/local-source.out" 2>&1 || fail "local automatic boundary refused source $source_member $unsafe_source"
+      [ "$(FM_HOME="$local_source_home" "$TOOL" profiles "$local_source_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+        || fail "local source $source_member $unsafe_source did not reach the real consumer"
+      cmp -s "$source_payload" "$local_source_home/config/$source_member" || fail 'local source link bytes changed'
+    fi
+    if [ "$unsafe_source" = directory ]; then
+      rmdir "$COHERENCE_SOURCE/config/$source_member"
+    else
+      rm "$COHERENCE_SOURCE/config/$source_member"
+    fi
+    remote_generation=$((remote_generation + 1))
+  done
+done
+pass 'automatic remote source guards withhold both members before transfer for either unsafe source while local source links remain consumable'
+
+RACE_BIN="$TMP_ROOT/pair-race-bin"
+RACE_LATER="$TMP_ROOT/pair-race-later"
+mkdir -p "$RACE_BIN" "$RACE_LATER"
+cp "$TMP_ROOT/retained-index.json" "$RACE_LATER/model-index.json"
+cp "$TMP_ROOT/retained-dispatch.json" "$RACE_LATER/crew-dispatch.json"
+REAL_GIT=$(command -v git)
+cat > "$RACE_BIN/git" <<'SH'
+#!/usr/bin/env bash
+set -eu
+for arg in "$@"; do
+  if [ "$arg" = check-ignore ]; then
+    count=0
+    [ ! -f "$PAIR_RACE_COUNT" ] || read -r count < "$PAIR_RACE_COUNT"
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$PAIR_RACE_COUNT"
+    if [ "$count" = 3 ]; then
+      for member in model-index.json crew-dispatch.json; do
+        if [ "$PAIR_RACE_ACTION" = remove ] && [ -e "$PAIR_RACE_SOURCE/$member" ]; then
+          rm "$PAIR_RACE_SOURCE/$member"
+        else
+          cp "$PAIR_RACE_LATER/$member" "$PAIR_RACE_SOURCE/$member"
+        fi
+      done
+      printf 'mutated\n' > "$PAIR_RACE_MARKER"
+    fi
+    break
+  fi
+done
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$RACE_BIN/git"
+for race_boundary in local remote; do
+  for presence in both index-only dispatch-only absent; do
+    for race_action in replace remove; do
+      race_home="$TMP_ROOT/pair-race-$race_boundary-$presence-$race_action"
+      race_expected="$race_home/expected"
+      race_mutated="$race_home/mutated"
+      seed_coherent_destination "$race_home"
+      mkdir -p "$race_home/state" "$race_expected" "$race_mutated"
+      git -C "$race_home" init -q
+      printf 'config/\n' > "$race_home/.gitignore"
+      set_pair_source "$presence"
+      rm -f "$COHERENCE_SOURCE/config/model-index.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+      for member in model-index.json crew-dispatch.json; do
+        if [ -f "$PAIR_SOURCE/$member" ]; then
+          cp "$PAIR_SOURCE/$member" "$COHERENCE_SOURCE/config/$member"
+          cp "$PAIR_SOURCE/$member" "$race_expected/$member"
+        fi
+        if [ "$race_action" != remove ] || [ ! -f "$PAIR_SOURCE/$member" ]; then
+          cp "$RACE_LATER/$member" "$race_mutated/$member"
+        fi
+      done
+      printf '%s\n' "$race_boundary-$presence-$race_action" > "$COHERENCE_SOURCE/config/dispatch-never-send"
+      if [ "$race_boundary" = local ]; then
+        PATH="$RACE_BIN:$PATH" REAL_GIT="$REAL_GIT" PAIR_RACE_COUNT="$race_home/check-count" \
+          PAIR_RACE_SOURCE="$COHERENCE_SOURCE/config" PAIR_RACE_LATER="$RACE_LATER" \
+          PAIR_RACE_ACTION="$race_action" PAIR_RACE_MARKER="$race_home/marker" \
+          propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$race_home" \
+          > "$TMP_ROOT/pair-race.out" 2>&1 || fail "local frozen $presence $race_action refused: $(cat "$TMP_ROOT/pair-race.out")"
+      else
+        printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+          "$ROOT" "$race_home" > "$COHERENCE_SOURCE/data/secondmates.md"
+        FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
+          FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" PAIR_RACE_SOURCE="$COHERENCE_SOURCE/config" \
+          PAIR_RACE_LATER="$RACE_LATER" PAIR_RACE_ACTION="$race_action" PAIR_RACE_MARKER="$race_home/marker" \
+          "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+          > "$TMP_ROOT/pair-race.out" 2>&1 || fail "remote frozen $presence $race_action refused: $(cat "$TMP_ROOT/pair-race.out")"
+        remote_generation=$((remote_generation + 1))
+      fi
+      [ "$(cat "$race_home/marker")" = mutated ] || fail "$race_boundary post-validation mutation hook did not run"
+      for member in model-index.json crew-dispatch.json; do
+        if [ -f "$race_mutated/$member" ]; then
+          cmp -s "$race_mutated/$member" "$COHERENCE_SOURCE/config/$member" || fail "$race_boundary original $member did not mutate"
+        else
+          [ ! -e "$COHERENCE_SOURCE/config/$member" ] || fail "$race_boundary original $member was not removed"
+        fi
+        if [ -f "$race_expected/$member" ]; then
+          cmp -s "$race_expected/$member" "$race_home/config/$member" || fail "$race_boundary published unfrozen $member for $presence $race_action"
+        else
+          [ ! -e "$race_home/config/$member" ] || fail "$race_boundary published late $member for $presence $race_action"
+        fi
+      done
+      if [ -f "$race_expected/crew-dispatch.json" ]; then
+        [ "$(FM_HOME="$race_home" "$TOOL" profiles "$race_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+          || fail "$race_boundary frozen $presence pair failed the real consumer"
+      fi
+      assert_unrelated_coherence_material "$race_home" launch
+    done
+  done
+done
+pass 'automatic local and remote boundaries publish validated bytes and absences after source replacement, removal, and late appearance of either member'
+
+NOJQ="$TMP_ROOT/no-jq"
+mkdir -p "$NOJQ/bin" "$NOJQ/home/config" "$NOJQ/home/data" "$NOJQ/home/state"
+for executable in bash sh dirname perl git mkdir mktemp cp mv rm cmp uname stat sed chmod date awk \
+  wc tr basename head cat ln readlink rmdir sleep base64 grep tail cut sort ps od touch; do
+  resolved=$(command -v "$executable") || fail "missing no-jq fixture dependency: $executable"
+  ln -s "$resolved" "$NOJQ/bin/$executable"
+done
+if resolved=$(command -v shasum); then
+  ln -s "$resolved" "$NOJQ/bin/shasum"
+else
+  ln -s "$(command -v sha256sum)" "$NOJQ/bin/sha256sum"
+fi
+PATH="$NOJQ/bin" bash -c '! command -v jq >/dev/null 2>&1' || fail 'restricted fixture PATH still exposes jq'
+for nojq_boundary in local remote; do
+  for presence in absent index-only dispatch-only; do
+    nojq_home="$NOJQ/$nojq_boundary-$presence"
+    seed_coherent_destination "$nojq_home"
+    mkdir -p "$nojq_home/state"
+    git -C "$nojq_home" init -q
+    printf 'config/\n' > "$nojq_home/.gitignore"
+    set_pair_source "$presence"
+    rm -f "$COHERENCE_SOURCE/config/model-index.json" "$COHERENCE_SOURCE/config/crew-dispatch.json"
+    for member in model-index.json crew-dispatch.json; do
+      [ ! -f "$PAIR_SOURCE/$member" ] || cp "$PAIR_SOURCE/$member" "$COHERENCE_SOURCE/config/$member"
+    done
+    printf '%s\n' "$nojq_boundary-$presence" > "$COHERENCE_SOURCE/config/dispatch-never-send"
+    nojq_code=0
+    if [ "$nojq_boundary" = local ]; then
+      (
+        export PATH="$NOJQ/bin"
+        ! command -v jq >/dev/null 2>&1 || exit 98
+        propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$nojq_home"
+      ) > "$TMP_ROOT/no-jq.out" 2>&1 || nojq_code=$?
+    else
+      printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
+        "$ROOT" "$nojq_home" > "$COHERENCE_SOURCE/data/secondmates.md"
+      PATH="$NOJQ/bin" FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
+        FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+        > "$TMP_ROOT/no-jq.out" 2>&1 || nojq_code=$?
+      remote_generation=$((remote_generation + 1))
+    fi
+    if [ "$presence" = absent ]; then
+      [ "$nojq_code" = 0 ] || fail "$nojq_boundary absent pair required jq: $(cat "$TMP_ROOT/no-jq.out")"
+      [ ! -e "$nojq_home/config/model-index.json" ] && [ ! -e "$nojq_home/config/crew-dispatch.json" ] \
+        || fail "$nojq_boundary no-jq pair absence did not remove both destination members"
+    else
+      [ "$nojq_code" -ne 0 ] || fail "$nojq_boundary accepted $presence without mandatory jq validation"
+      assert_retained_pair "$nojq_home" "$nojq_boundary no-jq $presence"
+      assert_contains "$(cat "$TMP_ROOT/no-jq.out")" jq 'present pair refusal must explain missing validation dependency'
+    fi
+    assert_unrelated_coherence_material "$nojq_home" launch
+  done
+done
+
+git -C "$PUSH/root" worktree add -q --detach "$NOJQ/sm" HEAD
+printf 'no-jq\n' > "$NOJQ/sm/.fm-secondmate-home"
+mkdir -p "$NOJQ/sm/config" "$NOJQ/sm/state" "$NOJQ/sm/data"
+printf 'window=firstmate:fm-no-jq\nkind=secondmate\nhome=%s\n' "$NOJQ/sm" > "$NOJQ/home/state/no-jq.meta"
+printf 'codex\n' > "$NOJQ/home/config/crew-harness"
+cp "$NOJQ/home/config/crew-harness" "$NOJQ/sm/config/crew-harness"
+touch "$NOJQ/home/state/.last-watcher-beat"
+mkdir -p "$NOJQ/code"
+cp -R "$ROOT/bin" "$NOJQ/code/bin"
+cat > "$NOJQ/code/bin/fm-send.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+[ "$#" = 2 ] && [ "$1" = fm-no-jq ] || exit 90
+case "$2" in
+  "CONFIG_REREAD: $NOJQ_SEND_HOME/state/"*) instruction=${2#CONFIG_REREAD: } ;;
+  *) exit 91 ;;
+esac
+[ -f "$instruction" ] || exit 92
+printf '%s\t%s\n' "$1" "$2" >> "$NOJQ_SEND_LOG"
+SH
+chmod +x "$NOJQ/code/bin/fm-send.sh"
+for presence in absent index-only dispatch-only; do
+  seed_coherent_destination "$NOJQ/sm"
+  rm "$NOJQ/sm/config/dispatch-never-send"
+  set_pair_source "$presence"
+  rm -f "$NOJQ/home/config/model-index.json" "$NOJQ/home/config/crew-dispatch.json"
+  for member in model-index.json crew-dispatch.json; do
+    [ ! -f "$PAIR_SOURCE/$member" ] || cp "$PAIR_SOURCE/$member" "$NOJQ/home/config/$member"
+  done
+  printf 'main-authoritative; read-only in secondmate homes; must not be edited there; edit in the main firstmate; document pointer\nno-jq %s\n' \
+    "$presence" > "$NOJQ/home/data/captain-shared.md"
+  nojq_code=0
+  rm -f "$NOJQ/send.log"
+  PATH="$NOJQ/bin" FM_HOME="$NOJQ/home" FM_ROOT_OVERRIDE="$PUSH/root" FM_MODEL_CATALOG_DIR="$CATALOGS" \
+    NOJQ_SEND_HOME="$NOJQ/sm" NOJQ_SEND_LOG="$NOJQ/send.log" \
+    "$NOJQ/code/bin/fm-config-push.sh" > "$TMP_ROOT/no-jq-push.out" 2>&1 || nojq_code=$?
+  if [ "$presence" = absent ]; then
+    [ "$nojq_code" = 0 ] || fail "config-push absent pair required jq: $(cat "$TMP_ROOT/no-jq-push.out")"
+    [ ! -e "$NOJQ/sm/config/model-index.json" ] && [ ! -e "$NOJQ/sm/config/crew-dispatch.json" ] \
+      || fail 'config-push no-jq absence did not remove both destination members'
+    assert_contains "$(cat "$NOJQ/send.log")" "fm-no-jq"$'\t'"CONFIG_REREAD: $NOJQ/sm/state/" \
+      'no-jq config-push pair removal must deliver the real reread instruction through the fixture transport'
+  else
+    [ "$nojq_code" -ne 0 ] || fail "config-push accepted $presence without jq"
+    assert_retained_pair "$NOJQ/sm" "config-push no-jq $presence"
+    assert_contains "$(cat "$TMP_ROOT/no-jq-push.out")" 'model-index.json and crew-dispatch.json not pushed' 'config-push must withhold unvalidated pair'
+    [ ! -e "$NOJQ/send.log" ] || fail 'withheld no-jq routing unexpectedly sent a reread instruction'
+  fi
+  cmp -s "$NOJQ/home/data/captain-shared.md" "$NOJQ/sm/data/captain-shared.md" || fail 'no-jq config-push blocked shared preferences'
+  cmp -s "$NOJQ/home/config/crew-harness" "$NOJQ/sm/config/crew-harness" || fail 'no-jq config-push changed unrelated config'
+done
+pass 'both-source absence removes routing without jq at local, remote, and config-push boundaries while either present member still requires validation'
 cat > "$PUSH/jqbin/pi" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --list-models ] || exit 0

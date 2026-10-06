@@ -571,24 +571,56 @@ fm_config_inherit_source() {
   printf '%s/%s\n' "$config" "$item"
 }
 
+fm_config_inherit_pair_stage() {
+  local config=$1 staging=$2 remote=${3:-0} item source present bytes
+  for item in model-index.json crew-dispatch.json; do
+    case " $FM_INHERITABLE_CONFIG " in *" $item "*) ;; *) continue ;; esac
+    source=$(fm_config_inherit_source "$config" "$item") || return 1
+    present=$(fm_config_source_present "$source") || return 1
+    [ "$present" = 1 ] || continue
+    if [ ! -f "$source" ] || [ ! -r "$source" ]; then
+      printf 'routing source is not a readable regular file: %s\n' "$source" >&2
+      return 1
+    fi
+    if [ "$remote" = 1 ]; then
+      if [ -L "$source" ] || [ "$(fm_inherit_file_link_count "$source")" != 1 ]; then
+        printf 'routing source has unsafe links: %s\n' "$source" >&2
+        return 1
+      fi
+    fi
+    cp -p -- "$source" "$staging/$item" || return 1
+    [ -f "$staging/$item" ] && [ -r "$staging/$item" ] && [ ! -L "$staging/$item" ] || return 1
+    if [ "$remote" = 1 ]; then
+      bytes=$(LC_ALL=C wc -c < "$staging/$item" | tr -d ' ') || return 1
+      if [ "$bytes" -gt 1048576 ]; then
+        printf 'routing source exceeds 1048576 bytes: %s\n' "$source" >&2
+        return 1
+      fi
+    fi
+  done
+}
+
 fm_config_inherit_pair_valid() {
-  local config=${FM_CONFIG_INHERIT_PAIR_DIR:-$1} item src present dispatch=/dev/null
+  local config=$1 item src present dispatch=/dev/null any_present=0
   for item in model-index.json crew-dispatch.json; do
     src="$config/$item"
     present=$(fm_config_source_present "$src") || return 1
     [ "$present" = 1 ] || continue
+    any_present=1
     if [ ! -f "$src" ] || [ ! -r "$src" ]; then
       printf 'routing source is not a readable regular file: %s\n' "$src" >&2
       return 1
     fi
     [ "$item" != crew-dispatch.json ] || dispatch=$src
   done
+  [ "$any_present" = 1 ] || return 0
   FM_CONFIG_OVERRIDE="$config" \
     "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles "$dispatch" >/dev/null
 }
 
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason=
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason= pair_stage=
+  local FM_CONFIG_INHERIT_PAIR_DIR=${FM_CONFIG_INHERIT_PAIR_DIR:-}
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
@@ -597,8 +629,10 @@ propagate_inheritable_config() {
       if ! destination_allows_inherited_pair "$dest_config"; then
         pair_allowed=0
         pair_reason=$(inheritable_config_skip_reason)
-      elif pair_reason=$(fm_config_inherit_pair_valid "$src_config" 2>&1); then
-        :
+      elif pair_stage=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-inherit-pair.XXXXXX") &&
+        pair_reason=$(fm_config_inherit_pair_stage "$src_config" "$pair_stage" 2>&1) &&
+        pair_reason=$(fm_config_inherit_pair_valid "$pair_stage" 2>&1); then
+        FM_CONFIG_INHERIT_PAIR_DIR=$pair_stage
       else
         pair_allowed=0
         rc=1
@@ -607,7 +641,10 @@ propagate_inheritable_config() {
   esac
   for item in $FM_INHERITABLE_CONFIG; do
     case "$item" in
-      ''|/*|.|..|../*|*/../*|*/..) return 1 ;;
+      ''|/*|.|..|../*|*/../*|*/..)
+        [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
+        return 1
+        ;;
     esac
     if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ] && fm_config_inherit_item_session_scoped "$item"; then
       record_inheritable_config_result "$item" unchanged "session-scoped"
@@ -623,7 +660,10 @@ propagate_inheritable_config() {
         fi
         ;;
     esac
-    src=$(fm_config_inherit_source "$src_config" "$item") || return 1
+    if ! src=$(fm_config_inherit_source "$src_config" "$item"); then
+      [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
+      return 1
+    fi
     dest="$dest_config/$item"
     if ! source_present=$(fm_config_source_present "$src"); then
       reason="cannot inspect primary source"
@@ -717,6 +757,7 @@ propagate_inheritable_config() {
       record_inheritable_config_result "$item" unchanged ""
     fi
   done
+  [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
   return "$rc"
 }
 

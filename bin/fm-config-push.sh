@@ -133,36 +133,10 @@ errors=0
 # resolve, keeps every home on its current index and the dispatch profiles
 # whose roles it resolves; so does an inheritable crew-dispatch.json that does
 # not resolve against the index. An unavailable catalog is only a notice.
-stage_pair() {
-  local item source present _id home _window meta remote=0
-  pair_dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-push-pair.XXXXXX") || return 1
-  while IFS='|' read -r _id home _window meta; do
-    [ -n "$home" ] || continue
-    if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then remote=1; break; fi
-  done < "$records"
-  for item in model-index.json crew-dispatch.json; do
-    case " $FM_INHERITABLE_CONFIG " in *" $item "*) ;; *) continue ;; esac
-    source="$CONFIG/$item"
-    present=$(fm_config_source_present "$source") || return 1
-    [ "$present" = 1 ] || continue
-    [ -f "$source" ] || return 1
-    if [ "$remote" = 1 ]; then
-      [ ! -L "$source" ] || return 1
-      [ "$(fm_inherit_file_link_count "$source")" = 1 ] || return 1
-    fi
-    cp -p -- "$source" "$pair_dir/$item" || return 1
-    [ -f "$pair_dir/$item" ] && [ ! -L "$pair_dir/$item" ] || return 1
-  done
-  FM_CONFIG_INHERIT_PAIR_DIR="$pair_dir"
-  export FM_CONFIG_INHERIT_PAIR_DIR
-}
 
 index_check() {
-  local harnesses harness selection root dispatch=/dev/null
-  case " $FM_INHERITABLE_CONFIG " in
-    *" crew-dispatch.json "*) [ ! -e "$pair_dir/crew-dispatch.json" ] || dispatch="$pair_dir/crew-dispatch.json" ;;
-  esac
-  FM_CONFIG_OVERRIDE="$pair_dir" "$SCRIPT_DIR/fm-model-index.sh" profiles "$dispatch" >/dev/null || return 1
+  local harnesses harness selection root
+  fm_config_inherit_pair_valid "$pair_dir" || return 1
   [ -e "$pair_dir/model-index.json" ] || return 0
   harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$pair_dir/model-index.json" 2>/dev/null) || return 1
   for harness in $harnesses; do
@@ -178,7 +152,17 @@ index_check() {
 }
 case " $FM_INHERITABLE_CONFIG " in
   *" model-index.json "*|*" crew-dispatch.json "*)
-    if ! stage_pair || ! index_check; then
+    remote=0
+    while IFS='|' read -r _id home _window meta; do
+      [ -n "$home" ] || continue
+      if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then remote=1; break; fi
+    done < "$records"
+    if pair_dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-push-pair.XXXXXX") &&
+      fm_config_inherit_pair_stage "$CONFIG" "$pair_dir" "$remote" &&
+      index_check; then
+      FM_CONFIG_INHERIT_PAIR_DIR=$pair_dir
+      export FM_CONFIG_INHERIT_PAIR_DIR
+    else
       echo "config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun"
       errors=1
       inheritable=

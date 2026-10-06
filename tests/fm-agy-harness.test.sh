@@ -592,6 +592,10 @@ EOF
 NODE_BIN=$(command -v node) || fail "test needs node"
 NODE_BIN_DIR=$(dirname "$NODE_BIN")
 BASE_PATH=${FM_TEST_BASE_PATH:-$NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
+JQ_BIN=$(command -v jq) || fail "test needs jq"
+DEPENDENCY_BIN=$(fm_fakebin "$TMP_ROOT/dependencies")
+ln -s "$JQ_BIN" "$DEPENDENCY_BIN/jq"
+BASE_PATH="$DEPENDENCY_BIN:$BASE_PATH"
 
 run_agy_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6

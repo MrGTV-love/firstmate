@@ -1180,8 +1180,10 @@ Run `bin/fm-model-index.sh check` after every index edit; it checks every active
 The Vernant steward lane owner must also run `FM_HOME="/path/to/lane-home" bin/fm-model-index.sh check-registry "/path/to/vernant-checkout/scripts/model_registry.json"` after every index edit and before every Vernant model change, replacing the placeholder paths with that lane's home and Vernant checkout.
 This read-only comparison writes nothing to Vernant; the command header and `--help` own its registry scanning and refusal semantics.
 `bin/fm-config-push.sh` runs the active-id catalog check before it pushes an index, each harness's entries under only that harness's `config/claude-account` or `config/pi-account` pin.
-The push stages the index and inheritable dispatch document once, validates that staged pair, and sends those same bytes or absences through both local and remote propagation.
-Before either routing file is replaced or removed, local and remote inheritance validate the selected source index/dispatch pair offline and preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
+Each propagation boundary stages the index and inheritable dispatch document once, validates that staged pair, and publishes those same bytes or absences.
+Before either routing file is replaced or removed, local and remote inheritance validate the staged pair offline and preflight both destination guards; refusal retains both files while unrelated inherited material continues to propagate.
+Remote propagation also requires both selected payloads to be readable regular files, without symlinks or multiple hardlinks, and no larger than 1,048,576 bytes each; local inheritance continues to accept readable regular-file source links.
+When both selected routing sources are proven absent, propagation mirrors their absence without requiring jq.
 Remote live callers still notify unrelated successfully published inherited changes when a destination pair guard refuses, and pending sends still retry despite that guard.
 When the index is malformed, an id is absent from a readable catalog, a declared pin does not resolve, or `crew-dispatch.json` does not resolve against the index, it withholds both `model-index.json` and `crew-dispatch.json` from every home, so each keeps a coherent pair, and exits non-zero; an unavailable catalog is only a notice.
 Spawn-time propagation and bootstrap run this offline coherence check, including when the primary removes its index, but do not fetch live catalogs.
