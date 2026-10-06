@@ -1581,6 +1581,28 @@ The suite's existing Darwin-specific index-lock mtime fault injection was not ex
 A checkout-local throwaway smoke separately executed the recovery fixture's production inventory/reaper boundary, including its command-scoped `ID` and `BACKEND` inputs: the generated owned process was removed and the unrelated process remained alive.
 No Herdr session was provisioned in this CI follow-up; the native named-lab evidence above is unchanged.
 
+The subsequent required-prerequisite CI correction was verified on 2026-10-06.
+Provider reads (`gh pr view`, `gh pr checks --json`, and the existing job log) succeeded without credential or configuration changes.
+Run `37512668073`, Herdr job `112437553561`, belongs to head `0aa309b273a5a3821687943679053fb5dad58acb`; its green result is not recovery-regression proof: the exact script reported `tasks-axi not found`, `exit=0`, and `gate_skip=true`.
+
+The Herdr job now installs tasks-axi using the existing npm convention before running the family.
+The existing `--fail-on-gate-skip` option accumulates repeated tokens, so this lane rejects both missing Herdr and missing tasks-axi at the shared serial/parallel result boundary.
+A throwaway executable smoke parsed the workflow and ran its actual npm installation command with a checkout-local prefix/cache; the installed CLI reported `0.2.6`.
+With tasks-axi deliberately absent from PATH, the original recovery entrypoint under the workflow's parsed required-skip options failed before provisioning (`exit=1`, `failed=1`, `skipped_gate=0`).
+An ordinary executable fixture under those same options passed with `gate_skip=false`.
+Shell syntax checks, pinned ShellCheck 0.11.0 full extended analysis of the changed shell files, and actionlint of the workflow passed.
+
+Current `origin/main` (`12609b8641addef89bf4ab980ad490644395daf5`) was merged without rewriting the task history.
+The merge retains the exact acquisition abort target and the approved release of presentation custody before allocation.
+Main's acquisition-contention fixture now proves that release, then uses the existing ownership-sensitive lock API to hold fixture-owned contention; it releases the lock before resuming allocation and before failure cleanup.
+The guarded acquisition entrypoint (`tests/fm-spawn-acquisition-herdr-e2e.test.sh`) passed through `fm-test-run.sh` with `exit=0`, `failed=0`, and `gate_skip=false` (306609 ms).
+Both flat and projected acquisition cases ran; the flat case also exercised fixture-held contention, preservation of both live leases, and exact cleanup of only the refused acquisition after the projected launch.
+The complete runner and workflow contract suites also passed through `fm-test-run.sh` (`total=2`, `failed=0`, `skipped_gate=0`): runner 693622 ms, workflow 12439 ms.
+The runner suite exercised singleton and repeated required-skip flags, both option forms and token ordering, ordinary skip accounting, serial/parallel result handling, and aggregate failure propagation.
+The recovery regression's scenarios and the Herdr family's 20-minute step timeout are unchanged.
+The outer executor must publish through the active pipeline, perform native current-base revalidation, and inspect the resulting real CI log for this exact recovery script completing with `exit=0` and `gate_skip=false` on a green mergeable head.
+No new-head CI execution or Linux timing measurement is claimed by these local checks.
+
 ### Workspace-removal focus safety
 
 The focus-flash regression ran on 2026-08-05 against both Herdr 0.7.5 protocol 17 and Herdr 0.8.0 protocol 19 on macOS aarch64, with the 0.7.5 run using the pinned upstream release binary first on `PATH`:

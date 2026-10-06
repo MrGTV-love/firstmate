@@ -955,13 +955,14 @@ assert record["gate_skip_reason"].startswith("live: "), record
 }
 
 test_fail_on_gate_skip_token() {
-  local tmp skip_f out rc
+  local tmp skip_f out rc token form
+  local -a flags
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-fail-skip.XXXXXX")
   skip_f="$tmp/skip.test.sh"
   out="$tmp/out.txt"
   cat >"$skip_f" <<'SH'
 #!/usr/bin/env bash
-echo "skip: herdr not found"
+echo "skip: ${TEST_GATE_SKIP_TOKEN:-herdr not found}"
 exit 0
 SH
   chmod +x "$skip_f"
@@ -974,8 +975,39 @@ SH
     || fail "summary must report failed=1 under fail-on-gate-skip: $(grep FM_TEST_SUMMARY "$out")"
   grep -q 'required gate skip token' "$tmp/err.txt" \
     || fail "runner must log the required gate skip token"
+
+  # Each token must survive accumulation, especially the first flag that the
+  # former singleton lost. Exercise repeated separate and equals-form flags.
+  for form in separate equals; do
+    case "$form" in
+      separate)
+        flags=(--fail-on-gate-skip 'herdr not found' --fail-on-gate-skip 'tasks-axi not found')
+        ;;
+      equals)
+        flags=('--fail-on-gate-skip=tasks-axi not found' '--fail-on-gate-skip=herdr not found')
+        ;;
+    esac
+    for token in 'herdr not found' 'tasks-axi not found'; do
+      set +e
+      TEST_GATE_SKIP_TOKEN="$token" "$RUNNER" "${flags[@]}" --json "$tmp/timing.json" \
+        "$skip_f" >"$out" 2>"$tmp/err.txt"
+      rc=$?
+      set -e
+      [ "$rc" -ne 0 ] || fail "$form repeated flags must make $token a hard failure"
+      grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
+        || fail "$form repeated flags must report failed=1 for $token"
+      grep -F -q "required gate skip token seen in $skip_f: skip: $token" "$tmp/err.txt" \
+        || fail "$form repeated flags must log the matching token $token"
+      python3 -c '
+import json, sys
+selection = json.load(open(sys.argv[1]))["selection"]
+for token in ("herdr not found", "tasks-axi not found"):
+    assert ";fail-on-gate-skip=" + token in selection, selection
+' "$tmp/timing.json" || fail "selection must retain both configured gate skip tokens"
+    done
+  done
   rm -rf "$tmp"
-  pass "fail-on-gate-skip converts herdr-not-found into a hard failure"
+  pass "single and repeated fail-on-gate-skip flags hard-fail each configured token"
 }
 
 test_exclude_family() {

@@ -13,15 +13,19 @@ HERDR_LAB_HELPER="$ROOT/bin/fm-herdr-lab.sh"
 FM_HOME="$TMP_ROOT/home"
 export FM_HOME
 "$LAB_HOME_HELPER" create "$FM_HOME" >/dev/null || fail "cannot create lab home"
+# shellcheck source=bin/fm-wake-lib.sh
+. "$ROOT/bin/fm-wake-lib.sh"
 LAB_TMUX_DIR=
 HERDR_LAB_SESSION=
 A_SPAWN_PID=
 B_SPAWN_PID=
 A_POLL_READY=
 B_ALLOW=
+SESSION_LOCK=
 cleanup_acquisition() {
   local rc=$?
   local pid alive gate
+  [ -z "$SESSION_LOCK" ] || fm_lock_release "$SESSION_LOCK" || rc=1
   for gate in "$A_POLL_READY" "$B_ALLOW"; do
     [ -z "$gate" ] || touch "$gate"
   done
@@ -296,7 +300,10 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   [ -s "$B_PIDFILE" ] && [ -e "$B_LEASE" ] || fail "contention B get never held its lease: $(cat "$B_OUT")"
   b_get_pid=$(cat "$B_PIDFILE")
   kill -0 "$b_get_pid" 2>/dev/null || fail 'contention B get exited before presentation contention'
-  [ "$(cat "$SESSION_LOCK/pid")" = "$B_SPAWN_PID" ] || fail 'contention B did not hold the shared session presentation lock'
+  [ ! -e "$SESSION_LOCK" ] && [ ! -L "$SESSION_LOCK" ] \
+    || fail 'contention B retained the shared session presentation lock during acquisition'
+  fm_lock_try_acquire "$SESSION_LOCK" || fail 'cannot hold the shared session presentation lock for contention'
+  [ "$(cat "$SESSION_LOCK/pid")" = "$$" ] || fail 'contention fixture did not own the shared session presentation lock'
   B_JOURNAL=$(fm_backend_herdr_projection_journal_path "$B_HOME/state" "$B_ID")
   b_pane=$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" pane_id) || fail 'contention B did not bind a projected pane'
   [ "$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" parent_workspace_id)" = "$B_PARENT" ] \
@@ -316,9 +323,9 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   done
   [ -e "$A_CLEANUP_WAIT" ] || fail "contention A did not enter serialized cleanup waiting: $(cat "$A_OUT")"
   /bin/sleep 10
-  kill -0 "$A_SPAWN_PID" 2>/dev/null || fail "contention A cleanup returned before B released the presentation lock: $(cat "$A_OUT")"
+  kill -0 "$A_SPAWN_PID" 2>/dev/null || fail "contention A cleanup returned before the fixture released the presentation lock: $(cat "$A_OUT")"
   kill -0 "$B_SPAWN_PID" 2>/dev/null || fail "contention B exited while its acquisition was blocked: $(cat "$B_OUT")"
-  [ "$(cat "$SESSION_LOCK/pid")" = "$B_SPAWN_PID" ] || fail 'contention B lost the shared presentation lock while blocked'
+  [ "$(cat "$SESSION_LOCK/pid")" = "$$" ] || fail 'contention fixture lost the shared presentation lock while B was blocked'
   if [ ! -e "$A_LEASE" ] || ! kill -0 "$a_get_pid" 2>/dev/null; then
     fail 'contention A lost its process lease before serialized cleanup'
   fi
@@ -331,6 +338,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$b_pane")" = present ] \
     || fail 'contention A cleanup closed contention B pane'
   pass 'herdr contention keeps both acquisition leases past the former cleanup timeout'
+  fm_lock_release "$SESSION_LOCK" || fail 'cannot release the shared session presentation lock after contention'
   touch "$B_ALLOW"
   for _ in $(seq 1 3000); do
     kill -0 "$B_SPAWN_PID" 2>/dev/null || break
