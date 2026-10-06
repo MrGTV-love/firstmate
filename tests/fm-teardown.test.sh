@@ -3857,7 +3857,7 @@ test_process_identity_is_recorded_before_term_and_kill() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   journal="$case_dir/state/task-x1.teardown-processes"
-  teardown_fixture_start "$case_dir/wt" KILL perl -e '
+  teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
     my ($journal, $seen, $ready) = @ARGV;
     $SIG{TERM} = sub {
       open my $in, "<", $journal or die "signal arrived without audit";
@@ -3867,7 +3867,8 @@ test_process_identity_is_recorded_before_term_and_kill() {
     };
     open my $ready_file, ">", $ready or die "ready"; close $ready_file;
     while (1) { sleep 300; }
-  ' "$journal" "$case_dir/term-observed" "$case_dir/ready"
+PERL
+  )" "$journal" "$case_dir/term-observed" "$case_dir/ready"
   pid=$TEARDOWN_FIXTURE_PID
   local i=0
   while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
@@ -4301,7 +4302,7 @@ test_process_audit_collection_exit_races() {
         land_shippable_commit "$case_dir"
         journal="$case_dir/state/task-x1.teardown-processes"
         cp "$case_dir/state/task-x1.meta" "$case_dir/task-x1.meta.before"
-        teardown_fixture_start "$case_dir/wt" KILL perl -e '
+        teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
           my ($ready, $exit, $journal, $seen) = @ARGV;
           $SIG{TERM} = sub {
             open my $in, "<", $journal or die "TERM without durable audit";
@@ -4311,7 +4312,8 @@ test_process_audit_collection_exit_races() {
           };
           open my $f, ">", $ready or die "ready"; close $f;
           until (-e $exit) { select undef, undef, undef, 0.01; }
-        ' "$case_dir/ready" "$case_dir/finite-exit" "$journal" "$case_dir/term-observed"
+PERL
+        )" "$case_dir/ready" "$case_dir/finite-exit" "$journal" "$case_dir/term-observed"
         pid=$TEARDOWN_FIXTURE_PID
         birth=$(teardown_fixture_birth "$pid") || fail "audit-collection: missing target birth"
         i=0
@@ -4571,7 +4573,10 @@ test_reused_pid_identity_is_not_force_killed() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
 
-  teardown_fixture_start "$case_dir" KILL perl -e '$SIG{TERM} = "IGNORE"; sleep 300'
+  teardown_fixture_start "$case_dir" KILL perl -e "$(cat <<'PERL'
+$SIG{TERM} = "IGNORE"; sleep 300
+PERL
+  )"
   pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/lsof" <<EOF
@@ -4623,13 +4628,14 @@ test_exec_changed_process_is_still_reaped() {
   marker="$case_dir/exec-now"
   done_flag="$case_dir/exec-done"
 
-  teardown_fixture_start "$case_dir/wt" KILL perl -e '
+  teardown_fixture_start "$case_dir/wt" KILL perl -e "$(cat <<'PERL'
       my ($marker, $done) = @ARGV;
       until (-e $marker) { select undef, undef, undef, 0.01; }
       open my $fh, ">", $done or die "open";
       close $fh;
-      exec "perl", "-e", '\''$SIG{TERM} = "IGNORE"; sleep 300'\'';
-    ' "$marker" "$done_flag"
+      exec "perl", "-e", '$SIG{TERM} = "IGNORE"; sleep 300';
+PERL
+    )" "$marker" "$done_flag"
   pid=$TEARDOWN_FIXTURE_PID
   sleep 0.2
   cat > "$case_dir/fakebin/ps" <<'SH'
@@ -4683,7 +4689,7 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
   land_shippable_commit "$case_dir"
   child_file="$case_dir/child.pid"
 
-  teardown_fixture_start "$case_dir/wt" HUP perl -e '
+  teardown_fixture_start "$case_dir/wt" HUP perl -e "$(cat <<'PERL'
       use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGHUP SIGINT SIGQUIT);
       require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
       my ($file, $ready) = @ARGV;
@@ -4719,7 +4725,8 @@ test_process_spawned_during_grace_is_reaped_on_later_pass() {
       };
       open my $fh, ">", $ready or die "ready"; close $fh;
       sleep 300;
-    ' "$child_file" "$case_dir/ready"
+PERL
+    )" "$child_file" "$case_dir/ready"
   pid=$TEARDOWN_FIXTURE_PID
   local i=0
   while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
@@ -4751,7 +4758,7 @@ test_persistent_scan_refuses_after_bounded_retries() {
   land_shippable_commit "$case_dir"
   # A real parent outside the task roots immediately replenishes leaked children.
   # Each killed child has a distinct kernel birth identity and a real cwd.
-  teardown_fixture_start "$case_dir" TERM perl -e '
+  teardown_fixture_start "$case_dir" TERM perl -e "$(cat <<'PERL'
     use POSIX qw(SIG_BLOCK SIG_SETMASK SIGTERM SIGINT SIGHUP SIGQUIT WNOHANG);
     require $ENV{FM_TEARDOWN_FIXTURE_HELPERS};
     my ($root, $ready) = @ARGV;
@@ -4792,7 +4799,8 @@ test_persistent_scan_refuses_after_bounded_retries() {
       }
       unlink $ready;
     }
-  ' "$case_dir/wt" "$case_dir/child-ready"
+PERL
+  )" "$case_dir/wt" "$case_dir/child-ready"
   spawner=$TEARDOWN_FIXTURE_PID
   cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
