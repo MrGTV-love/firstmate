@@ -1,0 +1,2 @@
+Worker, scout, and lane fm-control exit succeeded. Owned private tmux server stopped (status 0). fm-lab-home teardown status 0. Identity-matched surviving owned process PIDs reaped: []. Herdr tripwire verified unchanged during its teardown.
+Disposable workspace fixture, local Treehouse pool and Git origin removed. Read-only generated hook directories required chmod u+w before removal. Generated extension markers removed; no test fixture or private tmux socket remains.

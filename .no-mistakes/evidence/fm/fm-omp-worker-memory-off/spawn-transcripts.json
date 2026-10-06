@@ -1,0 +1,65 @@
+{
+  "memory-worker": {
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh",
+      "memory-worker",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home/projects/fixture",
+      "--mode",
+      "local-only",
+      "--yolo",
+      "off",
+      "--harness",
+      "omp",
+      "--backend",
+      "tmux",
+      "--model",
+      "google-antigravity/gemini-3.1-flash-lite",
+      "--effort",
+      "low"
+    ],
+    "returncode": 0,
+    "stdout": "spawned memory-worker harness=omp kind=ship mode=local-only yolo=off window=primary:fm-memory-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/pool/.treehouse/fixture-a7c7cc/1/fixture\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\nnotice: memory-worker ships mode=local-only while the standing posture for fixture is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state\n"
+  },
+  "memory-scout": {
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh",
+      "memory-scout",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home/projects/fixture",
+      "--scout",
+      "--harness",
+      "omp",
+      "--backend",
+      "tmux",
+      "--model",
+      "google-antigravity/gemini-3.1-flash-lite",
+      "--effort",
+      "low"
+    ],
+    "returncode": 0,
+    "stdout": "spawned memory-scout harness=omp kind=scout window=primary:fm-memory-scout worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/pool/.treehouse/fixture-a7c7cc/2/fixture\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+  },
+  "memory-lane": {
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh",
+      "memory-lane",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate",
+      "--secondmate",
+      "--harness",
+      "omp",
+      "--backend",
+      "tmux",
+      "--model",
+      "google-antigravity/gemini-3.1-flash-lite",
+      "--effort",
+      "low"
+    ],
+    "returncode": 0,
+    "stdout": "spawned memory-lane harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-memory-lane worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nwarning: secondmate memory-lane sync skipped before launch: primary default-branch commit cannot be resolved\n"
+  }
+}

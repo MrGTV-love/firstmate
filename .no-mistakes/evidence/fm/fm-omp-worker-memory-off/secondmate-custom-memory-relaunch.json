@@ -1,0 +1,5 @@
+{
+  "returncode": 0,
+  "stdout": "spawned memory-lane harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-memory-lane worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate\n",
+  "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nwarning: secondmate memory-lane sync skipped before launch: primary default-branch commit cannot be resolved\n"
+}

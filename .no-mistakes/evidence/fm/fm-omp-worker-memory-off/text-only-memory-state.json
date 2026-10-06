@@ -1,0 +1,23 @@
+{
+  "working_memory": [
+    [
+      "Project codename zephyr requires launch code ZEPHYR-7319.",
+      "coding-agent-learn",
+      1,
+      "bank"
+    ],
+    [
+      "[role: user]\nUse your retain memory tool to store this durable fact: Project codename zephyr requires launch code ZEPHYR-7319. Do not edit any files or use shell tools. Report the result.\n[user:end]\n\n[role: assistant]\nThe fact \"Project codename zephyr requires launch code ZEPHYR-7319\" has been stored in memory, Captain.\n[assistant:end]",
+      "coding-agent-transcript",
+      1,
+      "bank"
+    ],
+    [
+      "[role: user]\nWhat launch code does project codename zephyr require? Answer with only the code from your persistent memory; do not use file or shell tools.\n[user:end]\n\n[role: assistant]\nZEPHYR-7319\n[assistant:end]",
+      "coding-agent-transcript",
+      0,
+      "bank"
+    ]
+  ],
+  "embedding_count": 0
+}

@@ -1,0 +1,154 @@
+{
+  "version": "omp/18.6.3",
+  "rpc_worker": {
+    "command": "omp --mode rpc --no-session --no-extensions --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/isolation.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.omp/fm-session-overlay.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.omp/fm-worker-overlay.yml",
+    "result": "MEMORY_WORKER_OK",
+    "prompt_result": [
+      {
+        "type": "prompt_result",
+        "agentInvoked": true,
+        "status": "completed",
+        "sessionSettled": true
+      }
+    ],
+    "samples": 30,
+    "helper_observations": 0,
+    "precondition": "Isolation config explicitly requests noEmbeddings=false; tracked worker overlay overrides it."
+  },
+  "actual_spawns": {
+    "memory-worker": {
+      "returncode": 0,
+      "stdout": "spawned memory-worker harness=omp kind=ship mode=local-only yolo=off window=primary:fm-memory-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/pool/.treehouse/fixture-a7c7cc/1/fixture\n",
+      "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh memory-worker /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home/projects/fixture --mode local-only --yolo off --harness omp --backend tmux --model google-antigravity/gemini-3.1-flash-lite --effort low"
+    },
+    "memory-scout": {
+      "returncode": 0,
+      "stdout": "spawned memory-scout harness=omp kind=scout window=primary:fm-memory-scout worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/pool/.treehouse/fixture-a7c7cc/2/fixture\n",
+      "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh memory-scout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home/projects/fixture --scout --harness omp --backend tmux --model google-antigravity/gemini-3.1-flash-lite --effort low"
+    },
+    "memory-lane": {
+      "returncode": 0,
+      "stdout": "spawned memory-lane harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-memory-lane worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate\n",
+      "command": "bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/bin/fm-spawn.sh memory-lane /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate --secondmate --harness omp --backend tmux --model google-antigravity/gemini-3.1-flash-lite --effort low"
+    }
+  },
+  "actual_worker_scout": {
+    "samples_per_session": 30,
+    "worker_helpers": 0,
+    "scout_helpers": 0,
+    "visible_responses": [
+      "MEMORY_WORKER_OK",
+      "MEMORY_SCOUT_OK"
+    ],
+    "cwd_config": "mnemopi.noEmbeddings=false in committed fixture project config"
+  },
+  "text_only_memory": {
+    "retained_fact": "Project codename zephyr requires launch code ZEPHYR-7319.",
+    "fresh_session_query": "What launch code does project codename zephyr require?",
+    "fresh_session_answer": "ZEPHYR-7319",
+    "memory_state": {
+      "working_memory": [
+        [
+          "Project codename zephyr requires launch code ZEPHYR-7319.",
+          "coding-agent-learn",
+          1,
+          "bank"
+        ],
+        [
+          "[role: user]\nUse your retain memory tool to store this durable fact: Project codename zephyr requires launch code ZEPHYR-7319. Do not edit any files or use shell tools. Report the result.\n[user:end]\n\n[role: assistant]\nThe fact \"Project codename zephyr requires launch code ZEPHYR-7319\" has been stored in memory, Captain.\n[assistant:end]",
+          "coding-agent-transcript",
+          1,
+          "bank"
+        ],
+        [
+          "[role: user]\nWhat launch code does project codename zephyr require? Answer with only the code from your persistent memory; do not use file or shell tools.\n[user:end]\n\n[role: assistant]\nZEPHYR-7319\n[assistant:end]",
+          "coding-agent-transcript",
+          0,
+          "bank"
+        ]
+      ],
+      "embedding_count": 0
+    },
+    "commands": [
+      "omp --mode rpc --no-session --no-extensions --no-rules --no-skills --no-title --no-lsp --model google-antigravity/gemini-3.1-flash-lite --thinking low --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/recall --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/recall/isolation.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.omp/fm-session-overlay.yml --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.omp/fm-worker-overlay.yml"
+    ],
+    "helpers_observed": 0
+  },
+  "captain_control": {
+    "helper": [
+      {
+        "pid": 56938,
+        "ppid": 54586,
+        "rss_kib": 1139440,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ],
+    "completed": true
+  },
+  "firstmate_primary": {
+    "command": "tmux -L fm-lab new-session -d -s omp-primary -x 160 -y 50 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-home omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low",
+    "visible_response": "FIRSTMATE_PRIMARY_MEMORY_OK",
+    "helper": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ],
+    "initial_setup_correction": "Initial Enter arrived before the TUI composer was ready; resubmitted Enter after observing the loaded surface."
+  },
+  "secondmate_default": {
+    "visible_response": "SECONDMATE_MEMORY_OK",
+    "helpers": [
+      {
+        "pid": 10046,
+        "ppid": 6690,
+        "rss_kib": 1136048,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ],
+    "samples": 20
+  },
+  "secondmate_custom_disabled": {
+    "launch": {
+      "returncode": 0,
+      "stdout": "spawned memory-lane harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-memory-lane worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/secondmate\n",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nwarning: secondmate memory-lane sync skipped before launch: primary default-branch commit cannot be resolved\n"
+    },
+    "visible_response": "SECONDMATE_MEMORY_OK",
+    "samples": 30,
+    "helper_observations": 0,
+    "worker_overlay_absent_on_disk": true
+  },
+  "missing_worker_overlay": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/home\nWARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nerror: omp worker memory overlay missing at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/code/.omp/fm-worker-overlay.yml\n",
+    "metadata_published": false,
+    "window_inventory": "bash\nfm-memory-worker\nfm-memory-scout\nfm-memory-lane\n"
+  },
+  "upstream_filing": {
+    "issue": {
+      "url": "https://github.com/can1357/oh-my-pi/issues/9908",
+      "state": "open"
+    },
+    "shared_server_pr": {
+      "url": "https://github.com/can1357/oh-my-pi/pull/13785",
+      "title": "feat(mnemopi): add embed-serve, a shared embeddings server",
+      "state": "open"
+    },
+    "shared_worker_pr": {
+      "url": "https://github.com/can1357/oh-my-pi/pull/8653",
+      "title": "Share Mnemopi embedding workers across sessions",
+      "state": "open"
+    },
+    "method": "Read the three live GitHub REST API resources; no remote mutations."
+  },
+  "scope_notes": [
+    "RSS is not physical footprint; no fixed memory saving is asserted.",
+    "No full suite, lint, static analysis, pipeline, push, PR creation, credential mutation, or default-fleet control was performed.",
+    "Generated CLI metadata, TUI captures, RPC frames, isolated SQLite state, and owned descendant samples are the product evidence.",
+    "Herdr prepare followed by provision initially refused duplicate tripwire; teardown verified the fleet tripwire unchanged, and the private tmux route was used instead."
+  ]
+}

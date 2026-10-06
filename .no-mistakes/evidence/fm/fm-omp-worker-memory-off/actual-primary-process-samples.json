@@ -1,0 +1,682 @@
+[
+  {
+    "sample": 0,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596704,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 1,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596656,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 2,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596656,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 3,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596384,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 4,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596336,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 5,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596288,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 6,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596288,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 7,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596304,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 8,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596304,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 9,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596304,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 10,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596288,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 11,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596288,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 12,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596240,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 13,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596240,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 14,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596336,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 15,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596336,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 16,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596336,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 17,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 596352,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 18,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 595728,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 19,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 595728,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": []
+  },
+  {
+    "sample": 20,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133696,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133696,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 21,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133696,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133696,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 22,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 23,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 24,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 25,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611264,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 26,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611248,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133840,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 27,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611248,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 28,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611232,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  },
+  {
+    "sample": 29,
+    "after_submit": true,
+    "processes": [
+      {
+        "pid": 81039,
+        "ppid": 79696,
+        "rss_kib": 47664,
+        "command": "node /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.pi/extensions/lib/fm-sessionstart-supervisor.mjs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/bin/fm-sessionstart-run.sh --source startup --pi-prerequisite"
+      },
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      },
+      {
+        "pid": 79696,
+        "ppid": 7740,
+        "rss_kib": 611232,
+        "command": "omp --no-session --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M495YPNMRZZF233A2NVG47J1/.memory-live-9ymyc6uk/primary-isolation.yml --no-rules --no-skills --no-title --no-tools --model google-antigravity/gemini-3.1-flash-lite --thinking low"
+      }
+    ],
+    "helpers": [
+      {
+        "pid": 38524,
+        "ppid": 79696,
+        "rss_kib": 1133872,
+        "command": "/Users/charlesabrooker/.bun/bin/omp __omp_worker_mnemopi_embed"
+      }
+    ]
+  }
+]

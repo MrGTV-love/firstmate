@@ -1,0 +1,50 @@
+
+                                                                ████████████
+                                                                   ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                   ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                   ▒▒  ██                  █
+                                                                       ██       v18.6.3
+
+                                             Tip: `/shake` rips heavy tool results out of context to reclaim tokens
+                                                  without a full /compact — `/shake images` drops just images
+
+
+ Reply exactly FIRSTMATE_PRIMARY_MEMORY_OK. Do not use tools.
+
+
+ FIRSTMATE_PRIMARY_MEMORY_OK
+
+╭── π > ◔ Gemini 3.1 Flash Lite 🙈 > 🌳 32d18ed9638d/01M495YPNMRZZF233A2NVG47J1 > ⑂ detached ?1 > S0.00 + 👁 0.00 ▶─1%───────────────────┃───1M─◀ 🆔 01a1126a ──╮
+╰─                                                                                                                                                            ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

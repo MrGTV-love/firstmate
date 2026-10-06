@@ -1,0 +1,18 @@
+Real omp 18.6.3 live observations
+
+Firstmate-launched ship worker: MEMORY_WORKER_OK; no embedding helper in 30 descendant samples.
+Firstmate-launched scout: MEMORY_SCOUT_OK; no embedding helper in 30 descendant samples.
+Both started from a fixture whose own omp configuration explicitly enables embeddings.
+
+Text-only memory: real learn tool returned "Lesson stored."; a fresh real RPC session answered ZEPHYR-7319 from persistent memory. The isolated database recorded recall_count=1 for the stored fact and zero memory_embeddings.
+
+Captain control: completed its RPC turn and retained embedding helper PID 56938 (1,139,168 KiB RSS in an early sample).
+Firstmate primary: FIRSTMATE_PRIMARY_MEMORY_OK; retained helper PID 38524 (1,133,872 KiB RSS in the final sample).
+Secondmate default: SECONDMATE_MEMORY_OK; retained helper PID 10046 (1,136,032 KiB RSS in an early sample).
+Secondmate with its own noEmbeddings=true: relaunched successfully while the worker overlay was physically absent; SECONDMATE_MEMORY_OK and no helper in 30 descendant samples.
+
+Missing worker overlay: actual fm-spawn refused exit 1 with "omp worker memory overlay missing"; no task metadata or worker window was created.
+
+Upstream GitHub API confirmed issue 9908 and open shared-embedding PRs 13785 and 8653. No duplicate filing or shared server was created.
+
+All lab runtimes, private sockets, local Git/Treehouse fixtures, and generated markers were removed. RSS is not physical footprint and no fixed per-session saving is asserted.
