@@ -336,10 +336,10 @@
 #   The resolved switch reaches the pane export, compound launch, and env -i
 #   floor, replacing any inherited COMPACT_ADVISER_DISABLE. A truthy invoking
 #   FM_COMPACT_ADVISER_DISABLE is the operator's emergency override; Firstmate
-#   never exports it. Claude auto also launches with
-#   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1; when the worker shell had not already
-#   opted in, it adds FM_COMPACT_ADVISER_HOOKS=1 so the firstmate-calm mod,
-#   which shares that gate, stays inert.
+#   never exports it. Claude auto supplies
+#   CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 unless a leading raw-command assignment
+#   supplies the flag; automatic activation adds FM_COMPACT_ADVISER_HOOKS=1
+#   unless the worker shell already opted in, keeping firstmate-calm inert.
 #   No TypeSafe credential is read or embedded here; use plugin saved keys.
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
@@ -1589,12 +1589,12 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
       rc=2
       continue
     elif [ "$KIND" = scout ]; then
-      if FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}" --scout; then :; else
+      if FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}" --scout; then :; else
         echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
         rc=1
       fi
     else
-      if FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}"; then :; else
+      if FM_COMPACT_ADVISER_DISABLE="$COMPACT_ADVISER_FORCE_OFF" FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}"; then :; else
         echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
         rc=1
       fi
@@ -2320,13 +2320,17 @@ launch_template() {
   esac
 }
 
+RAW_FUNCTION_HOOKS_SET=0
 case "$ARG3" in
 *' '*) # raw launch command (unverified-adapter escape hatch)
   RAW_LAUNCH=1
   LAUNCH=$ARG3
   HARNESS=""
   for word in $LAUNCH; do
-    case "$word" in [A-Za-z_]*=*) continue ;; *)
+    case "$word" in
+    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=*) RAW_FUNCTION_HOOKS_SET=1 ;;
+    [A-Za-z_]*=*) continue ;;
+    *)
       HARNESS=$(basename "$word")
       break
       ;;
@@ -2374,7 +2378,7 @@ COMPACT_ADVISER_SWITCH=1
 COMPACT_ADVISER_HOOKS='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
 if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
   COMPACT_ADVISER_SWITCH=0
-  if [ "$HARNESS" = claude ]; then
+  if [ "$HARNESS" = claude ] && [ "$RAW_FUNCTION_HOOKS_SET" = 0 ]; then
     # shellcheck disable=SC2016
     COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
   fi

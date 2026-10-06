@@ -1003,15 +1003,15 @@ Auto allows the installed plugin to act; it does not install the plugin or suppl
 Use the plugin's supported saved settings to select `mode: auto`, acknowledge experimental automatic mode, and save the TypeSafe key without adding `TYPESAFE_API_KEY` to launch text or the worker environment.
 For omp's Pi plugin, these fields are `mode`, `autoAcknowledged`, and `typesafeApiKey` in the active agent directory's `compact-adviser.json`; back up the file before changing shared preferences.
 Claude stores mode and saved key in its plugin options and acknowledgement in the plugin's own preferences store.
-Claude auto launches receive `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting.
-When the worker's shell had not already set that flag to `1`, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
+Claude auto launches enable `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` without changing the global function-hook setting, unless a leading raw-command assignment explicitly supplies the flag's value.
+When automatic activation supplies that flag rather than preserving a captain's opt-in, the launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, which keeps the [firstmate-calm mod](calm.md#enabling-function-hooks) inert, so enabling the adviser does not enable Calm.
 Every launch first drops a flag that an earlier launch in the same pane marked this way, so an off or emergency-off relaunch runs without it.
 The installed plugin must support the host's settled-turn event and context API; loading its command alone does not prove that it judges completed turns.
 Print and other reliably detected noninteractive sessions remain inert under the plugin's own rules.
 
 Every launch replaces any inherited `COMPACT_ADVISER_DISABLE` with the resolved policy, so the `COMPACT_ADVISER_DISABLE=1` that a default-off secondmate carries does not disable its own automatic workers.
 A truthy `FM_COMPACT_ADVISER_DISABLE` (`1`, `true`, `yes`, or `on`) in the process that runs `bin/fm-spawn.sh`, `bin/fm-control.sh <id> relaunch`, or `bin/fm-remote-secondmate-relaunch.sh` is the operator's emergency kill switch.
-It forces that launch off, including a remote secondmate launch, and Firstmate consumes it before starting any backend server or pane, so it never reaches a worker.
+It forces that launch off, including every child in a batch and a remote secondmate launch, and Firstmate consumes it before starting any backend server or pane, so it never reaches a worker.
 For a lasting or fleet-wide stop, set the entry to `"off"` and push the configuration as described below.
 The default upstream minimum is 40,000 context tokens, with an additional 20,000-token conversation minimum; smaller sessions should not issue a judgement.
 Eligible checkpoint excerpts are sent to TypeSafe, with best-effort redaction rather than a guarantee that all sensitive material is removed.

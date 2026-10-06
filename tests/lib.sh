@@ -64,11 +64,6 @@ unset FM_TASK_ID
 # either sets it itself.
 unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
 
-# The launch-text prefix every bin/fm-spawn.sh launch emits to drop a function-
-# hooks flag an earlier launch in the same pane marked as adviser-only.
-# shellcheck disable=SC2016,SC2034
-FM_TEST_ADVISER_HOOKS_RESET='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
-
 # Clear the tasks-axi env overrides. An operator shell exports TASKS_AXI_FILE
 # (and may export TASKS_AXI_BACKEND) at its real home's backlog, and tasks-axi
 # resolves that env AHEAD of the .tasks.toml a fixture copies, so a suite that

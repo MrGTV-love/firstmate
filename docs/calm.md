@@ -185,8 +185,8 @@ Claude Code's early-access function-hooks surface is off by default.
 Claude Code can load modules through its rollout flag, or per session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 The mod independently requires that environment variable to equal `1` before doing anything.
 Firstmate never sets that flag in any project or user settings.
-A Claude worker launched under automatic [compact-adviser policy](configuration.md#compact-adviser-setting-configcompact-adviser) receives the flag for the adviser.
-Unless the worker's shell already had the flag set to `1`, that launch also sets `FM_COMPACT_ADVISER_HOOKS=1`, and the mod treats the flag as not set.
+Automatic [compact-adviser policy](configuration.md#compact-adviser-setting-configcompact-adviser) can enable function hooks for the adviser without enabling Calm.
+An explicit opt-in in the worker's shell or a leading raw-command assignment remains unmarked.
 Enabling Calm is each captain's own explicit opt-in.
 
 Without that exact value, or with `FM_COMPACT_ADVISER_HOOKS=1`, the mod is a complete no-op, even if Claude Code's rollout flag loads the module:
