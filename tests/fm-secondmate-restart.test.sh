@@ -26,6 +26,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 RESTART="$ROOT/bin/fm-secondmate-restart.sh"
 
@@ -847,6 +849,25 @@ test_already_current_unprovable_mate_stays_on_the_nudge_path() {
   pass "T16 an already-current mate with an unprovable runtime keeps the honest nudge path"
 }
 
+# --- T12: a TeamClaude home restarts its Claude mate through TeamClaude ----
+test_teamclaude_restart_reaches_claude_through_the_proxy() {
+  local dir out rc
+  dir=$(new_case teamclaude)
+  add_local_mate "$dir" sm1
+  arm_answer "$dir" sm1
+  printf 'teamclaude\n' > "$dir/home/config/claude-launcher"
+  fm_test_fake_teamclaude "$dir/fakebin"
+
+  out=$(run_restart "$dir" sm1); rc=$?
+
+  expect_code 0 "$rc" "a TeamClaude restart should succeed"$'\n'"$out"
+  assert_contains "$out" "restarted: sm1 (claude)" "the mate should be restarted on claude"
+  fm_test_assert_teamclaude_launch "$dir/fakebin" \
+    "$(grep -F 'Firstmate operational input waiting: read' "$dir/fake/literal" | tail -1)" \
+    "secondmate restart"
+  pass "T12 a TeamClaude home restarts its Claude mate through the TeamClaude proxy"
+}
+
 test_persist_gates_and_asks_only_for_open_records
 test_persist_precedes_restart
 test_arrived_answer_precedes_deadline_check
@@ -866,5 +887,6 @@ test_unpublished_worker_result_is_accounted_for
 test_result_published_while_reaping_is_honored
 test_already_current_mate_restarts_end_to_end
 test_already_current_unprovable_mate_stays_on_the_nudge_path
+test_teamclaude_restart_reaches_claude_through_the_proxy
 
 echo "# all fm-secondmate-restart tests passed"

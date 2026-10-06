@@ -6,6 +6,44 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Launch-scoped Git hook selection
+
+Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-git-strip-ai-trailers.test.sh tests/fm-spawn-dispatch-profile.test.sh tests/fm-kimi-harness.test.sh
+```
+
+Observed transition result:
+
+```text
+ok - supported same-task bash tmux relaunch reconciles generated hooks and preserves operator configuration
+ok - supported same-task ksh tmux relaunch reconciles generated hooks and preserves operator configuration
+# all fm-git-strip-ai-trailers tests passed
+```
+
+The regression drives fresh launch and supported already-stopped-task relaunch through `fm-spawn.sh` on its own private tmux socket in both Bash and ksh, retaining the same task, pane, and isolated copy.
+Git's effective local and command scopes prove the strip-to-keep transition, preservation of unrelated duplicate keys and literal values, preservation of an operator hooks-path override, and idempotent return to stripping.
+The executable replacing omp is a model-free Git probe, not live-harness evidence.
+The shared launch prefix applies before harness execution on each local backend; this record proves the actual tmux path, not other backends' lifecycle behavior.
+The focused three-file run completed with zero failures and zero gate skips; Claude credential forwarding and ship/scout permissions were checked through model-free executable environment and argv probes.
+[`configuration.md`](../configuration.md#commit-attribution) owns the operator-facing posture and `fm-spawn.sh --help` owns reconciliation mechanics.
+
+### Launch-prefix-independent CI probes
+
+Verified on 2026-10-05 on macOS arm64:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh tests/fm-trace-context-spawn.test.sh tests/fm-claude-trust.test.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+All four suites passed with zero gate skips.
+Claude brief delivery and credential-store selection are observed by model-free workers executing the complete staged command, without stripping shell prefixes.
+Trace probes observe enabled and reused carriers, disabled-relaunch clearing, cleanup after delivery or metadata-publication failure, and no worker execution after unsafe delivery.
+The private Bash/ksh tmux fixture also proves the allowlisted strip-to-keep transition clears the persistent pane's obsolete task override while preserving unrelated Git entries and operator routing.
+The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session case; this run is focused local evidence, not a rerun of the entire portable CI shard.
+
+
 ## Harness detection precedence
 
 Firstmate's own harness comes from two kinds of evidence, and `bin/fm-harness.sh` owns how they combine: an environment marker names its harness, and the nearest harness process in the parent chain proves who owns the process tree.
@@ -130,6 +168,19 @@ zsh
 
 A persistent parent shell waiting for a child remained reported as the parent process, while a shell that directly execed a simple command changed identity with the process itself.
 Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-spawn.sh` launches.
+
+### Control-plane endpoint absence
+
+[Agent lifecycle control](../agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) owns the reclaim contract.
+Refresh its portable production-command verification with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
+```
+
+The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
+Its process seam also separates a current-user server on another socket from a server owned by another uid.
+The reclaim cases cover two missing tmux tasks in one home, recovered sequentially onto configured Herdr while preserving work, task identity, status, armed polls, and progress notes, plus refusal of every other configured backend.
 
 ### Agent liveness name sources
 
@@ -392,6 +443,23 @@ Letting an unreadable inventory pass for absence makes the unreadable case compl
 Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced secondmate cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
+
+## TeamClaude launcher
+
+Verified 2026-09-29 on TeamClaude 1.1.21-affinity.0 with its proxy running in its default forward-proxy mode.
+The [Claude launcher configuration](../configuration.md#claude-launcher-configclaude-launcher) owns the routing contract; this guard checks the installed TeamClaude CLI's answers and exports.
+The live guard runs the real launcher in a clean environment against the real CLI, with a recording `claude` in place of the real one, so it spends no model tokens.
+
+```sh
+tests/fm-teamclaude-launch-live-e2e.test.sh
+```
+
+```
+ok - teamclaude 1.1.21-affinity.0: the launcher hands claude HTTPS_PROXY and a readable TeamClaude CA
+```
+
+The guard runs by default wherever TeamClaude is installed and its proxy answers, skips naming the absent tool or stopped proxy otherwise, and fails instead when `FM_TEAMCLAUDE_LAUNCH_LIVE=1` or `FM_LIVE=1` requested it.
+Rerun it after any TeamClaude upgrade.
 
 ## Claude workspace trust
 
@@ -1178,15 +1246,41 @@ ok - fm_backend_herdr_composer_state: a slash-command popup cannot hide a typed 
 ok - fm_backend_herdr_send_text_submit: a typed slash command hidden behind its popup is still proven and submitted
 ```
 
-Live guard (third scenario of the opt-in guard, verifying the agent actually exited):
+The live guard's public exit scenarios type `/exit` behind the same popup; its current command and observed output are under "Colored Claude slash commands" below.
+
+### Colored Claude slash commands
+
+Verified 2026-09-30 on macOS arm64 with Herdr 0.9.1 and Claude Code 2.1.285 in isolated `fm-lab-` sessions.
+Claude draws a recognized slash command typed into its composer in normal-intensity truecolor below the shared default ghost ceiling of 128; `/exit` measured RGB(51,102,255), luminance about 104.
+The live guard observed that shape both with forced truecolor and in a production-shape pane with the default color, launched unnamed as `fm-spawn` launches a worker.
+Under the default ceiling the command read as ghost text, so the payload proof read no payload and `fm-control exit` and `relaunch` refused before sending Enter.
+The pre-send guard read a human's colored draft under the same ceiling as an empty composer, so exit reported a generic send failure instead of the pending draft; the `tests/fm-control.test.sh` regression reproduces that against the previous adapter.
+At a load average near 90 the same Claude rendered a typed `/compact` 2.7 to 21 seconds after the literal send, while the payload proof read the composer once about 1.2 seconds after it; that single read refused and cleared the command, so `/compact` reported `send-failed` in the live guard.
+The current color and payload-proof contract is owned by [Claude composer proof](../herdr-backend.md#claude-composer-proof).
+`tests/fm-backend-herdr.test.sh` covers late rendering, prefix growth, owned-suffix cleanup, foreign and ambiguous text preservation, and unproven deadlines with prefix, empty, or unreadable captures.
+In the live guard run below, the public relaunch replaced the production-shape worker in the same endpoint through `fm-spawn`'s own launch, and the replacement rendered a token that existed only in its instructions.
+
+Refresh the repeatable pending-draft refusal, `/compact`, relaunch, prompt, and verified-exit evidence for both shapes with:
 
 ```sh
-FM_HERDR_SUBMIT_CONFIRM_LIVE=1 tests/fm-herdr-submit-confirm-live-e2e.test.sh
+HERDR_LAB_HELPER=bin/fm-herdr-lab.sh FM_HERDR_SUBMIT_CONFIRM_LIVE=1 \
+  bash bin/fm-test-run.sh tests/fm-herdr-submit-confirm-live-e2e.test.sh
 ```
 
 ```text
-ok - live Herdr submit confirm: Claude Code (2.1.283 (Claude Code)) on herdr 0.9.0 proves and submits a typed /exit behind its command popup
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the production shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes /compact in the production shape
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the production shape in its endpoint and the replacement reads its instructions
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the production shape and preserves its endpoint
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit refuses a pending /compact draft by name in the forced-truecolor shape (draft drawn below the default ghost ceiling)
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 executes /compact in the forced-truecolor shape
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 reports empty and renders the requested reply in isolated session fm-lab-herdr-submit-con-67549-4960
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 submits a U+2063 away-supervisor payload whose read-back drops the mark
+ok - live Herdr submit confirm: Claude Code (2.1.285 (Claude Code)) on herdr 0.9.1 fm-control exit stops the forced-truecolor shape and preserves its endpoint
 ```
+
+`tests/fm-backend-herdr.test.sh` covers a colored skill command whose first Enter is swallowed while the native identity probe is unavailable, a colored draft that reads pending only on a Claude pane, and dim suggestions that stay ghost text.
+`tests/fm-control.test.sh` covers the public exit refusal of a colored Claude draft on Herdr, with no deliberate-exit marker and nothing typed.
 
 ### Prune and respawn
 
@@ -2158,7 +2252,7 @@ ok - real Pi SDK 0.84.4 immediately renders appendEntry in the active transcript
 The focused regression recreated the two 2026-08-31 incident shapes against the real store scripts: a delivered decision outcome whose processing turn returned an empty assistant message, and one whose turn repeated an unrelated prior answer.
 In both, the processed marker held, the same sequence was presented again at the run boundary and after a session replacement, the triggered-turn budget gave way to a next-prompt copy without duplicates, and only `fm_branch_processed` with the presented sequence closed the outcome; a routine outcome never entered the path.
 The migration result in the historical output above is superseded: the current absent-marker rule is owned by `bin/fm-branch-outcome.sh`, and `tests/fm-branch-supervision.test.sh` covers it.
-On this machine the globally installed npm package is 0.81.1, whose stock `ToolExecutionComponent` rendering differs from the 0.84 line and fails the suite's first rendering-consumer case before any delivery case runs, which is why `FM_PI_PACKAGE_DIR` points at the 0.84.4 install above.
+The Pi 0.81.1 rendering-consumer failure that originally required the isolated package for this run is historical; the [current renderer comparison](../calm-mode-feasibility.md#2026-09-30-pi-0990-renderer-and-export-dom-verification) owns the replacement behavior and verification baseline.
 
 ### 2026-09-02 historical post-construction provider-error fallback
 
@@ -2234,8 +2328,8 @@ skip: installed Pi 0.81.1 predates the stock renderer contract 0.84.4 this case 
 ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.81.1
 ```
 
-That skip is the renderer case declining to render a verdict on a Pi older than the contract it compares against: since 0.84.4 the stock renderer no longer supplies an implicit reset at multiline boundaries and the extension emits that reset itself, so an older installed Pi differs legitimately.
-It names the installed version and the floor rather than degrading quietly, and a package whose version cannot be read at all is still a failure.
+At that verification, the extension reconstructed Pi's fallback and emitted the multiline resets required by Pi 0.84.4, unlike the older renderer.
+That reconstruction is superseded by the [current stock-component delegation](../calm-mode-feasibility.md#firstmate-pi-tool-audit).
 
 The same guard against the pre-change extension in the same lab measured a 676.9 ms worst keystroke echo while delivering two outcomes and a 295.3 ms worst echo with nothing to deliver, against a 49.2 ms extension-free floor, and failed as designed.
 Measured through the same real `fm_branch_report` tool and real `bin/` scripts with a 1 ms interval timer, the largest single block of the JavaScript thread fell from 273 ms to 2.0 ms for a routine outcome, from 286 ms to 2.0 ms for a captain outcome, and from 134 ms to 1.9 ms for main's acknowledgement, against a 1.3-2.2 ms idle-loop floor.

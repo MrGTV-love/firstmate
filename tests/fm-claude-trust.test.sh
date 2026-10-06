@@ -699,14 +699,22 @@ test_refused_spawn_leaves_no_task_state() {
   pass "fm-spawn.sh: a trust-refused claude spawn leaves no task state behind"
 }
 
-# Resolve the final prompt argument using the same shell argument splitting the
-# pane sees after the two leading export statements.
-claude_launch_doorbell() {  # <launch command>
-  local command=${1#*; }
-  (
-    eval "set -- ${command#*; }"
-    printf '%s' "${!#}"
-  )
+# Execute the complete staged launch with a model-free worker so brief delivery
+# and credential selection do not depend on the launch prefix's shell layout.
+claude_launch_value() {  # <launch command> <pane path> <brief|config-dir>
+  local launch=$1 pane=$2 kind=$3 probe
+  probe=$(fm_test_tmproot fm-claude-trust-launch)
+  cat > "$probe/claude" <<'SH'
+#!/bin/sh
+if [ "$FM_PROBE_KIND" = config-dir ]; then
+  printf '%s' "${CLAUDE_CONFIG_DIR-}"
+else
+  for arg do last=$arg; done
+  printf '%s' "${last-}"
+fi
+SH
+  chmod +x "$probe/claude"
+  fm_eval_launch "$launch" "$pane" "$probe" FM_PROBE_KIND="$kind"
 }
 
 # The spawn half: a real fm-spawn of a claude worker must pre-register the
@@ -732,10 +740,8 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
   assert_trusted "$config/.claude.json" "$wt" \
     "the claude spawn did not pre-register trust for its worktree"
   assert_present "$launch_log" "the claude spawn sent no launch command"
-  assert_grep 'claude --dangerously-skip-permissions' "$launch_log" \
-    "the launch command was not the claude worker launch"
   launch=$(cat "$launch_log")
-  doorbell=$(claude_launch_doorbell "$launch")
+  doorbell=$(claude_launch_value "$launch" "$wt" brief)
   record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
   [ -n "$record" ] || fail "the launch command did not carry a brief doorbell"
   [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
@@ -744,8 +750,8 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
     || fail "the worker could not read its launch brief from the record"
   # The worker must read the SAME store the registration wrote, or the trust
   # would land somewhere the pane never looks.
-  assert_grep "CLAUDE_CONFIG_DIR='$config'" "$launch_log" \
-    "the launch command did not point the worker at the store that was trusted"
+  [ "$(claude_launch_value "$launch" "$wt" config-dir)" = "$config" ] \
+    || fail "the worker did not receive the store that was trusted"
   pass "fm-spawn.sh: a claude spawn pre-trusts its worktree and launches with a readable brief doorbell"
 }
 
@@ -764,10 +770,8 @@ test_secondmate_standalone_clone_home_is_trusted() {
   assert_trusted "$case_dir/claude-config/.claude.json" "$home" \
     "the claude secondmate spawn did not pre-register trust for its standalone-clone home"
   assert_present "$case_dir/launch.log" "the claude secondmate spawn sent no launch command"
-  assert_grep 'claude --dangerously-skip-permissions' "$case_dir/launch.log" \
-    "the launch command was not the claude secondmate launch"
   launch=$(cat "$case_dir/launch.log")
-  doorbell=$(claude_launch_doorbell "$launch")
+  doorbell=$(claude_launch_value "$launch" "$home" brief)
   record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
   [ -n "$record" ] || fail "the secondmate launch command did not carry a brief doorbell"
   [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
@@ -776,8 +780,8 @@ test_secondmate_standalone_clone_home_is_trusted() {
     || fail "the secondmate could not read its charter from the record"
   # The pane must read the SAME store the registration wrote, or the trust would
   # land somewhere it never looks and the dialog would appear anyway.
-  assert_grep "CLAUDE_CONFIG_DIR='$case_dir/claude-config'" "$case_dir/launch.log" \
-    "the launch command did not point the secondmate at the store that was trusted"
+  [ "$(claude_launch_value "$launch" "$home" config-dir)" = "$case_dir/claude-config" ] \
+    || fail "the secondmate did not receive the store that was trusted"
   pass "fm-spawn.sh: a claude secondmate spawn pre-trusts a standalone-clone home"
 }
 

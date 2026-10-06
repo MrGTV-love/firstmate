@@ -243,9 +243,10 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     FM_COMPOSER_GHOST_LUMA_MAX (default 128): how grok renders its placeholder
 #     and hint text. A reset (SGR 0), a default-foreground (SGR 39), any base
 #     foreground colour (30-37 / 90-97), or a lighter 38;2 foreground ends the
-#     dark-foreground run. This assumes a DARK terminal theme, the firstmate
-#     fleet reality, where real typed input is bright and only de-emphasised UI
-#     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
+#     dark-foreground run. The default assumes a DARK terminal theme with
+#     bright typed input; backend exceptions are owned by their adapters
+#     (Herdr: docs/herdr-backend.md "Claude composer proof").
+#     The SGR-2 signal above stays theme-independent. A 256-colour
 #     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
 #     no fleet harness uses it for ghost text, so it is kept (real text wins:
 #     under-stripping merely defers, which the max-defer alarm surfaces, while
