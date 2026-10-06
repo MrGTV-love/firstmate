@@ -792,15 +792,17 @@ async function screen(payload, host, log, label = null) {
   const base = { id, host, ...(label ? { case_id: label.id, expected: label.expected, dataset: label.dataset } : {}) };
   const finish = (status, detail = {}) => {
     const record = { event: 'result', ...base, selected: selection.status === 'selected', status, latency_ms: elapsed(start), verdict: null, confidence: null, input_tokens: null, output_tokens: null, estimated_usd: null, cost_source: 'unknown', ...detail };
-    append(log, record);
-    return record;
+    return append(log, record);
   };
   if (selection.status !== 'selected') return finish(selection.status);
   if (withheld(payload)) return finish('withheld');
   const credential = await key();
   if (!credential) return finish('missing_key');
   // Do not spend when all-attempt accounting cannot be preserved.
-  if (!append(log, { event: 'attempt', ...base, selected: true })) return finish('log_unavailable');
+  if (!append(log, { event: 'attempt', ...base, selected: true })) {
+    finish('log_unavailable');
+    return false;
+  }
   const request = {
     model,
     state: { operations: selection.features, syntax_uncertain: selection.unsupported || false },
@@ -909,7 +911,13 @@ async function main() {
   let cases;
   try { cases = JSON.parse(readFileSync(options['--cases'], 'utf8')); } catch { throw new Error('invalid evaluation cases'); }
   if (!Array.isArray(cases) || !cases.length || cases.some(c => !/^[a-z0-9_-]{1,64}$/.test(c.id) || !['risky', 'routine'].includes(c.expected) || !['historical_september30', 'synthetic'].includes(c.dataset) || !c.payload) || new Set(cases.map(c => c.id)).size !== cases.length) throw new Error('cases require unique safe id, risky|routine expected, historical_september30|synthetic dataset and native payload');
-  for (const item of cases) await screen(item.payload, 'evaluation', log, item);
+  for (const item of cases) {
+    if (!await screen(item.payload, 'evaluation', log, item)) {
+      console.log('error: evaluation evidence could not be persisted; evaluation incomplete');
+      process.exitCode = 2;
+      return;
+    }
+  }
   toon(metrics(log));
 }
 main().catch(() => {

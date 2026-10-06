@@ -655,6 +655,177 @@ guardrail_status=$?
 
 node --input-type=module - "$ROOT" <<'JS'
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, statSync, rmSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+const root = process.argv[2];
+const lab = mkdtempSync(resolve(root, 'jev-persistence-test-'));
+const tool = resolve(root, 'bin/fm-jev-guardrail.mjs');
+const fakebin = resolve(lab, 'fakebin');
+mkdirSync(fakebin);
+const env = { ...process.env, FM_HOME: lab, FM_CONFIG_OVERRIDE: resolve(lab, 'config'), FM_STATE_OVERRIDE: resolve(lab, 'state'), TYPESAFE_API_KEY: 'synthetic-persistence-key', PATH: `${fakebin}:${process.env.PATH}` };
+delete env.TYPESAFE_API_KEY_PRIVATE;
+delete env.NODE_OPTIONS;
+mkdirSync(env.FM_CONFIG_OVERRIDE);
+writeFileSync(resolve(fakebin, 'curl'), `#!/usr/bin/env node
+const fs = require('node:fs');
+if (process.env.TYPESAFE_API_KEY || process.env.TYPESAFE_API_KEY_PRIVATE) process.exit(9);
+fs.readFileSync(0, 'utf8');
+fs.readFileSync(3, 'utf8');
+fs.appendFileSync(process.env.TRANSPORT_TRACE, 'request\\n');
+if (process.argv[2] !== '-q') process.exit(9);
+if (process.env.REPLY === 'timeout') process.exit(28);
+if (process.env.REPLY === 'transport_error') process.exit(7);
+const response = { model:'jev-1.13.0', usage:{input_tokens:100,output_tokens:1}, answers:{risk:{type:'choice',choice:'risky',confidence:0.9,probabilities:{risky:0.9,routine:0.05,uncertain:0.05}}} };
+if (process.env.REPLY === 'malformed_response') response.answers = {};
+process.stdout.write(JSON.stringify(response) + '\\n' + (process.env.REPLY === 'http_error' ? '503' : '200'));
+`);
+chmodSync(resolve(fakebin, 'curl'), 0o700);
+const preload = resolve(lab, 'refuse-write.cjs');
+writeFileSync(preload, `const fs = require('node:fs');
+const original = fs.writeSync;
+fs.writeSync = function(fd, data, ...rest) {
+  let row;
+  try { row = JSON.parse(typeof data === 'string' ? data : data.toString()); } catch {}
+  if (row && row.event === process.env.REFUSE_EVENT && (!process.env.REFUSE_STATUS || row.status === process.env.REFUSE_STATUS)) {
+    fs.appendFileSync(process.env.REFUSAL_TRACE, 'refused\\n');
+    throw new Error('synthetic append refusal');
+  }
+  return original.call(this, fd, data, ...rest);
+};
+require('node:module').syncBuiltinESMExports();
+`);
+const payload = command => ({ tool_name:'Bash', tool_input:{command} });
+const seed = JSON.stringify({version:1,at:1,mode:'shadow',event:'result',id:'prior',host:'evaluation',selected:false,status:'excluded',verdict:null}) + '\n';
+const rows = path => readFileSync(path, 'utf8').trim().split('\n').map(JSON.parse);
+const count = path => existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n').length : 0;
+const parseMetrics = text => Object.fromEntries(text.trim().split('\n').map(line => {
+  const colon = line.indexOf(':');
+  return [line.slice(0, colon), JSON.parse(line.slice(colon + 1).trim())];
+}));
+let sequence = 0;
+const setup = (scenario, refusal = false, mode = 0o600) => {
+  const prefix = resolve(lab, `case-${sequence++}`);
+  const log = `${prefix}.jsonl`;
+  writeFileSync(log, seed, {mode});
+  chmodSync(log, mode);
+  const cases = `${prefix}.cases.json`;
+  writeFileSync(cases, JSON.stringify([
+    {id:'first',expected:'risky',dataset:'synthetic',payload:scenario.payload},
+    {id:'later',expected:'risky',dataset:'synthetic',payload:payload('cat .env')},
+  ]));
+  const childEnv = { ...env, REPLY:scenario.reply || 'judged', TRANSPORT_TRACE:`${prefix}.transport`, REFUSAL_TRACE:`${prefix}.refusals`, ...(scenario.env || {}) };
+  if (refusal) Object.assign(childEnv, { NODE_OPTIONS:`--require=${preload}`, REFUSE_EVENT:scenario.event || 'result', REFUSE_STATUS:scenario.event === 'attempt' ? '' : scenario.status });
+  return {log,cases,env:childEnv};
+};
+const run = (args, fixture, input) => spawnSync(process.execPath, [tool, ...args, '--log', fixture.log], {env:fixture.env,input,encoding:'utf8'});
+const assertPreserved = fixture => {
+  assert.ok(readFileSync(fixture.log, 'utf8').startsWith(seed));
+  assert.equal(statSync(fixture.log).mode & 0o777, 0o600);
+};
+const assertFailure = result => {
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.equal(result.stdout, 'error: evaluation evidence could not be persisted; evaluation incomplete\n');
+  assert.equal(result.stderr, '');
+};
+try {
+  writeFileSync(resolve(env.FM_CONFIG_OVERRIDE, 'dispatch-never-send'), 'persistence-withheld\n');
+  const scenarios = [
+    {status:'excluded',payload:payload('cat README.md')},
+    {status:'invalid_input',payload:{tool_name:'Bash',tool_input:null}},
+    {status:'withheld',payload:payload('rm persistence-withheld')},
+    {status:'missing_key',payload:payload('cat .env'),env:{TYPESAFE_API_KEY:''}},
+    ...['timeout','transport_error','http_error','malformed_response','judged'].map(status => ({status,reply:status,payload:payload('cat .env'),transport:true})),
+  ];
+  for (const scenario of scenarios) {
+    const healthy = setup(scenario);
+    const success = run(['evaluate','--cases',healthy.cases], healthy);
+    assert.equal(success.status, 0, success.stdout + success.stderr);
+    assert.equal(success.stderr, '');
+    const metrics = parseMetrics(success.stdout);
+    const persisted = rows(healthy.log);
+    assert.equal(persisted.find(row => row.case_id === 'first' && row.event === 'result').status, scenario.status);
+    assert.equal(persisted.filter(row => row.event === 'result').length, 3);
+    assert.equal(metrics.observations, 3);
+    assert.equal(metrics.incomplete_attempts, 0);
+    assert.equal(metrics.attempts, persisted.filter(row => row.event === 'attempt').length);
+    const unknownAttempts = ['timeout','transport_error'].includes(scenario.status) ? metrics.attempts : 0;
+    assert.equal(metrics.unknown_cost_attempts, unknownAttempts);
+    assert.equal(metrics.known_input_tokens, (metrics.attempts - unknownAttempts) * 100);
+    assert.equal(metrics.known_output_tokens, metrics.attempts - unknownAttempts);
+    assert.equal(metrics.promotion_volume_met, false);
+    assert.equal(metrics.synthetic.labelled_risky, 2);
+    assert.equal(metrics.historical_september30.labelled_risky, 0);
+    assert.equal(metrics.native_judged, 0);
+    assert.equal(count(healthy.env.TRANSPORT_TRACE), (scenario.transport ? 1 : 0) + (scenario.status === 'missing_key' ? 0 : 1));
+    assertPreserved(healthy);
+
+    const refused = setup(scenario, true);
+    assertFailure(run(['evaluate','--cases',refused.cases], refused));
+    assertPreserved(refused);
+    assert.equal(count(refused.env.REFUSAL_TRACE), 1);
+    const evidence = rows(refused.log);
+    assert.ok(evidence.every(row => !row.case_id || row.case_id === 'first'));
+    assert.equal(evidence.length, scenario.transport ? 2 : 1);
+    assert.equal(count(refused.env.TRANSPORT_TRACE), scenario.transport ? 1 : 0);
+    const report = run(['metrics'], refused);
+    assert.equal(report.status, 0);
+    const incomplete = parseMetrics(report.stdout);
+    assert.equal(incomplete.observations, 1);
+    assert.equal(incomplete.attempts, scenario.transport ? 1 : 0);
+    assert.equal(incomplete.incomplete_attempts, scenario.transport ? 1 : 0);
+    assert.equal(incomplete.unknown_cost_attempts, scenario.transport ? 1 : 0);
+    assert.equal(incomplete.known_input_tokens, 0);
+    assert.equal(incomplete.known_output_tokens, 0);
+    assert.equal(incomplete.known_estimated_usd, 0);
+    assert.equal(incomplete.promotion_volume_met, false);
+    for (const host of ['claude','omp']) {
+      const native = setup(scenario, true);
+      const input = host === 'claude' ? scenario.payload : {toolName:'bash',input:scenario.payload.tool_input};
+      const result = run(['hook','--host',host], native, JSON.stringify(input));
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, '');
+      assert.equal(result.stderr, '');
+      assert.equal(count(native.env.REFUSAL_TRACE), 1);
+      assert.equal(count(native.env.TRANSPORT_TRACE), scenario.transport ? 1 : 0);
+      assert.equal(rows(native.log).length, scenario.transport ? 2 : 1);
+      assertPreserved(native);
+    }
+  }
+  const attemptScenario = {event:'attempt',payload:payload('cat .env')};
+  for (const host of ['evaluation','claude','omp']) {
+    const fixture = setup(attemptScenario, true);
+    const result = host === 'evaluation'
+      ? run(['evaluate','--cases',fixture.cases], fixture)
+      : run(['hook','--host',host], fixture, JSON.stringify(host === 'claude' ? attemptScenario.payload : {toolName:'bash',input:{command:'cat .env'}}));
+    if (host === 'evaluation') assertFailure(result);
+    else { assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, ''); }
+    assert.equal(count(fixture.env.REFUSAL_TRACE), 1);
+    assert.equal(count(fixture.env.TRANSPORT_TRACE), 0);
+    assert.equal(rows(fixture.log).length, 2);
+    assert.equal(rows(fixture.log).at(-1).status, 'log_unavailable');
+    assert.equal(rows(fixture.log).filter(row => row.event === 'attempt').length, 0);
+    assertPreserved(fixture);
+  }
+  for (const host of ['evaluation','claude','omp']) {
+    const fixture = setup({payload:payload('cat .env')}, false, 0o644);
+    const result = host === 'evaluation'
+      ? run(['evaluate','--cases',fixture.cases], fixture)
+      : run(['hook','--host',host], fixture, JSON.stringify(host === 'claude' ? payload('cat .env') : {toolName:'bash',input:{command:'cat .env'}}));
+    if (host === 'evaluation') assertFailure(result);
+    else { assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, ''); }
+    assert.equal(readFileSync(fixture.log, 'utf8'), seed);
+    assert.equal(statSync(fixture.log).mode & 0o777, 0o644);
+    assert.equal(count(fixture.env.TRANSPORT_TRACE), 0);
+  }
+  console.log('ok - evaluation refuses incomplete evidence at every append boundary; native persistence failures remain silent and advisory');
+} finally { rmSync(lab, {recursive:true,force:true}); }
+JS
+persistence_status=$?
+[ "$persistence_status" -eq 0 ] || exit "$persistence_status"
+
+node --input-type=module - "$ROOT" <<'JS'
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { accessSync, constants, mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
