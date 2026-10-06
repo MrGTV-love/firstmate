@@ -2528,6 +2528,7 @@ test_recovery_fixture_claims_only_owned_temp_directories() {
     printf 'preserve existing directory\n' > "$path/sentinel"
     before=$(shasum -a 256 "$path/sentinel")
     (
+      # shellcheck disable=SC2030 # The child cleanup must track only its own claims, not the parent's.
       TASK_TMPS=()
       TMP_ROOT="$dir/child-cleanup"
       mkdir "$TMP_ROOT" || exit 1
@@ -2794,7 +2795,7 @@ run_session_end_scan() {
   mkdir -p "$dir/user-home"
   (
     unset HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID
-    # shellcheck disable=SC2031 # This subshell's own environment is the point.
+    # shellcheck disable=SC2030,SC2031 # This subshell's own environment is the point.
     export PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
       HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05
@@ -2972,6 +2973,7 @@ test_teamclaude_reaches_fresh_herdr_spawns() {
   printf '%s' "$dir/wt" > "$dir/fake/herdr-treehouse-worktree"
   printf '%s' '%9' > "$dir/fake/herdr-pane"
   enable_teamclaude "$dir"
+  # shellcheck disable=SC2031 # Register in the parent; the collision fixture resets only its child copy.
   TASK_TMPS+=("/tmp/fm-tc9")
   out=$(run_spawn "$dir" tc9 "$dir/proj" claude --backend herdr --mode no-mistakes --yolo off); rc=$?
   expect_code 0 "$rc" "a TeamClaude fresh herdr spawn should succeed"$'\n'"$out"
@@ -3359,7 +3361,7 @@ test_reboot_recovery_completes_from_bounded_managed_observation() {
 
 recovery_liveness_episode() {  # <case-dir> <id>
   local dir=$1 id=$2
-  # shellcheck disable=SC2016 # The child shell must expand this liveness code.
+  # shellcheck disable=SC2016,SC2031 # The child expands the liveness code; PATH uses the unchanged parent value.
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
     FM_ROOT="$ROOT" STATE="$dir/home/state" bash -c '
       . "$1/bin/fm-secondmate-liveness-lib.sh"
@@ -3623,6 +3625,7 @@ test_bootstrap_recovers_the_derived_home_when_fm_home_is_unset() {
   mkdir -p "$dir/user-home" "$dir/home/.agents/skills" "$dir/home/.omp"
   cp "$ROOT/.omp/fm-worker-overlay.yml" "$dir/home/.omp/fm-worker-overlay.yml"
   before=$(shasum -a 256 "$dir/wt/unlanded.txt")
+  # shellcheck disable=SC2031 # The session-end scan's PATH override is confined to its subshell.
   out=$(env -u FM_HOME -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$dir/home" FM_FAKE_DIR="$dir/fake" \
