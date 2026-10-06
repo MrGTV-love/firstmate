@@ -12,21 +12,10 @@
 # the one site where --force overrides it, and bin/fm-backend.sh's
 # fm_backend_kill owns what each backend can prove about its own close - an
 # already-exited endpoint is not a failure and stays silent.
-# Removing state/<id>.meta and landing the backlog transition are one step, not
-# two: bin/fm-backlog-transition-lib.sh owns that invariant, and both halves run
-# under the task's own meta lock before this script reports success. Because the
-# completion links (the PR, the report path, a local-main note) live only in the
-# record being removed, the intended transition is recorded in
-# state/<id>.backlog-close first, so a process killed between the halves leaves
-# the next session start enough to finish it; a landed close removes that record.
-# A close that fails is fatal and loud, preserves its pending-close record, and
-# is retried by the next session start. The transition is skipped on a
-# config/backlog-backend=manual home and in a markdown home that keeps no
-# data/backlog.md; those cases print the manual follow-up. A configured
-# non-markdown adapter remains active without a markdown file; any active
-# automatic backend without compatible tasks-axi refuses before cleanup.
-# None of this loosens the landed-work gates below: the transition runs only on
-# the paths that already proceed to remove the record.
+# bin/fm-backlog-transition-lib.sh owns the fused metadata/backlog transition,
+# its exemptions, and the pending-close lifecycle in its CRASH RECOVERY header.
+# Teardown reports manual follow-up for exempt homes; an automatic transition
+# failure is fatal and loud rather than reporting cleanup success.
 # The close - and only the close - is replaced by `tasks-axi reopen` with the
 # deliverable recorded while the backlog item is still an open captain call
 # (bin/fm-captain-hold.sh `open` owns that predicate), because the policy holds
@@ -92,9 +81,9 @@
 # from it.
 # Worktree-slot ownership (teardown-slot-collision): a treehouse pool slot is
 # reused across tasks, so a stale, duplicated, or drifted worktree= record can
-# name a slot a DIFFERENT live task now holds. Cleanup kills every process under
-# that path and hard-resets it before returning it, so releasing a slot that is
-# not genuinely this task's destroys another worker's live work. Before the first
+# name a slot a DIFFERENT live task now holds. Cleanup reaps task-owned processes
+# and hard-resets the path before returning it, so releasing a slot that is not
+# genuinely this task's destroys another worker's live work. Before the first
 # cleanup step, teardown verifies record exclusivity: no OTHER task record in
 # this home or any locally registered Firstmate home may name the same live path
 # in its worktree= or home=. One live path with two task records is the reuse
@@ -274,10 +263,31 @@
 #     whose CURRENT WORKING DIRECTORY is this task's own worktree or tasktmp
 #     root via `lsof -a -d cwd` (cheap: bounded by process count, not by
 #     walking the worktree's file tree) and sends TERM, then KILL after a short
-#     grace period to any survivor whose process identity still matches. Both
-#     roots are unique per task and never
-#     shared, so this can never reach another task's or the primary's
-#     processes. Idempotent: nothing left to find is a silent no-op.
+#     grace period to any survivor whose process identity still matches.
+#     Nested-lane boundary: a matched cwd inside a linked git worktree that
+#     sits beneath either root (registered by any repository, the project or
+#     a sibling clone, and including lanes this task's own worker created) is
+#     never signalled, because no record proves which task owns that lane.
+#     Teardown refuses instead, even with --force, naming the pid, its birth
+#     identity, the matched path, and the lane. A lane is either a worktree
+#     the project or a git-backed root's repository still registers there,
+#     even when its directory or .git is missing or prunable, or a linked
+#     worktree git discovers from the cwd; outer-worktree discovery never
+#     proves custody. Only a cwd exactly equal to a live recorded scan root is
+#     eligible for signalling. Every other descendant cwd, existing or deleted,
+#     refuses with its pid, birth identity, matched path and scan root, because
+#     a damaged sibling lane cannot be distinguished from an own-tree directory.
+#     A missing lsof refuses too: without the scan no target can be audited, so
+#     no unaudited process or process-group signal is ever sent.
+#     Before each signal, state/<id>.teardown-processes records one tab-separated
+#     row: epoch, signal, pid, birth identity, command line,
+#     start time, cwd, matched open path (cwd descriptor), all shell-escaped
+#     with printf %q. This audit survives task-record retirement and records
+#     signal intent, not proof of delivery: an immediate birth-identity recheck
+#     can still skip the signal. Failed command/start collection skips the target
+#     only when a changed birth identity or kernel ESRCH proves it replaced or
+#     vanished; a live matching target or uncertain result refuses, as do authorization
+#     and write failures. Idempotent: nothing left to find is a silent no-op.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -432,6 +442,7 @@ CONTROL_LOCK_HELD=0
 SM_LIVENESS_LOCK=
 META_LOCK=
 META_LOCK_HELD=0
+BACKLOG_CLOSE_STAGE=
 DESCENDANT_LOCK_PATHS=()
 DESCENDANT_TASK_STATES=()
 DESCENDANT_TASK_IDS=()
@@ -440,6 +451,9 @@ DESCENDANT_TASK_HOMES=()
 DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 teardown_release_locks() {
   local status=$? i
+  if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
+    fm_backlog_record_remove "$BACKLOG_CLOSE_STAGE" "pending-close staged record" "$STATE" || true
+  fi
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
@@ -2032,11 +2046,10 @@ conclude_task_no_mistakes_run() {  # <worktree>
   return 1
 }
 
-# Fix 2 (see script header): pids of every process whose CURRENT WORKING
-# DIRECTORY is exactly $1 or under it, from one bounded system-wide `lsof -a
-# -d cwd` scan (never the recursive +D file-tree walk, which lsof itself
-# documents as slow). Never $$ (this script's own pid). Empty output when
-# nothing matches; failure means the scan could not establish a safe result.
+# Fix 2 (see script header): pid and matched cwd path for every process whose
+# CURRENT WORKING DIRECTORY is exactly $1 or under it, from a bounded system-wide
+# `lsof -a -d cwd` scan (never the recursive +D file-tree walk). Never $$.
+# Empty output when nothing matches; failure means no safe result was established.
 pids_with_cwd_under() {  # <dir>
   local dir=$1 out pid path line
   [ -n "$dir" ] && [ -d "$dir" ] || return 0
@@ -2056,7 +2069,7 @@ pids_with_cwd_under() {  # <dir>
         path=${line#n}
         case "$path" in
           "$dir"|"$dir"/*)
-            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\n' "$pid"
+            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\t%s\n' "$pid" "$path"
             ;;
         esac
         ;;
@@ -2098,83 +2111,187 @@ task_pid_list_contains() {  # <pid-list> <pid>
   printf '%s\n' "$1" | grep -Fxq "$2"
 }
 
+# Canonical form of <path> even when its tail no longer exists: the nearest
+# existing ancestor is resolved and the missing components are kept verbatim.
+task_canonical_path() {  # <path>
+  local dir=$1 rest=""
+  while [ ! -d "$dir" ]; do
+    case "$dir" in /?*) ;; *) return 1 ;; esac
+    rest=/${dir##*/}$rest
+    dir=${dir%/*}
+    [ -n "$dir" ] || dir=/
+  done
+  dir=$(CDPATH='' cd -- "$dir" && pwd -P) || return 1
+  printf '%s%s\n' "${dir%/}" "$rest"
+}
+
+# Prints a discovered nested worktree lane beneath <root> that holds <path>.
+# A lane in TASK_REGISTERED_LANES wins even when its directory or .git is gone;
+# otherwise git classifies the nearest existing directory. Empty output is
+# not proof of custody. Fails when git cannot classify <path> under a git <root>.
+task_nested_lane_for_path() {  # <root> <path>
+  local root=$1 path=$2 dir lane top git_dir common_dir
+  [ -e "$path" ] || path=${path% (deleted)}
+  for lane in ${TASK_REGISTERED_LANES[@]+"${TASK_REGISTERED_LANES[@]}"}; do
+    case "$path" in "$lane"|"$lane"/*) printf '%s\n' "$lane"; return 0 ;; esac
+  done
+  dir=$path
+  while [ ! -d "$dir" ]; do
+    case "$dir" in "$root"/*) dir=${dir%/*} ;; *) return 1 ;; esac
+  done
+  while :; do
+    if ! top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
+      git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && return 1
+      return 0
+    fi
+    top=$(CDPATH='' cd -- "$top" && pwd -P) || return 1
+    case "$top" in "$root"/*) ;; *) return 0 ;; esac
+    git_dir=$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+    common_dir=$(git -C "$top" rev-parse --git-common-dir 2>/dev/null) || return 1
+    case "$common_dir" in /*) ;; *) common_dir=$top/$common_dir ;; esac
+    git_dir=$(CDPATH='' cd -- "$git_dir" && pwd -P) || return 1
+    common_dir=$(CDPATH='' cd -- "$common_dir" && pwd -P) || return 1
+    if [ "$git_dir" != "$common_dir" ]; then
+      printf '%s\n' "$top"
+      return 0
+    fi
+    dir=${top%/*}
+  done
+}
+
+# Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
+# entries, that the project or a git-backed scan root's repository registers
+# strictly beneath a scan root. No git-backed root means no registry is read.
+task_registered_lanes_under_roots() {  # <canonical-root>...
+  local root src registry line lane
+  local -a sources
+  TASK_REGISTERED_LANES=()
+  sources=()
+  for root in "$@"; do
+    git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
+  done
+  [ "${#sources[@]}" -gt 0 ] || return 0
+  [ -z "$PROJ" ] || sources+=("$PROJ")
+  for src in "${sources[@]}"; do
+    if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
+      TASK_PIDS_FAILED_DIR=$src
+      TASK_PIDS_ERROR="worktree registration could not be read"
+      return 1
+    fi
+    while IFS= read -r line; do
+      case "$line" in worktree\ *) ;; *) continue ;; esac
+      if ! lane=$(task_canonical_path "${line#worktree }"); then
+        TASK_PIDS_FAILED_DIR=${line#worktree }
+        TASK_PIDS_ERROR="registered worktree path could not be resolved"
+        return 1
+      fi
+      for root in "$@"; do
+        case "$lane" in "$root"/*) TASK_REGISTERED_LANES+=("$lane") ;; esac
+      done
+    done <<EOF
+$registry
+EOF
+  done
+}
+
 task_pids_under_roots() {  # <dir>...
   TASK_PIDS=
   TASK_PIDS_FAILED_DIR=
-  local dir dir_pids pids=""
+  TASK_PIDS_ERROR="lsof failed"
+  TASK_PID_CWDS=()
+  TASK_SCAN_PIDS=()
+  local dir dir_matches pid path lane identity pids=""
+  local -a scan_roots
+  scan_roots=()
   for dir in "$@"; do
-    [ -n "$dir" ] || continue
-    if ! dir_pids=$(pids_with_cwd_under "$dir"); then
+    [ -n "$dir" ] && [ -d "$dir" ] || continue
+    if ! path=$(CDPATH='' cd -- "$dir" && pwd -P); then
+      TASK_PIDS_FAILED_DIR=$dir
+      TASK_PIDS_ERROR="scan root could not be resolved"
+      return 1
+    fi
+    scan_roots+=("$path")
+  done
+  [ "${#scan_roots[@]}" -gt 0 ] || return 0
+  if ! command -v lsof >/dev/null 2>&1; then
+    TASK_PIDS_FAILED_DIR=${scan_roots[0]}
+    TASK_PIDS_ERROR="lsof is unavailable, so no signal target can be audited"
+    return 1
+  fi
+  task_registered_lanes_under_roots "${scan_roots[@]}" || return 1
+  for dir in "${scan_roots[@]}"; do
+    if ! dir_matches=$(pids_with_cwd_under "$dir"); then
       TASK_PIDS_FAILED_DIR=$dir
       return 1
     fi
-    pids="$pids
-$dir_pids"
+    while IFS=$'\t' read -r pid path; do
+      [ -n "$pid" ] || continue
+      if ! lane=$(task_nested_lane_for_path "$dir" "$path"); then
+        TASK_PIDS_FAILED_DIR=$path
+        TASK_PIDS_ERROR="git could not classify the worktree holding process $pid's cwd"
+        return 1
+      fi
+      if [ -n "$lane" ]; then
+        identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$lane
+        TASK_PIDS_ERROR="registered nested worktree lane holds process $pid"
+        return 1
+      fi
+      if [ "$path" != "$dir" ]; then
+        identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        echo "REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$path
+        TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
+        return 1
+      fi
+      TASK_SCAN_PIDS+=("$pid")
+      TASK_PID_CWDS+=("$path")
+      pids="$pids
+$pid"
+    done <<EOF
+$dir_matches
+EOF
   done
   TASK_PIDS=$(printf '%s\n' "$pids" | grep -E '^[0-9]+$' | sort -un || true)
 }
 
-reap_task_backend_process_group() {  # <label>
-  local label=$1 leader leader_start pgid current_pgid own_pgid
-  if [ "$BACKEND" != tmux ]; then
-    echo "warning: lsof is unavailable; cannot resolve a process-group fallback for $BACKEND task $ID" >&2
-    return 0
+task_record_process_signal() {  # <pid> <birth-identity> <signal>
+  local pid=$1 identity=$2 signal=$3 command start cwd="" i record epoch current
+  record="$STATE/$ID.teardown-processes"
+  for i in "${!TASK_SCAN_PIDS[@]}"; do
+    [ "${TASK_SCAN_PIDS[$i]}" != "$pid" ] || { cwd=${TASK_PID_CWDS[$i]}; break; }
+  done
+  [ -n "$cwd" ] || return 1
+  if ! command=$(LC_ALL=C ps -ww -p "$pid" -o command= 2>/dev/null) \
+     || ! start=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) \
+     || [ -z "$command" ] || [ -z "$start" ]; then
+    if current=$(task_process_identity "$pid") && [ "$current" != "$identity" ]; then
+      return 2
+    fi
+    if perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+      return 2
+    fi
+    return 1
   fi
-  leader=$(tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null) || leader=""
-  case "$leader" in ''|*[!0-9]*)
-    echo "warning: lsof is unavailable; cannot resolve the tmux pane process group for $ID" >&2
-    return 0
-    ;;
-  esac
-  leader_start=$(task_process_identity "$leader") || {
-    echo "warning: lsof is unavailable; cannot identify the tmux pane process group for $ID" >&2
-    return 0
-  }
-  pgid=$(ps -o pgid= -p "$leader" 2>/dev/null) || pgid=""
-  pgid=$(printf '%s' "$pgid" | tr -d '[:space:]')
-  case "$pgid" in ''|*[!0-9]*|0|1)
-    echo "warning: lsof is unavailable; cannot resolve the tmux pane process group for $ID" >&2
-    return 0
-    ;;
-  esac
-  own_pgid=$(ps -o pgid= -p "$$" 2>/dev/null) || own_pgid=""
-  own_pgid=$(printf '%s' "$own_pgid" | tr -d '[:space:]')
-  if [ "$pgid" = "$own_pgid" ]; then
-    echo "warning: lsof is unavailable; refusing to signal teardown's own process group for $ID" >&2
-    return 0
+  epoch=$(date +%s) || return 1
+  fm_backlog_record_parent_authorized "$record" "teardown process audit" "$STATE" || return 1
+  if [ -e "$record" ] || [ -L "$record" ]; then
+    [ -f "$record" ] && [ ! -L "$record" ] || return 1
   fi
-  task_process_identity_matches "$leader" "$leader_start" || return 0
-  current_pgid=$(ps -o pgid= -p "$leader" 2>/dev/null) || current_pgid=""
-  current_pgid=$(printf '%s' "$current_pgid" | tr -d '[:space:]')
-  [ "$current_pgid" = "$pgid" ] || return 0
-  echo "teardown: reaping leaked $label process group for $ID: $pgid" >&2
-  kill -TERM -- "-$pgid" 2>/dev/null || true
-  sleep 1
-  if task_process_identity_matches "$leader" "$leader_start" \
-     && [ "$(ps -o pgid= -p "$leader" 2>/dev/null | tr -d '[:space:]')" = "$pgid" ] \
-     && kill -0 -- "-$pgid" 2>/dev/null; then
-    echo "teardown: force-killing leaked $label process group for $ID: $pgid" >&2
-    kill -KILL -- "-$pgid" 2>/dev/null || true
-  fi
+  (umask 077; printf '%q\t%q\t%q\t%q\t%q\t%q\t%q\t%q\n' \
+    "$epoch" "$signal" "$pid" "$identity" "$command" \
+    "$start" "$cwd" "$cwd" >> "$record") || return 1
 }
 
-# Reap every process rooted (by cwd) under this task's own worktree or tasktmp
-# - both unique per task and never shared - before either is removed. TERM
-# first, then KILL after a short grace period for anything still alive; a
-# process that exits on its own between the two passes is simply absent from
-# the recheck. A missing lsof uses the backend process-group fallback; an lsof
-# scan error refuses before destructive teardown.
+# Fix 2 in the script header owns exact-root custody and pre-signal auditing.
 reap_task_worktree_processes() {  # <label> <dir>...
   local label=$1 pids pid identity current_pids i pass=1 max_passes=3
   local -a tracked_pids tracked_identities remaining_pids remaining_identities
   shift
-  if ! command -v lsof >/dev/null 2>&1; then
-    reap_task_backend_process_group "$label"
-    return 0
-  fi
   while [ "$pass" -le "$max_passes" ]; do
     if ! task_pids_under_roots "$@"; then
-      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
       return 1
     fi
     pids=$TASK_PIDS
@@ -2185,7 +2302,7 @@ reap_task_worktree_processes() {  # <label> <dir>...
       [ -n "$pid" ] || continue
       if ! identity=$(task_process_identity "$pid"); then
         if ! task_pids_under_roots "$@"; then
-          echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+          echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
           return 1
         fi
         if task_pid_list_contains "$TASK_PIDS" "$pid"; then
@@ -2204,7 +2321,7 @@ EOF
       continue
     fi
     if ! task_pids_under_roots "$@"; then
-      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
       return 1
     fi
     current_pids=$TASK_PIDS
@@ -2214,12 +2331,20 @@ EOF
       identity=${tracked_identities[$i]}
       if task_pid_list_contains "$current_pids" "$pid" \
          && task_process_identity_matches "$pid" "$identity"; then
+        if task_record_process_signal "$pid" "$identity" TERM; then
+          :
+        else
+          [ "$?" -ne 2 ] || continue
+          echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without signalling it." >&2
+          return 1
+        fi
+        task_process_identity_matches "$pid" "$identity" || continue
         kill -TERM "$pid" 2>/dev/null || true
       fi
     done
     sleep 1
     if ! task_pids_under_roots "$@"; then
-      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+      echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
       return 1
     fi
     current_pids=$TASK_PIDS
@@ -2237,7 +2362,7 @@ EOF
     if [ "${#remaining_pids[@]}" -gt 0 ]; then
       echo "teardown: force-killing leaked $label process(es) for $ID: ${remaining_pids[*]}" >&2
       if ! task_pids_under_roots "$@"; then
-        echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+        echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
         return 1
       fi
       current_pids=$TASK_PIDS
@@ -2246,6 +2371,14 @@ EOF
         identity=${remaining_identities[$i]}
         if task_pid_list_contains "$current_pids" "$pid" \
            && task_process_identity_matches "$pid" "$identity"; then
+          if task_record_process_signal "$pid" "$identity" KILL; then
+            :
+          else
+            [ "$?" -ne 2 ] || continue
+            echo "REFUSED: cannot durably record leaked process $pid identity for $ID; preserving the worktree/tasktmp without force-killing it." >&2
+            return 1
+          fi
+          task_process_identity_matches "$pid" "$identity" || continue
           kill -KILL "$pid" 2>/dev/null || true
         fi
       done
@@ -2253,7 +2386,7 @@ EOF
     pass=$((pass + 1))
   done
   if ! task_pids_under_roots "$@"; then
-    echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID (lsof failed); preserving the worktree/tasktmp for manual inspection or retry." >&2
+    echo "REFUSED: cannot determine leaked processes under ${TASK_PIDS_FAILED_DIR:-<missing>} for $ID ($TASK_PIDS_ERROR); preserving the worktree/tasktmp for manual inspection or retry." >&2
     return 1
   fi
   [ -z "$TASK_PIDS" ] && return 0
@@ -3527,11 +3660,44 @@ if [ "$BACKEND" = herdr ]; then
   TEARDOWN_HERDR_PANE=$FM_BACKEND_HERDR_PANE
 fi
 teardown_release_herdr_locks
+# Prepare the non-authoritative close record and retire any previous marker
+# outside presentation custody. The EXIT trap retires this stage on refusal;
+# the legacy stamp and authoritative publication wait for exact reacquisition.
+BACKLOG_CLOSED=0
+BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION
+BACKLOG_TRANSITION_FLAGS=()
+[ "$BACKLOG_TRANSITION" = close ] || BACKLOG_TRANSITION_FLAGS=(--retain)
+BACKLOG_SKIP_REASON=
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   backlog_done_args || {
-    echo "error: the pending backlog $TEARDOWN_BACKLOG_TRANSITION for $ID is not replayable; refusing destructive teardown" >&2
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID is not replayable; refusing destructive teardown" >&2
     exit 1
   }
+  BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
+  if ! fm_backlog_record_parent_authorized "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE" \
+     || { { [ -e "$BACKLOG_CLOSE_MARKER" ] || [ -L "$BACKLOG_CLOSE_MARKER" ]; } \
+          && ! fm_backlog_record_present "$BACKLOG_CLOSE_MARKER" "pending-close record target" "$STATE"; }; then
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
+    exit 1
+  fi
+  if ! fm_backlog_close_marker_stage "$STATE/.$ID.backlog-close.${BASHPID:-$$}" \
+      "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
+      "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
+      "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
+    exit 1
+  fi
+  BACKLOG_CLOSE_STAGE="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
+else
+  if [ "$CLEANUP_RECOVERY" = orca ]; then
+    BACKLOG_SKIP_REASON="Orca cleanup recovery is not a launched backlog worker"
+  else
+    BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
+  fi
+fi
+if ! fm_backlog_close_marker_clear "$STATE" "$ID"; then
+  echo "error: the previous pending backlog $BACKLOG_TRANSITION for $ID could not be cleared ($FM_BACKLOG_TRANSITION_ERROR); refusing process cleanup" >&2
+  exit 1
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
@@ -3555,11 +3721,6 @@ if [ "$BACKEND" = herdr ]; then
   }
 fi
 
-BACKLOG_CLOSED=0
-BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION
-BACKLOG_TRANSITION_FLAGS=()
-[ "$BACKLOG_TRANSITION" = close ] || BACKLOG_TRANSITION_FLAGS=(--retain)
-BACKLOG_SKIP_REASON=
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
 # Roll the accepted legacy incarnation's stamp back to the record's exact
 # pre-stamp bytes. Uses perl - already in the teardown lifecycle's curated PATH
@@ -3598,11 +3759,8 @@ teardown_legacy_stamp_rollback() {
       exit 1
     fi
   fi
-  BACKLOG_CLOSED=1
-  META_SPAWN_GEN=$TEARDOWN_META_SPAWN_GEN
-  if ! fm_backlog_close_marker_write "$STATE" "$ID" "$DATA" "$META_SPAWN_GEN" \
-      "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
-      "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
+  if ! fm_backlog_atomic_transition publish "$BACKLOG_CLOSE_STAGE" "$BACKLOG_CLOSE_MARKER" \
+      "pending-close record" "$STATE"; then
     if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ] && [ -z "$TEARDOWN_LEGACY_RETAINED_STAMP" ] \
        && teardown_legacy_stamp_rollback; then
       echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); the accepted legacy incarnation was rolled back, retaining every durable task record" >&2
@@ -3614,12 +3772,8 @@ teardown_legacy_stamp_rollback() {
     fi
     exit 1
   fi
-else
-  if [ "$CLEANUP_RECOVERY" = orca ]; then
-    BACKLOG_SKIP_REASON="Orca cleanup recovery is not a launched backlog worker"
-  else
-    BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
-  fi
+  BACKLOG_CLOSE_STAGE=
+  BACKLOG_CLOSED=1
 fi
 
 HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
@@ -3866,7 +4020,6 @@ fi
 # row takes the retain transition here instead of the close: same record, same
 # ordering, the row returns to Queued with its deliverable recorded.
 if [ "$BACKLOG_CLOSED" = 1 ]; then
-  BACKLOG_CLOSE_MARKER=$(fm_backlog_close_marker_path "$STATE" "$ID") || exit 1
   if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$STATE/$ID.meta" "$BACKLOG_CLOSE_MARKER" \
       "$DATA" "$ID" "$STATE" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
     fm_lock_release "$META_LOCK"

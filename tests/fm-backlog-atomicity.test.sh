@@ -513,13 +513,16 @@ SH
   chmod +x "$case_dir/fakebin/tmux"
 }
 
+# Fail actual target removal, not rm -f's absent-target no-op.
 break_meta_removal() {  # <case-dir> <meta-path>
   local case_dir=$1 meta=$2 real
   real=$(command -v rm)
   cat > "$case_dir/fakebin/rm" <<SH
 #!/usr/bin/env bash
 for arg in "\$@"; do
-  [ "\$arg" != "$meta" ] || exit 1
+  if [ "\$arg" = "$meta" ] && { [ -e "\$arg" ] || [ -L "\$arg" ]; }; then
+    exit 1
+  fi
 done
 exec "$real" "\$@"
 SH
