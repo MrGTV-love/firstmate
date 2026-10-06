@@ -957,11 +957,11 @@ export default function (pi: ExtensionAPI) {
       owner.pendingActionables.some((item) => hostLaunchRefused(item.message))) {
       const result = spawnSync(
         "bash",
-        ["-c", '. "$1"; fm_supervision_host_config "$2" omp; printf "%s\\n" "$FM_SUPERVISION_ENGINE_PROBLEM"', "_",
+        ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" omp && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
           `${fmRoot}/bin/fm-supervision-engine-lib.sh`, config],
         { cwd: fmRoot, encoding: "utf8", env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config } },
       );
-      if (result.status === 0 && /^error: config\/session-launch-policy/m.test(result.stdout)) {
+      if (result.status === 1) {
         refusedHostConfiguration = hostConfiguration;
       }
     }

@@ -72,6 +72,7 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
+- A pending launch refusal is replayed once per owning replacement, whose arm selection uses the current host activation checks rather than the historical diagnostic.
 
 ### Cursor stop hook
 

@@ -118,15 +118,21 @@ fm_supervision_engine_turn claude sonnet "$TMP_ROOT/prompt" "$TMP_ROOT/message" 
 pass 'absent policy preserves configured Claude engine and direct turn (fixture executable only)'
 
 test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor>
-  local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} case_dir repo home out status
-  case_dir="$TMP_ROOT/$consumer-$publication-$phase-$replay_policy"
+  local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} selection=${5:-claude} case_dir repo home out status
+  case_dir="$TMP_ROOT/$consumer-$publication-$phase-$replay_policy-$selection"
   repo="$case_dir/repo"
   home="$case_dir/home"
   mkdir -p "$repo/bin" "$repo/.omp/extensions" "$repo/.pi/extensions/lib" \
     "$repo/.opencode/plugins/lib" "$repo/node_modules/typebox" "$home/state" "$home/config"
   git init -q "$repo"
   : > "$repo/AGENTS.md"
-  printf 'claude sonnet\n' > "$home/config/supervision-host"
+  case "$selection" in
+    claude) printf 'claude sonnet\n' ;;
+    empty) printf '\n' ;;
+    default) printf 'default\n' ;;
+    unverified) printf 'omp\n' ;;
+    extra) printf 'claude sonnet extra\n' ;;
+  esac > "$home/config/supervision-host"
   printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
   cp "$TMP_ROOT/prior-host" "$home/state/.supervision-host"
   printf 'previous turn custody\n' > "$home/state/.supervision-host-turn"
@@ -186,15 +192,10 @@ while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/"*.sh
   ln -s "$(command -v bun)" "$case_dir/$consumer"
-  status=0
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" \
-    FM_POLICY_ROOT="$ROOT" FM_POLICY_CONSUMER="$consumer" FM_POLICY_PUBLICATION="$publication" FM_POLICY_PHASE="$phase" \
-    FM_POLICY_REPLAY_POLICY="$replay_policy" \
-    FM_OMP_ARM_READY_TIMEOUT_MS=1000 FM_OPENCODE_ARM_READY_TIMEOUT_MS=1000 \
-    FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=1 \
-    "$case_dir/$consumer" --eval "$(cat <<'JS'
+  cat > "$case_dir/consumer.mjs" <<'JS'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const state = `${process.env.FM_HOME}/state`;
 const root = process.env.FM_ROOT_OVERRIDE;
@@ -202,6 +203,7 @@ const consumer = process.env.FM_POLICY_CONSUMER;
 const phase = process.env.FM_POLICY_PHASE;
 const expectedHosts = phase === "successor" ? 2 : 1;
 const replayAllowed = process.env.FM_POLICY_REPLAY_POLICY === "removed";
+const replaying = process.env.FM_POLICY_REPLAY_STAGE === "replacement";
 const records = [".supervision-host", ".supervision-host-turn", ".supervision-host-engine", "task.meta", "task.lease", "wakes.jsonl"];
 const before = records.map((name) => readFileSync(`${state}/${name}`, "utf8"));
 const rows = () => existsSync(`${state}/launches`) ? readFileSync(`${state}/launches`, "utf8").trim().split("\n") : [];
@@ -251,6 +253,25 @@ try {
   const mod = await import(pathToFileURL(modulePath).href);
   if (consumer === "omp") mod.default(api);
   else hooks = await mod.FmPrimaryWatchArm({ client, directory: root, worktree: root });
+  if (replaying) {
+    await handlers.get("session_start")({}, {});
+    await until(() => sent.filter(refusal).length === 1 &&
+      (replayAllowed ? hosts().length === expectedHosts + 1 : plains().length === 3),
+      "replacement did not replay its pending refusal with currently permitted monitoring");
+    if (hosts().length !== expectedHosts + (replayAllowed ? 1 : 0) || plains().length !== (replayAllowed ? 2 : 3)) {
+      throw new Error(`replacement replay selected the wrong host or watcher: ${rows().join(" | ")}`);
+    }
+    await consume();
+    await handlers.get("session_shutdown")({}, {});
+    await handlers.get("session_start")({}, {});
+    await until(() => replayAllowed ? hosts().length === expectedHosts + 2 : plains().length === 4,
+      "owning replacement did not retain currently permitted monitoring");
+    await arm();
+    if (hosts().length !== expectedHosts + (replayAllowed ? 2 : 0) || sent.filter(refusal).length !== 1) {
+      throw new Error(`consumed replacement selected wrong monitoring or redelivered refusal: ${JSON.stringify({ sent, launches: rows() })}`);
+    }
+    if (existsSync(`${state}/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("consumed refusal remained in replacement handoff");
+  } else {
   await arm();
   if (phase === "successor") {
     await until(() => hosts().length === 1, "first host did not start");
@@ -261,7 +282,7 @@ try {
   if (hosts().length !== expectedHosts || plains().length !== 1) throw new Error(`denied host was retried or monitoring was not restored: ${rows().join(" | ")}`);
   const refusalMessage = sent.find(refusal);
   const detail = process.env.FM_POLICY_PUBLICATION === "failed" ? "could not record the hand-back" : "predecessor custody is unchanged";
-  if (!refusalMessage.includes(detail) || !refusalMessage.includes("session-launch-policy")) throw new Error(`refusal lost policy or publication detail: ${refusalMessage}`);
+  if (!refusalMessage.includes(detail) || (process.env.FM_POLICY_SELECTION === "claude" && !refusalMessage.includes("session-launch-policy"))) throw new Error(`refusal lost selection or publication detail: ${refusalMessage}`);
   if (refusalMessage.includes("could not restore watcher continuity") || refusalMessage.includes("ready successor")) throw new Error(`ordinary fallback was reported as failed: ${refusalMessage}`);
   if (phase === "successor" && !sent.some((message) => message.includes("signal: prior host close"))) throw new Error(`original close was lost: ${JSON.stringify(sent)}`);
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -276,25 +297,15 @@ try {
   if (consumer === "omp") {
     await handlers.get("session_shutdown")({}, {});
     if (replayAllowed) unlinkSync(`${process.env.FM_HOME}/config/session-launch-policy`);
-    const replacement = await import(`${pathToFileURL(modulePath).href}?replacement=1`);
-    replacement.default(api);
-    await handlers.get("session_start")({}, {});
-    await until(() => sent.filter(refusal).length === 2 &&
-      (replayAllowed ? hosts().length === expectedHosts + 1 : plains().length === 3),
-      "replacement did not replay its pending refusal with currently permitted monitoring");
-    if (hosts().length !== expectedHosts + (replayAllowed ? 1 : 0) || plains().length !== (replayAllowed ? 2 : 3)) {
-      throw new Error(`replacement replay selected the wrong host or watcher: ${rows().join(" | ")}`);
+    const replacement = spawnSync(process.env.FM_POLICY_PRIMARY_BIN, [process.argv[1]], {
+      env: { ...process.env, FM_POLICY_REPLAY_STAGE: "replacement" },
+      encoding: "utf8",
+      timeout: 15000,
+    });
+    if (replacement.status !== 0 || replacement.stdout || replacement.stderr) {
+      throw new Error(`fresh owning replacement failed: ${replacement.stdout}${replacement.stderr}`);
     }
-    await consume();
-    await handlers.get("session_shutdown")({}, {});
-    await handlers.get("session_start")({}, {});
-    await until(() => replayAllowed ? hosts().length === expectedHosts + 2 : plains().length === 4,
-      "owning replacement did not retain currently permitted monitoring");
-    await arm();
-    if (hosts().length !== expectedHosts + (replayAllowed ? 2 : 0) || sent.filter(refusal).length !== 2) {
-      throw new Error(`consumed replacement selected wrong monitoring or redelivered refusal: ${JSON.stringify({ sent, launches: rows() })}`);
-    }
-    if (existsSync(`${state}/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("consumed refusal remained in replacement handoff");
+  }
   }
   records.forEach((name, index) => {
     if (readFileSync(`${state}/${name}`, "utf8") !== before[index]) throw new Error(`${name} custody changed`);
@@ -313,10 +324,16 @@ try {
 }
 process.exit(0);
 JS
-)" 2>&1) || status=$?
-  expect_code 0 "$status" "$consumer $publication $phase $replay_policy policy refusal public consumer: $out"
+  status=0
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" \
+    FM_POLICY_ROOT="$ROOT" FM_POLICY_CONSUMER="$consumer" FM_POLICY_PUBLICATION="$publication" FM_POLICY_PHASE="$phase" \
+    FM_POLICY_REPLAY_POLICY="$replay_policy" FM_POLICY_SELECTION="$selection" FM_POLICY_PRIMARY_BIN="$case_dir/$consumer" \
+    FM_OMP_ARM_READY_TIMEOUT_MS=1000 FM_OPENCODE_ARM_READY_TIMEOUT_MS=1000 \
+    FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=1 \
+    "$case_dir/$consumer" "$case_dir/consumer.mjs" 2>&1) || status=$?
+  expect_code 0 "$status" "$consumer $publication $phase $replay_policy $selection policy refusal public consumer: $out"
   [ -z "$out" ] || fail "$consumer policy consumer printed output: $out"
-  pass "$consumer $publication $phase $replay_policy: refusal delivered once per owner, current-policy monitoring, unchanged custody"
+  pass "$consumer $publication $phase $replay_policy $selection: refusal delivered once per owner, current-policy monitoring, unchanged custody"
 }
 
 if command -v bun >/dev/null 2>&1; then
@@ -328,6 +345,11 @@ if command -v bun >/dev/null 2>&1; then
           test_primary_consumer_policy_refusal "$consumer" "$publication" "$phase" removed
         fi
       done
+    done
+  done
+  for selection in empty default unverified extra; do
+    for replay_policy in denied removed; do
+      test_primary_consumer_policy_refusal omp published initial "$replay_policy" "$selection"
     done
   done
 else
