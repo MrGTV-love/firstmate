@@ -4,13 +4,27 @@
 #
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
+#        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
+#                                         [--reconcile-only]
 #                                         (--note <text> | --note-file <path>)
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
 # The spawn header owns what the flag adds to the launch.
+# --reconcile-only is relaunch-only: restore an exited ship/scout instruction
+# owner without dispatching blocked work. It requires a readable automatic
+# backlog row already In flight, preserves every hold/dependency, and refuses
+# live or unattributed owners, queued work, and pending authoritative closes.
+# The replacement receives fm-dod-lib.sh's reconciliation-only role above its
+# historical instructions, not implementation or validation permission.
+# A recorded recovery=reconcile-only is inherited even by ordinary replacement
+# calls; completing a dependency or restarting the owner is not clearance.
+# authorize-continuation is metadata-only: the lock-owning main Firstmate must
+# explicitly clear recovery after ordinary automatic-backlog admission.
+# It neither launches an agent nor delivers instructions; then use fm-send for
+# a new continuation instruction, or ordinary relaunch for an exited owner.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
@@ -80,6 +94,10 @@
 #              inherits the local copy but none of the conversation; a
 #              secondmate reconciles its own home's records at startup, so its
 #              standing charter is never rewritten.
+#              Read-only backlog admission is checked before recording notes or
+#              stopping the agent, using the launch owner's shared rule in
+#              bin/fm-backlog-transition-lib.sh; predictable blocked replacement
+#              refusal therefore leaves the old owner and instructions intact.
 #              Records a durable checkpoint and that note, exits the old agent,
 #              then delegates the launch to its single owner,
 #              bin/fm-spawn.sh --relaunch. A failure before publication keeps
@@ -107,7 +125,8 @@
 # A remotely placed secondmate is refused by name: its agent runs on another
 # host, so no postcondition this plane verifies could be read for it here.
 #
-# Fail-closed boundaries:
+# Runtime lifecycle boundaries (metadata-only authorization follows
+# docs/agent-control.md "Recovering an exited instruction owner"):
 #   - An unverified harness, or a harness whose control mechanics are unknown,
 #     is refused rather than guessed at.
 #   - A backend that cannot deliver the harness's interrupt key is refused
@@ -182,6 +201,10 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
+# shellcheck source=bin/fm-tasks-axi-lib.sh
+. "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
+# shellcheck source=bin/fm-backlog-transition-lib.sh
+. "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -197,6 +220,9 @@ die() {  # <message>
 
 CONTROL_LOCK=
 CONTROL_LOCK_HELD=0
+CONTROL_META_LOCK=
+CONTROL_META_LOCK_HELD=0
+CONTROL_META_TMP=
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 
@@ -205,6 +231,11 @@ control_cleanup() {
   if [ "$RELAUNCH_ACTIVE" = 1 ] \
      && declare -F relaunch_rollback >/dev/null 2>&1; then
     relaunch_rollback || true
+  fi
+  [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
+  if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
+    CONTROL_META_LOCK_HELD=0
+    fm_lock_release "$CONTROL_META_LOCK" || true
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -245,6 +276,7 @@ EFFORT_SET=0
 NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
+RECONCILE_ONLY=0
 control_want_value=
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
@@ -281,6 +313,7 @@ for control_arg in "$@"; do
       NOTE_SET=1
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
+    --reconcile-only) RECONCILE_ONLY=1 ;;
     *) die "unexpected argument '$control_arg'" ;;
   esac
 done
@@ -290,8 +323,8 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] \
-    || die "--harness, --model, --effort, --note, and --claude-debug apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, and --reconcile-only apply to 'relaunch' only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
@@ -333,6 +366,48 @@ if [ ! -f "$META" ]; then
   die "no task '$ID' in $STATE (fm-control resolves an exact task id only)"
 fi
 
+if [ "$VERB" = authorize-continuation ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot authorize continuation"
+  fm_lease_forbid_branch "continuation authorization (fm-control)"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "continuation authorization requires the actual lock-owning main Firstmate"
+  fm_backlog_record_present "$META" "task record" "$STATE" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ -z "$(fm_meta_get "$META" remote_host)" ] \
+    || die "continuation authorization requires a local ship or scout"
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  continuation_kind=$(fm_backend_meta_exact_value "$META" kind) \
+    || die "continuation authorization requires an unambiguous ship or scout kind"
+  case "$continuation_kind" in
+    ship|scout) ;;
+    *) die "continuation authorization requires a ship or scout" ;;
+  esac
+  continuation_recovery=$(fm_backend_meta_exact_value "$META" recovery) \
+    || die "continuation authorization requires an unambiguous recovery field"
+  [ "$continuation_recovery" = reconcile-only ] \
+    || die "continuation authorization requires recovery=reconcile-only"
+  fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$continuation_kind" \
+    || die "continuation authorization requires a readable automatic backlog"
+  fm_backlog_relaunch_admission "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$continuation_kind" "$ID" 0 \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
+    || die "task $ID has a pending authoritative backlog close; finish or repair it before authorizing continuation"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.meta.continuation.XXXXXX") \
+    || die "could not stage continuation authorization for $ID"
+  perl -e 'open(my $f, "<", $ARGV[0]) or exit 1; binmode $f; binmode STDOUT; local $/; my $s = <$f>; defined $s or exit 1; $s =~ s/^recovery=reconcile-only(?:\n|\z)//mg; print $s or exit 1' -- "$META" > "$CONTROL_META_TMP" \
+    || die "could not stage continuation authorization for $ID"
+  fm_backlog_atomic_transition publish "$CONTROL_META_TMP" "$META" "task record" "$STATE" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  CONTROL_META_TMP=
+  echo "continuation-authorized $ID"
+  exit 0
+fi
 # A remotely placed secondmate records its endpoint on ANOTHER host, so every
 # postcondition this plane verifies - the agent-state classification, the busy
 # verdict, the endpoint's existence - would be read here for an endpoint that
@@ -976,8 +1051,12 @@ record_note() {
         echo
         echo "## Progress note ($stamp)"
         echo
-        echo "This task was relaunched. Continue from here; the local copy and every"
-        echo "uncommitted change are exactly as the previous worker left them."
+        if [ "$RECONCILE_ONLY" = 1 ]; then
+          echo "This task was relaunched for instruction reconciliation only, not continuation."
+        else
+          echo "This task was relaunched. Continue from here; the local copy and every"
+          echo "uncommitted change are exactly as the previous worker left them."
+        fi
         echo
         echo "First, check your instruction inbox: list $STATE/$ID.inbox/*.msg, act on"
         echo "each message in numeric order, then mv each handled file into"
@@ -1023,6 +1102,32 @@ do_relaunch() {
   else
     note_line="note=none"
   fi
+  # A replacement is not continuation consent. Inherit the recorded recovery
+  # restriction even when an automatic caller uses ordinary relaunch syntax.
+  if [ "$(fm_meta_get "$META" recovery)" = reconcile-only ]; then
+    RECONCILE_ONLY=1
+  fi
+  # Share the launch owner's admission rule before lifecycle input can stop a
+  # live owner. An explicit reconciliation recovery may only restore an exited
+  # owner, never interrupt a live one or turn a hold into dispatch permission.
+  fm_backlog_relaunch_admission "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$KIND" "$ID" "$RECONCILE_ONLY" \
+    || die "$FM_BACKLOG_TRANSITION_ERROR"
+  [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
+    || die "task $ID has a pending authoritative backlog close; finish or repair it before relaunch"
+  if [ "$RECONCILE_ONLY" = 1 ]; then
+    state=$(agent_state)
+    case "$state" in
+      dead) ;;
+      missing)
+        state=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+        case "${state%%$'\t'*}" in
+          dead|gone) ;;
+          *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;
+        esac
+        ;;
+      *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;
+    esac
+  fi
   safe_checkpoint
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
@@ -1047,6 +1152,7 @@ do_relaunch() {
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
+  [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")

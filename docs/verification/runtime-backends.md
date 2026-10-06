@@ -511,6 +511,48 @@ ok - teamclaude 1.1.21-affinity.0: the launcher hands claude HTTPS_PROXY and a r
 The guard runs by default wherever TeamClaude is installed and its proxy answers, skips naming the absent tool or stopped proxy otherwise, and fails instead when `FM_TEAMCLAUDE_LAUNCH_LIVE=1` or `FM_LIVE=1` requested it.
 Rerun it after any TeamClaude upgrade.
 
+## Reconciliation-only owner recovery
+
+Verified on 2026-10-02 on Darwin 25.5.0 arm64 with omp 18.4.10, tmux 3.5a, and Herdr 0.9.1 protocol 22, using real `openai-codex/gpt-6.1-sol` model turns at low effort in a private tmux server and a helper-owned named Herdr lab.
+The [control-plane contract](../agent-control.md#recovering-an-exited-instruction-owner) owns the distinction between instruction recovery and continuation.
+The isolated fixtures drove these public commands against task records with both a genuine unresolved dependency and a captain hold:
+
+```bash
+bash "$ROOT/bin/fm-control.sh" "$id" relaunch --note 'fresh context'
+bash "$ROOT/bin/fm-control.sh" "$id" exit
+bash "$ROOT/bin/fm-control.sh" "$id" relaunch --reconcile-only --note 'Reconcile unread instruction 005 only. The dependency and captain hold remain unresolved.'
+```
+
+On both backends, ordinary replacement refused while leaving the original real omp owner alive; after public exit, reconciliation-only replacement restored the instruction owner in the same endpoint and local copy.
+Each real model read and acknowledged unread instruction 005, wrote a factual receipt, explicitly declined the historical request to create a file and commit it, and waited without implementing or validating.
+The fixture compared the retained commit, dirty file bytes, untracked file bytes, acknowledged instruction bytes, and whole backlog bytes; all were preserved.
+The named Herdr helper completed cleanup without its default-session tripwire firing.
+
+The portable public-interface regressions in `tests/fm-control-relaunch.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, inherited recovery after a genuine prerequisite completes, explicit owner-authorized clearance, both continuation/replacement lock orderings, and away-branch replacement admission.
+Their session-authority fixtures, stubbed backends, and 14-harness admission matrix are structural evidence, not live-harness liveness or model-compliance proof.
+The recovery-grade boundary remains tmux and Herdr; zellij, Orca, and cmux retain their existing refusal, and no native recovery surface was added for them.
+Secondmates retain their separate recovery owner rather than acquiring this ship/scout recovery option.
+The existing control, backlog-atomicity, and brief suites supply the unchanged capability, dispatch, and instruction-contract coverage.
+
+Verified on 2026-10-06 with stock Bash 3.2.57, tasks-axi 0.2.6, and pinned ShellCheck 0.11.0:
+
+```sh
+bash bin/fm-lint.sh bin/fm-control.sh tests/fm-control-relaunch.test.sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh
+```
+
+The focused lint roots passed full source-aware extended analysis. The session-lock import resolves to its tracked library, and the parent-shell background PID captures retain their readiness, wait, and cleanup behavior.
+
+Observed focused results:
+
+```text
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
+```
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.
@@ -852,6 +894,27 @@ This closes only #3436's idle-composer-misclassification symptom (Grok/Herdr com
 Cursor is deliberately outside this cursor-anchored empty-composer matrix because its terminal cursor is parked outside the composer; tmux's Cursor-specific, process-identity-gated cursorless fallback is covered by the [Cursor Agent CLI](#cursor-agent-cli) section's separate live evidence and drift guard.
 
 `zellij action dump-screen --pane-id <id> --ansi` was verified at zellij 0.44.0 to preserve ANSI styling (real Claude Code rendered inside a zellij pane dumped `ESC[m` `❯` U+00A0 for its idle composer row), which is the capability the zellij composer classifier reads.
+
+### 2026-10-02 omp 18.4.10 borderless effort hint
+
+The same live owner-recovery run above captured omp's otherwise empty borderless composer as a `❯` row followed by a right-side `⇧⇥ to change thinking effort` hint and the omp status row.
+The shortcut keys were `SGR 38;2;0;180;255`, followed by a normal-colour space and a muted explanation in `SGR 38;2;107;114;128`.
+The shared ghost extractor correctly kept the bright keys while dropping the explanation, so the first divergent stage was the remnant classification, not capture or ghost stripping.
+[`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh)'s shared row-content boundary owns the styled-hint proof used by both classification and selected-content extraction.
+The behavioral regressions in `tests/fm-composer-lib.test.sh` cover empty and draft-bearing extraction, wrapped drafts, human shortcut-like input, unrelated ghost text, and hint disappearance; `tests/fm-backend-zellij.test.sh` exercises public submission with the hint retained, disappeared, or beside wrapped payload text.
+Real typed copies remained `pending` and public exit refused without clearing them on both tmux and Herdr; busy drafts also read `pending`, and a real slash popup refused as `unknown` on tmux and `pending` on Herdr.
+The Herdr busy capture showed a native `Steering · 1` queue while the real model remained working; the queued reconciliation instruction did not change the owner's restricted authority.
+
+The affected omp arm of `tests/fm-composer-matrix-live-e2e.test.sh` was exercised against the real installed binary in a helper-owned private tmux server:
+
+```text
+ok - omp (omp/18.4.10): real idle composer classifies empty
+ok - omp (omp/18.4.10): the same idle pane read cursorless is not pending (verdict: empty)
+ok - omp (omp/18.4.10): typed effort-hint copy remains protected as pending
+```
+
+The portable `tests/fm-composer-lib.test.sh` and `tests/fm-composer-ghost.test.sh` runs passed, including bright hint-like drafts, multiline input, busy/queued input, popup refusal, plain boxed drafts, and both locale profiles.
+The existing full matrix command above refreshes installed-harness evidence; this focused refresh does not claim new native results for its other harnesses.
 
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 

@@ -116,6 +116,7 @@ check_harness_idle_empty() {  # <name> <launch-cmd...>
     CHECKED=$((CHECKED + 1))
     pass "$name ($version): real idle composer classifies empty"
     check_harness_idle_cursorless "$name" "$version" "$SESSION:$win"
+    [ "$name" != omp ] || check_omp_typed_hint "$SESSION:$win" "$version"
   fi
   tmux -L "$SOCKET" kill-window -t "$SESSION:$win" 2>/dev/null || true
 }
@@ -159,6 +160,23 @@ check_harness_idle_cursorless() {  # <name> <version> <target>
   fi
 }
 
+# The private pane has never received a prompt. Plant only our own synthetic
+# draft, prove the real vendor styles it as input even when its bytes equal UI
+# chrome, and leave cleanup to the owning check (never a live fleet composer).
+check_omp_typed_hint() {  # <target> <version>
+  local target=$1 version=$2 verdict
+  tmux send-keys -t "$target" -l '⇧⇥ to change thinking effort' \
+    || fail "omp ($version): could not plant the isolated draft"
+  sleep 1
+  verdict=$(fm_tmux_composer_state "$target")
+  if [ "$verdict" != pending ]; then
+    FAILED=1
+    printf 'not ok - omp (%s): typed effort-hint copy must stay pending, got %s\n' "$version" "$verdict"
+  else
+    pass "omp ($version): typed effort-hint copy remains protected as pending"
+  fi
+}
+
 # --- 1. Every installed verified harness must reach a proven-empty composer --
 for h in claude codex opencode pi grok kimi muse; do
   if command -v "$h" >/dev/null 2>&1; then
@@ -167,6 +185,12 @@ for h in claude codex opencode pi grok kimi muse; do
     note "harness absent, not verified here: $h"
   fi
 done
+if command -v omp >/dev/null 2>&1; then
+  OMP_SKIP_SETUP=1 check_harness_idle_empty omp omp \
+    --config "$ROOT/.omp/fm-worker-overlay.yml" --auto-approve
+else
+  note "harness absent, not verified here: omp"
+fi
 
 # --- 2. The strict blank-row posture, live ----------------------------------
 # A plain shell pane parked on a blank line between two rules (the audit's

@@ -994,6 +994,49 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/fm-spawn-compact-adviser-disable.test.sh`](../tests/fm-spawn-compact-adviser-disable.test.sh) and [`tests/fm-spawn-compact-adviser-disable-remote.test.sh`](../tests/fm-spawn-compact-adviser-disable-remote.test.sh).
 
+#### Experimental omp-native Jev bake-off
+
+The fork includes an opt-in timing-only comparison arm in [`extensions/omp-jev-pipeline.mjs`](../extensions/omp-jev-pipeline.mjs).
+Jev judges a successful, genuinely settled turn; a qualifying judgment requests omp's own compaction, leaving summary generation, retention and persistence to omp.
+Judging requires no queued messages or editor draft, context usage at least `minContextTokens`, and a snapshot with more than 20,000 conversation tokens and complete automatic coverage (`autoCoverage`).
+A completed judgment that marks work unfinished can defer an eligible automatic threshold or idle attempt once per agent loop; busy work can also defer once when Jev has returned a successful judgment within the last 60 seconds.
+Manual compaction, overflow recovery, incomplete-turn recovery, usage at or above 90% of the context window and unavailable Jev retain native precedence.
+This does not alter Firstmate's launch policy or enable the experiment by default in unattended workers.
+
+With omp 18.6.3, the extension API cannot override native `keepRecentTokens` or the cut point without replacing the compaction result.
+This arm therefore compares timing policy, not Jev-selected retention.
+Registering `session_before_compact` also prevents omp from reusing an armed speculative summary, so compare observed latency and cost rather than assuming an identical preparation cost.
+
+Install the dependency-complete, omp-compatible compact-adviser fork package into an ignored local root, then copy the static entry template into that root:
+
+```sh
+npm install --prefix .fm-adviser-root /absolute/path/to/omp-compatible-compact-adviser.tgz
+cp extensions/omp-jev-entry.mjs .fm-adviser-root/omp-jev-entry.mjs
+COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
+  FM_JEV_PIPELINE_AGENT_DIR=/absolute/path/to/isolated-adviser-config \
+  FM_JEV_PIPELINE_METRICS=/absolute/path/to/private-metrics.jsonl \
+  omp --no-extensions -e "$PWD/.fm-adviser-root/omp-jev-entry.mjs"
+```
+
+The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and its full dependency tree; the unadapted registry package is not a substitute.
+The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
+Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
+The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
+`FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
+`TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
+Neither installation nor loading changes global plugins or settings.
+
+`FM_JEV_OMP_PIPELINE=1` is required even when the extension is explicitly loaded; `COMPACT_ADVISER_DISABLE=1` disables the original adviser factory, not this separate opt-in controller.
+The optional metrics file contains event names, categorical reasons and methods, boolean outcomes, numeric timings, token counts, sanitized Jev model versions and an input-only cost estimate at USD 0.042 per million tokens, not requests, summaries, keys or task text.
+Fixture responses produce fixture usage, not paid Jev costs; keep those observations separate from real API runs.
+Pending requests and decisions are invalidated on new input, turns, navigation, compaction and shutdown.
+omp does not notify extensions of native model changes, so a managed identity check runs only while a request is pending; a completed decision can defer native compaction only for its original session, leaf and model identity.
+
+Native idle compaction requires the interactive TUI and the host's idle settings; an RPC session alone does not exercise that path.
+Native recovery also requires a runnable method for the selected model: a remote-only configuration does not make a custom provider support remote compaction.
+The portable boundary regressions run through [`tests/fm-omp-jev-pipeline.test.sh`](../tests/fm-omp-jev-pipeline.test.sh).
+Set `FM_JEV_ADVISER_DIR` to the installed package directory to include the actual helper's structured secret-redaction regression under Bun.
+
 ### Commit attribution
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
@@ -2038,11 +2081,13 @@ This section is the single owner of the runner's operating contract.
 
 Discovery is never a timer.
 Each registered source has its own child process blocking on that source.
-On every cycle, the watcher's `reconcile`:
+Once per cycle, unless that watcher process's previous run is still going, the watcher starts a background `reconcile` that:
 
 - Republishes every captured result without a durable handled acknowledgement, regardless of earlier publication.
 - Restarts a source whose owner is gone.
 - Stops this home's runner if its registration disappeared unexpectedly.
+
+This single-flight limit is per watcher process, not home-wide: a successor watcher can overlap a reconcile started by its predecessor.
 
 In supported steady state, a home with no registered source runs nothing, generates no state, and keeps its ordinary cadence.
 
@@ -2254,42 +2299,46 @@ The generation's first launch is immediate, later launches share its monotonic p
 
 **Confirm detached launches**
 
-`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) bounds how long `reconcile` waits for the runners it just started to prove they are running: never less than the configured value, and at most one second more, because the wait is measured on a whole-second clock.
+`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) sets how long `reconcile` allows the runners it just started to prove they are running: a fully unconfirmed window nominally lasts from the configured value through one second more, because the deadline uses a whole-second clock.
+Confirmation can end the wait early, while scheduling delays can extend elapsed wall-clock time.
 
-- Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports every unconfirmed launch as `failed=` and a non-zero exit instead.
+- Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
-- A healthy launch therefore confirms on the first poll and the window only bounds a launch that has not yet proved itself - one that died before claiming, or one merely too slow to claim inside the window; confirmation cannot tell those apart, and a launch that proves itself on a later cycle closes its failure episode without a retraction wake.
-- All of a cycle's launches share one window, so a home full of sources that cannot start costs the same bounded wait as one.
+- A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
+- All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
+- A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.
 
 **Keep confirmation below the watcher interval**
 
 Keep this window well below `FM_POLL`.
-`bin/fm-watch.sh` runs `reconcile` once per supervision cycle, so a source that cannot start makes every cycle wait up to the confirm window before the rest of that cycle runs.
+See **Reconcile sources** in [Process-to-event sources](#process-to-event-sources-stateprocevent) for the watcher's background scheduling and per-process single-flight rule.
+The watcher's own cycle and liveness beacon do not wait for launch confirmation.
 
-Raising the confirm window lengthens every supervision cycle and delays wake delivery by up to that much.
+Raising the confirm window past `FM_POLL` can make a reconcile pass overlap later supervision cycles, which then skip opportunities to restart sources and republish captured results.
+Results already queued are still delivered on every cycle.
 
 **Report launch failures**
 
 A source that can never start is reported as `failed=` with a non-zero exit on every `reconcile`, rather than counted as `started` and retried silently as though it were healthy, so a wedged source stays visible instead of presenting as armed.
 The `failed=` count reaches only the command's caller because `bin/fm-watch.sh` discards `reconcile` output and exit status.
 For that reason, `reconcile` also publishes a durable `check` wake once per failure episode, with key `procevent:<id>:launch-failed:<registration-identity>-<episode-nonce>`.
-Later cycles stay silent for that episode until a launch confirms.
+Later cycles stay silent for that episode until successful claim acquisition or a source-locked observation of a live owner, including another home's, ends it for the current registration without a retraction wake.
+Failure commits recheck the registration identity, claim and launch stamp under the source lock, which also serializes episode markers, live-owner recovery, wake append and failed-append rollback.
 A later fresh failure gets a fresh key, because the watcher never re-surfaces a key it has already surfaced.
 
-- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source every cycle exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
+- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source on each eligible reconcile pass exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
 - The wake reports only the observed failure: the launch did not prove that it took the claim within the window.
 - If the failure persists, inspect the source command and adapter binary named in the registration.
   The wake names both, along with the attached `bin/fm-procevent.sh start <source-id>` command that reproduces the refusal on stderr.
   The detached launch discards that output.
-- A later cycle that finds the source owned ends the episode automatically.
-  A runner that was merely slow to claim needs no operator action.
+- A runner that was merely slow to claim needs no operator action, and a delayed stamp-only confirmation of an earlier successful launch cannot erase a newer failure episode.
 - A source stranded on a claim nothing may automatically displace is announced the same way, once per stranded claim generation, as described above.
 - `bin/fm-watch.sh` surfaces both under their own headlines - `process-event source stranded` and `process-event source failed to start` - rather than as a captured result.
 
 **Reject unusable settings**
 
 A value this command cannot use is refused by name before anything is launched, the same way `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` and `FM_PROCEVENT_MAX_OUTPUT_BYTES` are refused, so a mistyped window can never present as a fleet of sources that cannot start.
-`bin/fm-watch.sh` validates the same value when it arms and refuses to arm on an unusable one, naming the variable and the range: under a running watcher that refusal would otherwise repeat on every cycle into a discarded stdout and leave the whole home disarmed while presenting as supervised, whereas a watcher that will not arm is loud through the liveness guard.
+`bin/fm-watch.sh` validates the same value when it arms and refuses to arm on an unusable one, naming the variable and the range: under a running watcher that refusal would otherwise repeat on each eligible background reconcile pass into discarded output and leave the whole home disarmed while presenting as supervised, whereas a watcher that will not arm is loud through the liveness guard.
 
 **Limit captured output**
 
@@ -2388,7 +2437,7 @@ FM_INACTIVE_RECONCILE_BUDGET_SECS=10  # 1..30-second scan deadline; wedged-scan 
 FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls, custom checks, or Relay dispatch)
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
-FM_CHECK_TIMEOUT=30     # seconds allowed per slow check script
+FM_CHECK_TIMEOUT=30     # decimal whole seconds allowed after each slow check launches, excluding output setup; leading zeros do not change the duration
 FM_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5..25, cut to fit FM_CHECK_TIMEOUT
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20

@@ -72,16 +72,11 @@
 #            detached and its errors reach no caller, so a source that cannot
 #            start would otherwise be counted exactly like one that is
 #            listening, and a wedged source would go on presenting as armed.
-#            Every launch is counted as `started` only after the source is
-#            observed owned or its launch-pacing stamp has moved, `failed`
-#            otherwise, and any failure also makes this command exit non-zero.
-#            One bounded window covers a whole cycle's launches
-#            (FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS; docs/configuration.md).
-#            A launch that fails to confirm is also announced as a durable
-#            `check` wake, once per failure episode - keyed by the registration
-#            identity it ran under and ended by a later launch of that source
-#            confirming - because the supervision cycle discards the `failed=`
-#            count. The launch itself is retried every cycle exactly as before.
+#            Launch confirmation, failure-episode reporting, and their settings
+#            are defined in docs/configuration.md under "Confirm detached
+#            launches" and "Report launch failures".
+#            Durable failure wakes are needed because the watcher discards this
+#            command's output and exit status.
 #            A source whose claim nothing may automatically displace is not
 #            relaunched at all; it is counted `uncertain` and announced once per
 #            stranded claim generation as a durable `check` wake, because the
@@ -1039,6 +1034,9 @@ cmd_start() {
   }
   fm_procevent_claim_acquire_locked "$id" "$FM_HOME" "$$" "$(source_file "$id")" "$STATE"
   claimed=$?
+  if [ "$claimed" -eq 0 ]; then
+    rm -f -- "$(launch_failed_file "$id")"
+  fi
   fm_procevent_source_lock_release "$id"
   case "$claimed" in
     0) ;;
@@ -1595,19 +1593,9 @@ report_stranded_source() {  # <source-id> <claim-token> <why-and-recovery>
 
 # Announce a launch that reconcile could not confirm, once per failure episode.
 #
-# A launch that never proves it took the claim - a runner that died before
-# claiming on unreadable argv, a missing adapter binary or a guard that refused
-# to start, or one merely too slow under load - is relaunched every supervision
-# cycle and reported `failed=` to a stdout that cycle discards: armed in
-# appearance, a dead drop in fact, which is the incident with a different cause.
-# Confirmation observes only that no claim and no launch stamp appeared inside
-# the window, so this says exactly that and no more about why. An episode is
-# keyed by the registration identity the launch ran under and ends when a later
-# cycle finds the source owned or a launch confirms, so a second failure inside
-# one episode announces nothing, a slow runner that arms later closes its own
-# episode without a retraction, and a source that recovers and then fails again
-# announces a new one. Nothing here changes what reconcile does about the launch
-# itself: it keeps relaunching exactly as before, and this only says so once.
+# docs/configuration.md "Report launch failures" owns the episode contract.
+# The caller holds the source lock after revalidating the registration and
+# launch evidence, through marker publication, wake append and rollback.
 #
 # The queue key carries a nonce beyond the episode: the watcher remembers every
 # key it has surfaced for good, so a key made of the registration identity alone
@@ -1662,7 +1650,7 @@ stranded_leaderless_detail() {  # <source-id>
 
 cmd_reconcile() {
   local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token identity claim_state stop_state task_pending
-  local launch_identity launch_stamp launch_mark unconfirmed entry
+  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry
   local -a launched=()
   # Rejected before anything is launched, and by name. A window this command
   # cannot use makes every launch unconfirmable, so validating it later would
@@ -1802,15 +1790,44 @@ cmd_reconcile() {
       || unconfirmed=$(printf '%s\n' "${launched[@]}")
     for entry in "${launched[@]}"; do
       id=${entry%%$'\t'*}
-      launch_identity=${entry#*$'\t'}
-      launch_identity=${launch_identity%%$'\t'*}
-      if launch_entry_listed "$entry" "$unconfirmed"; then
-        failed=$((failed + 1))
-        report_launch_failure "$id" "$launch_identity" || true
+      rest=${entry#*$'\t'}
+      launch_identity=${rest%%$'\t'*}
+      launch_mark=${rest#*$'\t'}
+      if ! fm_procevent_source_lock_acquire "$id"; then
+        uncertain=$((uncertain + 1))
+        continue
+      fi
+      current_identity=
+      if [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+        current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+      fi
+      if [ -z "$launch_identity" ] || [ "$current_identity" != "$launch_identity" ]; then
+        uncertain=$((uncertain + 1))
+        fm_procevent_source_lock_release "$id"
+        continue
+      fi
+      fm_procevent_claim_state_locked "$id"
+      claim_state=$?
+      if [ "$claim_state" -eq 0 ]; then
+        rm -f -- "$(launch_failed_file "$id")"
+        started=$((started + 1))
+      elif launch_entry_listed "$entry" "$unconfirmed"; then
+        current_mark=
+        if launch_stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$launch_identity"); then
+          current_mark=$(cat -- "$launch_stamp" 2>/dev/null || true)
+        fi
+        if [ -n "$current_mark" ] && [ "$current_mark" != "$launch_mark" ]; then
+          started=$((started + 1))
+        elif [ "$claim_state" -ne 1 ] || fm_procevent_claim_undisplaceable_locked "$id"; then
+          uncertain=$((uncertain + 1))
+        else
+          failed=$((failed + 1))
+          report_launch_failure "$id" "$launch_identity" || true
+        fi
       else
         started=$((started + 1))
-        rm -f -- "$(launch_failed_file "$id")"
       fi
+      fm_procevent_source_lock_release "$id"
     done
   fi
   printf 'reconciled: published=%s started=%s stopped=%s uncertain=%s failed=%s\n' \
@@ -1847,9 +1864,9 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # the failure this reports is "not proved within the window" and nothing more.
 #
 # Every launch shares ONE window rather than taking a window each, so a whole
-# fleet of failing sources costs a watcher cycle the same bounded wait as one.
+# fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state stamp mark
+  local deadline window entry id rest identity before state stamp mark current_identity
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1872,6 +1889,13 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if fm_procevent_source_lock_try_acquire "$id"; then
         fm_procevent_claim_state_locked "$id"
         state=$?
+        if [ "$state" -eq 0 ] && [ -n "$identity" ] \
+          && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+          current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+          if [ "$current_identity" = "$identity" ]; then
+            rm -f -- "$(launch_failed_file "$id")"
+          fi
+        fi
         fm_procevent_source_lock_release "$id"
       fi
       if [ "$state" -eq 0 ]; then

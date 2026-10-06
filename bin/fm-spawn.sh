@@ -42,8 +42,13 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
+#   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
+#   its admission limits, and fm-dod-lib.sh owns the restricted instruction role.
+#   Recorded recovery=reconcile-only is inherited while present; the clearance
+#   policy is in docs/agent-control.md "Recovering an exited instruction owner".
+#
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
@@ -680,6 +685,7 @@ YOLO_SET=0
 BRANCH_PREFIX_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
+RECONCILE_ONLY=0
 CLAUDE_DEBUG=0
 ALLOW_API_KEY=0
 POS=()
@@ -743,6 +749,7 @@ for a in "$@"; do
     KIND_SET=1
     ;;
   --relaunch) RELAUNCH=1 ;;
+  --reconcile-only) RECONCILE_ONLY=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
   --harness) want_value=harness ;;
   --harness=*)
@@ -844,6 +851,10 @@ esac
 # --relaunch preserves the recorded task rather than accepting fresh-spawn
 # identity overrides. The header owns the flags; docs/agent-control.md owns
 # the proven-gone endpoint replacement policy.
+if [ "$RECONCILE_ONLY" = 1 ] && [ "$RELAUNCH" != 1 ]; then
+  echo "error: --reconcile-only applies only to --relaunch of an existing exited owner" >&2
+  exit 1
+fi
 if [ "$RELAUNCH" -eq 1 ]; then
   [ "$BACKEND_SET" -eq 0 ] || {
     echo "error: --relaunch reuses the task's recorded backend; --backend cannot override it" >&2
@@ -1806,6 +1817,17 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
+  # Keep the instruction owner's recovery scope through direct and automatic
+  # replacements; dependency completion alone cannot restore execution rights.
+  if [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = reconcile-only ]; then
+    RECONCILE_ONLY=1
+  fi
+  # Read-only replacement admission before any per-task launch artifacts are
+  # rewritten. The control caller checks this same rule before stopping.
+  fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" "$RECONCILE_ONLY" || {
+    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  }
   # A secondmate whose endpoint is gone already has ONE owner for that
   # recovery: the session-start liveness sweep respawns it with
   # `fm-spawn.sh <id> --secondmate`, which stands its home's own workspace back
@@ -3122,6 +3144,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   {
     fm_brief_worker_role "$STATE" "$ID" &&
       printf '\n' &&
+      { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
       cat "$SOURCE_BRIEF" &&
       if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
         fm_brief_intent_overlay "$CAPTAIN_INTENT"
@@ -3529,11 +3552,10 @@ herdr_projection_existing_meta_allows_flat() { # <meta>
   esac
 }
 
-# Backlog preflight (bin/fm-backlog-transition-lib.sh). This spawn is about to
-# become the sole owner of the row's In-flight transition, so prove the row is
-# transitionable BEFORE any endpoint, worktree, or record exists: a refusal here
-# costs nothing to unwind, while the same refusal after publication would strand
-# a live pane. The authoritative mutation still runs under the meta lock below.
+# Backlog preflight (bin/fm-backlog-transition-lib.sh). Prove admission before
+# allocating or publishing launch resources: refusal after publication could
+# strand a live pane. The final commit under the meta lock transitions ordinary
+# dispatch, but only rechecks read-only admission for reconciliation recovery.
 BACKLOG_TRANSITION=0
 BACKLOG_ROW_STATE=
 if fm_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
@@ -3548,7 +3570,12 @@ if fm_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
     exit 1
   fi
   spawn_preflight_actor=$(fm_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
-  if [ "$spawn_preflight_actor" = branch ] && fm_lease_away_relocated; then
+  if [ "$RELAUNCH" = 1 ]; then
+    fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" "$RECONCILE_ONLY" || {
+      echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+      exit 1
+    }
+  elif [ "$spawn_preflight_actor" = branch ] && fm_lease_away_relocated; then
     if [ "$BACKLOG_ROW_STATE" != "queued no no" ]; then
       echo "error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task $ID has no dispatchable backlog item in this home" >&2
       exit 1
@@ -4955,7 +4982,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort account account_provider api_key busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -4968,6 +4995,7 @@ preserve_relaunch_meta() {
   echo "project=$PROJ_ABS"
   echo "harness=$HARNESS"
   echo "kind=$KIND"
+  [ "$RECONCILE_ONLY" = 0 ] || echo "recovery=reconcile-only"
   [ -z "$MODE" ] || echo "mode=$MODE"
   [ -z "$YOLO" ] || echo "yolo=$YOLO"
   [ -z "${BRANCH:-}" ] || echo "branch=$BRANCH"
@@ -5027,13 +5055,17 @@ if [ "$RELAUNCH" -eq 0 ]; then
   SPAWN_META_TMP=
 fi
 
-# Fuse the backlog In-flight transition into the publication that just created
-# the record (bin/fm-backlog-transition-lib.sh owns the invariant). It runs under
-# this task's own meta lock, so a steer or teardown racing the same id stays
-# serialized exactly as before. The call itself is deferred to the final commit
-# point below so every earlier launch-delivery failure remains unwindable.
+# Commit ordinary dispatch's In-flight transition, or recheck reconciliation's
+# read-only admission (bin/fm-backlog-transition-lib.sh owns the invariant).
+# It runs under this task's own meta lock so a steer or teardown racing the same
+# id stays serialized. Defer it to the final commit point below so every earlier
+# launch-delivery failure remains unwindable.
 spawn_commit_backlog_transition() {
   [ "$BACKLOG_TRANSITION" = 1 ] || return 0
+  if [ "$RECONCILE_ONLY" = 1 ]; then
+    fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" 1
+    return $?
+  fi
   fm_backlog_atomic_transition dispatch "$STATE/$ID.meta" "$DATA" "$ID" "$STATE"
 }
 
@@ -5056,6 +5088,14 @@ spawn_report_preserved_state() {
     else
       SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item state is unreadable (${FM_BACKLOG_ROW_ERROR:-no error recorded}); close out its paired task record and backlog item by hand"
     fi
+    return 1
+  fi
+  if [ "$RECONCILE_ONLY" = 1 ]; then
+    if fm_backlog_relaunch_admission "$CONFIG" "$DATA" "$KIND" "$ID" 1; then
+      SPAWN_PRESERVED_CLAIM="verified preserved: reconciliation-only owner with backlog state $FM_BACKLOG_ROW_STATE; no hold or dependency was changed"
+      return 0
+    fi
+    SPAWN_PRESERVED_CLAIM="reconciliation-only preservation could not be verified: $FM_BACKLOG_TRANSITION_ERROR; no backlog repair was attempted"
     return 1
   fi
   if [ "$FM_BACKLOG_ROW_STATE" = "in_flight no no" ]; then
@@ -5605,6 +5645,8 @@ if [ "$SPAWN_BACKLOG_COMMIT_STATUS" -ne 0 ]; then
     else
       echo "error: task $ID's backlog item could not be moved to In flight ($FM_BACKLOG_TRANSITION_ERROR), and failed-dispatch cleanup is incomplete; the provisional record may remain at $STATE/$ID.meta - close out endpoint $T and local copy $WT by hand, then remove the record and busy state before retrying" >&2
     fi
+  elif [ "$RECONCILE_ONLY" = 1 ]; then
+    echo "error: task $ID was republished but its read-only recovery admission could not be verified ($FM_BACKLOG_TRANSITION_ERROR); its owner remains reconciliation-only, with no continuation clearance" >&2
   else
     echo "error: task $ID was republished but its backlog item could not be moved to In flight ($FM_BACKLOG_TRANSITION_ERROR); fix the backlog and re-run the relaunch" >&2
   fi
