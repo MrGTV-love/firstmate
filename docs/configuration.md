@@ -2038,11 +2038,13 @@ This section is the single owner of the runner's operating contract.
 
 Discovery is never a timer.
 Each registered source has its own child process blocking on that source.
-Once per cycle, unless its previous run is still going, the watcher starts a background `reconcile` that:
+Once per cycle, unless that watcher process's previous run is still going, the watcher starts a background `reconcile` that:
 
 - Republishes every captured result without a durable handled acknowledgement, regardless of earlier publication.
 - Restarts a source whose owner is gone.
 - Stops this home's runner if its registration disappeared unexpectedly.
+
+This single-flight limit is per watcher process, not home-wide: a successor watcher can overlap a reconcile started by its predecessor.
 
 In supported steady state, a home with no registered source runs nothing, generates no state, and keeps its ordinary cadence.
 
@@ -2254,21 +2256,22 @@ The generation's first launch is immediate, later launches share its monotonic p
 
 **Confirm detached launches**
 
-`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) bounds how long `reconcile` waits for the runners it just started to prove they are running: never less than the configured value, and at most one second more, because the wait is measured on a whole-second clock.
+`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) sets how long `reconcile` allows the runners it just started to prove they are running: a fully unconfirmed window nominally lasts from the configured value through one second more, because the deadline uses a whole-second clock.
+Confirmation can end the wait early, while scheduling delays can extend elapsed wall-clock time.
 
 - Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
-- A healthy launch therefore confirms on the first poll and the window only bounds a launch that has not yet proved itself - one that died before claiming, or one merely too slow to claim inside the window; confirmation cannot tell those apart, and successful claim acquisition closes its failure episode without a retraction wake.
-- All of a cycle's launches share one window, so a home full of sources that cannot start costs the same bounded wait as one.
+- A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
+- All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
 - A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.
 
 **Keep confirmation below the watcher interval**
 
 Keep this window well below `FM_POLL`.
-`bin/fm-watch.sh` starts `reconcile` in the background once per supervision cycle and skips that start while the previous run is still going.
-A source that cannot start keeps each `reconcile` running for up to the confirm window, but the watcher's own cycle and liveness beacon do not wait for it.
+See **Reconcile sources** in [Process-to-event sources](#process-to-event-sources-stateprocevent) for the watcher's background scheduling and per-process single-flight rule.
+The watcher's own cycle and liveness beacon do not wait for launch confirmation.
 
-Raising the confirm window past `FM_POLL` makes the watcher skip `reconcile` on the cycles that run overlaps, so source restarts and republication of captured results lag by up to that much.
+Raising the confirm window past `FM_POLL` can make a reconcile pass overlap later supervision cycles, which then skip opportunities to restart sources and republish captured results.
 Results already queued are still delivered on every cycle.
 
 **Report launch failures**
@@ -2276,17 +2279,16 @@ Results already queued are still delivered on every cycle.
 A source that can never start is reported as `failed=` with a non-zero exit on every `reconcile`, rather than counted as `started` and retried silently as though it were healthy, so a wedged source stays visible instead of presenting as armed.
 The `failed=` count reaches only the command's caller because `bin/fm-watch.sh` discards `reconcile` output and exit status.
 For that reason, `reconcile` also publishes a durable `check` wake once per failure episode, with key `procevent:<id>:launch-failed:<registration-identity>-<episode-nonce>`.
-Later cycles stay silent for that episode until successful claim acquisition or a source-locked observation of a live owner, including another home's, ends it for the current registration.
+Later cycles stay silent for that episode until successful claim acquisition or a source-locked observation of a live owner, including another home's, ends it for the current registration without a retraction wake.
 Failure commits recheck the registration identity, claim and launch stamp under the source lock, which also serializes episode markers, live-owner recovery, wake append and failed-append rollback.
 A later fresh failure gets a fresh key, because the watcher never re-surfaces a key it has already surfaced.
 
-- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source every cycle exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
+- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source on each eligible reconcile pass exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
 - The wake reports only the observed failure: the launch did not prove that it took the claim within the window.
 - If the failure persists, inspect the source command and adapter binary named in the registration.
   The wake names both, along with the attached `bin/fm-procevent.sh start <source-id>` command that reproduces the refusal on stderr.
   The detached launch discards that output.
-- Successful claim acquisition ends the episode immediately, and a later cycle that finds the source owned also ends it automatically.
-  A runner that was merely slow to claim needs no operator action, and a delayed confirmation of an earlier successful launch cannot erase a newer failure episode.
+- A runner that was merely slow to claim needs no operator action, and a delayed stamp-only confirmation of an earlier successful launch cannot erase a newer failure episode.
 - A source stranded on a claim nothing may automatically displace is announced the same way, once per stranded claim generation, as described above.
 - `bin/fm-watch.sh` surfaces both under their own headlines - `process-event source stranded` and `process-event source failed to start` - rather than as a captured result.
 

@@ -72,16 +72,11 @@
 #            detached and its errors reach no caller, so a source that cannot
 #            start would otherwise be counted exactly like one that is
 #            listening, and a wedged source would go on presenting as armed.
-#            Every launch is counted as `started` only after the source is
-#            observed owned or its launch-pacing stamp has moved, `failed`
-#            otherwise, and any failure also makes this command exit non-zero.
-#            One bounded window covers a whole cycle's launches
-#            (FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS; docs/configuration.md).
-#            A launch that fails to confirm is also announced as a durable
-#            `check` wake, once per failure episode - keyed by the registration
-#            identity it ran under and ended by a later launch of that source
-#            confirming - because the supervision cycle discards the `failed=`
-#            count. The launch itself is retried every cycle exactly as before.
+#            Launch confirmation, failure-episode reporting, and their settings
+#            are defined in docs/configuration.md under "Confirm detached
+#            launches" and "Report launch failures".
+#            Durable failure wakes are needed because the watcher discards this
+#            command's output and exit status.
 #            A source whose claim nothing may automatically displace is not
 #            relaunched at all; it is counted `uncertain` and announced once per
 #            stranded claim generation as a durable `check` wake, because the
@@ -1879,7 +1874,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # the failure this reports is "not proved within the window" and nothing more.
 #
 # Every launch shares ONE window rather than taking a window each, so a whole
-# fleet of failing sources costs a watcher cycle the same bounded wait as one.
+# fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
   local deadline window entry id rest identity before state stamp mark current_identity
   local -a pending=("$@") remaining=()
