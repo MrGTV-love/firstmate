@@ -1240,6 +1240,8 @@ Example Client Ltd
 # dispatch-never-send marked-sections
 ```
 
+The following marked-region rules apply only to dispatch resolution; advisory skill selection neither removes nor validates these markers.
+
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
 ```markdown
@@ -1420,7 +1422,7 @@ This implementation cannot enable blocking or reset that date.
 ## Advisory skill selection
 
 `bin/fm-skill-suggest.sh` uses Jev to suggest which optional skill bodies to inspect first, without replacing the full skill index, required trigger rules, or agent judgment.
-The existing TypeSafe key opt-in and dispatch-never-send policy also apply here through the shared `bin/fm-typesafe-lib.sh` boundary; see [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) for setup.
+The existing TypeSafe key opt-in and dispatch-never-send literal policy also apply here through the shared `bin/fm-typesafe-lib.sh` boundary; see [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) for setup and directive validation.
 The tool's header and help own exact flags, size limits, probability policy, deadlines, and output.
 
 Provide a minimal permitted task summary, not a transcript, secret, customer excerpt, or pasted source report.
@@ -1436,7 +1438,7 @@ Agents read selected bodies through ordinary tools and may reject suggestions, a
 LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts.
 Supported name scalars ignore surrounding syntax spaces and tabs without altering quoted contents.
 
-Stage one evaluates each optional skill independently using its stable ID and full description, plus a no-fit need signal.
+Stage one evaluates each public optional skill in the selected catalog independently using its stable ID and full description, plus a no-fit need signal.
 Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
 Ambiguous shortlists receive a second evaluation using bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
 Paths remain local; the judge does not receive the catalog's full instruction bodies.
