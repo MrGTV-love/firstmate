@@ -1,0 +1,58 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-14029-1956
+initial composer=empty agent=alive endpoint=fm-lab-omp-composer-box-14029-1956:w1:p1
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home
+error: task ompbox13482's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home
+stopped ompbox13482 harness=omp backend=herdr endpoint=fm-lab-omp-composer-box-14029-1956:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/wt
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control exit stops the idle box-shaped worker and preserves its endpoint
+Actual failed-turn screen composer=empty agent=alive
+
+
+ Error: Google API error (429): You exceeded your current quota, please check your plan and billing details. For
+   more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current
+   usage, head to: https://ai.dev/rate-limit.
+   * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit:
+   0, model: gemini-3.1-pro
+   * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0,
+   model: gemini-3.1-pro
+   * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0,
+   … +16 more lines (⌃O to expand)
+
+ Error: Retry failed after 1 attempts: Provider requested 3692000ms wait, exceeds retry.maxDelayMs (300000ms).
+ Original error: Google API error (429): You exceeded your current quota, please check your plan and billing details.
+ For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your
+ current usage, head to: https://ai.dev/rate-limit.
+ * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit:
+ 0, model: gemini-3.1-pro
+ * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model:
+ gemini-3.1-pro
+ * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model:
+ gemini-3.1-pro
+ * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit:
+ 0, model: gemini-3.1-pro
+ Please retry in 1h1m32.280624476s.
+ {"error":{"status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.Help","links":[{"descript
+ ion":"Learn more about Gemini API
+ quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFa
+ ilure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_input_token_count",
+ "quotaId":"GenerateContentInputTokensPerModelPerDay-FreeTier","quotaDimensions":{"location":"global","model":"gemini-
+ 3.1-pro"}},{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"Generate
+ RequestsPerDayPerProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-3.1-pro"}},{"quotaM
+ etric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePe
+ rProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-3.1-pro"}},{"quotaMetric":"generati
+ velanguage.googleapis.com/generate_content_free_tier_input_token_count","quotaId":"GenerateContentInputTokensPerModel
+ PerMinute-FreeTier","quotaDimensions":{"location":"global","model":"gemini-3.1-pro"}}]},{"@type":"type.googleapis.com
+ /google.rpc.RetryInfo","retryDelay":"3692s"}]}}
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox13482 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─                                                                                                                   ─╯
+relaunch precondition composer=empty agent=alive endpoint=fm-lab-omp-composer-box-14029-1956:w1:p1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home/data/ompbox13482/launch-brief.md records no ship branch; defaulting to legacy branch fm/ompbox13482
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/control-home/data/ompbox13482/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched ompbox13482 harness=omp from=omp model=default effort=default backend=herdr endpoint=fm-lab-omp-composer-box-14029-1956:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.nGkmI6/wt
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint

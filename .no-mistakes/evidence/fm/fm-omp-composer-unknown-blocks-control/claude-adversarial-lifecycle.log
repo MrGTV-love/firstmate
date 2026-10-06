@@ -1,0 +1,25 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.X6SAFC/control-home
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-61248-7250
+initial composer=empty agent=alive endpoint=fm-lab-omp-composer-box-61248-7250:w1:p1
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+Initial plain-capture state=unknown
+not ok - ambiguous unstyled hint read pending
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                        Tip: Did you know? Each kitty/tmux/cmux/zellij/wezterm split keeps its
+                                     own session — `omp -c` resumes the right one
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox61063 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─ ⇧⇥ to change thinking efforts                                                                                     ─╯
+{"id":"cli:agent:get","result":{"agent":{"agent":"omp","agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.X6SAFC/wt","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.X6SAFC/wt","pane_id":"w1:p1","revision":2,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_65d33ea103ca21","terminal_title":"π > wt","terminal_title_stripped":"π > wt","workspace_id":"w1"},"type":"agent_info"}}
+{"id":"cli:pane:get","result":{"pane":{"agent":"omp","agent_status":"idle","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.X6SAFC/wt","focused":true,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.X6SAFC/wt","pane_id":"w1:p1","revision":2,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"term_65d33ea103ca21","terminal_title":"π > wt","terminal_title_stripped":"π > wt","workspace_id":"w1"},"type":"pane_info"}}

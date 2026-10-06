@@ -1,0 +1,21 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                                Tip: Press ⇧⇥ to cycle through reasoning effort levels
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Closing session…
+
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox19800 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯
+Mac-Studio:wt charlesabrooker$

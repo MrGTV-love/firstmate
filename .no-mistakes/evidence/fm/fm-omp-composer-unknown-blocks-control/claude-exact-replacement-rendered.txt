@@ -1,0 +1,39 @@
+g a literal * at that position. Use Bash(rm*/.claude/settings*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the trai
+ling :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containin
+g a literal * at that position. Use Bash(mv*/.claude/settings*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the trai
+ling :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containin
+g a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the traili
+ng :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing
+a literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trai
+ling :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containin
+g a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trai
+ling :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containin
+g a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trai
+ling :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containin
+g a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for
+  third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose security risks
+  https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel

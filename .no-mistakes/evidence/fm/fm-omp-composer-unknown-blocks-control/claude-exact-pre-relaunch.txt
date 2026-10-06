@@ -1,0 +1,18 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                       Tip: Bulk data to classify or triage? Say `jevify` in your message — the
+                         eval kernel's `judge()` processes the batch and you read only what it
+                                           flags — watch it glow as you type
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox96318 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯

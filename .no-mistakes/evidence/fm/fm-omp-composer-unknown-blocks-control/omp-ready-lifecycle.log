@@ -1,0 +1,17 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-14166-29272
+initial composer=empty agent=alive endpoint=fm-lab-omp-composer-box-14166-29272:w1:p1
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home
+error: task ompbox13847's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home
+stopped ompbox13847 harness=omp backend=herdr endpoint=fm-lab-omp-composer-box-14166-29272:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/wt
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control exit stops the idle box-shaped worker and preserves its endpoint
+relaunch precondition composer=empty agent=alive endpoint=fm-lab-omp-composer-box-14166-29272:w1:p1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home/data/ompbox13847/launch-brief.md records no ship branch; defaulting to legacy branch fm/ompbox13847
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/control-home/data/ompbox13847/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched ompbox13847 harness=omp from=omp model=default effort=default backend=herdr endpoint=fm-lab-omp-composer-box-14166-29272:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.cGn3CP/wt
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint

@@ -1,0 +1,22 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                         Tip: No native tool_calling? Inference provider botches parsing them?
+                              `PI_DIALECT=glm|kimi|anthropic…` rolls it locally for them!
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Closing session…
+
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox13482 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯
+Mac-Studio:wt charlesabrooker$

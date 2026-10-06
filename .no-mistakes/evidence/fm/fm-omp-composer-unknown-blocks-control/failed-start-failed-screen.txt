@@ -1,0 +1,27 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                                Tip: Press ⇧⇥ to cycle through reasoning effort levels
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Closing session…
+
+
+╭── π > ◒ Gemini 3.1 Pro Preview > 🌳 proj/wt > ⑂ ompbox19800 ▶─2%────────────────────────────────────────┃──────1M───╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯
+Mac-Studio:wt charlesabrooker$ env PI_CODING_AGENT_DIR='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4
+9M05K2KST38EB9PT2GA4QJ/.live-validation/omp-state' OMP_SKIP_SETUP=1 FM_OMP_HARNESS=omp omp --definitely-invalid-live-gu
+ard-option --cwd '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validatio
+n/tmp/fm-omp-composer-box-live.Bse4FN/wt'
+Error: unknown flag: --definitely-invalid-live-guard-option
+Run `omp --help` for available flags.
+Mac-Studio:wt charlesabrooker$
