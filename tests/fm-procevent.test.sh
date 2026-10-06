@@ -5148,8 +5148,9 @@ confirm_without_absent_reader_contention() {
 case "${1-}" in
   "$CONTENDED_CORE")
     case "${2-}" in
-      reconcile|ensure-listening) printf '%s\n' "$$" > "$CONTENDED/reader-pid" ;;
+      reconcile|ensure-listening) export CONTENDED_READER=1 ;;
       _start)
+        unset CONTENDED_READER
         while [ ! -e "$CONTENDED/post-launch-read" ]; do
           [ "$SECONDS" -lt 120 ] || exit 75
           /bin/sleep 0.01
@@ -5179,8 +5180,7 @@ SH
 last=; for arg in "$@"; do last=$arg; done
 if [ "$last" = "$CONTENDED_LOCK" ] && [ -e "$CONTENDED/post-launch-read" ] \
   && [ ! -e "$CONTENDED_CLAIM" ] && [ ! -e "$CONTENDED/reader-hold-applied" ]; then
-  reader=; [ ! -e "$CONTENDED/reader-pid" ] || read -r reader < "$CONTENDED/reader-pid"
-  if [ "$PPID" = "$reader" ]; then
+  if [ "${CONTENDED_READER:-0}" = 1 ]; then
     "$REAL_LN" "$@" || exit $?
     : > "$CONTENDED/reader-hold-applied"
     /bin/sleep 5
