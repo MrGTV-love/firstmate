@@ -1945,6 +1945,11 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if [ "$state" -eq 0 ]; then
         continue
       fi
+      # A failed try-lock can outlast the stamp snapshot while the runner
+      # publishes its launch. Refresh that durable proof after ownership work.
+      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
+        continue
+      fi
       remaining+=("$entry")
     done
     pending=("${remaining[@]+"${remaining[@]}"}")
@@ -2032,6 +2037,11 @@ cmd_ensure_listening() {
     listening=0
     generation_is_listening "$id" "$identity" || listening=$?
     [ "$listening" -ne 0 ] || return 0
+    # Lock contention may consume the final stamp snapshot's remaining life.
+    # Observe a launch published during that ownership attempt before refusing.
+    if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
+      return 0
+    fi
     [ "$final_read" -eq 0 ] || break
     if [ "$started_once" -eq 0 ] && generation_can_launch "$id"; then
       detach_runner "$id"
