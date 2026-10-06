@@ -2766,8 +2766,8 @@ teamclaude_launch_line() {
   grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
 }
 
-# Execute the pane command rather than pinning launcher quoting: Herdr wraps
-# it in /bin/sh -c to carry launch ownership proof across a restored pane.
+# Execute the pane command rather than pinning launcher quoting.
+# bin/fm-spawn.sh owns the launch-shell and environment boundaries.
 assert_teamclaude_launch() { # <fakebin> <launch-command> <label>
   local fakebin=$1 launch=$2 label=$3 out
   out="$(dirname "$fakebin")/claude-env.$RANDOM"

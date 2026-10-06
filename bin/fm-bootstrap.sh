@@ -114,16 +114,18 @@
 #          X-mode artifacts, project clones, or repair instructions.
 #          Unset/0 (the default) runs all mutating sweeps - this flag is purely
 #          additive.
-#          Set FM_BOOTSTRAP_NETWORK to split this run by whether a step talks to
-#          the network, so a session start can print its digest from local reads
-#          alone and run the network half off the digest's blocking path:
-#            all  (default, and any unrecognized value) - every local and network
+#          Set FM_BOOTSTRAP_NETWORK to split synchronous local work from the
+#          deferred phase, so a session start can print its digest from local
+#          reads while network checks and recorded Herdr launch recovery run
+#          off the digest's blocking path:
+#            all  (default, and any unrecognized value) - every bootstrap
 #                 step. Unrecognized values fall back here on purpose: a typo
 #                 must never silently skip a safety sweep.
-#            skip - every LOCAL step, and none of the network ones. Skips
-#                 `gh auth status`, secondmate_liveness_sweep, secondmate_sync,
-#                 secondmate_handoff_resume, and fleet_sync.
-#            only - ONLY those network steps and nothing else. No tool detection,
+#            skip - the synchronous local pass. Skips `gh auth status`,
+#                 secondmate_liveness_sweep, secondmate_sync,
+#                 secondmate_handoff_resume, fleet_sync, and recorded Herdr
+#                 launch recovery.
+#            only - the deferred steps listed above. No tool detection,
 #                 no version floors, no tangle check, no backlog
 #                 reconciliation, no x_mode_setup: those already ran on the
 #                 local pass.

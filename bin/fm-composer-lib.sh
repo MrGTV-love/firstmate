@@ -1023,8 +1023,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_BARE_ROW=$row
       fi
     fi
-    # Cursor safety: a cursor sitting on a structural edge row is never an
-    # input row.
+    # Literal draft borders must not invalidate their enclosing composer.
     if [ -n "$cy" ] && [ "$row" -eq "$cy" ] && ! _fm_composer_row_is_bare_literal "$row" \
        && fm_composer_row_has_edge "$trimmed"; then
       FM_COMPOSER_SCAN_CURSOR_EDGE=1
@@ -1209,8 +1208,9 @@ _fm_composer_titled_bottom_ok() {  # <family> <bottom-inner> <top-spaces>
   return 0
 }
 
-# fm_composer_row_has_edge: 0 when the trimmed row starts or ends with a
-# box-drawing/edge glyph - a structural row, never an input row.
+# fm_composer_row_has_edge: detect box-drawing/edge glyphs at either row end.
+# This is only an edge candidate; container and literal ownership decide whether
+# it bounds input, since omp floors and pasted frame rows can carry draft text.
 # The half-block glyphs are edges too. Herdr draws a composer's top and bottom
 # rules with ▄ and ▀ instead of the box-drawing family, so without them a bare
 # composer's WRAP region walks straight through its own closing rule and
@@ -1918,13 +1918,8 @@ EOF
       fi
       return 0
     fi
-    # A bare composer's WRAP region: long typed input wraps below the glyph
-    # row, and the cursor lands on a continuation row that carries no glyph of
-    # its own. When every row from the glyph row down to the cursor is
-    # non-blank and non-structural, the cursor is inside that composer's
-    # wrapped input - an IDENTIFIED region, so the strict blank-row rule does
-    # not apply and a swallowed Enter on a long message still reads pending
-    # and earns its retry.
+    # _fm_composer_wrap_region_ok owns the continuation proof; cursor position
+    # alone cannot make a blank or unrelated row safe for injection.
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
        && _fm_composer_wrap_region_ok "$plain" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"; then
       if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \

@@ -107,8 +107,8 @@
 #                             and the wake decision; every wait on it is bounded.
 #
 # The whole stage is bounded by FM_STARTUP_NETWORK_TIMEOUT (default 120s), one
-# aggregate deadline covering both the inactive-outcome scan and network sweeps
-# plus every lock the worker waits on before them.
+# aggregate deadline covering the inactive-outcome scan and bootstrap's deferred
+# phase, plus every lock the worker waits on before them.
 # Publication and delivery are bounded the same way by FM_SESSION_START_TIMEOUT.
 # A lock that a live process still holds at either deadline ends the worker with
 # a failed record naming that holder and the rerun command, never a wait that
