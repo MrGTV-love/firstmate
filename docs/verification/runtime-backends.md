@@ -556,7 +556,8 @@ FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 ## Jev shadow native tool hooks
 
 The current behavior and privacy boundary are owned by [Jev command screening](../configuration.md#jev-command-screening-shadow-only).
-The retained observations below describe the prior implementation, not a fresh run or proof of the current pre-tool-only integration.
+The retained observations below describe the prior implementation at its recorded heads, not a fresh run or proof of the current pre-tool-only integration or selection policy cohort 8.
+For cohort 8, the configuration owner's `secret_read` candidate semantics must not be mistaken for proof of actual secret-file reads.
 Native hook observations used omp 18.6.1 on 2026-10-05 and Claude Code 2.1.291 through TeamClaude 1.1.21-affinity.0 on 2026-10-06.
 Both hosts executed the same five synthetic cases: ordinary file read, bounded local missing-file delete, allowed synthetic secret-shaped file read, independently denied synthetic secret-shaped file read, and missing synthetic secret-shaped file read.
 External native-stream comparisons against matched controls that omitted only the shadow hook found the same success, denial and path-not-found outcomes with shadow enabled, a missing Jev key, or explicitly injected timeout/malformed transport responses.
@@ -580,13 +581,16 @@ Other harnesses have no guardrail caller in this slice, and these observations d
 
 The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh tests/fm-arm-pretool-check.test.sh tests/fm-cd-pretool-check.test.sh`; it proves selector, privacy, advisory-output, unavailable-usage, generated owning-home boundaries and shared-parser deterministic guard behavior, not native host activation or outcome correlation.
 The prior native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
-Those private fixture ledgers and exact native invocations remain prior delivery evidence, not shipped fixtures or a claim that offline tests refresh native proof after a host upgrade.
+Those private fixture ledgers and exact native invocations remain prior recorded-head delivery evidence, not shipped fixtures, cohort 8 evidence or a claim that offline tests refresh native proof after a host upgrade.
 
-The October 6 offline refresh passed all four focused suites: `FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=115213`.
+The prior October 6 offline refresh passed all four focused suites: `FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=115213`; that result predates cohort 8 and is not verification of its sensitive-token contract.
 The selector/evaluation suite passed 18 boundary groups, including ordered env argv, command queries, control syntax, effective shell stdin, heredoc expansion, SSH scope, Git/cloud option equivalents and secret operands.
 The deterministic arm and cd suites preserved their allow/deny contracts across all five transport entry forms.
 The owning-home suite passed six generated/tracked Claude and omp scenarios through filtered and hostile ambient environments, checking owner-key transport, withholding, private ledgers and advisory behavior.
 Transport responses were local fixtures; no paid provider or native host activation was exercised.
+The current offline reader matrix covers sensitive patterns and option values, routine reader tokens, wrapped/nested selection and command-query exclusions through both Claude and omp hook payloads with fake transport only; supplied command strings are not executed.
+The October 6 cohort 8 focused offline refresh, `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh`, passed: `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=56463`.
+That run exercised the correcting implementation through both hook input protocols, not native host activation or provider judgment.
 
 **September 30 historical dataset source is unavailable.**
 The supplied `/Users/charlesabrooker/firstmate/data/fm-jev-implementation-review/report.md` (October 1, F8 and the guardrail promotion row) records a planned screen and promotion contract, with no hook measurement; its cited `/Users/charlesabrooker/firstmate/data/fm-jev-value-scout/report.md` (September 29, worker destructive-risk proposal) describes prospective fixture replay, not dated blocked/allowed command receipts.
@@ -598,7 +602,8 @@ No historical placeholder rows are shipped; every row in `tests/fixtures/jev-gua
 New evaluation inputs require `historical_september30` or `synthetic` dataset ownership; metrics report labelled quality only in those separate objects, with no top-level quality aliases.
 Older labels without recognized dataset ownership contribute only to the top-level `unclassified_labelled` count, never dataset quality.
 The `historical_september30` object's labelled count remains zero and rates remain `null` until real historical receipts are supplied, regardless of synthetic results.
-This evidence gap does not change the existing promotion owner, date or criteria.
+Historical fixture labels and attempt records remain unchanged; synthetic-vs-historical quality stays separate rather than being relabelled for cohort 8.
+This evidence gap does not change the existing `fm-jev-guardrail-promote` ownership of the October 14, 09:00 America/Chicago decision or its quality, seven-day/300-command volume, latency and no-secret criteria.
 
 ## Claude workspace trust
 

@@ -25,13 +25,14 @@ const privateKey = process.env.TYPESAFE_API_KEY || '';
 delete process.env.TYPESAFE_API_KEY;
 delete process.env.TYPESAFE_API_KEY_PRIVATE;
 const model = 'jev-1.13.0';
-const policyVersion = 7;
+const policyVersion = 8;
 const clock = () => performance.now();
 const elapsed = start => Math.round((clock() - start) * 1000) / 1000;
 const secretPath = value => /(?:^|[/\\])(?:\.env(?:[.\w-]*)?|\.ssh|\.aws|\.gnupg|credentials(?:[.\w-]*)?|secrets?(?:[.\w-]*)?|id_(?:rsa|ed25519)|[^/]*\.(?:pem|key))(?:$|[/\\])/i.test(value);
+const sensitiveToken = value => /(?:\.env[\w.-]*|\.(?:pem|key)\b|\bid_[\w*?-]+|\bkeychains?\b|\bcredentials?[\w.-]*|\bsecrets?[\w.-]*|\.ssh\b|\.aws\b|\.gnupg\b|\.config[/\\]vernant\b|\bauth\.json\b)/i.test(value);
 const secretName = value => /(?:^|_)(?:token|secret|password|passwd|credentials?|(?:api|access|private)_?key)(?:_|$)/i.test(value);
 const production = value => /(?:^|[^a-z])(?:prod(?:uction)?|live)(?:$|[^a-z])/i.test(value);
-const readers = new Set(['cat', 'head', 'tail', 'less', 'more', 'grep', 'rg', 'sed', 'awk', 'base64', 'xxd']);
+const readers = new Set(['cat', 'head', 'tail', 'less', 'more', 'ls', 'find', 'jq', 'grep', 'rg', 'sed', 'awk', 'base64', 'xxd']);
 const riskyLiteral = /\b(?:rm|rmdir|unlink|shred|rmtree|delete|destroy|remove|drop|deploy|apply|upgrade|publish|release|push|reset|clean|secret\w*|credential\w*|printenv|env|find-(?:generic|internet)-password)\b|authorization:|cookie:|\.env|\.ssh|\.aws|\.gnupg|\.pem|\.key|id_(?:rsa|ed25519)/i;
 
 function targetScope(args) {
@@ -59,73 +60,6 @@ function operands(args, takesValue = new Set()) {
     else if (takesValue.has(value)) i++;
   }
   return result;
-}
-
-const readerOptionRoles = {
-  grep: {
-    file: new Set(['-f', '--file', '--exclude-from']),
-    program: new Set(['-e', '--regexp']),
-    value: new Set(['-A', '-B', '-C', '-m', '-d', '-D', '--after-context', '--before-context', '--context', '--max-count', '--directories', '--devices', '--label', '--include', '--exclude', '--exclude-dir', '--binary-files']),
-    flags: 'EFGIPivwxcLlnHhsoqRsrazZybUu',
-  },
-  rg: {
-    file: new Set(['-f', '--file', '--ignore-file']),
-    program: new Set(['-e', '--regexp']),
-    value: new Set(['-A', '-B', '-C', '-m', '-j', '-g', '-t', '-T', '-r', '--after-context', '--before-context', '--context', '--max-count', '--threads', '--glob', '--iglob', '--type', '--type-not', '--type-add', '--type-clear', '--replace', '--encoding', '--max-depth', '--max-filesize', '--sort', '--sortr', '--color', '--colors', '--path-separator', '--engine', '--hostname-bin', '--pre', '--pre-glob']),
-    flags: 'FivwxclLnHhsoqazUPSu.',
-  },
-  sed: {
-    file: new Set(['-f', '--file']),
-    program: new Set(['-e', '--expression']),
-    value: new Set(['-i', '--in-place']),
-    flags: 'nErszu',
-  },
-  awk: {
-    file: new Set(['-f', '--file', '-E', '--exec', '--include', '-i']),
-    program: new Set(['-e', '--source']),
-    value: new Set(['-F', '-v', '-W', '--field-separator', '--assign']),
-    flags: 'bcPOS',
-  },
-};
-
-function readerFiles(name, args) {
-  const roles = readerOptionRoles[name];
-  if (!roles) return operands(args);
-  const files = [];
-  const positional = [];
-  let explicitProgram = false;
-  for (let i = 0; i < args.length; i++) {
-    const word = args[i];
-    if (word === '--') { positional.push(...args.slice(i + 1)); break; }
-    if (!word.startsWith('-') || word === '-') { positional.push(word); continue; }
-    let option = word;
-    let value;
-    if (word.startsWith('--')) {
-      const equals = word.indexOf('=');
-      if (equals >= 0) { option = word.slice(0, equals); value = word.slice(equals + 1); }
-    } else {
-      for (let offset = 1; offset < word.length; offset++) {
-        const short = `-${word[offset]}`;
-        if ([roles.file, roles.program, roles.value].some(set => set.has(short))) {
-          option = short;
-          value = word.slice(offset + 1) || undefined;
-          break;
-        }
-        if (!roles.flags.includes(word[offset])) break;
-      }
-    }
-    if (![roles.file, roles.program, roles.value].some(set => set.has(option))) continue;
-    if (name === 'sed' && roles.value.has(option)) {
-      if (option === '-i' && value === undefined && process.platform === 'darwin') i++;
-      continue;
-    }
-    value ??= args[++i] || '';
-    if (roles.file.has(option)) files.push(value);
-    if (['-f', '--file', '-E', '--exec'].includes(option) || roles.program.has(option)) explicitProgram = true;
-  }
-  if (!explicitProgram) positional.shift();
-  files.push(...positional.filter(value => name !== 'awk' || !/^[a-zA-Z_]\w*=/.test(value)));
-  return files;
 }
 
 function sshInvocation(args) {
@@ -759,7 +693,7 @@ function describe(command, depth = 0) {
     } else if (Object.hasOwn(cloudOptionValues, name) || name === 'flyctl') features.push(...cloudOperations(name, args));
     else if (name === 'security' && operands(args).some(v => /^find-(?:generic|internet)-password$/.test(v))) add('secret_read', [], { scope: 'secret' });
     else if (name === 'printenv' && !optionWords(args).some(v => v === '--help' || v === '--version') && (!operands(args).length || operands(args).some(secretName))) add('secret_read', [], { scope: 'secret' });
-    else if (readers.has(name) && readerFiles(name, args).some(secretPath)) add('secret_read', [], { scope: 'secret' });
+    else if (readers.has(name) && args.some(sensitiveToken)) add('secret_read', [], { scope: 'secret' });
     else if (['curl', 'wget'].includes(name) && secretUpload(name, args)) add('secret_read', [], { scope: 'secret' });
     else if (['python', 'python3', 'node', 'ruby', 'perl'].includes(name) && args.some(v => /^-(?:c|e)$/.test(v)) && args.some(v => /(?:remove|unlink|rmtree|delete|secret|credential|\.env|deploy)/i.test(v))) add('opaque_execution', [], { scope: 'unknown' });
   }

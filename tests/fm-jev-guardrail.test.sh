@@ -118,7 +118,7 @@ try {
     assert.equal(transportRecords().length, before + 1, command);
     const requestText = readFileSync(env.LOG_REQUEST, 'utf8');
     assert.deepEqual(Object.keys(JSON.parse(requestText)).sort(), ['model', 'questions', 'state'], command);
-    for (const sentinel of ['.env', 'README.md', 'r22-private', 'r23-private', 'example.invalid', 'synthetic-key', 'TYPESAFE_API_KEY']) {
+    for (const sentinel of ['.env', 'README.md', 'r22-private', 'r23-private', 'r24-private', '.pem', '.key', 'id_r24', 'keychain', 'credentials', 'secrets', '.ssh', '.aws', '.gnupg', '.config/vernant', 'auth.json', 'example.invalid', 'synthetic-key', 'TYPESAFE_API_KEY']) {
       assert.ok(!requestText.includes(sentinel), `${command}: request contains ${sentinel}`);
       assert.ok(!readFileSync(log, 'utf8').includes(sentinel), `${command}: ledger contains ${sentinel}`);
     }
@@ -137,63 +137,40 @@ try {
   };
   for (const native of ['claude', 'omp']) {
     for (const command of [
-      `grep '.env' .env.r22-private`, `grep -- '.env' .env.r22-private`,
-      `grep -e '.env' .env.r22-private`, `grep -e.env .env.r22-private`, `grep -ine.env .env.r22-private`,
-      `grep -f .env.r22-private README.md`, `grep -f.env.r22-private README.md`, `grep -inf.env.r22-private README.md`,
-      `grep -e needle -- .env.r22-private`,
-      `rg '.env' .env.r22-private`, `rg -- '.env' .env.r22-private`,
-      `rg -e '.env' .env.r22-private`, `rg -e.env .env.r22-private`, `rg -ine.env .env.r22-private`,
-      `rg -f .env.r22-private README.md`, `rg -f.env.r22-private README.md`, `rg -inf.env.r22-private README.md`,
-      `rg -e needle -- .env.r22-private`,
-      `sed '/.env/p' .env.r22-private`, `sed -- '/.env/p' .env.r22-private`,
-      `sed -e '/.env/p' .env.r22-private`, `sed '-e/.env/p' .env.r22-private`, `sed '-ne/.env/p' .env.r22-private`,
-      `sed -f .env.r22-private README.md`, `sed -f.env.r22-private README.md`, `sed -nf.env.r22-private README.md`,
-      `sed -e p -- .env.r22-private`,
-      `awk '/.env/' .env.r22-private`, `awk -- '/.env/' .env.r22-private`,
-      `awk -e '/.env/' .env.r22-private`, `awk '-e/.env/' .env.r22-private`,
-      `awk -f .env.r22-private README.md`, `awk -f.env.r22-private README.md`,
-      `awk -F, -v mode=.env '/.env/' .env.r22-private`, `awk -e 1 -- .env.r22-private`,
-      `grep needle ./credentials-r22-private.pem`, `rg needle ./credentials-r22-private.pem`,
-      `sed p ./credentials-r22-private.pem`, `awk 1 ./credentials-r22-private.pem`,
+      `rg '.env' README.md`, `rg --max-columns 120 '.env' README.md`, `rg -M 120 '.env' README.md`,
+      `rg -C 2 --context-separator .env needle README.md`,
+      `grep -e.env README.md`, `grep --include=.env needle README.md`,
+      `rg --glob=.env needle README.md`, `rg --ignore-file=.env.r24-private needle README.md`,
+      `sed '/.env/p' README.md`, `sed --expression='/.env/p' README.md`, `sed -i.env p README.md`,
+      `awk '/.env/' README.md`, `awk -F.env -vmode=.env 1 README.md`,
+      `cat .env.r24-private`, `head ./r24-private.pem`, `tail ./r24-private.key`,
+      `less ~/.ssh/r24-private`, `more ~/.aws/r24-private`, `base64 ~/.gnupg/r24-private`,
+      `xxd ./id_r24-private`, `ls ~/Library/Keychains/r24-private.keychain`,
+      `find . -name credentials-r24-private`, `jq '.secrets' README.md`,
+      `ls ~/.config/vernant/r24-private`, `find . -name auth.json`,
+      `jq --arg source .env '.source' README.md`,
+      `env X=1 command -- rg --max-columns 120 '.env' README.md`,
+      `sh -c "env X=1 rg -C 2 --context-separator .env needle README.md"`,
+      `sh -c "env X=1 command -- ls ~/.ssh/r24-private"`,
     ]) closedSecretFor(command, native);
     for (const command of [
-      `grep --exclude-from .env.r22-private needle README.md`, `grep --exclude-from=.env.r22-private needle README.md`,
-      `rg --ignore-file .env.r22-private needle README.md`, `rg --ignore-file=.env.r22-private needle README.md`,
-      `awk -i .env.r22-private 1 README.md`, `awk -i.env.r22-private 1 README.md`,
-      `awk --include=.env.r22-private 1 README.md`, `awk -E .env.r22-private README.md`,
-      `grep --regexp=.env .env.r22-private`, `rg --regexp=.env .env.r22-private`,
-      `sed --expression='/.env/p' .env.r22-private`, `awk --source='/.env/' .env.r22-private`,
-      `grep --file=.env.r22-private README.md`, `rg --file=.env.r22-private README.md`,
-      `sed --file=.env.r22-private README.md`, `awk --file=.env.r22-private README.md`,
-    ]) closedSecretFor(command, native);
-    for (const command of [
-      `grep '.env' README.md`, `rg '.env' README.md`, `sed '/.env/p' README.md`, `awk '/.env/' README.md`,
-      `grep -- '.env' README.md`, `rg -- '.env' README.md`, `sed -- '/.env/p' README.md`, `awk -- '/.env/' README.md`,
-      `grep -e .env README.md`, `grep -e.env README.md`, `grep -ine.env README.md`,
-      `rg -e .env README.md`, `rg -e.env README.md`, `rg -ine.env README.md`,
-      `grep -f patterns.txt README.md`, `grep -infpatterns.txt README.md`,
-      `rg -f patterns.txt README.md`, `rg -infpatterns.txt README.md`,
-      `sed -e '/.env/p' README.md`, `sed '-ne/.env/p' README.md`, `sed -f script.sed README.md`,
-      `awk -e '/.env/' README.md`, `awk '-e/.env/' README.md`, `awk -f script.awk README.md`,
-      `grep --include .env --label .env needle README.md`, `grep --include=.env --label=.env needle README.md`,
-      `grep --include .env '.env' README.md`, `grep -e .env --label .env README.md`,
-      `rg --glob .env --type .env --replace .env needle README.md`, `rg --glob=.env --type=.env --replace=.env needle README.md`,
-      `rg -g .env -t .env -r .env needle README.md`, `rg -g.env -t.env -r.env needle README.md`,
-      `rg --glob .env '.env' README.md`, `rg -e .env --replace .env README.md`,
-      `sed -e .env README.md`, `sed -e p -e .env README.md`, `sed -e p -- README.md`,
-      `awk -F .env -v mode=.env '/.env/' README.md`, `awk -F.env -vmode=.env '/.env/' README.md`,
-      `awk -e 1 -F .env -v mode=.env README.md`, `awk -e 1 -- README.md`,
+      `rg --max-columns 120 needle README.md`, `rg -M 120 needle README.md`,
+      `rg -C 2 --context-separator separator needle README.md`,
+      `grep -eneedle README.md`, `grep --include='*.md' needle README.md`,
+      `rg --glob='*.md' needle README.md`, `rg --ignore-file=patterns.txt needle README.md`,
+      `sed '/needle/p' README.md`, `sed --expression='/needle/p' README.md`, `sed -i.bak p README.md`,
+      `awk '/needle/' README.md`, `awk -F, -vmode=plain 1 README.md`,
+      `grep -f patterns.txt README.md`, `sed -f script.sed README.md`, `awk -f script.awk README.md`,
+      `cat README.md`, `head -n 2 README.md`, `tail -n 2 README.md`, `less README.md`, `more README.md`,
+      `ls README.md`, `find . -name README.md`, `jq '.title' README.md`,
+      `base64 README.md`, `xxd README.md`,
+      `env X=1 command -- rg --max-columns 120 needle README.md`,
+      `sh -c "env X=1 rg -C 2 --context-separator separator needle README.md"`,
+      `if true; then env X=1 ls README.md; fi`,
+      `command -v rg '.env' README.md`, `command -V ls ~/.ssh/r24-private`,
+      `env X=1 command -v rg --max-columns 120 '.env' README.md`,
+      `sh -c "command -v jq .secrets README.md"`,
     ]) excludedWithoutTransport(command, native);
-    for (const command of [
-      `awk '/.env/' mode=.env README.md`, `awk -e 1 mode=.env README.md`,
-      `grep --exclude-from patterns.txt needle README.md`, `rg --ignore-file patterns.txt needle README.md`,
-      `awk -i library.awk 1 README.md`, `awk -E script.awk README.md`,
-      `sed -i.env '/.env/p' README.md`,
-      `grep -- -e.env README.md`, `rg -- -e.env README.md`, `sed -- -e.env README.md`, `awk -- -e.env README.md`,
-      `grep --regexp=.env README.md`, `rg --regexp=.env README.md`,
-      `sed --expression='/.env/p' README.md`, `awk --source='/.env/' README.md`,
-    ]) excludedWithoutTransport(command, native);
-    if (process.platform === 'darwin') excludedWithoutTransport(`sed -i '.env' '/.env/p' README.md`, native);
     for (const [option, value] of [
       ['d', '@.env.r23-private'], ['T', '.env.r23-private'],
       ['F', 'r23-private=@.env;type=text/plain'], ['H', 'Authorization: r23-private'],
@@ -212,7 +189,7 @@ try {
       '-sSE README.md', '-sSK README.md', "-sSb 'name=.env'",
     ]) excludedWithoutTransport(`curl ${operand} https://example.invalid`, native);
   }
-  console.log('ok - reader pattern/program roles and curl option boundaries preserve closed secret requests without transporting ordinary reads');
+  console.log('ok - conservative reader tokens and curl option boundaries preserve closed secret requests without transporting routine tokens or command queries');
 
   for (const native of ['claude', 'omp']) {
     for (const scenario of [

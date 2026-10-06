@@ -1369,11 +1369,13 @@ No key means `missing_key`, not a synthetic judgment.
 Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
 
 Selection reuses Firstmate's read-only shell parser, with shadow-only parsing extensions kept inside the Jev hook; deterministic guard policies and their parser behavior remain unchanged.
-Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access commands are candidates; ordinary reads and printed command examples do not call Jev.
+Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access candidates call Jev; ordinary reader arguments without sensitive-looking tokens and printed command examples do not.
 For delete/deploy operations, production scope takes precedence over a secret-shaped target.
 Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
 Native `Read`/`read` paths select secret-shaped targets without opening the file.
-Grep/rg patterns and sed/awk programs are not file inputs; selection checks positional filenames and file-backed patterns/scripts such as `-f`, while excluding non-file option values.
+Selection policy cohort 8 conservatively checks every argument token of `cat`, `head`, `tail`, `less`, `more`, `ls`, `find`, `jq`, `grep`, `rg`, `sed`, `awk`, `base64` and `xxd` for sensitive-looking evidence: `.env`, `.ssh`/`.aws`/`.gnupg`, `.pem`/`.key`, `id_*`, keychain, credentials/secrets, `~/.config/vernant` and `auth.json`.
+This is token evidence, not a claim that a file is read: patterns, programs and attached or separate option values intentionally qualify, including `rg --max-columns 120 '.env' README.md` and `rg -C 2 --context-separator .env needle README.md`.
+The `secret_read` operation enum therefore also denotes a sensitive-token candidate; native `Read`/`read` remains path-specific.
 Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
 Wrapper parsing preserves ordered `env -S` child arguments and literal env quoting/escapes, including trailing argv and `env -P` search paths; unsupported or environment-dependent split strings remain uncertain without expanding variables.
 `command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
@@ -1404,6 +1406,7 @@ Only authentic September 30 command/decision receipts may be labelled `historica
 The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
 The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.
 Until real receipts are available, the historical labelled count remains zero and historical quality rates remain `null`, even when synthetic quality is measurable.
+Historical labels and attempt records retain their original meaning; cohort 8 does not relabel prior evaluations or turn synthetic examples into historical receipts.
 Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
