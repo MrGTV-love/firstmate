@@ -27,6 +27,27 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
+unset _FM_TEST_POLL_OWNER _FM_TEST_POLL_COUNT
+sleep() {
+  local completed
+  if [ "${FUNCNAME[1]:-}" = event_wait_or_sleep ] \
+    && [ "$BASH_SUBSHELL" -eq 0 ] \
+    && [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ]; then
+    if [ "${_FM_TEST_POLL_OWNER:-}" != "$WATCHER_PID" ]; then
+      _FM_TEST_POLL_OWNER=$WATCHER_PID
+      _FM_TEST_POLL_COUNT=0
+    fi
+    _FM_TEST_POLL_COUNT=$((_FM_TEST_POLL_COUNT + 1))
+    completed="$STATE/.test-poll-completed-$WATCHER_PID"
+    if ! printf '%s\n' "$_FM_TEST_POLL_COUNT" > "$completed.tmp" \
+      || ! mv -f "$completed.tmp" "$completed"; then
+      exit 1
+    fi
+  fi
+  command sleep "$@"
+}
+export -f sleep
+
 ack_stopped_cycle() {  # <state>
   local state=$1 err sequence generation
   err="$state/.test-cycle-drain.err"
@@ -63,36 +84,25 @@ wait_live() {
   return 0
 }
 
-# Wait until <pid>'s watcher has completed a whole poll cycle, or exited first.
-# A fixed wait_live budget only proves the process is still ALIVE: fm-watch.sh
-# does bounded startup work (the recovery-marker snapshot, lock acquisition)
-# before its first stale scan, so on a loaded
-# machine a short fixed budget can reap a round before the cycle it asserts on
-# ever ran - and then every "no wake, no marker" assertion passes vacuously
-# while every "marker written" assertion fails spuriously.
-# The liveness beacon is touched at the TOP of every poll, so this drops any
-# beacon left by an earlier round, waits for THIS watcher to write a fresh one
-# (some poll's top), then waits for that one to advance (the next poll's top) -
-# and the whole cycle in between is what the caller's assertions describe.
-# 0 if the watcher is still alive after a completed cycle, 1 if it exited.
 wait_poll_cycle() {  # <state> <pid> [limit-ticks]
-  local state=$1 pid=$2 limit=${3:-300} beat first now i=0
-  beat="$state/.last-watcher-beat"
-  rm -f "$beat"
-  first=""
+  local state=$1 pid=$2 limit=${3:-300} completed first now i=0
+  completed="$state/.test-poll-completed-$pid"
+  first=$(cat "$completed" 2>/dev/null || true)
+  case "$first" in
+    ''|*[!0-9]*) first=0 ;;
+  esac
   while [ "$i" -lt "$limit" ]; do
     kill -0 "$pid" 2>/dev/null || return 1
-    first=$(file_mtime "$beat")
-    [ -n "$first" ] && break
-    sleep 0.1
-    i=$((i + 1))
-  done
-  while [ "$i" -lt "$limit" ]; do
-    kill -0 "$pid" 2>/dev/null || return 1
-    now=$(file_mtime "$beat")
-    if [ -n "$now" ] && [ "$now" != "$first" ]; then
-      return 0
-    fi
+    now=$(cat "$completed" 2>/dev/null || true)
+    case "$now" in
+      ''|*[!0-9]*) ;;
+      *)
+        if [ "$now" -ge "$((first + 2))" ]; then
+          kill -0 "$pid" 2>/dev/null
+          return $?
+        fi
+        ;;
+    esac
     sleep 0.1
     i=$((i + 1))
   done
@@ -858,6 +868,54 @@ test_secondmate_status_routine_absorbed_routed_surfaced_classifier() {
 }
 
 # --- benign wakes are absorbed ONLY when the crew is provably working ---------
+
+test_wait_poll_cycle_ignores_slow_check_beats() {
+  local dir state fakebin out status_file pid m1 m2
+  dir=$(make_case poll-cycle-slow-check); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  status_file="$state/task.status"
+  printf 'working: awaiting check completion\n' > "$status_file"
+  cat > "$state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-started"
+while [ ! -e "$FM_STATE_OVERRIDE/check-release" ]; do sleep 0.1; done
+SH
+  chmod 0700 "$state/slow.check.sh"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null \
+    || fail "could not register poll-cycle slow check"
+  export FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)'
+  watch_bg "$state" "$fakebin" "$out" env FM_GUARD_GRACE=3 FM_CHECK_TIMEOUT=120
+  pid=$!
+  wait_numeric_file "$state/check-started" 300 \
+    || { reap "$pid"; fail "poll-cycle check never started"; }
+  m1=$(file_mtime "$state/.last-watcher-beat")
+  if wait_poll_cycle "$state" "$pid" 60; then
+    reap "$pid"; fail "intermediate slow-check beats released the completed-cycle wait"
+  fi
+  kill -0 "$pid" 2>/dev/null \
+    || { reap "$pid"; fail "watcher exited while its quiet check was blocked"; }
+  m2=$(file_mtime "$state/.last-watcher-beat")
+  [ -n "$m1" ] && [ -n "$m2" ] && [ "$m2" -ge "$((m1 + 2))" ] \
+    || { reap "$pid"; fail "blocked check did not publish multiple intermediate beacon beats"; }
+  [ ! -e "$state/.test-poll-completed-$pid" ] \
+    || { reap "$pid"; fail "blocked check published a completed classification pass"; }
+  [ ! -e "$state/.seen-task_status" ] \
+    || { reap "$pid"; fail "signal classification ran before the blocked check completed"; }
+  touch "$state/check-release"
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "completed check never released the completed-cycle wait"; }
+  [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$status_file")" = "$(size_of "$status_file")" ] \
+    || { reap "$pid"; fail "completed-cycle wait returned before terminal signal classification"; }
+  printf 'working: after the completed check\n' >> "$status_file"
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "watcher exited after the next benign status mutation"; }
+  [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$status_file")" = "$(size_of "$status_file")" ] \
+    || { reap "$pid"; fail "completed-cycle wait missed classification after the status mutation"; }
+  [ ! -s "$out" ] && [ ! -s "$state/.wake-queue" ] \
+    || { reap "$pid"; fail "quiet check and benign signals surfaced a wake"; }
+  reap "$pid"
+  unset FM_FAKE_CREW_STATE
+  pass "completed-cycle waits ignore slow-check progress beats and include terminal classification"
+}
 
 test_provably_working_signal_absorbed() {
   local dir state fakebin out status_file pid
@@ -6222,9 +6280,6 @@ test_beacon_stays_fresh_while_absorbing() {
   export FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)'
   watch_bg "$state" "$fakebin" "$out"
   pid=$!
-  # Wait on the beacon itself rather than a fixed liveness budget: the watcher's
-  # bounded startup can outlast a short wait, and reading an absent beacon would
-  # report a missing beacon that simply had not been written yet.
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "watcher exited while absorbing the first benign signal"; }
   m1=$(file_mtime "$state/.last-watcher-beat")
   # A second benign signal keeps it absorbing; the beacon must keep advancing.
@@ -6570,6 +6625,7 @@ test_empty_write_prune_from_the_environment_widens_the_probe
 test_worktree_write_probe_is_wall_clock_bounded
 test_signal_crew_provably_working_classifier
 test_secondmate_status_routine_absorbed_routed_surfaced_classifier
+test_wait_poll_cycle_ignores_slow_check_beats
 test_provably_working_signal_absorbed
 test_turn_ended_provably_working_absorbed
 test_turn_ended_not_working_surfaced

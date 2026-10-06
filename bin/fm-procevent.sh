@@ -1039,6 +1039,9 @@ cmd_start() {
   }
   fm_procevent_claim_acquire_locked "$id" "$FM_HOME" "$$" "$(source_file "$id")" "$STATE"
   claimed=$?
+  if [ "$claimed" -eq 0 ]; then
+    rm -f -- "$(launch_failed_file "$id")"
+  fi
   fm_procevent_source_lock_release "$id"
   case "$claimed" in
     0) ;;
@@ -1662,7 +1665,7 @@ stranded_leaderless_detail() {  # <source-id>
 
 cmd_reconcile() {
   local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token identity claim_state stop_state task_pending
-  local launch_identity launch_stamp launch_mark unconfirmed entry
+  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry
   local -a launched=()
   # Rejected before anything is launched, and by name. A window this command
   # cannot use makes every launch unconfirmable, so validating it later would
@@ -1802,15 +1805,42 @@ cmd_reconcile() {
       || unconfirmed=$(printf '%s\n' "${launched[@]}")
     for entry in "${launched[@]}"; do
       id=${entry%%$'\t'*}
-      launch_identity=${entry#*$'\t'}
-      launch_identity=${launch_identity%%$'\t'*}
+      rest=${entry#*$'\t'}
+      launch_identity=${rest%%$'\t'*}
+      launch_mark=${rest#*$'\t'}
+      if ! fm_procevent_source_lock_acquire "$id"; then
+        uncertain=$((uncertain + 1))
+        continue
+      fi
+      current_identity=
+      if [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+        current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+      fi
+      if [ -z "$launch_identity" ] || [ "$current_identity" != "$launch_identity" ]; then
+        uncertain=$((uncertain + 1))
+        fm_procevent_source_lock_release "$id"
+        continue
+      fi
       if launch_entry_listed "$entry" "$unconfirmed"; then
-        failed=$((failed + 1))
-        report_launch_failure "$id" "$launch_identity" || true
+        fm_procevent_claim_state_locked "$id"
+        claim_state=$?
+        current_mark=
+        if launch_stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$launch_identity"); then
+          current_mark=$(cat -- "$launch_stamp" 2>/dev/null || true)
+        fi
+        if [ "$claim_state" -eq 0 ] \
+          || { [ -n "$current_mark" ] && [ "$current_mark" != "$launch_mark" ]; }; then
+          started=$((started + 1))
+        elif [ "$claim_state" -ne 1 ] || fm_procevent_claim_undisplaceable_locked "$id"; then
+          uncertain=$((uncertain + 1))
+        else
+          failed=$((failed + 1))
+          report_launch_failure "$id" "$launch_identity" || true
+        fi
       else
         started=$((started + 1))
-        rm -f -- "$(launch_failed_file "$id")"
       fi
+      fm_procevent_source_lock_release "$id"
     done
   fi
   printf 'reconciled: published=%s started=%s stopped=%s uncertain=%s failed=%s\n' \

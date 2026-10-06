@@ -125,12 +125,6 @@ launch_failed_wake_keys() {  # <home> <source-id>
 launch_failed_wake_count() {  # <home> <source-id>
   launch_failed_wake_keys "$1" "$2" | grep -c . || true
 }
-launch_failed_wake_payloads() {  # <home> <source-id>
-  [ -e "$1/state/.wake-queue" ] || return 0
-  awk -F '\t' -v id="$2" \
-    '$3 == "check" && index($4, "procevent:" id ":launch-failed:") == 1 { print $5 }' \
-    "$1/state/.wake-queue"
-}
 
 first_result() {  # <home> <source-id>: print the first captured result, if any
   local g
@@ -226,6 +220,291 @@ hold_source_lock_then_handle() {  # <home> <source-id> <sequence> <ready-file> <
   ' _ "$ROOT" "$id" "$home" "$ready" "$release" "$parent" "$seq" &
   HOLDER_PID=$!
 }
+
+test_launch_episodes() {
+# --- a launch that cannot confirm is announced once per failure episode ------
+# `bin/fm-watch.sh` discards reconcile's `failed=` count and exit status, so a
+# runner that dies before claiming - for any cause, not only the claim wedge -
+# would be relaunched and reported failed every cycle with nobody told: armed
+# in appearance, a dead drop in fact. The episode is keyed by the registration
+# identity the launch ran under and ends when a launch of that source confirms,
+# so the registration below is damaged and repaired IN PLACE to keep that
+# identity fixed across the whole sequence. The wake changes nothing about the
+# launch: every failing cycle below still relaunches and still reports failed.
+HEP="$TMP_ROOT/hep"; new_home "$HEP"
+EP_SOURCE_CMD="$TMP_ROOT/episode-source.sh"
+cat > "$EP_SOURCE_CMD" <<'SH'
+#!/usr/bin/env bash
+printf 'episode result\n'
+SH
+chmod +x "$EP_SOURCE_CMD"
+pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
+EP_SOURCE="$HEP/state/procevent/episode-src.source"
+cp "$EP_SOURCE" "$TMP_ROOT/episode-good.source"
+awk '/^argv:$/ { print; exit } { print }' "$EP_SOURCE" > "$TMP_ROOT/episode-bad.source" \
+  || fail "could not prepare the damaged episode registration"
+ep_damage() { cat "$TMP_ROOT/episode-bad.source" > "$EP_SOURCE"; }
+ep_repair() { cat "$TMP_ROOT/episode-good.source" > "$EP_SOURCE"; }
+ep_reconcile() {  # <expected-fragment> <expected-exit-nonzero:0|1> <msg>; sets ep_out
+  local rc=0
+  ep_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
+  assert_contains "$ep_out" "$1" "$3: $ep_out"
+  if [ "$2" -eq 1 ]; then
+    [ "$rc" -ne 0 ] || fail "$3 (reconcile exited 0): $ep_out"
+  else
+    [ "$rc" -eq 0 ] || fail "$3 (reconcile exited $rc): $ep_out"
+  fi
+}
+ep_damage
+ep_reconcile "failed=1" 1 "a launch that never proved its claim was not reported failed"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "a launch that could not confirm was not announced: $ep_out"
+ep_key=$(launch_failed_wake_keys "$HEP" episode-src)
+# <registration identity>-<per-episode nonce>: the watcher remembers every key
+# it has surfaced for good, so the identity alone would announce only the first
+# episode of a registration (tests/fm-watch-triage.test.sh proves delivery).
+[[ "$ep_key" =~ ^(procevent:episode-src:launch-failed:[0-9]+-[0-9]+)-[0-9]+$ ]] \
+  || fail "the launch-failed wake is not keyed by source, registration identity and episode: $ep_key"
+ep_episode_prefix=${BASH_REMATCH[1]}
+ep_reconcile "failed=1" 1 "the second cycle stopped relaunching a source that cannot start"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "the same failure episode was announced twice: $ep_out"
+ep_repair
+ep_reconcile "started=1" 0 "a repaired source did not confirm"
+assert_contains "$ep_out" "failed=0" "a repaired source was still reported failed: $ep_out"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "a confirmed launch produced a launch-failed wake: $ep_out"
+for _ in $(seq 1 100); do
+  [ -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] || break
+  sleep 0.1
+done
+[ ! -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] \
+  || fail "the confirmed episode runner never released its claim"
+ep_damage
+ep_reconcile "failed=1" 1 "a source that failed again after recovering was not reported failed"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 2 ] \
+  || fail "a new failure episode after a confirmed launch was not announced: $ep_out"
+# The earlier version of this assertion locked in ONE key for both episodes,
+# which is exactly the collision that left every episode after the first
+# unsurfaced: both keys must carry the same registration identity and still
+# differ, or the watcher's seen marker for episode one suppresses episode two.
+ep_key_again=$(launch_failed_wake_keys "$HEP" episode-src | sed -n '2p')
+[ "$ep_key_again" != "$ep_key" ] \
+  || fail "a new failure episode reused the first episode's queue key: $ep_key_again"
+case "$ep_key_again" in
+  "$ep_episode_prefix"-*) ;;
+  *) fail "the second episode ran under a different registration identity: $ep_key_again (first: $ep_key)" ;;
+esac
+ep_repair
+pe "$HEP" retire episode-src >/dev/null 2>&1 || true
+pass "a launch that cannot confirm is announced once per failure episode"
+EP_HOOK="$TMP_ROOT/episode-hooks.sh"
+cat > "$EP_HOOK" <<'SH'
+ep_gate_wait() {
+  local gate=$1 n
+  printf 'ready\n' > "$gate.ready"
+  for n in $(seq 1 1000); do
+    [ ! -e "$gate.release" ] || return 0
+    sleep 0.02
+  done
+  return 1
+}
+ep_install_hooks() {
+  local definition
+  definition=$(declare -f confirm_launched_runners)
+  eval "${definition/confirm_launched_runners/ep_original_confirm}"
+  confirm_launched_runners() {
+    local result rc=0
+    result=$(ep_original_confirm "$@") || rc=$?
+    ep_gate_wait "$EP_GATE" || return 1
+    [ -z "$result" ] || printf '%s\n' "$result"
+    return "$rc"
+  }
+  if [ -n "${EP_APPEND_GATE:-}" ]; then
+    definition=$(declare -f fm_wake_append)
+    eval "${definition/fm_wake_append/ep_original_append}"
+    fm_wake_append() {
+      case "$2" in
+        procevent:*:launch-failed:*)
+          ep_gate_wait "$EP_APPEND_GATE" || return 1
+          [ "${EP_FAIL_APPEND:-0}" -ne 1 ] || return 1
+          ;;
+      esac
+      ep_original_append "$@"
+    }
+  fi
+}
+trap 'case "$BASH_COMMAND" in '\''cmd_reconcile "$@"'\'') trap - DEBUG; ep_install_hooks ;; esac' DEBUG
+SH
+ep_new() {
+  HEP="$TMP_ROOT/episode-$1"; new_home "$HEP"
+  pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
+  EP_SOURCE="$HEP/state/procevent/episode-src.source"
+  cp "$EP_SOURCE" "$TMP_ROOT/episode-good.source"
+  awk '/^argv:$/ { print; exit } { print }' "$EP_SOURCE" > "$TMP_ROOT/episode-bad.source"
+}
+ep_pause() {
+  ep_gate="$TMP_ROOT/$1"
+  EP_GATE="$ep_gate" EP_APPEND_GATE="${2:-}" EP_FAIL_APPEND="${3:-0}" \
+    BASH_ENV="$EP_HOOK" FM_HOME="$HEP" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+    "$ROOT/bin/fm-procevent.sh" reconcile > "$ep_gate.out" 2>&1 &
+  ep_pid=$!
+  wait_for "$ep_gate.ready" || fail "reconcile did not reach the decision barrier: $(cat "$ep_gate.out")"
+}
+ep_finish() {
+  local pid=$1 gate=$2 expected=$3 rc=0
+  : > "$gate.release"
+  wait "$pid" || rc=$?
+  [ "$rc" -eq "$expected" ] || fail "paused reconcile exited $rc, wanted $expected: $(cat "$gate.out")"
+}
+ep_lock_busy() {
+  FM_HOME="$HEP" bash -c '
+    . "$1/bin/fm-pr-lib.sh"
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-procevent-lib.sh"
+    if fm_procevent_source_lock_try_acquire episode-src; then
+      fm_procevent_source_lock_release episode-src
+      exit 1
+    fi
+  ' _ "$ROOT"
+}
+ep_new concurrent
+ep_damage
+ep_append="$TMP_ROOT/episode-append"
+ep_pause episode-first "$ep_append" 1
+ep_first_pid=$ep_pid; ep_first_gate=$ep_gate
+ep_pause episode-second
+ep_second_pid=$ep_pid; ep_second_gate=$ep_gate
+: > "$ep_first_gate.release"
+wait_for "$ep_append.ready" || fail "first failure did not reach its wake append"
+[ -s "$HEP/state/procevent/.episode-src.launch-failed" ] \
+  || fail "first failure did not reserve its episode before append"
+ep_lock_busy || fail "failure append did not retain the source lock"
+: > "$ep_second_gate.release"
+: > "$ep_append.release"
+ep_finish "$ep_first_pid" "$ep_first_gate" 1
+ep_finish "$ep_second_pid" "$ep_second_gate" 1
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "concurrent failure rollback lost or duplicated the surviving announcement"
+[ -s "$HEP/state/procevent/.episode-src.launch-failed" ] \
+  || fail "failed append rollback erased the surviving episode marker"
+ep_reconcile "failed=1" 1 "concurrent failures stopped retrying"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "a concurrent failure episode was announced again"
+pe "$HEP" retire episode-src >/dev/null
+pass "concurrent failure append and rollback keep one durable episode"
+
+ep_new late-stamp
+ep_damage
+ep_pause episode-late-stamp
+ep_repair
+pe "$HEP" start episode-src >/dev/null || fail "attached fast recovery failed"
+wait_capture "$HEP" episode-src || fail "fast recovery did not release its claim"
+ep_finish "$ep_pid" "$ep_gate" 0
+assert_contains "$(cat "$ep_gate.out")" "started=1" "late launch stamp was not recognized"
+assert_contains "$(cat "$ep_gate.out")" "failed=0" "late launch stamp was reported failed"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 0 ] \
+  || fail "a recovered fast launch published an obsolete failure"
+[ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+  || fail "a recovered fast launch left an obsolete marker"
+ep_damage
+ep_reconcile "failed=1" 1 "a genuine failure after late recovery was suppressed"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+  || fail "a genuine episode after late recovery was not announced"
+pe "$HEP" retire episode-src >/dev/null
+pass "late durable startup evidence suppresses an obsolete failure"
+
+ep_new late-claim
+cat > "$EP_SOURCE_CMD" <<SH
+#!/usr/bin/env bash
+exec "$BLOCKER" "$TMP_ROOT/episode-live-trigger" "live episode"
+SH
+ep_damage
+ep_pause episode-late-claim
+ep_repair
+pe "$HEP" start episode-src > "$TMP_ROOT/episode-live-start.out" 2>&1 &
+ep_live_pid=$!
+wait_for "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" || fail "attached recovery did not claim"
+ep_finish "$ep_pid" "$ep_gate" 0
+assert_contains "$(cat "$ep_gate.out")" "started=1" "late live claim was not recognized"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 0 ] \
+  || fail "a live recovered launch published an obsolete failure"
+: > "$TMP_ROOT/episode-live-trigger"
+wait "$ep_live_pid" || fail "attached live recovery failed"
+pe "$HEP" retire episode-src >/dev/null
+pass "late live ownership suppresses an obsolete failure"
+cat > "$EP_SOURCE_CMD" <<'SH'
+#!/usr/bin/env bash
+printf 'episode result\n'
+SH
+
+for ep_transition in retire replace symlink uncertain-claim; do
+  ep_new "$ep_transition"
+  ep_damage
+  ep_pause "episode-$ep_transition"
+  case "$ep_transition" in
+    retire) pe "$HEP" retire episode-src >/dev/null ;;
+    replace)
+      pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
+      ep_damage
+      ;;
+    symlink)
+      mv "$EP_SOURCE" "$EP_SOURCE.saved"
+      ln -s "$EP_SOURCE.saved" "$EP_SOURCE"
+      ;;
+    uncertain-claim)
+      (umask 077; printf 'unreadable claim\n' > "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim")
+      ;;
+  esac
+  ep_finish "$ep_pid" "$ep_gate" 0
+  assert_contains "$(cat "$ep_gate.out")" "started=0" "$ep_transition was counted started"
+  assert_contains "$(cat "$ep_gate.out")" "uncertain=1" "$ep_transition was not counted uncertain"
+  assert_contains "$(cat "$ep_gate.out")" "failed=0" "$ep_transition was counted failed"
+  [ "$(launch_failed_wake_count "$HEP" episode-src)" = 0 ] \
+    || fail "$ep_transition let a stale launch announce failure"
+  [ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+    || fail "$ep_transition let a stale launch mutate its marker"
+  if [ "$ep_transition" = replace ]; then
+    ep_reconcile "failed=1" 1 "replacement's genuine failure was suppressed"
+    [ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
+      || fail "replacement's genuine failure was not announced"
+  fi
+  if [ "$ep_transition" = symlink ]; then
+    rm "$EP_SOURCE"
+    mv "$EP_SOURCE.saved" "$EP_SOURCE"
+  fi
+  if [ "$ep_transition" = uncertain-claim ]; then
+    rm "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim"
+  fi
+  pe "$HEP" retire episode-src >/dev/null
+done
+pass "obsolete registrations and uncertain claims reject stale launch failures"
+
+ep_new stale-success
+ep_damage
+ep_reconcile "failed=1" 1 "initial failure did not establish an episode"
+ep_repair
+ep_pause episode-stale-success
+wait_capture "$HEP" episode-src || fail "confirmed recovery did not complete"
+[ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+  || fail "successful claim did not clear the old episode before delayed confirmation"
+ep_damage
+ep_reconcile "failed=1" 1 "new failure after successful claim was suppressed"
+ep_new_marker=$(cat "$HEP/state/procevent/.episode-src.launch-failed")
+ep_finish "$ep_pid" "$ep_gate" 0
+[ "$(cat "$HEP/state/procevent/.episode-src.launch-failed")" = "$ep_new_marker" ] \
+  || fail "historical success erased a newer same-registration episode"
+ep_reconcile "failed=1" 1 "a newer failure stopped retrying after historical success"
+[ "$(launch_failed_wake_count "$HEP" episode-src)" = 2 ] \
+  || fail "historical success made the newer episode announce twice"
+pe "$HEP" retire episode-src >/dev/null
+pass "delayed historical success cannot erase a newer failure episode"
+}
+
+if [ "${FM_TEST_ONLY:-}" = launch-episodes ]; then
+  test_launch_episodes
+  exit 0
+fi
 
 # --- inert with nothing configured ------------------------------------------
 IDLE="$TMP_ROOT/idle"; mkdir -p "$IDLE"
@@ -2246,101 +2525,7 @@ for _ in $(seq 1 50); do kill -0 -"$sr5_leader" 2>/dev/null || break; sleep 0.1;
 pe "$HSR5" retire reused-plain-src >/dev/null 2>&1 || true
 pass "start reclaims a reused-pid claim whose leftovers can still be tidied"
 
-# --- a launch that cannot confirm is announced once per failure episode ------
-# `bin/fm-watch.sh` discards reconcile's `failed=` count and exit status, so a
-# runner that dies before claiming - for any cause, not only the claim wedge -
-# would be relaunched and reported failed every cycle with nobody told: armed
-# in appearance, a dead drop in fact. The episode is keyed by the registration
-# identity the launch ran under and ends when a launch of that source confirms,
-# so the registration below is damaged and repaired IN PLACE to keep that
-# identity fixed across the whole sequence. The wake changes nothing about the
-# launch: every failing cycle below still relaunches and still reports failed.
-HEP="$TMP_ROOT/hep"; new_home "$HEP"
-EP_SOURCE_CMD="$TMP_ROOT/episode-source.sh"
-cat > "$EP_SOURCE_CMD" <<'SH'
-#!/usr/bin/env bash
-printf 'episode result\n'
-SH
-chmod +x "$EP_SOURCE_CMD"
-pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
-EP_SOURCE="$HEP/state/procevent/episode-src.source"
-cp "$EP_SOURCE" "$TMP_ROOT/episode-good.source"
-awk '/^argv:$/ { print; exit } { print }' "$EP_SOURCE" > "$TMP_ROOT/episode-bad.source" \
-  || fail "could not prepare the damaged episode registration"
-ep_damage() { cat "$TMP_ROOT/episode-bad.source" > "$EP_SOURCE"; }
-ep_repair() { cat "$TMP_ROOT/episode-good.source" > "$EP_SOURCE"; }
-ep_reconcile() {  # <expected-fragment> <expected-exit-nonzero:0|1> <msg>; sets ep_out
-  local rc=0
-  ep_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
-  assert_contains "$ep_out" "$1" "$3: $ep_out"
-  if [ "$2" -eq 1 ]; then
-    [ "$rc" -ne 0 ] || fail "$3 (reconcile exited 0): $ep_out"
-  else
-    [ "$rc" -eq 0 ] || fail "$3 (reconcile exited $rc): $ep_out"
-  fi
-}
-ep_damage
-ep_reconcile "failed=1" 1 "a launch that never proved its claim was not reported failed"
-[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
-  || fail "a launch that could not confirm was not announced: $ep_out"
-ep_key=$(launch_failed_wake_keys "$HEP" episode-src)
-# <registration identity>-<per-episode nonce>: the watcher remembers every key
-# it has surfaced for good, so the identity alone would announce only the first
-# episode of a registration (tests/fm-watch-triage.test.sh proves delivery).
-[[ "$ep_key" =~ ^(procevent:episode-src:launch-failed:[0-9]+-[0-9]+)-[0-9]+$ ]] \
-  || fail "the launch-failed wake is not keyed by source, registration identity and episode: $ep_key"
-ep_episode_prefix=${BASH_REMATCH[1]}
-ep_wake=$(launch_failed_wake_payloads "$HEP" episode-src)
-assert_contains "$ep_wake" "episode-src" \
-  "the launch-failed wake does not name the source it is about: $ep_wake"
-# The payload may state only what confirmation observed: no claim proved
-# inside the window. It cannot know whether the runner died or was slow, so it
-# must not assert a cause, must not present `start` as the fix, and must say
-# that a later cycle finding the source owned closes the episode by itself.
-assert_contains "$ep_wake" "did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS" \
-  "the launch-failed wake does not state what confirmation observed: $ep_wake"
-assert_contains "$ep_wake" "attached bin/fm-procevent.sh start episode-src to reproduce a refusal" \
-  "the launch-failed wake does not say start reproduces rather than fixes: $ep_wake"
-assert_contains "$ep_wake" "adapter binary" \
-  "the launch-failed wake does not name what to check: $ep_wake"
-assert_contains "$ep_wake" "finds the source owned ends this episode on its own" \
-  "the launch-failed wake does not say a slow runner closes its own episode: $ep_wake"
-case "$ep_wake" in
-  *"never claimed"*|*"exited without"*|*"runner died"*)
-    fail "the launch-failed wake asserts a cause confirmation cannot observe: $ep_wake" ;;
-esac
-ep_reconcile "failed=1" 1 "the second cycle stopped relaunching a source that cannot start"
-[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
-  || fail "the same failure episode was announced twice: $ep_out"
-ep_repair
-ep_reconcile "started=1" 0 "a repaired source did not confirm"
-assert_contains "$ep_out" "failed=0" "a repaired source was still reported failed: $ep_out"
-[ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
-  || fail "a confirmed launch produced a launch-failed wake: $ep_out"
-for _ in $(seq 1 100); do
-  [ -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] || break
-  sleep 0.1
-done
-[ ! -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] \
-  || fail "the confirmed episode runner never released its claim"
-ep_damage
-ep_reconcile "failed=1" 1 "a source that failed again after recovering was not reported failed"
-[ "$(launch_failed_wake_count "$HEP" episode-src)" = 2 ] \
-  || fail "a new failure episode after a confirmed launch was not announced: $ep_out"
-# The earlier version of this assertion locked in ONE key for both episodes,
-# which is exactly the collision that left every episode after the first
-# unsurfaced: both keys must carry the same registration identity and still
-# differ, or the watcher's seen marker for episode one suppresses episode two.
-ep_key_again=$(launch_failed_wake_keys "$HEP" episode-src | sed -n '2p')
-[ "$ep_key_again" != "$ep_key" ] \
-  || fail "a new failure episode reused the first episode's queue key: $ep_key_again"
-case "$ep_key_again" in
-  "$ep_episode_prefix"-*) ;;
-  *) fail "the second episode ran under a different registration identity: $ep_key_again (first: $ep_key)" ;;
-esac
-ep_repair
-pe "$HEP" retire episode-src >/dev/null 2>&1 || true
-pass "a launch that cannot confirm is announced once per failure episode"
+test_launch_episodes
 
 # --- the launch-failed key fits the watcher's seen marker at the id limit ----
 # bin/fm-watch.sh names the marker for a surfaced key `.seen-procevent-<hex>`,

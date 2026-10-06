@@ -184,6 +184,62 @@ matrix_case K22 allow $'while ps -p 424242 -o command= | grep -q fm-watch.sh; do
 matrix_case K23 deny $'if !\n pkill -f fm-watch; then\n  kill 424242\nfi'
 matrix_case K24 deny $'if true; then\n  if ! pkill -f fm-watch.sh; then\n    kill 424242\n  fi\nfi'
 matrix_case K25 deny $'while true; do\n  bin/fm-watch.sh\n  kill 424242\ndone'
+matrix_case K26 deny $'if pgrep -fl fm-watch.sh; then kill 424242 <<EOF\n$(pkill -f fm-watch.sh)\nEOF\nfi'
+matrix_case K27 deny $'if pgrep -fl fm-watch.sh <<EOF\n$(pkill -f fm-watch.sh)\nEOF\nthen kill 424242; fi'
+matrix_case K28 deny $'if true; then kill 424242 <<EOF\n$(bin/fm-watch-arm.sh &)\nEOF\nfi'
+matrix_case K29 deny $'if true <<EOF\n$(bin/fm-watch-arm.sh &)\nEOF\nthen kill 424242; fi'
+matrix_case K30 deny $'if pgrep -fl fm-watch.sh; then kill 424242 <<\'EOF\'\nplain input\nEOF\nfi'
+matrix_case K31 deny 'if pgrep -fl fm-watch.sh; then builtin kill 1; kill 424242; fi'
+matrix_case K32 deny 'if pgrep -fl fm-watch.sh; then builtin source bin/fm-watch-arm.sh; kill 424242; fi'
+matrix_case K33 deny 'if pgrep -fl fm-watch.sh; then source /tmp/companion.sh; kill 424242; fi'
+matrix_case K34 deny 'if pgrep -fl fm-watch.sh; then . /tmp/companion.sh; kill 424242; fi'
+matrix_case K35 deny 'if pgrep -fl fm-watch.sh; then python3 -c "import os; os.system(\"pkill -f fm-watch.sh\")"; kill 424242; fi'
+matrix_case K36 deny $'if pgrep -fl fm-watch.sh\nthen\n  python -c \'import os; os.system("bin/fm-watch-arm.sh &")\'\n  kill 424242\nfi'
+matrix_case K37 deny 'if pgrep -fl fm-watch.sh; then ./*; kill 424242; fi'
+matrix_case K38 deny 'if ps -p 424242 -o command= | grep -q fm-watch.sh*; then kill 424242; fi'
+matrix_case K39 deny 'if pgrep -fl fm-watch.sh; then kill 42424?; fi'
+matrix_case K40 deny 'if ps -p "$pid" -o command= | grep -q fm-watch.sh; then kill 424242; fi'
+matrix_case K41 deny 'if pgrep -fl fm-watch.sh; then "$stop" 424242; kill 424242; fi'
+matrix_case K42 deny 'if pgrep -fl fm-watch.sh; then kill -s "$signal" 424242; fi'
+matrix_case K43 deny 'if pgrep -fl fm-watch.sh; then PATH=/tmp kill 424242; fi'
+matrix_case K44 deny 'if PATH=/tmp pgrep -fl fm-watch.sh; then kill 424242; fi'
+matrix_case K45 deny 'if pgrep -fl fm-watch.sh; then env kill 424242; fi'
+matrix_case K46 deny 'if pgrep -fl fm-watch.sh; then sudo kill 424242; fi'
+matrix_case K47 deny 'if pgrep -fl fm-watch.sh; then exec kill 424242; fi'
+matrix_case K48 deny 'if pgrep -fl fm-watch.sh; then command -p kill 424242; fi'
+matrix_case K49 deny 'if pgrep -fl fm-watch.sh; then /tmp/kill 424242; fi'
+matrix_case K50 deny 'if command pgrep -fl fm-watch.sh; then kill 424242; fi'
+matrix_case K51 deny 'if pgrep -fl fm-watch.sh; then kill 424242 >/tmp/out; fi'
+matrix_case K52 deny 'if pgrep -fl fm-watch.sh >>/tmp/out; then kill 424242; fi'
+matrix_case K53 deny 'if pgrep -fl fm-watch.sh; then kill 424242 </tmp/input; fi'
+matrix_case K54 deny 'if pgrep -fl fm-watch.sh <>/tmp/input; then kill 424242; fi'
+matrix_case K55 deny 'if pgrep -fl fm-watch.sh; then kill 424242 2>&1; fi'
+matrix_case K56 deny 'if pgrep -fl fm-watch.sh 0<&3; then kill 424242; fi'
+matrix_case K57 deny 'if pgrep -fl fm-watch.sh; then kill 424242 <<<plain; fi'
+matrix_case K58 deny $'if pgrep -fl fm-watch.sh <<-EOF\n\tplain input\n\tEOF\nthen kill 424242; fi'
+matrix_case K59 deny 'if pgrep -fl fm-watch.sh; then kill 424242 >"$(bin/fm-watch-arm.sh &)"; fi'
+matrix_case K60 deny 'if pgrep -fl fm-watch.sh >"$output"; then kill 424242; fi'
+matrix_case K61 deny 'if pgrep -fl fm-watch.sh; then kill 424242 >*.out; fi'
+matrix_case K62 deny 'if pgrep -fl fm-watch.sh; then kill 424242 >|/tmp/out; fi'
+matrix_case K63 deny 'if pgrep -fl fm-watch.sh; then kill 424242 &>/tmp/out; fi'
+matrix_case K64 deny 'if pgrep -fl fm-watch.sh; then printf "%s\n" "$(bin/fm-watch-arm.sh &)"; kill 424242; fi'
+matrix_case K65 deny 'if pgrep -fl fm-watch.sh; then (kill 424242); fi'
+matrix_case K66 deny 'if pgrep -fl fm-watch.sh; then printf "%s\n" plain; kill 424242; fi'
+matrix_case K67 deny 'if ps -p 424243 -o command= | grep -q fm-watch.sh; then kill 424242; fi'
+matrix_case K68 deny 'if ps -p 424242 -o command= | grep --pre=/tmp/code -q fm-watch.sh; then kill 424242; fi'
+matrix_case K69 deny 'if pgrep -fl fm-watch.sh; then true extra; kill 424242; fi'
+matrix_case K70 allow 'if true; then pgrep -fl fm-watch.sh; command kill -n 15 -- 424242; else false; fi'
+matrix_case K71 allow $'until false\ndo\n  pgrep -fl fm-watch.sh\n  /bin/kill -TERM -- 424242\ndone'
+matrix_case K72 allow $'if true\nthen\n  if ! pgrep -fl fm-watch.sh\n  then\n    :\n  else\n    kill 424242\n  fi\nfi'
+matrix_case K73 deny 'if pgrep -fl fm-watch.sh; then kill 424242 <(bin/fm-watch-arm.sh &); fi'
+matrix_case K74 deny 'if pgrep -fl fm-watch.sh; then : `bin/fm-watch-arm.sh`; kill 424242; fi'
+matrix_case K75 deny 'if pgrep -fl fm-watch.sh; then env -S "kill 1"; kill 424242; fi'
+matrix_case K76 deny 'if pgrep -fl fm-watch.sh; then kill 42424{1,2}; fi'
+matrix_case K77 deny $'if true; then kill 424242 <<EOF\n$(bin/fm-watch.sh)\nEOF\nfi'
+matrix_case K78 deny $'if true <<EOF\n$(bin/fm-watch.sh)\nEOF\nthen kill 424242; fi'
+matrix_case K79 deny 'if true; then builtin source bin/fm-watch.sh; kill 424242; fi'
+matrix_case K80 deny 'if true; then python3 -c '\''import os; os.system("bin/fm-watch.sh")'\''; kill 424242; fi'
+matrix_case K81 deny 'if true; then bin/fm-watch.sh*; kill 424242; fi'
 run_matrix_entry() {
   local id=$1 expected=$2 entry=$3 cmd=$4 payload out_file err_file rc
   local FM_HOME="$ROOT"
@@ -236,13 +292,18 @@ run_matrix_entry() {
 }
 
 test_full_acceptance_matrix() {
-  local i entry
+  local i entry prefix=${1:-}
   for ((i = 0; i < ${#MATRIX_IDS[@]}; i++)); do
+    if [ -n "$prefix" ] && [[ ${MATRIX_IDS[$i]} != "$prefix"* ]]; then continue; fi
     for entry in codex claude grok opencode pi; do
       run_matrix_entry "${MATRIX_IDS[$i]}" "${MATRIX_EXPECTED[$i]}" "$entry" "${MATRIX_COMMANDS[$i]}"
     done
     pass "matrix ${MATRIX_IDS[$i]}: ${MATRIX_EXPECTED[$i]} through all five entry forms"
   done
+}
+
+test_home_pid_kill_matrix() {
+  test_full_acceptance_matrix K
 }
 
 assert_policy() {
@@ -495,6 +556,11 @@ test_shellcheck_clean() {
   out=$("$ROOT/bin/fm-lint.sh" "$CHECK" 2>&1)     || fail "bin/fm-arm-pretool-check.sh is not lint-clean under the pinned definition: $out"
   pass "bin/fm-arm-pretool-check.sh is clean under bin/fm-lint.sh"
 }
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
 
 test_full_acceptance_matrix
 test_direct_policy_contract
