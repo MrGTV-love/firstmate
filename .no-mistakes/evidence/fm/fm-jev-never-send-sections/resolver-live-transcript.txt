@@ -1,0 +1,655 @@
+REAL RESOLVER PRIVACY VALIDATION
+All input data and API key synthetic. Actual /bin/bash product and real curl; local TLS transport only.
+The receiver intentionally responds HTTP 429 after recording requests, stopping downstream model/quota work.
+
+$ /bin/bash bin/fm-dispatch-resolve.sh canonical-multiple-regions/brief.md --project synthetic-pager
+scenario: canonical-multiple-regions
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 3 ms
+  timings: api_ms=3 quota_ms=null local_ms=201 total_ms=204
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 3 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "## Captain's intent\nRepair the public pager.\nPreserve the public pagination behavior.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh whole-brief-sanitized-fallback/brief.md --project synthetic-pager
+scenario: whole-brief-sanitized-fallback
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 2 ms
+  timings: api_ms=2 quota_ms=null local_ms=124 total_ms=126
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 2 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "Public task before.\nPublic task after.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh markers-inside-code-fence/brief.md --project synthetic-pager
+scenario: markers-inside-code-fence
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 2 ms
+  timings: api_ms=2 quota_ms=null local_ms=135 total_ms=137
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 2 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "Public fenced example:\n```\npublic code\n```\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh unmarked-without-list/brief.md --project synthetic-pager
+scenario: unmarked-without-list
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 2 ms
+  timings: api_ms=2 quota_ms=null local_ms=145 total_ms=147
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 2 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh enabled-unmarked-without-project/brief.md
+scenario: enabled-unmarked-without-project
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 3 ms
+  timings: api_ms=3 quota_ms=null local_ms=171 total_ms=174
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 3 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "",
+        "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh whitespace-policy-and-markers/brief.md --project synthetic-pager
+scenario: whitespace-policy-and-markers
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 2 ms
+  timings: api_ms=2 quota_ms=null local_ms=145 total_ms=147
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 2 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "Public before\nPublic after\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh no-list-markers/brief.md --project synthetic-pager
+scenario: no-list-markers
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-only-markers/brief.md --project synthetic-pager
+scenario: literal-only-markers
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh no-list-unspaced-markers/brief.md --project synthetic-pager
+scenario: no-list-unspaced-markers
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-unclosed/brief.md --project synthetic-pager
+scenario: malformed-marker-unclosed
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-orphan/brief.md --project synthetic-pager
+scenario: malformed-marker-orphan
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-nested/brief.md --project synthetic-pager
+scenario: malformed-marker-nested
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-inline/brief.md --project synthetic-pager
+scenario: malformed-marker-inline
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-suffix-typo/brief.md --project synthetic-pager
+scenario: malformed-marker-suffix-typo
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-unspaced/brief.md --project synthetic-pager
+scenario: malformed-marker-unspaced
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-recased/brief.md --project synthetic-pager
+scenario: malformed-marker-recased
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh malformed-marker-unknown-reserved-marker/brief.md --project synthetic-pager
+scenario: malformed-marker-unknown-reserved-marker
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-project-removed-unmarked/brief.md --project synthetic-pager
+scenario: invalid-directive-project-removed-unmarked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-project-removed-unmarked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-project-removed-marked/brief.md --project synthetic-pager
+scenario: invalid-directive-project-removed-marked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-project-removed-marked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-suffix-typo-unmarked/brief.md --project synthetic-pager
+scenario: invalid-directive-suffix-typo-unmarked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-suffix-typo-unmarked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-suffix-typo-marked/brief.md --project synthetic-pager
+scenario: invalid-directive-suffix-typo-marked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-suffix-typo-marked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-unspaced-unmarked/brief.md --project synthetic-pager
+scenario: invalid-directive-unspaced-unmarked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-unspaced-unmarked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-unspaced-marked/brief.md --project synthetic-pager
+scenario: invalid-directive-unspaced-marked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-unspaced-marked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-recased-unmarked/brief.md --project synthetic-pager
+scenario: invalid-directive-recased-unmarked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-recased-unmarked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh invalid-directive-recased-marked/brief.md --project synthetic-pager
+scenario: invalid-directive-recased-marked
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-recased-marked/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-after-section-stripping/brief.md --project synthetic-pager
+scenario: literal-after-section-stripping
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-after-section-stripping/config/dispatch-never-send line 2; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-case-and-whitespace/brief.md --project synthetic-pager
+scenario: literal-case-and-whitespace
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-case-and-whitespace/config/dispatch-never-send line 1; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-unicode-whitespace/brief.md --project synthetic-pager
+scenario: literal-unicode-whitespace
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-unicode-whitespace/config/dispatch-never-send line 1; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-project-name/brief.md --project synthetic-private-project
+scenario: literal-project-name
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-project-name/config/dispatch-never-send line 1; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-rule-criterion/brief.md --project synthetic-pager
+scenario: literal-rule-criterion
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-rule-criterion/config/dispatch-never-send line 1; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh literal-fixed-question/brief.md --project synthetic-pager
+scenario: literal-fixed-question
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-fixed-question/config/dispatch-never-send line 1; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh unrelated-literal-preserves-request/brief.md --project synthetic-pager
+scenario: unrelated-literal-preserves-request
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 18 ms
+  timings: api_ms=18 quota_ms=null local_ms=260 total_ms=278
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 18 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh policy-directory-refused/brief.md --project synthetic-pager
+scenario: policy-directory-refused
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/policy-directory-refused/config/dispatch-never-send is not a readable regular file; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh policy-broken-symlink-refused/brief.md --project synthetic-pager
+scenario: policy-broken-symlink-refused
+exit: 0
+HTTP POSTs: 0; curl invocations: 0; quota invocations: 0
+local brief unchanged: True
+stdout:
+
+stderr:
+dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/policy-broken-symlink-refused/config/dispatch-never-send is not a readable regular file; nothing sent)
+
+result: pass
+
+$ /bin/bash bin/fm-dispatch-resolve.sh inherited-section-policy/brief.md --project synthetic-pager
+scenario: inherited-section-policy
+exit: 0
+HTTP POSTs: 1; curl invocations: 1; quota invocations: 0
+local brief unchanged: True
+stdout:
+dispatch-resolve:
+  status: error
+  reason: http 429 after 2 ms
+  timings: api_ms=2 quota_ms=null local_ms=158 total_ms=160
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+
+stderr:
+dispatch-resolve: error (http 429 after 2 ms)
+
+Captured end-user request payload:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "## Captain's intent\nRepair the public pager.\nPreserve the public pagination behavior.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+result: pass

@@ -1,0 +1,35 @@
+$ /bin/bash -c '. "$1" && propagate_inheritable_config "$2" "$3"' _ bin/fm-config-inherit-lib.sh <isolated-parent>/config <isolated-child>/config
+
+$ FM_HOME=<isolated-child> /bin/bash bin/fm-dispatch-resolve.sh <isolated-child>/brief.md --project synthetic-pager
+dispatch-resolve:
+  status: error
+  reason: http 429 after 4 ms
+  timings: api_ms=4 quota_ms=null local_ms=259 total_ms=263
+  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null
+dispatch-resolve: error (http 429 after 4 ms)
+
+Actual captured HTTPS request from child home:
+{
+  "path": "/v1/systemone",
+  "body": {
+    "model": "jev-latest",
+    "state": {
+      "task": {
+        "project": "synthetic-pager",
+        "brief": "## Captain's intent\nRepair the public pager.\nPreserve the public pagination behavior.\n\n## Firstmate spec\nUse the existing public pager.\n"
+      }
+    },
+    "questions": {
+      "rule": {
+        "type": "choice",
+        "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+        "criteria": {
+          "rule_1": "A synthetic public pagination repair.",
+          "default": "No listed rule applies to this task."
+        }
+      }
+    }
+  },
+  "host": "api.typesafe.ai"
+}
+Local child brief unchanged.

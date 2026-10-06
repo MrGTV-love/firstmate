@@ -1,0 +1,5 @@
+$ ['/bin/bash', 'bin/fm-brief.sh', 'brief-branch-safe-g3', 'some-proj', '--mode', 'local-only', '--branch-prefix', '$(touch${IFS}/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/tmp/branch-prefix-shell-safe-marker)']
+exit: 1
+error: --branch-prefix and task id must form a valid git branch (got '$(touch${IFS}/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/tmp/branch-prefix-shell-safe-marker)brief-branch-safe-g3')
+
+Test TMPDIR was inside .no-mistakes and .privacy-validation path components; Git ref-format forbids dot-leading components. Rerun uses ordinary /tmp for incidental toolchain temp files (per allowed boundary).

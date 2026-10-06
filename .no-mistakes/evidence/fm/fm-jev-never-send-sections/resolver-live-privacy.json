@@ -1,0 +1,947 @@
+{
+  "transport": {
+    "product": "bin/fm-dispatch-resolve.sh",
+    "bash": "/bin/bash",
+    "curl": "/usr/bin/curl",
+    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "isolation": "real curl --connect-to to private 127.0.0.1 TLS receiver; temporary CA verifies api.typesafe.ai; --noproxy *",
+    "response": "intentional local HTTP 429; no TypeSafe or model call; no real credentials/customer data",
+    "quota": "sentinel only, never invoked"
+  },
+  "scenarios": [
+    {
+      "name": "canonical-multiple-regions",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "canonical-multiple-regions/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 3 ms\n  timings: api_ms=3 quota_ms=null local_ms=201 total_ms=204\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 3 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "## Captain's intent\nRepair the public pager.\nPreserve the public pagination behavior.\n\n## Firstmate spec\nUse the existing public pager.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\nSYNTHETIC-SECRET-4417\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "whole-brief-sanitized-fallback",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "whole-brief-sanitized-fallback/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 2 ms\n  timings: api_ms=2 quota_ms=null local_ms=124 total_ms=126\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 2 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "Public task before.\nPublic task after.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "Public task before.\n   <!-- dispatch-never-send:start -->\n# Task\n## Captain's intent\nSYNTHETIC-SECRET-HIDDEN-TASK\n   <!-- dispatch-never-send:end -->\nPublic task after.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "markers-inside-code-fence",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "markers-inside-code-fence/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 2 ms\n  timings: api_ms=2 quota_ms=null local_ms=135 total_ms=137\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 2 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "Public fenced example:\n```\npublic code\n```\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "Public fenced example:\n```\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-FENCED\n<!-- dispatch-never-send:end -->\npublic code\n```\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "unmarked-without-list",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "unmarked-without-list/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 2 ms\n  timings: api_ms=2 quota_ms=null local_ms=145 total_ms=147\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 2 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": null,
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "enabled-unmarked-without-project",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "enabled-unmarked-without-project/brief.md"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 3 ms\n  timings: api_ms=3 quota_ms=null local_ms=171 total_ms=174\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 3 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "",
+                "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "whitespace-policy-and-markers",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "whitespace-policy-and-markers/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 2 ms\n  timings: api_ms=2 quota_ms=null local_ms=145 total_ms=147\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 2 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "Public before\nPublic after\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": " \t#\tdispatch-never-send\tmarked-sections  \n",
+      "fixture_brief": "Public before\n \t<!-- dispatch-never-send:start --> \t\nSYNTHETIC-SECRET-WHITESPACE\n \t<!-- dispatch-never-send:end --> \t\nPublic after\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "no-list-markers",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "no-list-markers/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": null,
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-only-markers",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-only-markers/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "Unrelated synthetic literal\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "no-list-unspaced-markers",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "no-list-unspaced-markers/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (never-send markers need the marked-sections directive; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": null,
+      "fixture_brief": "Public task\n<!--dispatch-never-send:start-->\nSYNTHETIC-SECRET-NEAR-MISS\n<!--dispatch-never-send:end-->\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-unclosed",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-unclosed/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "Public\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-BAD\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-orphan",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-orphan/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "SYNTHETIC-SECRET-BAD\n<!-- dispatch-never-send:end -->\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-nested",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-nested/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "<!-- dispatch-never-send:start -->\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-BAD\n<!-- dispatch-never-send:end -->\n<!-- dispatch-never-send:end -->\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-inline",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-inline/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "Public <!-- dispatch-never-send:start --> SYNTHETIC-SECRET-BAD\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-suffix-typo",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-suffix-typo/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "<!-- dispatch-never-send:star -->\nSYNTHETIC-SECRET-BAD\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-unspaced",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-unspaced/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "<!--dispatch-never-send:start-->\nSYNTHETIC-SECRET-BAD\n<!--dispatch-never-send:end-->\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-recased",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-recased/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "<!-- Dispatch-Never-Send:start -->\nSYNTHETIC-SECRET-BAD\n<!-- Dispatch-Never-Send:end -->\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "malformed-marker-unknown-reserved-marker",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "malformed-marker-unknown-reserved-marker/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid never-send markers or unreadable brief; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\n",
+      "fixture_brief": "<!-- \tDISPATCH-NEVER-SEND:unknown -->\nSYNTHETIC-SECRET-BAD\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-project-removed-unmarked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-project-removed-unmarked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-project-removed-unmarked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# dispatch-never-send project: synthetic-pager\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-project-removed-marked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-project-removed-marked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-project-removed-marked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# dispatch-never-send project: synthetic-pager\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-suffix-typo-unmarked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-suffix-typo-unmarked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-suffix-typo-unmarked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# dispatch-never-send marked-section\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-suffix-typo-marked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-suffix-typo-marked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-suffix-typo-marked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# dispatch-never-send marked-section\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-unspaced-unmarked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-unspaced-unmarked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-unspaced-unmarked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n#dispatch-never-send marked-sections\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-unspaced-marked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-unspaced-marked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-unspaced-marked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n#dispatch-never-send marked-sections\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-recased-unmarked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-recased-unmarked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-recased-unmarked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# Dispatch-Never-Send marked-sections\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "invalid-directive-recased-marked",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "invalid-directive-recased-marked/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (invalid privacy directive in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/invalid-directive-recased-marked/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary synthetic comment\n# Dispatch-Never-Send marked-sections\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-after-section-stripping",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-after-section-stripping/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-after-section-stripping/config/dispatch-never-send line 2; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\npublic pagination\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-case-and-whitespace",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-case-and-whitespace/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-case-and-whitespace/config/dispatch-never-send line 1; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "  synthetic  client ltd  \n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair SYNTHETIC Client\nLtd before\tthe\u00a0release.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-unicode-whitespace",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-unicode-whitespace/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-unicode-whitespace/config/dispatch-never-send line 1; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "before the release\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair SYNTHETIC Client\nLtd before\tthe\u00a0release.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-project-name",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-project-name/brief.md",
+        "--project",
+        "synthetic-private-project"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-project-name/config/dispatch-never-send line 1; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "synthetic-private-project\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-rule-criterion",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-rule-criterion/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-rule-criterion/config/dispatch-never-send line 1; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "public pagination repair\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "literal-fixed-question",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "literal-fixed-question/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/literal-fixed-question/config/dispatch-never-send line 1; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "Which ONE dispatch rule\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "unrelated-literal-preserves-request",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "unrelated-literal-preserves-request/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 18 ms\n  timings: api_ms=18 quota_ms=null local_ms=260 total_ms=278\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 18 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "## Captain's intent\nRepair the public pager.\n\n## Firstmate spec\nUse the existing public pager.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# Ordinary comment\nUnrelated synthetic literal\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "policy-directory-refused",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "policy-directory-refused/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/policy-directory-refused/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": null,
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "policy-broken-symlink-refused",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "policy-broken-symlink-refused/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919MDG8TG6XBJAT3EP8DN9/.privacy-validation-g4enrvjj/policy-broken-symlink-refused/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "requests": [],
+      "curl_invocations": 0,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": null,
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n## Firstmate spec\nUse the existing public pager.\n",
+      "errors": [],
+      "result": "pass"
+    },
+    {
+      "name": "inherited-section-policy",
+      "argv": [
+        "/bin/bash",
+        "bin/fm-dispatch-resolve.sh",
+        "inherited-section-policy/brief.md",
+        "--project",
+        "synthetic-pager"
+      ],
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: error\n  reason: http 429 after 2 ms\n  timings: api_ms=2 quota_ms=null local_ms=158 total_ms=160\n  usage: input_tokens=null output_tokens=null jev_cost_usd=null jev_input_usd_per_million=0.042 returned_model=null\n",
+      "stderr": "dispatch-resolve: error (http 429 after 2 ms)\n",
+      "requests": [
+        {
+          "path": "/v1/systemone",
+          "body": {
+            "model": "jev-latest",
+            "state": {
+              "task": {
+                "project": "synthetic-pager",
+                "brief": "## Captain's intent\nRepair the public pager.\nPreserve the public pagination behavior.\n\n## Firstmate spec\nUse the existing public pager.\n"
+              }
+            },
+            "questions": {
+              "rule": {
+                "type": "choice",
+                "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+                "criteria": {
+                  "rule_1": "A synthetic public pagination repair.",
+                  "default": "No listed rule applies to this task."
+                }
+              }
+            }
+          },
+          "host": "api.typesafe.ai"
+        }
+      ],
+      "curl_invocations": 1,
+      "quota_invocations": 0,
+      "local_brief_unchanged": true,
+      "policy": "# dispatch-never-send marked-sections\nSYNTHETIC-SECRET-4417\n",
+      "fixture_brief": "# Task\n## Captain's intent\nRepair the public pager.\n<!-- dispatch-never-send:start -->\n### SYNTHETIC-PRIVATE-HEADING\nSYNTHETIC-SECRET-4417\n# Private heading must not truncate public intent\n<!-- dispatch-never-send:end -->\nPreserve the public pagination behavior.\n## Firstmate spec\n<!-- dispatch-never-send:start -->\nSYNTHETIC-SECRET-SECOND\n<!-- dispatch-never-send:end -->\nUse the existing public pager.\n# Setup\nSynthetic boilerplate is not task text.\n",
+      "errors": [],
+      "result": "pass"
+    }
+  ],
+  "inheritance_command": [
+    "/bin/bash",
+    "-c",
+    ". \"$1\" && propagate_inheritable_config \"$2\" \"$3\"",
+    "_",
+    "bin/fm-config-inherit-lib.sh",
+    "isolated-parent/config",
+    "isolated-child/config"
+  ]
+}
