@@ -355,6 +355,66 @@ for metadata in missing-frontmatter missing-name invalid-name ambiguous-name; do
     done
   done
 done
+printf '%s\n' '---' 'name: acme-private' 'description: HOME-PRIVATE-DESCRIPTION' \
+  '---' 'HOME-PRIVATE-OPENING' > "$PRIVATE_SKILL"
+for discovery_root in home selected; do
+  if [ "$discovery_root" = home ]; then
+    discovery_dir=$HOME_SKILLS
+    discovery_child="$HOME_SKILLS/acme-private"
+  else
+    discovery_dir="$SPLIT_CODE/.agents/skills"
+    discovery_child="$discovery_dir/delta"
+  fi
+  for access in root-enumeration root-search child-enumeration child-search body-read; do
+    case "$access" in
+      root-enumeration) denied=$discovery_dir; permissions=100 ;;
+      root-search) denied=$discovery_dir; permissions=400 ;;
+      child-enumeration) denied=$discovery_child; permissions=100 ;;
+      child-search) denied=$discovery_child; permissions=400 ;;
+      body-read) denied="$discovery_child/SKILL.md"; permissions=000 ;;
+    esac
+    for input in --task-file --brief; do
+      if [ "$input" = --task-file ]; then input_path=$TASK; else input_path=$BRIEF; fi
+      for format in toon brief; do
+        reset
+        chmod "$permissions" "$denied"
+        case "$access" in
+          *enumeration) [ ! -r "$denied" ] || fail "fixture must deny enumeration" ;;
+          *search) [ ! -x "$denied" ] || fail "fixture must deny search" ;;
+          body-read) [ ! -r "$denied" ] || fail "fixture must deny body reads" ;;
+        esac
+        out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" \
+          bash "$SPLIT_CODE/bin/fm-skill-suggest.sh" "$input" "$input_path" \
+          --required acme-private --required safety --format "$format") || {
+            chmod 700 "$denied"
+            fail "$discovery_root $access must return ordinary selection"
+          }
+        chmod 700 "$denied"
+        if [ "$format" = toon ]; then
+          assert_contains "$out" 'status: fallback' "$discovery_root $access withholds advice"
+          assert_contains "$out" '"acme-private",' "$discovery_root $access retains caller-required identity"
+          assert_contains "$out" '"safety",' "$discovery_root $access retains caller-required safety"
+          if [ "$discovery_root" = home ] || [[ "$access" != root-* ]]; then
+            assert_contains "$out" "\"gamma\",\"$SPLIT_CODE/.agents/skills/gamma/SKILL.md\"" "$discovery_root $access retains recognized task requirement"
+          else
+            assert_contains "$out" "\"acme-private\",\"$PRIVATE_SKILL\"" "$discovery_root $access retains accessible home requirement"
+          fi
+        else
+          assert_contains "$out" 'No optional suggestion (fallback:' "$discovery_root $access restores ordinary selection"
+          assert_contains "$out" 'Required named skill: acme-private -' "$discovery_root $access preserves caller identity in brief advice"
+          assert_contains "$out" 'Required named skill: safety -' "$discovery_root $access preserves caller safety in brief advice"
+          if [ "$discovery_root" = home ] || [[ "$access" != root-* ]]; then
+            assert_contains "$out" "Required named skill: gamma - read $SPLIT_CODE/.agents/skills/gamma/SKILL.md." "$discovery_root $access preserves recognized requirements in brief advice"
+          else
+            assert_contains "$out" "Required named skill: acme-private - read $PRIVATE_SKILL." "$discovery_root $access preserves accessible home requirement in brief advice"
+          fi
+        fi
+        assert_absent "$LOG/calls" "$discovery_root $access $input $format never sends undiscovered private names"
+      done
+    done
+  done
+done
+pass "filesystem discovery failures withhold both stages while retaining accessible requirements"
 rm -rf "$HOME_SKILLS/acme-private"
 cp "$TMP_ROOT/split-task-save" "$TASK"
 pass "split-home private identities stay required and local across all public input and output paths"

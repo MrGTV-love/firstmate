@@ -106,17 +106,32 @@ else
   cp "$TASK" "$WORK/task" || die "could not read task"
 fi
 # Local catalog snapshot includes authoritative body paths.
-[ ! -d "$CATALOG" ] || CATALOG=$(cd "$CATALOG" && pwd -P) || fallback fallback "catalog unavailable"
+DISCOVERY_FAILED=false
+[ ! -d "$CATALOG" ] || CATALOG=$(cd "$CATALOG" && pwd -P) || DISCOVERY_FAILED=true
 HOME_CATALOG="$FM_HOME/.agents/skills"
-[ ! -d "$HOME_CATALOG" ] || HOME_CATALOG=$(cd "$HOME_CATALOG" && pwd -P) || fallback fallback "home catalog unavailable"
+[ ! -d "$HOME_CATALOG" ] || HOME_CATALOG=$(cd "$HOME_CATALOG" && pwd -P) || DISCOVERY_FAILED=true
 : > "$WORK/identities"
 : > "$WORK/public-paths"
-DISCOVERY_FAILED=false
 DISCOVERY_ROOTS=("$CATALOG")
 [ "$HOME_CATALOG" = "$CATALOG" ] || DISCOVERY_ROOTS+=("$HOME_CATALOG")
 for root in "${DISCOVERY_ROOTS[@]}"; do
-  for file in "$root"/*/SKILL.md; do
+  [ -d "$root" ] || continue
+  if [ ! -r "$root" ] || [ ! -x "$root" ]; then
+    DISCOVERY_FAILED=true
+    continue
+  fi
+  for child in "$root"/*; do
+    [ -d "$child" ] || continue
+    if [ ! -r "$child" ] || [ ! -x "$child" ]; then
+      DISCOVERY_FAILED=true
+      continue
+    fi
+    file="$child/SKILL.md"
     [ -f "$file" ] || continue
+    if [ ! -r "$file" ]; then
+      DISCOVERY_FAILED=true
+      continue
+    fi
     public=false
     if [ ! -L "$file" ] && git --literal-pathspecs -C "$root" ls-files --error-unmatch -- "${file#"$root"/}" >/dev/null 2>&1; then
       public=true
@@ -148,15 +163,14 @@ RESULT=$(jq -n --slurpfile names "$WORK/names" --argjson required "$REQ_IDS" '{s
 [ -d "$CATALOG" ] || fallback fallback "catalog unavailable"
 : > "$WORK/rows"
 COUNT=0
-for file in "$CATALOG"/*/SKILL.md; do
-  [ -f "$file" ] || continue
+while IFS= read -r -d '' file; do
   COUNT=$((COUNT + 1))
   [ "$COUNT" -le 128 ] || fallback fallback "catalog exceeds 128 skills"
   [ "$(wc -c < "$file")" -le 524288 ] || fallback fallback "skill body exceeds 512 KiB"
   # shellcheck disable=SC2094 # --arg path is metadata, not an output; rows is separate private scratch.
   jq -eRsc --arg path "$file" -f "$SCRIPT_DIR/fm-skill-catalog.jq" < "$file" >> "$WORK/rows" 2>/dev/null \
     || fallback fallback "unsupported skill metadata"
-done
+done < <(jq -jr --arg root "$CATALOG" 'select(.root == $root) | .path + "\u0000"' "$WORK/identities")
 [ "$COUNT" -gt 0 ] || fallback fallback "empty catalog"
 jq -sc 'sort_by(.id)' "$WORK/rows" > "$WORK/catalog"
 jq -e 'map(.id) | length == (unique | length)' "$WORK/catalog" >/dev/null || fallback fallback "duplicate skill IDs"

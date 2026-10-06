@@ -18,7 +18,7 @@ The inherited dispatch file applies the same best-fit profiles there.
 ## Skill advice at intake
 
 Apply every existing mandatory explicit/named and safety trigger before considering optional advice.
-Follow [advisory skill selection](../../../../../docs/configuration.md#advisory-skill-selection) at intake and on material intent changes; it owns permitted input, worker overlays, privacy, role coverage, and supported limits.
+Follow [advisory skill selection](../../../docs/configuration.md#advisory-skill-selection) at intake and on material intent changes; it owns permitted input, worker overlays, privacy, role coverage, and supported limits.
 
 
 ## Owners

@@ -1442,7 +1442,7 @@ Ambiguous shortlists receive a second evaluation using bounded opening excerpts,
 Paths remain local; the judge does not receive the catalog's full instruction bodies.
 TypeSafe key consent covers only Git-tracked, non-symlink catalog entries; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
 Local discovery and required-trigger handling include private skills from both the selected catalog and the active Firstmate home, even when that home differs from the code root; if the task summary names one, the request is withheld rather than rewriting that summary.
-Incomplete local identity discovery withholds requests while preserving caller-required IDs and other recognized named requirements.
+Incomplete local identity discovery, including catalogs or skill children that cannot be enumerated or searched and unreadable skill bodies, withholds requests while preserving caller-required IDs and other recognized named requirements.
 Git-tracked, non-symlink home entries are classified as public independently of the selected remote catalog; home-only entries do not enlarge that catalog.
 Byte-identical public copies across the selected catalog and a distinct active home resolve to the selected catalog's path, while differing or private copies remain ambiguous.
 Catalogs without verifiable Git tracking remain local.
