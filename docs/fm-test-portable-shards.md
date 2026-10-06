@@ -114,7 +114,7 @@ No fast mode, path skips, reduced checks, or paid runner provisioning is part of
 
 Local branch selection includes changed shell files and their known transitive sourcing callers, including runtime-dispatched backend adapters and imports in executable child-shell programs; unchanged imported libraries are analyzed only through those callers.
 For changed or deleted shell/source inputs, unresolved runtime imports conservatively select possible callers through known transitive closures, independently of ShellCheck source overrides.
-Dependency discovery excludes inert quoted program text, comments, and heredoc data; its conservative fallback does not resolve arbitrary computed Bash imports precisely and can select extra roots.
+Dependency discovery follows imports in Bash/sh heredocs when stdin is the program, resolving quoted child positional arguments and stripping `<<-` tabs; comments, inert quoted text, and heredocs used as data remain excluded, while arbitrary computed imports remain conservative and can select extra roots.
 Successful analyses with proved closures are keyed by the root and transitive source contents, analysis arguments, lint implementation, platform, and ShellCheck binary; identical misses serialize across isolated copies.
 Unproved runtime source closures are never reused from the successful-result cache.
 CI never reuses that cache.

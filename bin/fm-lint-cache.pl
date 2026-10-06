@@ -68,7 +68,7 @@ sub balanced_text {
     return substr($body, $start);
 }
 sub shell_word {
-    my ($body, $position, $parameters, $stop) = @_;
+    my ($body, $position, $parameters, $stop, $literal) = @_;
     my ($value, $quote, @subs) = ('', '');
     my $raw_start = $$position;
     while ($$position < length $body) {
@@ -91,13 +91,15 @@ sub shell_word {
             next;
         }
         if (substr($body, $$position, 2) eq '$(' || (!$quote && substr($body, $$position, 2) =~ /^[<>]\(/)) {
+            my $start = $$position;
             $$position += 2;
             my $program = balanced_text($body, $position, '(', ')');
-            push @subs, $program unless $program =~ /^\(/;
-            $value .= "\x01";
+            push @subs, $program unless $literal || $program =~ /^\(/;
+            $value .= $literal ? substr($body, $start, $$position - $start) : "\x01";
             next;
         }
         if ($char eq '`') {
+            my $start = $$position;
             $$position++;
             my $program = '';
             while ($$position < length $body) {
@@ -108,11 +110,11 @@ sub shell_word {
                 }
                 $program .= $part;
             }
-            push @subs, $program;
-            $value .= "\x01";
+            push @subs, $program unless $literal;
+            $value .= $literal ? substr($body, $start, $$position - $start) : "\x01";
             next;
         }
-        if ($char eq '$') {
+        if ($char eq '$' && !$literal) {
             pos($body) = $$position;
             if ($body =~ /\G\$(?:\{([0-9]+)\}|([0-9]))/gc) {
                 my $number = defined $1 ? $1 : $2;
@@ -157,7 +159,7 @@ sub source_dependency {
     }
 }
 sub command_dependencies {
-    my ($path, $words, $deps, $finite_backend) = @_;
+    my ($path, $words, $deps, $finite_backend, $stdin) = @_;
     my @words = @$words;
     while (@words) {
         my $raw = $words[0]{raw} // $words[0]{value};
@@ -181,8 +183,11 @@ sub command_dependencies {
             $command = shift @words;
         }
         return unless $command->{value} =~ m{(?:^|/)(?:bash|sh)$};
-        while (@words) {
+        my $stdin_mode = 0;
+        while (@words && $words[0]{value} =~ /^[-+]/) {
             my $option = shift @words;
+            if ($option->{value} eq '-') { $stdin_mode = 1; last; }
+            last if $option->{value} eq '--';
             if ($option->{value} =~ /^-[A-Za-z]*c[A-Za-z]*$/) {
                 my $payload = shift @words;
                 return unless defined $payload;
@@ -192,14 +197,19 @@ sub command_dependencies {
                 scan_program($path, $payload->{value}, $deps, $finite_backend, \%child_parameters);
                 return;
             }
-            shift @words if $option->{value} =~ /^[-+][oO]$/;
-            last if $option->{value} !~ /^[-+]/;
+            $stdin_mode = 1 if $option->{value} =~ /^-[A-Za-z]*s[A-Za-z]*$/;
+            shift @words if $option->{value} =~ /^(?:[-+][oO]|--rcfile|--init-file)$/;
         }
+        if (!$stdin_mode && @words && $words[0]{value} eq '-') { $stdin_mode = 1; shift @words; }
+        return unless defined $stdin && ($stdin_mode || !@words);
+        my %child_parameters;
+        $child_parameters{$_ + 1} = $words[$_]{value} for 0 .. $#words;
+        $stdin->{parameters} = \%child_parameters;
     }
 }
 sub scan_program {
     my ($path, $body, $deps, $finite_backend, $parameters) = @_;
-    my ($position, @words, @heredocs, @cases);
+    my ($position, @words, @heredocs, @cases, $stdin);
     $position = 0;
     while ($position < length $body) {
         pos($body) = $position;
@@ -230,9 +240,20 @@ sub scan_program {
             my $operator = $1;
             $position = pos($body);
             $position++ while substr($body, $position, 1) =~ /[ \t]/;
-            my $target = shell_word($body, \$position, $parameters);
+            my $heredoc = $operator =~ /^(?:[0-9]+)?<<-?$/;
+            my $target = shell_word($body, \$position, $parameters, undef, $heredoc);
             scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$target->{subs}};
-            push @heredocs, [$target->{value}, $operator =~ /<<-/] if $operator =~ /<<-?$/;
+            my $input = $operator =~ /^(?:0)?</;
+            $stdin = undef if $input;
+            if ($heredoc) {
+                my $record = {
+                    delimiter => $target->{value},
+                    tabs => scalar($operator =~ /<<-/),
+                    quoted => scalar($target->{raw} =~ /['"\\]/),
+                };
+                push @heredocs, $record;
+                $stdin = $record if $input;
+            }
             next;
         }
         if ($body =~ /\G([\n;(){}|&])/gc) {
@@ -241,19 +262,27 @@ sub scan_program {
             if (@cases && $cases[-1] eq 'pattern') {
                 $cases[-1] = 'body' if $separator eq ')';
             } else {
-                command_dependencies($path, \@words, $deps, $finite_backend);
+                command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
                 $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
             }
             @words = ();
+            $stdin = undef;
             if ($separator eq "\n") {
                 for my $heredoc (@heredocs) {
+                    my $program = '';
                     while ($position < length $body) {
                         my $end = index($body, "\n", $position);
                         $end = length $body if $end < 0;
                         my $line = substr($body, $position, $end - $position);
                         $position = $end < length($body) ? $end + 1 : $end;
-                        $line =~ s/^\t+// if $heredoc->[1];
-                        last if $line eq $heredoc->[0];
+                        $line =~ s/^\t+// if $heredoc->{tabs};
+                        last if $line eq $heredoc->{delimiter};
+                        $program .= "$line\n" if exists $heredoc->{parameters};
+                    }
+                    if (exists $heredoc->{parameters}) {
+                        my $child_parameters = $heredoc->{quoted} ? $heredoc->{parameters} : $parameters;
+                        $unknown{$path} = 1 if !$heredoc->{quoted} && $program =~ /[\$`]/;
+                        scan_program($path, $program, $deps, $finite_backend, $child_parameters);
                     }
                 }
                 @heredocs = ();
@@ -268,7 +297,7 @@ sub scan_program {
         next if @cases && $cases[-1] eq 'pattern';
         push @words, $word;
     }
-    command_dependencies($path, \@words, $deps, $finite_backend);
+    command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
 }
 sub dependencies {
     my ($path) = @_;
