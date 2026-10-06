@@ -13,6 +13,10 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=bin/fm-backend.sh
+. "$ROOT/bin/fm-backend.sh"
 
 STRIP="$ROOT/bin/fm-git-strip-ai-trailers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-git-strip-ai-trailers)
@@ -301,6 +305,205 @@ test_strip_msgfile_alone_does_not_rewrite_author_fields() {
   pass "commit-msg file mode strips the trailer and keeps the subject"
 }
 
+# Use the real launch owner and a private tmux server. The omp replacement is
+# a Git probe, not a model call: it exits immediately, leaving the SAME shell
+# for the supported already-stopped-task relaunch path.
+test_relaunch_reconciles_only_its_generated_hooks() {
+  local ksh
+  test_relaunch_reconciles_only_its_generated_hooks_in_shell bash /bin/bash
+  ksh=$(command -v ksh) || {
+    printf 'skip: ksh absent; ksh launch/relaunch hook transition not exercised\n'
+    return
+  }
+  test_relaunch_reconciles_only_its_generated_hooks_in_shell ksh "$ksh"
+}
+
+test_relaunch_reconciles_only_its_generated_hooks_in_shell() {
+  local shell_name="$1" shell_path="$2" shell_command
+  local real_tmux dir home proj wt fakebin socket id hooks endpoint pane out scope n
+  real_tmux=$(command -v tmux) || {
+    printf 'skip: tmux absent; %s launch/relaunch hook transition not exercised\n' "$shell_name"
+    return
+  }
+  dir="$TMP_ROOT/relaunch-$shell_name"
+  mkdir -p "$dir"
+  dir=$(cd "$dir" && pwd -P)
+  home="$dir/home"
+  proj="$dir/project"
+  wt="$dir/wt"
+  socket="$dir/tmux.sock"
+  id="hooks-relaunch-$shell_name-$$"
+  fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
+  fm_test_spawn_home "$home" omp
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_worktree "$proj" "$wt" fixture-hooks
+  git -C "$wt" config core.hooksPath .project-hooks
+  hooks="$home/state/$id.git-hooks"
+  cat > "$fakebin/tmux" <<SH
+#!/bin/sh
+exec '$real_tmux' -S '$socket' "\$@"
+SH
+  cat > "$fakebin/omp" <<SH
+#!/bin/sh
+git config --show-scope --get-all core.hooksPath > '$dir/scope.tmp'
+git config --get-all fixture.preserved > '$dir/preserved.tmp' || :
+git config --show-scope --get fixture.operator > '$dir/operator.tmp' || :
+mv '$dir/preserved.tmp' '$dir/preserved'
+mv '$dir/operator.tmp' '$dir/operator'
+mv '$dir/scope.tmp' '$dir/scope'
+SH
+  chmod +x "$fakebin/tmux" "$fakebin/omp"
+  cat > "$dir/rc" <<SH
+export PATH='$fakebin:$PATH'
+treehouse() { if [ "\${1:-}" = get ]; then cd '$wt'; fi; }
+PS1='fixture> '
+SH
+  case "$shell_name" in
+    bash) shell_command="'$shell_path' --noprofile --rcfile '$dir/rc' -i" ;;
+    ksh) shell_command="'$shell_path' -i" ;;
+  esac
+  # The socket and every terminal belong to this fixture; no shared tmux
+  # environment, user shell startup file, or live worker is read or changed.
+  env -i HOME="$home/user-home" PATH="$fakebin:$PATH" TERM=xterm ENV="$dir/rc" \
+    GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" GIT_CONFIG_NOSYSTEM=1 \
+    "$real_tmux" -S "$socket" -f /dev/null new-session -d -s firstmate \
+    -c "$proj" "$shell_command" \
+    || fail "cannot start owned $shell_name tmux fixture"
+  "$real_tmux" -S "$socket" set-option -g default-command "$shell_command"
+  trap '"$real_tmux" -S "$socket" kill-server 2>/dev/null || :; rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*; fm_test_cleanup' EXIT
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" \
+    --mode no-mistakes --yolo off --harness omp --backend tmux)
+  expect_code 0 "$?" "initial real tmux launch failed: $out"
+  assert_present "$home/state/$id.meta" "initial launch did not publish a task record: $out"
+  endpoint=$(fm_meta_get "$home/state/$id.meta" window)
+  [ -n "$endpoint" ] || fail "initial launch recorded no endpoint: $out"
+  pane=$("$real_tmux" -S "$socket" display-message -p -t "$endpoint" '#{pane_id}')
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || {
+    "$real_tmux" -S "$socket" capture-pane -p -t "$endpoint" -S -100 >&2
+    printf 'launch result: %s\n' "$out" >&2
+    fail "initial launch never ran the Git probe"
+  }
+  scope=$(cat "$dir/scope")
+  assert_contains "$scope" $'command\t'"$hooks" "initial launch did not select the strip layer"
+  assert_contains "$scope" $'local\t.project-hooks' "repository hook config was changed"
+
+  # Keep the generated entry between unrelated numbered entries, including
+  # duplicate keys and values containing shell syntax that must remain data.
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "export GIT_CONFIG_COUNT=4 GIT_CONFIG_KEY_0=fixture.preserved GIT_CONFIG_VALUE_0='first value' GIT_CONFIG_KEY_1=core.hooksPath GIT_CONFIG_VALUE_1='$hooks' GIT_CONFIG_KEY_2=fixture.preserved GIT_CONFIG_VALUE_2='literal \$(false); tail' GIT_CONFIG_KEY_3=fixture.operator GIT_CONFIG_VALUE_3=explicit" Enter
+  : > "$home/config/keep-ai-trailers"
+  rm "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "same-task real tmux relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "replacement launch never ran the Git probe"
+  scope=$(cat "$dir/scope")
+  assert_equals $'local\t.project-hooks' "$scope" \
+    "keep-ai-trailers relaunch retained the obsolete command-scope strip override"
+  assert_equals $'first value\nliteral $(false); tail' "$(cat "$dir/preserved")" \
+    "relaunch lost or evaluated unrelated numbered Git configuration"
+  assert_equals $'command\texplicit' "$(cat "$dir/operator")" \
+    "relaunch lost explicit operator configuration"
+  assert_equals "$endpoint" "$(fm_meta_get "$home/state/$id.meta" window)" "relaunch replaced the endpoint"
+  assert_equals "$pane" "$("$real_tmux" -S "$socket" display-message -p -t "$endpoint" '#{pane_id}')" "relaunch replaced the pane"
+  assert_equals "$wt" "$(fm_meta_get "$home/state/$id.meta" worktree)" "relaunch replaced the isolated copy"
+
+  # An operator's hooksPath is not Firstmate's routing state, even if another
+  # task's path has the same generated-looking suffix.
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='$home/state/other.git-hooks' GIT_CONFIG_KEY_1=fixture.preserved GIT_CONFIG_VALUE_1=operator" Enter
+  rm "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "operator hooks relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "operator relaunch never ran the Git probe"
+  assert_contains "$(cat "$dir/scope")" $'command\t'"$home/state/other.git-hooks" \
+    "relaunch removed an explicit operator hooksPath"
+
+  # Turning stripping back on appends the task override without clobbering the
+  # preserved operator entry. Repeating the launch must not accumulate entries.
+  rm "$home/config/keep-ai-trailers"
+  for n in 1 2; do
+    rm "$dir/scope"
+    out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+    expect_code 0 "$?" "strip-enabled relaunch $n failed: $out"
+    local attempt
+    for attempt in $(seq 1 100); do
+      [ ! -f "$dir/scope" ] || break
+      sleep 0.1
+    done
+    [ -f "$dir/scope" ] || fail "strip-enabled relaunch $n never ran the Git probe after $attempt polls"
+    assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s\ncommand\t%s' "$home/state/other.git-hooks" "$hooks")" \
+      "$(cat "$dir/scope")" "strip launch lost operator routing or accumulated generated entries"
+    assert_equals operator "$(cat "$dir/preserved")" "strip launch lost unrelated configuration"
+  done
+  : > "$home/config/keep-ai-trailers"
+  : > "$home/config/launch-env-allowlist"
+  rm "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "allowlisted keep-ai-trailers relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "allowlisted replacement never ran the Git probe"
+  assert_equals $'local\t.project-hooks' "$(cat "$dir/scope")" \
+    "allowlisted keep-ai-trailers worker selected a command-scope hook override"
+  assert_equals '' "$(cat "$dir/preserved")" "allowlist leaked unrelated pane Git configuration"
+  assert_equals "$endpoint" "$(fm_meta_get "$home/state/$id.meta" window)" "allowlisted relaunch replaced the endpoint"
+  assert_equals "$pane" "$("$real_tmux" -S "$socket" display-message -p -t "$endpoint" '#{pane_id}')" "allowlisted relaunch replaced the pane"
+  assert_equals "$wt" "$(fm_meta_get "$home/state/$id.meta" worktree)" "allowlisted relaunch replaced the isolated copy"
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; env > '$dir/pane-env'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/pane-scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/pane-scope" ] || fail "persistent pane never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$home/state/other.git-hooks")" \
+    "$(cat "$dir/pane-scope")" "persistent pane retained obsolete hooks or lost operator routing"
+  assert_equals operator "$(cat "$dir/pane-preserved")" "persistent pane lost unrelated Git configuration"
+  assert_contains "$(cat "$dir/pane-env")" 'GIT_CONFIG_COUNT=2' "persistent pane did not compact Git configuration"
+  assert_not_contains "$(cat "$dir/pane-env")" "$hooks" "persistent pane still exports obsolete task hooks"
+
+  rm "$home/config/keep-ai-trailers" "$dir/scope"
+  out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+  expect_code 0 "$?" "allowlisted strip-enabled relaunch failed: $out"
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/scope" ] || fail "allowlisted strip-enabled replacement never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$hooks")" \
+    "$(cat "$dir/scope")" "allowlisted strip worker lost task hooks or inherited operator routing"
+  assert_equals '' "$(cat "$dir/preserved")" "strip launch bypassed the environment filter"
+  rm "$dir/pane-scope"
+  "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
+    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
+  for n in $(seq 1 100); do
+    [ ! -f "$dir/pane-scope" ] || break
+    sleep 0.1
+  done
+  [ -f "$dir/pane-scope" ] || fail "strip-enabled persistent pane never ran the Git probe"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s\ncommand\t%s' "$home/state/other.git-hooks" "$hooks")" \
+    "$(cat "$dir/pane-scope")" "allowlisted strip launch lost pane routing or accumulated generated entries"
+  assert_equals operator "$(cat "$dir/pane-preserved")" "allowlisted strip launch lost pane Git configuration"
+  "$real_tmux" -S "$socket" kill-server
+  rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+  trap fm_test_cleanup EXIT
+  pass "supported same-task $shell_name tmux relaunch reconciles generated hooks and preserves operator configuration"
+}
+
 test_cursor_trailer_does_not_reach_the_commit_object
 test_human_coauthor_is_kept
 test_human_at_a_vendor_domain_is_kept
@@ -314,5 +517,6 @@ test_pane_hookspath_does_not_reroute_another_repository
 test_repository_pre_push_runs_on_every_override_channel
 test_git_c_override_still_strips_and_chains_commit_hooks
 test_strip_msgfile_alone_does_not_rewrite_author_fields
+test_relaunch_reconciles_only_its_generated_hooks
 
 echo "# all fm-git-strip-ai-trailers tests passed"

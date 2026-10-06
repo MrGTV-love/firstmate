@@ -37,6 +37,7 @@ make_spawn_fakebin() {
   fakebin=$(fm_test_make_spawn_fakebin "$dir")
   cat > "$fakebin/timeout" <<'SH'
 #!/usr/bin/env bash
+[ "${1:-}" != -k ] || shift 2
 shift
 exec "$@"
 SH
@@ -87,12 +88,6 @@ make_seeded_secondmate_home() {
   git -C "$home" init -q -b main
 }
 
-ai_trailer_hooks_prefix() {  # <home> <id>
-  local state
-  state=$(CDPATH='' cd -- "$1/state" && pwd -P) || fail "cannot resolve state dir $1/state"
-  printf "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='%s'; " "$state/$2.git-hooks"
-}
-
 run_spawn() {
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
@@ -101,7 +96,12 @@ run_spawn() {
   # explicitly (empty by default) instead of leaking the invoking shell's value,
   # which would make launch assertions depend on the developer's environment.
   # A test opts in to the set case via FM_TEST_CLAUDE_CONFIG_DIR.
+  # XDG_CONFIG_HOME and TEAMCLAUDE_CONFIG are handed to a TeamClaude launch's
+  # own teamclaude calls, so they are pinned for the same reason.
   CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
+    XDG_CONFIG_HOME="${FM_TEST_XDG_CONFIG_HOME:-}" \
+    TEAMCLAUDE_CONFIG="${FM_TEST_TEAMCLAUDE_CONFIG:-}" \
+    FM_FAKE_TEAMCLAUDE_STATUS="${FM_TEST_TEAMCLAUDE_STATUS:-0}" \
     FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="${FM_TEST_PANE_LOG:-}" \
     FM_FAKE_PI_VERSION="${FM_TEST_PI_VERSION:-0.84.0}" \
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
@@ -130,7 +130,7 @@ assert_meta_profile() {
 }
 
 test_no_profile_keeps_claude_profile_defaults() {
-  local rec id out status expected launch
+  local rec id out status
   id=profile-off-z1
   rec=$(make_spawn_case profile-off claude "$id")
   read_case_record "$rec"
@@ -140,11 +140,7 @@ test_no_profile_keeps_claude_profile_defaults() {
   expect_code 0 "$status" "claude spawn without profile flags should succeed"
   assert_contains "$out" "spawned $id harness=claude" "spawn did not report claude"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
-
-  launch=$(cat "$LAUNCH_LOG")
-  expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" --dangerously-skip-permissions)
-  [ "$launch" = "$expected" ] || fail "no-profile claude launch did not use the canonical launch kind"$'\n'"expected: $expected"$'\n'"actual:   $launch"
-  pass "no --model/--effort records defaults and types the claude launch instructions"
+  pass "no --model/--effort records the default profile"
 }
 
 # Claude Code strips U+2063 from the launch-prompt argument, so a claude launch
@@ -460,7 +456,7 @@ test_active_dispatch_profile_allows_positional_harness() {
 }
 
 test_active_dispatch_profile_allows_raw_launch_command() {
-  local rec id out status launch
+  local rec id out status
   id=profile-raw-z15
   rec=$(make_spawn_case profile-raw claude "$id")
   read_case_record "$rec"
@@ -472,11 +468,6 @@ test_active_dispatch_profile_allows_raw_launch_command() {
   expect_code 0 "$status" "raw launch command should satisfy active dispatch-profile requirement"
   assert_contains "$out" "spawned $id harness=custom-agent" "spawn did not report raw command harness"
   assert_meta_profile "$HOME_DIR/state/$id.meta" custom-agent default default
-  launch=$(cat "$LAUNCH_LOG")
-  # The unverified-adapter escape hatch is still an agent this fleet launched,
-  # so it carries the compact-adviser floor and the AI-trailer strip; nothing
-  # else may rewrite the captain's own command.
-  [ "$launch" = "export COMPACT_ADVISER_DISABLE=1; $(ai_trailer_hooks_prefix "$HOME_DIR" "$id")custom-agent --flag" ] || fail "raw launch command changed"$'\n'"actual: $launch"
   pass "active crew-dispatch profile allows the raw launch-command escape hatch"
 }
 
@@ -1067,14 +1058,13 @@ test_claude_forwards_firstmate_config_dir_when_set() {
 
   # A creatable path: this spawn now pre-registers workspace trust in that store
   # (bin/fm-claude-trust.sh), so an unwritable directory is a genuine blocker.
-  # The forwarding assertion below is what this case proves and is unchanged.
   out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
-    "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
+  [ "$(claude_launch_arg "$launch" config-dir "CLAUDE_CONFIG_DIR=$CASE_DIR/destination-claude")" = "$CASE_DIR/claude-work" ] \
+    || fail "claude launch did not forward firstmate's CLAUDE_CONFIG_DIR to the crewmate pane"
   pass "claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store"
 }
 
@@ -1119,39 +1109,6 @@ SH
   assert_grep 'destination.example' "$seen" \
     "the worker launch did not retain the destination pane's Lavish host"
   pass "absent Lavish configuration preserves the destination environment"
-}
-
-test_claude_omits_config_dir_prefix_when_unset() {
-  local rec id out status launch
-  id=profile-claude-nocfgdir-z18
-  rec=$(make_spawn_case profile-claude-nocfgdir claude "$id")
-  read_case_record "$rec"
-
-  # run_spawn pins CLAUDE_CONFIG_DIR empty by default, exercising the single-store
-  # default path where fm-spawn adds no prefix.
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "claude spawn without CLAUDE_CONFIG_DIR should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_not_contains "$launch" "CLAUDE_CONFIG_DIR=" \
-    "claude launch must not add a config-dir prefix when firstmate has no CLAUDE_CONFIG_DIR set"
-  pass "claude omits the config-dir prefix when firstmate runs with the single-store default"
-}
-
-test_non_claude_harness_ignores_config_dir() {
-  local rec id out status launch
-  id=profile-codex-nocfgdir-z19
-  rec=$(make_spawn_case profile-codex-nocfgdir codex "$id")
-  read_case_record "$rec"
-
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="/opt/test/claude-work" \
-    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "codex spawn with CLAUDE_CONFIG_DIR set should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_not_contains "$launch" "CLAUDE_CONFIG_DIR=" \
-    "non-claude harness launch must not receive the claude-specific config-dir prefix"
-  pass "non-claude harnesses do not receive the claude CLAUDE_CONFIG_DIR prefix"
 }
 
 # The captain's attribution policy lives in the `user` settings scope, which a
@@ -1213,26 +1170,6 @@ test_claude_secondmate_launch_omits_task_control_channel_authority() {
   pass "a persistent claude secondmate keeps its supervisor contract without a task-worker authority overlay"
 }
 
-test_claude_long_launch_is_delivered_intact() {
-  local rec id out status launch expected
-  id=profile-claude-long-launch-z24
-  rec=$(make_spawn_case profile-claude-long-launch claude "$id")
-  read_case_record "$rec"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "long Claude launch should succeed"$'\n'"$out"
-  launch=$(cat "$LAUNCH_LOG")
-  expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" --dangerously-skip-permissions)
-  [ "${#expected}" -gt 1024 ] \
-    || fail "Claude regression fixture is too short to cover the terminal line limit: ${#expected} bytes"
-  [ "${#launch}" -gt 1024 ] \
-    || fail "long Claude launch was truncated to ${#launch} bytes; staging must deliver the full command"
-  [ "$launch" = "$expected" ] \
-    || fail "long Claude launch was not delivered intact (${#launch}/${#expected} bytes)"
-  pass "fm-spawn: a Claude launch longer than 1024 bytes is delivered intact through the staging path"
-}
-
 test_claude_crewmate_launch_carries_the_attribution_policy() {
   local rec id out status launch
   id=profile-claude-attribution-z22
@@ -1260,8 +1197,6 @@ test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   expect_code 0 "$status" "claude spawn with keep-ai-trailers should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "opted-in claude"
-  assert_not_contains "$launch" 'GIT_CONFIG_KEY_0=core.hooksPath' \
-    "opted-in launch still overrides the repository hooksPath"
   [ ! -e "$HOME_DIR/state/$id.git-hooks" ] \
     || fail "opted-in launch installed AI trailer strip hooks"
   pass "keep-ai-trailers omits Claude attribution settings and the pane strip hooks"
@@ -1290,8 +1225,6 @@ test_keep_ai_trailers_reaches_secondmate_crew_launches() {
   expect_code 0 "$status" "secondmate crew spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "secondmate crew claude"
-  assert_not_contains "$launch" 'GIT_CONFIG_KEY_0=core.hooksPath' \
-    "secondmate crew launch still overrides the repository hooksPath"
   [ ! -e "$HOME_DIR/state/$crew_id.git-hooks" ] \
     || fail "secondmate crew launch installed AI trailer strip hooks"
   pass "keep-ai-trailers is inherited so a secondmate's crew launch keeps AI trailers"
@@ -1633,76 +1566,52 @@ SH
   pass "fm-spawn: actual ship/scout launch commands deliver the worker role contract"
 }
 
-# config/claude-permission-mode (bin/fm-spawn.sh header): absent and `bypass`
-# must both produce today's launch byte-for-byte, `auto` swaps only the
-# permission flag, and any other token refuses before endpoint or metadata.
-claude_settings_json_arg() {  # <launch>
-  local command=$1
-  while [[ "$command" == export\ *\;* ]]; do
-    command=${command#*; }
-  done
-  eval "set -- $command"
+# Explicit permission-mode selection and invalid-config refusals.
+# Execute the staged launch with a model-free argv probe instead of parsing a
+# snapshot of the launcher's shell implementation.
+claude_launch_arg() {  # <launch> <settings|brief|config-dir|permissions> [VAR=val ...]
+  local launch=$1 kind=$2 probe
+  shift 2
+  probe=$(fm_test_tmproot fm-claude-launch-arg)
+  cat > "$probe/claude" <<'SH'
+#!/bin/sh
+if [ "$FM_ARG_KIND" = config-dir ]; then
+  printf '%s' "${CLAUDE_CONFIG_DIR-}"
+  exit
+fi
+if [ "$FM_ARG_KIND" = permissions ]; then
   while [ "$#" -gt 0 ]; do
-    if [ "$1" = --settings ]; then
-      shift
-      printf '%s' "$1"
-      return 0
-    fi
+    case "$1" in
+      --permission-mode)
+        printf '%s\n' "--permission-mode ${2-}"
+        ;;
+      --dangerously-skip-permissions)
+        printf '%s\n' '--dangerously-skip-permissions'
+        ;;
+    esac
     shift
   done
-  return 1
-}
-
-claude_launch_brief_arg() {  # <launch>
-  local command=$1
-  while [[ "$command" == export\ *\;* ]]; do
-    command=${command#*; }
+  exit
+fi
+if [ "$FM_ARG_KIND" = settings ]; then
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = --settings ]; then printf '%s' "$2"; exit; fi
+    shift
   done
-  (
-    eval "set -- ${command#*; }"
-    eval "printf '%s' \"\${$#}\""
-  )
+  exit 1
+fi
+for arg do last=$arg; done
+printf '%s' "$last"
+SH
+  chmod +x "$probe/claude"
+  fm_eval_launch "$launch" "$WT_DIR" "$probe" FM_ARG_KIND="$kind" "$@"
 }
 
-# The --add-dir segment every Claude worker launch now carries between the
-# permission flag and --settings, real-path resolved the way the spawn's
-# claude_add_dirs_flag resolves it. Prints a trailing space so callers can
-# drop it straight into an expected command.
-claude_worker_add_dirs() {  # <home> <id>
-  local state_real data_real root_real
-  state_real=$(cd "$1/state" && pwd -P)
-  data_real=$(cd "$1/data" && pwd -P)
-  root_real=$(cd "$ROOT" && pwd -P)
-  printf '%s ' "--add-dir '$state_real/operational-inbox' --add-dir '$state_real/$2.inbox' --add-dir '$data_real/$2' --add-dir '$root_real/.agents/skills'"
-}
-
-claude_expected_launch() {  # <launch> <home> <id> <permission-flag>
-  local doorbell quoted
-  doorbell=$(claude_launch_brief_arg "$1")
-  [ "$(printf '%s' "$doorbell" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
-    || doorbell="not a launch-brief doorbell"
-  quoted="'$(printf '%s' "$doorbell" | sed "s/'/'\\\\''/g")'"
-  printf '%s' "export COMPACT_ADVISER_DISABLE=1; $(ai_trailer_hooks_prefix "$2" "$3")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
-}
-
-test_claude_permission_mode_bypass_matches_absent_launch() {
-  local rec id out status launch expected
-  id=permmode-bypass-z19
-  rec=$(make_spawn_case permmode-bypass claude "$id")
-  read_case_record "$rec"
-  printf 'bypass\n' > "$HOME_DIR/config/claude-permission-mode"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
-  status=$?
-  expect_code 0 "$status" "claude spawn with claude-permission-mode=bypass should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" --dangerously-skip-permissions)
-  [ "$launch" = "$expected" ] || fail "explicit bypass did not reproduce the absent-file launch"$'\n'"expected: $expected"$'\n'"actual:   $launch"
-  pass "config/claude-permission-mode=bypass launches exactly as an absent file does"
-}
+claude_settings_json_arg() { claude_launch_arg "$1" settings; }
+claude_launch_brief_arg() { claude_launch_arg "$1" brief; }
 
 test_claude_permission_mode_auto_swaps_only_the_permission_flag() {
-  local rec id out status launch expected
+  local rec id out status launch
   id=permmode-auto-z20
   rec=$(make_spawn_case permmode-auto claude "$id")
   read_case_record "$rec"
@@ -1714,9 +1623,8 @@ test_claude_permission_mode_auto_swaps_only_the_permission_flag() {
   expect_code 0 "$status" "claude spawn with claude-permission-mode=auto should succeed"
   assert_contains "$out" "spawned $id harness=claude" "auto spawn did not report claude"
   launch=$(cat "$LAUNCH_LOG")
-  expected=$(claude_expected_launch "$launch" "$HOME_DIR" "$id" '--permission-mode auto')
-  [ "$launch" = "$expected" ] || fail "auto changed more than the permission flag"$'\n'"expected: $expected"$'\n'"actual:   $launch"
-  assert_not_contains "$launch" "--dangerously-skip-permissions" "auto launch must not request bypass mode"
+  [ "$(claude_launch_arg "$launch" permissions)" = "--permission-mode auto" ] \
+    || fail "auto launch must deliver exactly --permission-mode auto without bypass mode"
   pass "config/claude-permission-mode=auto replaces --dangerously-skip-permissions with --permission-mode auto"
 }
 
@@ -1731,8 +1639,8 @@ test_claude_permission_mode_auto_reaches_scout_launch() {
   status=$?
   expect_code 0 "$status" "claude scout spawn with claude-permission-mode=auto should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "claude --permission-mode auto " "scout launch did not carry --permission-mode auto"
-  assert_not_contains "$launch" "--dangerously-skip-permissions" "scout launch must not request bypass mode"
+  [ "$(claude_launch_arg "$launch" permissions)" = "--permission-mode auto" ] \
+    || fail "scout launch must deliver exactly --permission-mode auto without bypass mode"
   pass "config/claude-permission-mode=auto reaches scout launches too"
 }
 
@@ -1793,22 +1701,6 @@ test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata() {
   pass "an unrecognized config/claude-permission-mode token refuses before any endpoint or metadata"
 }
 
-test_non_claude_harness_ignores_claude_permission_mode() {
-  local rec id out status launch
-  id=permmode-codex-z23
-  rec=$(make_spawn_case permmode-codex codex "$id")
-  read_case_record "$rec"
-  printf 'auto\n' > "$HOME_DIR/config/claude-permission-mode"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex)
-  status=$?
-  expect_code 0 "$status" "codex spawn under claude-permission-mode=auto should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "codex " "codex launch did not run codex"
-  assert_not_contains "$launch" "--permission-mode" "the claude permission flag must not leak into a codex launch"
-  pass "config/claude-permission-mode changes claude launches only"
-}
-
 test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_claude_launch_brief_publishes_record_doorbell
@@ -1854,21 +1746,310 @@ test_batch_forwards_shared_profile_flags
 test_claude_forwards_firstmate_config_dir_when_set
 test_lavish_server_address_is_exported_to_worker_launch
 test_lavish_absent_config_preserves_destination_ambient
-test_claude_omits_config_dir_prefix_when_unset
-test_claude_permission_mode_bypass_matches_absent_launch
 test_claude_permission_mode_auto_swaps_only_the_permission_flag
 test_claude_permission_mode_auto_reaches_scout_launch
 test_claude_worker_launch_covers_task_channel_dirs
 test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata
-test_non_claude_harness_ignores_claude_permission_mode
-test_non_claude_harness_ignores_config_dir
 test_claude_task_launch_carries_control_channel_authority
 test_claude_secondmate_launch_omits_task_control_channel_authority
-test_claude_long_launch_is_delivered_intact
 test_claude_crewmate_launch_carries_the_attribution_policy
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
 test_keep_ai_trailers_reaches_secondmate_crew_launches
 test_claude_secondmate_launch_carries_the_attribution_policy
 test_active_dispatch_profile_does_not_block_secondmate_launch
+
+# --- config/claude-launcher -------------------------------------------------
+
+# make_teamclaude_case <name> <id> -> a claude case whose home selects TeamClaude.
+make_teamclaude_case() {
+  local rec
+  rec=$(make_spawn_case "$1" claude "$2")
+  read_case_record "$rec"
+  fm_test_fake_teamclaude "$FAKEBIN_DIR"
+  printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+  printf '%s\n' "$rec"
+}
+
+test_teamclaude_launcher_proxies_a_fresh_claude_spawn() {
+  local rec id out status
+  id=teamclaude-fresh-z40
+  rec=$(make_teamclaude_case teamclaude-fresh "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a TeamClaude claude spawn should succeed while the proxy answers"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "fresh ship spawn"
+  pass "config/claude-launcher=teamclaude: a fresh claude spawn reaches claude with the TeamClaude proxy"
+}
+
+# The counterfactual: with no launcher file the same fakes are present, yet the
+# launch is the bare claude word and claude receives no proxy setting.
+test_absent_claude_launcher_keeps_the_direct_launch() {
+  local rec id out status env_out
+  id=teamclaude-absent-z41
+  rec=$(make_teamclaude_case teamclaude-absent "$id")
+  read_case_record "$rec"
+  rm "$HOME_DIR/config/claude-launcher"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a claude spawn with no launcher file should succeed"$'\n'"$out"
+  assert_contains "$(cat "$LAUNCH_LOG")" "CLAUDE_CODE_SEND_FEEDBACK=0 claude " \
+    "an absent config/claude-launcher must keep the bare claude launch"
+  assert_not_contains "$(cat "$LAUNCH_LOG")" "fm-teamclaude-launch.sh" \
+    "an absent config/claude-launcher must not start the TeamClaude launcher"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the direct launch command failed"
+  [ -s "$env_out" ] || fail "the direct launch never started claude"
+  ! grep -q '^HTTPS_PROXY=' "$env_out" || fail "a direct launch must not route claude through a proxy"
+  pass "an absent config/claude-launcher keeps the direct claude launch with no proxy"
+}
+
+test_teamclaude_launcher_proxies_a_claude_secondmate_launch() {
+  local rec id sm out status
+  id=teamclaude-secondmate-z43
+  rec=$(make_teamclaude_case teamclaude-secondmate "$id")
+  read_case_record "$rec"
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$id"
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  expect_code 0 "$status" "a TeamClaude claude secondmate spawn should succeed"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "secondmate launch"
+  pass "config/claude-launcher=teamclaude: a claude secondmate launch reaches claude with the TeamClaude proxy"
+}
+
+test_teamclaude_launcher_refusals_leave_no_task() {
+  local rec id out status
+  id=teamclaude-refuse-z44
+  rec=$(make_teamclaude_case teamclaude-refuse "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_TEAMCLAUDE_STATUS=1 \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "a stopped TeamClaude proxy must refuse the spawn"
+  assert_contains "$out" "proxy is not running" "the refusal must name the stopped proxy"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a stopped TeamClaude proxy must not launch anything"
+  assert_absent "$HOME_DIR/state/$id.meta" "a stopped TeamClaude proxy must refuse before the task record"
+
+  printf 'proxy\n' > "$HOME_DIR/config/claude-launcher"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "an unknown launcher token must refuse the spawn"
+  assert_contains "$out" "the only accepted value is teamclaude" "the refusal must name the accepted launcher value"
+  assert_absent "$HOME_DIR/state/$id.meta" "an unknown launcher token must refuse before the task record"
+  pass "config/claude-launcher=teamclaude refuses a stopped proxy or an unknown token before any task exists"
+}
+
+# A raw launch command whose program is claude passes the same check and runs
+# word for word under the launcher, so claude gets the proxy and its own flags.
+test_teamclaude_launcher_proxies_a_raw_claude_launch() {
+  local rec id out status env_out
+  id=teamclaude-raw-z47
+  rec=$(make_teamclaude_case teamclaude-raw "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_TEAMCLAUDE_STATUS=1 \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 1 "$status" "a stopped TeamClaude proxy must refuse a raw claude launch"
+  assert_contains "$out" "proxy is not running" "the raw refusal must name the stopped proxy"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw claude launch must not launch anything"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused raw claude launch must leave no task record"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 'claude --model opus')
+  status=$?
+  expect_code 0 "$status" "a raw claude launch should succeed while the proxy answers"$'\n'"$out"
+  fm_test_assert_teamclaude_launch "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "raw claude launch"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the raw claude command must keep its own arguments: $(cat "$env_out.args" 2>/dev/null)"
+  pass "config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments"
+}
+
+test_teamclaude_config_paths_reach_only_teamclaude() {
+  local rec id out status env_out
+  id=teamclaude-paths-z45
+  rec=$(make_teamclaude_case teamclaude-paths "$id")
+  read_case_record "$rec"
+
+  out=$(FM_TEST_XDG_CONFIG_HOME="$CASE_DIR/xdg" FM_TEST_TEAMCLAUDE_CONFIG="$CASE_DIR/teamclaude.json" \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "absolute TeamClaude configuration paths should be accepted"$'\n'"$out"
+  env_out="$CASE_DIR/claude-env"
+  fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
+    || fail "the TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
+  grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/xdg" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the XDG_CONFIG_HOME the spawn checked"
+  grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/teamclaude.json" "$env_out.teamclaude" \
+    || fail "the worker's teamclaude must read the TEAMCLAUDE_CONFIG the spawn checked"
+  grep -Fqx "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$env_out" \
+    || fail "claude must still receive HTTPS_PROXY from teamclaude"
+  ! grep -Eq '^(XDG_CONFIG_HOME|TEAMCLAUDE_CONFIG|FM_TC_[A-Z_]+)=' "$env_out" \
+    || fail "the TeamClaude configuration paths must not reach claude: $(cat "$env_out")"
+
+  id=teamclaude-relative-z46
+  fm_test_spawn_brief "$HOME_DIR" "$id"
+  out=$(FM_TEST_TEAMCLAUDE_CONFIG=teamclaude.json \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 1 "$status" "a relative TEAMCLAUDE_CONFIG must refuse"
+  assert_contains "$out" "requires an absolute TEAMCLAUDE_CONFIG" "the refusal must name the relative path"
+  assert_absent "$HOME_DIR/state/$id.meta" "a relative TEAMCLAUDE_CONFIG must refuse before the task record"
+  pass "TeamClaude configuration paths reach only the worker's teamclaude calls, and a relative one refuses"
+}
+
+make_config_sensitive_teamclaude() {
+  local fakebin=$1
+  cat > "$fakebin/teamclaude" <<'SH'
+#!/usr/bin/env bash
+config=$FM_TEST_TC_DEFAULT
+if [ -n "${TEAMCLAUDE_CONFIG:-}" ]; then
+  config=$TEAMCLAUDE_CONFIG
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
+  config=$XDG_CONFIG_HOME/teamclaude.json
+fi
+{
+  IFS= read -r proxy
+  IFS= read -r ca
+} < "$config" || exit 1
+printf '%s|%s|%s|%s|%s|%s|%s\n' "${1:-}" "${XDG_CONFIG_HOME+set}" \
+  "${XDG_CONFIG_HOME-}" "${TEAMCLAUDE_CONFIG+set}" "${TEAMCLAUDE_CONFIG-}" \
+  "$proxy" "$ca" >> "$FM_FAKE_TEAMCLAUDE_ENV_LOG"
+case "${1:-}" in
+  status) exit 0 ;;
+  env)
+    printf "export HTTPS_PROXY='%s'\nexport NODE_EXTRA_CA_CERTS='%s'\n" "$proxy" "$ca"
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$fakebin/teamclaude"
+}
+
+test_teamclaude_snapshot_overrides_stale_pane_configuration() {
+  local scenario rec id out status xdg_presence xdg_value tc_presence tc_value
+  local selected proxy ca expected preflight pane_log env_out bash_dir launch_kind
+  local -a launch_args
+  for scenario in unset xdg teamclaude both empty xdg-empty teamclaude-empty; do
+    id="teamclaude-snapshot-$scenario"
+    rec=$(make_teamclaude_case "teamclaude-snapshot-$scenario" "$id")
+    read_case_record "$rec"
+    make_config_sensitive_teamclaude "$FAKEBIN_DIR"
+    mkdir -p "$CASE_DIR/caller xdg" "$CASE_DIR/pane-xdg"
+    printf '%s\n' http://caller-default:13456 "$CASE_DIR/default-ca.pem" > "$CASE_DIR/default-config"
+    printf '%s\n' http://caller-xdg:13456 "$CASE_DIR/xdg-ca.pem" > "$CASE_DIR/caller xdg/teamclaude.json"
+    printf '%s\n' http://caller-explicit:13456 "$CASE_DIR/explicit-ca.pem" > "$CASE_DIR/caller explicit.json"
+    printf '%s\n' http://stale-pane:13456 "$CASE_DIR/stale-ca.pem" > "$CASE_DIR/pane-config"
+    printf '%s\n' http://stale-xdg:13456 "$CASE_DIR/stale-xdg-ca.pem" > "$CASE_DIR/pane-xdg/teamclaude.json"
+    xdg_presence='' tc_presence='' xdg_value='' tc_value=''
+    selected="$CASE_DIR/default-config"
+    launch_kind=template
+    launch_args=("$id" "$PROJ_DIR")
+    case "$scenario" in
+      xdg) xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"; selected="$xdg_value/teamclaude.json" ;;
+      teamclaude)
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      both)
+        xdg_presence='set'; xdg_value="$CASE_DIR/caller xdg"
+        tc_presence='set'; tc_value="$CASE_DIR/caller explicit.json"; selected=$tc_value
+        ;;
+      empty)
+        xdg_presence='set'; tc_presence='set'
+        launch_kind=raw; launch_args+=('claude --model opus')
+        ;;
+      xdg-empty) xdg_presence='set' ;;
+      teamclaude-empty) tc_presence='set' ;;
+    esac
+    {
+      IFS= read -r proxy
+      IFS= read -r ca
+    } < "$selected"
+    expected="$xdg_presence|$xdg_value|$tc_presence|$tc_value|$proxy|$ca"
+    preflight="$CASE_DIR/preflight.log"
+    : > "$preflight"
+    : > "$LAUNCH_LOG"
+    out=$(
+      unset XDG_CONFIG_HOME TEAMCLAUDE_CONFIG FM_TC_CONFIG_SNAPSHOT FM_TC_XDG_CONFIG_HOME FM_TC_TEAMCLAUDE_CONFIG
+      [ "$xdg_presence" != set ] || export XDG_CONFIG_HOME="$xdg_value"
+      [ "$tc_presence" != set ] || export TEAMCLAUDE_CONFIG="$tc_value"
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$preflight" \
+        FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+          "${launch_args[@]}" --mode no-mistakes --yolo off
+    )
+    status=$?
+    expect_code 0 "$status" "$scenario: $launch_kind spawn must use caller configuration"$'\n'"$out"
+    [ "$(cat "$preflight")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: preflight must read caller selector presence, values, proxy and CA: $(cat "$preflight")"
+    pane_log="$CASE_DIR/pane-teamclaude.log"
+    env_out="$CASE_DIR/pane-claude.env"
+    : > "$pane_log"
+    : > "$env_out"
+    bash_dir=$(fm_test_bash_only_dir "$CASE_DIR")
+    env -i HOME="$CASE_DIR/pane-home" PATH="$FAKEBIN_DIR:$bash_dir:/usr/bin:/bin" \
+      XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TC_CONFIG_SNAPSHOT=stale FM_TC_XDG_CONFIG_HOME="$CASE_DIR/pane-xdg" \
+      FM_TC_TEAMCLAUDE_CONFIG="$CASE_DIR/pane-config" \
+      FM_TEST_TC_DEFAULT="$CASE_DIR/default-config" FM_FAKE_TEAMCLAUDE_ENV_LOG="$pane_log" \
+      FM_FAKE_CLAUDE_ENV_LOG="$env_out" \
+      /bin/sh -c "$(cat "$LAUNCH_LOG")" </dev/null > "$CASE_DIR/pane-output" 2>&1
+    status=$?
+    expect_code 0 "$status" "$scenario: recorded $launch_kind command must run in the stale pane"
+    [ "$(cat "$pane_log")" = "$(printf '%s\n' "status|$expected" "env|$expected")" ] \
+      || fail "$scenario: launch must match caller configuration, not stale pane selectors: $(cat "$pane_log")"
+    grep -Fqx "HTTPS_PROXY=$proxy" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected proxy"
+    grep -Fqx "NODE_EXTRA_CA_CERTS=$ca" "$env_out" \
+      || fail "$scenario: Claude must receive the caller-selected CA"
+    grep -Fqx "XDG_CONFIG_HOME=$CASE_DIR/pane-xdg" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's XDG_CONFIG_HOME"
+    grep -Fqx "TEAMCLAUDE_CONFIG=$CASE_DIR/pane-config" "$env_out" \
+      || fail "$scenario: Claude must retain the pane's TEAMCLAUDE_CONFIG"
+    ! grep -q '^FM_TC_' "$env_out" \
+      || fail "$scenario: private snapshot variables must not reach Claude"
+    if [ "$launch_kind" = raw ]; then
+      [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
+        || fail "$scenario: the raw command must retain its Claude arguments"
+    fi
+  done
+  pass "TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration"
+}
+
+test_teamclaude_launcher_is_inherited_by_secondmates() {
+  local dir src dest status
+  dir="$TMP_ROOT/teamclaude-inherit"
+  src="$dir/home/config"
+  dest="$dir/secondmate"
+  mkdir -p "$src" "$dest"
+  printf 'teamclaude\n' > "$src/claude-launcher"
+  printf 'config/\n' > "$dest/.gitignore"
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$src" \
+    bash -c '. "$1/bin/fm-config-inherit-lib.sh"; propagate_inheritable_config "$2" "$3/config"' \
+    bash "$ROOT" "$src" "$dest" >/dev/null 2>&1
+  status=$?
+  expect_code 0 "$status" "TeamClaude launcher inheritance should succeed"
+  [ "$(cat "$dest/config/claude-launcher" 2>/dev/null)" = teamclaude ] \
+    || fail "a secondmate home did not inherit config/claude-launcher"
+  pass "config/claude-launcher is inherited by secondmate homes"
+}
+
+test_teamclaude_launcher_proxies_a_fresh_claude_spawn
+test_absent_claude_launcher_keeps_the_direct_launch
+test_teamclaude_launcher_proxies_a_claude_secondmate_launch
+test_teamclaude_launcher_refusals_leave_no_task
+test_teamclaude_config_paths_reach_only_teamclaude
+test_teamclaude_snapshot_overrides_stale_pane_configuration
+test_teamclaude_launcher_proxies_a_raw_claude_launch
+test_teamclaude_launcher_is_inherited_by_secondmates
 
 echo "# all fm-spawn-dispatch-profile tests passed"

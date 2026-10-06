@@ -183,6 +183,29 @@ EOF
 meta_traceparent() { sed -n 's/^traceparent=//p' "$1"; }
 injected_traceparent() { sed -n 's/^export TRACEPARENT=//p' "$1"; }
 
+# Execute every delivered pane command, including the full staged launch, with
+# a model-free worker probe. A stale exported carrier makes failure cleanup
+# observable; the probe distinguishes an unset carrier from an empty one.
+assert_worker_traceparent() {  # <launchlog> <pane-path> <fakebin> <expected>
+  local launchlog=$1 pane=$2 fakebin=$3 expected=$4 observed status
+  cat > "$fakebin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${TRACEPARENT-<unset>}" > "${0%/*}/traceparent.observed"
+SH
+  chmod +x "$fakebin/claude"
+  rm -f "$fakebin/traceparent.observed"
+  fm_eval_launch "$(cat "$launchlog")" "$pane" "$fakebin" \
+    TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+  status=$?
+  expect_code 0 "$status" "captured spawn launch should execute successfully"
+  observed='<not-launched>'
+  if [ -f "$fakebin/traceparent.observed" ]; then
+    observed=$(cat "$fakebin/traceparent.observed")
+  fi
+  [ "$observed" = "$expected" ] \
+    || fail "worker TRACEPARENT must match expected carrier (expected='$expected' observed='$observed')"
+}
+
 # Two-level primary -> secondmate -> worker regression for the FM_TRACE_CONTEXT
 # effective override. Drives bin/fm-spawn.sh TWICE against real homes and a real
 # worktree: first the primary launches a secondmate (capturing the exact env the
@@ -295,6 +318,7 @@ test_enabled_records_and_injects_identical_carrier_before_launch() {
   [ -n "$gl" ] && [ -n "$tl" ] && [ -n "$ll" ] || fail "launch log missing GOTMPDIR/TRACEPARENT/launch lines"
   [ "$tl" -gt "$gl" ] || fail "TRACEPARENT export must ride the GOTMPDIR pre-launch site (gotmp=$gl tp=$tl)"
   [ "$tl" -lt "$ll" ] || fail "TRACEPARENT export must be sent before the launch literal (tp=$tl launch=$ll)"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" "$mtp"
   pass "enabled: one resolved carrier is recorded in meta and the identical TRACEPARENT is exported before launch"
 }
 
@@ -314,6 +338,8 @@ test_disabled_writes_and_injects_neither() {
   ! grep -q '^traceparent=' "$meta" || fail "default-off spawn must not write a traceparent= line to meta"
   ! grep -q '^export TRACEPARENT=' "$LAUNCH_LOG" || fail "default-off spawn must not inject a TRACEPARENT export"
   grep -q '^export GOTMPDIR=' "$LAUNCH_LOG" || fail "the spawn should still run (GOTMPDIR is always injected)"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" \
+    00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
   pass "disabled: neither traceparent= in meta nor a TRACEPARENT export is produced"
 }
 
@@ -335,7 +361,7 @@ test_failed_delivery_omits_metadata_and_still_launches() {
     || fail "failed traceparent delivery must not leave a traceparent= claim in meta"
   ! grep -q '^export TRACEPARENT=' "$LAUNCH_LOG" \
     || fail "the failed TRACEPARENT export must not be recorded as delivered"
-  grep -q 'claude' "$LAUNCH_LOG" || fail "the source task must still launch"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" '<unset>'
   pass "failed TRACEPARENT delivery omits metadata while the source task still launches"
 }
 
@@ -352,8 +378,7 @@ test_unsafe_delivery_refuses_to_append_launch() {
   [ "$status" -ne 0 ] || fail "uncleared traceparent input must stop spawn"
   assert_contains "$out" "refusing to append the launch command" \
     "unsafe traceparent delivery should report why spawn stopped"
-  ! grep -q 'claude' "$LAUNCH_LOG" \
-    || fail "unsafe traceparent delivery must not append the launch command"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" '<not-launched>'
   pass "uncleared TRACEPARENT input stops before the launch command is appended"
 }
 
@@ -373,8 +398,9 @@ test_failed_metadata_append_unsets_carrier_and_still_launches() {
 
   ! grep -q '^traceparent=' "$meta" \
     || fail "failed metadata append must not leave a traceparent= claim in meta"
-  grep -q '^unset TRACEPARENT; .*claude' "$LAUNCH_LOG" \
-    || fail "failed metadata append must unset TRACEPARENT in the launch command"
+  fm_trace_context_valid "$(injected_traceparent "$LAUNCH_LOG")" \
+    || fail "metadata append failure must occur after a valid carrier is delivered"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" '<unset>'
   pass "failed traceparent metadata append removes the carrier from the launched task"
 }
 
@@ -444,6 +470,7 @@ test_relaunch_reuses_recorded_carrier() {
   injected=$(injected_traceparent "$LAUNCH_LOG")
   [ "$second" = "$first" ] || fail "relaunch must reuse the recorded carrier in meta (first='$first' second='$second')"
   [ "$injected" = "$first" ] || fail "relaunch must inject the same recorded carrier (first='$first' injected='$injected')"
+  assert_worker_traceparent "$LAUNCH_LOG" "$WT_DIR" "$FAKEBIN_DIR" "$first"
   pass "relaunch reuses the recorded carrier verbatim for both the meta record and the injected export"
 }
 

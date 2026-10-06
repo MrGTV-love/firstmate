@@ -1,35 +1,40 @@
 #!/usr/bin/env python3
 """
-fm-jev-mem-guard.py - Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)
+fm-mem-guard.py - Local host memory-pressure and top-RSS diagnostic.
 
-Audits host memory availability (/proc/meminfo) and swap utilization to detect memory
-starvation, swap thrashing, and out-of-control worker RSS expansion across multi-agent seats.
-Prevents catastrophic OOM killer invocations against persistent agent supervisors and tmux sessions.
+No model, API, or network call is made; the guard only reports host readings.
+Linux uses /proc/meminfo and /proc/<pid>/{statm,comm}.
+macOS uses memory_pressure -Q, sysctl -n hw.memsize vm.swapusage, and ps ucomm.
+On macOS MemAvailable is estimated from the native memory-pressure free percentage,
+not vm_stat's raw free pages: reclaimable/compressed memory must not be counted
+as exhausted RAM. SwapTotal is the currently allocated swap pool, not a fixed cap;
+macOS swap occupancy is telemetry only and never classifies pressure, because
+the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
-Thresholds (each named for the CLI flag that carries its operational default; run --help for current values):
-  - --warn-mem-pct: memory utilization warning, percent of MemTotal not available.
-  - --crit-mem-pct: memory utilization critical, percent of MemTotal not available.
-  - --warn-swap-pct: swap utilization warning, percent of SwapTotal in use.
-  - --crit-swap-pct: swap utilization critical, percent of SwapTotal in use.
+Thresholds (run --help for defaults):
+  - --warn-mem-pct / --crit-mem-pct: percent of total memory not available.
+  - --warn-swap-pct / --crit-swap-pct: Linux-only percent of swap capacity in use.
 
 Invariants:
-  - Read-only diagnostics.
-  - Fail-open: an unreadable or incomplete /proc/meminfo degrades to a graceful status
-    UNKNOWN with a machine-readable reason and a 0 --check exit, never a crash and never
-    a false alarm; an unassessed host reports null measured percentages (JSON null,
-    "unavailable" in human output) instead of fabricated numbers.
-  - Swap with SwapTotal > 0 but no SwapFree line is reported as unknown and never
-    classifies the verdict; a failed top-process listing degrades to an empty list.
-  - Bounded sub-second execution (< 500ms).
-  - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic text
-    for the operator, never a command.
+  - Read-only diagnostics, not OOM prevention or an automatic intervention.
+  - Missing memory readings yield UNKNOWN, a reason, null summary measurements,
+    and a 0 --check exit. Missing swap never classifies the verdict.
+  - A failed top-process listing degrades to an empty list.
+  - macOS memory reads share a 400ms budget and the ps top-RSS listing has its
+    own 400ms budget; unavailable commands/timeouts withhold the affected
+    measurement rather than blocking the caller.
+  - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic
+    text for the operator, never a command.
 """
 
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 from datetime import datetime, timezone
+from time import monotonic
 from typing import Any, Dict, List, Optional
 
 
@@ -48,6 +53,69 @@ def read_meminfo() -> Dict[str, int]:
     except Exception:
         pass
     return info
+
+
+def native_output(command: List[str], deadline: float) -> str:
+    """Reads a native utility within the remaining shared budget."""
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        return ""
+    try:
+        return subprocess.run(
+            command, capture_output=True, text=True, check=True,
+            timeout=remaining, env={**os.environ, "LC_ALL": "C"},
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def read_macos_memory(deadline: float) -> Dict[str, int]:
+    """Maps native pressure and swap readings to the existing kB metric contract."""
+    host = native_output(
+        ["/usr/sbin/sysctl", "-n", "hw.memsize", "vm.swapusage"], deadline,
+    )
+    pressure = native_output(["/usr/bin/memory_pressure", "-Q"], deadline)
+    total = re.search(r"^(\d+)$", host, re.MULTILINE)
+    free = re.search(r"^System-wide memory free percentage:\s*(\d+)%$", pressure, re.MULTILINE)
+    info: Dict[str, int] = {}
+    if total and free and int(total[1]) > 0 and 0 <= int(free[1]) <= 100:
+        info["MemTotal"] = int(total[1]) // 1024
+        info["MemAvailable"] = info["MemTotal"] * int(free[1]) // 100
+
+    swap = re.search(
+        r"total\s*=\s*([\d.]+)([KMG])\s+used\s*=\s*([\d.]+)([KMG])"
+        r"\s+free\s*=\s*([\d.]+)([KMG])", host,
+    )
+    if swap:
+        try:
+            units = {"K": 1, "M": 1024, "G": 1024 * 1024}
+            total_kb = float(swap[1]) * units[swap[2]]
+            used_kb = float(swap[3]) * units[swap[4]]
+            free_kb = float(swap[5]) * units[swap[6]]
+            if 0 <= used_kb <= total_kb and 0 <= free_kb <= total_kb:
+                info["SwapTotal"] = int(total_kb)
+                info["SwapFree"] = int(free_kb)
+        except ValueError:
+            pass
+    return info
+
+
+def get_macos_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
+    """Reads ps RSS in KiB within its own budget, applying the Linux listing's cutoff and ordering."""
+    procs: List[Dict[str, Any]] = []
+    output = native_output(["/bin/ps", "-axo", "pid=,rss=,ucomm="], monotonic() + 0.4)
+    for line in output.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+            continue
+        rss_kb = int(parts[1])
+        if rss_kb >= 10240:
+            procs.append({
+                "pid": int(parts[0]), "comm": parts[2].rstrip(),
+                "rss_mb": round(rss_kb / 1024.0, 1),
+            })
+    procs.sort(key=lambda p: p["rss_mb"], reverse=True)
+    return procs[:top_n]
 
 
 def get_top_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
@@ -102,7 +170,18 @@ def audit_memory(
     crit_swap_pct: float,
 ) -> Dict[str, Any]:
     """Audits system memory and swap usage, failing open to status UNKNOWN when unmeasurable."""
-    mem = read_meminfo()
+    if sys.platform == "darwin":
+        mem = read_macos_memory(monotonic() + 0.4)
+        unavailable_reason = "macos-memory-unavailable"
+        unavailable_source = "Native macOS memory-pressure readings are unavailable or incomplete"
+    elif sys.platform.startswith("linux"):
+        mem = read_meminfo()
+        unavailable_reason = "meminfo-unavailable"
+        unavailable_source = "/proc/meminfo is unreadable or incomplete"
+    else:
+        mem = {}
+        unavailable_reason = "unsupported-platform"
+        unavailable_source = "Memory readings for this platform are unsupported"
     mem_total_kb = mem.get("MemTotal")
     mem_avail_kb = mem.get("MemAvailable")
     swap_total_kb = mem.get("SwapTotal")
@@ -118,9 +197,9 @@ def audit_memory(
 
     if mem_total_kb is None or mem_total_kb <= 0 or mem_avail_kb is None:
         status = "UNKNOWN"
-        reason = "meminfo-unavailable"
+        reason = unavailable_reason
         recommendation = (
-            "/proc/meminfo is unreadable or incomplete on this host; "
+            f"{unavailable_source} on this host; "
             "the verdict is withheld rather than fabricated."
         )
     else:
@@ -139,35 +218,43 @@ def audit_memory(
                 swap_used_gb = round(swap_used_kb / (1024.0 * 1024.0), 2)
                 swap_used_pct = round((swap_used_kb / swap_total_kb) * 100.0, 1)
 
+        swap_classifies = sys.platform.startswith("linux")
         crit = mem_used_pct >= crit_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= crit_swap_pct
+            swap_classifies and swap_used_pct is not None and swap_used_pct >= crit_swap_pct
         )
         warn = mem_used_pct >= warn_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= warn_swap_pct
+            swap_classifies and swap_used_pct is not None and swap_used_pct >= warn_swap_pct
         )
+        condition = "Native memory pressure" if sys.platform == "darwin" else "Memory or swap utilization"
         if crit:
             status = "CRITICAL"
             recommendation = (
-                "Memory or swap utilization is at or above a critical threshold; "
+                f"{condition} is at or above a critical threshold; "
                 "this host condition can explain worker silence while it holds."
             )
         elif warn:
             status = "WARNING"
             recommendation = (
-                "Memory or swap utilization is above a warning threshold but below a "
+                f"{condition} is above a warning threshold but below a "
                 "critical one; degraded but explained, see the top RSS processes."
             )
         else:
             status = "OK"
             recommendation = (
-                "Memory and swap utilization are within thresholds; "
+                ("Native memory pressure is within thresholds; swap is telemetry only; "
+                 if sys.platform == "darwin" else "Memory and swap utilization are within thresholds; ") +
                 "the caller should continue unchanged."
             )
 
-    top_procs = get_top_rss_processes()
+    if sys.platform == "darwin":
+        top_procs = get_macos_rss_processes()
+    elif sys.platform.startswith("linux"):
+        top_procs = get_top_rss_processes()
+    else:
+        top_procs = []
 
     return {
-        "name": "fm-jev-mem-guard",
+        "name": "fm-mem-guard",
         "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": status,
         "recommendation": recommendation,
@@ -187,7 +274,7 @@ def audit_memory(
 def main():
     sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(
-        description="Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)"
+        description="Local host memory-pressure and top-RSS diagnostic (Linux and macOS; no API calls)"
     )
     parser.add_argument(
         "--warn-mem-pct",
@@ -205,13 +292,13 @@ def main():
         "--warn-swap-pct",
         type=float,
         default=85.0,
-        help="Warning threshold for swap utilization %% (default: %(default)s)",
+        help="Linux-only warning threshold for swap utilization %% (default: %(default)s)",
     )
     parser.add_argument(
         "--crit-swap-pct",
         type=float,
         default=95.0,
-        help="Critical threshold for swap utilization %% (default: %(default)s)",
+        help="Linux-only critical threshold for swap utilization %% (default: %(default)s)",
     )
     parser.add_argument(
         "--json",
