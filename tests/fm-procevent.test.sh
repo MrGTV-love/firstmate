@@ -5208,16 +5208,16 @@ confirm_live_at_boundary arm
 confirm_live_at_boundary reconcile 1
 confirm_live_at_boundary arm 1
 
-# A confirmation reader must not become the obstacle to publication. Release
-# the real runner at a post-launch stamp read, and make a reader-owned mutex
-# publication return slowly. It is a real lock, not a claimed/readiness marker;
-# taking it just to inspect an absent claim would make this healthy launch fail.
-confirm_without_absent_reader_contention() {
-  local operation=$1 CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK
+# A confirmation reader must not become the obstacle to publication. Gate the
+# real runner until a post-launch stamp read, and make a reader-owned mutex
+# publication return slowly. Taking it just to inspect an absent or old stale
+# claim would make this healthy replacement fail at the unchanged default window.
+confirm_without_unproved_reader_contention() {
+  local operation=$1 claim_kind=${2:-absent} CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK
   local REAL_CAT REAL_LN rc=0 output owner
   local -a command=()
-  CONTENDED="$TMP_ROOT/absent-reader-$operation"
-  CONTENDED_ID="absent-reader-$operation"
+  CONTENDED="$TMP_ROOT/$claim_kind-reader-$operation"
+  CONTENDED_ID="$claim_kind-reader-$operation"
   CONTENDED_CORE="$ROOT/bin/fm-procevent.sh"
   CONTENDED_CLAIM="$FM_PROCEVENT_CLAIM_ROOT/$CONTENDED_ID.claim"
   CONTENDED_LOCK="$FM_PROCEVENT_CLAIM_ROOT/$CONTENDED_ID.lock"
@@ -5226,6 +5226,12 @@ confirm_without_absent_reader_contention() {
   mkdir -p "$CONTENDED/bin" "$CONTENDED/home/state"
   pe_register "$CONTENDED/home" lavish "$CONTENDED_ID" -- \
     "$STARTED_BLOCKER" "$CONTENDED/started" "$BLOCKER" "$CONTENDED/release" "done" >/dev/null
+  if [ "$claim_kind" = stale ]; then
+    printf '%s\n999999\ndead-token\ndead-identity\n%s\n' \
+      "$CONTENDED/home" "$CONTENDED/home/state/procevent" > "$CONTENDED_CLAIM"
+    chmod 0600 "$CONTENDED_CLAIM"
+    printf 'abandoned output\n' > "$CONTENDED/home/state/procevent/.$CONTENDED_ID.dead-token.output"
+  fi
   export CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK REAL_CAT REAL_LN
   cat > "$CONTENDED/bin/bash" <<'SH'
 #!/bin/bash
@@ -5235,7 +5241,8 @@ case "${1-}" in
       reconcile|ensure-listening) export CONTENDED_READER=1 ;;
       _start)
         unset CONTENDED_READER
-        while [ ! -e "$CONTENDED/post-launch-read" ]; do
+        : > "$CONTENDED/runner-waiting"
+        while [ ! -e "$CONTENDED/runner-release" ]; do
           [ "$SECONDS" -lt 120 ] || exit 75
           /bin/sleep 0.01
         done
@@ -5250,11 +5257,20 @@ SH
 last=; for arg in "$@"; do last=$arg; done
 case "$last" in
   *"/$CONTENDED_ID."*.last-launch)
-    n=0; [ ! -e "$CONTENDED/stamp-reads" ] || read -r n < "$CONTENDED/stamp-reads"
-    n=$((n + 1)); printf '%s\n' "$n" > "$CONTENDED/stamp-reads"
-    "$REAL_CAT" "$@"; rc=$?
-    [ "$n" -lt 3 ] || : > "$CONTENDED/post-launch-read"
-    exit "$rc"
+    if [ "${CONTENDED_READER:-0}" = 1 ] && [ -e "$CONTENDED/runner-waiting" ]; then
+      "$REAL_CAT" "$@"; rc=$?
+      if [ -e "$CONTENDED/post-launch-read" ] && [ ! -e "$CONTENDED/reader-hold-applied" ]; then
+        # Observe that the previous pass skipped the unproved claim's mutex,
+        # then retain this stale stamp snapshot until the real publisher ran.
+        : > "$CONTENDED/runner-release"
+        while [ ! -s "$CONTENDED/started" ]; do
+          [ "$SECONDS" -lt 10 ] || exit 75
+          /bin/sleep 0.01
+        done
+      fi
+      : > "$CONTENDED/post-launch-read"
+      exit "$rc"
+    fi
     ;;
 esac
 exec "$REAL_CAT" "$@"
@@ -5262,13 +5278,34 @@ SH
   cat > "$CONTENDED/bin/ln" <<'SH'
 #!/bin/bash
 last=; for arg in "$@"; do last=$arg; done
-if [ "$last" = "$CONTENDED_LOCK" ] && [ -e "$CONTENDED/post-launch-read" ] \
-  && [ ! -e "$CONTENDED_CLAIM" ] && [ ! -e "$CONTENDED/reader-hold-applied" ]; then
-  if [ "${CONTENDED_READER:-0}" = 1 ]; then
+if [ "$last" = "$CONTENDED_LOCK" ] && [ -e "$CONTENDED/post-launch-read" ]; then
+  unproved=0; token=
+  if [ ! -e "$CONTENDED_CLAIM" ] && [ ! -L "$CONTENDED_CLAIM" ]; then
+    unproved=1
+  elif [ -f "$CONTENDED_CLAIM" ] && [ ! -L "$CONTENDED_CLAIM" ]; then
+    { IFS= read -r home; IFS= read -r pid; IFS= read -r token; } < "$CONTENDED_CLAIM"
+    [ "$token" != dead-token ] || unproved=1
+  fi
+  if [ "${CONTENDED_READER:-0}" = 1 ] && [ "$unproved" -eq 1 ] \
+    && [ ! -e "$CONTENDED/reader-hold-applied" ]; then
     "$REAL_LN" "$@" || exit $?
     : > "$CONTENDED/reader-hold-applied"
+    : > "$CONTENDED/runner-release"
     /bin/sleep 5
     exit 0
+  elif [ "${CONTENDED_READER:-0}" != 1 ] && [ -e "$CONTENDED/reader-hold-applied" ] \
+    && [ ! -e "$CONTENDED/reader-finished" ]; then
+    "$REAL_LN" "$@"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+      printf 'blocked by reader\n' > "$CONTENDED/runner-blocked"
+      # Preserve the actual refused publisher attempt until the consumer returns,
+      # so an over-deadline retry cannot rescue a reader that obstructed startup.
+      while [ ! -e "$CONTENDED/reader-finished" ]; do
+        [ "$SECONDS" -lt 120 ] || exit 75
+        /bin/sleep 0.01
+      done
+    fi
+    exit "$rc"
   fi
 fi
 exec "$REAL_LN" "$@"
@@ -5278,12 +5315,19 @@ SH
   [ "$operation" = reconcile ] || command+=("$CONTENDED_ID")
   PATH="$CONTENDED/bin:$PATH" FM_HOME="$CONTENDED/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS='' \
     "${command[@]}" > "$CONTENDED/out" 2> "$CONTENDED/err" || rc=$?
-  [ "$rc" -eq 0 ] || fail "$operation delayed a healthy claim while inspecting absent ownership: $(cat "$CONTENDED/err")"
+  : > "$CONTENDED/reader-finished"
+  [ "$rc" -eq 0 ] || fail "$operation delayed a healthy claim while inspecting $claim_kind ownership: $(cat "$CONTENDED/err")"
+  assert_absent "$CONTENDED/reader-hold-applied" \
+    "$operation took a confirmation mutex for an absent or old stale claim"
   wait_for "$CONTENDED/started" || fail "$operation did not launch the actual source command"
   owner=$(pe "$CONTENDED/home" list | awk -v id="$CONTENDED_ID" '$1 == id { print $3 }')
   [ "$owner" = live ] || fail "$operation accepted an unproved owner: $owner"
   assert_contains "$(pe "$CONTENDED/home" start "$CONTENDED_ID")" "already owned" \
     "$operation failed to retain exclusive live ownership"
+  if [ "$claim_kind" = stale ]; then
+    assert_absent "$CONTENDED/home/state/procevent/.$CONTENDED_ID.dead-token.output" \
+      "$operation bypassed the old generation's staging cleanup"
+  fi
   if [ "$operation" = reconcile ]; then
     output=$(cat "$CONTENDED/out")
     assert_contains "$output" "started=1" "reconcile did not confirm the healthy launch"
@@ -5294,10 +5338,12 @@ SH
   : > "$CONTENDED/release"
   pe "$CONTENDED/home" retire "$CONTENDED_ID" >/dev/null 2>&1 || true
   unset CONTENDED CONTENDED_ID CONTENDED_CORE CONTENDED_CLAIM CONTENDED_LOCK REAL_CAT REAL_LN
-  pass "$operation confirms a healthy default-window launch without obstructing claim publication"
+  pass "$operation confirms a healthy default-window $claim_kind-claim launch without obstructing publication"
 }
-confirm_without_absent_reader_contention reconcile
-confirm_without_absent_reader_contention ensure-listening
+confirm_without_unproved_reader_contention reconcile
+confirm_without_unproved_reader_contention ensure-listening
+confirm_without_unproved_reader_contention reconcile stale
+confirm_without_unproved_reader_contention ensure-listening stale
 
 # Holding the source lock is not a claim: argv is read before the claim file is
 # written. Keep a live runner at that read beyond the default 3 s window and
