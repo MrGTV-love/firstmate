@@ -88,5 +88,4 @@ Claude's PreToolUse seatbelt blocks directly, and its deny is honored only with 
 
 ### Helper agents
 
-Claude's helper agents and session tools remain available to the primary for work that is not project-specific, such as consolidating firstmate-private reports.
 [`Primary helper agents and durable project work`](../../../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
