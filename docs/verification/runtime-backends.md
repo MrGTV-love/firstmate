@@ -1003,6 +1003,45 @@ tests/fm-composer-codex-idle-live-e2e.test.sh
 The verification machine runs its fleet on Herdr and has no tmux installed, so on 2026-09-15 that guard reported `skip: live: tmux absent` there, and the Herdr capture above is this entry's live evidence.
 The guard also notes whether the starfield and the placeholder were actually drawn during its read, because codex need not animate them under every model or mode; a refresh on a tmux host should record that note beside the verdict rather than assume the starfield was exercised.
 
+### 2026-10-06 omp box composer through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against omp 18.6.3 in an isolated Herdr 0.9.1 lab session, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the session composer pin; the remaining user configuration selected `box` in this verification.
+omp live-reloads every `--config` overlay file it was started with: an idle worker launched with the overlay pinning `borderless` drew a bare `❯` row, and removing the `shape` line from that file in place made the same worker redraw as the box shape within seconds, with no restart.
+The observed empty single-line composer had its status in the top border and its last input row folded into the bottom border:
+
+```text
+╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 firstmate/firstmate > ⑂ fm/fm-model-index > … 🆔 01a111e1 ──╮
+╰─                                                                                     ─╯
+```
+
+Typed text appears in the folded row (`╰─ hello world typed text ─╯`), wrapped text takes `│ … │` rows above it, and the empty row shows a right-aligned `⇧⇥ to change thinking effort` hint whose key glyphs are bright and whose words are dim italic (luminance 113, below the default ghost ceiling of 128).
+The current classification and plain-hint safety boundary is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact container predicates are owned by `bin/fm-composer-lib.sh`.
+`test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
+
+The live guard that refreshes this entry launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
+Its default-on checks spend no tokens wherever omp, herdr, and jq are installed; the relaunch proof submits a real worker brief and remains opt-in:
+
+```sh
+FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
+```
+
+Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
+Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
+The relaunch proof first requires a live agent with a proven empty box composer, failing if that readiness wait expires, then checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
+
+Observed output:
+
+```text
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-26478-21255
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control exit stops the idle box-shaped worker and preserves its endpoint
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint
+```
+
+With the classifier change reverted, the same run stopped at `an idle empty box composer read 'unknown', not empty`.
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
