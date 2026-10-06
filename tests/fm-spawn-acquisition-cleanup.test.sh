@@ -101,6 +101,11 @@ DIRTY="$TMP_ROOT/dirty"
 fm_git_init_commit "$DIRTY"
 CLEAN="$TMP_ROOT/clean"
 fm_git_init_commit "$CLEAN"
+# An ordinary caller checkout must not lend its origin to acquired origin-less copies.
+CALLER="$TMP_ROOT/caller"
+fm_git_init_commit "$CALLER"
+git -C "$CALLER" config remote.origin.url "file://$TMP_ROOT/caller-only-origin.git"
+cd "$CALLER" || fail "cannot enter caller checkout"
 # A dirty acquired copy exercises refusal AFTER discovery, before launch.
 printf 'uncommitted\n' >> "$DIRTY/README.md"
 if [ "$BACKEND" = tmux ]; then

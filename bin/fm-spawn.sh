@@ -1308,6 +1308,12 @@ spawn_abort_cleanup() {
       "$HERDR_PROJECTION_ABORT_SESSION" \
       "$HERDR_PROJECTION_ABORT_TASK_PANE" \
       "$HERDR_PROJECTION_ABORT_SEEDED_PANE" || true
+    # Projection cleanup already owns this exact pane under the held lock.
+    # Retire the generic target only after proving the process endpoint is gone.
+    if [ "$SPAWN_TREEHOUSE_ABORT_TARGET" = "$HERDR_PROJECTION_ABORT_SESSION:$HERDR_PROJECTION_ABORT_TASK_PANE" ] &&
+      fm_backend_herdr_endpoint_confirmed_gone "$SPAWN_TREEHOUSE_ABORT_TARGET"; then
+      SPAWN_TREEHOUSE_ABORT_TARGET=
+    fi
   fi
   if [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" = 1 ]; then
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
@@ -3446,6 +3452,7 @@ spawn_worktree_has_origin_config() { # <worktree>
   git -C "$worktree" config --get-regexp '^remote\.origin\.' >/dev/null 2>&1 && return 0
   while IFS=$'\t' read -r origin key; do
     case $origin in file:*) config=${origin#file:} ;; *) continue ;; esac
+    case $config in /*) ;; *) config="$worktree/$config" ;; esac
     [ -f "$config" ] || continue
     case $seen in *$'\n'"$config"$'\n'*) continue ;; esac
     seen+="$config"$'\n'
