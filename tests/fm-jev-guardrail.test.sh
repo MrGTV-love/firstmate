@@ -45,6 +45,18 @@ try {
     [{operation:'secret_read',scope:'secret',recursive:false,force:false}]);
   console.log('ok - wrapper-only env dumps are screened without executing env; wrapped reads, help and command lookup remain excluded');
 
+  // Pass command text to the hook only; never execute an environment lookup.
+  assert.equal(hook('printenv TYPESAFE_API_KEY').status, 'missing_key');
+  assert.equal(hook('printenv PATH').status, 'excluded');
+  assert.equal(hook('printenv --help').status, 'excluded');
+  assert.equal(hook('printenv -- TYPESAFE_API_KEY', { TYPESAFE_API_KEY: 'synthetic-key' }).status, 'judged');
+  assert.deepEqual(JSON.parse(readFileSync(env.LOG_REQUEST, 'utf8')).state.operations,
+    [{operation:'secret_read',scope:'secret',recursive:false,force:false}]);
+  assert.ok(!readFileSync(env.LOG_REQUEST, 'utf8').includes('TYPESAFE_API_KEY'));
+  assert.ok(!readFileSync(log, 'utf8').includes('TYPESAFE_API_KEY'));
+  assert.ok(!readFileSync(log, 'utf8').includes('synthetic-key'));
+  console.log('ok - named secret environment lookups are selected without sending names or values; PATH and help stay excluded');
+
   const secret = 'synthetic-secret-customer-content';
   const result = hook(`TOKEN=${secret} rm -rf /production/${secret}; printf '${secret}'`, { TYPESAFE_API_KEY: 'synthetic-key' });
   assert.equal(result.status, 'judged');

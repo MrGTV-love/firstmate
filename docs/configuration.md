@@ -1370,6 +1370,7 @@ Selection reuses Firstmate's shell command-position parser, including nested gro
 Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access commands are candidates; ordinary reads and printed command examples do not call Jev.
 Native `Read`/`read` paths select secret-shaped targets without opening the file.
 Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
+`printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
 

@@ -553,6 +553,33 @@ ok - away branch replacement applies ordinary/recovery replacement admission wit
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 ```
 
+## Jev shadow native tool hooks
+
+The current behavior and privacy boundary are owned by [Jev command screening](../configuration.md#jev-command-screening-shadow-only).
+Native hook observations used omp 18.6.1 on 2026-10-05 and Claude Code 2.1.291 through TeamClaude 1.1.21-affinity.0 on 2026-10-06.
+Both hosts executed the same five synthetic cases: ordinary file read, bounded local missing-file delete, allowed synthetic secret-shaped file read, independently denied synthetic secret-shaped file read, and missing synthetic secret-shaped file read.
+Matched native controls omitted only the shadow hook; both hosts retained exactly the same success, denial and path-not-found outcomes with shadow enabled, a missing Jev key, or explicitly injected timeout/malformed transport responses.
+
+| Actual native observation | omp | Claude |
+| --- | --- | --- |
+| Ordinary read | Excluded; no request | Excluded; no request |
+| Genuine Jev starts / returned judgments | 4 / 4 | 4 / 3, plus one genuine timeout with unknown usage/cost |
+| Bounded local delete verdict | Routine | Routine |
+| Allowed and independently denied synthetic secret-read verdicts | Risky | Risky |
+| Native selected-command p95 screen time | 221.722ms | 2029.214ms |
+| Missing-key attempts | 0 | 0 |
+| Injected fault handling | One timeout, three malformed responses | One timeout, three malformed responses |
+
+The timeout is retained rather than retried into a pass, and neither host's synthetic sample establishes fleet recall, seven-day/300-command volume, total task cost savings or blocking readiness.
+The Claude sample misses the separately owned 500ms promotion bar.
+Only closed structural operations reach Jev; native ledgers contain no fixture bodies, command text, paths or key sentinels.
+Native `PostToolUse`/`PostToolUseFailure` and omp `tool_result` observations correlate outcomes by hashed tool identifier; an independently denied call without a completion event remains unknown in metrics rather than being called successful.
+Other harnesses have no guardrail caller in this slice, and these observations do not claim their coverage.
+
+The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh`; it proves selector, privacy, advisory-output and unavailable-usage boundaries, not native host activation.
+The actual native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
+Those private fixture ledgers and exact native invocations remain delivery evidence, not shipped fixtures or a claim that offline tests refresh native proof after a host upgrade.
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.
