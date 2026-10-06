@@ -20,9 +20,9 @@
 # `start` refuses on those harnesses. The same holds for away mode (not quiet
 # mode) on a claude, cursor, opencode, omp, grok, or codex primary whose home
 # opted into the supervision host (config/supervision-host), where the host
-# runs the away session; `enter` there adds one line when the host has no
-# engine, because every away wake then reaches main. Every other harness still
-# runs the daemon for now, so `start` and `start-native` require the record
+# runs the away session when activation is permitted; `enter` adds one line when
+# the host has no engine, because every away wake then reaches main.
+# Every other harness still runs the daemon, so `start` and `start-native` require the record
 # `enter` wrote before they launch the daemon.
 # QUIET MODE on a home that opted into the supervision host needs nothing
 # where the attended host runs (docs/supervision-host.md "Quiet mode"): its
@@ -237,8 +237,8 @@ fm_afk_launch_primary_harness() {
   "$FM_AFK_LAUNCH_DIR/fm-harness.sh" 2>/dev/null || printf unknown
 }
 
-# The primary harnesses whose arm owner runs the supervision host when the
-# home opted in (docs/supervision-host.md).
+# The primary harnesses whose arm owner selects the supervision host when the
+# home opts in (docs/supervision-host.md owns activation).
 fm_afk_launch_host_primary() {  # <harness>
   case "$1" in
     claude|cursor|opencode|omp|grok|codex) return 0 ;;
@@ -316,7 +316,7 @@ fm_afk_launch_quiet_check() {
 # The away daemon is no longer launched on Pi, nor for away mode on a primary
 # whose home opted into the supervision host (config/supervision-host,
 # docs/supervision-host.md): the posture record is the whole entry there and
-# the ordinary supervision session runs in both postures. Quiet mode runs the
+# main handles wakes when host activation is refused. Quiet mode runs the
 # daemon on that home only where a quiet `enter` found the attended host
 # unready (the header's QUIET MODE), so a quiet entry or a refresh of a running
 # quiet daemon is allowed.
@@ -339,9 +339,9 @@ fm_afk_launch_daemon_allowed() {
   return 1
 }
 
-# One line for the entry when this home runs the supervision host but the host
-# has no engine (bin/fm-supervision-engine-lib.sh owns the opt-in parse), so
-# the away posture would hand every wake to main.
+# One entry line when the configured host has no usable engine, including a
+# launch-policy refusal (bin/fm-supervision-engine-lib.sh owns selection), so
+# main handles every away wake.
 fm_afk_launch_host_engine_note() {
   local harness config
   [ "${FM_AFK_MODE:-}" != quiet ] || return 0

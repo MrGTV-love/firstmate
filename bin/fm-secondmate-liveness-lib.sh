@@ -257,9 +257,9 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 
 # fm_secondmate_liveness_relaunch <meta> <id> [timeout-secs]
 #
-# Acts on a `relaunchable` probe verdict for <id>: kills a confirmed-dead local
-# endpoint first (FM_SM_LIVE_KILL), records the attempt and its outcome in the
-# per-mate ledger, then runs the guarded secondmate spawn. A positive timeout
+# Acts on a `relaunchable` probe verdict for <id>, subject to the launch policy
+# owned by docs/configuration.md: records the attempt before killing a confirmed-dead
+# local endpoint (FM_SM_LIVE_KILL), then runs the guarded secondmate spawn and records its outcome. A positive timeout
 # wraps the spawn in fm_run_timed so a watcher poll stays bounded; 124/137 mean
 # the bound fired. Returns the spawn exit status; combined spawn output is in
 # FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the ledger cannot be

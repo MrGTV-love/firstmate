@@ -24,16 +24,18 @@
 //   - The arming tool is fm_watch_arm_omp and its human fallback
 //     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
 //   - Supervision host: a home opted in with config/supervision-host
-//     (docs/configuration.md "Supervision host" owns the opt-in) spawns
-//     bin/fm-supervision-host.sh park --restart in the arm's place, which
-//     takes away-posture wakes itself and closes only when main is needed; its
-//     header owns the output read here. A "supervision-host:" line is
+//     (docs/configuration.md "Supervision host" owns the opt-in) selects
+//     bin/fm-supervision-host.sh park --restart in the arm's place, subject to
+//     the session launch policy. A permitted host takes away-posture wakes itself
+//     and closes when main is needed; its header owns the output read here.
+//     A "supervision-host:" line is
 //     actionable like a wake line, and the message delivered at the host's
 //     close carries every such line in order while wake lines keep an
 //     eight-line cap. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
-//     longer readiness budget for the host's own startup. Without the file
+//     longer readiness budget for the host's own startup. A launch refusal restores
+//     the ordinary arm until the host configuration changes. Without the file
 //     nothing below changes.
 //
 // Session-generation ownership (stated once here):

@@ -323,7 +323,7 @@ Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, 
 
 ### Failures and when changes apply
 
-An unverified engine, a primary without a verified engine, or a malformed line leaves the host without an engine.
+Without an enabled [session launch policy](#session-launch-policy-configsession-launch-policy), an unverified engine, a primary without a verified engine, or a malformed line leaves the host without an engine.
 It takes no wake, so every wake reaches main as it would without the host.
 Each away-posture wake includes a line naming the problem.
 An active host reads the file at every wake, so an engine-selection change applies at the next one without a restart.
@@ -787,7 +787,7 @@ The shared template leaves this restriction off by default: absence preserves ex
 Enabling it in each captain home is the operator's responsibility; Main owns that activation for the captain's fleet.
 An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
-Local recovery converges this setting before checkpointing or stopping the old endpoint and refuses if the child restriction cannot be established, while unrelated inheritance remains best-effort.
+Local recovery converges this setting before stopping the old endpoint and refuses if the child restriction cannot be established, while unrelated inheritance remains best-effort.
 
 This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
 Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
@@ -801,7 +801,7 @@ Remote secondmate replacement checks the initiating home's policy before transpo
 Automatic secondmate recovery and host-local remote launch check the selected replacement before removing an existing endpoint; a refused automatic recovery records no attempt.
 The supervision host also refuses a disallowed engine before activation can stop its predecessor or retire its custody, and direct or resumed engine turns repeat the same check.
 Its policy refusal is a terminal actionable close, not an ownership stand-down: Claude's Stop hook and Cursor's park deliver it, while omp and OpenCode restore ordinary watcher monitoring without retrying the denied host.
-An omp replacement replays pending refusal feedback but suppresses host selection only while the current launch policy still denies the configured engine.
+Pending refusal replay follows the [omp session replacement contract](watcher-continuity.md#omp-session-replacement).
 Currently its only verified engine starts standalone Claude, so this opt-in prevents host activation even under an omp primary; use ordinary primary supervision until a permitted native engine is verified.
 A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
 Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.

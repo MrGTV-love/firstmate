@@ -431,13 +431,13 @@ All remote secondmates on one host share `fm-remote` and retain separate `2ndmat
 
 ### Liveness recovery
 
-Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
+Startup liveness recovery relaunches an eligible dead or missing remote secondmate through this same command, subject to the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 So recovery passes the same readiness gate rather than a weaker one.
 
 The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/fm-secondmate-liveness-lib.sh`:
 
 - The remote endpoint is probed read-only once per cadence.
-- Only a positive `dead` or `missing` reply relaunches through that command.
+- Only a positive `dead` or `missing` reply permits a relaunch through that command, subject to the same launch checks.
 - An unreachable transport or inconclusive state is left untouched rather than replaced locally.
 
 ### Inventory reconcile for markerless routes
