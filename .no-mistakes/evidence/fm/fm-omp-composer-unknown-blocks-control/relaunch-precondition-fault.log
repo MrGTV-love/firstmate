@@ -1,0 +1,4 @@
+Second launch intentionally runs real omp --version, which exits without an agent or composer.
+Lab teardown exit=0
+Observed pane run count: 2 (initial real TUI; real omp --version fault). No replacement launch occurred.
+Expected guard rejection confirmed: exit=1, agent=dead, composer=unknown.

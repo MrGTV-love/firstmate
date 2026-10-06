@@ -1,0 +1,2 @@
+{"args": ["provision", "fm-lab-omp-composer-box-93666-14387"], "status": 0, "stdout": "", "stderr": ""}
+{"args": ["teardown", "fm-lab-omp-composer-box-93666-14387"], "status": 0, "stdout": "", "stderr": ""}

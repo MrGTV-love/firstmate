@@ -1,0 +1,24 @@
+window=fm-lab-composer-adversa-56496-13586:w1:p1
+endpoint_task_id=boxsafe56291
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/worker
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/project
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/boxsafe56291
+tasktmp=/tmp/fm-boxsafe56291
+model=default
+effort=default
+busy_gen=g1791326572.10940.19739
+spawn_gen=s1791326572.4904.3542
+backend=herdr
+herdr_session=fm-lab-composer-adversa-56496-13586
+herdr_workspace_id=w1
+herdr_tab_id=w1:t1
+herdr_pane_id=w1:p1
+control_relaunch_tx=95552.20261006T224250Z.19918
+
+Preserved HEAD: 04ca425c7ecabfff6cc0f00292890cfd57a74b21
+Preserved uncommitted file:
+Preserve this uncommitted work through harness transition.

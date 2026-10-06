@@ -1,0 +1,43 @@
+SESSION fm-lab-composer-adversa-56496-13586
+PASS idle real omp: alive; rounded box; composer=empty
+REGRESSION identical real idle ANSI capture: base=unknown, target=empty
+CONTROL exit () plain=False exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+
+PASS typed-greater: composer=pending; exit refused; no quit or deliberate-exit marker
+CONTROL exit () plain=False exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+
+PASS typed-chevron: composer=pending; exit refused; no quit or deliberate-exit marker
+CONTROL exit () plain=False exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+
+PASS typed-dash: composer=pending; exit refused; no quit or deliberate-exit marker
+CONTROL exit () plain=False exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+
+PASS wrapped-draft: composer=pending; exit refused; no quit or deliberate-exit marker
+CONTROL exit () plain=False exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+
+CONTROL exit () plain=True exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+error: task boxsafe56291's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+
+PASS exact idle-hint text typed bright: styled=pending, plain fallback=unknown; extraction preserved; both exit paths refuse without changing draft
+RELAUNCH PRECONDITION: alive / empty / fm-lab-composer-adversa-56496-13586:w1:p1
+CONTROL relaunch ('--harness', 'claude', '--note', 'Verify replacement liveness only; do not edit any file.') plain=False exit=0
+relaunched boxsafe56291 harness=claude from=omp model=default effort=default backend=herdr endpoint=fm-lab-composer-adversa-56496-13586:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home/data/boxsafe56291/launch-brief.md records no ship branch; defaulting to legacy branch fm/boxsafe56291
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/supplement/home/data/boxsafe56291/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+
+REPLACEMENT NATIVE IDENTITY: claude	blocked
+PASS live omp -> Claude: old idle box stopped, Claude native identity alive in same pane; metadata, worktree HEAD and uncommitted file preserved
+TEARDOWN exit=0 

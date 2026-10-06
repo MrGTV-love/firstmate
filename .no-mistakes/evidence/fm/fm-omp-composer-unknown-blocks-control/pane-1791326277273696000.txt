@@ -1,0 +1,4 @@
+env OMP_SKIP_SETUP=1 FM_OMP_HARNESS=omp omp --config '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M
+05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.U1cM9h/box-overlay.yml' --auto-approve --cwd '/Users
+/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2GA4QJ/.live-validation/tmp/fm-omp-composer-bo
+x-live.U1cM9h/wt'

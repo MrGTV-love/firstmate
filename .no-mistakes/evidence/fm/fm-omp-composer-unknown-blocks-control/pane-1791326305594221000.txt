@@ -1,0 +1,23 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                        Tip: Use /tan to fork the current conversation into a background agent
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Closing session…
+
+
+╭── π > ◒ Gemini 3.8 Flash 🙈 > 🌳 proj/wt > ⑂ ompbox92890 > (sub) ▶─2%───────────────────────┃────1M─◀ 🆔 01a1135e ──╮
+╰─                                                                                      ⇧⇥ to change thinking effort ─╯
+charlesabrooker@Mac-Studio wt % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49M05K2KST38EB9PT2
+GA4QJ/.live-validation/tmp/fm-omp-composer-box-live.U1cM9h/wt'
+charlesabrooker@Mac-Studio wt %
