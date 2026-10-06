@@ -994,6 +994,49 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/fm-spawn-compact-adviser-disable.test.sh`](../tests/fm-spawn-compact-adviser-disable.test.sh) and [`tests/fm-spawn-compact-adviser-disable-remote.test.sh`](../tests/fm-spawn-compact-adviser-disable-remote.test.sh).
 
+#### Experimental omp-native Jev bake-off
+
+The fork includes an opt-in timing-only comparison arm in [`extensions/omp-jev-pipeline.mjs`](../extensions/omp-jev-pipeline.mjs).
+Jev judges a successful, genuinely settled turn; a qualifying judgment requests omp's own compaction, leaving summary generation, retention and persistence to omp.
+Judging requires no queued messages or editor draft, context usage at least `minContextTokens`, and a snapshot with more than 20,000 conversation tokens and complete automatic coverage (`autoCoverage`).
+A completed judgment that marks work unfinished can defer an eligible automatic threshold or idle attempt once per agent loop; busy work can also defer once when Jev has returned a successful judgment within the last 60 seconds.
+Manual compaction, overflow recovery, incomplete-turn recovery, usage at or above 90% of the context window and unavailable Jev retain native precedence.
+This does not alter Firstmate's launch policy or enable the experiment by default in unattended workers.
+
+With omp 18.6.3, the extension API cannot override native `keepRecentTokens` or the cut point without replacing the compaction result.
+This arm therefore compares timing policy, not Jev-selected retention.
+Registering `session_before_compact` also prevents omp from reusing an armed speculative summary, so compare observed latency and cost rather than assuming an identical preparation cost.
+
+Install the dependency-complete, omp-compatible compact-adviser fork package into an ignored local root, then copy the static entry template into that root:
+
+```sh
+npm install --prefix .fm-adviser-root /absolute/path/to/omp-compatible-compact-adviser.tgz
+cp extensions/omp-jev-entry.mjs .fm-adviser-root/omp-jev-entry.mjs
+COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
+  FM_JEV_PIPELINE_AGENT_DIR=/absolute/path/to/isolated-adviser-config \
+  FM_JEV_PIPELINE_METRICS=/absolute/path/to/private-metrics.jsonl \
+  omp --no-extensions -e "$PWD/.fm-adviser-root/omp-jev-entry.mjs"
+```
+
+The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and its full dependency tree; the unadapted registry package is not a substitute.
+The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
+Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
+The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
+`FM_JEV_PIPELINE_AGENT_DIR` selects the adviser configuration directory; when omitted, the controller uses omp's public `getAgentDir()` and reads that configuration without modifying it.
+`TYPESAFE_BASE` follows compact-adviser's HTTPS-or-loopback-only endpoint policy.
+Neither installation nor loading changes global plugins or settings.
+
+`FM_JEV_OMP_PIPELINE=1` is required even when the extension is explicitly loaded; `COMPACT_ADVISER_DISABLE=1` disables the original adviser factory, not this separate opt-in controller.
+The optional metrics file contains event names, categorical reasons and methods, boolean outcomes, numeric timings, token counts, sanitized Jev model versions and an input-only cost estimate at USD 0.042 per million tokens, not requests, summaries, keys or task text.
+Fixture responses produce fixture usage, not paid Jev costs; keep those observations separate from real API runs.
+Pending requests and decisions are invalidated on new input, turns, navigation, compaction and shutdown.
+omp does not notify extensions of native model changes, so a managed identity check runs only while a request is pending; a completed decision can defer native compaction only for its original session, leaf and model identity.
+
+Native idle compaction requires the interactive TUI and the host's idle settings; an RPC session alone does not exercise that path.
+Native recovery also requires a runnable method for the selected model: a remote-only configuration does not make a custom provider support remote compaction.
+The portable boundary regressions run through [`tests/fm-omp-jev-pipeline.test.sh`](../tests/fm-omp-jev-pipeline.test.sh).
+Set `FM_JEV_ADVISER_DIR` to the installed package directory to include the actual helper's structured secret-redaction regression under Bun.
+
 ### Commit attribution
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
