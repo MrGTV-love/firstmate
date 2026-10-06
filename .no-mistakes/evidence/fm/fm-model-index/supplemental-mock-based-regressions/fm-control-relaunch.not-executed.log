@@ -1,0 +1,9 @@
+Supplemental mock-based regression safety inspection; not live product validation.
+No command executed.
+
+Unsafe unchanged test: tests/fm-control-relaunch.test.sh
+Line 268: echo "tasktmp=/tmp/fm-$id"
+Line 275: TASK_TMPS+=("/tmp/fm-$id")
+Lines 45-51: relaunch_cleanup iterates TASK_TMPS and unconditionally rm -rf each directory.
+IDs are fixed (rl1, rl2, tc1, tc9, etc.), not unique per run, and cleanup performs no ownership/provenance check.
+Parent explicitly agreed to skip this test unchanged.

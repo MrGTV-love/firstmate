@@ -1,0 +1,7 @@
+Owned disposable regression setup cleanup executed after all requested safe targeted regressions completed.
+Command: chmod -R u+w .focused-regression-tmp-e6td3hfd && rm -rf .focused-regression-tmp-e6td3hfd
+Exit code: 0
+Output: none
+Working directory: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35
+No external setup directory was manually created or externally cleaned; /tmp fixture creation/cleanup was performed only by existing worker-account/spawn-profile tests after parent-approved runtime TMPDIR remediation.
+No source/test files edited. No builds, lint/static checks, full suite, live scenarios, or pipeline commands invoked by this worker.

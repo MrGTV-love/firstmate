@@ -1,0 +1,34 @@
+[
+  {
+    "index": {
+      "version": 1,
+      "roles": {}
+    },
+    "command": "FM_HOME=<disposable workspace home> bin/fm-model-index.sh profiles <home>/config/crew-dispatch.json",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-schema-ilavfvow/config/model-index.json\n"
+  },
+  {
+    "index": {
+      "version": 2,
+      "roles": {},
+      "retired": []
+    },
+    "command": "FM_HOME=<disposable workspace home> bin/fm-model-index.sh profiles <home>/config/crew-dispatch.json",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-schema-ilavfvow/config/model-index.json\n"
+  },
+  {
+    "index": {
+      "version": 1,
+      "roles": {},
+      "retired": []
+    },
+    "command": "FM_HOME=<disposable workspace home> bin/fm-model-index.sh profiles <home>/config/crew-dispatch.json",
+    "exit": 0,
+    "stdout": "{\n  \"default\": {\n    \"harness\": \"claude\"\n  }\n}\n",
+    "stderr": ""
+  }
+]

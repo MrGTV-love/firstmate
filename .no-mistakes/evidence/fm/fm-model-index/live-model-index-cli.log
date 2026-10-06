@@ -1,0 +1,769 @@
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+
+[exit 0]
+
+$ claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources "" < initialize.json
+{
+  "models": [
+    {
+      "value": "default",
+      "resolvedModel": "claude-sonnet-5-5",
+      "displayName": "Default (recommended)",
+      "description": "Sonnet 5.5 \u00b7 Efficient for routine tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "opus",
+      "resolvedModel": "claude-opus-5-5",
+      "displayName": "Opus 5.5",
+      "description": "For complex work and everyday tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsFastMode": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "fable",
+      "resolvedModel": "claude-fable-5-1",
+      "displayName": "Fable 5.1",
+      "description": "For your toughest challenges",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "sonnet",
+      "resolvedModel": "claude-sonnet-5-5",
+      "displayName": "Sonnet 5.5",
+      "description": "Most efficient for simpler tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "haiku",
+      "resolvedModel": "claude-haiku-4-5-20251001",
+      "displayName": "Haiku 4.5",
+      "description": "Fastest for quick answers"
+    },
+    {
+      "value": "claude-sonnet-5",
+      "resolvedModel": "claude-sonnet-5",
+      "displayName": "Sonnet 5",
+      "description": "Efficient for routine tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-opus-5",
+      "resolvedModel": "claude-opus-5",
+      "displayName": "Opus 5",
+      "description": "Best for everyday, complex tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsFastMode": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-fable-5",
+      "resolvedModel": "claude-fable-5",
+      "displayName": "Fable 5",
+      "description": "Most capable for your hardest and longest-running tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-opus-4-8",
+      "resolvedModel": "claude-opus-4-8",
+      "displayName": "Opus 4.8",
+      "description": "Best for everyday, complex tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsFastMode": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-opus-4-7",
+      "resolvedModel": "claude-opus-4-7",
+      "displayName": "Opus 4.7",
+      "description": "Best for everyday, complex tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-opus-4-6",
+      "resolvedModel": "claude-opus-4-6",
+      "displayName": "Opus 4.6",
+      "description": "Best for everyday, complex tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    },
+    {
+      "value": "claude-sonnet-4-6",
+      "resolvedModel": "claude-sonnet-4-6",
+      "displayName": "Sonnet 4.6",
+      "description": "Efficient for routine tasks",
+      "supportsEffort": true,
+      "supportedEffortLevels": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "supportsAdaptiveThinking": true,
+      "supportsAutoMode": true
+    }
+  ]
+}
+[exit 0; only model-picker response retained]
+
+$ bin/fm-model-index.sh check
+model-index: active ids checked; none absent or retired
+
+[exit 0]
+
+$ bin/fm-model-index.sh model claude role:strong
+opus
+
+[exit 0]
+
+$ bin/fm-model-index.sh model claude stand-in:strong
+sonnet
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "effort": "high",
+    "model": "opus"
+  }
+}
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "effort": "high",
+    "model": "sonnet"
+  }
+}
+
+[exit 0]
+
+$ bin/fm-model-index.sh model claude gpt-6-sol
+model-index: warning: literal model 'gpt-6-sol' for claude is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+
+[exit 5]
+
+$ bin/fm-model-index.sh model claude openai/gpt-6-sol[1m]
+model-index: warning: literal model 'openai/gpt-6-sol[1m]' for claude is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: openai/gpt-6-sol[1m]
+
+[exit 5]
+
+$ bin/fm-model-index.sh model claude role:missing
+jq: error (at <stdin>:4): role or stand-in not configured: claude:missing
+
+[exit 5]
+
+$ bin/fm-model-index.sh check claude
+model-index: id 'fm-intentionally-absent-live-model' absent or retired in claude catalog (role 'strong')
+
+[exit 2]
+
+$ bin/fm-model-index.sh check claude opus
+model-index: id 'opus' absent or retired in claude catalog (role 'strong')
+
+[exit 2]
+
+$ bin/fm-model-index.sh check
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'opus' (role 'strong') not validated
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'sonnet' (role 'strong') not validated
+model-index: active ids checked; none absent or retired
+
+[exit 0]
+
+$ git init -q /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination
+
+[exit 0]
+
+$ bash -c . "$1"; propagate_inheritable_config "$2" "$3" _ bin/fm-config-inherit-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/source-config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "effort": "high",
+    "model": "opus"
+  }
+}
+
+[exit 0]
+
+$ bash -c . "$1"; propagate_inheritable_config "$2" "$3" _ bin/fm-config-inherit-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/source-config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config: destination does not allow inherited item (not gitignored or guard failed)
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "effort": "high",
+    "model": "opus"
+  }
+}
+
+[exit 0]
+
+$ bash -c . "$1"; propagate_inheritable_config "$2" "$3" _ bin/fm-config-inherit-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/source-config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "model": "sonnet"
+  }
+}
+
+[exit 0]
+
+$ bin/fm-remote-inherit.sh put config/model-index.json 81 71406b062d4a4e8864dbc2c2dc95d20a7cace433178da9127d7bfa5b294d221b 1
+error: inherited destination is a symlink
+
+[exit 1]
+
+$ bin/fm-remote-inherit.sh put config/model-index.json 81 71406b062d4a4e8864dbc2c2dc95d20a7cace433178da9127d7bfa5b294d221b 2
+pushed: config/model-index.json
+
+[exit 0]
+
+$ bin/fm-remote-inherit.sh put config/crew-dispatch.json 50 5bb7331317ee674b43510594e14162135e0ea0eb9bd4e31c6ed58fad648bda6e 2
+pushed: config/crew-dispatch.json
+
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/receiver/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "model": "sonnet"
+  }
+}
+
+[exit 0]
+
+$ bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+/tmp/fml.vVQbRC
+
+[exit 0]
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home claude
+
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab add README.md
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab -c user.name=Model Lab -c user.email=model-lab@example.invalid commit -qm Initialize disposable model lab
+
+[exit 0]
+
+$ bin/fm-brief.sh model-role-live model-lab --scout
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model-role-live/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary -l This is isolated test validation, not captain fleet work. FM_HOME is the disposable marked lab /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home. Do not touch any other fleet home, primary, credentials, global settings, repository code, or pipeline. Do not sign in or re-login. Run only this exact command from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35, then report its output and stop: TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/pool bin/fm-spawn.sh model-role-live /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness claude --model role:strong --backend tmux. No delegation beyond this single disposable scout, no additional setup or followup. All lifecycle commands must stay within this marked lab and inherited private tmux socket.
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ omp models --json
+{
+  "selected_live_catalog_entry": [
+    {
+      "provider": "openai-codex",
+      "kind": "chat",
+      "id": "gpt-6.1-sol",
+      "selector": "openai-codex/gpt-6.1-sol",
+      "name": "GPT-6.1-Sol",
+      "contextWindow": 272000,
+      "maxTokens": 128000,
+      "reasoning": true,
+      "thinking": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.1,
+        "cacheWrite": 0
+      },
+      "pricingStatus": "fixed"
+    }
+  ]
+}
+[exit 0; selected entry excerpt]
+
+$ tmux -L fm-lab display-message -p -t primary #{socket_path},#{pid},#{session_id}
+/private/tmp/fml.vVQbRC/tmux-501/fm-lab,6345,$0
+
+[exit 0]
+
+$ tmux -L fm-lab display-message -p -t primary #{pane_id}
+%0
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary C-u
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary -l Do not run the previous Claude scout command: it would write operator workspace-trust configuration. Cancel the suggested answer. The Claude 2.1.291 session server stripped the launch environment; the private tmux identity below was observed from the live primary pane, not fabricated. Instead run only this command from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35: env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home TMUX_TMPDIR=/tmp/fml.vVQbRC TMUX=/private/tmp/fml.vVQbRC/tmux-501/fm-lab,6345,$0 TMUX_PANE=%0 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/pool bin/fm-spawn.sh model-role-live /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness omp --model role:strong --backend tmux . The omp worker does not write a global workspace trust store. Keep this exact marked lab isolation, no additional setup, pipeline, sign-in, config/credential edits, or fleet work. Return the command output.
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ bash -c . "$1"; fm_worker_account_check_entry "" "$2" codex worker-only-model _ bin/fm-worker-account-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh
+model-index: notice: codex catalog unavailable (effective worker account context is not established); 'worker-only-model' (role 'effective') not validated
+
+[exit 0]
+
+$ bash -c . "$1"; fm_worker_account_check_entry "" "$2" codex worker-only-model _ bin/fm-worker-account-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh
+model-index: id 'worker-only-model' absent or retired in codex catalog (role 'effective')
+
+[exit 2]
+
+$ bin/fm-spawn.sh native-literal-refusal /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness omp --model google/fm-intentionally-absent-live-model --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+model-index: warning: literal model 'google/fm-intentionally-absent-live-model' for omp is not an index entry; name its role so the next model release is one index edit
+error: omp model 'google/fm-intentionally-absent-live-model' is not listed by 'omp models --json' although provider 'google' is; choose a listed <provider>/<id> or omit --model
+
+[exit 1]
+
+$ tmux -L fm-lab list-windows -a -F #{session_name}:#{window_name} #{pane_id} #{pane_current_command} #{pane_current_path}
+primary:2.1.291 %0 2.1.291 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary -l ! env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home TMUX_TMPDIR=/tmp/fml.vVQbRC TMUX=/private/tmp/fml.vVQbRC/tmux-501/fm-lab,6345,0 TMUX_PANE=%0 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/pool bin/fm-spawn.sh model-role-live /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness omp --model role:strong --backend tmux
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ tmux -L fm-lab list-windows -a -F #{session_name}:#{window_name} #{pane_id} #{pane_current_command} #{pane_current_path}
+primary:2.1.291 %0 2.1.291 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35
+primary:fm-model-role-live %1 omp /Users/charlesabrooker/.treehouse/model-lab-510d09/1/model-lab
+
+[exit 0]
+
+$ tmux -L fm-lab kill-window -t primary:fm-model-role-live
+
+[exit 0]
+
+$ treehouse init
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+Created /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/treehouse.toml
+
+[exit 0]
+
+$ treehouse destroy /Users/charlesabrooker/.treehouse/model-lab-510d09/1/model-lab --include-leased --include-in-use --include-unlanded --yes
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Destroyed 1 worktree in ~/.treehouse/model-lab-510d09/1/model-lab and freed 609 B.
+  1     [disposable]  609 B  ~/.treehouse/model-lab-510d09/1/model-lab
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab add treehouse.toml
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab -c user.name=Model Lab -c user.email=model-lab@example.invalid commit -qm Confine test toolchain pool to disposable project
+
+[exit 0]
+
+$ bin/fm-brief.sh model-role-local model-lab --scout
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model-role-local/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+[exit 0]
+
+$ tmux -L fm-lab set-environment -g TREEHOUSE_ROOT /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab
+
+[exit 0]
+
+$ tmux -L fm-lab set-environment -t primary TREEHOUSE_ROOT /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab
+
+[exit 0]
+
+$ tmux -L fm-lab set-environment -t primary FM_HOME /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary -l ! env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home TMUX_TMPDIR=/tmp/fml.vVQbRC TMUX=/private/tmp/fml.vVQbRC/tmux-501/fm-lab,6345,0 TMUX_PANE=%0 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab bin/fm-spawn.sh model-role-local /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness omp --model role:strong --backend tmux
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ tmux -L fm-lab capture-pane -p -S -100 -t primary:fm-model-role-local
+treehouse get
+charlesabrooker@Mac-Studio model-lab % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projec
+ts/model-lab/.treehouse/model-lab-510d09/1/model-lab. Type 'exit' to return.
+cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/p
+rojects/model-lab/.treehouse/model-lab-510d09/1/model-lab'
+export GOTMPDIR=/tmp/fm-model-role-local/gotmp
+export COMPACT_ADVISER_DISABLE=1
+export FM_TASK_ID=model-role-local
+. '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125fd1fa33fff9/launch.s1791308104.99627.30
+598.sh'
+charlesabrooker@Mac-Studio model-lab % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKT
+XPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/.treehouse/model-lab-510d09/1/model-lab'
+export GOTMPDIR=/tmp/fm-model-role-local/gotmp
+export COMPACT_ADVISER_DISABLE=1
+export FM_TASK_ID=model-role-local
+. '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125fd1fa33fff9/launch.s1791308104.99627.30
+598.sh'
+charlesabrooker@Mac-Studio model-lab % export GOTMPDIR=/tmp/fm-model-role-local/gotmp
+export COMPACT_ADVISER_DISABLE=1
+export FM_TASK_ID=model-role-local
+. '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125fd1fa33fff9/launch.s1791308104.99627.30
+598.sh'
+charlesabrooker@Mac-Studio model-lab % export COMPACT_ADVISER_DISABLE=1
+export FM_TASK_ID=model-role-local
+. '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125fd1fa33fff9/launch.s1791308104.99627.30
+598.sh'
+charlesabrooker@Mac-Studio model-lab % export FM_TASK_ID=model-role-local
+. '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125fd1fa33fff9/launch.s1791308104.99627.30
+598.sh'
+charlesabrooker@Mac-Studio model-lab % . '/tmp/fm-model-role-local+80df9ca0434691db9ee12d19bd23d3d27a4ce4e06ecb003628125
+fd1fa33fff9/launch.s1791308104.99627.30598.sh'
+
+
+
+
+
+[exit 0]
+
+$ tmux -L fm-lab list-panes -t primary:fm-model-role-local -F #{pane_pid} #{pane_current_command} #{pane_width}x#{pane_height}
+3507 omp 120x40
+
+[exit 0]
+
+$ bin/fm-control.sh model-role-local relaunch --model role:strong --note Disposable retirement guard check; preserve worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+jq: error (at <stdin>:4): retired model: openai-codex/gpt-6.1-sol
+
+[exit 1]
+
+$ tmux -L fm-lab list-panes -t primary:fm-model-role-local -F #{pane_pid} #{pane_current_command} #{pane_width}x#{pane_height}
+3507 omp 120x40
+
+[exit 0]
+
+$ bin/fm-control.sh model-role-local relaunch --model role:strong --note Disposable withdrawn model guard check; preserve worker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+model-index: id 'openai-codex/gpt-6.1-sol' absent or retired in omp catalog (role 'strong')
+
+[exit 1]
+
+$ tmux -L fm-lab list-panes -t primary:fm-model-role-local -F #{pane_pid} #{pane_current_command} #{pane_width}x#{pane_height}
+3507 omp 120x40
+
+[exit 0]
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-model-role-local
+ three clear steps I should follow. It should be straightforward, but I don’t want to overlook anything!
+
+ • Read (2)
+   ├─ README.md:1-1
+   └─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.agents/skills/captain-hold-lifecycle/SKILL.md
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-captain-hold.sh       │
+│ --help                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ … (194 earlier lines, showing 10 of 204) ⟦⌃O: Expand⟧                                                                │
+│ publishes `needs-decision [key=captain-hold-<task>-<n>]` and `answer` (and                                           │
+│ `answers`) the matching `resolved` line on the parent channel through                                                │
+│ bin/fm-parent-channel-lib.sh, whether or not the mate model appends anything.                                        │
+│ <n> is the count of resolution records the body already carries plus one, so                                         │
+│ a released and re-held task opens and closes a distinct parent decision with                                         │
+│ no new persisted state, and an exact retry republishes the same line, which                                          │
+│ the channel deduplicates. A main home has no channel and publishes nothing.                                          │
+│ The hold or answer is already durable in the backlog, so a channel that                                              │
+│ cannot be written is reported as `actionable:` on stderr rather than undoing                                         │
+│ the record; bin/fm-inactive-reconcile.sh's diagnostics name a broken binding.                                        │
+│ ⟦Wall: 0.71s | Timeout: 30s⟧                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭─── ✎ Write: 📝 ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model…╮
+│   1 MODEL_ROLE_LIVE_READY                                                                                            │
+│   2 Disposable model-index runtime validation project.                                                               │
+│   3                                                                                                                  │
+│   4 The disposable model-index scout launched and read README.md:1 using the read tool. The first line is reproduced │
+│ above verbatim. No project code was changed, and no commit, push, pipeline, sign-in, external review, or fleet       │
+│ administration was performed.                                                                                        │
+│   5                                                                                                                  │
+│   6 No unresolved decisions or further action are required. Recommendation: treat this scout launch as confirmed.    │
+│ … 1 more line ⟦⌃O: Expand⟧                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Writing scout readiness report
+
+❯
+ ⠏ 24s · ◒ GPT-6.1-Sol 👁 · 🌳 model-lab/model-lab · ⑂ detached · ◫ 9.7%/272K ⟲ · S0.05 + 👁 0.04             🆔 01a11248
+
+[exit 0]
+
+$ bin/fm-brief.sh model-next-local model-lab --scout
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model-next-local/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary -l ! env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home TMUX_TMPDIR=/tmp/fml.vVQbRC TMUX=/private/tmp/fml.vVQbRC/tmux-501/fm-lab,6345,0 TMUX_PANE=%0 TREEHOUSE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab bin/fm-spawn.sh model-next-local /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab --scout --harness omp --model role:strong --backend tmux
+
+[exit 0]
+
+$ tmux -L fm-lab send-keys -t primary Enter
+
+[exit 0]
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-model-next-local
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                                        Tip: You can /btw to ask a side question
+
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◒ GPT-6-Luna 👁 · 🌳 model-lab/model-lab · ⑂ detached · ◫ 7.5%/272K ⟲ · (sub)                           🆔 01a1124b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[exit 0]
+
+$ ssh-keygen -q -t ed25519 -N  -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/ssh/host-key
+
+[exit 0]
+
+$ ssh-keygen -q -t ed25519 -N  -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/ssh/client-key
+
+[exit 0]
+
+$ bin/fm-remote-inherit-push.sh remote-live 3
+skipped: config/model-index.json and config/crew-dispatch.json (Warning: Permanently added '[127.0.0.1]:52178' (ED25519) to the list of known hosts.
+error: remote root and home must be separate, non-overlapping directories)
+error: remote root and home must be separate, non-overlapping directories
+
+[exit 64]
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-model-next-local
+ doesn’t identify the next scout launch. I recorded completion; the shared completion command was not run because it
+ would write fleet state, which the task forbids.
+
+ ⓘ Advisor 1 note · 1 blocker
+   ▎ ⟦blocker⟧ Your report omits the required literal `MODEL_NEXT_LIVE_READY`. The Firstmate spec explicitly
+   ▎ requires that marker plus the README first line; add the marker to the assigned report before treating
+   ▎ this task as complete.
+
+ Updating the report
+
+ ● Read
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model-next-local/report.
+md
+
+╭─── ✎ Edit: 📝 ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XH…el-dxim2e0j/home/data/model-next-local/report.md ⟦+2⟧ ╮
+│   1│# Scout report: next role-selected launch                                                                        │
+│  +2│MODEL_NEXT_LIVE_READY                                                                                            │
+│    │                                                                                                                 │
+│  +4│                                                                                                                 │
+│   3│## What I did                                                                                                    │
+│   4│                                                                                                                 │
+│…                                                                                                                     │
+│   6│                                                                                                                 │
+│…                                                                                                                     │
+│  23│I reviewed the full `captain-hold-lifecycle` skill. This report contains no unresolved captain choice, so its    │
+│    │semantic inventory is empty. I did not run `fm-captain-hold.sh complete --none`: that command records completion │
+│    │metadata outside the report/status files, which conflicts with the task's explicit instruction not to administer │
+│    │fleet state and its restriction on writes outside the report and status files.                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Correcting report wording
+
+ Added MODEL_NEXT_LIVE_READY to the report. It already contains the README’s first line, Disposable model-index runtime
+ validation project.
+
+ ※ recap: The scout read the README and wrote its first line plus `MODEL_NEXT_LIVE_READY` to the report. No further
+ action is pending.
+
+❯
+ π · ◒ GPT-6-Luna 🙈 · 🌳 model-lab/model-lab · ⑂ detached · ◫ 10.8%/272K ⟲ · S0.01 + 👁 0.06                🆔 01a1124b
+
+[exit 0]
+
+$ tmux -L fm-lab kill-server
+
+[exit 0]
+
+$ tmux -L fm-lab list-sessions
+no server running on /private/tmp/fml.vVQbRC/tmux-501/fm-lab
+
+[exit 1]
+
+$ bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home
+
+[exit 0]

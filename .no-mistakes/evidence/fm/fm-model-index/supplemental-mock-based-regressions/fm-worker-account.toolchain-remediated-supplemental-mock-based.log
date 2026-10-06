@@ -1,0 +1,24 @@
+Supplemental mock-based regression log; not live product validation.
+Command: /usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-worker-account.test.sh
+
+ok - an unrelated or other-harness index entry leaves Cursor and omp non-entry native guards active
+ok - Cursor and omp primary and stand-in entries delegate their native guards through the shared boundary
+ok - ordinary Claude pins retain launch semantics without treating supervisor HOME as catalog proof
+ok - unpinned Codex, Pi, and Pi-signed selected checks disclose unknown context and never use supervisor catalogs
+ok - a pinned worker's model-index verdict comes from its pinned account's catalog, not the ambient one
+ok - an absent pin leaves Claude and Pi launches exactly as they were
+ok - a Claude pin selects its root and sheds the credentials that would outrank it
+ok - a Claude pin refuses a signed-out root even when the invoking process has a usable login and API key
+ok - an ordinary Claude pin selects the default login and drops an ambient root
+ok - malformed, relative, CR-terminated, empty, extra-line, missing-root, and non-file pins refuse before launch
+ok - a Pi pin selects its root and passes the declared provider
+ok - a Pi pin refuses unqualified, missing, undeclared, signed-out, and raw launches
+ok - extension providers and a Pi without auth check fall back to an exact model-listing match
+ok - a Claude pin leaves codex and Pi launches unchanged
+ok - a raw Claude launch command receives the home's pin
+ok - a pinned home refuses a raw Claude command that overrides the account
+ok - an unpinned home keeps a raw Claude account override
+not ok - a local secondmate spawn under the launching home's pin should succeed: error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/fm-worker-account.TifMSI/secondmate/secondmate-home: expected exit 0, got 1
+
+Exit code: 1
+Elapsed seconds: 415.78

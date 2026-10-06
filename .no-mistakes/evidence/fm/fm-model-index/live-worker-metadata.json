@@ -1,0 +1,13 @@
+{
+  "window": "primary:fm-model-role-local",
+  "endpoint_task_id": "model-role-local",
+  "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/.treehouse/model-lab-510d09/1/model-lab",
+  "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab",
+  "harness": "omp",
+  "kind": "scout",
+  "tasktmp": "/tmp/fm-model-role-local",
+  "model": "openai-codex/gpt-6.1-sol",
+  "effort": "default",
+  "busy_gen": "g1791308104.30529.21112",
+  "spawn_gen": "s1791308104.99627.30598"
+}

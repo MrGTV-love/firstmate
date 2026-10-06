@@ -1,0 +1,40 @@
+ doesn’t identify the next scout launch. I recorded completion; the shared completion command was not run because it
+ would write fleet state, which the task forbids.
+
+ ⓘ Advisor 1 note · 1 blocker
+   ▎ ⟦blocker⟧ Your report omits the required literal `MODEL_NEXT_LIVE_READY`. The Firstmate spec explicitly
+   ▎ requires that marker plus the README first line; add the marker to the assigned report before treating
+   ▎ this task as complete.
+
+ Updating the report
+
+ ● Read
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/data/model-next-local/report.
+md
+
+╭─── ✎ Edit: 📝 ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XH…el-dxim2e0j/home/data/model-next-local/report.md ⟦+2⟧ ╮
+│   1│# Scout report: next role-selected launch                                                                        │
+│  +2│MODEL_NEXT_LIVE_READY                                                                                            │
+│    │                                                                                                                 │
+│  +4│                                                                                                                 │
+│   3│## What I did                                                                                                    │
+│   4│                                                                                                                 │
+│…                                                                                                                     │
+│   6│                                                                                                                 │
+│…                                                                                                                     │
+│  23│I reviewed the full `captain-hold-lifecycle` skill. This report contains no unresolved captain choice, so its    │
+│    │semantic inventory is empty. I did not run `fm-captain-hold.sh complete --none`: that command records completion │
+│    │metadata outside the report/status files, which conflicts with the task's explicit instruction not to administer │
+│    │fleet state and its restriction on writes outside the report and status files.                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Correcting report wording
+
+ Added MODEL_NEXT_LIVE_READY to the report. It already contains the README’s first line, Disposable model-index runtime
+ validation project.
+
+ ※ recap: The scout read the README and wrote its first line plus `MODEL_NEXT_LIVE_READY` to the report. No further
+ action is pending.
+
+❯
+ π · ◒ GPT-6-Luna 🙈 · 🌳 model-lab/model-lab · ⑂ detached · ◫ 10.8%/272K ⟲ · S0.01 + 👁 0.06                🆔 01a1124b

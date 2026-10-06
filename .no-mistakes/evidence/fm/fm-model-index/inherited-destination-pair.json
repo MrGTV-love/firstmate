@@ -1,0 +1,40 @@
+{
+  "local": {
+    "crew-dispatch.json": {
+      "default": {
+        "harness": "claude",
+        "role": "next"
+      }
+    },
+    "model-index.json": {
+      "version": 1,
+      "roles": {
+        "next": {
+          "claude": {
+            "model": "sonnet"
+          }
+        }
+      },
+      "retired": []
+    }
+  },
+  "receiver": {
+    "crew-dispatch.json": {
+      "default": {
+        "harness": "claude",
+        "role": "next"
+      }
+    },
+    "model-index.json": {
+      "version": 1,
+      "roles": {
+        "next": {
+          "claude": {
+            "model": "sonnet"
+          }
+        }
+      },
+      "retired": []
+    }
+  }
+}

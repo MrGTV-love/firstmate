@@ -1,0 +1,13 @@
+{
+  "window": "primary:fm-model-next-local",
+  "endpoint_task_id": "model-next-local",
+  "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/.treehouse/model-lab-510d09/2/model-lab",
+  "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab",
+  "harness": "omp",
+  "kind": "scout",
+  "tasktmp": "/tmp/fm-model-next-local",
+  "model": "openai-codex/gpt-6-luna",
+  "effort": "default",
+  "busy_gen": "g1791308276.68369.21469",
+  "spawn_gen": "s1791308276.18072.18725"
+}

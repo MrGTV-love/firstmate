@@ -1,0 +1,158 @@
+{
+  "transport": "native /usr/sbin/sshd and /usr/bin/ssh on owned loopback port 58308",
+  "sender": "original bin/fm-remote-inherit-push.sh via original bin/fm-on.sh",
+  "receiver": "byte-identical copied tracked entrypoint, real remote-job worker, inheritance receiver, and model-index consumers",
+  "isolation": {
+    "spool": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/spool",
+    "FM_REMOTE_JOB_PLATFORM_OVERRIDE": "Linux",
+    "native_darwin_launchagent_proven": false
+  },
+  "scenarios": [
+    {
+      "generation": 6101,
+      "case": "valid pair",
+      "exit": 0,
+      "persisted_pair": {
+        "model-index.json": {
+          "version": 1,
+          "roles": {
+            "next": {
+              "claude": {
+                "model": "sonnet",
+                "stand_in": "opus"
+              }
+            }
+          },
+          "retired": []
+        },
+        "crew-dispatch.json": {
+          "default": {
+            "harness": "claude",
+            "role": "next"
+          },
+          "rules": [
+            {
+              "match": "owned-manual-scenario",
+              "use": {
+                "harness": "claude",
+                "role": "next",
+                "stand_in": true
+              }
+            }
+          ]
+        }
+      },
+      "actual_remote_profiles": {
+        "default": {
+          "harness": "claude",
+          "model": "sonnet"
+        },
+        "rules": [
+          {
+            "match": "owned-manual-scenario",
+            "use": {
+              "harness": "claude",
+              "model": "opus"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "generation": 6102,
+      "case": "symlink dispatch destination preflight",
+      "exit": 1,
+      "retained_both_pair_bytes": true,
+      "retained_both_generation_records": true,
+      "retained_symlink_inode_and_target": true,
+      "unrelated_crew_harness": "omp"
+    },
+    {
+      "generation": 6103,
+      "case": "hardlinked index destination preflight",
+      "exit": 1,
+      "retained_both_pair_bytes": true,
+      "retained_both_generation_records": true,
+      "retained_hardlink_inode_and_count": true,
+      "unrelated_crew_harness": "pi"
+    },
+    {
+      "generation": 6104,
+      "case": "public frozen pair input after both original sources changed",
+      "exit": 0,
+      "persisted_pair": {
+        "model-index.json": {
+          "version": 1,
+          "roles": {
+            "next": {
+              "claude": {
+                "model": "opus",
+                "stand_in": "sonnet"
+              }
+            }
+          },
+          "retired": []
+        },
+        "crew-dispatch.json": {
+          "default": {
+            "harness": "claude",
+            "role": "next",
+            "phase": "guarded-new-source"
+          },
+          "rules": [
+            {
+              "match": "owned-manual-scenario",
+              "use": {
+                "harness": "claude",
+                "role": "next",
+                "stand_in": true
+              }
+            }
+          ]
+        }
+      },
+      "actual_remote_profiles": {
+        "default": {
+          "harness": "claude",
+          "phase": "guarded-new-source",
+          "model": "opus"
+        },
+        "rules": [
+          {
+            "match": "owned-manual-scenario",
+            "use": {
+              "harness": "claude",
+              "model": "sonnet"
+            }
+          }
+        ]
+      },
+      "both_cmp_stage_passed": true,
+      "both_cmp_live_different": true,
+      "unrelated_crew_harness": "claude"
+    }
+  ],
+  "final_generation_records": {
+    "model-index.json": "6104\n154\ndb8350a8a8752fa7ef9f7b4d391c810a3ff4de5cd5b027159cf4b285eabc34b3\nput\n",
+    "crew-dispatch.json": "6104\n273\n1819f8d9236a804a336d0ba7c62c30fb50a57f7824a9f7b9ecbb60623a99a6f6\nput\n",
+    "crew-harness": "6104\n7\n98038b25280788a45a2f06c209513024c99adee81c6416b691b4b5872db7e027\nput\n"
+  },
+  "cleanup": {
+    "worker_api": "fm_remote_job_worker_owned_alive + fm_remote_job_worker_identity_matches + fm_remote_job_stop_worker_tree",
+    "worker_pid": 40592,
+    "worker_group_absent_after_stop": true,
+    "ssh_service": "owned-live-remote-inheritance-sshd",
+    "ssh_pid": 75247,
+    "ssh_identity_verified_before_stop": true,
+    "ssh_pid_absent_and_port_closed": true,
+    "fixture_root_removed": true,
+    "private_keys_removed": true,
+    "source_edits": false,
+    "evidence_preserved": true
+  },
+  "limitations": [
+    "Linux worker mode on Darwin with isolated spool, not native Darwin LaunchAgent",
+    "Provided frozen stage input, not an actual remote fm-config-push native catalog race",
+    "No reread nudge notification or fleet/default backend exercised"
+  ]
+}

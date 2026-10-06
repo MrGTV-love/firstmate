@@ -1,0 +1,13 @@
+Supplemental mock-based regression log; not live product validation.
+Command: /usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-worker-account.test.sh
+
+ok - an unrelated or other-harness index entry leaves Cursor and omp non-entry native guards active
+ok - Cursor and omp primary and stand-in entries delegate their native guards through the shared boundary
+not ok - an ordinary pin must not refuse using the supervisor HOME catalog: model-index: notice: claude catalog unavailable (effective worker account context is not established); 'pane-only' (role 'chosen') not validated
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/fm-worker-account.X1b093/ordinary-index/home/data/acct-ordinary-index/launch-brief.md records no ship branch; defaulting to legacy branch fm/acct-ordinary-index
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/fm-worker-account.X1b093/ordinary-index/home/data/acct-ordinary-index/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: refusing to pre-register Claude trust: node is required to record workspace trust and was not found on PATH
+error: could not pre-register Claude workspace trust for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/fm-worker-account.X1b093/ordinary-index/wt; refusing to launch a claude worker that would wedge on the trust dialog; inspect window firstmate:fm-acct-ordinary-index: expected exit 0, got 1
+
+Exit code: 1
+Elapsed seconds: 209.32

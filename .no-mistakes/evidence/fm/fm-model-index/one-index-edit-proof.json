@@ -1,0 +1,54 @@
+{
+  "first_worker": {
+    "window": "primary:fm-model-role-local",
+    "endpoint_task_id": "model-role-local",
+    "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/.treehouse/model-lab-510d09/1/model-lab",
+    "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab",
+    "harness": "omp",
+    "kind": "scout",
+    "tasktmp": "/tmp/fm-model-role-local",
+    "model": "openai-codex/gpt-6.1-sol",
+    "effort": "default",
+    "busy_gen": "g1791308104.30529.21112",
+    "spawn_gen": "s1791308104.99627.30598"
+  },
+  "next_worker": {
+    "window": "primary:fm-model-next-local",
+    "endpoint_task_id": "model-next-local",
+    "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab/.treehouse/model-lab-510d09/2/model-lab",
+    "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-model-dxim2e0j/home/projects/model-lab",
+    "harness": "omp",
+    "kind": "scout",
+    "tasktmp": "/tmp/fm-model-next-local",
+    "model": "openai-codex/gpt-6-luna",
+    "effort": "default",
+    "busy_gen": "g1791308276.68369.21469",
+    "spawn_gen": "s1791308276.18072.18725"
+  },
+  "dispatch_sha256_before": "15765ef18b1d046f1b6c155db7662adcb4a3620cbf4a1ec984781f2de4cd0cbd",
+  "dispatch_sha256_after": "15765ef18b1d046f1b6c155db7662adcb4a3620cbf4a1ec984781f2de4cd0cbd",
+  "unchanged_dispatch": {
+    "default": {
+      "harness": "claude",
+      "role": "strong",
+      "effort": "high"
+    }
+  },
+  "edited_index": {
+    "version": 1,
+    "roles": {
+      "strong": {
+        "claude": {
+          "model": "opus",
+          "stand_in": "sonnet"
+        },
+        "omp": {
+          "model": "openai-codex/gpt-6-luna"
+        }
+      }
+    },
+    "retired": [
+      "gpt-6-sol"
+    ]
+  }
+}

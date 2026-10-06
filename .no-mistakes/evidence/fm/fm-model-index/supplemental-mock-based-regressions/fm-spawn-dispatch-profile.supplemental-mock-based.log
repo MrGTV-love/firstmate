@@ -1,0 +1,16 @@
+Supplemental mock-based regression log; not live product validation.
+Command: /usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-spawn-dispatch-profile.test.sh
+
+ok - allowlist=absent preserves the operational floor and filters only when opted in
+ok - allowlist=missing-config preserves the operational floor and filters only when opted in
+ok - allowlist=enabled preserves the operational floor and filters only when opted in
+ok - allowlist=empty preserves the operational floor and filters only when opted in
+ok - invalid allowlist names refuse before launch or task publication
+ok - inaccessible config with present allowlist refuses before launch or task publication
+ok - inaccessible config with absent allowlist refuses before launch or task publication
+ok - inaccessible ancestor with present allowlist refuses before launch or task publication
+ok - inaccessible ancestor with absent allowlist refuses before launch or task publication
+not ok - secondmate with an allowlist should spawn: error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/fm-spawn-dispatch-profile.cAdqc9/env-secondmate/secondmate-home: expected exit 0, got 1
+
+Exit code: 1
+Elapsed seconds: 41.19

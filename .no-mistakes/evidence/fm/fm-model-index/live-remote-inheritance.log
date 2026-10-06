@@ -1,0 +1,541 @@
+Live manual remote inheritance scenario
+Native OpenSSH transport on loopback; actual original sender, byte-identical copied entrypoint/worker/receiver.
+Isolation: workspace FM_REMOTE_JOB_STATE_ROOT and FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux. This is NOT native Darwin LaunchAgent proof. No nudge notification, fleet lifecycle, vendor/catalog mocks, credentials, agent forwarding, gate bypass, or FM_REMOTE_JOB_ACTIVE override.
+All intentional fixture files are inside current worktree. Evidence preserved outside fixtures.
++ /bin/mkdir -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code
+
+exit=0
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/AGENTS.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/AGENTS.md
+
+exit=0
++ /bin/cp -Rp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin
+
+exit=0
++ /usr/bin/git init --quiet /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code
+
+exit=0
++ /usr/bin/git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code add -- AGENTS.md bin
+
+exit=0
++ /usr/bin/git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code -c 'user.name=Disposable Remote Test' -c user.email=remote-test@localhost -c commit.gpgsign=false commit --quiet -m 'Byte-identical genuine code for isolated live remote test'
+
+exit=0
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary
+exit=0
++ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination
+exit=0
++ /usr/bin/ssh-keygen -q -t ed25519 -N '' -C owned-loopback-host -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/host_key
+
+exit=0
++ /usr/bin/ssh-keygen -q -t ed25519 -N '' -C owned-loopback-client -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/client_key
+
+exit=0
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatcher
+#!/bin/bash
+set -euo pipefail
+case "${SSH_ORIGINAL_COMMAND:-}" in
+  'fm-remote-entrypoint.sh '*) ;;
+  *) printf 'owned dispatcher: refused original command
+' >&2; exit 64 ;;
+esac
+read -r -a args <<< "$SSH_ORIGINAL_COMMAND"
+[ "${#args[@]}" -eq 5 ] || { printf 'owned dispatcher: requires fixed protocol argv
+' >&2; exit 64; }
+[ "${args[0]}" = fm-remote-entrypoint.sh ] || exit 64
+for arg in "${args[@]:1}"; do
+  case "$arg" in ''|*[!A-Za-z0-9+/=]*) exit 64 ;; esac
+done
+exec /usr/bin/env TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp FM_REMOTE_JOB_STATE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/spool FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-entrypoint.sh "${args[@]:1}"
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config
+Port 58308
+ListenAddress 127.0.0.1
+HostKey /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/host_key
+PidFile /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd.pid
+AuthorizedKeysFile /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/authorized_keys
+AllowUsers charlesabrooker
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+PermitRootLogin no
+StrictModes yes
+PermitUserEnvironment no
+PermitTTY no
+DisableForwarding yes
+UseDNS no
+LogLevel VERBOSE
+ForceCommand /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatcher
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/client_config
+Host owned-loopback
+  HostName 127.0.0.1
+  Port 58308
+  User charlesabrooker
+  IdentityFile /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/client_key
+  IdentitiesOnly yes
+  IdentityAgent none
+  UserKnownHostsFile /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/known_hosts
+  GlobalKnownHostsFile /dev/null
+  StrictHostKeyChecking yes
+  BatchMode yes
+  ForwardAgent no
+  ClearAllForwardings yes
+  ConnectTimeout 10
+  ControlMaster no
+  ControlPath none
+  LogLevel ERROR
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper
+#!/bin/bash
+exec /usr/bin/ssh -F /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/client_config "$@"
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvPlVyD7kNhdsMlGFqHrimJafxdJyr3JHPnXRbinhFP owned-loopback-client
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/known_hosts
+[127.0.0.1]:58308 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBnhENWkOc2mjkdcgOLPuYp+WY/Z7O0PgoeZpOWxijpU owned-loopback-host
+fixture file /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/data/secondmates.md
+- owned-destination - Disposable remote transport scenario (host: owned-loopback; root: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code; home: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination; scope: manual inheritance; projects: ; added 2026-10-06)
++ /bin/chmod 700 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatcher /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper
+
+exit=0
++ /bin/chmod 600 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/authorized_keys /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/known_hosts /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/client_config
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/AGENTS.md /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/AGENTS.md
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-entrypoint.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-entrypoint.sh
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-job-worker.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-job-worker.sh
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-job-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-job-lib.sh
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-inherit.sh
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-config-inherit-lib.sh
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-model-index.sh
+
+exit=0
++ env PATH=/usr/sbin:/usr/bin:/bin:/opt/homebrew/bin TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /usr/sbin/sshd -t -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config
+
+exit=0
++ /usr/sbin/sshd -D -e -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config (owned service pid=75247, localhost-only port 58308)
+owned sshd identity: 75247 | Tue Oct  6 12:53:56 2026 | sshd: /usr/sbin/sshd -D -e -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config [listener] 0 of 10-100 startups
+primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json
+{
+  "version": 1,
+  "roles": {
+    "next": {
+      "claude": {
+        "model": "sonnet",
+        "stand_in": "opus"
+      }
+    }
+  },
+  "retired": []
+}
+primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "role": "next"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "role": "next",
+        "stand_in": true
+      }
+    }
+  ]
+}
+primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness
+claude
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh owned-destination 6101
+pushed: config/model-index.json
+pushed: config/crew-dispatch.json
+unchanged: config/dispatch-never-send
+pushed: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-harness
+
+exit=0
+ASSERT actual remote consumers phase=valid pair generation 6101
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "model": "sonnet"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "model": "opus"
+      }
+    }
+  ]
+}
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude role:next
+sonnet
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude stand-in:next
+opus
+exit=0
+PASS actual remote profiles resolved default=sonnet and explicit stand-in=opus; model commands agree
++ /bin/mkdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained
+
+exit=0
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/model-index.json
+
+exit=0
+persisted model-index.json SHA256=ff194f62db2897c7e558c8a4cd0e45f06465bb7c71394c93f839a06f4260e799
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/crew-dispatch.json
+
+exit=0
+persisted crew-dispatch.json SHA256=f367dee947bb16af1b6b54b4d1482017bde73789f84e55c08586fe12a846b5a7
+new primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json
+{
+  "version": 1,
+  "roles": {
+    "next": {
+      "claude": {
+        "model": "opus",
+        "stand_in": "sonnet"
+      }
+    }
+  },
+  "retired": []
+}
+new primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "role": "next",
+    "phase": "guarded-new-source"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "role": "next",
+        "stand_in": true
+      }
+    }
+  ]
+}
+new primary input /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness
+omp
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatch-symlink-target.json
+
+exit=0
++ /bin/rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /bin/ln -s /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatch-symlink-target.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh owned-destination 6102
+skipped: config/model-index.json and config/crew-dispatch.json (error: inherited destination is a symlink)
+unchanged: config/dispatch-never-send
+pushed: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md
+exit=1
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-harness
+
+exit=0
+ASSERT actual remote consumers phase=symlink dispatch guarded generation 6102
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "model": "sonnet"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "model": "opus"
+      }
+    }
+  ]
+}
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude role:next
+sonnet
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude stand-in:next
+opus
+exit=0
+PASS actual remote profiles resolved default=sonnet and explicit stand-in=opus; model commands agree
+PASS dispatch symlink retained exactly, model-index and dispatch bytes plus both generation receipts unchanged; unrelated crew-harness=omp propagated
++ /bin/rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /bin/ln /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/index-hardlink-target.json
+
+exit=0
+new primary config/crew-harness=pi
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh owned-destination 6103
+skipped: config/model-index.json and config/crew-dispatch.json (error: inherited destination is hardlinked)
+unchanged: config/dispatch-never-send
+pushed: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md
+exit=1
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/retained/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/index-hardlink-target.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-harness
+
+exit=0
+ASSERT actual remote consumers phase=hardlinked model-index guarded generation 6103
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "model": "sonnet"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "model": "opus"
+      }
+    }
+  ]
+}
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude role:next
+sonnet
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude stand-in:next
+opus
+exit=0
+PASS actual remote profiles resolved default=sonnet and explicit stand-in=opus; model commands agree
+PASS hardlinked model-index identity/link count retained, both pair bytes and generation receipts unchanged; unrelated crew-harness=pi propagated
++ /bin/rm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/index-hardlink-target.json
+
+exit=0
++ /bin/mkdir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair
+
+exit=0
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/model-index.json
+
+exit=0
++ /bin/cp -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/crew-dispatch.json
+
+exit=0
++ /bin/chmod 444 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/crew-dispatch.json
+
+exit=0
+Frozen-stage scope: provided public FM_CONFIG_INHERIT_PAIR_DIR input is tested end to end. Actual remote fm-config-push native race is not driven because its successful propagation attempts the out-of-authority fm-send remote reread nudge. No nudge implementation is intercepted or bypassed. Native fm-config-push staging was covered separately by the parent local scenario, not by this remote run.
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_CONFIG_OVERRIDE=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "phase": "guarded-new-source",
+    "model": "opus"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "model": "sonnet"
+      }
+    }
+  ]
+}
+exit=0
+original changed after stage /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json
+{
+  "version": 1,
+  "roles": {
+    "next": {
+      "claude": {
+        "model": "sonnet",
+        "stand_in": "opus"
+      }
+    }
+  },
+  "retired": []
+}
+original changed after stage /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "role": "next",
+    "phase": "original-mutated-after-stage"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "role": "next",
+        "stand_in": true
+      }
+    }
+  ]
+}
+original changed after stage /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness
+claude
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp FM_CONFIG_INHERIT_PAIR_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh owned-destination 6104
+pushed: config/model-index.json
+pushed: config/crew-dispatch.json
+unchanged: config/dispatch-never-send
+pushed: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/model-index.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/model-index.json differ: char 82, line 6
+exit=1
+persisted frozen model-index.json SHA256=db8350a8a8752fa7ef9f7b4d391c810a3ff4de5cd5b027159cf4b285eabc34b3
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/frozen-pair/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+
+exit=0
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-dispatch.json /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json differ: char 77, line 5
+exit=1
+persisted frozen crew-dispatch.json SHA256=1819f8d9236a804a336d0ba7c62c30fb50a57f7824a9f7b9ecbb60623a99a6f6
++ /usr/bin/cmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary/config/crew-harness /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-harness
+
+exit=0
+ASSERT actual remote consumers phase=frozen provided pair generation 6104 after both originals changed
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "claude",
+    "phase": "guarded-new-source",
+    "model": "opus"
+  },
+  "rules": [
+    {
+      "match": "owned-manual-scenario",
+      "use": {
+        "harness": "claude",
+        "model": "sonnet"
+      }
+    }
+  ]
+}
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude role:next
+opus
+exit=0
++ env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/primary FM_SSH_BIN=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/ssh-wrapper TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/tmp /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-on.sh owned-destination fm-model-index.sh model claude stand-in:next
+sonnet
+exit=0
+PASS actual remote profiles resolved default=opus and explicit stand-in=sonnet; model commands agree
+PASS full actual sender consumed frozen public pair, both persisted files byte-identical to frozen stage and different from both live originals; unrelated current crew-harness=claude propagated
++ /bin/ps -p 40592 -o pid=,ppid=,pgid=,command=
+40592 40257 40257 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code/bin/fm-remote-job-worker.sh --serve
+exit=0
+actual worker code identity=9f201d66ac992338ba0576f0cdd357f06f097e01:68d3b62c064e7d525d566b87ebb86f3f2e7df580:8973f5d6dae12ebf4c7b642431e3137dba5a95d6
+Observed native server authentication evidence from proc://owned-live-remote-inheritance-sshd:
+Server listening on 127.0.0.1 port 58308.
+Accepted publickey for charlesabrooker from 127.0.0.1 port 58744 ssh2: ED25519 SHA256:ikQETBqYyDfxeI8RrMu0R4XNh7ioRRb+7LQWtT2P+I0
+Starting session: forced-command (config) '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/dispatcher' for charlesabrooker from 127.0.0.1 port 58744 id 0
+Native nonroot sshd emitted BSM audit Operation not permitted notices; actual SSH publickey authentication, forced-command sessions, product job results, and manual payload assertions all succeeded. No audit facility or production sshd configuration was changed.
++ env FM_REMOTE_JOB_STATE_ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/spool FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux /bin/bash -c 'set -euo pipefail
+. "$1/bin/fm-remote-job-lib.sh"
+fm_remote_job_worker_owned_alive "$2" "$3"
+fm_remote_job_worker_identity_matches "$2" "$3"
+printf '"'"'identity-verified owned worker pid=%s
+'"'"' "$FM_REMOTE_JOB_OWNER_PID"
+fm_remote_job_stop_worker_tree "$FM_REMOTE_JOB_OWNER_PID"
+printf '"'"'owned worker tree stopped using fm_remote_job_stop_worker_tree
+'"'"'
+' owned-worker-cleanup /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/code /Users/charlesabrooker
+identity-verified owned worker pid=40592
+owned worker tree stopped using fm_remote_job_stop_worker_tree
+exit=0
+PASS owned worker isolated process group 40257 absent after identity-aware API cleanup
+PASS owned SSH listener start time and private config path identity verified before stop: sshd: /usr/sbin/sshd -D -e -f /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture/sshd_config [listener] 0 of 10-100 startups
++ write proc://owned-live-remote-inheritance-sshd/kill (only identity-verified owned service)
++ /bin/ps -p 75247 -o pid=,command=
+
+exit=1
+PASS owned SSH listener pid absent and localhost port 58308 no longer accepts connections
++ /bin/rm -rf -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.live-remote-inheritance-fixture
+
+exit=0
+PASS all own fixtures removed: copied code checkout, marked primary/destination homes, spool, private host/client keys, authorized_keys, client/server config, wrapper/dispatcher, frozen stage, link targets, and own TMPDIR. Evidence retained. No source edits, global LaunchAgents, production remote-job state, fleet/default backend, or production SSH configuration/credentials touched.

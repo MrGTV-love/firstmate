@@ -1,0 +1,73 @@
+{
+  "classification": "Supplemental mock-based regression evidence only; no live product validation",
+  "results": [
+    {
+      "test": "tests/fm-model-index.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-model-index.test.sh",
+      "result": "inconclusive: eval 600-second timeout; output capture interrupted; no exit code observed",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-model-index.supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-worker-account.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-worker-account.test.sh",
+      "exit_code": 1,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-worker-account.supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-worker-account.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-worker-account.test.sh",
+      "exit_code": 1,
+      "elapsed_seconds": 415.78,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-worker-account.toolchain-remediated-supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-spawn-dispatch-profile.test.sh",
+      "exit_code": 1,
+      "elapsed_seconds": 41.19,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-spawn-dispatch-profile.supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-worker-account.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/tmp FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-worker-account.test.sh",
+      "exit_code": 0,
+      "elapsed_seconds": 234.01,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-worker-account.fixture-placement-remediated-supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/tmp FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-spawn-dispatch-profile.test.sh",
+      "exit_code": 0,
+      "elapsed_seconds": 491.14,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-spawn-dispatch-profile.fixture-placement-remediated-supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-dispatch-resolve.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-dispatch-resolve.test.sh",
+      "exit_code": 0,
+      "elapsed_seconds": 48.25,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-dispatch-resolve.supplemental-mock-based.log"
+    },
+    {
+      "test": "tests/fm-model-index.test.sh",
+      "command": "/usr/bin/env -i PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/home TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd FM_LIVE=0 FM_TEST_BASE_PATH=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd/bin:/usr/bin:/bin:/usr/sbin:/sbin TERM=xterm DISABLE_AUTOUPDATER=1 bash tests/fm-model-index.test.sh",
+      "exit_code": 0,
+      "elapsed_seconds": 319.79,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/supplemental-mock-based-regressions/fm-model-index.deadline-remediated-supplemental-mock-based.log"
+    }
+  ],
+  "unsafe_test": {
+    "test": "tests/fm-control-relaunch.test.sh",
+    "result": "not executed: unsafe unowned fixed /tmp cleanup",
+    "reason": "lines 268 and 275 use /tmp/fm-$id with fixed IDs such as rl1; lines 45-51 unconditionally rm -rf TASK_TMPS. Parent agreed skip unchanged test."
+  },
+  "setup_remediation": [
+    "Added real /opt/homebrew/bin/node symlink to curated PATH after missing-node setup failure.",
+    "Parent allowed tests-owned ephemeral /tmp fixture creation; worker-account and spawn-profile used TMPDIR=/tmp on remediation because in-worktree secondmate fixtures are rejected by existing safety guard.",
+    "Removed infrastructure 600-second eval deadline and used durable file-streamed subprocess stdout/stderr for model-index redrive."
+  ],
+  "cleanup": {
+    "owned_setup": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.focused-regression-tmp-e6td3hfd",
+    "planned_action": "chmod -R u+w owned_setup && rm -rf owned_setup; no external fixture cleanup commands"
+  }
+}

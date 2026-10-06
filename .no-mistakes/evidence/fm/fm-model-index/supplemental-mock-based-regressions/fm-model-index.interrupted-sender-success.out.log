@@ -1,0 +1,14 @@
+removed: config/model-index.json
+removed: config/crew-dispatch.json
+unchanged: config/dispatch-never-send
+unchanged: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
