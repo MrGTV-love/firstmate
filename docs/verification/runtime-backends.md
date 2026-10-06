@@ -1901,6 +1901,17 @@ poll 8: {"agent_status":"working","session":".../2026-09-21T14-10-08-776Z_01a0c4
 
 The read that supplies the reference is `bin/backends/herdr.sh`'s `fm_backend_herdr_pane_agent_session_ref`, the per-harness rule is `bin/fm-control-lib.sh`'s `fm_control_relaunch_resume_flag`, and the launch argument is composed by `relaunch_resume_args` in `bin/fm-spawn.sh`; `docs/herdr-backend.md` "Agent status authority and relaunch" owns the contract. Nothing here changes `resume` as a control verb, and only a relaunch asks for it.
 
+### Native omp default-band composer
+
+Measured 2026-10-06 on macOS aarch64 with omp 18.6.3 in a fresh guarded, named non-default Herdr lab.
+The shared classifier recognized the native status-band header and adjacent `╰─` input row without a Firstmate composer overlay.
+Actual empty captures classified `empty` and extracted no draft; unsubmitted `!git diff` classified `pending`, extracted completely, and ordinary exit refused without changing the screen or recorded task identity.
+An unsubmitted multiline draft containing literal borders, status-shaped text, and a pasted band remained pending and fully extractable, including cursor-on-root and cursor-on-continuation checks.
+These public-API checks passed in both default-locale and fresh `LC_ALL=C` Bash processes.
+A positively attributed bare `omp --resume=<ref>` returned launch proof `unmanaged`; `fm-control.sh native-band-exit exit` changed from status 1 with unknown-composer refusal to status 0 with `stopped native-band-exit`, leaving only the pane's shell process.
+No model input was submitted, and guarded lab teardown succeeded.
+The saved actual renderer captures and focused portable checks are refreshed with `bash tests/fm-composer-native-band.test.sh` and `LC_ALL=C bash tests/fm-composer-native-band.test.sh`; these checks do not themselves launch the live lab.
+
 ### Bare native omp restoration and managed recovery
 
 Measured 2026-10-04 on macOS aarch64 (Darwin 25.5.0), Herdr 0.9.1 protocol 22, and omp 18.6.1.
