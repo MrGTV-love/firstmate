@@ -5854,12 +5854,12 @@ seed_captured_procevent_result() {  # <dir>
   [ -s "$dir/state/.wake-queue" ]
 }
 
-# The watcher, scoped by FM_HOME rather than FM_STATE_OVERRIDE, so the
-# per-cycle reconcile it launches resolves the same home's state.
+# Keep FM_HOME for per-cycle reconcile and give the inherited poll hook the
+# same home's explicit state directory through FM_STATE_OVERRIDE.
 procevent_watch_bg() {  # <dir> <out>
   local dir=$1 out=$2
   dir=$(cd "$dir" && pwd -P) || return 1
-  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" \
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" \
     FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" \
     FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
 }
@@ -6108,7 +6108,7 @@ test_procevent_surface_crash_boundaries() {
   append_wake "$state" check "procevent:output-fail:1" "check: procevent fixture output-fail 1"
   mkfifo "$fifo"
   sh -c ': < "$1"' _ "$fifo" & reader=$!
-  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" \
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" \
     FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$fifo" &
   pid=$!

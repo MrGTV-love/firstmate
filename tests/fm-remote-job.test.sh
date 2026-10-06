@@ -26,6 +26,7 @@ STALL_WORKER_PID=
 STALL_REPLACEMENT_PID=
 STALL_JOB_GROUP=
 QUIET_WORKER_PID=
+GROUP_PID=
 mkdir -p "$REMOTE_ROOT/bin" "$REMOTE_HOME" "$ACCOUNT_HOME" "$RUNTIME_BIN"
 # worker.pid records the serving child, not its restart supervisor, so stopping
 # that pid alone leaves the supervisor to respawn - the leak
@@ -45,6 +46,7 @@ cleanup_remote_job_fixture() {
     wait "$stall_pid" 2>/dev/null || true
   done
   [ -z "$STALL_JOB_GROUP" ] || kill -KILL -- "-$STALL_JOB_GROUP" 2>/dev/null || true
+  [ -z "$GROUP_PID" ] || kill -KILL -- "-$GROUP_PID" 2>/dev/null || true
   if [ -f "$STATE_ROOT/worker.pid" ]; then
     fm_remote_job_stop_worker_tree "$(cat "$STATE_ROOT/worker.pid")" || true
   fi
@@ -83,7 +85,7 @@ cat > "$REMOTE_ROOT/bin/fm-shutdown-job.sh" <<'SH'
 #!/bin/bash
 trap '' HUP INT TERM
 printf 'started\n' > "$1"
-sleep 3
+read -r _ < "$3"
 printf 'ran\n' > "$2"
 SH
 cat > "$REMOTE_ROOT/bin/fm-output-job.sh" <<'SH'
@@ -466,15 +468,21 @@ pass "sibling polls never preempt each other into a re-arm churn loop"
 
 STARTED="$TMP_ROOT/shutdown-started"
 SHUTDOWN_SIDE_EFFECT="$TMP_ROOT/shutdown-side-effect"
+SHUTDOWN_FIFO="$TMP_ROOT/shutdown-fifo"
+mkfifo "$SHUTDOWN_FIFO"
 FM_REMOTE_JOB_TIMEOUT=5
-fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
-  fm-shutdown-job.sh "$STARTED" "$SHUTDOWN_SIDE_EFFECT" < /dev/null > /dev/null
+FM_REMOTE_JOB_TIMEOUT=60 fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
+  fm-shutdown-job.sh "$STARTED" "$SHUTDOWN_SIDE_EFFECT" "$SHUTDOWN_FIFO" < /dev/null > /dev/null
 JOB_ID=$FM_REMOTE_JOB_ID
+JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 for _ in $(seq 1 100); do
   [ -f "$STARTED" ] && break
   sleep 0.05
 done
 assert_present "$STARTED" "the shutdown fixture did not begin executing"
+GROUP_PID=$(cat "$JOB_DIR/.claim/group")
+kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the shutdown command group exited before worker termination"
 WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 kill -TERM "$WORKER_PID"
 for _ in $(seq 1 100); do
@@ -492,22 +500,34 @@ done
 assert_present "$STATE_ROOT/worker.ready" "the replacement worker did not become ready"
 fm_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
 [ "$FM_REMOTE_JOB_EXIT" -eq 125 ] || fail "the interrupted job did not publish an unknown-completion result"
-sleep 3
+for _ in $(seq 1 100); do
+  kill -0 -- "-$GROUP_PID" 2>/dev/null || break
+  sleep 0.05
+done
+! kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the shutdown command group was still alive after worker shutdown"
+GROUP_PID=
 assert_absent "$SHUTDOWN_SIDE_EFFECT" "the active command mutated after worker shutdown"
 fm_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the interrupted job could not be reaped"
 pass "worker shutdown terminates the active command tree before replacement"
 
 CRASH_STARTED="$TMP_ROOT/crash-started"
 CRASH_SIDE_EFFECT="$TMP_ROOT/crash-side-effect"
+CRASH_FIFO="$TMP_ROOT/crash-fifo"
+mkfifo "$CRASH_FIFO"
 FM_REMOTE_JOB_TIMEOUT=5
-fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
-  fm-shutdown-job.sh "$CRASH_STARTED" "$CRASH_SIDE_EFFECT" < /dev/null > /dev/null
+FM_REMOTE_JOB_TIMEOUT=60 fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
+  fm-shutdown-job.sh "$CRASH_STARTED" "$CRASH_SIDE_EFFECT" "$CRASH_FIFO" < /dev/null > /dev/null
 JOB_ID=$FM_REMOTE_JOB_ID
+JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 for _ in $(seq 1 100); do
   [ -f "$CRASH_STARTED" ] && break
   sleep 0.05
 done
 assert_present "$CRASH_STARTED" "the crash fixture did not begin executing"
+GROUP_PID=$(cat "$JOB_DIR/.claim/group")
+kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the crash command group exited before worker termination"
 CRASHED_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 kill -KILL "$CRASHED_WORKER_PID"
 for _ in $(seq 1 200); do
@@ -519,7 +539,13 @@ done
   || fail "the Linux supervisor did not restart a crashed worker"
 fm_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
 [ "$FM_REMOTE_JOB_EXIT" -eq 125 ] || fail "worker crash recovery did not publish unknown completion"
-sleep 3
+for _ in $(seq 1 100); do
+  kill -0 -- "-$GROUP_PID" 2>/dev/null || break
+  sleep 0.05
+done
+! kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the crash command group was still alive after worker crash recovery"
+GROUP_PID=
 assert_absent "$CRASH_SIDE_EFFECT" "an orphaned command mutated after worker crash recovery"
 fm_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the crash-recovered job could not be reaped"
 fm_remote_job_probe "$ACCOUNT_HOME" || fail "the restarted worker did not remain ready"
@@ -582,9 +608,11 @@ pass "the worker refuses symlinked job fields before command execution"
 
 QUARANTINE_STARTED="$TMP_ROOT/quarantine-started"
 QUARANTINE_SIDE_EFFECT="$TMP_ROOT/quarantine-side-effect"
+QUARANTINE_FIFO="$TMP_ROOT/quarantine-fifo"
+mkfifo "$QUARANTINE_FIFO"
 FM_REMOTE_JOB_TIMEOUT=5
-fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
-  fm-shutdown-job.sh "$QUARANTINE_STARTED" "$QUARANTINE_SIDE_EFFECT" < /dev/null > /dev/null
+FM_REMOTE_JOB_TIMEOUT=60 fm_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
+  fm-shutdown-job.sh "$QUARANTINE_STARTED" "$QUARANTINE_SIDE_EFFECT" "$QUARANTINE_FIFO" < /dev/null > /dev/null
 JOB_ID=$FM_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 for _ in $(seq 1 100); do
@@ -593,6 +621,8 @@ for _ in $(seq 1 100); do
 done
 assert_present "$QUARANTINE_STARTED" "the quarantine fixture did not begin executing"
 GROUP_PID=$(cat "$JOB_DIR/.claim/group")
+kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the quarantine command group exited before its claim was corrupted"
 printf 'invalid\n' > "$JOB_DIR/.claim/group"
 WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 kill -TERM "$WORKER_PID"
@@ -611,8 +641,16 @@ REPLACEMENT_RC=$?
 set -e
 [ "$REPLACEMENT_RC" -ne 0 ] || fail "a replacement worker ignored quarantined ownership"
 assert_present "$STATE_ROOT/worker.lock/quarantine" "a replacement removed quarantined ownership"
+kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the quarantine command group exited before explicit termination"
 kill -KILL -- "-$GROUP_PID" 2>/dev/null || true
-sleep 3
+for _ in $(seq 1 100); do
+  kill -0 -- "-$GROUP_PID" 2>/dev/null || break
+  sleep 0.05
+done
+! kill -0 -- "-$GROUP_PID" 2>/dev/null \
+  || fail "the quarantine command group was still alive after explicit termination"
+GROUP_PID=
 assert_absent "$QUARANTINE_SIDE_EFFECT" "the quarantined command mutated after explicit termination"
 pass "failed shutdown quarantines ownership against replacement workers"
 
