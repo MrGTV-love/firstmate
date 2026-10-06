@@ -2783,9 +2783,11 @@ test_tmux_no_server_reclaim_keeps_work_and_task() {
       printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/$id.check.sh"
       chmod 0700 "$dir/home/state/$id.check.sh"
       FM_HOME="$dir/home" "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "cannot arm reclaim check"
+      printf 'busy_gen=gone-%s\n' "$id" >> "$dir/home/state/$id.meta"
       out=$(run_control "$dir" "$id" exit); rc=$?
       expect_code 0 "$rc" "no user tmux server should prove exit for $id"$'\n'"$out"
       assert_contains "$out" endpoint-gone "exit should report proven absence"
+      assert_equals "gen=gone-$id" "$(cat "$dir/home/state/$id.control-exit")" "proven-gone exit must cancel the recorded incarnation"
       out=$(FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --note "resume after reboot"); rc=$?
       expect_code 0 "$rc" "no user tmux server should permit Herdr reclaim for $id"$'\n'"$out"
       [ "$(meta_field "$dir" "$id" backend)" = herdr ] || fail "reclaim did not publish Herdr"
@@ -3129,9 +3131,11 @@ test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server() {
     return 0
   }
   dir=$HERDR_CASE_DIR
+  printf 'busy_gen=retired-rl72\n' >> "$dir/home/state/rl72.meta"
 
   out=$(run_control "$dir" rl72 exit) || rc=$?
   expect_code 0 "$rc" "a pane that outlived its stopped server holds no agent, which is success"$'\n'"$out"
+  assert_equals gen=retired-rl72 "$(cat "$dir/home/state/rl72.control-exit")" "surviving dead endpoint exit must cancel its retired incarnation"
   assert_contains "$out" "already-stopped" \
     "the endpoint is there and idle, which is the ordinary already-stopped outcome"
   assert_not_contains "$out" "endpoint-gone" \
@@ -3139,6 +3143,41 @@ test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server() {
   [ "$(meta_field "$dir" rl72 window)" = 'fmlab:%7' ] \
     || fail "exit must leave the recorded endpoint exactly as it found it"
   pass "fm-control exit: a herdr pane that outlived its stopped server is already-stopped, not gone"
+}
+
+test_herdr_exit_resolves_retired_quota_identity_after_server_recovery() {
+  local dir id=rl72-quota out rc=0 gen journal_before
+  herdr_case_or_skip gone-herdr-quota-exit "$id" || {
+    echo "skip - herdr quota exit needs jq"
+    return 0
+  }
+  dir=$HERDR_CASE_DIR
+  "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+  gen=$(cat "$dir/home/state/$id.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" retire "$dir/home/state" "$id" --current-gen >/dev/null
+  printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
+  {
+    printf 'task=%s\nworktree=%s\nkind=ship\n' "$id" "$dir/wt"
+    printf 'backend=herdr\nendpoint=fmlab:%%7\n'
+    printf 'phase=failed:noted\nrollback=instructions-restored\n'
+    printf 'quota_gen=%s\nquota_seq=1\nrelaunch_tx=quota-partial\n' "$gen"
+    printf 'from_busy_gen=-\nfrom_relaunch_tx=-\n'
+    printf 'from_harness=claude\nfrom_model=default\nfrom_effort=default\n'
+  } > "$dir/home/state/$id.control-relaunch"
+  journal_before=$(cat "$dir/home/state/$id.control-relaunch")
+  out=$(run_control "$dir" "$id" exit) || rc=$?
+  expect_code 0 "$rc" "recovered dead endpoint must satisfy explicit exit: $out"
+  assert_contains "$out" already-stopped "the restored endpoint must remain stopped"
+  assert_equals "gen=$gen" "$(cat "$dir/home/state/$id.control-exit")" "successful absence recovery must resolve the validated retired quota identity"
+  out=$(run_session_end_scan "$dir"); rc=$?
+  expect_code 0 "$rc" "cancelled recovered-dead quota scan must succeed: $out"
+  assert_equals '' "$out" "the recovered journal must not relaunch after explicit exit"
+  assert_equals "$journal_before" "$(cat "$dir/home/state/$id.control-relaunch")" "cancelled recovered journal must remain unchanged"
+  assert_no_grep 'pane send-text' "$dir/fake/herdr-log" "cancelled recovery must not type or launch"
+  assert_absent "$dir/home/state/$id.busy-gen" "server recovery must not resurrect retired busy generation"
+  assert_absent "$dir/home/state/$id.busy-state" "server recovery must not resurrect busy state"
+  assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "server recovery cancellation must preserve work"
+  pass "explicit exit resolves a retired quota identity only after recovering its dead Herdr endpoint"
 }
 
 test_herdr_rebind_stays_in_the_recorded_session() {
@@ -4405,6 +4444,66 @@ test_quota_recovery_retries_real_stop_then_failed_launch() {
   pass "quota recovery retries proven-dead real stopping, exited, launching and post-arm failures without resurrecting busy state"
 }
 
+test_explicit_exit_cancels_partial_quota_recovery() {
+  local dir failure id out rc gen marker_gen journal_before literal_before meta_before real_mv
+  real_mv=$(command -v mv)
+  for failure in stopping exited retired-meta postarm published; do
+    id="rl-quota-exit-$failure"
+    dir=$(new_case quota-explicit-exit "$id")
+    add_quota_recovery_task "$dir" "$id"
+    gen=$(cat "$dir/home/state/$id.busy-gen")
+    if [ "$failure" = retired-meta ]; then
+      printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/$id.meta"
+    fi
+    case "$failure" in
+      stopping)
+        out=$(FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 run_session_end_scan "$dir"); rc=$?
+        ;;
+      exited|retired-meta)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$real_mv" FM_FAKE_JOURNAL_PHASE_MV_FAIL=launching run_session_end_scan "$dir"); rc=$?
+        ;;
+      postarm)
+        make_mv_failure_stub "$dir"
+        out=$(FM_REAL_MV="$real_mv" FM_FAKE_META_PUBLISH_MV_FAIL="$dir/home/state/$id.meta" run_session_end_scan "$dir"); rc=$?
+        ;;
+      published)
+        out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 run_session_end_scan "$dir"); rc=$?
+        ;;
+    esac
+    expect_code 0 "$rc" "quota scan must record the partial failure: $out"
+    assert_contains "$out" 'auto-relaunch failed after quota exhaustion' "$failure must reach the real recovery transaction"
+    assert_absent "$dir/home/state/$id.control-exit" "internal relaunch stop must not cancel recovery"
+    marker_gen=$(meta_field "$dir" "$id" busy_gen)
+    [ -n "$marker_gen" ] || marker_gen=$gen
+    journal_before=$(cat "$dir/home/state/$id.control-relaunch")
+    meta_before=$(cat "$dir/home/state/$id.meta")
+    out=$(run_control "$dir" "$id" exit); rc=$?
+    expect_code 0 "$rc" "explicit exit must succeed after $failure: $out"
+    if [ "$failure" = published ]; then
+      assert_contains "$out" stopped "explicit exit must stop the published replacement"
+      [ "$marker_gen" != "$gen" ] || fail "published cancellation must bind the replacement generation"
+    else
+      assert_contains "$out" already-stopped "dead partial recovery must be an idempotent exit"
+    fi
+    assert_equals "gen=$marker_gen" "$(cat "$dir/home/state/$id.control-exit")" "exit must mark the owned recovery incarnation"
+    literal_before=$(cat "$dir/fake/literal")
+    printf '%s' "$dir/wt" > "$dir/fake/cwd"
+    out=$(FM_REAL_MV="$real_mv" run_session_end_scan "$dir"); rc=$?
+    expect_code 0 "$rc" "scan after explicit exit must succeed: $out"
+    assert_equals '' "$out" "explicit exit must cancel partial quota retry"
+    assert_equals "$literal_before" "$(cat "$dir/fake/literal")" "cancelled recovery must not launch a replacement"
+    assert_equals "$journal_before" "$(cat "$dir/home/state/$id.control-relaunch")" "cancellation must preserve the failed journal"
+    assert_equals "$meta_before" "$(cat "$dir/home/state/$id.meta")" "cancellation must preserve metadata"
+    assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "cancellation must preserve work"
+    if [ "$failure" != stopping ]; then
+      assert_absent "$dir/home/state/$id.busy-gen" "cancelled recovery must not resurrect a generation"
+      assert_absent "$dir/home/state/$id.busy-state" "cancelled recovery must not resurrect a busy record"
+    fi
+  done
+  pass "explicit exits cancel retired and published partial quota recovery without changing work or journals"
+}
+
 test_quota_published_failure_retries_only_its_dead_transaction() {
   local dir id=rl-quota-published out rc gen seq record tx literal_before
   dir=$(new_case quota-published "$id")
@@ -4624,6 +4723,7 @@ test_quota_published_failure_retries_only_its_dead_transaction
 test_quota_confirmed_replacement_is_not_retried
 test_quota_retry_preserves_identity_after_pre_stop_failure
 test_live_quota_retries_after_initial_pre_stop_failure
+test_explicit_exit_cancels_partial_quota_recovery
 test_relaunch_reports_the_profile_spawn_actually_served
 test_ordinary_partial_failure_keeps_its_attempt_caps
 
@@ -4706,6 +4806,7 @@ test_reclaim_refuses_an_unreadable_endpoint
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
 test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server
+test_herdr_exit_resolves_retired_quota_identity_after_server_recovery
 test_herdr_rebind_stays_in_the_recorded_session
 test_herdr_reclaim_refuses_an_agent_that_came_back
 test_herdr_reclaim_keeps_the_task_whole

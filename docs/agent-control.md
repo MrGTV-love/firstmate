@@ -86,11 +86,12 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 3. **Record the note.**
    A ship or scout relaunch requires `--note`, because the replacement inherits the local copy but none of the conversation; the note is appended to the instructions it reads.
    A secondmate relaunch does not require one and never rewrites its standing charter.
-4. **Stop the old agent** through the `exit` verb, with its postcondition.
+4. **Stop the old agent** through the shared exit postcondition, without marking the internal relaunch stop as an explicit exit.
    Before the stop, a Claude replacement must pass the [Claude API key guard](configuration.md#claude-api-key-guard), so a relaunch whose replacement an Anthropic credential would reach refuses while the old agent and its instructions are untouched.
-   The exit verb writes `state/<id>.control-exit` bound to the busy generation before it types the exit command.
-   A known non-delivery (`send-failed`) removes that marker before refusing; this includes the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
-   A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait, and `bin/fm-session-end-relaunch-lib.sh` owns how a later tick reads it.
+   Every successful explicit `exit`, including an already-stopped agent or a proven-gone endpoint, writes `state/<id>.control-exit` as `gen=TOKEN` to cancel recovery of that incarnation.
+   The token names the current busy generation, then the recorded metadata generation if retired, or an identity validated against the existing quota-recovery journal if neither exists.
+   Explicit exit also writes the marker before typing its exit command so a late SessionEnd remains deliberate after an unconfirmed wait; a known non-delivery (`send-failed`) removes it before refusing, including the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
+   Successful stopping retires the busy record without recreating it, and `bin/fm-session-end-relaunch-lib.sh` owns marker validation for ordinary session-end and partial quota-recovery scans.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
    When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that same worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**

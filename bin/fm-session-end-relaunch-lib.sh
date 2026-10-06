@@ -24,12 +24,6 @@
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
-# A completed fm-control exit retires the busy record, so its session-end
-# is never seen here. The control-exit marker covers the exit whose command
-# was delivered but whose agent did not stop within the exit wait: that
-# exit never retired the record, and its later session-end is still
-# deliberate.
-#
 # Ordinary session-end caps count attempt rows in state/.session-end-relaunch-<id>:
 # at most one attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
@@ -421,14 +415,13 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
 # supervisor-visible line, or empty. Returns non-zero only when a required
 # write failed.
 fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
-  local state=$1 meta id reason first= deadline
+  local state=$1 meta id reason first= deadline last_attempt attempts epoch kind ledger
   FM_SESSION_END_WAKE=
   [ -d "$state" ] || return 0
   fm_session_end_bounds "${2:-}" || return 0
   deadline=$(( $(date +%s) + FM_SESSION_END_TIMEOUT ))
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$state/.wake-queue"
-  for meta in "$state"/*.meta; do
-    [ -e "$meta" ] || continue
+  while IFS=$'\t' read -r last_attempt attempts meta; do
     [ "$((deadline - $(date +%s)))" -ge 2 ] || break
     id=${meta##*/}
     id=${id%.meta}
@@ -442,7 +435,25 @@ fm_session_end_relaunch_scan() {  # <state-dir> [<watcher-grace-secs>]
     case "$FM_SESSION_END_ACTION" in
       relaunch) break ;;
     esac
-  done
+  done < <(
+    for meta in "$state"/*.meta; do
+      [ -e "$meta" ] || continue
+      id=${meta##*/}
+      id=${id%.meta}
+      ledger=$(fm_session_end_ledger_path "$state" "$id")
+      last_attempt=0
+      attempts=0
+      if [ -f "$ledger" ] && [ ! -L "$ledger" ] && [ -r "$ledger" ]; then
+        while IFS=$'\t' read -r epoch kind || [ -n "$epoch" ]; do
+          [ "$kind" = attempt ] || continue
+          [[ -n "$epoch" && "$epoch" != *[!0-9]* ]] || continue
+          attempts=$((attempts + 1))
+          [ "$epoch" -le "$last_attempt" ] || last_attempt=$epoch
+        done < "$ledger"
+      fi
+      printf '%s\t%s\t%s\n' "$last_attempt" "$attempts" "$meta"
+    done | LC_ALL=C sort -t $'\t' -k1,1n -k2,2n -k3,3
+  )
   FM_SESSION_END_WAKE=$first
   return 0
 }

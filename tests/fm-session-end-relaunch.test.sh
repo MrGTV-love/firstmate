@@ -358,9 +358,9 @@ test_failed_quota_recovery_does_not_starve_later_tasks() {
 
   FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
     || fail "second multi-task quota scan failed"
-  [ "$(cut -d' ' -f1 "$dir/control.log")" = $'a-sol\nc-luna' ] \
-    || fail "failed Sol did not retry, handled Luna duplicated, or the third task starved: $(cat "$dir/control.log")"
-  for scan in 3 4; do
+  [ "$(cut -d' ' -f1 "$dir/control.log")" = c-luna ] \
+    || fail "an unattempted task lost priority or a handled Luna duplicated: $(cat "$dir/control.log")"
+  for scan in 3 4 5; do
     FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
       || fail "multi-task quota scan $scan failed"
     [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
@@ -417,6 +417,57 @@ SH
     fi
   done
   pass "failed attempts share one scan budget and leave a half-budget launch wait for later recovery"
+}
+
+test_deadline_consuming_quota_failure_advances_next_scan() {
+  local dir="$TMP_ROOT/quota-slow-starvation" state id gen scan attempts
+  state="$dir/state"
+  for id in a-sol b-luna; do
+    add_lane "$dir" "$id" omp
+    gen=$(cat "$state/$id.busy-gen")
+    "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" idle --gen "$gen" \
+      --source omp-ext --event quota-exhausted >/dev/null \
+      || fail "quota exhaustion was not recorded for $id"
+  done
+  printf '100000\n' > "$dir/clock"
+  mkdir -p "$dir/fakebin"
+  cat > "$dir/fakebin/date" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = +%s ] || exit 1
+cat "${FM_SESSION_END_CONTROL_FAIL_CLOCK:?}"
+SH
+  chmod +x "$dir/fakebin/date"
+  for scan in 1 2 3 4 5; do
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol \
+      FM_SESSION_END_CONTROL_FAIL_CLOCK="$dir/clock" \
+      FM_SESSION_END_CONTROL_FAIL_TIME="$(( $(cat "$dir/clock") + 6 ))" \
+      FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" 66 \
+      || fail "bounded quota scan $scan failed"
+    [ "$FM_SESSION_END_TIMEOUT" = 6 ] && [ "$FM_SESSION_END_LAUNCH_WAIT" = 3 ] \
+      || fail "scan $scan changed the grace-derived execution bound"
+    grep -Fx 'FM_CONTROL_LAUNCH_WAIT=3' "$dir/control-env.log" >/dev/null \
+      || fail "scan $scan did not preserve the half-budget command wait"
+    if [ "$scan" = 2 ]; then
+      [ "$(cut -d' ' -f1 "$dir/control.log")" = b-luna ] \
+        || fail "the slow failed task starved the usable later route: $(cat "$dir/control.log")"
+      [ "$FM_SESSION_END_WAKE" = "check: b-luna auto-relaunched after quota exhaustion" ] \
+        || fail "the later quota task did not recover"
+    else
+      [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
+        || fail "scan $scan exceeded its budget, capped retries, or duplicated recovery"
+      if [ "$scan" = 1 ]; then
+        [ ! -e "$state/.session-end-relaunch-b-luna" ] \
+          || fail "the exhausted first scan attempted a second lane"
+        [ "$(cat "$dir/clock")" = 100006 ] \
+          || fail "the failed attempt did not consume the shared scan deadline"
+      fi
+    fi
+  done
+  attempts=$(awk -F '\t' '$2 == "attempt" {n++} END {print n}' "$state/.session-end-relaunch-a-sol")
+  [ "$attempts" = 4 ] || fail "slow quota retries were capped after $attempts attempts"
+  [ "$(awk -F '\t' '$2 == "relaunched" {n++} END {print n}' "$state/.session-end-relaunch-b-luna")" = 1 ] \
+    || fail "the recovered later task was not deduplicated"
+  pass "deadline-consuming quota failures yield first position on the next bounded scan without retry caps"
 }
 
 test_deliberate_exit_and_waits_are_skipped() {
@@ -639,7 +690,7 @@ test_partial_quota_retries_are_uncapped_and_deduplicated() {
   for scan in 1 2 3 4; do
     FM_SESSION_END_CONTROL_FAIL_ID="$id" FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
       || fail "partial quota failure scan $scan failed"
-    [ "$(cut -d' ' -f1 "$dir/control.log")" = "$(if [ "$scan" = 1 ]; then printf '%s\nb-session-end' "$id"; else printf '%s' "$id"; fi)" ] \
+    [ "$(cut -d' ' -f1 "$dir/control.log")" = "$(if [ "$scan" = 1 ]; then printf 'b-session-end'; else printf '%s' "$id"; fi)" ] \
       || fail "a partial quota retry was capped, starved the later lane, or repeated a success"
     [ ! -e "$dir/state/$id.busy-gen" ] && [ ! -e "$dir/state/$id.busy-state" ] \
       || fail "journal eligibility resurrected busy state"
@@ -785,6 +836,7 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure
 test_quota_recovery_ignores_daily_cap_and_capped_handling
 test_failed_quota_recovery_does_not_starve_later_tasks
 test_failed_recovery_shares_the_scan_time_bound
+test_deadline_consuming_quota_failure_advances_next_scan
 test_partial_quota_retries_are_uncapped_and_deduplicated
 test_partial_quota_journal_guards_fail_closed
 test_deliberate_exit_and_waits_are_skipped

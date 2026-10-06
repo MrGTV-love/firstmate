@@ -26,7 +26,6 @@
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
-# A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
@@ -645,9 +644,39 @@ retire_busy_incarnation() {
   fi
 }
 
+deliberate_exit_generation() {
+  local gen identity
+  gen=$(cat "$(fm_busy_gen_path "$STATE" "$ID")" 2>/dev/null || true)
+  [ -n "$gen" ] || gen=$(fm_meta_get "$META" busy_gen)
+  if [ -z "$gen" ] || [ "$gen" = - ]; then
+    . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
+    identity=$(fm_session_end_quota_journal_identity "$STATE" "$ID" "$META" 2>/dev/null || true)
+    gen=${identity%% *}
+  fi
+  printf '%s' "${gen:--}"
+}
+
+record_deliberate_exit() {
+  [ "$VERB" = exit ] || return 0
+  printf 'gen=%s\n' "$deliberate_gen" > "$STATE/$ID.control-exit" \
+    || die "could not record that this exit of $ID was deliberate"
+}
+
 # do_exit: stop the running agent, preserving endpoint and worktree. Prints
 # `already-stopped`, `endpoint-gone`, or `stopped`.
 do_exit() {
+  local deliberate_gen=
+  if [ "$VERB" = exit ]; then
+    deliberate_gen=$(deliberate_exit_generation)
+  fi
+  stop_agent || return $?
+  if [ "$VERB" = exit ] && [ "$deliberate_gen" = - ]; then
+    deliberate_gen=$(deliberate_exit_generation)
+  fi
+  record_deliberate_exit
+}
+
+stop_agent() {
   local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed
   require_state_verified_backend exit
   state=$(agent_state)
@@ -733,19 +762,7 @@ do_exit() {
   # agent-state wait below. The retried Enter still
   # matters, because a slash command opens a completion popup on some TUIs that
   # swallows the first Enter.
-  # A deliberate exit verb records the busy generation before anything is typed.
-  # A completed exit retires the busy record anyway; the marker keeps a later
-  # SessionEnd deliberate when the agent outlives the exit wait and this
-  # transaction dies before that retire. Relaunch calls this function too and
-  # must not mark its own replacement stop as a deliberate exit.
-  if [ "$VERB" = exit ]; then
-    local gen_file gen
-    gen_file=$(fm_busy_gen_path "$STATE" "$ID")
-    gen=$(cat "$gen_file" 2>/dev/null || true)
-    [ -n "$gen" ] || gen=-
-    printf 'gen=%s\n' "$gen" > "$STATE/$ID.control-exit" \
-      || die "could not record that this exit of $ID was deliberate; nothing was typed"
-  fi
+  record_deliberate_exit
   verdict=$(fm_backend_send_text_submit "$BACKEND" "$T" "$cmd" "$EXIT_RETRIES" "$POLL" 1.2 "$LABEL") \
     || verdict=send-failed
   if [ "$verdict" = send-failed ]; then
