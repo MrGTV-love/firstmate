@@ -81,8 +81,9 @@ else
   [ "$VERB" != check ] || [ "$#" = 2 ] || die "index required: $INDEX"
   printf '%s\n' '{"version":1,"roles":{},"retired":[]}' > "$TMP/index.json"
 fi
-jq -e '
+jq -se '
   def token: type == "string" and length > 0 and (test("[[:space:][:cntrl:]]") | not);
+  length == 1 and (.[0] |
   type == "object" and .version == 1 and
   (.roles | type == "object") and (.retired | type == "array") and
   all(.retired[]; token) and
@@ -91,7 +92,7 @@ jq -e '
     all(.value | to_entries[];
       (.key | IN("claude","codex","omp","pi","pi-signed","opencode","cursor","agy","grok","kimi","gemini","muse","rovo","devin")) and
       (.value | type == "object" and ((keys - ["model","stand_in"]) | length == 0)) and (.value.model | token) and
-      (.value | (has("stand_in") | not) or (.stand_in | token))))
+      (.value | (has("stand_in") | not) or (.stand_in | token)))))
 ' "$TMP/index.json" >/dev/null 2>&1 || die "malformed index: $INDEX"
 
 # The one retirement and index-entry rule, shared by every check and resolution.
@@ -166,7 +167,7 @@ catalog() { # <harness>; output normalized ids and optional alias targets
   esac
 }
 validate_catalog() {
-  jq -e '.models | type == "array" and length > 0 and all(.[]; (.id | type == "string" and length > 0) and ((has("resolved_id") | not) or (.resolved_id | type == "string" and length > 0)))' "$1" >/dev/null 2>&1
+  jq -se 'length == 1 and (.[0] | type == "object" and (.models | type == "array" and length > 0 and all(.[]; type == "object" and (.id | type == "string" and length > 0) and ((has("resolved_id") | not) or (.resolved_id | type == "string" and length > 0)))))' "$1" >/dev/null 2>&1
 }
 check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   local role=$1 h=$2 m=$3 f="$TMP/catalog-$2.json"

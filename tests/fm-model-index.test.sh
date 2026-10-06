@@ -144,6 +144,26 @@ FM_HOME="$TMP_ROOT/no-index" refuses check-registry "$REGISTRY"
 cp "$BASE" "$INDEX"
 pass 'registry comparison reports every retired token key and value offline, rejects invalid inputs and missing index, and leaves inputs unchanged'
 
+for first_version in 1 2; do
+  jq --argjson version "$first_version" '.version = $version | .retired = []' "$BASE" > "$INDEX"
+  jq '.roles.strong.codex.model = "next" | .retired = ["current"]' "$BASE" >> "$INDEX"
+  printf '%s\n' '{"model":"current"}' > "$REGISTRY"
+  refuses model codex role:strong
+  refuses model omp stand-in:routine
+  refuses model codex current
+  refuses entry codex current
+  refuses check
+  refuses check codex current
+  refuses profiles "$TMP_ROOT/dispatch.json"
+  refuses check-registry "$REGISTRY"
+done
+cp "$BASE" "$INDEX"
+jq '.version = 2' "$BASE" >> "$INDEX"
+refuses model codex role:strong
+refuses check-registry "$REGISTRY"
+cp "$BASE" "$INDEX"
+pass 'concatenated valid or invalid index objects cannot split resolution, membership, catalog checking, and registry policy'
+
 jq '.roles.strong.codex.model = "absent"' "$BASE" > "$INDEX"
 refuses check
 refuses check codex absent
@@ -170,6 +190,28 @@ jq '.roles.opus = {omp:{model:"provider/unlisted"}}' "$BASE" > "$INDEX"
 refuses check omp provider/unlisted
 cp "$BASE" "$INDEX"
 pass 'unavailable, empty, undiscoverable, and extension-provider catalogs are notices; a listed provider with an absent id refuses'
+
+for first_catalog in \
+  '{"models":[{"id":"current"}]}' \
+  '{"models":[{"id":"other"}]}' \
+  '{"models":[{"id":"current","resolved_id":null}]}'; do
+  printf '%s\n' "$first_catalog" '{"models":[{"id":"current"}]}' > "$CATALOGS/codex.json"
+  accepts_with_notice 'codex catalog unavailable' check codex current
+  accepts_with_notice 'codex catalog unavailable' check
+done
+printf '%s\n' '{"models":[{"id":"current"}]}' '{"models":[{"id":"other"}]}' > "$CATALOGS/codex.json"
+accepts_with_notice 'codex catalog unavailable' check codex current
+for malformed_catalog in \
+  '[{"models":[{"id":"current"}]}]' \
+  '{"models":[{"id":42}]}' \
+  '{"models":[{"id":"current","resolved_id":null}]}'; do
+  printf '%s\n' "$malformed_catalog" > "$CATALOGS/codex.json"
+  accepts_with_notice 'codex catalog unavailable' check codex current
+done
+printf '%s\n' '{"models":[{"id":"current"},{"id":"old"},{"id":"next"}]}' > "$CATALOGS/codex.json"
+"$TOOL" check codex current >/dev/null 2> "$TMP_ROOT/single-catalog-notice" || fail 'a valid single-object catalog must validate'
+[ ! -s "$TMP_ROOT/single-catalog-notice" ] || fail 'a valid single-object catalog was treated as unavailable'
+pass 'multi-document and malformed catalog exports remain unavailable evidence, not contradictory evidence'
 
 for profile in \
   '{"harness":"codex","role":"strong","model":"current"}' \

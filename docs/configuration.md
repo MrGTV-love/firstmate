@@ -1158,6 +1158,7 @@ It does not change commit-attribution preferences.
 }
 ```
 
+The index must contain exactly one JSON object; empty files and concatenated documents are malformed.
 `version` must be `1`, `roles` must be an object keyed by non-empty role names, and `retired` must be an array of non-empty model ids.
 Each role contains one or more verified harness names, each with a required `model` string and an optional `stand_in` string, with no other entry fields.
 Names and ids cannot contain whitespace or control characters.
@@ -1204,7 +1205,7 @@ The command's header and `--help` own discovery commands and the authoritative-e
 Native discovery covers Codex, Claude, omp, Pi, OpenCode, Cursor, and Antigravity; other harnesses accept a current export from their own documented discovery surface.
 An export directory is used instead of live discovery, never mixed with it.
 Only concrete contradictory evidence refuses: an id absent from a readable catalog, or a catalog alias whose resolved id is retired.
-An unreachable, empty, or missing catalog, and an omp provider its listing does not know (extension-registered providers such as `claude-bridge` are never listed), pass with a notice, so no spawn, intake, or relaunch is refused for missing evidence.
+An unreachable, empty, missing, or malformed catalog (including concatenated JSON documents), and an omp provider its listing does not know (extension-registered providers such as `claude-bridge` are never listed), pass with a notice, so no spawn, intake, or relaunch is refused for missing evidence.
 `tests/fm-model-index.test.sh` exercises role resolution, stand-ins, retirement, unavailable catalogs, absent ids, native catalog parsing, and inherited index changes; `tests/fm-worker-account.test.sh` proves the pinned account's catalog decides the spawn verdict.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
