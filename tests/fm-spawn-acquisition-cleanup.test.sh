@@ -15,8 +15,34 @@ export FM_HOME
 "$LAB_HOME_HELPER" create "$FM_HOME" >/dev/null || fail "cannot create lab home"
 LAB_TMUX_DIR=
 HERDR_LAB_SESSION=
+A_SPAWN_PID=
+B_SPAWN_PID=
+A_POLL_READY=
+B_ALLOW=
 cleanup_acquisition() {
   local rc=$?
+  local pid alive gate
+  for gate in "$A_POLL_READY" "$B_ALLOW"; do
+    [ -z "$gate" ] || touch "$gate"
+  done
+  for pid in "$A_SPAWN_PID" "$B_SPAWN_PID"; do
+    [ -z "$pid" ] || kill "$pid" 2>/dev/null || true
+  done
+  if [ -n "$A_SPAWN_PID$B_SPAWN_PID" ]; then
+    for _ in $(seq 1 100); do
+      alive=0
+      for pid in "$A_SPAWN_PID" "$B_SPAWN_PID"; do
+        [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null || alive=1
+      done
+      [ "$alive" -eq 1 ] || break
+      /bin/sleep 0.02
+    done
+    for pid in "$A_SPAWN_PID" "$B_SPAWN_PID"; do
+      [ -n "$pid" ] || continue
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    done
+  fi
   if [ -n "$LAB_TMUX_DIR" ]; then
     TMUX_TMPDIR="$LAB_TMUX_DIR" "$REAL_TMUX" kill-server 2>/dev/null || true
     "$LAB_HOME_HELPER" teardown "$FM_HOME" || rc=1
@@ -32,6 +58,15 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT/fake")
 # Speed only the caller's polling sleeps. The acquisition uses /bin/sleep.
 cat > "$FAKEBIN/sleep" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_POLL_READY:-}" ]; then
+  while [ ! -e "$FM_TEST_POLL_READY" ]; do /bin/sleep 0.02; done
+fi
+if [ "${1:-}" = 0.1 ] && [ "${FM_TEST_REAL_CLEANUP_SLEEP:-0}" = 1 ]; then
+  if [ -n "${FM_TEST_CLEANUP_WAIT_STARTED:-}" ] && [ -e "${FM_TEST_CLEANUP_WATCH:-}" ]; then
+    touch "$FM_TEST_CLEANUP_WAIT_STARTED"
+  fi
+  exec /bin/sleep "$@"
+fi
 exec /bin/sleep 0.02
 SH
 chmod +x "$FAKEBIN/sleep"
@@ -174,3 +209,155 @@ for MODE in success slow spawning foreign dirty; do
   fi
   pass "$BACKEND $MODE refusal returns its slot and ends its get subshell"
 done
+
+if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
+  . "$ROOT/bin/backends/herdr.sh"
+  herdr_acquisition_pane() {
+    local tabs identity
+    tabs=$("$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" tab list) || return 1
+    identity=$(printf '%s' "$tabs" | jq -er --arg label "fm-$1" '
+      [.result.tabs[]? | select(.label == $label)]
+      | select(length == 1) | .[0] | [.workspace_id, .tab_id] | @tsv
+    ') || return 1
+    PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_for_tab "$HERDR_LAB_SESSION" \
+      "${identity%%$'\t'*}" "${identity#*$'\t'}"
+  }
+  A_CASE="$TMP_ROOT/case-contention-a"
+  B_CASE="$TMP_ROOT/case-contention-b"
+  mkdir -p "$A_CASE" "$B_CASE"
+  A_ID="get-cleanup-contention-a-$$"
+  B_ID="get-cleanup-contention-b-$$"
+  A_LEASE="$A_CASE/lease"
+  A_PIDFILE="$A_CASE/pid"
+  A_ALLOW="$A_CASE/allow"
+  A_ARRIVED="$A_CASE/arrived"
+  A_POLL_READY="$A_CASE/poll-ready"
+  A_CLEANUP_WATCH="$A_CASE/cleanup-watch"
+  A_CLEANUP_WAIT="$A_CASE/cleanup-wait"
+  A_OUT="$A_CASE/out"
+  B_LEASE="$B_CASE/lease"
+  B_PIDFILE="$B_CASE/pid"
+  B_ALLOW="$B_CASE/allow"
+  B_ARRIVED="$B_CASE/arrived"
+  B_OUT="$B_CASE/out"
+  B_HOME="$TMP_ROOT/home-contention-b"
+  B_PROJECT="$TMP_ROOT/project-contention-b"
+  B_CLEAN="$TMP_ROOT/clean-contention-b"
+  "$LAB_HOME_HELPER" create "$B_HOME" >/dev/null || fail 'cannot create contention lab home'
+  printf 'codex\n' > "$B_HOME/config/crew-harness"
+  printf 'on\n' > "$B_HOME/config/herdr-presentation-spaces"
+  fm_git_init_commit "$B_PROJECT"
+  fm_git_init_commit "$B_CLEAN"
+  protected_pane=$(herdr_acquisition_pane "get-cleanup-success-$$") || fail 'cannot record protected acquisition pane'
+  printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
+    slow "$A_LEASE" "$A_PIDFILE" "$A_ALLOW" "$A_ARRIVED" "$FOREIGN" > "$TMP_ROOT/get-config"
+  fm_test_spawn_brief "$FM_HOME" "$A_ID" 'Refused acquisition must wait for the shared presentation lock.'
+  FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$A_CASE/claude" PATH="$FAKEBIN:$PATH" \
+    FM_TEST_POLL_READY="$A_POLL_READY" FM_TEST_REAL_CLEANUP_SLEEP=1 \
+    FM_TEST_CLEANUP_WATCH="$A_CLEANUP_WATCH" FM_TEST_CLEANUP_WAIT_STARTED="$A_CLEANUP_WAIT" \
+    bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
+    > "$A_OUT" 2>&1 &
+  A_SPAWN_PID=$!
+  for _ in $(seq 1 1000); do
+    [ ! -s "$A_PIDFILE" ] || [ ! -e "$A_LEASE" ] || break
+    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  [ -s "$A_PIDFILE" ] && [ -e "$A_LEASE" ] || fail "contention A get never held its lease: $(cat "$A_OUT")"
+  a_get_pid=$(cat "$A_PIDFILE")
+  kill -0 "$a_get_pid" 2>/dev/null || fail 'contention A get exited before presentation contention'
+  a_pane=$(herdr_acquisition_pane "$A_ID") || fail 'cannot record exact contention A pane'
+  B_PARENT_OUT=$("$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" workspace create --cwd "$B_PROJECT" --label firstmate --no-focus) \
+    || fail 'cannot establish contention B parent workspace'
+  B_PARENT=$(printf '%s' "$B_PARENT_OUT" | jq -er '.result.workspace.workspace_id') || fail 'contention B parent returned no workspace'
+  B_PARENT_PANE=$(printf '%s' "$B_PARENT_OUT" | jq -er '.result.root_pane.pane_id') || fail 'contention B parent returned no pane'
+  B_SOCKET=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_socket_path "$HERDR_LAB_SESSION") \
+    || fail 'cannot resolve contention B exact session socket'
+  SESSION_LOCK=$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_presentation_session_lock_path "$HERDR_LAB_SESSION") \
+    || fail 'cannot resolve shared contention presentation lock'
+  printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
+    slow "$B_LEASE" "$B_PIDFILE" "$B_ALLOW" "$B_ARRIVED" "$B_CLEAN" > "$TMP_ROOT/get-config"
+  fm_test_spawn_brief "$B_HOME" "$B_ID" 'Projected acquisition must survive another home refusing its pending get.'
+  FM_HOME="$B_HOME" FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$B_CASE/claude" PATH="$FAKEBIN:$PATH" \
+    HERDR_PANE_ID="$B_PARENT_PANE" HERDR_SOCKET_PATH="$B_SOCKET" FM_TEST_POLL_READY="$B_ALLOW" \
+    bash "$ROOT/bin/fm-spawn.sh" "$B_ID" "$B_PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
+    > "$B_OUT" 2>&1 &
+  B_SPAWN_PID=$!
+  for _ in $(seq 1 1000); do
+    [ ! -s "$B_PIDFILE" ] || [ ! -e "$B_LEASE" ] || break
+    kill -0 "$B_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  [ -s "$B_PIDFILE" ] && [ -e "$B_LEASE" ] || fail "contention B get never held its lease: $(cat "$B_OUT")"
+  b_get_pid=$(cat "$B_PIDFILE")
+  kill -0 "$b_get_pid" 2>/dev/null || fail 'contention B get exited before presentation contention'
+  [ "$(cat "$SESSION_LOCK/pid")" = "$B_SPAWN_PID" ] || fail 'contention B did not hold the shared session presentation lock'
+  B_JOURNAL=$(fm_backend_herdr_projection_journal_path "$B_HOME/state" "$B_ID")
+  b_pane=$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" pane_id) || fail 'contention B did not bind a projected pane'
+  [ "$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" parent_workspace_id)" = "$B_PARENT" ] \
+    || fail 'contention B projected under the wrong exact parent workspace'
+  touch "$A_POLL_READY"
+  for _ in $(seq 1 3000); do
+    grep -Fq 'did not enter an isolated worktree within 60s' "$A_OUT" && break
+    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  assert_contains "$(cat "$A_OUT")" 'did not enter an isolated worktree within 60s' 'contention A missed the unchanged isolation refusal'
+  touch "$A_CLEANUP_WATCH"
+  for _ in $(seq 1 1000); do
+    [ ! -e "$A_CLEANUP_WAIT" ] || break
+    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  [ -e "$A_CLEANUP_WAIT" ] || fail "contention A did not enter serialized cleanup waiting: $(cat "$A_OUT")"
+  /bin/sleep 10
+  kill -0 "$A_SPAWN_PID" 2>/dev/null || fail "contention A cleanup returned before B released the presentation lock: $(cat "$A_OUT")"
+  kill -0 "$B_SPAWN_PID" 2>/dev/null || fail "contention B exited while its acquisition was blocked: $(cat "$B_OUT")"
+  [ "$(cat "$SESSION_LOCK/pid")" = "$B_SPAWN_PID" ] || fail 'contention B lost the shared presentation lock while blocked'
+  [ -e "$A_LEASE" ] && kill -0 "$a_get_pid" 2>/dev/null || fail 'contention A lost its process lease before serialized cleanup'
+  [ -e "$B_LEASE" ] && kill -0 "$b_get_pid" 2>/dev/null || fail 'contention A cleanup ended contention B acquisition'
+  [ ! -e "$A_ARRIVED" ] && [ ! -e "$B_ARRIVED" ] || fail 'blocked contention acquisition entered a worktree early'
+  [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$a_pane")" = present ] \
+    || fail 'contention A pane disappeared before the presentation lock was released'
+  [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$b_pane")" = present ] \
+    || fail 'contention A cleanup closed contention B pane'
+  pass 'herdr contention keeps both acquisition leases past the former cleanup timeout'
+  touch "$B_ALLOW"
+  for _ in $(seq 1 3000); do
+    kill -0 "$B_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  ! kill -0 "$B_SPAWN_PID" 2>/dev/null || fail "contention B launch never returned: $(cat "$B_OUT")"
+  wait "$B_SPAWN_PID"
+  b_rc=$?
+  B_SPAWN_PID=
+  expect_code 0 "$b_rc" "contention B clean isolated acquisition did not launch: $(cat "$B_OUT")"
+  [ -e "$B_ARRIVED" ] || fail 'contention B never acquired its clean isolated worktree'
+  [ -f "$B_HOME/state/$B_ID.meta" ] || fail 'contention B launch did not publish its task record'
+  for _ in $(seq 1 3000); do
+    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  ! kill -0 "$A_SPAWN_PID" 2>/dev/null || fail "contention A cleanup never returned after B launch: $(cat "$A_OUT")"
+  wait "$A_SPAWN_PID"
+  a_rc=$?
+  A_SPAWN_PID=
+  [ "$a_rc" -ne 0 ] || fail "contention A unexpectedly launched: $(cat "$A_OUT")"
+  [ ! -e "$SESSION_LOCK" ] && [ ! -L "$SESSION_LOCK" ] || fail 'contention cleanup retained the shared presentation lock'
+  [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$a_pane")" = dead ] \
+    || fail "contention A exact pane was not confirmed gone: $(cat "$A_OUT")"
+  for _ in $(seq 1 100); do
+    [ -e "$A_LEASE" ] || kill -0 "$a_get_pid" 2>/dev/null || break
+    /bin/sleep 0.02
+  done
+  [ ! -e "$A_LEASE" ] || fail 'contention A retained its process lease after cleanup'
+  ! kill -0 "$a_get_pid" 2>/dev/null || fail 'contention A get survived exact-pane cleanup'
+  [ ! -e "$A_ARRIVED" ] || fail 'contention A completed acquisition after its isolation refusal'
+  [ -e "$B_LEASE" ] && kill -0 "$b_get_pid" 2>/dev/null || fail 'contention A cleanup ended the successfully launched B acquisition'
+  [ -e "$protected_lease" ] && kill -0 "$protected_pid" 2>/dev/null || fail 'contention cleanup ended the previous successful acquisition'
+  for pane in "$b_pane" "$protected_pane" "$sentinel"; do
+    [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$pane")" = present ] \
+      || fail "contention cleanup closed surviving pane $pane"
+  done
+  pass 'herdr contention releases only the refused acquisition after projected launch'
+fi

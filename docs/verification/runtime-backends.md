@@ -447,10 +447,10 @@ Dropping the retention-is-not-durable line makes the refusal claim a retention t
 ## Fresh acquisition abort
 
 `bin/fm-spawn.sh`'s header owns abort cleanup for fresh Treehouse-backed launches.
-Verified on 2026-10-04 on macOS arm64 with tmux 3.5a and Herdr 0.9.1 protocol 22:
+Reverified on 2026-10-06 on macOS arm64:
 
 ```sh
-bash bin/fm-test-run.sh tests/fm-spawn-acquisition-cleanup.test.sh tests/fm-spawn-acquisition-herdr-e2e.test.sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-backend-herdr.test.sh tests/fm-spawn-acquisition-cleanup.test.sh tests/fm-spawn-acquisition-herdr-e2e.test.sh
 ```
 
 The regression runs the real spawn entrypoint and real terminals with a fake `treehouse get` that holds a process lease until its shell exits.
@@ -461,7 +461,13 @@ No real Treehouse pool or model session is used.
 Herdr runs both flat and projected layouts in generated lab sessions through `bin/fm-herdr-lab.sh`, whose teardown verifies the default-session tripwire.
 Both terminal shells and the fake get's interactive child use lab-private history files.
 
-Observed output, with the five Herdr rows printed once per layout:
+The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
+After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
+The shared endpoint-close boundary waits for that lock rather than abandoning cleanup or closing unlocked.
+Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
+An unresolved session lock identity still refuses an unlocked close.
+
+Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
 
 ```text
 ok - tmux successful launch retains its slot
@@ -474,7 +480,11 @@ ok - herdr slow refusal returns its slot and ends its get subshell
 ok - herdr spawning refusal returns its slot and ends its get subshell
 ok - herdr foreign refusal returns its slot and ends its get subshell
 ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
 ```
+
+Focused verification passed all three scripts with no failures or gate skips.
 
 The Zellij and cmux creation paths also retain their response-derived endpoint identifiers for abort cleanup, but those real backends were not exercised by this command.
 Orca does not run Treehouse acquisition and retains its separate abort cleanup.

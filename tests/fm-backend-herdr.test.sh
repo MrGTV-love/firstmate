@@ -2954,42 +2954,26 @@ test_kill_focused_workspace_stays_plain_close() {
 }
 
 test_kill_refuses_when_presentation_lock_is_unavailable() {
-  local dir mode out status attempts
+  local dir out status
   dir="$TMP_ROOT/kill-lock-refusal"; mkdir -p "$dir"
-  for mode in unresolved contended; do
-    : > "$dir/cli.log"
-    : > "$dir/attempts"
-    out=$(ROOT="$ROOT" MODE="$mode" CLI_LOG="$dir/cli.log" ATTEMPTS="$dir/attempts" bash -c '
-      . "$ROOT/bin/backends/herdr.sh"
-      fm_backend_herdr_target_ready() { fm_backend_herdr_parse_target "$1"; }
-      fm_backend_herdr_presentation_session_lock_path() {
-        [ "$MODE" = contended ] || return 1
-        printf "/tmp/fm-herdr-contended-test-lock"
-      }
-      fm_lock_try_acquire() {
-        printf "x\n" >> "$ATTEMPTS"
-        return 1
-      }
-      fm_backend_herdr_cli() {
-        printf "%s\n" "$*" >> "$CLI_LOG"
-        return 0
-      }
-      sleep() { :; }
-      fm_backend_herdr_kill fmtest:w2:p2
-    ' 2>&1)
-    status=$?
-    [ "$status" -eq 0 ] || fail "$mode presentation lock refusal changed best-effort kill status: $status"
-    [ ! -s "$dir/cli.log" ] || fail "$mode presentation lock refusal still mutated Herdr: $(cat "$dir/cli.log")"
-    assert_contains "$out" "refusing an unlocked pane close" \
-      "$mode presentation lock refusal did not report the deferred close"
-    attempts=$(wc -l < "$dir/attempts" | tr -d ' ')
-    if [ "$mode" = contended ]; then
-      [ "$attempts" = 50 ] || fail "contended presentation lock did not use the bounded wait: $attempts attempts"
-    else
-      [ "$attempts" = 0 ] || fail "unresolved presentation lock path attempted acquisition: $attempts"
-    fi
-  done
-  pass "fm_backend_herdr_kill: unavailable session locks defer every pane close"
+  : > "$dir/cli.log"
+  out=$(ROOT="$ROOT" CLI_LOG="$dir/cli.log" bash -c '
+    . "$ROOT/bin/backends/herdr.sh"
+    fm_backend_herdr_target_ready() { fm_backend_herdr_parse_target "$1"; }
+    fm_backend_herdr_presentation_session_lock_path() { return 1; }
+    fm_lock_try_acquire() { return 1; }
+    fm_backend_herdr_cli() {
+      printf "%s\n" "$*" >> "$CLI_LOG"
+      return 0
+    }
+    fm_backend_herdr_kill fmtest:w2:p2
+  ' 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "unresolved presentation lock changed best-effort kill status: $status"
+  [ ! -s "$dir/cli.log" ] || fail "unresolved presentation lock still mutated Herdr: $(cat "$dir/cli.log")"
+  assert_contains "$out" "refusing an unlocked pane close" \
+    "unresolved presentation lock did not report the deferred close"
+  pass "fm_backend_herdr_kill: unresolved session locks defer every pane close"
 }
 
 test_endpoint_confirmed_gone_gates_on_structured_presence() {
