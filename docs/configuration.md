@@ -1373,7 +1373,11 @@ For delete/deploy operations, production scope takes precedence over a secret-sh
 Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
 Native `Read`/`read` paths select secret-shaped targets without opening the file.
 Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
-`command -v`/`command -V` look up a candidate without executing it; substitutions and redirections still retain their own effects and are screened.
+Wrapper parsing preserves ordered `env -S` child arguments, including trailing argv and `env -P` search paths.
+`command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
+Shell payload selection distinguishes command, script and stdin invocation, uses the effective fd-0 input, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
+SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
+Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags.
 `printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.

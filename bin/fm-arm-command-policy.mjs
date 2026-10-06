@@ -234,7 +234,8 @@ export class Lexer {
       }
       this.tokens.push(word);
       if (this.expectHeredoc) {
-        this.pendingHeredocs.push({ delimiter: word.value, stripTabs: this.expectHeredoc.stripTabs, token: this.expectHeredoc.token });
+        this.expectHeredoc.token.heredocQuoted = word.quoted;
+        this.pendingHeredocs.push({ delimiter: word.value, quoted: word.quoted, stripTabs: this.expectHeredoc.stripTabs, token: this.expectHeredoc.token });
         this.expectHeredoc = null;
       }
     }
@@ -268,6 +269,22 @@ export class Lexer {
         break;
       }
       heredoc.token.heredoc = body;
+      heredoc.token.subs = [];
+      if (!heredoc.quoted) {
+        for (let i = 0; i < body.length; i += 1) {
+          if (body[i] === "\\" && /[$`\\\n]/.test(body[i + 1] || "")) {
+            i += 1;
+            continue;
+          }
+          const substitution = body.startsWith("$(", i)
+            ? extractBalanced(body, i + 2, "(", ")")
+            : body[i] === "`" ? extractBackticks(body, i + 1) : null;
+          if (substitution) {
+            heredoc.token.subs.push({ kind: "command", content: substitution.content });
+            i = substitution.next - 1;
+          }
+        }
+      }
     }
     this.pendingHeredocs = [];
   }
@@ -327,6 +344,7 @@ export class Lexer {
           this.index += 2;
           continue;
         }
+        word.quoted = true;
         word.value += this.source[this.index + 1];
         this.index += 2;
         continue;
@@ -354,8 +372,11 @@ export class Lexer {
           this.error = "unclosed command substitution";
           return null;
         }
-        word.subs.push({ kind: "command", content: balanced.content });
-        word.literal = false;
+        if (this.expectHeredoc) word.value += this.source.slice(this.index, balanced.next);
+        else {
+          word.subs.push({ kind: "command", content: balanced.content });
+          word.literal = false;
+        }
         this.index = balanced.next;
         continue;
       }
@@ -376,12 +397,15 @@ export class Lexer {
           this.error = "unclosed backtick substitution";
           return null;
         }
-        word.subs.push({ kind: "command", content: backticks.content });
-        word.literal = false;
+        if (this.expectHeredoc) word.value += this.source.slice(this.index, backticks.next);
+        else {
+          word.subs.push({ kind: "command", content: backticks.content });
+          word.literal = false;
+        }
         this.index = backticks.next;
         continue;
       }
-      if (char === "$") word.literal = false;
+      if (char === "$" && !this.expectHeredoc) word.literal = false;
       if ("*?[]{}".includes(char)) word.unquotedExpansion = true;
       word.value += char;
       this.index += 1;
@@ -410,20 +434,26 @@ export class Lexer {
       if (this.source.startsWith("$(", this.index)) {
         const balanced = extractBalanced(this.source, this.index + 2, "(", ")");
         if (!balanced) break;
-        word.subs.push({ kind: "command", content: balanced.content });
-        word.literal = false;
+        if (this.expectHeredoc) word.value += this.source.slice(this.index, balanced.next);
+        else {
+          word.subs.push({ kind: "command", content: balanced.content });
+          word.literal = false;
+        }
         this.index = balanced.next;
         continue;
       }
       if (char === "`") {
         const backticks = extractBackticks(this.source, this.index + 1);
         if (!backticks) break;
-        word.subs.push({ kind: "command", content: backticks.content });
-        word.literal = false;
+        if (this.expectHeredoc) word.value += this.source.slice(this.index, backticks.next);
+        else {
+          word.subs.push({ kind: "command", content: backticks.content });
+          word.literal = false;
+        }
         this.index = backticks.next;
         continue;
       }
-      if (char === "$") word.literal = false;
+      if (char === "$" && !this.expectHeredoc) word.literal = false;
       word.value += char;
       this.index += 1;
     }
@@ -477,7 +507,7 @@ function wordsInNode(tokens) {
 
 const WRAPPER_OPTIONS = {
   command: { noArgument: new Set(["p", "v", "V"]), takesArgument: new Set() },
-  env: { noArgument: new Set(["0", "i", "P", "v"]), takesArgument: new Set(["a", "C", "S", "u"]) },
+  env: { noArgument: new Set(["0", "i", "v"]), takesArgument: new Set(["a", "C", "P", "S", "u"]) },
   exec: { noArgument: new Set(["c", "l"]), takesArgument: new Set(["a"]) },
   nohup: { noArgument: new Set(), takesArgument: new Set() },
   sudo: { noArgument: new Set(["A", "B", "b", "E", "e", "H", "i", "K", "k", "l", "N", "n", "P", "S", "s", "v", "V"]), takesArgument: new Set(["C", "D", "g", "h", "p", "r", "R", "t", "T", "u", "U"]) },
@@ -497,12 +527,11 @@ function consumeWrapperOptions(name, words, index) {
   const optionOwner = name === "gtimeout" ? "timeout" : name;
   const short = WRAPPER_OPTIONS[optionOwner];
   const long = WRAPPER_LONG_OPTIONS[optionOwner];
-  const embeddedPayloads = [];
   let next = index;
   while (words[next]) {
     const value = words[next].value;
-    if (value === "--") return { index: next + 1, unresolved: false, embeddedPayloads };
-    if (!value.startsWith("-") || value === "-") return { index: next, unresolved: false, embeddedPayloads };
+    if (value === "--") return { index: next + 1, unresolved: false };
+    if (!value.startsWith("-") || value === "-") return { index: next, unresolved: false };
     if (value.startsWith("--")) {
       const equals = value.indexOf("=");
       const option = value.slice(2, equals === -1 ? undefined : equals);
@@ -510,14 +539,24 @@ function consumeWrapperOptions(name, words, index) {
         next += 1;
         continue;
       }
-      if (!long.takesArgument.has(option)) return { index: next, unresolved: true, embeddedPayloads };
+      if (!long.takesArgument.has(option)) return { index: next, unresolved: true };
       if (equals !== -1) {
-        if (name === "env" && option === "split-string") embeddedPayloads.push(value.slice(equals + 1));
+        if (name === "env" && option === "split-string") {
+          const split = new Lexer(value.slice(equals + 1)).tokenize();
+          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
+          words.splice(next, 1, ...split.tokens);
+          return consumeWrapperOptions(name, words, next);
+        }
         next += 1;
         continue;
       }
-      if (!words[next + 1]) return { index: next, unresolved: true, embeddedPayloads };
-      if (name === "env" && option === "split-string") embeddedPayloads.push(words[next + 1].value);
+      if (!words[next + 1]) return { index: next, unresolved: true };
+      if (name === "env" && option === "split-string") {
+        const split = new Lexer(words[next + 1].value).tokenize();
+        if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
+        words.splice(next, 2, ...split.tokens);
+        return consumeWrapperOptions(name, words, next);
+      }
       next += 2;
       continue;
     }
@@ -525,13 +564,23 @@ function consumeWrapperOptions(name, words, index) {
     for (let offset = 1; offset < value.length; offset += 1) {
       const option = value[offset];
       if (short.noArgument.has(option)) continue;
-      if (!short.takesArgument.has(option)) return { index: next, unresolved: true, embeddedPayloads };
+      if (!short.takesArgument.has(option)) return { index: next, unresolved: true };
       if (offset + 1 === value.length) {
-        if (!words[next + 1]) return { index: next, unresolved: true, embeddedPayloads };
-        if (name === "env" && option === "S") embeddedPayloads.push(words[next + 1].value);
+        if (!words[next + 1]) return { index: next, unresolved: true };
+        if (name === "env" && option === "S") {
+          const split = new Lexer(words[next + 1].value).tokenize();
+          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
+          words.splice(next, 2, ...split.tokens);
+          return consumeWrapperOptions(name, words, next);
+        }
         next += 2;
       } else {
-        if (name === "env" && option === "S") embeddedPayloads.push(value.slice(offset + 1));
+        if (name === "env" && option === "S") {
+          const split = new Lexer(value.slice(offset + 1)).tokenize();
+          if (split.error || split.tokens.some(token => token.type !== "word" || !token.literal || token.subs.length > 0)) return { index: next, unresolved: true };
+          words.splice(next, 1, ...split.tokens);
+          return consumeWrapperOptions(name, words, next);
+        }
         next += 1;
       }
       consumedArgument = true;
@@ -539,18 +588,26 @@ function consumeWrapperOptions(name, words, index) {
     }
     if (!consumedArgument) next += 1;
   }
-  return { index: next, unresolved: false, embeddedPayloads };
+  return { index: next, unresolved: false };
 }
 
 export function commandPosition(tokens) {
   const words = wordsInNode(tokens);
   let index = 0;
+  let unsupportedControl = false;
+  const prefixes = new Set(["if", "then", "else", "elif", "while", "until", "do", "time", "coproc", "!"]);
+  while (words[index] && !words[index].quoted && prefixes.has(words[index].value)) {
+    unsupportedControl = true;
+    const prefix = words[index++].value;
+    if (prefix === "time" && words[index]?.value === "-p") index += 1;
+  }
+  if (words[index] && !words[index].quoted && ["for", "case", "fi", "esac", "done", "function"].includes(words[index].value)) unsupportedControl = true;
+  const assignmentStart = index;
   while (index < words.length && isAssignment(words[index].value)) index += 1;
-  const prefixAssignments = index;
+  const prefixAssignments = index - assignmentStart;
   const wrappers = [];
   let unresolvedWrapperOption = false;
   let commandLookup = false;
-  const wrapperPayloads = [];
   let command = words[index];
   while (command) {
     const name = basename(command.value);
@@ -558,8 +615,11 @@ export function commandPosition(tokens) {
       wrappers.push(name);
       const options = consumeWrapperOptions(name, words, index + 1);
       if (name === "command") commandLookup ||= words.slice(index + 1, options.index).some(word => /^-[^-]*[vV]/.test(word.value));
+      if (commandLookup) {
+        command = undefined;
+        break;
+      }
       unresolvedWrapperOption ||= options.unresolved;
-      wrapperPayloads.push(...options.embeddedPayloads);
       index = options.index;
       command = words[index];
       continue;
@@ -568,9 +628,8 @@ export function commandPosition(tokens) {
       wrappers.push(name);
       const options = consumeWrapperOptions(name, words, index + 1);
       unresolvedWrapperOption ||= options.unresolved;
-      wrapperPayloads.push(...options.embeddedPayloads);
       index = options.index;
-      while (words[index] && (words[index].value.startsWith("-") || isAssignment(words[index].value))) index += 1;
+      while (words[index] && isAssignment(words[index].value)) index += 1;
       command = words[index];
       continue;
     }
@@ -594,7 +653,7 @@ export function commandPosition(tokens) {
     }
     break;
   }
-  return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, wrapperPayloads, commandLookup };
+  return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, unsupportedControl, commandLookup };
 }
 
 const PROTECTED_SCRIPTS = [
@@ -616,21 +675,21 @@ function hasUnclassifiableProtectedExpansion(word, root) {
   return /(?:^|\/)fm-watch/.test(word.value);
 }
 
-function shellInvocation(position) {
-  if (!position.command) return null;
+export function shellInvocation(position) {
+  if (!position.command || position.commandLookup) return null;
   const name = basename(position.command.value);
-  if (!["sh", "bash", "zsh"].includes(name)) return null;
+  if (!["sh", "bash", "zsh", "dash", "ksh"].includes(name)) return null;
   const words = position.words;
   let readsStdin = false;
   let optionsEnded = false;
   for (let i = position.index + 1; i < words.length; i += 1) {
     const option = words[i];
-    if (/^-[A-Za-z]*c[A-Za-z]*$/.test(option.value)) {
+    if (!optionsEnded && /^-[A-Za-z]*c[A-Za-z]*$/.test(option.value)) {
       let payloadIndex = i + 1;
       if (words[payloadIndex]?.value === "--") payloadIndex += 1;
       return { kind: "command", payload: words[payloadIndex] || null };
     }
-    if (/^[-+]O$/.test(option.value)) {
+    if (!optionsEnded && /^[-+][oO]$/.test(option.value)) {
       i += 1;
       continue;
     }
@@ -641,7 +700,7 @@ function shellInvocation(position) {
       if (readsStdin) return { kind: "stdin", payload: null, operand: words[i + 1] || null };
       optionsEnded = true;
     }
-    if (option.value === "--" || /^[-+]/.test(option.value)) continue;
+    if (option.value === "--" || (!optionsEnded && /^[-+]/.test(option.value))) continue;
     // With -s the shell still reads its program from stdin; the operand is only
     // a positional parameter, kept as `operand` so a protected path there still
     // fails closed.
@@ -651,22 +710,20 @@ function shellInvocation(position) {
   return { kind: "stdin", payload: null };
 }
 
-function shellHeredocPayloads(tokens, position) {
-  if (shellInvocation(position)?.kind !== "stdin") return [];
-  const heredocs = tokens.filter((token) => token.type === "redir" && token.fd === 0 && typeof token.heredoc === "string");
-  return heredocs.length === 0 ? [] : [heredocs.at(-1).heredoc];
-}
-
-function shellHereStringPayloads(tokens, position) {
-  if (shellInvocation(position)?.kind !== "stdin") return [];
-  const payloads = [];
+export function shellStdinPayload(tokens, position) {
+  if (shellInvocation(position)?.kind !== "stdin") return null;
+  let payload = null;
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
-    if (token.type !== "redir" || token.value !== "<<<" || token.fd !== 0) continue;
-    const payload = tokens[i + 1];
-    if (payload?.type === "word" && payload.literal && payload.subs.length === 0) payloads.push(payload.value);
+    if (token.type !== "redir" || token.fd !== 0) continue;
+    payload = null;
+    if (typeof token.heredoc === "string") payload = token.heredoc;
+    if (token.value === "<<<") {
+      const target = tokens[i + 1];
+      if (target?.type === "word" && target.literal && target.subs.length === 0) payload = target.value;
+    }
   }
-  return payloads;
+  return payload;
 }
 
 function sourcedScript(position) {
@@ -692,12 +749,10 @@ function wordReferencesAny(word, names) {
 function hasDynamicExecutionPayload(position, context) {
   if (!position.command) return false;
   const name = basename(position.command.value);
-  if (["sh", "bash", "zsh"].includes(name)) {
-    for (let i = position.index + 1; i < position.words.length; i += 1) {
-      if (!/^-[A-Za-z]*c[A-Za-z]*$/.test(position.words[i].value)) continue;
-      const payload = position.words[i + 1];
-      return Boolean(payload && (!payload.literal || payload.subs.length > 0) && wordReferencesAny(payload, context.protectedVariables));
-    }
+  const shell = shellInvocation(position);
+  if (shell?.kind === "command") {
+    const payload = shell.payload;
+    return Boolean(payload && (!payload.literal || payload.subs.length > 0) && wordReferencesAny(payload, context.protectedVariables));
   }
   if (name === "eval") {
     return position.words.slice(position.index + 1).some((payload) => (!payload.literal || payload.subs.length > 0) && wordReferencesAny(payload, context.protectedVariables));
@@ -809,21 +864,11 @@ function analyzeProgram(command, context, depth = 0) {
   for (const tokens of program.nodes) {
     const position = commandPosition(tokens);
     const nodeContext = contextWithAssignments(activeContext, position.words);
-    const firstName = basename(position.words[0]?.value || "");
-    if (["if", "then", "else", "elif", "fi", "for", "while", "until", "case", "esac", "do", "done", "function", "time", "coproc"].includes(firstName)) {
-      unsupported = true;
-    }
+    unsupported ||= position.unsupportedControl;
 
     let nodeNestedProtected = false;
     let nodePgrepWatcher = false;
     const substitutionResults = new Map();
-    for (const payload of position.wrapperPayloads) {
-      const nested = analyzeProgram(payload, nodeContext, depth + 1);
-      nodeNestedProtected ||= nested.protectedFound;
-      broadKill ||= nested.broadKill;
-      nodePgrepWatcher ||= nested.pgrepWatcher;
-      if (nested.error && rawMentionsProtected(payload)) unsupported = true;
-    }
     for (const token of tokens) {
       if (token.type === "group") {
         const nested = analyzeProgram(token.content, nodeContext, depth + 1);
@@ -832,8 +877,8 @@ function analyzeProgram(command, context, depth = 0) {
         nodePgrepWatcher ||= nested.pgrepWatcher;
         if (nested.error && rawMentionsProtected(token.content)) unsupported = true;
       }
-      if (token.type === "word") {
-        for (const substitution of token.subs) {
+      if (token.type === "word" || token.type === "redir") {
+        for (const substitution of token.subs || []) {
           const nested = analyzeProgram(substitution.content, nodeContext, depth + 1);
           substitutionResults.set(substitution, nested);
           nodeNestedProtected ||= nested.protectedFound;
@@ -849,8 +894,7 @@ function analyzeProgram(command, context, depth = 0) {
     const shellScript = shell?.kind === "script" ? shell.payload : shell?.operand || null;
     const sourceScript = sourcedScript(position);
     const literalEvalPayload = evalPayload(position);
-    const heredocPayloads = shellHeredocPayloads(tokens, position);
-    const hereStringPayloads = shellHereStringPayloads(tokens, position);
+    const stdinPayload = shellStdinPayload(tokens, position);
     for (const script of [shellScript, sourceScript]) {
       if (!script) continue;
       nodeNestedProtected ||= Boolean(protectedIdentity(script.value, context.root)) || wordReferencesAny(script, nodeContext.protectedVariables);
@@ -865,7 +909,7 @@ function analyzeProgram(command, context, depth = 0) {
       nodePgrepWatcher ||= nested.pgrepWatcher;
       if (nested.error && rawMentionsProtected(shellPayload.value)) unsupported = true;
     }
-    for (const payload of [literalEvalPayload, ...heredocPayloads, ...hereStringPayloads]) {
+    for (const payload of [literalEvalPayload, stdinPayload]) {
       if (payload === null) continue;
       const nested = analyzeProgram(payload, nodeContext, depth + 1);
       nodeNestedProtected ||= nested.protectedFound;

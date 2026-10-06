@@ -578,14 +578,15 @@ The prior implementation observed native `PostToolUse`/`PostToolUseFailure` and 
 The unchanged native outcomes above come from the external stream comparisons, not a current ledger success/failure claim.
 Other harnesses have no guardrail caller in this slice, and these observations do not claim their coverage.
 
-The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh`; it proves selector, privacy, advisory-output, unavailable-usage and generated owning-home boundaries, not native host activation or outcome correlation.
+The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh tests/fm-arm-pretool-check.test.sh tests/fm-cd-pretool-check.test.sh`; it proves selector, privacy, advisory-output, unavailable-usage, generated owning-home boundaries and shared-parser deterministic guard behavior, not native host activation or outcome correlation.
 The prior native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
 Those private fixture ledgers and exact native invocations remain prior delivery evidence, not shipped fixtures or a claim that offline tests refresh native proof after a host upgrade.
 
-The October 6 review correction exercised the selector/evaluation suite successfully (12 boundary groups, exit 0), including control syntax, executable queries, production/secret scope and separated quality datasets.
-The owning-home suite's first run stopped at an incomplete source fixture's missing skill directory; after supplying that required fixture directory, its focused run passed six generated/tracked Claude and omp scenarios (exit 0).
-Those scenarios executed emitted Claude hook commands and omp callbacks through filtered and hostile ambient environments, checked owner-key transport, withholding and private ledgers, and preserved secondmate ownership and advisory timeout behavior.
-Transport responses were local fixtures; no paid provider or native host activation was exercised in this review round.
+The October 6 offline refresh passed all four focused suites: `FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=115213`.
+The selector/evaluation suite passed 18 boundary groups, including ordered env argv, command queries, control syntax, effective shell stdin, heredoc expansion, SSH scope, Git/cloud option equivalents and secret operands.
+The deterministic arm and cd suites preserved their allow/deny contracts across all five transport entry forms.
+The owning-home suite passed six generated/tracked Claude and omp scenarios through filtered and hostile ambient environments, checking owner-key transport, withholding, private ledgers and advisory behavior.
+Transport responses were local fixtures; no paid provider or native host activation was exercised.
 
 **September 30 historical dataset source is unavailable.**
 The supplied `/Users/charlesabrooker/firstmate/data/fm-jev-implementation-review/report.md` (October 1, F8 and the guardrail promotion row) records a planned screen and promotion contract, with no hook measurement; its cited `/Users/charlesabrooker/firstmate/data/fm-jev-value-scout/report.md` (September 29, worker destructive-risk proposal) describes prospective fixture replay, not dated blocked/allowed command receipts.

@@ -30,10 +30,7 @@ const elapsed = start => Math.round((clock() - start) * 1000) / 1000;
 const secretPath = value => /(?:^|[/\\])(?:\.env(?:[.\w-]*)?|\.ssh|\.aws|\.gnupg|credentials(?:[.\w-]*)?|secrets?(?:[.\w-]*)?|id_(?:rsa|ed25519)|[^/]*\.(?:pem|key))(?:$|[/\\])/i.test(value);
 const secretName = value => /(?:^|_)(?:token|secret|password|passwd|credentials?|(?:api|access|private)_?key)(?:_|$)/i.test(value);
 const production = value => /(?:^|[^a-z])(?:prod(?:uction)?|live)(?:$|[^a-z])/i.test(value);
-const shells = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);
 const readers = new Set(['cat', 'head', 'tail', 'less', 'more', 'grep', 'rg', 'sed', 'awk', 'base64', 'xxd']);
-const controlWords = new Set(['fi', 'for', 'case', 'esac', 'done', 'function']);
-const executionPrefixes = new Set(['if', 'then', 'else', 'elif', 'while', 'until', 'do', 'time', 'coproc', '!']);
 const riskyLiteral = /\b(?:rm|rmdir|unlink|shred|rmtree|delete|destroy|remove|drop|deploy|apply|upgrade|publish|release|push|reset|clean|secret\w*|credential\w*|printenv|env|find-(?:generic|internet)-password)\b|authorization:|cookie:|\.env|\.ssh|\.aws|\.gnupg|\.pem|\.key|id_(?:rsa|ed25519)/i;
 
 function targetScope(args) {
@@ -42,6 +39,159 @@ function targetScope(args) {
   const targets = args.filter(v => !v.startsWith('-'));
   if (targets.length && targets.every(v => /^(?:\.\.?\/|\/tmp\/|\/private\/tmp\/)/.test(v) && !/(?:^|\/)\.\.(?:\/|$)/.test(v.replace(/^\.\//, '')))) return 'local';
   return 'unknown';
+}
+
+function optionWords(args) {
+  const end = args.indexOf('--');
+  return end < 0 ? args : args.slice(0, end);
+}
+
+function operands(args, takesValue = new Set()) {
+  const result = [];
+  for (let i = 0; i < args.length; i++) {
+    const value = args[i];
+    if (value === '--') {
+      result.push(...args.slice(i + 1));
+      break;
+    }
+    if (!value.startsWith('-') || value === '-') result.push(value);
+    else if (takesValue.has(value)) i++;
+  }
+  return result;
+}
+
+function sshInvocation(args) {
+  const takesValue = new Set(['B', 'b', 'c', 'D', 'E', 'e', 'F', 'I', 'i', 'J', 'L', 'l', 'm', 'O', 'o', 'P', 'p', 'Q', 'R', 'S', 'W', 'w']);
+  let query = false;
+  let i = 0;
+  for (; i < args.length; i++) {
+    const value = args[i];
+    if (value === '--') { i++; break; }
+    if (!value.startsWith('-') || value === '-') break;
+    for (let offset = 1; offset < value.length; offset++) {
+      if (['G', 'N', 'V', 'Q', 'O'].includes(value[offset])) query = true;
+      if (!takesValue.has(value[offset])) continue;
+      if (offset === value.length - 1) i++;
+      break;
+    }
+  }
+  return { destination: args[i] || '', command: query ? '' : args.slice(i + 1).join(' ') };
+}
+
+function gitInvocation(args) {
+  const mirrorConfig = new Map();
+  let i = 0;
+  for (; i < args.length; i++) {
+    const value = args[i];
+    if (value === '--') { i++; break; }
+    if (!value.startsWith('-')) break;
+    let configValue;
+    if (value === '-c') configValue = args[++i];
+    else if (value.startsWith('-c')) configValue = value.slice(2);
+    else if (['-C', '--git-dir', '--work-tree', '--namespace'].includes(value)) i++;
+    if (configValue !== undefined) {
+      const match = configValue.match(/^remote\.(.+)\.mirror(?:=(.*))?$/i);
+      if (match) mirrorConfig.set(match[1], match[2] === undefined || /^(?:true|yes|on|1)$/i.test(match[2]));
+    }
+  }
+  const command = args[i];
+  const childArgs = args.slice(i + 1);
+  const options = [];
+  const targets = [];
+  let remoteOption;
+  for (let j = 0; j < childArgs.length; j++) {
+    const value = childArgs[j];
+    if (value === '--') { targets.push(...childArgs.slice(j + 1)); break; }
+    if (['--repo', '--receive-pack', '--exec', '--push-option', '-o'].includes(value)) {
+      const operand = childArgs[++j];
+      if (value === '--repo') remoteOption = operand;
+    } else if (value.startsWith('--repo=')) remoteOption = value.slice(7);
+    else if (/^-o.+/.test(value)) continue;
+    else if (value.startsWith('-')) options.push(value);
+    else targets.push(value);
+  }
+  const remote = remoteOption || targets[0] || 'origin';
+  let mirror = mirrorConfig.get(remote) || false;
+  for (const value of options) {
+    if (value === '--mirror') mirror = true;
+    else if (value === '--no-mirror') mirror = false;
+  }
+  return { command, options, targets, mirror };
+}
+
+const cloudOptionValues = {
+  kubectl: ['--context', '--cluster', '--user', '--namespace', '-n', '--kubeconfig', '--server', '-s', '--token', '--certificate-authority', '--client-certificate', '--client-key', '--request-timeout', '-f', '--filename', '-k', '--kustomize', '-o', '--output', '-l', '--selector', '--field-selector'],
+  helm: ['--kube-context', '--kubeconfig', '--namespace', '-n', '--kube-apiserver', '--kube-token', '--kube-ca-file', '--registry-config', '--repository-config', '--repository-cache', '-f', '--values', '--set', '--set-string', '--set-file', '--version', '--timeout'],
+  terraform: ['-chdir'],
+  pulumi: ['--stack', '-s', '--cwd', '-C', '--config', '-c', '--target', '--policy-pack', '--policy-pack-config'],
+  aws: ['--profile', '--region', '--endpoint-url', '--output', '--query', '--cli-input-json', '--cli-input-yaml'],
+  gcloud: ['--project', '--account', '--configuration', '--impersonate-service-account', '--format', '--filter', '--flags-file'],
+  az: ['--subscription', '--resource-group', '-g', '--name', '-n', '--output', '-o', '--query'],
+  vercel: ['--cwd', '--token', '-t', '--scope', '--local-config'],
+  fly: ['--app', '-a', '--config', '-c', '--access-token'],
+  wrangler: ['--env', '-e', '--config', '-c', '--cwd'],
+  npm: ['--prefix', '--workspace', '-w', '--registry'],
+  make: ['-C', '--directory', '-f', '--file', '--makefile'],
+};
+
+function cloudOperations(name, args) {
+  const options = optionWords(args);
+  const words = operands(options, new Set(cloudOptionValues[name === 'flyctl' ? 'fly' : name]));
+  const verb = words[0];
+  const operations = [];
+  if (name === 'kubectl') {
+    if (verb === 'delete') operations.push('delete');
+    if (verb === 'apply') operations.push('deploy');
+    if (['get', 'describe'].includes(verb) && /^(?:secrets?)(?:\/|$)/.test(words[1] || '')) operations.push('secret_read');
+  } else if (name === 'helm') {
+    if (['uninstall', 'delete'].includes(verb)) operations.push('delete');
+    if (['install', 'upgrade'].includes(verb)) operations.push('deploy');
+  } else if (name === 'terraform' || name === 'pulumi') {
+    if (verb === 'destroy') operations.push('delete');
+    if (verb === (name === 'pulumi' ? 'up' : 'apply')) operations.push('deploy');
+  } else {
+    if (words.some(v => /^(?:delete|destroy|remove|rm|drop)(?:-|$)/.test(v))) operations.push('delete');
+    if (words.some(v => /^(?:deploy|apply|upgrade|publish|release)(?:[:=-]|$)/.test(v))) operations.push('deploy');
+    if (words.some(v => /^(?:secrets?|get-secret-value|access-secret-version)$/.test(v))) operations.push('secret_read');
+  }
+  return operations.map(operation => ({
+    operation,
+    scope: operation === 'secret_read' ? 'secret' : targetScope(args),
+    recursive: operation === 'delete' && name === 'aws' && words[0] === 's3' && words[1] === 'rm' && options.includes('--recursive'),
+    force: operation === 'delete' && name === 'kubectl' && options.reduce((force, v) => v === '--force' || v === '--force=true' ? true : v === '--force=false' ? false : force, false),
+  }));
+}
+
+function secretUpload(name, args) {
+  const files = name === 'curl'
+    ? new Set(['--data', '--data-binary', '--data-urlencode', '--json', '--upload-file', '--form', '-d', '-T', '-F'])
+    : new Set(['--post-file', '--body-file']);
+  const options = optionWords(args);
+  for (let i = 0; i < options.length; i++) {
+    let option = options[i];
+    let value;
+    if (option.startsWith('--') && option.includes('=')) {
+      const equals = option.indexOf('=');
+      value = option.slice(equals + 1);
+      option = option.slice(0, equals);
+    } else if (name === 'curl' && /^-[dTFH].+/.test(option)) {
+      value = option.slice(2);
+      option = option.slice(0, 2);
+    }
+    if (!files.has(option) && !['-H', '--header'].includes(option)) continue;
+    value ??= options[++i] || '';
+    if (['-H', '--header'].includes(option)) {
+      if (/^(?:authorization:|cookie:)/i.test(value)) return true;
+      continue;
+    }
+    if (['--upload-file', '-T', '--post-file', '--body-file'].includes(option)) {
+      if (secretPath(value)) return true;
+    } else {
+      const at = value.indexOf('@');
+      if (at >= 0 && (at === 0 || ['--data-urlencode', '--form', '-F'].includes(option)) && secretPath(value.slice(at + 1))) return true;
+    }
+  }
+  return false;
 }
 
 // Only closed enums and booleans survive. Arbitrary tokens are NEVER redacted
@@ -63,26 +213,14 @@ function describe(command, depth = 0) {
       if (token.type === 'group') descend(token.content);
       for (const sub of token.subs || []) descend(sub.content);
     }
-    for (let i = 0; i < node.length - 1; i++) if (node[i].type === 'redir' && node[i].value === '<' && secretPath(node[i + 1].value || '')) add('secret_read', [], { scope: 'secret' });
-    let position = parser.commandPosition(node);
-    while (executionPrefixes.has(position.command?.value)) {
-      unsupported = true;
-      const prefix = position.command.value;
-      let remaining = node.slice(node.indexOf(position.command) + 1);
-      if (prefix === 'time' && remaining[0]?.value === '-p') remaining = remaining.slice(1);
-      position = parser.commandPosition(remaining);
-    }
+    for (let i = 0; i < node.length - 1; i++) if (node[i].type === 'redir' && ['<', '<>'].includes(node[i].value) && secretPath(node[i + 1].value || '')) add('secret_read', [], { scope: 'secret' });
+    const position = parser.commandPosition(node);
+    unsupported ||= position.unsupportedControl || position.unresolvedWrapperOption;
     if (position.commandLookup) continue;
-    if (controlWords.has(position.command?.value)) {
-      unsupported = true;
-      if (position.words.some(word => riskyLiteral.test(word.value))) add('opaque_execution', []);
-    }
-    for (const payload of position.wrapperPayloads) descend(payload);
+    if (position.unsupportedControl && position.index === 0 &&
+        position.words.some(word => riskyLiteral.test(word.value))) add('opaque_execution', []);
     if (!position.command) {
-      // The shared parser consumes env as a wrapper even when it has no
-      // child command. That form dumps the environment; -S child payloads
-      // and informational options do not.
-      if (position.wrappers.at(-1) === 'env' && !position.wrapperPayloads.length &&
+      if (position.wrappers.at(-1) === 'env' &&
           !position.words.some(word => word.value === '--help' || word.value === '--version')) {
         add('secret_read', [], { scope: 'secret' });
       }
@@ -90,29 +228,32 @@ function describe(command, depth = 0) {
     }
     const name = basename(position.command.value);
     const args = position.words.slice(position.index + 1).map(w => w.value);
-    if (shells.has(name)) {
-      const index = args.findIndex(v => /^-[^-]*c/.test(v));
-      if (index >= 0 && args[index + 1]) descend(args[index + 1]);
-      for (const token of node) if (token.heredoc) descend(token.heredoc);
+    const shell = parser.shellInvocation(position);
+    if (shell) {
+      if (shell.kind === 'command' && shell.payload) descend(shell.payload.value);
+      const stdin = parser.shellStdinPayload(node, position);
+      if (stdin !== null) descend(stdin);
     } else if (name === 'eval') descend(args.join(' '));
     else if (name === 'ssh') {
-      // Remote scope is never assumed safe, even for relative paths.
+      const remote = sshInvocation(args);
       const start = features.length;
-      descend(args.slice(1).join(' '));
-      for (const feature of features.slice(start)) if (feature.scope === 'local') feature.scope = 'unknown';
+      descend(remote.command);
+      for (const feature of features.slice(start)) {
+        if (feature.operation !== 'secret_read' && production(remote.destination)) feature.scope = 'production';
+        else if (feature.scope === 'local') feature.scope = 'unknown';
+      }
     } else if (['rm', 'rmdir', 'unlink', 'shred'].includes(name)) {
-      add('delete', args, { recursive: args.some(v => /^-[^-]*[rR]/.test(v) || v === '--recursive'), force: args.some(v => /^-[^-]*f/.test(v) || v === '--force') });
+      const options = optionWords(args);
+      add('delete', args, { recursive: name === 'rm' && options.some(v => /^-[^-]*[rR]/.test(v) || v === '--recursive'), force: ['rm', 'shred'].includes(name) && options.some(v => /^-[^-]*f/.test(v) || v === '--force') });
     } else if (name === 'git') {
-      if (args.includes('push') && args.some(v => /^--force(?:-with-lease(?:=.*)?)?$/.test(v) || /^-[^-]*f/.test(v) || v.startsWith('+'))) add('force_push', args);
-      if (args.includes('reset') && args.includes('--hard') || args.includes('clean') && args.some(v => /^-[^-]*f/.test(v))) add('destructive_git', args);
-    } else if (['kubectl', 'helm', 'terraform', 'pulumi', 'aws', 'gcloud', 'az', 'vercel', 'fly', 'flyctl', 'wrangler', 'npm', 'make'].includes(name)) {
-      if (args.some(v => /^(?:delete|destroy|remove|rm|drop)(?:-|$)/.test(v))) add('delete', args);
-      if (args.some(v => /^(?:deploy|apply|upgrade|publish|release)(?:[:=-]|$)/.test(v))) add('deploy', args);
-      if (args.some(v => /^(?:secrets?|get-secret-value|access-secret-version)$/.test(v))) add('secret_read', args, { scope: 'secret' });
-    } else if (name === 'security' && args.some(v => /^find-(?:generic|internet)-password$/.test(v))) add('secret_read', [], { scope: 'secret' });
-    else if (name === 'printenv' && !args.some(v => v === '--help' || v === '--version') && (args.every(v => v.startsWith('-')) || args.some(secretName))) add('secret_read', [], { scope: 'secret' });
-    else if (readers.has(name) && args.some(secretPath)) add('secret_read', [], { scope: 'secret' });
-    else if (['curl', 'wget'].includes(name) && args.some(v => secretPath(v.replace(/^@/, '')) || /^(?:authorization:|cookie:)/i.test(v))) add('secret_read', [], { scope: 'secret' });
+      const git = gitInvocation(args);
+      if (git.command === 'push' && (git.mirror || git.options.some(v => /^--force(?:-with-lease(?:=.*)?)?$/.test(v) || /^-[^-]*f/.test(v)) || git.targets.some(v => v.startsWith('+')))) add('force_push', args);
+      if (git.command === 'reset' && git.options.includes('--hard') || git.command === 'clean' && git.options.some(v => v === '--force' || /^-[^-]*f/.test(v))) add('destructive_git', args);
+    } else if (Object.hasOwn(cloudOptionValues, name) || name === 'flyctl') features.push(...cloudOperations(name, args));
+    else if (name === 'security' && operands(args).some(v => /^find-(?:generic|internet)-password$/.test(v))) add('secret_read', [], { scope: 'secret' });
+    else if (name === 'printenv' && !optionWords(args).some(v => v === '--help' || v === '--version') && (!operands(args).length || operands(args).some(secretName))) add('secret_read', [], { scope: 'secret' });
+    else if (readers.has(name) && operands(args).some(secretPath)) add('secret_read', [], { scope: 'secret' });
+    else if (['curl', 'wget'].includes(name) && secretUpload(name, args)) add('secret_read', [], { scope: 'secret' });
     else if (['python', 'python3', 'node', 'ruby', 'perl'].includes(name) && args.some(v => /^-(?:c|e)$/.test(v)) && args.some(v => /(?:remove|unlink|rmtree|delete|secret|credential|\.env|deploy)/i.test(v))) add('opaque_execution', [], { scope: 'unknown' });
   }
   if (parsed.error && riskyLiteral.test(command)) add('opaque_execution', []);

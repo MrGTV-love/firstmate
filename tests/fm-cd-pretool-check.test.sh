@@ -142,6 +142,16 @@ matrix_case A33 allow 'command -v cd'
 matrix_case A34 allow 'command -V cd'
 matrix_case A35 allow 'command -pv cd'
 matrix_case A36 allow 'command -vp cd'
+matrix_case A37 allow "env -S 'command cd' projects/foo"
+matrix_case A38 allow 'env -P /usr/bin cd projects/foo'
+matrix_case A39 allow "command -v env -S 'cd' projects/foo"
+matrix_case A40 allow 'command -V command cd projects/foo'
+matrix_case A41 allow 'env if cd projects/foo'
+matrix_case A42 allow 'command time cd projects/foo'
+matrix_case A43 allow 'if cd projects/foo; then pwd; fi'
+matrix_case A44 allow 'if true; then cd projects/foo; fi'
+matrix_case A45 allow 'time -p cd projects/foo'
+matrix_case A46 allow '! command cd projects/foo'
 
 MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-cd-policy-matrix.XXXXXX")
 FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
