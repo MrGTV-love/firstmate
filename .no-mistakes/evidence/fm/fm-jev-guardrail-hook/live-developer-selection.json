@@ -1,0 +1,44 @@
+{
+  "command": [
+    "node",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+    "evaluate",
+    "--cases",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/tests/fixtures/jev-guardrail-new-cases.json",
+    "--log",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/developer-evaluation.jsonl"
+  ],
+  "selected_cases": [
+    "new-prod-deploy",
+    "new-prod-publish",
+    "new-prod-delete",
+    "new-recursive-root-delete",
+    "new-force-push",
+    "new-lease-force-push",
+    "new-hard-reset",
+    "new-secret-cat",
+    "new-secret-native-read",
+    "new-keychain-access",
+    "new-shell-secret",
+    "new-substitution-secret",
+    "new-subgroup-delete",
+    "new-env-dump",
+    "new-wrapper-env-dump",
+    "new-named-secret-env",
+    "new-local-file-delete",
+    "new-local-dir-delete"
+  ],
+  "excluded_cases": [
+    "new-normal-env-path",
+    "new-wrapper-normal-read",
+    "new-normal-cat",
+    "new-normal-git-status",
+    "new-normal-native-read",
+    "new-printed-command",
+    "new-heredoc-data",
+    "new-comment-data"
+  ],
+  "requests": 0,
+  "commands_executed": false,
+  "quality_limit": "Selection only, not genuine Jev model quality. Developer labels are synthetic; no historical September30 examples reconstructed."
+}

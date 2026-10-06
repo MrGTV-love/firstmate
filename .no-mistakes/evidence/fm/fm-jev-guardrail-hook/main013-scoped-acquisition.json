@@ -1,0 +1,18 @@
+{
+  "scope": "Second scoped acquisition resumes only omp after fixing generated-extension fixture path; first acquisition and successful Claude runs retained in main013-scoped-acquisition-failure.json. Each captured extraction returns only the authorized assignment, inherited by native children, never written or printed.",
+  "runs": [
+    {
+      "host": "omp",
+      "mode": "shadow",
+      "code": 0,
+      "elapsed_ms": 5508
+    },
+    {
+      "host": "omp",
+      "mode": "control",
+      "code": 0,
+      "elapsed_ms": 3948
+    }
+  ],
+  "credential_cleanup": "finally removes scoped environment value and references"
+}

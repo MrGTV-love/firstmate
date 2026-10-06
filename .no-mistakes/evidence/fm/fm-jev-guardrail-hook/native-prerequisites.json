@@ -1,0 +1,10 @@
+{
+  "command": "HOME=<worktree disposable tool-home> bash bin/fm-teamclaude-launch.sh --check",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "error: TeamClaude is not installed: install an executable teamclaude on PATH or under one Node version in ~/.nvm/versions/node; refusing to launch Claude without it\n",
+  "PATH_teamclaude": null,
+  "key_available_in_inherited_env": false,
+  "workspace_env_file_present": false,
+  "local_obtain_route": "Public npm teamclaude@0.2.7 is an unrelated autonomous sprint visualization plugin, not the required 1.1.21-affinity.0 proxy; not installed. No repo-local proxy implementation/configuration supplied. No external filesystem search or normal credential/config read performed."
+}

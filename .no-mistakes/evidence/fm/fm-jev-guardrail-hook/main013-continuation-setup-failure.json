@@ -1,0 +1,8 @@
+{
+  "classification": "Disposable fixture path error, not product/provider failure",
+  "reproduction": "First scope completed Claude shadow/control, then failed before omp because extension was sought in wt/.omp/extensions",
+  "fix": "Use actual effective-state/main013-native-omp.omp-ext.ts; do not repeat Claude requests",
+  "genuine_logical_starts": 2,
+  "omp_starts": 0,
+  "cleanup": "Scoped key removed in finally"
+}

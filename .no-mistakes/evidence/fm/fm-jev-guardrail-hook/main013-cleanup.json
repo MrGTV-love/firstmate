@@ -1,0 +1,10 @@
+{
+  "lab": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-main013-0ykxus2e",
+  "removed": true,
+  "process_check_before_removal": "No process references lab after both native hosts exited",
+  "cleanup_setup": "Initial removal hit a read-only generated git-hook fixture directory. Added owner-write permission only within the disposable lab without following symlinks, then removed it. No rejected ledger safeguard changed or bypassed.",
+  "credential_cleanup": "Every scoped acquisition executes finally; all supervisor/native processes exited; no key written to any file",
+  "kept": "Prior source/test fixture changes and prior evidence unchanged; new evidence retained under explicitly authorized evidence directory",
+  "not_removed": "No commands.prepare dependencies or unrelated files touched",
+  "source_or_system_changes_outside_worktree": false
+}

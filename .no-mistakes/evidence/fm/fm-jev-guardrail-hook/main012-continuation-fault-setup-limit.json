@@ -1,0 +1,5 @@
+{
+  "scope": "Synthetic fault fixture setup only, not product/provider failure.",
+  "failedAttempt": "Routing shim spawned real curl with only stdin/stdout/stderr; Authorization fd3 was not inherited. Two logical synthetic starts returned transport_error; no loopback requests reached receiver. Original rows preserved; no genuine Jev attempted or retried.",
+  "repair": "Route shim passes fd3 to real curl; new separately named native fault run; prior attempts retained."
+}

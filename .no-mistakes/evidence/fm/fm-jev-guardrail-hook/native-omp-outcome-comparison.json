@@ -1,0 +1,223 @@
+{
+  "scope": "Current-head native omp via existing auth. Jev credential absent; no real provider judgment. Faults use real curl/loopback synthetic responses. External native-stream comparison only; no product outcome instrumentation. Read/write paths and fixture bodies in this observer artifact are disposable synthetic data, never persisted by the shadow ledger.",
+  "comparison": {
+    "missing-key": {
+      "completed": true,
+      "observations": [
+        {
+          "input": {
+            "command": "cat ordinary.txt"
+          },
+          "outcome": "ordinary-success",
+          "isError": false,
+          "text": "ORDINARY_FIXTURE_OK\n\n\nWall time: 0.01 seconds"
+        },
+        {
+          "input": {
+            "command": "rm ./missing-local.txt"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "rm: cannot remove './missing-local.txt': No such file or directory\n\n\nWall time: 0.01 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "cat .env.allowed"
+          },
+          "outcome": "synthetic-read-success",
+          "isError": false,
+          "text": "SYNTHETIC_ALLOWED_BODY_32d18ed\n\n\nWall time: 0.00 seconds"
+        },
+        {
+          "input": {
+            "command": "cat .env.denied"
+          },
+          "outcome": "independent-fixture-denial",
+          "isError": true,
+          "text": "Independent fixture policy: synthetic denied file must not be read"
+        },
+        {
+          "input": {
+            "command": "cat .env.missing"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "cat: .env.missing: No such file or directory\n\n\nWall time: 0.00 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-watch.sh"
+          },
+          "outcome": "authoritative-watcher-denial",
+          "isError": true,
+          "text": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+        }
+      ]
+    },
+    "control": {
+      "completed": true,
+      "observations": [
+        {
+          "input": {
+            "command": "cat ordinary.txt"
+          },
+          "outcome": "ordinary-success",
+          "isError": false,
+          "text": "ORDINARY_FIXTURE_OK\n\n\nWall time: 0.02 seconds"
+        },
+        {
+          "input": {
+            "command": "rm ./missing-local.txt"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "rm: cannot remove './missing-local.txt': No such file or directory\n\n\nWall time: 0.02 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "cat .env.allowed"
+          },
+          "outcome": "synthetic-read-success",
+          "isError": false,
+          "text": "SYNTHETIC_ALLOWED_BODY_32d18ed\n\n\nWall time: 0.00 seconds"
+        },
+        {
+          "input": {
+            "command": "cat .env.denied"
+          },
+          "outcome": "independent-fixture-denial",
+          "isError": true,
+          "text": "Independent fixture policy: synthetic denied file must not be read"
+        },
+        {
+          "input": {
+            "command": "cat .env.missing"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "cat: .env.missing: No such file or directory\n\n\nWall time: 0.00 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-watch.sh"
+          },
+          "outcome": "authoritative-watcher-denial",
+          "isError": true,
+          "text": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+        }
+      ]
+    },
+    "faults": {
+      "completed": true,
+      "observations": [
+        {
+          "input": {
+            "command": "cat ordinary.txt"
+          },
+          "outcome": "ordinary-success",
+          "isError": false,
+          "text": "ORDINARY_FIXTURE_OK\n\n\nWall time: 0.04 seconds"
+        },
+        {
+          "input": {
+            "command": "rm ./missing-local.txt"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "rm: cannot remove './missing-local.txt': No such file or directory\n\n\nWall time: 0.02 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "cat .env.allowed"
+          },
+          "outcome": "synthetic-read-success",
+          "isError": false,
+          "text": "SYNTHETIC_ALLOWED_BODY_32d18ed\n\n\nWall time: 0.00 seconds"
+        },
+        {
+          "input": {
+            "command": "cat .env.denied"
+          },
+          "outcome": "independent-fixture-denial",
+          "isError": true,
+          "text": "Independent fixture policy: synthetic denied file must not be read"
+        },
+        {
+          "input": {
+            "command": "cat .env.missing"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "cat: .env.missing: No such file or directory\n\n\nWall time: 0.00 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-watch.sh"
+          },
+          "outcome": "authoritative-watcher-denial",
+          "isError": true,
+          "text": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+        }
+      ]
+    },
+    "refused-ledger": {
+      "completed": true,
+      "observations": [
+        {
+          "input": {
+            "command": "cat ordinary.txt"
+          },
+          "outcome": "ordinary-success",
+          "isError": false,
+          "text": "ORDINARY_FIXTURE_OK\n\n\nWall time: 0.01 seconds"
+        },
+        {
+          "input": {
+            "command": "rm ./missing-local.txt"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "rm: cannot remove './missing-local.txt': No such file or directory\n\n\nWall time: 0.01 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "cat .env.allowed"
+          },
+          "outcome": "synthetic-read-success",
+          "isError": false,
+          "text": "SYNTHETIC_ALLOWED_BODY_32d18ed\n\n\nWall time: 0.01 seconds"
+        },
+        {
+          "input": {
+            "command": "cat .env.denied"
+          },
+          "outcome": "independent-fixture-denial",
+          "isError": true,
+          "text": "Independent fixture policy: synthetic denied file must not be read"
+        },
+        {
+          "input": {
+            "command": "cat .env.missing"
+          },
+          "outcome": "missing-file",
+          "isError": true,
+          "text": "cat: .env.missing: No such file or directory\n\n\nWall time: 0.01 seconds\n\nCommand exited with code 1"
+        },
+        {
+          "input": {
+            "command": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-watch.sh"
+          },
+          "outcome": "authoritative-watcher-denial",
+          "isError": true,
+          "text": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+        }
+      ]
+    }
+  },
+  "refused_ledger": {
+    "bytes_preserved": true,
+    "mode": "0644"
+  },
+  "loopback_physical_requests": 4,
+  "real_jev_requests": 0
+}

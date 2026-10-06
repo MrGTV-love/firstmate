@@ -1,0 +1,38 @@
+{
+  "supplied_teamclaude": {
+    "path": "/Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin/teamclaude",
+    "version": "1.1.21-affinity.0",
+    "launcher_preflight_exit": 0,
+    "autoupdate_disabled": true
+  },
+  "claude_version": "2.1.292",
+  "inherited_jev_key_present": false,
+  "worktree_env_present": false,
+  "genuine_jev_requests": 0,
+  "missing_prerequisite": "Existing authorized TYPESAFE_API_KEY must be inherited by this test process or provisioned by the operator into a disposable worktree-local owning home .env. The existing hook supports only those two sources; neither is present. No credential source outside the isolated lab was inspected/copied; TeamClaude supplies Anthropic client auth, not a Jev key.",
+  "boundary": "No installation, account switching, shared service/configuration changes, plain-Claude substitution, or inspection of operator credential stores.",
+  "native_claude_isolated_attempts": [
+    {
+      "route": "repository guarded MITM launcher; explicit lab CLAUDE_CONFIG_DIR",
+      "exit": 1,
+      "error": "authentication_failed",
+      "message": "Not logged in · Please run /login",
+      "pretool_calls": 0
+    },
+    {
+      "route": "supported TeamClaude run --no-mitm; explicit lab CLAUDE_CONFIG_DIR",
+      "exit": 1,
+      "error": "authentication_failed",
+      "message": "Not logged in · Please run /login",
+      "pretool_calls": 0
+    },
+    {
+      "route": "repository guarded MITM launcher; HOME=lab; CLAUDE_CONFIG_DIR unset",
+      "exit": 1,
+      "error": "authentication_failed",
+      "message": "Not logged in · Please run /login",
+      "pretool_calls": 0
+    }
+  ],
+  "native_auth_prerequisite": "A supported normal authenticated Claude client binding usable with lab-owned HOME/client files. Three supported routed native calls returned authentication_failed before tool use. No login/account switch or manual credential inspection/export/copy attempted. Safe authenticated binding must be supplied rather than using real operator settings or weakening isolation."
+}

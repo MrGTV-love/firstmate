@@ -1,0 +1,13 @@
+{
+  "fixture": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk",
+  "loopback_servers_stopped": true,
+  "native_process_check": "pgrep -fl <exact worktree fixture path> returned no matches",
+  "intentional_source_change": "tests/fm-jev-guardrail-home.test.sh now copies the required tracked fm-session-overlay.yml into its isolated code fixture; re-driven successfully. No production sources, guards or memory files changed.",
+  "initial_attempt_limit": "Initial omp print-mode call timed out at 145s with no ledger/observer output; then RPC input-EOF attempt exited before activation. Both unsuccessful attempts retained separately. Successful native proof uses RPC stdin kept open through agent_end. No Jev judgment was retried.",
+  "genuine_jev_attempts": 0,
+  "missing_acceptance": [
+    "TeamClaude executable on PATH (no repository-local compatible source supplied); supported Claude cannot be launched unproxied as a substitute.",
+    "Existing authorized Jev TYPESAFE_API_KEY must be supplied in inherited environment or a disposable worktree-local FM_HOME/.env; inherited environment has none and worktree .env is absent. Operator credential stores were not inspected or altered."
+  ],
+  "fixture_removed": true
+}

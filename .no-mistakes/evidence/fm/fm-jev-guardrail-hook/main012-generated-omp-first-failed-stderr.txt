@@ -1,0 +1,2 @@
+Still starting after 12s — phase: registerDaemonProjectPresence
+  logs: /Users/charlesabrooker/.omp/logs/omp.2026-10-06.48993.log · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers

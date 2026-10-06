@@ -1,0 +1,173 @@
+{
+  "scope": "Current-head actual Claude through TeamClaude, full generated settings, sandbox denies operator writes; actual real curl/local receiver synthetic faults, not provider evidence.",
+  "commands": [
+    "cat ordinary.txt",
+    "cat .env.allowed",
+    "rm ./missing-local.txt",
+    "cat .env.owner-private",
+    "bin/fm-watch.sh"
+  ],
+  "outcomes": [
+    {
+      "is_error": false,
+      "content": "ORDINARY_CONTINUATION_OK"
+    },
+    {
+      "is_error": false,
+      "content": "SYNTHETIC_CONTINUATION_BODY_ONLY"
+    },
+    {
+      "is_error": true,
+      "content": "Exit code 1\nrm: ./missing-local.txt: No such file or directory"
+    },
+    {
+      "is_error": true,
+      "content": "Exit code 1\ncat: .env.owner-private: No such file or directory"
+    },
+    {
+      "is_error": true,
+      "content": "PreToolUse:Bash hook error: [bash '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-arm-pretool-check.sh' --claude]: {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+    }
+  ],
+  "matchingModes": [
+    "shadow-final",
+    "control-final",
+    "shadow-faults-final"
+  ],
+  "modeDurationsMs": {
+    "shadow": 33581,
+    "control": 42134,
+    "syntheticFaults": 50832
+  },
+  "latencyInference": "Elapsed differences are not causal screen-overhead estimates.",
+  "allPriorSetupAttemptsRetained": [
+    "shadow",
+    "control",
+    "shadow-temp",
+    "shadow-faults"
+  ],
+  "ownerPolicyAndLedgerObserved": true,
+  "owningSyntheticKeyObserved": true,
+  "genuineJevRequests": 0,
+  "privacy": {
+    "ledgerContainsSyntheticBody": false,
+    "ledgerContainsSyntheticKey": false
+  },
+  "ledgerMode": 384,
+  "faultRows": [
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320735100,
+      "mode": "shadow",
+      "event": "result",
+      "id": "1fb9622c-e7ec-4c6f-86a2-4040240fae1a",
+      "host": "claude",
+      "selected": false,
+      "status": "excluded",
+      "latency_ms": 1.78,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown"
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320739429,
+      "mode": "shadow",
+      "event": "attempt",
+      "id": "a79438c6-6823-4ced-b819-a3b6cd7b7187",
+      "host": "claude",
+      "selected": true
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320739547,
+      "mode": "shadow",
+      "event": "result",
+      "id": "a79438c6-6823-4ced-b819-a3b6cd7b7187",
+      "host": "claude",
+      "selected": true,
+      "status": "malformed_response",
+      "latency_ms": 214.761,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": 100,
+      "output_tokens": 1,
+      "estimated_usd": 0.0000042000000000000004,
+      "cost_source": "typesafe_models_input_estimate",
+      "model": "jev-1.13.0",
+      "api_ms": 116.075
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320741733,
+      "mode": "shadow",
+      "event": "attempt",
+      "id": "40aaacdb-a76f-4c1b-95b8-7460e04626c2",
+      "host": "claude",
+      "selected": true
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320743875,
+      "mode": "shadow",
+      "event": "result",
+      "id": "40aaacdb-a76f-4c1b-95b8-7460e04626c2",
+      "host": "claude",
+      "selected": true,
+      "status": "timeout",
+      "latency_ms": 2181.734,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown",
+      "model": null,
+      "api_ms": 2141.521
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320745881,
+      "mode": "shadow",
+      "event": "result",
+      "id": "d1c5124a-d89e-4a6b-9c19-c8eadd6cb5c7",
+      "host": "claude",
+      "selected": true,
+      "status": "withheld",
+      "latency_ms": 1.768,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown"
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791320759428,
+      "mode": "shadow",
+      "event": "result",
+      "id": "7424a58c-33de-4129-98af-4f67d984dd60",
+      "host": "claude",
+      "selected": false,
+      "status": "excluded",
+      "latency_ms": 2.878,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "method": "Actual fm-spawn production code; inert runtime acquisition using existing tests/fixtures.sh. Only emitted config consumed by native host, no fake CLI as native proof.",
+  "initialAttempt": "60-second generation deadline interrupted; clean disposable reset and 240-second bounded key-free trace completed at 94.9 seconds.",
+  "sourceCustody": [
+    {
+      "path": "bin/fm-spawn.sh",
+      "sha256": "c614ebe7d6166100967037b1561a4ee12e6b4d73d55ba3f3a855d53c9f638057",
+      "identical": true
+    },
+    {
+      "path": "bin/fm-jev-guardrail.mjs",
+      "sha256": "0b4bb8225d82b907f9ef20a44b6b9e48052663e3432f54577daa718947318692",
+      "identical": true
+    },
+    {
+      "path": ".omp/extensions/fm-jev-guardrail.ts",
+      "sha256": "78fb54898e1ea6c891054b464c5edfe3045dc28942f17541b4e76c725f6024d7",
+      "identical": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "1126f3db59f6c16be83da00a59063a4641473ae8980a3fa9226581f1b487dd2b",
+      "identical": true
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "claude-settings",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M49B0KN51DPCGNZVG2F29T2D/main012-continuation-generated-claude-settings.json",
+      "sha256": "2afe7d6f5ae66238c11f505d27b9e9b3a749d274c2611e46865ab411e8a62c40"
+    },
+    {
+      "name": "omp-extension",
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M49B0KN51DPCGNZVG2F29T2D/main012-continuation-generated-omp-extension.ts",
+      "sha256": "22b8d7905ea8db1a2ba28fe0e7876b174cf76e1846ff43635699191c2a73e405"
+    }
+  ],
+  "genuineJevKeyAvailable": false,
+  "vaultInjectionTool": "av not on PATH; supplied no repository-local implementation. No host search or installations."
+}

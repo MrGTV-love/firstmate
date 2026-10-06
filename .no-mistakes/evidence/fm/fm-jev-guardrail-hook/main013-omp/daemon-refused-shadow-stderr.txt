@@ -1,0 +1,19 @@
+646286 | import * as zR from "fs/promises";
+646287 | import * as Pv from "path";
+646288 | async function jri(e, t) {
+646289 |   const s = await P1(e);
+646290 |   const o = t ?? ud(s);
+646291 |   await zR.mkdir(n, { recursive: true, mode: 448 });
+                         ^
+EPERM: operation not permitted, mkdir '/Users/charlesabrooker/.omp/run/daemons/04271c82cdb8e560'
+    path: "/Users/charlesabrooker/.omp/run/daemons/04271c82cdb8e560",
+ syscall: "mkdir",
+   errno: -1,
+    code: "EPERM"
+
+      at async jri (/$bunfs/root/omp-darwin-arm64:646291:17)
+      at async ZB (/$bunfs/root/omp-darwin-arm64:699550:12)
+      at async run (/$bunfs/root/omp-darwin-arm64:699943:16)
+      at async FLi (/$bunfs/root/omp-darwin-arm64:2717:16)
+      at async M1o (/$bunfs/root/omp-darwin-arm64:703126:12)
+

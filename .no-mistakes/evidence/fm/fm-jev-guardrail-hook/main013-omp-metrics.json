@@ -1,0 +1,6 @@
+{
+  "exit": 0,
+  "stdout": "mode: \"shadow\"\nobservations: 5\nscreened: 3\njudged: 2\npolicy_versions: \"8\"\nexcluded: 2\nattempts: 2\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0.000040362000000000004\nknown_input_tokens: 961\nknown_output_tokens: 83\np95_screen_ms: 329.172\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 0.00022204861111111112\nnative_judged: 2\nnative_observed_days: 0.00006740740740740741\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+  "stderr": "",
+  "billingScope": "Genuine provider responses for synthetic lab operations; returned input-priced estimate, not invoice or independent physical wire-attempt audit"
+}

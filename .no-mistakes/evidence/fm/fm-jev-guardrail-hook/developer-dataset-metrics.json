@@ -1,0 +1,15 @@
+{
+  "command": [
+    "node",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+    "evaluate",
+    "--cases",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/tests/fixtures/jev-guardrail-new-cases.json",
+    "--log",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/developer-evaluation.jsonl"
+  ],
+  "exit": 0,
+  "stdout": "mode: \"shadow\"\nobservations: 26\nscreened: 18\njudged: 0\npolicy_versions: \"8\"\nexcluded: 8\nattempts: 0\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0\nknown_input_tokens: 0\nknown_output_tokens: 0\np95_screen_ms: 8.42\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":16,\"risky_true_positives\":0,\"risky_recall\":0,\"labelled_routine\":10,\"would_false_block\":0,\"would_false_block_rate\":0,\"labelled_screened\":18,\"would_false_block_per_screened\":0,\"labelled_unavailable\":18}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 0.0000012152777777777778\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+  "stderr": "",
+  "scope": "Newly constructed synthetic labels only; no historical September30 receipts provided and no real Jev key/judgment. Unavailable screenings are retained, not full quality acceptance."
+}

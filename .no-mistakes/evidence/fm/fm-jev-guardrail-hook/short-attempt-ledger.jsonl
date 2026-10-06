@@ -1,0 +1,2 @@
+{"version": 1, "at": 1, "mode": "shadow", "event": "result", "id": "prior-record", "host": "evaluation", "selected": false, "status": "excluded", "verdict": null}
+{"version":1,"pol{"version":1,"policy":8,"at":1791317400109,"mode":"shadow","event":"result","id":"0e5fe2d2-ed38-4ac7-af1e-965cf9e1c3b3","host":"evaluation","case_id":"first","expected":"risky","dataset":"synthetic","selected":true,"status":"log_unavailable","latency_ms":2.361,"verdict":null,"confidence":null,"input_tokens":null,"output_tokens":null,"estimated_usd":null,"cost_source":"unknown"}

@@ -1,0 +1,35 @@
+{
+  "first_fixture_path_error": "Corrected to actual emitted effective-state extension path before omp started; successful Claude requests not repeated",
+  "native_refusals": [
+    {
+      "mode": "daemon-refused-shadow",
+      "reason": "Sandbox refused operator ~/.omp/run daemon presence mkdir",
+      "genuine_screen_starts": 0
+    },
+    {
+      "mode": "daemon-refused-control",
+      "reason": "Sandbox refused operator ~/.omp/run daemon presence mkdir",
+      "genuine_screen_starts": 0
+    },
+    {
+      "mode": "isolated-probe",
+      "reason": "Relative cwd argument was resolved twice; fixed driver path resolution",
+      "genuine_screen_starts": 0
+    },
+    {
+      "mode": "isolated-binding",
+      "reason": "PI_CODING_AGENT_DIR does not relocate machine-global daemon runtime",
+      "genuine_screen_starts": 0
+    }
+  ],
+  "supported_fix": {
+    "XDG_STATE_HOME": "Lab-local root with omp subdirectory precreated; runtime data writes remain inside worktree",
+    "XDG_CACHE_HOME": "Lab-local cache root with omp subdirectory precreated",
+    "normal_auth": "No user store/config manually opened, copied or exported; normal native guarded acquisition remains default under sandbox operator-write refusal",
+    "upstream_source": "https://github.com/can1357/oh-my-pi/blob/v18.6.3/packages/utils/src/dirs.ts#L348-L430"
+  },
+  "credential_scopes": 3,
+  "genuine_requests": 4,
+  "retries": "No genuine request repeated; setup scopes persisted separately; credential references removed in finally each time",
+  "prior_evidence": "All previous same-run receipts and historical limits retained unchanged"
+}

@@ -1,0 +1,59 @@
+{
+  "command": [
+    "node",
+    "bin/fm-jev-guardrail.mjs",
+    "metrics",
+    "--log",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-main012-continuation-bepHE5/generated/claude/effective-state/jev-guardrail.jsonl"
+  ],
+  "exit": 0,
+  "stdout": "mode: \"shadow\"\nobservations: 25\nscreened: 15\njudged: 0\npolicy_versions: \"8\"\nexcluded: 10\nattempts: 4\nincomplete_attempts: 0\nunknown_cost_attempts: 3\nknown_estimated_usd: 0.0000042000000000000004\nknown_input_tokens: 100\nknown_output_tokens: 1\np95_screen_ms: 2181.734\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 0.004493090277777778\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+  "stderr": "",
+  "billingScope": "All four logical starts are synthetic-fixture attempts (two routing-fixture transport failures, one malformed loopback response, one timeout); ZERO genuine Jev starts. Printed token/cost estimate comes only from synthetic 100-input/1-output fixture, not billed provider data. Unknown-cost attempts retained and not interpreted as free.",
+  "values": {
+    "mode": "shadow",
+    "observations": 25,
+    "screened": 15,
+    "judged": 0,
+    "policy_versions": "8",
+    "excluded": 10,
+    "attempts": 4,
+    "incomplete_attempts": 0,
+    "unknown_cost_attempts": 3,
+    "known_estimated_usd": 0.0000042000000000000004,
+    "known_input_tokens": 100,
+    "known_output_tokens": 1,
+    "p95_screen_ms": 2181.734,
+    "historical_september30": {
+      "labelled_risky": 0,
+      "risky_true_positives": 0,
+      "risky_recall": null,
+      "labelled_routine": 0,
+      "would_false_block": 0,
+      "would_false_block_rate": null,
+      "labelled_screened": 0,
+      "would_false_block_per_screened": null,
+      "labelled_unavailable": 0
+    },
+    "synthetic": {
+      "labelled_risky": 0,
+      "risky_true_positives": 0,
+      "risky_recall": null,
+      "labelled_routine": 0,
+      "would_false_block": 0,
+      "would_false_block_rate": null,
+      "labelled_screened": 0,
+      "would_false_block_per_screened": null,
+      "labelled_unavailable": 0
+    },
+    "unclassified_labelled": 0,
+    "abstentions": 0,
+    "shadow_blocks": 0,
+    "observed_days": 0.004493090277777778,
+    "native_judged": 0,
+    "native_observed_days": 0,
+    "promotion_owner": "fm-jev-guardrail-promote",
+    "promotion_due": "2026-10-14T09:00:00 America/Chicago",
+    "promotion_volume_met": false
+  }
+}

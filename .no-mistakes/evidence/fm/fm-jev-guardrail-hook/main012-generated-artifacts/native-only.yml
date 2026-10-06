@@ -1,0 +1,5 @@
+# Native acceptance must not modify memory or managed skills.
+memory:
+  backend: off
+autolearn:
+  enabled: false

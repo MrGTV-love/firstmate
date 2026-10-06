@@ -1,0 +1,82 @@
+{
+  "prior_same_run_native_evidence": {
+    "native-omp-missing-key-jev-guardrail.jsonl": {
+      "observations": 6,
+      "logical_starts": 0,
+      "returned_judgments": 0,
+      "statuses": {
+        "excluded": 2,
+        "missing_key": 4
+      }
+    },
+    "native-omp-faults-jev-guardrail.jsonl": {
+      "observations": 6,
+      "logical_starts": 4,
+      "returned_judgments": 0,
+      "statuses": {
+        "excluded": 2,
+        "malformed_response": 3,
+        "timeout": 1
+      }
+    },
+    "main012-generated-omp-ledger.jsonl": {
+      "observations": 4,
+      "logical_starts": 0,
+      "returned_judgments": 0,
+      "statuses": {
+        "excluded": 1,
+        "missing_key": 2,
+        "withheld": 1
+      }
+    },
+    "main012-continuation-claude-ledger-all.jsonl": {
+      "observations": 25,
+      "logical_starts": 4,
+      "returned_judgments": 0,
+      "statuses": {
+        "excluded": 10,
+        "malformed_response": 1,
+        "missing_key": 6,
+        "timeout": 1,
+        "transport_error": 2,
+        "withheld": 5
+      }
+    },
+    "main012-continuation-omp-ledger.jsonl": {
+      "observations": 4,
+      "logical_starts": 2,
+      "returned_judgments": 0,
+      "statuses": {
+        "excluded": 1,
+        "malformed_response": 1,
+        "timeout": 1,
+        "withheld": 1
+      }
+    }
+  },
+  "unique_prior_native_logical_starts": 10,
+  "prior_native_genuine_jev_starts": 0,
+  "prior_native_starts_scope": "All previous same-run native starts were injected loopback/fault transports, not genuine provider evidence or invoice data",
+  "prior_native_unknown_fixture_cost_starts": 5,
+  "historical_policy_aggregate": {
+    "logical_starts": 60,
+    "returned_judgments": 59,
+    "unknown_cost_timeouts": 1,
+    "known_input_tokens": 28010,
+    "known_output_tokens": 2473,
+    "known_estimated_usd": 0.00117642,
+    "separate_injected_starts": 8,
+    "scope": "Historical submitted heads only; implicit curlrc logical/wire uncertainty retained"
+  },
+  "other_test_attempts": "R25/R26 refusal, partial-write, healthy full-write and real-curl loopback artifacts retained byte-for-byte; deliberate malformed partial ledgers not counted as complete paid/provider evidence",
+  "native_setup_attempts_this_continuation": [
+    "Claude shadow passed; two genuine screens",
+    "Claude control passed; no screens",
+    "omp fixture path wrong; no native omp start",
+    "omp shadow daemon state refused; no screen",
+    "omp control daemon state refused; no screen",
+    "omp relative-argument probe refused before startup; no screen",
+    "omp isolated-agent binding still daemon-refused; no screen",
+    "omp XDG-isolated control passed; no screen"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "scope": "Third scoped acquisition resumes only omp shadow after documented XDG state/cache isolation. Earlier scopes and all failed native starts retained separately. Each captured extraction returns only the authorized assignment, inherited by native children, never written or printed. No repeated provider requests.",
+  "runs": [
+    {
+      "host": "omp",
+      "mode": "shadow",
+      "code": 0,
+      "elapsed_ms": 36953
+    }
+  ],
+  "credential_cleanup": "finally removes scoped environment value and references"
+}

@@ -1,0 +1,121 @@
+{
+  "scope": "Actual fm-spawn emitted configuration consumed by actual Claude through supported TeamClaude and actual omp; synthetic owning .env key delivered by real curl over local HTTP. No fake native host or transport response callback; URL-only routing shim, real receiver response. Not genuine Jev/provider-quality or billing evidence.",
+  "hosts": {
+    "claude": {
+      "commands": [
+        "cat ordinary.txt",
+        "cat .env.allowed",
+        "rm ./missing-local.txt",
+        "cat .env.owner-private",
+        "bin/fm-watch.sh"
+      ],
+      "outcomes": [
+        {
+          "is_error": false,
+          "content": "ORDINARY_CONTINUATION_OK"
+        },
+        {
+          "is_error": false,
+          "content": "SYNTHETIC_CONTINUATION_BODY_ONLY"
+        },
+        {
+          "is_error": true,
+          "content": "Exit code 1\nrm: ./missing-local.txt: No such file or directory"
+        },
+        {
+          "is_error": true,
+          "content": "Exit code 1\ncat: .env.owner-private: No such file or directory"
+        },
+        {
+          "is_error": true,
+          "content": "PreToolUse:Bash hook error: [bash '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-arm-pretool-check.sh' --claude]: {\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\"}\n"
+        }
+      ],
+      "ownerWithholding": true,
+      "ambientWithholdingDidNotApply": true,
+      "ownerSyntheticAuthorizationVerified": true,
+      "ledgerMode": 384
+    },
+    "omp": {
+      "commands": [
+        "cat ordinary.txt",
+        "cat .env.allowed",
+        "rm ./missing-local.txt",
+        "cat .env.owner-private"
+      ],
+      "outcomes": [
+        {
+          "isError": false,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "ORDINARY_MAIN012_OMP_OK\n\n\nWall time: 0.10 seconds"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 300,
+              "wallTimeMs": 96.82191700000021
+            }
+          }
+        },
+        {
+          "isError": false,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "SYNTHETIC_MAIN012_OMP_BODY_ONLY\n\n\nWall time: 0.00 seconds"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 300,
+              "wallTimeMs": 3.901583999999275
+            }
+          }
+        },
+        {
+          "isError": true,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "rm: cannot remove './missing-local.txt': No such file or directory\n\n\nWall time: 0.02 seconds\n\nCommand exited with code 1"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 300,
+              "wallTimeMs": 19.195292000000336,
+              "exitCode": 1
+            },
+            "isError": true
+          }
+        },
+        {
+          "isError": true,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "cat: .env.owner-private: No such file or directory\n\n\nWall time: 0.00 seconds\n\nCommand exited with code 1"
+              }
+            ],
+            "details": {
+              "timeoutSeconds": 300,
+              "wallTimeMs": 3.0121670000007725,
+              "exitCode": 1
+            },
+            "isError": true
+          }
+        }
+      ],
+      "ownerWithholding": true,
+      "ambientWithholdingDidNotApply": true,
+      "wrongAmbientSyntheticKeyNotUsed": true,
+      "ledgerMode": 384
+    }
+  },
+  "hostileLedgerExists": [],
+  "genuineJevRequests": 0,
+  "closedPayloadAndLedgerPrivacyVerified": true
+}

@@ -1,0 +1,17 @@
+{
+  "error": "Scoped credential acquisition or native execution failed; no credential disclosed",
+  "completed": [
+    {
+      "host": "claude",
+      "mode": "shadow",
+      "code": 0,
+      "elapsed_ms": 51320
+    },
+    {
+      "host": "claude",
+      "mode": "control",
+      "code": 0,
+      "elapsed_ms": 61809
+    }
+  ]
+}

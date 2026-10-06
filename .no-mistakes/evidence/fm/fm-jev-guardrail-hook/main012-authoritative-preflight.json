@@ -1,0 +1,18 @@
+{
+  "command": [
+    "bash",
+    "bin/fm-arm-pretool-check.sh",
+    "--claude",
+    "--command",
+    "bin/fm-watch.sh"
+  ],
+  "exit": 2,
+  "stderr": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny"
+    },
+    "systemMessage": "[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead"
+  },
+  "execution": "Classifier only; no watcher executed. Native lab sentinel cannot perform lifecycle operations."
+}

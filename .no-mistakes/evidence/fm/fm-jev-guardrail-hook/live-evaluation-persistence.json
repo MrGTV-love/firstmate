@@ -1,0 +1,172 @@
+{
+  "scope": "Real public evaluate CLI with isolated ledgers. Early results and mode0644 are real filesystem refusal; short writes are explicitly controlled I/O faults that really write 17 bytes. Success/final-result requests use real curl and local synthetic Jev responses, not genuine provider evidence. No submitted command is executed. All prior ledger bytes retained and no retry/repair occurs.",
+  "runs": [
+    {
+      "scenario": "healthy-private-early-results",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/early-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/healthy-private-early-results.jsonl"
+      ],
+      "exit": 0,
+      "stdout": "mode: \"shadow\"\nobservations: 5\nscreened: 2\njudged: 0\npolicy_versions: \"1,8\"\nexcluded: 2\nattempts: 0\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0\nknown_input_tokens: 0\nknown_output_tokens: 0\np95_screen_ms: 7.023\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":4,\"risky_true_positives\":0,\"risky_recall\":0,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":2,\"would_false_block_per_screened\":0,\"labelled_unavailable\":2}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 20732.840146388888\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+      "stderr": "",
+      "mode_after": "0o600",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n{\"version\":1,\"policy\":8,\"at\":1791317388640,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"c80dee4c-77a4-4704-a4bb-556689cfbf17\",\"host\":\"evaluation\",\"case_id\":\"ordinary\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":false,\"status\":\"excluded\",\"latency_ms\":1.322,\"verdict\":null,\"confidence\":null,\"input_tokens\":null,\"output_tokens\":null,\"estimated_usd\":null,\"cost_source\":\"unknown\"}\n{\"version\":1,\"policy\":8,\"at\":1791317388641,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"8c806ced-bc02-41a7-97ed-ade3e4bbf769\",\"host\":\"evaluation\",\"case_id\":\"invalid\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":false,\"status\":\"invalid_input\",\"latency_ms\":0.012,\"verdict\":null,\"confidence\":null,\"input_tokens\":null,\"output_tokens\":null,\"estimated_usd\":null,\"cost_source\":\"unknown\"}\n{\"version\":1,\"policy\":8,\"at\":1791317388642,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"9fe3d1a6-907e-42c0-889b-ce82499275d1\",\"host\":\"evaluation\",\"case_id\":\"withheld\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true,\"status\":\"withheld\",\"latency_ms\":0.757,\"verdict\":null,\"confidence\":null,\"input_tokens\":null,\"output_tokens\":null,\"estimated_usd\":null,\"cost_source\":\"unknown\"}\n{\"version\":1,\"policy\":8,\"at\":1791317388649,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"ae3e1379-19ee-451f-8ee3-bfaca80d158f\",\"host\":\"evaluation\",\"case_id\":\"nokey\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true,\"status\":\"missing_key\",\"latency_ms\":7.023,\"verdict\":null,\"confidence\":null,\"input_tokens\":null,\"output_tokens\":null,\"estimated_usd\":null,\"cost_source\":\"unknown\"}\n"
+    },
+    {
+      "scenario": "mode0644-ordinary",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/ordinary-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/mode0644-ordinary.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o644",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n"
+    },
+    {
+      "scenario": "mode0644-invalid",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/invalid-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/mode0644-invalid.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o644",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n"
+    },
+    {
+      "scenario": "mode0644-withheld",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/withheld-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/mode0644-withheld.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o644",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n"
+    },
+    {
+      "scenario": "mode0644-nokey",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/nokey-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/mode0644-nokey.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o644",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n"
+    },
+    {
+      "scenario": "healthy-full-write",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/selected-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/healthy-full-write.jsonl"
+      ],
+      "exit": 0,
+      "stdout": "mode: \"shadow\"\nobservations: 3\nscreened: 2\njudged: 2\npolicy_versions: \"1,8\"\nexcluded: 1\nattempts: 2\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0.000008400000000000001\nknown_input_tokens: 200\nknown_output_tokens: 2\np95_screen_ms: 26.452\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":2,\"risky_true_positives\":2,\"risky_recall\":1,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":2,\"would_false_block_per_screened\":0,\"labelled_unavailable\":0}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 20732.840151898148\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+      "stderr": "",
+      "mode_after": "0o600",
+      "loopback_requests": 2,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n{\"version\":1,\"policy\":8,\"at\":1791317389084,\"mode\":\"shadow\",\"event\":\"attempt\",\"id\":\"8e1ff61a-d6e3-405b-b786-f5f2b97da228\",\"host\":\"evaluation\",\"case_id\":\"first\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true}\n{\"version\":1,\"policy\":8,\"at\":1791317389108,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"8e1ff61a-d6e3-405b-b786-f5f2b97da228\",\"host\":\"evaluation\",\"case_id\":\"first\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true,\"status\":\"judged\",\"latency_ms\":26.452,\"verdict\":\"risky\",\"confidence\":0.9,\"input_tokens\":100,\"output_tokens\":1,\"estimated_usd\":0.0000042000000000000004,\"cost_source\":\"typesafe_models_input_estimate\",\"model\":\"jev-1.13.0\",\"api_ms\":23.387}\n{\"version\":1,\"policy\":8,\"at\":1791317389108,\"mode\":\"shadow\",\"event\":\"attempt\",\"id\":\"615ad7f8-6cef-49fe-b2d6-8240b7437408\",\"host\":\"evaluation\",\"case_id\":\"later\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true}\n{\"version\":1,\"policy\":8,\"at\":1791317389125,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"615ad7f8-6cef-49fe-b2d6-8240b7437408\",\"host\":\"evaluation\",\"case_id\":\"later\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true,\"status\":\"judged\",\"latency_ms\":17.479,\"verdict\":\"risky\",\"confidence\":0.9,\"input_tokens\":100,\"output_tokens\":1,\"estimated_usd\":0.0000042000000000000004,\"cost_source\":\"typesafe_models_input_estimate\",\"model\":\"jev-1.13.0\",\"api_ms\":16.974}\n"
+    },
+    {
+      "scenario": "short-attempt",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/selected-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/short-attempt.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o600",
+      "loopback_requests": 0,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n{\"version\":1,\"pol{\"version\":1,\"policy\":8,\"at\":1791317400109,\"mode\":\"shadow\",\"event\":\"result\",\"id\":\"0e5fe2d2-ed38-4ac7-af1e-965cf9e1c3b3\",\"host\":\"evaluation\",\"case_id\":\"first\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true,\"status\":\"log_unavailable\",\"latency_ms\":2.361,\"verdict\":null,\"confidence\":null,\"input_tokens\":null,\"output_tokens\":null,\"estimated_usd\":null,\"cost_source\":\"unknown\"}\n",
+      "short_write_observer": [
+        {
+          "event": "attempt",
+          "complete_bytes": 217,
+          "partial_bytes": 17
+        }
+      ]
+    },
+    {
+      "scenario": "short-result",
+      "command": [
+        "node",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-jev-guardrail.mjs",
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/selected-cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-live-g6irmznk/evaluation/short-result.jsonl"
+      ],
+      "exit": 2,
+      "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+      "stderr": "",
+      "mode_after": "0o600",
+      "loopback_requests": 1,
+      "ledger_before": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n",
+      "ledger_after_utf8": "{\"version\": 1, \"at\": 1, \"mode\": \"shadow\", \"event\": \"result\", \"id\": \"prior-record\", \"host\": \"evaluation\", \"selected\": false, \"status\": \"excluded\", \"verdict\": null}\n{\"version\":1,\"policy\":8,\"at\":1791317400224,\"mode\":\"shadow\",\"event\":\"attempt\",\"id\":\"9b71e62e-60b9-47ac-925c-817dcfc16a39\",\"host\":\"evaluation\",\"case_id\":\"first\",\"expected\":\"risky\",\"dataset\":\"synthetic\",\"selected\":true}\n{\"version\":1,\"pol",
+      "short_write_observer": [
+        {
+          "event": "result",
+          "status": "judged",
+          "complete_bytes": 451,
+          "partial_bytes": 17
+        }
+      ]
+    }
+  ]
+}

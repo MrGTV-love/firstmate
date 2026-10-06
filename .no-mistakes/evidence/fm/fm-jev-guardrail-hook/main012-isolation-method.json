@@ -1,0 +1,10 @@
+{
+  "generated_caller": "Real fm-spawn emits lab caller configuration using inert runtime acquisition backend; actual native hosts consume those artifacts, not mocked hook callbacks.",
+  "claude_settings": "Full emitted settings retained; independent unchanged authoritative arm guard added. Control removes only screening entry. User/project settings sources disabled. HOME and CLAUDE_CONFIG_DIR restricted after proxy acquisition.",
+  "native_routes": [
+    "Repository fm-teamclaude-launch.sh --exec env scoped client: preflight passed, native returned authentication_failed; retained as unsuccessful attempt.",
+    "TeamClaude supported run --no-mitm with PATH Claude shim that only scopes HOME/CLAUDE_CONFIG_DIR then execs actual native Claude: being exercised; no automatic/plain fallback."
+  ],
+  "privacy": "Only synthetic lab commands and bodies; no production risk operation or real secret read. No manual auth/key/config exports. No observer records claimed as product outcome instrumentation.",
+  "genuine_jev_limit": "Authorized real calls cannot proceed without existing key supplied safely; missing_key evidence cannot substitute for genuine judgment."
+}

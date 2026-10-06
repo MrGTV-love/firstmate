@@ -1,0 +1,2 @@
+{"version":1,"policy":8,"at":1791317472171,"mode":"shadow","event":"attempt","id":"7a2aab77-3c82-4eb8-8baa-06b459f6e80d","host":"claude","selected":true}
+{"version":1,"policy":8,"at":1791317472185,"mode":"shadow","event":"result","id":"7a2aab77-3c82-4eb8-8baa-06b459f6e80d","host":"claude","selected":true,"status":"http_error","latency_ms":15.872,"verdict":null,"confidence":null,"input_tokens":null,"output_tokens":null,"estimated_usd":null,"cost_source":"unknown","model":null,"api_ms":13.519}

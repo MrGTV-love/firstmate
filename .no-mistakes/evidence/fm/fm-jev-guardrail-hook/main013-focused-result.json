@@ -1,0 +1,134 @@
+{
+  "summary": "Verified genuine native Jev judgments and advisory parity",
+  "verdict": "pass",
+  "tested_head_sha": "14c8a675f723d6badab953edcd8f0fe8d509a467",
+  "phase": "Targeted Test continuation only",
+  "root_cause": "Remaining acceptance failure was unavailable credential binding. Main013 authorized scoped extraction; no product repair needed. Disposable driver path/runtime setup errors were reproduced, corrected and preserved as setup failures.",
+  "source_changes_this_continuation": false,
+  "tested_this_continuation": [
+    "Real fm-spawn generation with inert runtime acquisition fixtures; actual emitted native configuration retained",
+    "Supported native Claude via guarded TeamClaude launcher, shadow and disabled control, five exact synthetic Bash calls",
+    "Actual omp RPC with actual generated extension, XDG-isolated runtime/cache and sandbox operator-write refusal, shadow and disabled control, five exact synthetic Bash calls",
+    "Four genuine real-curl Jev screens with returned confidence/usage/API and screening latency",
+    "node jev-main013-0ykxus2e/verify.mjs: pass; public metrics output captured",
+    "Closed structural request and persisted ledger schemas, sentinel absence and owner-only mode0600 ledger placement",
+    "Process teardown check: no process references disposable lab"
+  ],
+  "not_run": "No full suite, lint, formatter, static analysis, push, PR, CI or pipeline command. Earlier targeted regression and synthetic-fault results retained rather than re-run.",
+  "scenarios": [
+    {
+      "name": "Risky selection without command execution; ordinary exclusion",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-developer-selection.json",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Control/shadow ordinary and synthetic-sensitive operation parity",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-genuine-native-acceptance.json",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Unchanged authoritative watcher denial",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-genuine-native-acceptance.json",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Native missing-key remains advisory",
+      "result": "pass",
+      "live": true,
+      "evidence": "native-omp-outcome-comparison.json; main012-continuation-claude-comparison.json",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Native injected malformed response and timeout remain advisory",
+      "result": "pass",
+      "live": true,
+      "evidence": "main012-continuation-claude-comparison.json; main012-continuation-omp-ledger.jsonl",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Owner private withholding and closed structural privacy",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-genuine-native-acceptance.json; main013-genuine-structural-requests.jsonl",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Mode0644 evaluation refuses without mutation",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-evaluation-persistence.json",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Actual short attempt write refuses request admission",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-evaluation-persistence.json; short-attempt-ledger.jsonl",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Actual short result write fails evaluation before next case",
+      "result": "pass",
+      "live": true,
+      "evidence": "live-evaluation-persistence.json; short-result-ledger.jsonl",
+      "scope": "Retained earlier same-run live evidence; not re-run in this continuation"
+    },
+    {
+      "name": "Actual generated caller owner policy/key/ledger context",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-genuine-native-acceptance.json; main012-continuation-owning-home-proof.json",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Supported current native Claude through TeamClaude",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-claude-shadow.json; main013-claude-genuine-ledger.jsonl",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Honest incomplete/synthetic metrics and separate promotion",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-retained-attempt-accounting.json; main013-claude-metrics.json; main013-omp-metrics.json",
+      "scope": "Current genuine-native continuation"
+    },
+    {
+      "name": "Genuine current native Jev returned judgments for both hosts",
+      "result": "pass",
+      "live": true,
+      "evidence": "main013-genuine-native-acceptance.json",
+      "scope": "Current genuine-native continuation"
+    }
+  ],
+  "accounting": {
+    "genuine_logical_starts": 4,
+    "genuine_returned_judgments": 4,
+    "request_body_observer_starts": 4,
+    "known_input_tokens": 1922,
+    "known_output_tokens": 166,
+    "known_estimated_usd": 8.072400000000001e-05,
+    "unknown_cost_attempts": 0,
+    "wire_limit": "One curl invocation per recorded start, -q disables ambient retry/trace. Observer records request body and dispatch, not an independent wire-level packet count."
+  },
+  "setup_failures": "main013-setup-attempts-and-isolation.json; all refused streams/stderr retained, zero provider starts on those launches",
+  "privacy": "Only authorized assignment returned into execution memory; three explicitly recorded scoped acquisitions, cleanup in finally. No credential file, env dump, auth-header capture, credential-bearing argv, whole-dotenv read/source/eval or manual other-store read. Request-body-only observer forwards actual real curl stdin/argv/fd3 without canned responses. Product ledger contains only verified closed scalar accounting fields.",
+  "limits": "Tiny synthetic-lab operation sample, genuine provider responses; not authentic September30 gold, invoice accounting or independently audited physical wire counts. Claude current screen899.279ms misses500ms promotion bar and is retained; historical p95/timeout and curlrc uncertainty retained. No 300-command/7-day or October14 promotion completion claim.",
+  "artifacts": [
+    "main013-genuine-native-acceptance.json",
+    "main013-genuine-structural-requests.jsonl",
+    "main013-claude-genuine-ledger.jsonl",
+    "main013-omp-genuine-ledger.jsonl",
+    "main013-claude-metrics.json",
+    "main013-omp-metrics.json",
+    "main013-retained-attempt-accounting.json",
+    "main013-setup-attempts-and-isolation.json"
+  ]
+}

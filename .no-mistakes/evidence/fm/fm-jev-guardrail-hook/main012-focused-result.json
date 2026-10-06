@@ -1,0 +1,118 @@
+{
+  "scope": "Assigned targeted Test continuation; no broad tests, lint, static analysis, installs, fleet operations or pipeline control.",
+  "verdict": "blocked; mandatory acceptance incomplete, not waived",
+  "scenarios": [
+    {
+      "name": "Generated Claude and omp callers retain owning-home policy, key and ledger context",
+      "result": "partial",
+      "live": true,
+      "observed": "Actual native omp control and generated-extension shadow completed identical four-command outcomes. Owner policy withholding and private owner-state ledger proven despite hostile ambient bindings.",
+      "limits": "Owner key missing so credential selection not proven; native Claude authentication refused before tool use.",
+      "evidence": "main012-generated-omp.json"
+    },
+    {
+      "name": "Supported native Claude through TeamClaude activates current shadow hook",
+      "result": "blocked",
+      "live_attempted": true,
+      "observed": "Supplied compatible TeamClaude 1.1.21-affinity.0 available and guarded launcher preflight exit0. Actual Claude2.1.292 called through guarded MITM wrapper, supported base-URL run, and normal native client binding; all returned authentication_failed before PreToolUse.",
+      "limits": "Need authorized authenticated client binding usable with lab-owned HOME/client files, without copying operator credentials, changing real settings, logging in or switching account.",
+      "evidence": [
+        "main012-native-claude-shadow.json",
+        "main012-native-claude-base-shadow.json",
+        "main012-native-claude-normal-shadow.json"
+      ]
+    },
+    {
+      "name": "Current native hooks obtain genuine Jev judgments with real usage and latency accounting",
+      "result": "blocked",
+      "live": false,
+      "observed": "No TYPESAFE_API_KEY inherited and no owning-home .env. Existing shared hook supports only those sources. No Jev attempts started.",
+      "limits": "Operator must supply existing authorized key to inherited test environment or disposable worktree-local owning home .env. Normal TeamClaude Anthropic authentication cannot supply a Jev key.",
+      "evidence": "main012-prerequisites.json"
+    }
+  ],
+  "sourceCustody": [
+    {
+      "path": "bin/fm-spawn.sh",
+      "currentSha256": "c614ebe7d6166100967037b1561a4ee12e6b4d73d55ba3f3a855d53c9f638057",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": "bin/fm-jev-guardrail.mjs",
+      "currentSha256": "0b4bb8225d82b907f9ef20a44b6b9e48052663e3432f54577daa718947318692",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": "bin/fm-env-lib.sh",
+      "currentSha256": "f5236d1f81ac97775b8cee50da1ea496bfb4431b046a8d2e21c5d81c1164589c",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": ".omp/extensions/fm-jev-guardrail.ts",
+      "currentSha256": "78fb54898e1ea6c891054b464c5edfe3045dc28942f17541b4e76c725f6024d7",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": ".omp/fm-session-overlay.yml",
+      "currentSha256": "051ac0c6fbc2d9bc67f9cf1028cd66fcc43b6f1b587cf5885aafdd8f751c6714",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": ".omp/fm-worker-overlay.yml",
+      "currentSha256": "5ed5ea34dc81f102733d630ae4b60957a94947d199adb622cf3f3b07a7359c8e",
+      "matchesRecordedOriginal": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "currentSha256": "1126f3db59f6c16be83da00a59063a4641473ae8980a3fa9226581f1b487dd2b",
+      "matchesRecordedOriginal": true
+    }
+  ],
+  "nativeOmp": {
+    "control": {
+      "elapsed_ms": 41716,
+      "reported_host_cost_usd": 0.033544000000000004,
+      "reported_host_tokens": {
+        "input": 11923,
+        "output": 541,
+        "reasoning": 0,
+        "cacheRead": 42880,
+        "cacheWrite": 0,
+        "total": 55344
+      }
+    },
+    "shadow": {
+      "elapsed_ms": 26293,
+      "reported_host_cost_usd": 0.0534644,
+      "reported_host_tokens": {
+        "input": 22423,
+        "output": 538,
+        "reasoning": 0,
+        "cacheRead": 32384,
+        "cacheWrite": 0,
+        "total": 55345
+      }
+    },
+    "screen_latencies_ms": [
+      1.86,
+      802.217,
+      31.108,
+      12.379
+    ],
+    "jev_attempts": 0,
+    "jev_returned_usage": null,
+    "jev_known_estimated_cost_usd": null,
+    "note": "Native host cost is not Jev billing. Missing-key results preserve unknown accounting, not genuine returned usage/cost. Control/shadow elapsed difference not causal overhead proof."
+  },
+  "earlierEvidence": "Previous nine live scenarios and historical/native unsuccessful attempts retained separately and unchanged. No new genuine-Jev, native-Claude tool-use, historical-quality, wire-accounting or promotion-volume claim.",
+  "repairs": "No new permanent source/test/documentation edits; missing safe credential/auth binding is an environment prerequisite, not permission to alter product safeguards.",
+  "cleanup": {
+    "removed": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-main012-native",
+    "worktree_lab_exists": false,
+    "native_process_check": "pgrep -fl <exact disposable lab path> returned exit1 with no matches after all native processes exited.",
+    "cleanup_permission_adjustment": "Only two generated read-only git-hooks fixture directories were made owner-writable for deletion; no ledger safeguard or operator file was modified.",
+    "evidence_retained_under": "/Users/charlesabrooker/.no-mistakes/evidence/01M49B0KN51DPCGNZVG2F29T2D",
+    "prior_evidence_untouched": true,
+    "permanent_edits_in_this_continuation": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "node",
+    "bin/fm-jev-guardrail.mjs",
+    "metrics",
+    "--log",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-main012-continuation-bepHE5/generated/omp/effective-state/jev-guardrail.jsonl"
+  ],
+  "exit": 0,
+  "stdout": "mode: \"shadow\"\nobservations: 4\nscreened: 3\njudged: 0\npolicy_versions: \"8\"\nexcluded: 1\nattempts: 2\nincomplete_attempts: 0\nunknown_cost_attempts: 1\nknown_estimated_usd: 0.0000042000000000000004\nknown_input_tokens: 100\nknown_output_tokens: 1\np95_screen_ms: 2155.497\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 0.0001390625\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+  "stderr": "",
+  "scope": "Synthetic malformed/timeout fixture only; usage/cost estimator arithmetic is not actual Jev billing."
+}
