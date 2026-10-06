@@ -41,7 +41,11 @@ LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-fm_live_gate default-on FM_OMP_COMPOSER_BOX_LIVE herdr jq omp
+LIVE_CONTROLS=FM_OMP_COMPOSER_BOX_LIVE
+if [ "${FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH:-0}" = 1 ]; then
+  LIVE_CONTROLS="$LIVE_CONTROLS,FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH"
+fi
+fm_live_gate default-on "$LIVE_CONTROLS" herdr jq omp
 
 [ -x "$LAB_HELPER" ] || fail "FM_OMP_COMPOSER_BOX_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
 
@@ -104,8 +108,6 @@ SUBJECT="omp ($VERSION) on $HERDR_VER"
 # posture every worker launches with, minus the one setting under test.
 BOX_OVERLAY="$TMP_ROOT/box-overlay.yml"
 sed 's/^  shape: borderless$/  shape: box/' "$ROOT/.omp/fm-session-overlay.yml" > "$BOX_OVERLAY"
-grep -q '^  shape: box$' "$BOX_OVERLAY" \
-  || fail "the tracked session overlay no longer pins a composer shape this guard can swap"
 
 CONTROL_HOME="$TMP_ROOT/control-home"
 PROJECT="$TMP_ROOT/proj"

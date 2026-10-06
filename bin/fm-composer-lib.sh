@@ -1289,8 +1289,7 @@ _fm_composer_top_is_omp_box() {  # <trimmed-top-row>
   inner=${inner%╮}
   while [ "${inner#─}" != "$inner" ]; do inner=${inner#─}; done
   fm_composer_normalize_trim_var inner
-  fm_composer_idle_matches "$inner" \
-    "${FM_COMPOSER_OMP_BOX_TOP_RE:-$FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT}" sensitive
+  fm_composer_idle_matches "$inner" "$FM_COMPOSER_OMP_BOX_TOP_RE_DEFAULT" sensitive
 }
 
 # _fm_composer_omp_box_last_row: 0 when the trimmed row is an omp box's folded
@@ -1336,15 +1335,9 @@ _fm_composer_ompbox_row_content() {  # <raw-row> <styled> <last-row-flag> -> con
 # _fm_composer_classify_ompbox: omp's box composer (rows <first-row> through
 # <last-row>, the last being the folded `╰─ … ─╯` row). Any editor text is
 # pending, never read through the shared prompt-glyph rules because omp's box
-# draws no prompt glyph, so a typed `>` or `❯` is text. The one exception is
-# omp's own empty-row hint (FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT): a styled read
-# proves it only as a strictly shorter remnant of the whole hint (the dim words
-# stripped, the bright key glyphs left), a plain read only by its position in
-# the last row, the same two proofs fm_composer_classify_content applies to
-# every other placeholder.
+# draws no prompt glyph, so a typed `>` or `❯` is text.
 _fm_composer_classify_ompbox() {  # <screen> <styled> <first-row> <last-row>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw content plain is_last hint_re hint
-  hint_re=${FM_COMPOSER_OMP_BOX_HINT_RE:-$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT}
+  local screen=$1 styled=$2 first=$3 last=$4 row raw content plain is_last hint
   row=$first
   while [ "$row" -le "$last" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
@@ -1354,13 +1347,14 @@ _fm_composer_classify_ompbox() {  # <screen> <styled> <first-row> <last-row>
     plain=$(_fm_composer_ompbox_row_content "$raw" 0 "$is_last")
     if [ -n "$content" ]; then
       hint=0
-      if [ "$is_last" = 1 ] && fm_composer_idle_matches "$plain" "$hint_re" sensitive; then
+      if [ "$is_last" = 1 ] && fm_composer_idle_matches "$plain" "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive; then
         if [ "$styled" = 1 ]; then
           if [ "${#content}" -lt "${#plain}" ]; then
             case "$plain" in *"$content"*) hint=1 ;; esac
           fi
         else
-          hint=1
+          printf 'unknown'
+          return 0
         fi
       fi
       if [ "$hint" != 1 ]; then
@@ -1735,19 +1729,14 @@ EOF
     placeholder_position=0
     case "$FM_COMPOSER_SELECTED_KIND" in
       ompbox)
-        # omp's box draws no prompt glyph, and its empty-row hint is dropped by
-        # the same two proofs the classifier applies (see
-        # _fm_composer_classify_ompbox); anything else is typed text.
         is_last=0
         [ "$row" -ne "$FM_COMPOSER_SELECTED_LAST" ] || is_last=1
         content=$(_fm_composer_ompbox_row_content "$raw" "$styled" "$is_last")
         if [ "$is_last" = 1 ] && [ -n "$content" ]; then
           omp_plain=$(_fm_composer_ompbox_row_content "$raw" 0 1)
           if fm_composer_idle_matches "$omp_plain" \
-               "${FM_COMPOSER_OMP_BOX_HINT_RE:-$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT}" sensitive; then
-            if [ "$styled" != 1 ]; then
-              content=
-            elif [ "${#content}" -lt "${#omp_plain}" ]; then
+               "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive; then
+            if [ "$styled" = 1 ] && [ "${#content}" -lt "${#omp_plain}" ]; then
               case "$omp_plain" in *"$content"*) content= ;; esac
             fi
           fi

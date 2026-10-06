@@ -568,7 +568,7 @@ omp_box_last() {  # <editor text>
 }
 
 test_matrix_omp_box_composer() {
-  local top captured typed multi hint styled_hint styled_typed
+  local top captured typed multi hint styled_hint styled_typed multi_hint
   top=$(omp_box_top)
   captured=$'⚠ Operation aborted
 
@@ -601,15 +601,24 @@ test_matrix_omp_box_composer() {
     $'transcript\n\n'"$top"$'\n'"$(omp_box_last '❯')" '' probe-absent
   assert_screen "omp box typed dash" pending "$CAPS_STYLED" \
     $'transcript\n\n'"$top"$'\n'"$(omp_box_last '─')" '' probe-absent
-  # The empty-row hint: whole-text on a plain read, `⇧⇥` remnant on a styled one
-  # (key glyphs bright, words dim italic), and the whole hint typed in full
-  # brightness stays pending because nothing proves it is ghost.
   hint=$'transcript\n\n'"$top"$'\n╰─'"$(printf '%*s' 60 '')"$'⇧⇥ to change thinking effort ─╯'
-  assert_screen "omp box hint on plain backends" empty "$CAPS_PLAIN" "$hint"
+  assert_screen "omp box unstyled hint stays ambiguous" unknown "$CAPS_PLAIN" "$hint"
+  assert_screen "omp box unstyled hint with cursor" unknown \
+    $'styled=0\ncursor=1\nidentity=1' "$hint" 3 probe-absent
   styled_hint=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m$(printf '%*s' 60 '')${ESC}[0m${ESC}[38;2;0;180;255m⇧⇥${ESC}[0m${ESC}[38;2;229;229;231m ${ESC}[0m${ESC}[3m${ESC}[38;2;107;114;128mto change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
   assert_screen "omp box styled hint" empty "$CAPS_STYLED" "$styled_hint" '' probe-absent
   styled_typed=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
   assert_screen "omp box whole hint typed bright" pending "$CAPS_STYLED" "$styled_typed" '' probe-absent
+  assert_screen "omp box hint loses proof without styling" unknown "$CAPS_PLAIN" "$styled_hint"
+  assert_screen "omp box styled hint with cursor" empty "$CAPS_TMUX" "$styled_hint" 3 probe-absent
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$hint")" = '⇧⇥ to change thinking effort' ] \
+    || fail "omp box plain extraction must preserve ambiguous hint-like text"
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled_typed")" = '⇧⇥ to change thinking effort' ] \
+    || fail "omp box styled extraction must preserve a bright typed hint"
+  multi_hint=$'transcript\n\n'"$top"$'\n│ first line │\n'"$(omp_box_last '⇧⇥ to change thinking effort')"
+  assert_screen "omp box draft precedes ambiguous last row" pending "$CAPS_PLAIN" "$multi_hint"
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$multi_hint")" = 'first line ⇧⇥ to change thinking effort' ] \
+    || fail "omp box extraction must preserve both the upper draft and ambiguous last row"
   [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled_hint")" = '' ] \
     || fail "omp box extraction must drop the empty-row hint"
   [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$typed")" = 'hello world typed text' ] \

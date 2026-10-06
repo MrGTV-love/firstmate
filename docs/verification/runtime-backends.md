@@ -1020,6 +1020,8 @@ Typed text appears in the folded row (`╰─ hello world typed text ─╯`), w
 Before the change every one of those screens classified `unknown`, because the generic box rule needs a side-bordered content row and the status text in the top border defeats its geometry proof, so `fm-control exit` and `fm-control relaunch` refused each idle worker with `composer state is 'unknown', not proven empty`.
 The classifier now recognizes the shape only when the rounded top border opens with omp's own status identity (`π` or `󰵗`, then `>` or `·`) and the box closes with a `╰─ … ─╯` row that is not a bare rule.
 Any other titled border, a busy spinner status, the ascii preset, a broken interior, or live activity below the box still reads `unknown`; a typed `>`, `❯`, or `─` reads `pending`, because omp's box draws no prompt glyph.
+The hint is proven empty only by styling: a plain capture of `⇧⇥ to change thinking effort` reads `unknown` and preserves those bytes during content extraction, because it cannot distinguish the idle hint from a typed draft.
+A styled capture drops the dim idle hint, while the same text typed in full brightness reads `pending` and remains extracted content.
 `test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
 
 The live guard that refreshes this entry launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands; it spends no tokens and is default-on wherever omp, herdr, and jq are installed, and the relaunch proof starts a real worker so it stays opt-in:
@@ -1027,6 +1029,9 @@ The live guard that refreshes this entry launches the installed omp idle with th
 ```sh
 FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
 ```
+
+Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
+Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
 
 Observed output:
 
