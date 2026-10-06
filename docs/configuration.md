@@ -304,7 +304,7 @@ The optional local, gitignored `config/supervision-host` enables a supervision h
 The host runs the supervision branch's contract on a headless engine session beside a non-Pi primary.
 [docs/supervision-host.md](supervision-host.md) defines its design, current scope, and verified engines.
 A Claude, Cursor, OpenCode, omp, Grok, or Codex primary can run the host.
-With the file present, the primary's arm owner runs the host in place of the watcher arm.
+With the file present, the primary's arm owner selects the host in place of the watcher arm, subject to the [session launch policy](#session-launch-policy-configsession-launch-policy).
 The host handles wakes on the engine while `state/.afk-contract` exists, and also while attended on a Claude or Cursor primary, whose dialog mirror is verified ([supervision-host.md](supervision-host.md#postures)).
 On that home, `/afk` launches no away daemon; see [Quiet mode](supervision-host.md#quiet-mode) for `/quiet`'s attended statement and fallback.
 The file also gates the primary's dialog-mirror hooks (`bin/fm-host-mirror.sh`), which record on a Claude or Cursor primary ([supervision-host.md](supervision-host.md#the-dialog-mirror)).
@@ -326,7 +326,7 @@ Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, 
 An unverified engine, a primary without a verified engine, or a malformed line leaves the host without an engine.
 It takes no wake, so every wake reaches main as it would without the host.
 Each away-posture wake includes a line naming the problem.
-The file is read at every wake, so a change applies at the next one without a restart.
+An active host reads the file at every wake, so an engine-selection change applies at the next one without a restart.
 
 It is local to each home and not part of secondmate inherited configuration.
 While the file exists, main's lease-checked commands also take the per-task lease lock, so a claim by the host's engine cannot race a mutation main already started (`bin/fm-lease-lib.sh`).

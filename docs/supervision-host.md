@@ -20,9 +20,9 @@ An arm owner is the component in each primary harness that starts watcher cycles
 
 ## Scope today
 
-The host is opt-in per home through `config/supervision-host`; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the file.
+The host is opt-in per home through `config/supervision-host`; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the file, and the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) governs activation.
 Without the file every home behaves exactly as it does without the host.
-Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
+When activation is permitted, it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
 
 ### Behavior by posture and harness
 
@@ -47,7 +47,7 @@ Until they land, their current behavior stays as described in their own owners.
 | Component | Owner | Role |
 |---|---|---|
 | The loop | `bin/fm-supervision-host.sh` | Its header owns the per-close order, the park boundary, ownership checks, predecessor cleanup, state files, and tunables. |
-| The arm owners | Each primary's existing arm owner | Runs the host for an opted-in home and delivers a handed-back wake to main; see [Arm owners](#arm-owners). |
+| The arm owners | Each primary's existing arm owner | Selects the host for an opted-in home and delivers a handed-back wake to main; see [Arm owners](#arm-owners). |
 | The engine | `bin/fm-supervision-engine-lib.sh` | Owns the opt-in parse, the verified-engine list, and one bounded engine turn, including the reap of engine tool processes that outlive it. |
 | Row eligibility and the offer rule | `bin/fm-branch-dispatch.mjs` | The command entry to `.pi/extensions/lib/fm-branch-dispatch.ts`, so the host and the Pi extension compute branch-claimable rows, their task scope, and whether the branch may take a close (`branchOfferForWake`) from one owner; it also renders the wake message with the same away-posture tail, or the dialog mirror at its head. |
 | The grant and the drain | `bin/fm-wake-grant.sh` | Publishes the branch's rows bound to the host's own process; [watcher-continuity.md](watcher-continuity.md#per-actor-acknowledgement) owns the per-actor drain and acknowledgement the engine runs. |
@@ -60,7 +60,7 @@ Until they land, their current behavior stays as described in their own owners.
 
 ### Arm owners
 
-For an opted-in home, each primary's existing arm owner runs the host in place of its watcher command.
+When host activation is permitted for an opted-in home, each primary's existing arm owner runs the host in place of its watcher command.
 The arm owner delivers a handed-back wake through the wake path that harness already trusts.
 The host's header owns the output contract they read.
 

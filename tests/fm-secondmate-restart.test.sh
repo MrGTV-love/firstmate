@@ -74,8 +74,8 @@ case "${1:-}" in
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
         /exit|/quit)
-          if [ -e "$D/remote-relaunch-start" ] && [ ! -e "$D/remote-relaunch-end" ]; then
-            : > "$D/local-relaunch-during-remote"
+          if [ ! -e "$D/remote-relaunch-end" ]; then
+            : > "$D/local-relaunch-before-remote-end"
           fi
           printf 'zsh' > "$D/command.$target"
           ;;
@@ -487,6 +487,16 @@ case "${rargs[1]:-}" in
         /bin/sleep 2
         : > "$FM_FAKE_DIR/remote-relaunch-end"
         ;;
+      coordinated-relaunch)
+        : > "$FM_FAKE_DIR/remote-relaunch-start"
+        # Wait for independent local progress, including progress before SSH started.
+        # A serial consumer reaches the bound and cannot publish the overlap marker.
+        for ((i = 0; i < 100; i++)); do
+          [ ! -e "$FM_FAKE_DIR/local-relaunch-before-remote-end" ] || break
+          /bin/sleep 0.1
+        done
+        : > "$FM_FAKE_DIR/remote-relaunch-end"
+        ;;
     esac
     printf 'relaunched %s harness=%s from=claude model=%s effort=%s backend=herdr endpoint=fm-remote:2ndmate-%s worktree=/srv/fm\n' \
       "${rargs[2]}" "${rargs[3]}" "${rargs[4]}" "${rargs[5]}" "${rargs[2]}"
@@ -692,7 +702,7 @@ test_post_stop_failure_is_reported_unreached() {
 test_relaunches_do_not_block_persist_polling() {
   local dir out rc
   dir=$(new_case relaunch-polling)
-  setup_remote_case "$dir" sm1 slow-relaunch
+  setup_remote_case "$dir" sm1 coordinated-relaunch
   add_local_mate "$dir" sm2
   printf -- '- sm2 - local domain (home: %s; scope: things; projects: p; added 2026-09-03)\n' \
     "$dir/sm2-home" >> "$dir/home/data/secondmates.md"
@@ -703,7 +713,7 @@ test_relaunches_do_not_block_persist_polling() {
   unset FM_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
-  assert_present "$dir/fake/local-relaunch-during-remote" \
+  assert_present "$dir/fake/local-relaunch-before-remote-end" \
     "the slow first relaunch blocked lifecycle progress for the second mate"
   assert_contains "$out" "summary: 2 of 2 restarted, 0 nudged, 0 unreached" \
     "parallel relaunches were not both accounted for"
