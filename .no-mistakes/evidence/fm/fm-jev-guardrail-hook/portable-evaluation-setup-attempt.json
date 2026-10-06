@@ -1,0 +1,41 @@
+{
+  "issue": "Eval runtime process.execPath is omp rather than Node; option parser refused each invocation before hook/evaluation. Corrected to PATH node. No provider calls.",
+  "attempts": [
+    {
+      "args": [
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/refused.jsonl"
+      ],
+      "status": 2,
+      "stdout": "",
+      "stderr": "Error: unknown flags: --cases, --log\nRun `omp --help` for available flags.\n"
+    },
+    {
+      "args": [
+        "hook",
+        "--host",
+        "claude",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/refused.jsonl"
+      ],
+      "status": 2,
+      "stdout": "",
+      "stderr": "Error: unknown flags: --host, --log\nRun `omp --help` for available flags.\n"
+    },
+    {
+      "args": [
+        "evaluate",
+        "--cases",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/cases.json",
+        "--log",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/healthy.jsonl"
+      ],
+      "status": 2,
+      "stdout": "",
+      "stderr": "Error: unknown flags: --cases, --log\nRun `omp --help` for available flags.\n"
+    }
+  ]
+}

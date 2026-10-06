@@ -1,0 +1,8 @@
+{
+  "head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "command": "node bin/fm-jev-guardrail.mjs evaluate --cases tests/fixtures/jev-guardrail-new-cases.json --log <disposable-private-ledger>; process-scoped missing key",
+  "status": 0,
+  "stdout": "mode: \"shadow\"\nobservations: 26\nscreened: 18\njudged: 0\npolicy_versions: \"8\"\nexcluded: 8\nattempts: 0\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0\nknown_input_tokens: 0\nknown_output_tokens: 0\np95_screen_ms: 6.699\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":16,\"risky_true_positives\":0,\"risky_recall\":0,\"labelled_routine\":10,\"would_false_block\":0,\"would_false_block_rate\":0,\"labelled_screened\":18,\"would_false_block_per_screened\":0,\"labelled_unavailable\":18}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 8.449074074074074e-7\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+  "stderr": "",
+  "scope": "Real evaluation CLI; missing-key result recording and labelled-unavailable reporting only, not model quality. No requests or risky command execution."
+}

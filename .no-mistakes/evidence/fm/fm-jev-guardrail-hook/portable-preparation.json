@@ -1,0 +1,19 @@
+{
+  "tested_head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "lab": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-native-lab",
+  "generation": "Executed only model-free actual fm-spawn using fake terminal fixture; no native, credential acquisition, tests, builds, lint or formatters executed",
+  "sourceCustody": {
+    "headEnforcedByGeneration": true,
+    "sourceBin": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-native-lab/generated/code/bin",
+    "actualSource": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D"
+  },
+  "invocations": [
+    "node jev-portable-native-lab/run-native.mjs",
+    "node jev-portable-native-lab/verify.mjs",
+    "node jev-portable-native-lab/run-faults.mjs",
+    "node jev-portable-native-lab/verify-faults.mjs"
+  ],
+  "order": "Verify genuine ledgers before adding fault rows; do not rerun genuine driver into this lab because verifier requires a single fresh replay",
+  "cleanup": "Parent owns cleanup; remove only disposable jev-portable-native-lab after preserving receipts; no operator config/data modifications",
+  "credential": "Parent run-native only: Main013 captured grep for one authorized assignment, process environment only, finally deletes variables; observer never reads stdin/header"
+}

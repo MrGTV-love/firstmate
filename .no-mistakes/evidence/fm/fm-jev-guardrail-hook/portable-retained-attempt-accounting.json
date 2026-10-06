@@ -1,0 +1,185 @@
+{
+  "tested_head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "prior_accounting_artifact": "current-r27-retained-attempt-accounting.json",
+  "prior_accounting": {
+    "prior_same_run": {
+      "prior_same_run_native_evidence": {
+        "native-omp-missing-key-jev-guardrail.jsonl": {
+          "observations": 6,
+          "logical_starts": 0,
+          "returned_judgments": 0,
+          "statuses": {
+            "excluded": 2,
+            "missing_key": 4
+          }
+        },
+        "native-omp-faults-jev-guardrail.jsonl": {
+          "observations": 6,
+          "logical_starts": 4,
+          "returned_judgments": 0,
+          "statuses": {
+            "excluded": 2,
+            "malformed_response": 3,
+            "timeout": 1
+          }
+        },
+        "main012-generated-omp-ledger.jsonl": {
+          "observations": 4,
+          "logical_starts": 0,
+          "returned_judgments": 0,
+          "statuses": {
+            "excluded": 1,
+            "missing_key": 2,
+            "withheld": 1
+          }
+        },
+        "main012-continuation-claude-ledger-all.jsonl": {
+          "observations": 25,
+          "logical_starts": 4,
+          "returned_judgments": 0,
+          "statuses": {
+            "excluded": 10,
+            "malformed_response": 1,
+            "missing_key": 6,
+            "timeout": 1,
+            "transport_error": 2,
+            "withheld": 5
+          }
+        },
+        "main012-continuation-omp-ledger.jsonl": {
+          "observations": 4,
+          "logical_starts": 2,
+          "returned_judgments": 0,
+          "statuses": {
+            "excluded": 1,
+            "malformed_response": 1,
+            "timeout": 1,
+            "withheld": 1
+          }
+        }
+      },
+      "unique_prior_native_logical_starts": 10,
+      "prior_native_genuine_jev_starts": 0,
+      "prior_native_starts_scope": "All previous same-run native starts were injected loopback/fault transports, not genuine provider evidence or invoice data",
+      "prior_native_unknown_fixture_cost_starts": 5,
+      "historical_policy_aggregate": {
+        "logical_starts": 60,
+        "returned_judgments": 59,
+        "unknown_cost_timeouts": 1,
+        "known_input_tokens": 28010,
+        "known_output_tokens": 2473,
+        "known_estimated_usd": 0.00117642,
+        "separate_injected_starts": 8,
+        "scope": "Historical submitted heads only; implicit curlrc logical/wire uncertainty retained"
+      },
+      "other_test_attempts": "R25/R26 refusal, partial-write, healthy full-write and real-curl loopback artifacts retained byte-for-byte; deliberate malformed partial ledgers not counted as complete paid/provider evidence",
+      "native_setup_attempts_this_continuation": [
+        "Claude shadow passed; two genuine screens",
+        "Claude control passed; no screens",
+        "omp fixture path wrong; no native omp start",
+        "omp shadow daemon state refused; no screen",
+        "omp control daemon state refused; no screen",
+        "omp relative-argument probe refused before startup; no screen",
+        "omp isolated-agent binding still daemon-refused; no screen",
+        "omp XDG-isolated control passed; no screen"
+      ]
+    },
+    "earlier_genuine_native": {
+      "head": "14c8a675f723d6badab953edcd8f0fe8d509a467",
+      "aggregate": {
+        "genuine_logical_starts": 4,
+        "genuine_returned_judgments": 4,
+        "request_body_observer_starts": 4,
+        "known_input_tokens": 1922,
+        "known_output_tokens": 166,
+        "known_estimated_usd": 0.00008072400000000001,
+        "unknown_cost_attempts": 0,
+        "wire_limit": "One curl invocation per recorded start, -q disables ambient retry/trace. Observer records request body and dispatch, not an independent wire-level packet count."
+      },
+      "evidence": "main013-genuine-native-acceptance.json",
+      "latency_limit": "Earlier Claude screen899.279ms retained; not reclassified as current-head observations"
+    },
+    "current_genuine_native": {
+      "head": "d2e4380c3b80be99babe3d4ec04b32b1c3007340",
+      "aggregate": {
+        "genuine_logical_starts": 4,
+        "genuine_returned_judgments": 4,
+        "request_body_observer_starts": 4,
+        "known_input_tokens": 1922,
+        "known_output_tokens": 166,
+        "known_estimated_usd": 0.00008072400000000001,
+        "unknown_cost_attempts": 0,
+        "wire_limit": "One curl invocation per recorded start, -q disables ambient retry/trace. Observer records request body and dispatch, not an independent wire-level packet count."
+      },
+      "evidence": "current-r27-genuine-native-acceptance.json"
+    },
+    "combined_same_run_genuine_native": {
+      "logical_starts": 8,
+      "returned_judgments": 8,
+      "known_input_tokens": 3844,
+      "known_output_tokens": 332,
+      "known_estimated_usd": 0.00016144800000000002,
+      "unknown_cost_attempts": 0
+    },
+    "limits": "Separate head/policy scopes; model returned input-priced estimates, not invoices. Request body observer starts are not independent physical wire audits. Historical September30 receipts remain unavailable; no gold quality/promotion-volume claim. Every earlier failed setup/synthetic attempt remains in original receipts; no data reset or promotion.",
+    "current_native_failure_modes": {
+      "synthetic_loopback_starts": 4,
+      "malformed": 2,
+      "timeouts": 2,
+      "missing_key_provider_starts": 0,
+      "unknown_fixture_cost_attempts": 2,
+      "evidence": "current-r27-native-fault-receipts.json",
+      "limits": "Synthetic fault responses and real local curl timeouts; not extra genuine provider samples or spend."
+    },
+    "current_executable_checks": {
+      "command": "env TMPDIR=\"$PWD/jev-current-native-lab/tmp\" bash bin/fm-test-run.sh --jobs 1 tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh tests/fm-turnend-guard.test.sh",
+      "exit": 0,
+      "scope": "Targeted subjects only; transport and persistence fixtures are not genuine provider or native judgments",
+      "evidence": "current-r27-focused-regressions.json"
+    }
+  },
+  "current_genuine_native": {
+    "genuine_logical_starts": 4,
+    "genuine_returned_judgments": 4,
+    "request_body_observer_starts": 4,
+    "known_input_tokens": 1922,
+    "known_output_tokens": 166,
+    "known_estimated_usd": 0.00008072400000000001,
+    "unknown_cost_attempts": 0,
+    "wire_limit": "One curl invocation per recorded start, -q disables ambient retry/trace. Observer records request body and dispatch, not an independent wire-level packet count."
+  },
+  "current_synthetic_faults": {
+    "loopback_physical_requests": 4,
+    "logical_attempts": 4,
+    "statuses": {
+      "excluded": 8,
+      "missing_key": 4,
+      "withheld": 4,
+      "malformed_response": 2,
+      "timeout": 2
+    },
+    "usage_cost_scope": "Synthetic malformed response contains no usage; timeout has no response. These 4 unknown-cost fixture attempts are not genuine provider billing."
+  },
+  "combined_same_run_genuine_native": {
+    "logical_starts": 12,
+    "returned_judgments": 12,
+    "known_input_tokens": 5766,
+    "known_output_tokens": 498,
+    "known_estimated_usd": 0.00024217200000000003,
+    "unknown_cost_attempts": 0
+  },
+  "current_setup_attempts": [
+    "Model-free generation passed for both callers",
+    "Eight native model turns across control, genuine shadow, missing-key and loopback faults passed; four real Jev responses",
+    "Disposable manual CLI initially invoked omp runtime instead of node; refused before hooks and fixed with PATH node",
+    "Manual observer initially expected empty evaluation-error stdout; adjusted to explicit intended error, without another request or product invocation"
+  ],
+  "limits": "All previous receipts retained, including historical print/RPC/daemon/setup failures, logical/wire uncertainty and timeout. Current request-body observer is not packet-count proof. Historical September30 receipts absent; synthetic labels are not gold. No promotion, automatic blocking or 300-command/7-day proof.",
+  "verification_commands": [
+    "bash bin/fm-test-run.sh --jobs 1 tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh tests/fm-arm-pretool-check.test.sh tests/fm-cd-pretool-check.test.sh",
+    "R27 targeted executable consumers (two functions only)",
+    "node jev-portable-native-lab/run-native.mjs && node jev-portable-native-lab/verify.mjs",
+    "node jev-portable-native-lab/run-faults.mjs && node jev-portable-native-lab/verify-faults.mjs",
+    "Manual actual evaluate/hook/metrics CLI in disposable homes"
+  ]
+}

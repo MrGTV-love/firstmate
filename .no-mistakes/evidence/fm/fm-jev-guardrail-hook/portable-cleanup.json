@@ -1,0 +1,16 @@
+{
+  "tested_head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "removed_disposable_paths": [
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-native-lab",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-test-tmp",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/tests/jev-portable-compatibility-smoke.test.sh",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-developer-lab"
+  ],
+  "evidence_retained": true,
+  "permanent_source_test_changes": "None",
+  "cleanup_observation": "Generated fixture git-hooks directories were read-only; made only those two disposable directories writable to delete. No ledger safeguards changed.",
+  "native_lifecycle": "All eight bounded native CLI subprocesses exited successfully; no captain/Herdr/default tmux lifecycle operated",
+  "operator_write_boundary": "Sandbox refuses operator-home writes; authorized single-assignment key acquired process-only and removed in finally. No credential/settings file copies.",
+  "earlier_receipts": "Retained unchanged, including historical/synthetic/setup failures; not relabelled as current head"
+}

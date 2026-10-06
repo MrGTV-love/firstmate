@@ -1,0 +1,31 @@
+{
+  "head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "runs": [
+    {
+      "host": "claude",
+      "mode": "control",
+      "code": 0,
+      "elapsed_ms": 28062
+    },
+    {
+      "host": "omp",
+      "mode": "control",
+      "code": 0,
+      "elapsed_ms": 24407
+    },
+    {
+      "host": "claude",
+      "mode": "shadow",
+      "code": 0,
+      "elapsed_ms": 22595
+    },
+    {
+      "host": "omp",
+      "mode": "shadow",
+      "code": 0,
+      "elapsed_ms": 25561
+    }
+  ],
+  "credential_route": "Only authorized assignment captured once directly inside execution process; no key file/argv/header capture; native children inherit process environment; references removed in finally",
+  "prior_receipts": "All main012/main013 and earlier setup/synthetic/provider receipts retained unchanged"
+}

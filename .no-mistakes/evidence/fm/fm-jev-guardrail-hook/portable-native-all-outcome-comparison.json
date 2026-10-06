@@ -1,0 +1,227 @@
+{
+  "tested_head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "verdict": "pass",
+  "scope": "Actual native outcomes match control, genuine shadow, missing-key and synthetic loopback fault modes. Loopback faults are not genuine provider or billing evidence.",
+  "hosts": {
+    "claude": {
+      "control": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow-missing-key": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow-faults": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ]
+    },
+    "omp": {
+      "control": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow-missing-key": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ],
+      "shadow-faults": [
+        {
+          "command": "cat ordinary.txt",
+          "error": false,
+          "outcome": "ordinary-success"
+        },
+        {
+          "command": "cat .env.allowed",
+          "error": false,
+          "outcome": "synthetic-read-success"
+        },
+        {
+          "command": "rm ./missing-local.txt",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "cat .env.owner-private",
+          "error": true,
+          "outcome": "missing-file"
+        },
+        {
+          "command": "bin/fm-watch.sh",
+          "error": true,
+          "outcome": "authoritative-denial"
+        }
+      ]
+    }
+  }
+}

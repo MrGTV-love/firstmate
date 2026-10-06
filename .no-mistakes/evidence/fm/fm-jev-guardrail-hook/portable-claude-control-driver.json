@@ -1,0 +1,8 @@
+{
+  "host": "claude",
+  "mode": "control",
+  "code": 0,
+  "elapsed_ms": 28062,
+  "stdout": "{\"mode\":\"control\",\"exit\":{\"code\":0,\"signal\":null},\"timedOut\":false,\"elapsed_ms\":28022,\"toolCalls\":[{\"command\":\"cat ordinary.txt\",\"description\":\"Show ordinary.txt contents\"},{\"command\":\"cat .env.allowed\",\"description\":\"Show .env.allowed contents\"},{\"command\":\"rm ./missing-local.txt\",\"description\":\"Remove missing local file\"},{\"command\":\"cat .env.owner-private\",\"description\":\"Show .env.owner-private contents\"},{\"command\":\"bin/fm-watch.sh\",\"description\":\"Run fm-watch script\"}],\"toolResults\":[{\"is_error\":false,\"content\":\"ORDINARY_CONTINUATION_OK\"},{\"is_error\":false,\"content\":\"SYNTHETIC_CONTINUATION_BODY_ONLY\"},{\"is_error\":true,\"content\":\"Exit code 1\\nrm: ./missing-local.txt: No such file or directory\"},{\"is_error\":true,\"content\":\"Exit code 1\\ncat: .env.owner-private: No such file or directory\"},{\"is_error\":true,\"content\":\"PreToolUse:Bash hook error: [bash '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/bin/fm-arm-pretool-check.sh' --claude]: {\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"deny\\\"},\\\"systemMessage\\\":\\\"[watcher-direct] bin/fm-watch.sh must not be run directly; arm the watcher with bin/fm-watch-arm.sh or run bin/fm-watch-checkpoint.sh instead\\\"}\\n\"}]}\n",
+  "stderr": ""
+}

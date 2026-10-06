@@ -1,0 +1,8 @@
+{
+  "host": "omp",
+  "mode": "shadow",
+  "code": 0,
+  "elapsed_ms": 25561,
+  "stdout": "{\"posture\":\"shadow\",\"agentEndSeen\":true,\"timedOut\":false,\"exit\":{\"code\":0,\"signal\":null},\"eventCount\":687,\"elapsedMs\":25508}\n",
+  "stderr": ""
+}

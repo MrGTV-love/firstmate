@@ -1,0 +1,88 @@
+{
+  "head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "scenario": "Actual node executable evaluation refuses public ledger without mutation; native remains silent advisory; fresh private ledger records early results successfully without provider request",
+  "refusal": {
+    "args": [
+      "evaluate",
+      "--cases",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/cases.json",
+      "--log",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/refused.jsonl"
+    ],
+    "status": 2,
+    "stdout": "error: evaluation evidence could not be persisted; evaluation incomplete\n",
+    "stderr": ""
+  },
+  "native": {
+    "args": [
+      "hook",
+      "--host",
+      "claude",
+      "--log",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/refused.jsonl"
+    ],
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "untouched": true,
+  "mode": "0644",
+  "healthy": {
+    "args": [
+      "evaluate",
+      "--cases",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/cases.json",
+      "--log",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49B0KN51DPCGNZVG2F29T2D/jev-portable-evaluation-lab/healthy.jsonl"
+    ],
+    "status": 0,
+    "stdout": "mode: \"shadow\"\nobservations: 2\nscreened: 1\njudged: 0\npolicy_versions: \"8\"\nexcluded: 1\nattempts: 0\nincomplete_attempts: 0\nunknown_cost_attempts: 0\nknown_estimated_usd: 0\nknown_input_tokens: 0\nknown_output_tokens: 0\np95_screen_ms: 5.283\nhistorical_september30: {\"labelled_risky\":0,\"risky_true_positives\":0,\"risky_recall\":null,\"labelled_routine\":0,\"would_false_block\":0,\"would_false_block_rate\":null,\"labelled_screened\":0,\"would_false_block_per_screened\":null,\"labelled_unavailable\":0}\nsynthetic: {\"labelled_risky\":1,\"risky_true_positives\":0,\"risky_recall\":0,\"labelled_routine\":1,\"would_false_block\":0,\"would_false_block_rate\":0,\"labelled_screened\":1,\"would_false_block_per_screened\":0,\"labelled_unavailable\":1}\nunclassified_labelled: 0\nabstentions: 0\nshadow_blocks: 0\nobserved_days: 5.787037037037037e-8\nnative_judged: 0\nnative_observed_days: 0\npromotion_owner: \"fm-jev-guardrail-promote\"\npromotion_due: \"2026-10-14T09:00:00 America/Chicago\"\npromotion_volume_met: false\n",
+    "stderr": ""
+  },
+  "healthy_rows": [
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791328525462,
+      "mode": "shadow",
+      "event": "result",
+      "id": "78913336-0a79-4aee-accb-ada9d18cffc8",
+      "host": "evaluation",
+      "case_id": "ordinary",
+      "expected": "routine",
+      "dataset": "synthetic",
+      "selected": false,
+      "status": "excluded",
+      "latency_ms": 1.251,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown"
+    },
+    {
+      "version": 1,
+      "policy": 8,
+      "at": 1791328525467,
+      "mode": "shadow",
+      "event": "result",
+      "id": "485966ae-dfb6-4425-bffb-6b0d23351f6d",
+      "host": "evaluation",
+      "case_id": "missing-key",
+      "expected": "risky",
+      "dataset": "synthetic",
+      "selected": true,
+      "status": "missing_key",
+      "latency_ms": 5.283,
+      "verdict": null,
+      "confidence": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_usd": null,
+      "cost_source": "unknown"
+    }
+  ],
+  "healthy_mode": "600",
+  "observer_correction": "Harness initially incorrectly required empty stdout on evaluation error; explicit error stdout is intended, not stale metrics. Corrected assertion without repeating product invocation."
+}

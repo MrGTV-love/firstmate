@@ -1,0 +1,8 @@
+{
+  "head": "4467ea600ab64362423e14c94aaeebabec53e23e",
+  "command": "bash bin/fm-test-run.sh --jobs 1 tests/jev-portable-compatibility-smoke.test.sh (two existing R27 functions only)",
+  "status": 0,
+  "elapsed_ms": 18436,
+  "stdout": "FM_TEST_BEGIN 2026-10-06T23:14:27Z tests/jev-portable-compatibility-smoke.test.sh family=unclassified expected_gate_skip=none\nwarning: re-init: ignored --initial-branch=main\nok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion\nwarning: re-init: ignored --initial-branch=main\nok - Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained\nFM_TEST_END 2026-10-06T23:14:45Z tests/jev-portable-compatibility-smoke.test.sh exit=0 duration_ms=17667 gate_skip=false\nFM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=18147\nFM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=17667 failed=0\nFM_TEST_SLOWEST rank=1 script=tests/jev-portable-compatibility-smoke.test.sh duration_ms=17667\n",
+  "stderr": ""
+}
