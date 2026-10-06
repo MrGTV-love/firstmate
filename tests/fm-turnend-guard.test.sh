@@ -882,72 +882,247 @@ test_grok_adapter_missing_jq_and_no_supervision_allow() {
 # watcher, and wedged the Grok turn for its declared 28800-second timeout.
 # Every tracked Claude entry must be inert under Grok's compatibility loading;
 # docs/turnend-guard.md owns the supervision and mirror applicability boundary.
-test_tracked_claude_entries_inert_under_grok() {
-  local dir cmd script target guarded=0
+claude_config_hook_behavior() {
+  local mode=$1 dir task home
   command -v jq >/dev/null 2>&1 || fail "test host must provide jq"
-  dir="$TMP_ROOT/claude-entries-grok-inert"
-  mkdir -p "$dir/bin"
-  for script in fm-turnend-guard.sh fm-claude-stop-autoarm.sh fm-sessionstart-run.sh \
-    fm-arm-pretool-check.sh fm-cd-pretool-check.sh fm-host-mirror.sh; do
-    printf '#!/usr/bin/env bash\nprintf ran >> %q\n' "$dir/invoked" > "$dir/bin/$script"
-    chmod +x "$dir/bin/$script"
+  command -v node >/dev/null 2>&1 || fail "test host must provide node"
+  dir=$(make_primary_dir "$TMP_ROOT/claude-config-$mode")
+  task=$(make_crewmate_worktree_dir "$dir" "$TMP_ROOT/claude-config-$mode-task")
+  cp -R "$ROOT/bin/." "$dir/bin/"
+  cp -R "$ROOT/bin/." "$task/bin/"
+  mkdir -p "$dir/config" "$task/config" "$dir/pane-home" "$task/pane-home" "$dir/fakebin"
+  ln -s /bin/bash "$dir/fakebin/claude"
+  for home in "$dir" "$task"; do
+    cat > "$home/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
+exit 1
+SH
+    chmod +x "$home/bin/fm-watch-arm.sh"
   done
-
-  # Runs one tracked command string and reports whether it reached its script.
-  ran_under() {
-    rm -f "$dir/invoked"
-    env "$@" CLAUDE_PROJECT_DIR="$dir" bash -c "$cmd" </dev/null >/dev/null 2>&1
-    [ -e "$dir/invoked" ]
+  "$dir/fakebin/claude" -c 'node - "$@" "$$"; status=$?; exit "$status"' _ \
+    "$mode" "$ROOT/.claude/settings.json" "$dir" "$task" <<'JS' \
+    || fail "tracked Claude configuration failed its $mode behavioral contract"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const [mode, settingsPath, primary, task, owner] = process.argv.slice(2);
+const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+const contracts = {
+  'fm-sessionstart-run.sh': ['SessionStart'],
+  'fm-arm-pretool-check.sh': ['PreToolUse'],
+  'fm-cd-pretool-check.sh': ['PreToolUse'],
+  'fm-jev-guardrail.mjs': ['PreToolUse'],
+  'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
+  'fm-turnend-guard.sh': ['Stop'],
+  'fm-claude-stop-autoarm.sh': ['Stop'],
+};
+const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
+  groups.flatMap(group => {
+    const matcher = new RegExp(!group.matcher || group.matcher === '*' ? '.*' : group.matcher);
+    return group.hooks.map(hook => {
+      assert.equal(hook.type, 'command', `unknown hook type in ${event}`);
+      assert.equal(typeof hook.command, 'string');
+      const targets = Object.keys(contracts).filter(name => hook.command.includes(`/bin/${name}`));
+      assert.equal(targets.length, 1, `unknown hook behavioral contract: ${hook.command}`);
+      const target = targets[0];
+      assert.ok(contracts[target].includes(event), `${target} registered for unexpected ${event}`);
+      return { event, matcher, command: hook.command, target };
+    });
+  }));
+for (const [target, events] of Object.entries(contracts)) {
+  for (const event of events) assert.ok(registrations.some(r => r.target === target && r.event === event),
+    `${event} lost the ${target} behavioral contract`);
+}
+const statePath = (home, name) => path.join(home, 'state', name);
+const rows = (home, name) => fs.existsSync(statePath(home, name))
+  ? fs.readFileSync(statePath(home, name), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+function reset(home, target, ordinary = false) {
+  fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
+  fs.mkdirSync(path.join(home, 'state'));
+  fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
+  if (target === 'fm-host-mirror.sh' || target === 'fm-claude-stop-autoarm.sh') {
+    fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
+  if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
+  if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
+    fs.writeFileSync(statePath(home, 'task1.meta'), '');
+  }
+}
+function snapshot(home) {
+  return fs.readdirSync(path.join(home, 'state')).sort().map(name =>
+    [name, fs.readFileSync(statePath(home, name), 'utf8')]);
+}
+function invoke(registration, home, context, payload) {
+  const env = {
+    PATH: process.env.PATH,
+    HOME: path.join(home, 'pane-home'), XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
+    XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
+    FM_HOME: home, FM_CONFIG_OVERRIDE: path.join(home, 'config'), FM_STATE_OVERRIDE: path.join(home, 'state'),
+    CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+    FM_CLAUDE_AUTOARM_SYNC_WAIT_MS: '100', FM_CLAUDE_AUTOARM_ATTEMPTS: '1',
+  };
+  if (home === task || context === 'task-marker') env.FM_TASK_ID = 'config-consumer-task';
+  if (context === 'modern') Object.assign(env, {
+    GROK_HOOK_EVENT: registration.event, GROK_HOOK_NAME: 'project/settings:configured',
+    GROK_SESSION_ID: 'config-consumer-grok', GROK_WORKSPACE_ROOT: home,
+  });
+  if (context === 'legacy') env.GROK_AGENT = '1';
+  if (context === 'session-metadata') env.GROK_SESSION_ID = 'native-session-metadata';
+  const result = spawnSync('/bin/bash', ['-c', registration.command], {
+    cwd: home, env, input: JSON.stringify(payload), encoding: 'utf8', timeout: 15000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.signal, null, `${registration.target} did not settle`);
+  return result;
+}
+function silent(result, label) {
+  assert.equal(result.status, 0, `${label}: ${result.stderr}`);
+  assert.equal(result.stdout, '', `${label}: unexpected stdout`);
+  assert.equal(result.stderr, '', `${label}: unexpected stderr`);
+}
+function deny(result, label) {
+  assert.equal(result.status, 2, `${label}: violation allowed`);
+  assert.equal(result.stdout, '', `${label}: unexpected stdout`);
+  const output = JSON.parse(result.stderr);
+  assert.equal(output.hookSpecificOutput.hookEventName, 'PreToolUse');
+  assert.equal(output.hookSpecificOutput.permissionDecision, 'deny');
+  assert.ok(output.systemMessage, `${label}: deny has no reason`);
+}
+function payloadFor(registration, tool = 'Bash', ordinary = false) {
+  const payload = { hook_event_name: registration.event, source: 'resume', stop_hook_active: false,
+    prompt_id: 'config-consumer', prompt: 'Please watch the fleet.',
+    last_assistant_message: 'The fleet is being watched.', tool_name: tool,
+    tool_input: tool === 'Read' ? { file_path: 'README.md' } : { command: 'cat README.md' } };
+  if (!ordinary && registration.target === 'fm-arm-pretool-check.sh') payload.tool_input.command = 'bin/fm-watch-arm.sh &';
+  if (!ordinary && registration.target === 'fm-cd-pretool-check.sh') payload.tool_input.command = 'cd projects/example';
+  return payload;
+}
+if (mode === 'contexts') {
+  for (const registration of registrations) {
+    const tools = registration.target === 'fm-jev-guardrail.mjs' ? ['Bash', 'Read'] : ['Bash'];
+    for (const tool of tools) {
+      if (registration.event === 'PreToolUse') assert.ok(registration.matcher.test(tool), `${registration.target} lost ${tool}`);
+      for (const home of [primary, task]) {
+        for (const context of ['native', 'modern', 'legacy', 'session-metadata']) {
+          reset(home, registration.target);
+          const before = snapshot(home);
+          const result = invoke(registration, home, context, payloadFor(registration, tool));
+          const label = `${registration.event}/${registration.target}/${tool}/${home === task ? 'task' : 'primary'}/${context}`;
+          if (context === 'modern' || context === 'legacy') {
+            silent(result, label);
+            assert.deepEqual(snapshot(home), before, `${label}: excluded hook changed state`);
+          } else if (home === task && registration.target !== 'fm-arm-pretool-check.sh') {
+            silent(result, label);
+            assert.deepEqual(snapshot(home), before, `${label}: primary hook changed task state`);
+          } else {
+            switch (registration.target) {
+              case 'fm-sessionstart-run.sh':
+                assert.equal(result.status, 0, label);
+                assert.equal(result.stderr, '', label);
+                assert.ok(result.stdout.includes('bin/fm-session-start.sh'), `${label}: no startup instruction`);
+                break;
+              case 'fm-arm-pretool-check.sh':
+              case 'fm-cd-pretool-check.sh':
+                deny(result, label);
+                break;
+              case 'fm-jev-guardrail.mjs': {
+                silent(result, label);
+                const records = rows(home, 'jev-guardrail.jsonl');
+                assert.equal(records.length, 1, `${label}: duplicate or missing screening result`);
+                assert.equal(records[0].event, 'result');
+                assert.equal(records[0].status, 'excluded');
+                assert.equal(records[0].host, 'claude');
+                assert.equal(records[0].selected, false);
+                break;
+              }
+              case 'fm-host-mirror.sh':
+                silent(result, label);
+                assert.deepEqual(rows(home, '.host-mirror.jsonl').map(row => [row.tag, row.text]),
+                  [[registration.event === 'Stop' ? 'main' : 'captain',
+                    registration.event === 'Stop' ? 'The fleet is being watched.' : 'Please watch the fleet.']], label);
+                break;
+              case 'fm-turnend-guard.sh':
+                assert.equal(result.status, 2, label);
+                assert.ok(result.stderr.includes('TURN WOULD END BLIND'), `${label}: no supervision refusal`);
+                assert.ok(fs.existsSync(statePath(home, '.turnend-claude-blocks')), `${label}: no block receipt`);
+                break;
+              case 'fm-claude-stop-autoarm.sh':
+                assert.equal(result.status, 2, label);
+                assert.ok(result.stderr.includes('watcher auto-arm FAILED'), `${label}: no bounded arm failure`);
+                assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
+                assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
+                break;
+              default: assert.fail(`unhandled hook: ${registration.target}`);
+            }
+          }
+        }
+      }
+    }
+    if (['fm-arm-pretool-check.sh', 'fm-cd-pretool-check.sh', 'fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(registration.target)) {
+      reset(primary, registration.target, true);
+      const before = snapshot(primary);
+      silent(invoke(registration, primary, 'native', payloadFor(registration, 'Bash', true)), `${registration.target}/ordinary`);
+      assert.deepEqual(snapshot(primary), before, `${registration.target}: ordinary hook changed state`);
+    }
+    if (registration.target === 'fm-jev-guardrail.mjs') {
+      for (const tool of tools) {
+        reset(primary, registration.target);
+        silent(invoke(registration, primary, 'task-marker', payloadFor(registration, tool)), `Jev/${tool}/task-marker`);
+        assert.deepEqual(snapshot(primary), [], `Jev/${tool}: task marker did not exclude tracked screening`);
+      }
+    }
+  }
+} else if (mode === 'tools') {
+  assert.deepEqual(settings.permissions?.deny ?? [], [], 'tracked permissions deny helper/session tools');
+  const pretool = registrations.filter(r => r.event === 'PreToolUse');
+  const helpers = ['Agent', 'Monitor', 'TaskCreate', 'ScheduleWakeup', 'SendMessage', 'Workflow'];
+  const tools = ['Bash', 'Read', ...helpers, 'Edit', 'Write', 'Glob', 'Grep', 'WebFetch', 'WebSearch',
+    'Skill', 'NotebookEdit', 'MultiEdit', 'ExitPlanMode', 'EnterPlanMode', 'Task', 'TaskOutput', 'TaskStop'];
+  for (const registration of pretool) {
+    const expected = registration.target === 'fm-jev-guardrail.mjs' ? ['Bash', 'Read'] : ['Bash'];
+    assert.deepEqual(tools.filter(tool => registration.matcher.test(tool)), expected,
+      `${registration.target}: matcher intercepts a tool outside its exact surface`);
+  }
+  for (const tool of helpers) assert.ok(!pretool.some(r => r.matcher.test(tool)), `${tool} intercepted`);
+  for (const [tool, command] of [['Bash', 'cat README.md'], ['Read', null],
+    ['Bash', 'bin/fm-watch-arm.sh &'], ['Bash', 'cd projects/example']]) {
+    reset(primary, '', true);
+    const deniers = [];
+    for (const registration of pretool.filter(r => r.matcher.test(tool))) {
+      const payload = payloadFor(registration, tool, true);
+      if (command !== null) payload.tool_input.command = command;
+      const result = invoke(registration, primary, 'native', payload);
+      const expectedDeny = command === 'bin/fm-watch-arm.sh &' && registration.target === 'fm-arm-pretool-check.sh'
+        || command === 'cd projects/example' && registration.target === 'fm-cd-pretool-check.sh';
+      if (expectedDeny) {
+        deny(result, `${registration.target}/${command}`);
+        deniers.push(registration.target);
+      } else silent(result, `${registration.target}/${command}`);
+    }
+    assert.deepEqual(deniers, command === null || command === 'cat README.md' ? []
+      : [command === 'cd projects/example' ? 'fm-cd-pretool-check.sh' : 'fm-arm-pretool-check.sh'],
+      `${tool}/${command}: missing, duplicated, or crossed Bash authorization`);
+    const records = rows(primary, 'jev-guardrail.jsonl');
+    assert.ok(records.every(row => row.event === 'result'), 'credential-free screening attempted transport');
+    if (command === null || command === 'cat README.md') {
+      assert.deepEqual(records.map(row => [row.host, row.status]), [['claude', 'excluded']],
+        `${tool}: ordinary tool must produce one advisory excluded result`);
+    }
+  }
+} else assert.fail(`unknown config consumer mode: ${mode}`);
+JS
+}
 
-  while IFS= read -r cmd; do
-    [ -n "$cmd" ] || continue
-    target=$(printf '%s\n' "$cmd" | sed -n 's|.*/bin/\([a-z0-9-]*\.sh\).*|\1|p')
-    [ -n "$target" ] || fail "could not identify the target script of tracked entry: $cmd"
-
-    # Native Claude: EVERY tracked entry must still reach its script, or a guard
-    # has silently disarmed Claude's own protection.
-    ran_under -u GROK_AGENT -u GROK_HOOK_EVENT -u GROK_HOOK_NAME -u GROK_SESSION_ID \
-      -u GROK_WORKSPACE_ROOT \
-      || fail "tracked entry for $target did not run under a native Claude environment"
-
-    guarded=$((guarded + 1))
-    # grok 1.0.0 hook process: hook markers present, GROK_AGENT absent.
-    ! ran_under -u GROK_AGENT GROK_HOOK_EVENT=stop \
-      GROK_HOOK_NAME='project/settings:stop[0].hooks[0]' \
-      GROK_SESSION_ID=grok-test-session GROK_WORKSPACE_ROOT="$dir" \
-      || fail "tracked entry for $target ran under a grok 1.0.0 hook environment"
-    # grok 0.2.73 child/tool process: GROK_AGENT present, hook markers absent.
-    ! ran_under -u GROK_HOOK_EVENT -u GROK_HOOK_NAME GROK_AGENT=1 \
-      || fail "tracked entry for $target ran under a legacy GROK_AGENT environment"
-  done < <(jq -r '.hooks[][].hooks[].command' "$ROOT/.claude/settings.json")
-
-  [ "$guarded" -eq 7 ] || fail "expected 7 grok-guarded tracked entries, saw $guarded"
-  pass "tracked .claude/settings.json entries: $guarded inert under grok, all live under Claude"
+test_tracked_claude_entries_inert_under_grok() {
+  claude_config_hook_behavior contexts
+  pass "tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion"
 }
 
 test_claude_helper_tools_are_not_intercepted() {
-  local settings tool matcher matched bash_hooks=0
-  settings="$ROOT/.claude/settings.json"
-  command -v jq >/dev/null 2>&1 || fail "test host must provide jq"
-  jq -e '(.permissions.deny // []) | length == 0' "$settings" >/dev/null \
-    || fail "tracked Claude settings must not deny helper or session tools"
-
-  for tool in Agent Monitor TaskCreate ScheduleWakeup SendMessage Workflow; do
-    matched=0
-    while IFS= read -r matcher; do
-      [[ "$tool" =~ $matcher ]] && matched=$((matched + 1))
-    done < <(jq -r '.hooks.PreToolUse[] | .matcher // "" | if . == "" or . == "*" then ".*" else . end' "$settings")
-    [ "$matched" -eq 0 ] || fail "Claude PreToolUse intercepts $tool ($matched hooks)"
-  done
-
-  while IFS= read -r matcher; do
-    [[ Bash =~ $matcher ]] && bash_hooks=$((bash_hooks + 1))
-  done < <(jq -r '.hooks.PreToolUse[] | .matcher // "" | if . == "" or . == "*" then ".*" else . end' "$settings")
-  [ "$bash_hooks" -eq 1 ] || fail "Claude Bash must retain exactly one PreToolUse matcher"
-  [ "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[]] | length' "$settings")" -eq 2 ] \
-    || fail "Claude Bash must retain both command protections"
-  pass "Claude helper and session tool calls reach their tools; Bash retains both protections"
+  claude_config_hook_behavior tools
+  pass "Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained"
 }
 
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root() {
