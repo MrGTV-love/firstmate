@@ -77,13 +77,21 @@ test_predicate_healthy_fresh_beacon() {
 
 test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
-  mkdir -p "$state"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "empty/absent wake queue must not read as pending"
-  printf 'record\n' > "$state/.wake-queue"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "a non-empty wake queue must read as pending"
-  pass "fm_supervision_status: FM_SUP_QUEUE_PENDING tracks state/.wake-queue"
+  mkdir -p "$state/procevent"
+  fm_supervision_needed "$state" 300 && fail "an empty home must not need supervision"
+  : > "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "the source must need supervision before its final capture"
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$state/.wake-queue"
+  rm "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "retiring the last source must not suppress its unread final wake"
+  [ "$FM_SUP_SOURCES" -eq 0 ] || fail "the terminal source must actually be absent"
+  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "the pending wake must not depend on a live task"
+  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "the final wake must remain pending"
+  : > "$state/.wake-queue"
+  fm_supervision_needed "$state" 300 && fail "an acknowledged last wake must release supervision need"
+  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "the cleared queue must not remain pending"
+  pass "fm_supervision_needed: a final unread wake survives source retirement and releases need after acknowledgement"
 }
 
 test_predicate_x_mode_needs_supervision() {
@@ -917,6 +925,7 @@ const contracts = {
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
+  'fm-procevent-posttool-check.sh': ['PostToolUse'],
 };
 const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
   groups.flatMap(group => {
@@ -942,17 +951,30 @@ function reset(home, target, ordinary = false) {
   fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
   fs.mkdirSync(path.join(home, 'state'));
   fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
-  if (target === 'fm-host-mirror.sh' || target === 'fm-claude-stop-autoarm.sh') {
+  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
   if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
   if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, 'task1.meta'), '');
   }
+  if (target === 'fm-procevent-posttool-check.sh') {
+    const inbox = statePath(home, 'procevent-inbox');
+    fs.mkdirSync(inbox);
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.result'), '{"answer":"continue"}\n');
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.adapter'), 'lavish\n');
+  }
 }
 function snapshot(home) {
-  return fs.readdirSync(path.join(home, 'state')).sort().map(name =>
-    [name, fs.readFileSync(statePath(home, name), 'utf8')]);
+  function entries(directory, prefix = '') {
+    return fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap(entry => {
+        const name = path.join(prefix, entry.name);
+        const filename = path.join(directory, entry.name);
+        return entry.isDirectory() ? entries(filename, name) : [[name, fs.readFileSync(filename, 'utf8')]];
+      });
+  }
+  return entries(path.join(home, 'state'));
 }
 function invoke(registration, home, context, payload) {
   const env = {
@@ -1054,6 +1076,20 @@ if (mode === 'contexts') {
                 assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
                 assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
                 break;
+              case 'fm-procevent-posttool-check.sh': {
+                assert.equal(result.status, 0, label);
+                assert.equal(result.stderr, '', label);
+                const output = JSON.parse(result.stdout);
+                assert.equal(output.hookSpecificOutput.hookEventName, 'PostToolUse', label);
+                assert.equal(output.hookSpecificOutput.additionalContext,
+                  'A captured Lavish result is waiting: lavish-config-consumer 1. Run bin/fm-wake-drain.sh now. '
+                  + 'If the drain has no row for this result, read it directly with bin/fm-procevent-lavish.sh read '
+                  + `'${statePath(home, 'procevent-inbox/lavish-config-consumer.1.result')}'. `
+                  + 'Handle the result, then acknowledge it with bin/fm-procevent.sh handled lavish-config-consumer 1 before continuing.',
+                  label);
+                assert.deepEqual(snapshot(home), before, `${label}: notification changed pending state`);
+                break;
+              }
               default: assert.fail(`unhandled hook: ${registration.target}`);
             }
           }
