@@ -314,8 +314,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   kill -0 "$A_SPAWN_PID" 2>/dev/null || fail "contention A cleanup returned before B released the presentation lock: $(cat "$A_OUT")"
   kill -0 "$B_SPAWN_PID" 2>/dev/null || fail "contention B exited while its acquisition was blocked: $(cat "$B_OUT")"
   [ "$(cat "$SESSION_LOCK/pid")" = "$B_SPAWN_PID" ] || fail 'contention B lost the shared presentation lock while blocked'
-  [ -e "$A_LEASE" ] && kill -0 "$a_get_pid" 2>/dev/null || fail 'contention A lost its process lease before serialized cleanup'
-  [ -e "$B_LEASE" ] && kill -0 "$b_get_pid" 2>/dev/null || fail 'contention A cleanup ended contention B acquisition'
+  if [ ! -e "$A_LEASE" ] || ! kill -0 "$a_get_pid" 2>/dev/null; then
+    fail 'contention A lost its process lease before serialized cleanup'
+  fi
+  if [ ! -e "$B_LEASE" ] || ! kill -0 "$b_get_pid" 2>/dev/null; then
+    fail 'contention A cleanup ended contention B acquisition'
+  fi
   [ ! -e "$A_ARRIVED" ] && [ ! -e "$B_ARRIVED" ] || fail 'blocked contention acquisition entered a worktree early'
   [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$a_pane")" = present ] \
     || fail 'contention A pane disappeared before the presentation lock was released'
@@ -353,8 +357,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   [ ! -e "$A_LEASE" ] || fail 'contention A retained its process lease after cleanup'
   ! kill -0 "$a_get_pid" 2>/dev/null || fail 'contention A get survived exact-pane cleanup'
   [ ! -e "$A_ARRIVED" ] || fail 'contention A completed acquisition after its isolation refusal'
-  [ -e "$B_LEASE" ] && kill -0 "$b_get_pid" 2>/dev/null || fail 'contention A cleanup ended the successfully launched B acquisition'
-  [ -e "$protected_lease" ] && kill -0 "$protected_pid" 2>/dev/null || fail 'contention cleanup ended the previous successful acquisition'
+  if [ ! -e "$B_LEASE" ] || ! kill -0 "$b_get_pid" 2>/dev/null; then
+    fail 'contention A cleanup ended the successfully launched B acquisition'
+  fi
+  if [ ! -e "$protected_lease" ] || ! kill -0 "$protected_pid" 2>/dev/null; then
+    fail 'contention cleanup ended the previous successful acquisition'
+  fi
   for pane in "$b_pane" "$protected_pane" "$sentinel"; do
     [ "$(PATH="$FAKEBIN:$PATH" fm_backend_herdr_pane_presence_state "$HERDR_LAB_SESSION" "$pane")" = present ] \
       || fail "contention cleanup closed surviving pane $pane"
