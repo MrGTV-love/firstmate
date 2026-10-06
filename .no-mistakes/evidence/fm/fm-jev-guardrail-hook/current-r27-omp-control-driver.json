@@ -1,0 +1,8 @@
+{
+  "host": "omp",
+  "mode": "control",
+  "code": 0,
+  "elapsed_ms": 31977,
+  "stdout": "{\"posture\":\"control\",\"agentEndSeen\":true,\"timedOut\":false,\"exit\":{\"code\":0,\"signal\":null},\"eventCount\":677,\"elapsedMs\":31919}\n",
+  "stderr": ""
+}

@@ -1,0 +1,24 @@
+{
+  "head": "d2e4380c3b80be99babe3d4ec04b32b1c3007340",
+  "disposable_lab_removed": true,
+  "all_native_driver_receipts_exited": true,
+  "loopback_server_closed_in_finally": true,
+  "scoped_key_references_removed_in_finally": true,
+  "source_changes": false,
+  "setup_cleanup_observations": [
+    "Initial process snapshot exceeded default captured buffer; larger in-memory capture succeeded, no process data printed",
+    "Initial lab removal found two intentionally read-only generated git-hook directories; granted owner-write only on those disposable directories, then removed lab. No ledger safeguard changed."
+  ],
+  "evidence_retained": "All new evidence and every earlier same-run receipt retained unchanged in dedicated evidence directory",
+  "not_run": [
+    "full repository suite",
+    "linters",
+    "formatters",
+    "static analysis",
+    "Herdr lifecycle",
+    "pipeline control",
+    "push",
+    "PR",
+    "CI"
+  ]
+}

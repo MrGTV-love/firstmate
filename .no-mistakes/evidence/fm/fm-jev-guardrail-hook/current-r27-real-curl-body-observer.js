@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+const {spawn}=require('node:child_process');const fs=require('node:fs');let bytes=[];
+process.stdin.on('data',b=>bytes.push(b));process.stdin.on('end',()=>{const body=Buffer.concat(bytes);const request=JSON.parse(body);fs.appendFileSync(process.env.JEV_LAB_REQUESTS,JSON.stringify({at:Date.now(),transport:'real /usr/bin/curl; unmodified argv/stdin/fd3; no response injection',request})+'\n',{mode:0o600});const child=spawn('/usr/bin/curl',process.argv.slice(2),{stdio:['pipe',1,2,3]});child.stdin.on('error',()=>{});child.stdin.end(body);child.on('error',()=>process.exit(127));child.on('close',(code)=>process.exit(code??1));});
