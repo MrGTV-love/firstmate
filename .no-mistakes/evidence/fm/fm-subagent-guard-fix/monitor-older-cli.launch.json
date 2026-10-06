@@ -1,0 +1,14 @@
+{
+  "version": "2.1.217 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-ku1yg7dt",
+  "private_socket_directory": "/tmp/fml.DwSH6p",
+  "command": "claude -p 'Captain-approved isolated private session monitoring check, not project work. Use ToolSearch exact select:Monitor and actually invoke Monitor if available. Choose a safe one-shot local monitoring command that only prints MONITOR_PRIVATE_OK (such as printf '\"'\"'MONITOR_PRIVATE_OK\\n'\"'\"') and exits successfully; no file writes, project inspection, network requests, fleet operations, worktrees, signing in, or credential changes. Wait for its observed output or completion. If Monitor keeps running, load TaskStop and stop only your new monitor before finishing. If Monitor is unavailable, state that clearly rather than faking a tool. Do not enable FM_ALLOW_SUBAGENT. Finish MONITOR_TOOL_CHECK_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low --tools Monitor,ToolSearch,TaskStop,Bash",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}

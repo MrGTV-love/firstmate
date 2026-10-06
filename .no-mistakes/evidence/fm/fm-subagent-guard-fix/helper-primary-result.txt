@@ -1,0 +1,29 @@
+Captain, all three checks are done.
+
+**1. Helper consolidation.** I called the foreground Agent helper and waited for its result. It read all five reports, changed nothing, and found no inconsistencies: reaped plus retained equals the total in every report and in the totals row.
+
+| name | total | reaped | retained |
+|---|---|---|---|
+| alpha | 3 | 1 | 2 |
+| beta | 5 | 2 | 3 |
+| delta | 8 | 3 | 5 |
+| epsilon | 4 | 1 | 3 |
+| gamma | 2 | 0 | 2 |
+| **TOTAL** | **22** | **7** | **15** |
+
+I did not enable FM_ALLOW_SUBAGENT or any other escape hatch.
+
+**2. Tool discovery.** I looked up the five tools by exact name and invoked none of them.
+- **ScheduleWakeup:** exists. Its schema takes `delaySeconds` (number, limited to 60–3600), `noop` (boolean), `prompt` (string), `reason` (string) and `stop` (boolean). The first four are required unless `stop` is true.
+- **SendMessage:** exists. It requires `to` and `message`, and also takes optional `summary` and `notify_when_idle` (boolean).
+- **Workflow:** exists. It takes `script`, `scriptPath`, `name`, `args`, `resumeFromRunId` (pattern `^wf_…`), `description` and `title`. The last two are ignored.
+- **Monitor:** not found in this session.
+- **TaskCreate:** not found in this session.
+
+**3. Watcher seatbelt test.** I ran `bin/fm-watch-arm.sh &` exactly once. It was rejected before running, as expected, and I did not retry or work around it. The rejection:
+```
+PreToolUse:Bash hook error: [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-arm-pretool-check.sh --claude]: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or through nohup/disown"}
+```
+The hook command shown in that error begins with `[[` but closes with a single `]`. That looks malformed, though the denial itself came through correctly.
+
+LIVE_HELPER_CHECK_DONE

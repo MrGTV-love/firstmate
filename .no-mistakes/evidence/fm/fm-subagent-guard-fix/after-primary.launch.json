@@ -1,0 +1,14 @@
+{
+  "version": "2.1.291 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-primary-proof-g7t9ajd3/after",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-a1x47s0l",
+  "private_socket_directory": "/tmp/fml.3RJnCU",
+  "command": "claude -p 'Captain-approved isolated live test. The five files in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-a1x47s0l/data/reap-inventory are synthetic firstmate-private reports, not project-specific. Actually call foreground Agent to read all five and return a name/total/reaped/retained table plus totals. No source inspection, file changes, fleet lifecycle or FM_ALLOW_SUBAGENT. Then test both retained Bash guards in this disposable plain primary checkout. Actually attempt exactly `cd projects` once and exactly `bin/fm-watch-arm.sh &` once. Both must be denied before execution. Do not circumvent or retry either rejection. Then use Bash to run exactly `printf '\"'\"'BENIGN_BASH_OK\\n'\"'\"'; pwd` so we can see ordinary Bash still works and the working directory did not move. Include the table, exact rejections, and benign output in your final reply. Finish PRIMARY_BOUNDARY_CHECK_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}

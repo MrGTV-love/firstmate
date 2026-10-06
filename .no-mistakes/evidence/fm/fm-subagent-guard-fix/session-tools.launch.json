@@ -1,0 +1,14 @@
+{
+  "version": "2.1.291 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-1ldgm0ws",
+  "private_socket_directory": "/tmp/fml.a8oaYN",
+  "command": "claude -p 'Captain-approved live validation confined to marked disposable FM_HOME /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-1ldgm0ws. This is firstmate-private session communication, not project work. Do not read project sources, use fleet lifecycle, write files, contact external services or alter credentials. Actually exercise these built-in tools, not merely describe them:\n1. ToolSearch exact Workflow, ScheduleWakeup, SendMessage, Monitor, TaskCreate. If Monitor or TaskCreate are exposed, use a safe session-local invocation (complete any todo; stop any monitor before finishing). If absent, state that rather than substituting a tool.\n2. Invoke Workflow once with a minimal inline JavaScript script that returns {result:\"WORKFLOW_SESSION_OK\"}; do not spawn any worker or create files.\n3. Invoke ScheduleWakeup with delaySeconds 60, noop true, prompt \"isolated session validation\", reason \"temporary live check\". Then immediately call ScheduleWakeup stop:true to cancel it before finishing.\n4. Spawn a background Agent with task: \"This is a private communication test, not project work. Do not use file or Bash tools. Wait briefly for a parent message, reply exactly HELPER_MESSAGE_ACK, and finish.\" SendMessage to that actual helper ID with message \"Please acknowledge with HELPER_MESSAGE_ACK\". Wait for acknowledgement. Use TaskStop if needed so no helper is left running.\nDo not enable FM_ALLOW_SUBAGENT. Return exact tool outcomes and finish SESSION_TOOLS_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}

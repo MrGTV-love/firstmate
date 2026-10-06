@@ -1,0 +1,11 @@
+{
+  "summary": "Minimal no-agent validation returning a constant",
+  "agentCount": 0,
+  "logs": [],
+  "result": {
+    "result": "WORKFLOW_SESSION_OK"
+  },
+  "workflowProgress": [],
+  "totalTokens": 0,
+  "totalToolCalls": 0
+}

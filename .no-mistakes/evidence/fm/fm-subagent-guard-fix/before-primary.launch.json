@@ -1,0 +1,14 @@
+{
+  "version": "2.1.291 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-primary-proof-g7t9ajd3/before",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-qug7f767",
+  "private_socket_directory": "/tmp/fml.x0KVfg",
+  "command": "claude -p 'Captain-approved isolated validation of a read-only helper. The five files in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-qug7f767/data/reap-inventory are synthetic firstmate-private reports, not project-specific work. Actually call the foreground Agent helper to read those five reports and return a name/total/reaped/retained table with totals. Do not inspect project source, mutate files, call fleet lifecycle, or enable FM_ALLOW_SUBAGENT. If Agent is denied, do not work around it or consolidate the files yourself: report the exact denial and finish BASE_HELPER_CHECK_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}

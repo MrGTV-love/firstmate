@@ -1,0 +1,3 @@
+npm install --prefix /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-claude-tool-rribjwz9 --no-save --package-lock=false --ignore-scripts --no-audit --no-fund @anthropic-ai/claude-code@2.1.217
+
+added 2 packages in 1s

@@ -1,0 +1,14 @@
+{
+  "version": "2.1.291 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-ijhudp6_",
+  "private_socket_directory": "/tmp/fml.6TUS3J",
+  "command": "claude -p 'Isolated live capability probe only. Do not use Bash, read files, create records, or touch any services. ToolSearch separately with exact query select:Monitor and select:TaskCreate, max_results 1. If either is available state its exact schema; if absent report that. Do not invent a tool or substitute a different one. Finish TOOL_CAPABILITY_PROBE_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low --tools Bash,Read,ToolSearch,TaskCreate,Monitor",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}

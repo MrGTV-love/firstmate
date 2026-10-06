@@ -1,0 +1,14 @@
+{
+  "version": "2.1.291 (Claude Code)",
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90",
+  "lab_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M491NWG3WKRR0X7M1ME4WB90/.fm-live-cthchrym",
+  "private_socket_directory": "/tmp/fml.K1Cu5k",
+  "command": "claude -p 'Captain-approved isolated session-todo test, not project work. Use ToolSearch to load TaskCreate, TaskGet, TaskUpdate and TaskList. Actually call TaskCreate to create one session-local item subject \"Isolated helper availability probe\" description \"Disposable private session check; no project work\". Use TaskGet on the returned id to confirm subject, then TaskUpdate status completed and TaskGet to confirm completed. Finally TaskUpdate status deleted to remove only that item. Do not use file or Bash tools, fleet lifecycle, or any external service. Report exact outcomes; finish TASK_TOOL_CHECK_DONE.' --dangerously-skip-permissions --setting-sources project --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --no-session-persistence --output-format stream-json --verbose --include-hook-events --effort low --tools ToolSearch,TaskCreate,TaskGet,TaskUpdate,TaskList",
+  "grid": "120x40",
+  "teardown": {
+    "socket_exit": 0,
+    "socket_error": "",
+    "home_removed": true,
+    "primary_status": "1 0 120x40"
+  }
+}
