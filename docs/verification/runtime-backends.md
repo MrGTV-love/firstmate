@@ -603,11 +603,7 @@ The review's cited E7, `/Users/charlesabrooker/firstmate/data/backlog.md` (`fm-j
 The missing source is the authentic September 30 blocked and allowed command inputs paired with their independently recorded decisions and dated provenance.
 Proposal narrative, subsequent native synthetic observations and reconstructed examples cannot replace that source.
 No historical placeholder rows are shipped; every row in `tests/fixtures/jev-guardrail-new-cases.json` is marked `dataset: "synthetic"`.
-New evaluation inputs require `historical_september30` or `synthetic` dataset ownership; metrics report labelled quality only in those separate objects, with no top-level quality aliases.
-Older labels without recognized dataset ownership contribute only to the top-level `unclassified_labelled` count, never dataset quality.
-The `historical_september30` object's labelled count remains zero and rates remain `null` until real historical receipts are supplied, regardless of synthetic results.
-Historical fixture labels and attempt records remain unchanged; synthetic-vs-historical quality stays separate rather than being relabelled for cohort 8.
-This evidence gap does not change the existing `fm-jev-guardrail-promote` ownership of the October 14, 09:00 America/Chicago decision or its quality, seven-day/300-command volume, latency and no-secret criteria.
+The [configuration owner](../configuration.md#jev-command-screening-shadow-only) defines evaluation dataset rules, legacy-label handling and the separate promotion boundary.
 
 ## Claude workspace trust
 

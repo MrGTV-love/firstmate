@@ -746,7 +746,7 @@ Enabled primary-session turn-end guard integrations are tracked as repo-level ho
 Kimi remains outside the primary turn-end guard integrations; [`docs/turnend-guard.md`](turnend-guard.md#compatibility-limits) owns its separate captain-approved crew wake hook.
 Primary-session watcher wake protocols are rendered at session start by [`bin/fm-supervision-instructions.sh`](../bin/fm-supervision-instructions.sh) from [`docs/supervision-protocols/`](supervision-protocols/).
 
-Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses its own two tracked `.omp/extensions/` files with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
+Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses two tracked supervision extensions under `.omp/extensions/` with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
 
 ### Choose the worker harness
 
@@ -1383,7 +1383,8 @@ Wrapper parsing preserves ordered `env -S` child arguments and literal env quoti
 Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
 SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
 Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
-Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options. Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
+Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options.
+Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
 `printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
 Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
 This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
