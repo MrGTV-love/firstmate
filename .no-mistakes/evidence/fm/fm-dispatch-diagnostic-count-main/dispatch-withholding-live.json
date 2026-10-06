@@ -1,0 +1,143 @@
+{
+  "scope": "Actual resolver CLI executed with real dependencies and disposable FM_HOME; raw stdout/stderr are retained without filtering or line-count assertions. No production credentials or fleet lifecycle used.",
+  "observation": "Separate bash -x invocation checked executed curl and quota-axi commands. Initial BASH_XTRACEFD approach was discarded because stock macOS Bash does not support it.",
+  "macOS": [
+    {
+      "name": "Private brief is withheld despite case and surrounding whitespace",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 3; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 3",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Private phrase spanning brief lines is withheld",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/wrapped-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/wrapped-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Private phrase using tab and no-break spaces is withheld",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/wrapped-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/wrapped-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Private project name is withheld",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/public-brief.md --project orion-private",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/public-brief.md --project orion-private",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Private rule criterion is withheld",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/public-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send line 1",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/public-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Inherited private list withholds dispatch from a secondmate home",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/secondmate-home/config/dispatch-never-send line 1; nothing sent)\n",
+      "expected_reason": "brief text matches /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/secondmate-home/config/dispatch-never-send line 1",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Directory at the never-send path fails closed without leaking the brief",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "expected_reason": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    },
+    {
+      "name": "Broken symlink at the never-send path fails closed without leaking the brief",
+      "result": "pass",
+      "live": true,
+      "command": "FM_HOME=<disposable home> TYPESAFE_API_KEY=<disposable sentinel> bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "expected_reason": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file",
+      "observation_command": "bash -x bin/fm-dispatch-resolve.sh .dispatch-validation/private-brief.md --project pager",
+      "observation_exit": 0,
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": []
+    }
+  ],
+  "Linux": [
+    {
+      "name": "Directory at the never-send path fails closed without leaking the brief",
+      "platform": "Linux, Bash and jq 1.7.1",
+      "result": "pass",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": [],
+      "network": "disabled for disposable container"
+    },
+    {
+      "name": "Broken symlink at the never-send path fails closed without leaking the brief",
+      "platform": "Linux, Bash and jq 1.7.1",
+      "result": "pass",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "dispatch-resolve: off (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4919CAQHJ5E6TXXT20PMCEB/.dispatch-validation/primary-home/config/dispatch-never-send is not a readable regular file; nothing sent)\n",
+      "curl_or_quota_invocations": [],
+      "sensitive_values_observed": [],
+      "network": "disabled for disposable container"
+    }
+  ],
+  "historical_failure": "The previously unlogged second Linux stderr line was not reproduced or attributed."
+}
