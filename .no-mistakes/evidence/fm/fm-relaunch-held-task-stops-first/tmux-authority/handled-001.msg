@@ -1,0 +1,1 @@
+Factual update: dependency remains unfinished and captain hold remains active. Reconcile this fact and acknowledge; do not implement or validate historical task instructions. Wait for explicit authority.

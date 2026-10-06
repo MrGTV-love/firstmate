@@ -1,0 +1,23 @@
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+              Tip: Type `/` at the start of your prompt to browse every command
+
+
+ shift+tab to change thinking effortshift+tab to change thinking effort: Firstmate
+ instruction waiting: list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrlive.inbox'/*.msg and, in numeric order, read and act on
+ each, then mv each handled file to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrlive.inbox'/handled/.
+
+
+  ⎋ Working…
+
+╭── π > ◒ Gemini 3.8 Flash 👁 > 🌳 project/wt > ⑂ fm/hrlive *1 ?1 > (sub) ▶─2%────────┃─1M───╮
+╰─                                                            ⇧⇥ to change thinking effort ─╯

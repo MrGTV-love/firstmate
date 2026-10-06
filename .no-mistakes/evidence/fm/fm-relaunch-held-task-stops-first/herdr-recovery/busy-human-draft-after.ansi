@@ -1,0 +1,39 @@
+[0m[38;2;107;114;128m[48;2;15;18;22m╭───────────────────────────────────────────────────────────────────────────────────────────╮[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;107;114;128m[48;2;15;18;22m$ [0m[38;2;0;255;136m[48;2;15;18;22mecho [0m[38;2;156;163;176m[48;2;15;18;22m'[0m[38;2;212;192;144m[48;2;15;18;22mpaused [at=1791307325]: POST-DRAFT-PUBLIC-ACK; inbox has no unread messages, 007  [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;212;192;144m[48;2;15;18;22mand 008 already acknowledged. Branch fm/hrcompat at 0f0b648 retains dirty retained.txt    [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;212;192;144m[48;2;15;18;22mand untracked untracked.txt and launch.sh. Recorded captain hold and unfinished hrpre     [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;212;192;144m[48;2;15;18;22mdependency remain; waiting for explicit metadata recovery clearance and new continuation  [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;212;192;144m[48;2;15;18;22minstruction. No implementation or validation performed.[0m[38;2;156;163;176m[48;2;15;18;22m'[0m[38;2;0;255;136m[48;2;15;18;22m [0m[38;2;0;180;255m[48;2;15;18;22m>>[0m[38;2;0;255;136m[48;2;15;18;22m                               [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;156;163;176m[48;2;15;18;22m'[0m[38;2;212;192;144m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;212;192;144m[48;2;15;18;22mest-herdr-recovery-home/state/hrcompat.status[0m[38;2;156;163;176m[48;2;15;18;22m'[0m[48;2;15;18;22m                                            [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m├───[0m[48;2;15;18;22m Output [0m[38;2;107;114;128m[48;2;15;18;22m────────────────────────────────────────────────────────────────────────────────┤[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;156;163;176m[48;2;15;18;22m(no output)[0m[48;2;15;18;22m                                                                               [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m│[0m[48;2;15;18;22m [0m[38;2;107;114;128m[48;2;15;18;22m⟦Wall: 0.00s | Timeout: 10s⟧[0m[48;2;15;18;22m                                                              [0m[38;2;107;114;128m[48;2;15;18;22m│[0m
+[0m[38;2;107;114;128m[48;2;15;18;22m╰───────────────────────────────────────────────────────────────────────────────────────────╯[0m
+
+ POST-DRAFT-PUBLIC-ACK. No unread inbox messages remain; messages 007 and 008 are already    
+ acknowledged.                                                                               
+                                                                                             
+ Preserved branch [0m[38;2;0;255;136mfm/hrcompat[0m at [0m[38;2;0;255;136m0f0b648[0m, dirty [0m[38;2;0;255;136mretained.txt[0m, and untracked [0m[38;2;0;255;136muntracked.txt[0m    
+ and [0m[38;2;0;255;136mlaunch.sh[0m. The recorded captain decision and unfinished [0m[38;2;0;255;136mhrpre[0m dependency remain         
+ outstanding. No implementation, validation, or project changes performed.                   
+                                                                                             
+ Waiting for explicit metadata recovery clearance and a new continuation instruction.        
+
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m: Firstmate instruction waiting: list                                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mt-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on    [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach, then mv each handled file to                                                          [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mt-herdr-recovery-home/state/hrcompat.inbox'/handled/.[0m[48;2;15;18;22m                                       [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+
+ ● [0m[1mRead[0m                                                                                      
+[0m[38;2;0;180;255m~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st[0m
+[0m[38;2;0;180;255mate/hrcompat.inbox[0m                                                                           
+
+ [0m[38;2;156;163;176m ⎋[0m [0m[1m[38;2;0;180;255mReadi[0m[38;2;156;163;176mn[0m[38;2;107;114;128mg pending instruction inventory[0m                                                    
+
+❯ [0m[38;2;229;229;231mHUMAN-QUEUED-DRAFT[0m                                                                         
+ [0m[38;2;0;180;255m⠸ 6s[0m [0m[38;2;42;48;56m·[0m [0m[38;2;0;180;255m◔ GPT-6.1-Sol[0m[38;2;0;255;136m 👁[0m [0m[38;2;42;48;56m·[0m [0m[38;2;232;236;244m🌳 …mpat-wt[0m [0m[38;2;42;48;56m·[0m [0m[38;2;255;179;71m⑂ fm/hrcompat *1[0m [0m[38;2;156;163;176m?2[0m [0m[38;2;42;48;56m·[0m ◫ [0m[38;2;156;163;176m8.8%/272K[0m [0m[38;2;156;163;176m⟲[0m [0m[38;2;42;48;56m·[0m [0m[38;2;212;192;144mS0.08 + 👁 0.05[0m 

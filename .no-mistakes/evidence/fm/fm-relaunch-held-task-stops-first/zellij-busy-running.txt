@@ -1,0 +1,30 @@
+ New version 18.6.3 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Reply exactly ZELLIJ_WRAPPED_ACK_09. This is a real wrapped composer regression check with a long payload; preserve each word rather than
+ treating the UI shortcut as human input. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The
+ quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The
+ quick brown fox checks terminal wrapping. Reply only ZELLIJ_WRAPPED_ACK_09.
+
+
+ • Read (3)
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/home/state
+   └─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/home/state/zellijfresh.inbox/001.msg
+
+ ZELLIJ_WRAPPED_ACK_09
+
+
+ Runtime busy protection check: use your bash tool to run sleep 15; after it finishes reply exactly ZELLIJ_BUSY_DONE_10. Do not run any
+ other command.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 15                                                                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Perform requested busy protection delay
+
+❯
+ ⠧ 7s · ◔ GPT-6.1-Sol 👁 · 🌳 32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6 · ⑂ detached ?5 · ◫ 4.7%/272K ⟲ · S0.03 + 👁 0.04           🆔 01a1123c

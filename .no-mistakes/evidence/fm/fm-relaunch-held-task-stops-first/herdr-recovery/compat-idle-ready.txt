@@ -1,0 +1,31 @@
+
+╭─── omp v18.4.10 ────────────────────────────────────────────────────────────────────────╮
+│                          │ Tips                                                         │
+│      Welcome back!       │ # for prompt actions                                         │
+│                          │ / for commands                                               │
+│       ████████████       │ ! to run bash                                                │
+│          ██  ██          │ $ to run python                                              │
+│          ██  ██          │ ──────────────────────────────────────────────────────────── │
+│          ▒▒  ██          │ LSP Servers                                                  │
+│              ██          │ No LSP servers                                               │
+│                          │                                                              │
+│       GPT-6.1-Sol        │                                                              │
+│       openai-codex       │                                                              │
+│                          │ ──────────────────────────────────────────────────────────── │
+│                          │ Recent sessions                                              │
+│                          │ No recent sessions                                           │
+│                          │                                                              │
+│                          │                                                              │
+│                          │                                                              │
+│                          │                                                              │
+╰──────────────────────────┴──────────────────────────────────────────────────────────────╯
+ Tip: Press ⌥P (or /switch) to switch provider, and ⌃P to cycle role models smol -> slow ->
+      etc
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.6.3 is available. Run: omp update
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ◒ GPT-6.1-Sol 👁 > 🌳 project/compat-wt > ⑂ fm/hrcompat *1 ?2 > (sub) ▶─7%──╎┃272K───╮
+╰─                                                            ⇧⇥ to change thinking effort ─╯

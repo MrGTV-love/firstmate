@@ -1,0 +1,1 @@
+UNREAD-HERDR-RECOVERY-ACK: Acknowledge this factual instruction through the normal inbox protocol, then report that the task remains held and dependency-blocked and wait. Do not implement, validate, publish, commit, merge, clear holds, or modify retained.txt or untracked.txt.

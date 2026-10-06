@@ -1,0 +1,230 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-06T17:21:37Z",
+  "generated_epoch": 1791307297,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home",
+  "valid": false,
+  "reason": "in-flight backlog item has no child metadata: hrnonqueued",
+  "invalidity": {
+    "kind": "orphan_in_flight",
+    "ids": [
+      "hrnonqueued"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [
+    {
+      "id": "hrcompat",
+      "kind": "ship",
+      "state": "working",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/project",
+      "name": "compatible real owner retained recovery",
+      "source": "pane",
+      "doing": "harness busy (fm-spawn)"
+    },
+    {
+      "id": "hrlive",
+      "kind": "ship",
+      "state": "working",
+      "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/project",
+      "name": "Retain lab work and wait",
+      "source": "pane",
+      "doing": "harness busy (fm-spawn)"
+    }
+  ],
+  "decisions_open": [],
+  "holds": [
+    {
+      "id": "hrcompat",
+      "title": "compatible real owner retained recovery",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "reason": "captain decision pending",
+      "source": "backlog"
+    },
+    {
+      "id": "hrlive",
+      "title": "Retain lab work and wait",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "reason": "captain decision pending",
+      "source": "backlog"
+    },
+    {
+      "id": "hrblocked",
+      "title": "isolated away fresh dispatch hrblocked",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "reason": "fresh held dispatch must refuse",
+      "source": "backlog"
+    }
+  ],
+  "queued": [
+    {
+      "id": "hrcompat",
+      "title": "compatible real owner retained recovery",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "blocked_reason": null,
+      "hold_reason": "captain decision pending",
+      "hold_kind": "captain",
+      "hold_until": null,
+      "hold_bucket": "blocked",
+      "hold_age_days": 0,
+      "captain_actionable": false,
+      "repo": null,
+      "kind": "ship",
+      "since": "2026-10-06"
+    },
+    {
+      "id": "hrlive",
+      "title": "Retain lab work and wait",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "blocked_reason": null,
+      "hold_reason": "captain decision pending",
+      "hold_kind": "captain",
+      "hold_until": null,
+      "hold_bucket": "blocked",
+      "hold_age_days": 0,
+      "captain_actionable": false,
+      "repo": null,
+      "kind": "ship",
+      "since": "2026-10-06"
+    },
+    {
+      "id": "hrpre",
+      "title": "unfinished prerequisite",
+      "blocked_by": null,
+      "blocked_by_ids": [],
+      "unresolved_blocker_ids": [],
+      "blocked_reason": null,
+      "hold_reason": null,
+      "hold_kind": null,
+      "hold_until": null,
+      "hold_bucket": null,
+      "hold_age_days": 0,
+      "captain_actionable": false,
+      "repo": null,
+      "kind": "ship",
+      "since": "2026-10-06"
+    },
+    {
+      "id": "hrblocked",
+      "title": "isolated away fresh dispatch hrblocked",
+      "blocked_by": "hrpre",
+      "blocked_by_ids": [
+        "hrpre"
+      ],
+      "unresolved_blocker_ids": [
+        "hrpre"
+      ],
+      "blocked_reason": null,
+      "hold_reason": "fresh held dispatch must refuse",
+      "hold_kind": "captain",
+      "hold_until": null,
+      "hold_bucket": "blocked",
+      "hold_age_days": 0,
+      "captain_actionable": false,
+      "repo": null,
+      "kind": "ship",
+      "since": "2026-10-06"
+    }
+  ],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "hraway",
+      "state": "unknown",
+      "source": "none",
+      "endpoint": {
+        "target": "fm-lab-recovery-10534-5669:w4:p1",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-06T17:21:37Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "hrcompat",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-recovery-10534-5669:w3:p1",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-06T17:21:37Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "hrlive",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-recovery-10534-5669:w2:p1",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-10-06T17:21:37Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 2,
+    "decisions_open": 0,
+    "holds": 3,
+    "queued": 4,
+    "landed": 0,
+    "endpoints": 3
+  },
+  "omitted": []
+}

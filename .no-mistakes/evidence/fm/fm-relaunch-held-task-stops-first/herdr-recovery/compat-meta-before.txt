@@ -1,0 +1,14 @@
+kind=ship
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/project
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/compat-wt
+backend=herdr
+window=fm-lab-recovery-10534-5669:w3:p1
+harness=omp
+model=openai-codex/gpt-6.1-sol
+mode=local-only
+yolo=off
+endpoint_task_id=hrcompat
+herdr_session=fm-lab-recovery-10534-5669
+herdr_workspace_id=w3
+herdr_tab_id=w3:t1
+herdr_pane_id=w3:p1

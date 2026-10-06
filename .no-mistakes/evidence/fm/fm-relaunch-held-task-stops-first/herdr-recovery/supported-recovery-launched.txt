@@ -1,0 +1,13 @@
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+           Tip: Press ←← to drill into a running or finished agent and inspect its
+                                  tool calls and transcript
+
+
+❯                                                                ⇧⇥ to change thinking effort
+ π · ◔ GPT-6.1-Sol 👁 · 🌳 project/compat-wt · ⑂ fm/hrcompat *1 ?2 · ◫ 7.5%/272K ⟲ · (sub)

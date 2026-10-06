@@ -1,0 +1,17 @@
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+            Tip: No native tool_calling? Inference provider botches parsing them?
+                 `PI_DIALECT=glm|kimi|anthropic…` rolls it locally for them!
+
+
+ Closing session…
+
+
+❯                                                                ⇧⇥ to change thinking effort
+ π · ◔ GPT-6.1-Sol 🙈 · 🌳 project/compat-wt · ⑂ fm/hrcompat *1 ?2 · ◫ 7.5%/272K ⟲ · (sub)
+charlesabrooker@Mac-Studio compat-wt %

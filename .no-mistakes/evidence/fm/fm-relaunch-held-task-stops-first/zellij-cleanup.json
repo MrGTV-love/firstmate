@@ -1,0 +1,22 @@
+{
+  "lab_removed": true,
+  "owned_server_stop": "SIGTERM exact owned PID16770 after guarded named-delete failed to stop real server",
+  "owned_pids_checked": [
+    16770,
+    17038,
+    20740,
+    20765,
+    28649,
+    28670,
+    32465,
+    55746,
+    55769,
+    90487,
+    90585,
+    90784
+  ],
+  "owned_survivors": "",
+  "supervisor_exit": 143,
+  "initial_guard_delete_status": 0,
+  "guarded_query_limitation": "list-sessions hung after client termination; cancelled only owned query PIDs47560/55622; no fleet-wide commands"
+}

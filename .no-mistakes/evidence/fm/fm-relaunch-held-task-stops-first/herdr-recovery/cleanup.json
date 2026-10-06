@@ -1,0 +1,15 @@
+{
+  "live_session": "fm-lab-recovery-10534-5669",
+  "herdr_teardown_exit": 0,
+  "fleet_tripwire": "Helper teardown returned 0: named session deletion/absence and unchanged running default snapshot verified by helper.",
+  "lab_home_teardown_exit": 0,
+  "tmux": "No private or default tmux server was created for this Herdr-only lab.",
+  "initial_cleanup_issue": "Product-owned read-only git-hooks directories resisted rm inside the combined EXIT cleanup. Herdr/session/viewer teardown had already succeeded.",
+  "residual_cleanup_command": "chmod -R u+w .test-herdr-recovery-home && rm -rf .test-herdr-recovery-home && test ! -e .test-herdr-recovery-home && test ! -e .test-herdr-recovery-driver.sh && test ! -e .test-herdr-recovery-wrapper.sh && printf 'LAB_AND_DRIVERS_REMOVED=1\\n'",
+  "residual_cleanup_exit": 0,
+  "residual_cleanup_output": "LAB_AND_DRIVERS_REMOVED=1",
+  "lab_and_drivers_removed": true,
+  "source_docs_permanent_tests_changed": false,
+  "incidental_product_tasktmp": ["/tmp/fm-hrcompat", "/tmp/fm-hraway"],
+  "incidental_product_tasktmp_note": "fm-spawn records these deterministic ephemeral tool temp roots. No manual out-of-boundary removal was performed; parent was notified. They are not used as lab home or socket state."
+}

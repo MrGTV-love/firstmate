@@ -1,0 +1,44 @@
+
+╭─── omp v18.4.10 ─────────────────────────────────────────────────────────────────────────────────╮
+│                          │ Tips                                                                  │
+│      Welcome back!       │ # for prompt actions                                                  │
+│                          │ / for commands                                                        │
+│       ████████████       │ ! to run bash                                                         │
+│          ██  ██          │ $ to run python                                                       │
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │
+│          ▒▒  ██          │ Recent sessions                                                       │
+│              ██          │ No recent sessions                                                    │
+│                          │                                                                       │
+│     Gemini 3.8 Flash     │                                                                       │
+│    google-antigravity    │                                                                       │
+│                          │                                                                       │
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯
+ Tip: Pair up live: `/collab` shares your session through an end-to-end encrypted relay link — a
+      teammate runs `/join <link>` to watch tool calls stream and prompt the agent from their own
+      omp
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.6.3 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+❯                                                                                                               ⇧⇥ to change thinking effort
+ π · ◒ Gemini 3.8 Flash 👁 · 🌳 32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6 · ⑂ detached ?7 · ◫ 1.3%/1M ⟲ · (sub)                    🆔 01a11236
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

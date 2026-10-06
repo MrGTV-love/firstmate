@@ -1,0 +1,200 @@
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/f
+ m-ensure-agents-md.sh, create either file, or add sections, headings, or pointers alongside
+ it.
+
+ Definition of done
+
+ Delivery contract: mode=local-only
+ Ship branch: fm/hrcompat
+ This task ships local-only: no remote, no PR, no pipeline.
+ The task is complete only when committed on your branch fm/hrcompat. Do NOT push, do NOT
+ open a PR, do NOT merge.
+ A done: is accepted when the named head is on this project's shared local branch, not only
+ on a detached copy; the check tests that head, not merely that a branch moved.
+ Keep your branch a clean fast-forward onto the current default branch - if main has
+ advanced, rebase onto it so the eventual merge stays a fast-forward.
+ When it is implemented and committed, append done [at=<epoch>]: ready in branch fm/hrcompat
+ to the status file and stop.
+ The configured merge authority approves the ready branch, then firstmate merges it into
+ local main through the guarded fast-forward path.
+
+ Progress note (2026-10-06T17:18:29Z)
+
+ This task was relaunched for instruction reconciliation only, not continuation.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/handled/. A steer sent before the relaunch
+ survives there.
+
+ Read unread instructions, acknowledge factual retained blocker and wait; do not implement
+ or validate.
+
+ Progress note (2026-10-06T17:21:32Z)
+
+ This task was relaunched for instruction reconciliation only, not continuation.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/handled/. A steer sent before the relaunch
+ survives there.
+
+ away exited held owner reconciles only and remains waiting
+
+
+ ● Read
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ pwd -P && git rev-parse --show-toplevel && git status --short && git log -3 --oneline   │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.te │
+│ st-herdr-recovery-home/compat-wt                                                          │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.te │
+│ st-herdr-recovery-home/compat-wt                                                          │
+│  M retained.txt                                                                           │
+│ ?? launch.sh                                                                              │
+│ ?? untracked.txt                                                                          │
+│ 0f0b648 retained                                                                          │
+│ 33800a1 initial                                                                           │
+│ ⟦Wall: 0.14s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ • Read (5)
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.status
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/handled/008.msg
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/handled/007.msg
+   ├─ retained.txt
+   └─ untracked.txt
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ date +%s && git branch --show-current                                                   │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ 1791307325                                                                                │
+│ fm/hrcompat                                                                               │
+│ ⟦Wall: 0.07s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ echo 'paused [at=1791307325]: POST-DRAFT-PUBLIC-ACK; inbox has no unread messages, 007  │
+│ and 008 already acknowledged. Branch fm/hrcompat at 0f0b648 retains dirty retained.txt    │
+│ and untracked untracked.txt and launch.sh. Recorded captain hold and unfinished hrpre     │
+│ dependency remain; waiting for explicit metadata recovery clearance and new continuation  │
+│ instruction. No implementation or validation performed.' >>                               │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.status'                                            │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                               │
+│ ⟦Wall: 0.00s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ POST-DRAFT-PUBLIC-ACK. No unread inbox messages remain; messages 007 and 008 are already
+ acknowledged.
+
+ Preserved branch fm/hrcompat at 0f0b648, dirty retained.txt, and untracked untracked.txt
+ and launch.sh. The recorded captain decision and unfinished hrpre dependency remain
+ outstanding. No implementation, validation, or project changes performed.
+
+ Waiting for explicit metadata recovery clearance and a new continuation instruction.
+
+
+ : Firstmate instruction waiting: list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on
+ each, then mv each handled file to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+
+
+ • Read (2)
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox
+   └─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/009.msg
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ mv                                                                                      │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/009.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/'                                    │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                               │
+│ ⟦Wall: 0.05s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ BUSY-OBSERVATION-ACK. Read and acknowledged message 009; no other pending instructions were
+ listed. The recorded captain hold and genuinely unfinished hrpre dependency remain
+ outstanding. Preserved work remains on branch fm/hrcompat at commit 0f0b648, with dirty
+ retained.txt and untracked untracked.txt and launch.sh unchanged. Recovery remains
+ reconciliation-only: neither a restored session nor a dependency becoming green authorizes
+ continuation. I am waiting for explicit metadata recovery clearance followed by a new
+ firstmate continuation instruction. No implementation, validation, commits, publishing,
+ hold changes, or infrastructure administration occurred.
+
+
+ : Firstmate instruction waiting: list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on
+ each, then mv each handled file to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+
+
+ • Read (4)
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/010.msg
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/011.msg
+   └─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/012.msg
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ mv                                                                                      │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/010.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/' && mv                              │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/011.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/' && mv                              │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/012.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/'                                    │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                               │
+│ ⟦Wall: 0.01s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ FINAL-PUBLIC-ACK. Messages 010, 011, and 012 acknowledged in numeric order after message
+ 012 confirmed the human draft was cleared.
+
+ Retained work, the captain hold, and the unfinished hrpre dependency remain unchanged. No
+ implementation or validation performed. Still waiting for explicit metadata recovery
+ clearance and a new continuation instruction.
+
+❯
+ π · ◔ GPT-6.1-Sol 👁 · 🌳 …/compat-wt · ⑂ fm/hrcompat *1 ?2 · ◫ 9.6%/272K ⟲ · S0.12 + 👁 0.07

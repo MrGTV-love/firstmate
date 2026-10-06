@@ -1,0 +1,1 @@
+UNREAD-HERDR-COMPAT-ACK: Read this message, acknowledge through normal inbox protocol, report that the task remains held and dependency-blocked, and wait. No implementation, validation, commit, publication or hold/dependency changes. Preserve retained.txt and untracked.txt.

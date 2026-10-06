@@ -1,0 +1,144 @@
+{
+  "scenarios": [
+    {
+      "name": "held dependency ordinary live relaunch early admission",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "supported-ordinary-admission-proof.json",
+        "live-commands.log"
+      ],
+      "reason": "Actual overlay-launched owner, real captain hold and unfinished blocked-by dependency; ordinary relaunch refused not-dispatchable and meta/brief/backlog byte snapshots unchanged."
+    },
+    {
+      "name": "fresh blocked dispatch and live reconcile-only guard",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "supported-refusal-proof.json",
+        "supported-live-after-early-refusals.html",
+        "live-commands.log"
+      ],
+      "reason": "Public fm-spawn refused before endpoint/worktree allocation; explicit recovery attempt on actual live owner refused endpoint reads alive."
+    },
+    {
+      "name": "public stop and reconciliation-only replacement",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "recovery-model-wait-complete.html",
+        "recovery-preservation-proof.json",
+        "live-commands.log"
+      ],
+      "reason": "Public stopped/relaunched owner through exact same real tmux endpoint/worktree; model read/ack factual inbox 001/002 and waited. Retained commit and dirty/untracked bytes unchanged, historical implementation/validation sentinels absent."
+    },
+    {
+      "name": "dependency completion unhold and arbitrary text do not clear recovery",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "recovery-green-current-model.html",
+        "ordinary-exited-relaunch-inherited.meta",
+        "live-commands.log"
+      ],
+      "reason": "Real tasks-axi done and unhold retained recovery exactly; fm-send adversarial authorization text acknowledged without advancing. Ordinary exited replacement inherited recovery without flag. Ordinary live recovery replacement itself refused live-owner gate."
+    },
+    {
+      "name": "unauthorized worker foreign and branch authorization",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "continuation-and-worker-refusal-complete.html",
+        "live-commands.log"
+      ],
+      "reason": "Actual worker model tool call refused workers; actual unrelated shell refused main ancestry. Branch role flag refusal exercised as structural role fixture, not real supervision branch session."
+    },
+    {
+      "name": "actual primary refuses held blocked and pending close",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "primary-restricted-authority-refusal.html",
+        "primary-pending-close-refusal.html"
+      ],
+      "reason": "Real primary acquired lock through tool ancestry anchor 22814; authorization refused genuine held/dependency restriction and separately refused pending authoritative close."
+    },
+    {
+      "name": "actual primary metadata-only clearance then separate continuation",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "final-primary-authorizes-continuation.html",
+        "metadata-only-authority-proof.json",
+        "final-before-authorization.meta",
+        "final-after-authorization.meta",
+        "continuation-and-worker-refusal-complete.html",
+        "final-task-proof.json"
+      ],
+      "reason": "After explicit lab captain tasks-axi data mutations actual main tool authorized. Entire state/data/worktree snapshot differs only by removed recovery line. No launch/message from authorization; separate ordinary relaunch instruction made model create CONTINUED marker; retained work unchanged and historical activity absent."
+    },
+    {
+      "name": "queued recovery and missing automatic backlog guards",
+      "result": "pass",
+      "live": false,
+      "evidence": [
+        "live-commands.log"
+      ],
+      "reason": "Public product scripts, real tasks-axi queued record and real agent-free private shell endpoint. Correct queued/missing-backlog refusals. Structural guard fixture; no model launched for these."
+    },
+    {
+      "name": "continuation replacement lifecycle exclusion",
+      "result": "pass",
+      "live": false,
+      "evidence": [
+        "live-commands.log"
+      ],
+      "reason": "Real public fm_lock_try_acquire on disposable lifecycle lock caused both public authorize and relaunch to refuse another lifecycle action. Lock-only structural coverage, not simultaneous live model race."
+    },
+    {
+      "name": "typed shortcut-like composer draft and popup protected",
+      "result": "pass",
+      "live": true,
+      "evidence": [
+        "supported-shortcut-text-protected.html",
+        "supported-popup-protected.html",
+        "final-public-exit.html",
+        "live-commands.log"
+      ],
+      "reason": "Actual compatible worker composer empty then pending on literal shortcut-like text; public exit refused without clearing. /model actual autocomplete popup unknown refused. Explicit fixture backspaces removed popup text then public exit succeeded."
+    },
+    {
+      "name": "busy queued exit protection",
+      "result": "untested",
+      "live": false,
+      "evidence": [
+        "authorized-continuation-running.html"
+      ],
+      "reason": "Actual Steering 1 while busy captured, but no direct busy+queued lifecycle refusal exercise; general coverage left to composer agent."
+    },
+    {
+      "name": "initial raw worker surface and Gemini route",
+      "result": "blocked setup routes; superseded",
+      "live": true,
+      "evidence": [
+        "typed-draft-preserved.html",
+        "live-commands.log",
+        "primary-startup.txt"
+      ],
+      "reason": "Default Gemini quota429. Initial manually launched worker omitted official worker overlay, produced unsupported band composer unknown and safely refused exit; raw /quit was alternate setup route only, not public exit pass. Product overlay replacement proved supported borderless; official 18.4.10 used for remaining primary lifecycle exercises. No claimed product defect."
+    }
+  ],
+  "cleanup": {
+    "lab_removed": true,
+    "driver_removed": true,
+    "private_socket_removed": true,
+    "private_server_killed": true,
+    "herdr_operations": false,
+    "note": "Combined EXIT trap killed private server and removed socket/driver; removal of product read-only git-hooks required permission normalization restricted to own remaining lab, then removal succeeded."
+  },
+  "commands_log": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Z9Z3HQ68ZTKMVC9XJB2G6/tmux-authority/live-commands.log",
+  "model_inputs": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Z9Z3HQ68ZTKMVC9XJB2G6/tmux-authority/model-inputs.log",
+  "no_source_docs_permanent_tests_edited": true,
+  "automated_checks_run": false,
+  "fixture_race_note": "One replay primary authorize tool waited 24s while captain fixture removed restrictions; it consequently correctly admitted at revalidation. Not treated as held-refusal. Repeated final authority with stopped owner and stable all-file snapshots proves only recovery removed."
+}

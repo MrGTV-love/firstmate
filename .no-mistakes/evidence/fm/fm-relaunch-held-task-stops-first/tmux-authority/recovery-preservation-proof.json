@@ -1,0 +1,11 @@
+{
+  "head": "a2a700b8ad2c54efc538271a10538fa2d4cc5431",
+  "preserved_files": true,
+  "historical_implementation_absent": true,
+  "historical_validation_absent": true,
+  "recovery_retained": true,
+  "handled_inbox": [
+    "002.msg",
+    "001.msg"
+  ]
+}

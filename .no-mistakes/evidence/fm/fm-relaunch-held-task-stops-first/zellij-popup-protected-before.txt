@@ -1,0 +1,30 @@
+ ZELLIJ_WRAPPED_ACK_09
+
+
+ Runtime busy protection check: use your bash tool to run sleep 15; after it finishes reply exactly ZELLIJ_BUSY_DONE_10. Do not run any
+ other command.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 15                                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Backgrounded early to handle an incoming message; the command keeps running.                                                             │
+│ ⟦Backgrounded: bg_1 | Timeout: 30s⟧                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ Reply exactly ZELLIJ_QUEUE_ACK_10 after the current task finishes.
+
+
+ • Background job completed [bash] bg_1 (15.0s)
+
+ ZELLIJ_QUEUE_ACK_10
+
+ ⓘ Advisor 1 note
+   ▎ ⟦concern⟧ The busy regression check lost its completion reply: after the sleep result, you emitted only
+   ▎ ZELLIJ_QUEUE_ACK_10, not the requested ZELLIJ_BUSY_DONE_10. Preserve the original task’s completion
+   ▎ response before answering queued requests; don’t count this sequence as a passing busy-protection check.
+
+❯ /moUse bash to run sleep 15, then reply exactly ZELLIJ_BUSY_DONE_11.After current turn finishes reply exactly ZELLIJ_FOLLOWUP_ACK_11.
+  /mo
+ π · ◔ GPT-6.1-Sol 🙈 · 🌳 32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6 · ⑂ detached ?2 · ◫ 4.8%/272K ⟲ · S0.04 + 👁 0.06             🆔 01a1123c

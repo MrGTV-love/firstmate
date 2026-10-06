@@ -1,0 +1,187 @@
+[
+  {
+    "name": "HerdrHeldOwnerRefusal",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-held-relaunch.log",
+      "compat-meta-before.txt",
+      "compat-brief-before.md",
+      "compat-backlog-before.md",
+      "driver-live.log:556-562"
+    ],
+    "reason": "Public relaunch refused held/dependency-blocked In-flight row; CLI alive; metadata, brief, backlog comparisons all identical."
+  },
+  {
+    "name": "HerdrPublicExitAndReconciliation",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-public-exit.log",
+      "supported-reconcile-relaunch.log",
+      "compat-meta-recovered.txt",
+      "recovery-model.txt",
+      "recovered-wait.txt",
+      "compat-status-recovered.txt"
+    ],
+    "reason": "Public exit succeeded and endpoint classified dead; reconcile-only restored actual omp18.6.3 at same w3:p1 endpoint/worktree. Real model read and acknowledged unread 005/006 then declared wait; recovery=reconcile-only."
+  },
+  {
+    "name": "RetainedWorkAndRestrictions",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "compat-head-before.txt",
+      "compat-head-after.txt",
+      "compat-head-final.txt",
+      "compat-retained-before.txt",
+      "compat-retained-final.txt",
+      "compat-untracked-before.txt",
+      "compat-untracked-final.txt",
+      "final-core-records.json",
+      "driver-live.log:603-606,2997-3000"
+    ],
+    "reason": "Commit, dirty and untracked bytes unchanged; held flag and hrpre dependency preserved in genuine tasks-axi backlog."
+  },
+  {
+    "name": "AwayOrdinaryLiveAndExitedReplacement",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-away-contract.log",
+      "away-live-replacement.log",
+      "away-public-exit.log",
+      "away-exited-replacement.log",
+      "away-owner-response.txt"
+    ],
+    "reason": "Supported away record enter/validate; FM_SUPERVISION_ACTOR=branch ordinary In-flight replacements allowed both live-before-stop and already-exited; endpoint/worktree reused and backlog unchanged."
+  },
+  {
+    "name": "AwayBlockedNormalRefusal",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "away-normal-held-refusal.log",
+      "away-normal-held-live.txt",
+      "driver-live.log:3029-3035"
+    ],
+    "reason": "Supported borderless live ordinary hraway owner held/dependency-blocked through real APIs; normal replacement refused not dispatchable with metadata, brief, backlog identical and CLI alive."
+  },
+  {
+    "name": "AwayHeldReconciliationReplacement",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "away-recovery-exit.log",
+      "away-recovery-replacement.log",
+      "away-recovered-meta.txt",
+      "away-recovery-model-wait.txt"
+    ],
+    "reason": "Public exit then branch reconcile-only replacement succeeded for held task, retained recovery-only scope and restrictions; real model remained waiting."
+  },
+  {
+    "name": "InheritedRecoveryRefusesLiveOrdinary",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-away-held-refusal.log",
+      "driver-live.log:1743-1749"
+    ],
+    "reason": "Ordinary syntax on recovered live owner inherited reconcile-only restriction and required proven exited owner; records unchanged."
+  },
+  {
+    "name": "AwayFreshAdmission",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "away-hrnonqueued-fresh.log",
+      "away-hrblocked-fresh.log"
+    ],
+    "reason": "Real fresh nonqueued In-flight and queued held/dependency-blocked dispatch both refused by queued-unblocked gate before endpoint/worktree allocation."
+  },
+  {
+    "name": "StyledEmptyEffortHintAndExtraction",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-worker-ready.ansi",
+      "supported-worker-ready.txt",
+      "driver-live.log:549-552",
+      "rendered-terminals.html"
+    ],
+    "reason": "Actual current omp18.6.3 with tracked borderless worker overlay and truecolor showed styled \u21e7\u21e5 effort hint; shared classifier empty and selected extraction empty."
+  },
+  {
+    "name": "HumanShortcutDraftProtection",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-typed-hint-before.ansi",
+      "supported-typed-hint-after.ansi",
+      "supported-typed-send.log",
+      "supported-draft-exit.log",
+      "driver-live.log:1249-1254,1455-1458"
+    ],
+    "reason": "Literal human shift+tab phrase classified pending and extracted exactly; public steering durably queued without typing/Enter; full ANSI captures identical; public exit refused pending text."
+  },
+  {
+    "name": "PublicSteeringDeliveredToRealModel",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "supported-send.log",
+      "supported-cleared-send.log",
+      "final-send.log",
+      "final-model-wait.txt",
+      "final-core-records.json"
+    ],
+    "reason": "Actual public fm-send instruction reached real model; it acknowledged messages in numeric order and replied POST-DRAFT-PUBLIC-ACK / FINAL-PUBLIC-ACK while retaining recovery-only wait."
+  },
+  {
+    "name": "BusyQueuedHumanDraftProtection",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "busy-native.json",
+      "busy-human-draft-before.ansi",
+      "busy-human-draft-after.ansi",
+      "busy-draft-send.log",
+      "busy-control-native.json",
+      "busy-control-before.ansi",
+      "busy-control-after.ansi",
+      "busy-control-exit.log",
+      "driver-live.log:2177-2183,2384,3466-3471,3672-3673"
+    ],
+    "reason": "Native real busy state plus HUMAN-QUEUED-DRAFT remained pending; public steering skipped doorbell and retained exact draft. Separate actual busy draft public exit refused and preserved BUSY-CONTROL-HUMAN-DRAFT with CLI alive."
+  },
+  {
+    "name": "SlashPopupProtection",
+    "result": "pass",
+    "live": true,
+    "evidence": [
+      "slash-popup-before.ansi",
+      "slash-popup-after.ansi",
+      "popup-send.log",
+      "popup-exit.log"
+    ],
+    "reason": "Actual omp slash-command popup protected: conservative pending verdict, durable steering skipped doorbell, exit refused and no human draft submitted/cleared. Selected extraction was popup item text, not literal slash; exact popup extraction not claimed."
+  },
+  {
+    "name": "UnsupportedBandWarmup",
+    "result": "untested-supported-contract",
+    "live": true,
+    "evidence": [
+      "compat-idle-ready.ansi",
+      "typed-after-send.ansi",
+      "public-exit.log"
+    ],
+    "reason": "Initial manually launched default band fixtures omitted required worker overlay. Both CLI versions classified unknown; exit failed closed but advisory fm-send concatenated band draft. Unsupported fixture observation retained, not a supported-worker failure; all named scenarios re-driven with proper overlay."
+  },
+  {
+    "name": "LiveZellij",
+    "result": "untested",
+    "live": false,
+    "evidence": [],
+    "reason": "zellij unavailable; no invented live evidence."
+  }
+]

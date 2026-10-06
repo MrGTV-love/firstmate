@@ -1,0 +1,683 @@
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w2:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w2:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrlive.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrlive.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w2:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w2:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 /quit
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/compat-wt'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export GOTMPDIR=/tmp/fm-hrcompat/gotmp
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export COMPACT_ADVISER_DISABLE=1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export FM_TASK_ID=hrcompat
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 . '/tmp/fm-hrcompat+f839fbb13cc6cbebe62b57f87e463a1609f04174da33618be74384a28cc1106e/launch.s1791307115.65489.319.sh'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w4:p1 /quit
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/away-wt'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export GOTMPDIR=/tmp/fm-hraway/gotmp
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export COMPACT_ADVISER_DISABLE=1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export FM_TASK_ID=hraway
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w4:p1 . '/tmp/fm-hraway+f839fbb13cc6cbebe62b57f87e463a1609f04174da33618be74384a28cc1106e/launch.s1791307259.45632.31502.sh'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w4:p1 /quit
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/away-wt'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export GOTMPDIR=/tmp/fm-hraway/gotmp
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export COMPACT_ADVISER_DISABLE=1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w4:p1 export FM_TASK_ID=hraway
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w4:p1 . '/tmp/fm-hraway+f839fbb13cc6cbebe62b57f87e463a1609f04174da33618be74384a28cc1106e/launch.s1791307276.1063.8316.sh'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w4:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 /quit
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/compat-wt'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w2:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w4:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w2:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export GOTMPDIR=/tmp/fm-hrcompat/gotmp
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export COMPACT_ADVISER_DISABLE=1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane run w3:p1 export FM_TASK_ID=hrcompat
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 . '/tmp/fm-hrcompat+f839fbb13cc6cbebe62b57f87e463a1609f04174da33618be74384a28cc1106e/launch.s1791307297.70778.19483.sh'
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source recent --lines 200
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w4:p1
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-text w3:p1 : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 enter
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane send-keys w3:p1 escape
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 pane read w3:p1 --source visible --format ansi
+herdr helper run fm-lab-recovery-10534-5669 pane get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1
+herdr helper run fm-lab-recovery-10534-5669 pane process-info --pane w3:p1
+herdr helper run fm-lab-recovery-10534-5669 status --json
+herdr helper run fm-lab-recovery-10534-5669 agent get w3:p1

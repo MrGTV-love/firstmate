@@ -1,0 +1,39 @@
+
+                               [0m[38;2;200;88;223m█[0m[38;2;191;90;227m█[0m[38;2;181;92;230m█[0m[38;2;172;93;234m█[0m[38;2;163;95;238m█[0m[38;2;154;97;241m█[0m[38;2;145;102;244m█[0m[38;2;132;114;242m█[0m[38;2;120;126;241m█[0m[38;2;108;137;240m█[0m[38;2;93;147;238m█[0m[38;2;79;157;237m█[0m    
+                                  [0m[38;2;148;99;244m█[0m[38;2;136;111;243m█[0m  [0m[38;2;97;144;239m█[0m[38;2;82;154;237m█[0m       [0m[1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                  [0m[38;2;114;132;240m█[0m[38;2;100;142;239m█[0m  [0m[38;2;57;172;234m█[0m[38;2;43;183;233m█[0m       [0m[1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                  [0m[38;2;75;159;236m▒[0m[38;2;61;170;235m▒[0m  [0m[38;2;20;203;230m█[0m[38;2;7;214;229m█[0m       [0m[1m           █[0m
+                                      [0m[38;2;236;81;209m█[0m[38;2;227;83;212m█[0m       [0m[38;2;107;114;128mv18.6.3[0m
+
+             [0m[3m[38;2;212;192;144mTip: [0m[3m[38;2;156;163;176mFind out which model you emotionally abuse the most with `omp[0m
+                                           [0m[3m[38;2;156;163;176mstats`[0m
+
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mA [0m[38;2;0;255;136m[48;2;15;18;22mdone:[0m[38;2;229;229;231m[48;2;15;18;22m is accepted when the named head is on this project's shared local branch, not only  [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mon a detached copy; the check tests that head, not merely that a branch moved.[0m[48;2;15;18;22m              [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mKeep your branch a clean fast-forward onto the current default branch - if [0m[38;2;0;255;136m[48;2;15;18;22mmain[0m[38;2;229;229;231m[48;2;15;18;22m has         [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22madvanced, rebase onto it so the eventual merge stays a fast-forward.[0m[48;2;15;18;22m                        [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mWhen it is implemented and committed, append [0m[38;2;0;255;136m[48;2;15;18;22mdone [at=<epoch>]: ready in branch fm/hraway[0m[38;2;229;229;231m[48;2;15;18;22m   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mto the status file and stop.[0m[48;2;15;18;22m                                                                [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThe configured merge authority approves the ready branch, then firstmate merges it into     [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mlocal [0m[38;2;0;255;136m[48;2;15;18;22mmain[0m[38;2;229;229;231m[48;2;15;18;22m through the guarded fast-forward path.[0m[48;2;15;18;22m                                           [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mProgress note (2026-10-06T17:20:51Z)[0m[48;2;15;18;22m                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis task was relaunched. Continue from here; the local copy and every[0m[48;2;15;18;22m                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22muncommitted change are exactly as the previous worker left them.[0m[48;2;15;18;22m                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirst, check your instruction inbox: list                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/*.msg, act on[0m[48;2;15;18;22m                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                               [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/handled/. A steer sent before the relaunch survives [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthere.[0m[48;2;15;18;22m                                                                                      [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mordinary unblocked In-flight away replacement[0m[48;2;15;18;22m                                               [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+
+ [0m[38;2;156;163;176m ⎋[0m [0m[38;2;107;114;128mWorking…[0m                                                                                 
+
+❯                                                                                            
+ [0m[38;2;0;180;255m⠴ 0s[0m [0m[38;2;42;48;56m·[0m [0m[38;2;0;180;255m◔ GPT-6.1-Sol[0m[38;2;0;255;136m 👁[0m [0m[38;2;42;48;56m·[0m [0m[38;2;232;236;244m🌳 project/away-wt[0m [0m[38;2;42;48;56m·[0m [0m[38;2;255;179;71m⑂ fm/hraway [0m[38;2;156;163;176m?1[0m [0m[38;2;42;48;56m·[0m ◫ [0m[38;2;156;163;176m8.8%/272K[0m [0m[38;2;156;163;176m⟲[0m [0m[38;2;42;48;56m·[0m [0m[38;2;212;192;144m(sub)[0m 

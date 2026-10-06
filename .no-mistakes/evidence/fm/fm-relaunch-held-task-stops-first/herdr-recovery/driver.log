@@ -1,0 +1,6 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home
+fm-herdr-lab: tripwire already exists for 'fm-lab-recovery-96057-15148'; refusing ambiguous ownership
+CLEANUP begin rc=1
+HERDR_TEARDOWN_RC=0
+HOME_TEARDOWN_RC=0
+CLEANUP complete lab_exists=no

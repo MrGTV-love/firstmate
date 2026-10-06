@@ -1,0 +1,37 @@
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mlocal [0m[38;2;0;255;136m[48;2;15;18;22mmain[0m[38;2;229;229;231m[48;2;15;18;22m through the guarded fast-forward path.[0m[48;2;15;18;22m                                           [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mProgress note (2026-10-06T17:20:51Z)[0m[48;2;15;18;22m                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis task was relaunched. Continue from here; the local copy and every[0m[48;2;15;18;22m                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22muncommitted change are exactly as the previous worker left them.[0m[48;2;15;18;22m                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirst, check your instruction inbox: list                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/*.msg, act on[0m[48;2;15;18;22m                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                               [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/handled/. A steer sent before the relaunch survives [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthere.[0m[48;2;15;18;22m                                                                                      [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mordinary unblocked In-flight away replacement[0m[48;2;15;18;22m                                               [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[1m[38;2;229;229;231m[48;2;15;18;22mProgress note (2026-10-06T17:21:12Z)[0m[48;2;15;18;22m                                                        [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mThis task was relaunched. Continue from here; the local copy and every[0m[48;2;15;18;22m                      [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22muncommitted change are exactly as the previous worker left them.[0m[48;2;15;18;22m                            [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mFirst, check your instruction inbox: list                                                   [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/*.msg, act on[0m[48;2;15;18;22m                                       [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22meach message in numeric order, then mv each handled file into[0m[48;2;15;18;22m                               [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22m-herdr-recovery-home/state/hraway.inbox/handled/. A steer sent before the relaunch survives [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mthere.[0m[48;2;15;18;22m                                                                                      [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+[0m[48;2;15;18;22m [0m[38;2;229;229;231m[48;2;15;18;22mordinary already-exited In-flight away replacement[0m[48;2;15;18;22m                                          [0m
+[0m[48;2;15;18;22m                                                                                             [0m
+
+ AWAY-OWNER-READY — I am waiting without doing project work.                                 
+
+❯                                                                                            
+ [0m[38;2;107;114;128mπ[0m [0m[38;2;42;48;56m·[0m [0m[38;2;0;180;255m◔ GPT-6.1-Sol[0m[38;2;0;255;136m 🙈[0m [0m[38;2;42;48;56m·[0m [0m[38;2;232;236;244m🌳 project/away-wt[0m [0m[38;2;42;48;56m·[0m [0m[38;2;255;179;71m⑂ fm/hraway [0m[38;2;156;163;176m?1[0m [0m[38;2;42;48;56m·[0m ◫ [0m[38;2;156;163;176m8.1%/272K[0m [0m[38;2;156;163;176m⟲[0m [0m[38;2;42;48;56m·[0m [0m[38;2;212;192;144mS0.01 + 👁 0.03[0m 

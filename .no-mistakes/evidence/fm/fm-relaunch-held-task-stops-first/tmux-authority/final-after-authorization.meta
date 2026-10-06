@@ -1,0 +1,16 @@
+window=primary:fm-retain
+endpoint_task_id=retain
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-home/worktree
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-home/project
+harness=omp
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/retain
+tasktmp=/tmp/fm-retain
+model=openai-codex/gpt-6.1-sol
+effort=low
+busy_gen=g1791307143.83415.1625
+spawn_gen=s1791307143.66485.6972
+custom_record=preserve exact bytes
+control_relaunch_tx=60394.20261006T171857Z.2175

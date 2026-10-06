@@ -1,0 +1,7 @@
+{
+  "changed_paths": [
+    "state/retain.meta"
+  ],
+  "only_recovery_removed": true,
+  "recovery_removed": true
+}

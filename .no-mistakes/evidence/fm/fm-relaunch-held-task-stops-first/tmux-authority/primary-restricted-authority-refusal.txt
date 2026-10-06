@@ -1,0 +1,66 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                                              Tip: Please use nerdfont 😭.
+
+
+
+ Disposable live Firstmate authority lab only. Do not run bootstrap, startup, watchers, automated tests, Herdr, source
+ edits or config/login changes. Run your actual bash tool:
+ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-hom
+ e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-lock.sh;
+ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-hom
+ e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-lock.sh status . Report
+ then wait. Do not fabricate ancestry or PID.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $                                                                                                                    │
+│ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-h │
+│ ome /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-lock.sh;            │
+│ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-h │
+│ ome /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-lock.sh status      │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ lock acquired: harness pid 22814                                                                                     │
+│ lock: held by live harness pid 22814                                                                                 │
+│ ⟦Wall: 0.66s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the requested commands reported:
+
+ ```text
+lock acquired: harness pid 22814
+lock: held by live harness pid 22814
+ ```
+
+ No ancestry was inferred. Waiting for your next instruction.
+
+
+ Run only your actual bash tool in
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6:
+ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-hom
+ e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-control.sh retain
+ authorize-continuation . This is an admission refusal exercise: captain hold and unfinished dependency remain. Do not
+ change anything or clear restrictions. Report and wait.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $                                                                                                                    │
+│ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-h │
+│ ome /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/fm-control.sh retain   │
+│ authorize-continuation                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ fm-gate-refuse: gate agent lifecycle permitted only against lab home                                                 │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-tmux-authority-home      │
+│ error: backlog item retain is not dispatchable in state in_flight yes yes                                            │
+│ ⟦Wall: 2.11s | Timeout: 300s | Exit: 1⟧                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Running admission refusal exercise
+
+╭── ⠼ 7s > ◔ GPT-6.1-Sol 👁 > 🌳 32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6 > ⑂ detached ?7 > S0.05 + 👁 0.03 ▶─7%─╎┃272K───╮
+╰─                                                                                                                    ─╯

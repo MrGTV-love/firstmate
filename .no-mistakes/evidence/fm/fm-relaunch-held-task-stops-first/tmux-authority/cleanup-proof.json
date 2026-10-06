@@ -1,0 +1,8 @@
+{
+  "lab_removed": true,
+  "driver_removed": true,
+  "private_socket_removed": true,
+  "private_server_killed": true,
+  "herdr_operations": false,
+  "note": "Combined EXIT trap killed private server and removed socket/driver; removal of product read-only git-hooks required permission normalization restricted to own remaining lab, then removal succeeded."
+}

@@ -1,0 +1,15 @@
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+           Tip: Type `#` anywhere in your prompt for quick actions — copy the line
+                         or the whole prompt, undo, jump the cursor
+
+
+  ⎋ Working…
+
+❯                                                                ⇧⇥ to change thinking effort
+ ⠹ 0s · ◔ GPT-6.1-Sol 👁 · 🌳 project/compat-wt · ⑂ fm/hrcompat *1 ?2 · ◫ 9.1%/272K ⟲ · (sub)

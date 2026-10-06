@@ -1,0 +1,24 @@
+env PATH='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2
+G6/.test-live-tools:/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68Z
+TKMVC9XJB2G6/.test-herdr-recovery-home/bin:/Users/charlesabrooker/.npm-global/bin:/opt/homebr
+ew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbi
+n:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/co
+m.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd
+/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/.cla
+ude/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin
+:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.
+local/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/cha
+rlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources' FM_HOME='/Users/charlesa
+b%
+charlesabrooker@Mac-Studio compat-wt % env PATH='/Users/charlesabrooker/.no-mistakes/worktree
+s/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-live-tools:/Users/charlesabrooker/.no-mistake
+s/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/bin:/Users/char
+lesabrooker/.npm-global/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Crypt
+exes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.sys
+tem/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/b
+in:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env
+/global/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.antigravity/antigravit
+y/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooke
+r/.pyenv/shims:/Users/charlesabrooker/.local/bin:/Users/charlesabrooker/go/bin:/Users/charles
+abrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Conte
+nts/Resources' FM_HOME='/Users/charlesab

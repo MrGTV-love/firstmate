@@ -1,0 +1,150 @@
+[
+  {
+    "scenario": "truecolor idle hint",
+    "live": true,
+    "omp": "18.4.10",
+    "zellij": "0.44.0",
+    "state": "empty",
+    "content": "",
+    "expected": "empty state and empty content",
+    "pass": true,
+    "capture": "zellij-truecolor-idle"
+  },
+  {
+    "scenario": "public durable steer Gemini normal default",
+    "live": true,
+    "send_exit": 0,
+    "ring": "submitted (terminal transcript has doorbell)",
+    "model_ack": false,
+    "blocker": "Cloud Code Assist API 429 quota exhausted gemini-3.8-flash-high; reset 2h59m50s; retry exceeds configured delay",
+    "capture": "zellij-after-send-04",
+    "pass": false
+  },
+  {
+    "scenario": "public durable steer codex",
+    "live": true,
+    "send_exit": 0,
+    "record": "003.msg",
+    "model_ack": true,
+    "handled": true,
+    "pass": true,
+    "capture": "zellij-ack-07-complete",
+    "model": "openai-codex/gpt-6.1-sol"
+  },
+  {
+    "scenario": "typed shortcut preservation",
+    "live": true,
+    "draft": "⇧⇥ to change thinking effort",
+    "state": "pending",
+    "extraction": "⇧⇥ to change thinking effort",
+    "send_exit": 0,
+    "durable_record": true,
+    "ring_skipped": true,
+    "after_extraction": "⇧⇥ to change thinking effort",
+    "surface_unchanged": true,
+    "pass": true,
+    "capture": "zellij-human-shortcut-draft-before and after"
+  },
+  {
+    "scenario": "human draft plus actual UI hint",
+    "live": true,
+    "draft": "Keep this captain draft.",
+    "state": "pending",
+    "content": "Keep this captain draft.",
+    "visible_ui_hint": false,
+    "pass": true,
+    "capture": "zellij-draft-plus-hint",
+    "concurrent_hint": "untested: actual omp hides the hint immediately on real typing"
+  },
+  {
+    "scenario": "bright shortcut copy draft preservation (actual UI hint hidden on typing)",
+    "live": true,
+    "draft": "⇧⇥ to change thinking effort",
+    "state": "pending",
+    "content": "⇧⇥ to change thinking effort",
+    "after_content": "⇧⇥ to change thinking effort",
+    "surface_unchanged": true,
+    "send_exit": 0,
+    "durable_record": true,
+    "ring_skipped": true,
+    "pass": true,
+    "capture": "zellij-shortcut-plus-identical-ui-hint-before and after"
+  },
+  {
+    "scenario": "wrapped literal extraction and append proof",
+    "live": true,
+    "payload": "Reply exactly ZELLIJ_WRAPPED_ACK_09. This is a real wrapped composer regression check with a long payload; preserve each word rather than treating the UI shortcut as human input. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. Reply only ZELLIJ_WRAPPED_ACK_09.",
+    "before_content": "",
+    "extracted_content": "Reply exactly ZELLIJ_WRAPPED_ACK_09. This is a real wrapped composer regression check with a long payload; preserve each word rather than treating the UI shortcut as human input. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. The quick brown fox checks terminal wrapping. Reply only ZELLIJ_WRAPPED_ACK_09.",
+    "state": "pending",
+    "observed_append_exit": 0,
+    "pass": true,
+    "capture": "zellij-wrapped-draft"
+  },
+  {
+    "scenario": "public explicit-target wrapped submit",
+    "live": true,
+    "send_exit": 0,
+    "ack_visible": true,
+    "pass": true,
+    "capture": "zellij-wrapped-submit-ack",
+    "note": "Confirm model response versus submitted prompt in rendered capture."
+  },
+  {
+    "scenario": "real busy and queued surface",
+    "live": true,
+    "busy_state": "empty",
+    "queued_state": "empty",
+    "queued_content_exit": 0,
+    "queued_content": "",
+    "queued_marker_visible": false,
+    "capture": "zellij-busy-running and zellij-busy-queued",
+    "pass": null,
+    "note": "Queue-marker branch untested: actual Enter steered/interrupted a running tool and backgrounded sleep rather than leaving queued UI. Busy empty composer correctly reads empty; not a busy-as-pending promise."
+  },
+  {
+    "scenario": "actual slash command completion popup",
+    "live": true,
+    "typed": "/mo",
+    "state": "pending",
+    "content_exit": 0,
+    "content": "⬢ model Model: openai-codex/gpt-6.1-sol █",
+    "capture": "zellij-command-popup",
+    "pass": false
+  },
+  {
+    "scenario": "Alt-Enter follow-up queue",
+    "live": true,
+    "state": "pending",
+    "content_exit": 0,
+    "content": "/moUse bash to run sleep 15, then reply exactly ZELLIJ_BUSY_DONE_11.After current turn finishes reply exactly ZELLIJ_FOLLOWUP_ACK_11.",
+    "queued_marker_visible": true,
+    "capture": "zellij-alt-enter-queued",
+    "pass": null,
+    "note": "Untested queued marker: gesture attempted while no busy turn existed due preceding send-failed; real surface held draft/newline."
+  },
+  {
+    "scenario": "public durable send with retained test draft after queue gesture attempt",
+    "live": true,
+    "state": "pending",
+    "expected_catalogue_verdict": "unknown",
+    "actual_safety": "pending => doorbell skipped",
+    "send_exit": 0,
+    "ring_skipped": true,
+    "surface_unchanged": true,
+    "pass": true,
+    "capture": "zellij-popup-protected-before and after",
+    "limitation": "Alt-Enter inserted a newline; line-local clear did not erase earlier draft. This attempt proves pending draft skip, not popup-unknown behavior."
+  },
+  {
+    "scenario": "genuine popup public durable protection",
+    "live": true,
+    "state": "pending",
+    "send_exit": 0,
+    "ring_skipped": true,
+    "surface_unchanged": true,
+    "pass": true,
+    "capture": "zellij-genuine-popup-before and after",
+    "limitation": "Actual popup is pending rather than fixture unknown; never empty."
+  }
+]

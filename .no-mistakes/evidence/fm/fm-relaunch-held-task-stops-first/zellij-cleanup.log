@@ -1,0 +1,14 @@
+named zellij_safe_delete session=fm-composer-live-zellij-66235 status=1
+No active zellij sessions found.
+disposable download, binary, driver, marked lab and config removed
+External unblock via same named zellij_safe_delete: 0 
+named zellij_safe_delete session=fm-composer-live-zellij-66235-b status=1
+disposable download, binary, driver, marked lab and config removed
+Server removed using named zellij_safe_delete(status0); own exiting client and holder terminated; subsequent list-sessions queries hung and only those owned query PIDs47560 and55622 were cancelled. Supervisor EXIT trap finished; download/config/driver/lab removal confirmed.
+pgrep -fl exact owned disposable path: exit 0 output 16770 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/zellij --server .sockets/contract_version_1/fm-composer-live-zellij-66235-b
+20740 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/launch-omp-truecolor.sh
+28649 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/launch-omp-codex.sh
+55746 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/launch-omp-fresh.sh
+90487 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/launch-omp.sh
+
+Named delete returned0 but real server PID16770 persisted; exact server argv ownership verified, then SIGTERM only PID16770. This removed owned server and terminal descendants. Final ps of all recorded owned PIDs: ; lab exists=False

@@ -1,0 +1,39 @@
+
+                               ████████████
+                                  ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                  ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                  ▒▒  ██                  █
+                                      ██       v18.6.3
+
+             Tip: Find out which model you emotionally abuse the most with `omp
+                                           stats`
+
+ A done: is accepted when the named head is on this project's shared local branch, not only
+ on a detached copy; the check tests that head, not merely that a branch moved.
+ Keep your branch a clean fast-forward onto the current default branch - if main has
+ advanced, rebase onto it so the eventual merge stays a fast-forward.
+ When it is implemented and committed, append done [at=<epoch>]: ready in branch fm/hraway
+ to the status file and stop.
+ The configured merge authority approves the ready branch, then firstmate merges it into
+ local main through the guarded fast-forward path.
+
+ Progress note (2026-10-06T17:20:51Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hraway.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hraway.inbox/handled/. A steer sent before the relaunch survives
+ there.
+
+ ordinary unblocked In-flight away replacement
+
+
+  ⎋ Working…
+
+❯
+ ⠴ 0s · ◔ GPT-6.1-Sol 👁 · 🌳 project/away-wt · ⑂ fm/hraway ?1 · ◫ 8.8%/272K ⟲ · (sub)

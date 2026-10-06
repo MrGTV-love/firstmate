@@ -1,0 +1,3 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/run.sh: line 15: 16065 Terminated: 15          python3 "$LAB/hold.py"
+zellij safety guard: refusing - session 'fm-composer-live-zellij-66235-b' not found in 'zellij list-sessions'
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/run.sh: line 5: 55622 Killed: 9               python3 "$LAB/hold.py"

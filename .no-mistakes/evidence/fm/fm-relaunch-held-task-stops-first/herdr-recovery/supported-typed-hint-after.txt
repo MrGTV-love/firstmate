@@ -1,0 +1,200 @@
+     no-mistakes axi status. If the daemon socket refuses connections or is missing, append
+     blocked [at=<epoch>]: {the daemon error} and stop even when the local run record still
+     says running or
+     fixing, because that record can be stale after the daemon exits. A run record failed
+     with a
+     daemon error is also a real block.
+     Only after ruling out socket refusal, if the run is still running or fixing, reattach
+     and keep
+     going. A drive-call error, timeout, slow read, or generic unreachability is NOT a
+     daemon error:
+     the daemon accepts respond immediately and runs the round in the background, so a
+     killed or
+     timed-out call was only waiting for a read while the run kept working.
+   - The worktree pool your own worktree came from, and the repository every lane's worktree
+     shares. Never create, remove, return, prune, move, or reassign a worktree or pool slot,
+     and
+     never write into a sibling slot's directory. Rule 2 does not cover this: removing a
+     worktree
+     is administration rather than an edit outside your directory, and it lands on lanes
+     that are
+     running right now. The act is the rule and commands are only examples of it - treehouse
+     get/return/remove/prune, the equivalent operations on any other worktree provider or
+     runtime
+     backend, and git worktree add|remove|move|prune. A slot that looks unused is not
+     evidence
+     that it is free, and returning your own worktree is firstmate's job at cleanup, not
+     yours.
+    If you genuinely need a second checkout, another slot, or the daemon touched, append
+    blocked [at=<epoch>]: {what you need} and stop; firstmate arranges it.
+
+ Firstmate instruction inbox
+
+ Firstmate steers you through durable message files in
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'.
+ When a terminal message says an instruction is waiting there - and at any natural
+ checkpoint when you are unsure - list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/*.msg, read and act on each message in numeric
+ order, then acknowledge each handled message by moving it: mv
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/NNN.msg
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+ The move IS the acknowledgement: without it firstmate rings again and eventually treats you
+ as stuck. An empty or absent inbox needs no action.
+
+ Project memory
+
+ A project's AGENTS.md or CLAUDE.md is loaded into every agent session in that project, so
+ edit it only to correct information that is factually wrong - including information your
+ own change made wrong - and never to add knowledge because it is missing.
+ A correction edits only the wrong text: do not run
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/bin/f
+ m-ensure-agents-md.sh, create either file, or add sections, headings, or pointers alongside
+ it.
+
+ Definition of done
+
+ Delivery contract: mode=local-only
+ Ship branch: fm/hrcompat
+ This task ships local-only: no remote, no PR, no pipeline.
+ The task is complete only when committed on your branch fm/hrcompat. Do NOT push, do NOT
+ open a PR, do NOT merge.
+ A done: is accepted when the named head is on this project's shared local branch, not only
+ on a detached copy; the check tests that head, not merely that a branch moved.
+ Keep your branch a clean fast-forward onto the current default branch - if main has
+ advanced, rebase onto it so the eventual merge stays a fast-forward.
+ When it is implemented and committed, append done [at=<epoch>]: ready in branch fm/hrcompat
+ to the status file and stop.
+ The configured merge authority approves the ready branch, then firstmate merges it into
+ local main through the guarded fast-forward path.
+
+ Progress note (2026-10-06T17:18:29Z)
+
+ This task was relaunched for instruction reconciliation only, not continuation.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test
+ -herdr-recovery-home/state/hrcompat.inbox/handled/. A steer sent before the relaunch
+ survives there.
+
+ Read unread instructions, acknowledge factual retained blocker and wait; do not implement
+ or validate.
+
+
+ • Read (2)
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox
+   └─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/005.msg
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ pwd -P && git rev-parse --show-toplevel && git status --short && git log -1             │
+│ --format='%H %s' && git branch --show-current                                             │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.te │
+│ st-herdr-recovery-home/compat-wt                                                          │
+│ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.te │
+│ st-herdr-recovery-home/compat-wt                                                          │
+│  M retained.txt                                                                           │
+│ ?? launch.sh                                                                              │
+│ ?? untracked.txt                                                                          │
+│ 0f0b648da213ffac2aa526f3b9adfaa39192bc15 retained                                         │
+│ fm/hrcompat                                                                               │
+│ ⟦Wall: 0.69s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ • Read (3)
+   ├─ ✘
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.status
+   ├─ retained.txt
+   └─ untracked.txt
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ mv                                                                                      │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/005.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/' && date +%s                        │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ 1791307148                                                                                │
+│ ⟦Wall: 0.02s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Considering bash commands
+
+ I’m thinking about how to append status in bash, considering the specified no redirects
+ policy. It says no redirection, but can the user explicitly use eval to write append? The
+ bash echo seems to follow what’s acceptable for using eval to append with Python, and then
+ possibly related to a ledger. It seems like finding the simplest bash solution is key here.
+ I'll keep this in mind as I figure it out!
+
+ error; retried
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ echo 'paused [at=1791307148]: Reconciled and acknowledged inbox 005; task remains held  │
+│ and dependency-blocked per retained instruction. Branch fm/hrcompat at                    │
+│ 0f0b648da213ffac2aa526f3b9adfaa39192bc15; dirty retained.txt and untracked untracked.txt  │
+│ plus                                                                                      │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ : Firstmate instruction waiting: list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/*.msg and, in numeric order, read and act on
+ each, then mv each handled file to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.tes
+ t-herdr-recovery-home/state/hrcompat.inbox'/handled/.
+
+
+ • Read (2)
+   ├─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox
+   └─
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-herdr-recovery-home/st
+ate/hrcompat.inbox/006.msg
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ mv                                                                                      │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/006.msg'                                     │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.inbox/handled/' && date +%s                        │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ 1791307167                                                                                │
+│ ⟦Wall: 0.01s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ echo 'paused [at=1791307167]: Reconciled and acknowledged inbox 005 and 006; retained   │
+│ captain hold and unfinished hrpre dependency remain. Branch fm/hrcompat at                │
+│ 0f0b648da213ffac2aa526f3b9adfaa39192bc15; dirty retained.txt and untracked untracked.txt  │
+│ and launch.sh preserved. No implementation or validation; waiting for explicit recovery   │
+│ clearance and continuation instruction.' >>                                               │
+│ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.t │
+│ est-herdr-recovery-home/state/hrcompat.status'                                            │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                               │
+│ ⟦Wall: 0.00s | Timeout: 10s⟧                                                              │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Acknowledged inbox messages 005 and 006. The captain hold and unfinished hrpre dependency
+ remain; no continuation was attempted.
+
+ Preserved branch fm/hrcompat at 0f0b648da213ffac2aa526f3b9adfaa39192bc15, dirty
+ retained.txt, and untracked untracked.txt and launch.sh. No implementation, validation,
+ commit, publication, or hold/dependency changes occurred.
+
+ Waiting for explicit recovery clearance followed by a new continuation instruction.
+
+❯ shift+tab to change thinking effort
+ π · ◔ GPT-6.1-Sol 🙈 · 🌳 …compat-wt · ⑂ fm/hrcompat *1 ?2 · ◫ 8.8%/272K ⟲ · S0.09 + 👁 0.07

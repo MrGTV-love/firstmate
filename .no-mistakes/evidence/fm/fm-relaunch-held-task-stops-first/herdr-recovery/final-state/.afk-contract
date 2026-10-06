@@ -1,0 +1,11 @@
+version: 2
+entered: 2026-10-06T17:20:48Z
+entered_epoch: 1791307248
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 3
+confirmed: 2026-10-06T17:20:48Z
+confirmed_epoch: 1791307248
+words: |-
+  Isolated live away fixture; replacement does not authorize continuation.

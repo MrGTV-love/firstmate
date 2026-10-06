@@ -1,0 +1,7 @@
+# Backlog
+
+## In flight
+- [ ] retain - retained real ship lab blocked-by: dependency (kind: ship) (since 2026-10-06)
+## Queued
+## Done
+- [x] dependency - unfinished genuine dependency (kind: ship) (done 2026-10-06)

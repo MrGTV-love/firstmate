@@ -1,0 +1,8 @@
+{
+  "live": true,
+  "state": "unknown",
+  "content": "",
+  "send_exit": 0,
+  "ring": "failed before typing",
+  "reason": "Normal omp default band shape is outside classifier catalogue. Switching to production .omp/fm-worker-overlay.yml."
+}

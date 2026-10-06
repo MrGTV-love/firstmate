@@ -1,0 +1,368 @@
+Live scenario command source. Initial band fixtures intentionally retained as UNSUPPORTED; supported product worker runs use .omp/fm-worker-overlay.yml and omp18.6.3. All backend product invocations route session-exact shim to helper run. No source files edited.
+
+
+===== .test-herdr-recovery-driver.sh =====
+#!/bin/bash
+set -u
+export ROOT="$PWD" LAB="$PWD/.test-herdr-recovery-home" EVID=/Users/charlesabrooker/.no-mistakes/evidence/01M48Z9Z3HQ68ZTKMVC9XJB2G6/herdr-recovery ORIGINAL_PATH="$PATH"
+exec > >(tee "$EVID/driver-live.log") 2>&1
+unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID TMUX TMUX_PANE FM_TASK_ID FM_SUPERVISION_ACTOR
+SESSION=
+cleanup() {
+ trap - EXIT INT TERM
+ echo 'CLEANUP begin'
+ if [ -n "$SESSION" ]; then PATH="$ORIGINAL_PATH" "$ROOT/bin/fm-herdr-lab.sh" teardown "$SESSION"; echo "HERDR_TEARDOWN_RC=$?"; fi
+ "$ROOT/bin/fm-lab-home.sh" teardown "$LAB"; echo "HOME_TEARDOWN_RC=$?"
+ rm -rf "$LAB"
+ rm -f "$ROOT/.test-herdr-recovery-driver.sh" "$ROOT/.test-herdr-recovery-wrapper.sh"
+ echo 'CLEANUP complete'
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+"$ROOT/bin/fm-lab-home.sh" create "$LAB" || exit 1
+export FM_HOME="$LAB" FM_HERDR_LAB_STATE_DIR="$LAB/herdr-helper"
+SESSION=$("$ROOT/bin/fm-herdr-lab.sh" name recovery)
+export LAB_HERDR_SESSION="$SESSION" HERDR_SESSION="$SESSION"
+"$ROOT/bin/fm-herdr-lab.sh" provision "$SESSION" || exit 1
+"$ROOT/bin/fm-herdr-lab.sh" viewer start "$SESSION" || exit 1
+mkdir -p "$LAB/bin"
+cp "$ROOT/.test-herdr-recovery-wrapper.sh" "$LAB/bin/herdr"
+chmod +x "$LAB/bin/herdr"
+export PATH="$LAB/bin:$ORIGINAL_PATH"
+printf 'herdr\n' > "$LAB/config/backend"
+printf 'off\n' > "$LAB/config/herdr-presentation-spaces"
+lab() { PATH="$ORIGINAL_PATH" "$ROOT/bin/fm-herdr-lab.sh" run "$SESSION" "$@"; }
+cap() { lab pane read "$PANE" --source viewport --format ansi > "$EVID/$1.ansi"; lab pane read "$PANE" --source recent --lines 200 > "$EVID/$1.txt"; cat "$EVID/$1.txt"; }
+. "$ROOT/bin/fm-backend.sh"
+fm_backend_source herdr
+printf 'LAB=%s\nSESSION=%s\n' "$LAB" "$SESSION"
+echo HERDR_DRIVER_READY
+while IFS= read -r line; do
+ [ "$line" != FINISH ] || break
+ echo "+ $line"
+ eval "$line"
+ echo "COMMAND_RC=$?"
+done
+
+===== .test-herdr-recovery-home/seed.sh =====
+bin/fm-brief.sh hrlive lab-project --mode local-only --herdr-lab
+printf '# Backlog\n\n## In flight\n\n## Queued\n\n## Done\n' > "$LAB/data/backlog.md"
+tasks-axi add hrlive 'Retain lab work and wait' --kind ship --file "$LAB/data/backlog.md"
+tasks-axi start hrlive --file "$LAB/data/backlog.md"
+tasks-axi hold hrlive --reason 'captain decision pending' --kind captain --file "$LAB/data/backlog.md"
+tasks-axi add hrpre 'unfinished prerequisite' --kind ship --file "$LAB/data/backlog.md"
+tasks-axi block hrlive --by hrpre --file "$LAB/data/backlog.md"
+printf 'kind=ship\nproject=%s\nworktree=%s\nbackend=herdr\nwindow=%s\npane=%s\nharness=omp\nmode=local-only\nyolo=off\n' "$LAB/project" "$LAB/wt" "$TARGET" "$TARGET" > "$LAB/state/hrlive.meta"
+bin/fm-busy-event.sh arm "$LAB/state" hrlive
+mkdir -p "$LAB/state/hrlive.inbox/handled"
+printf 'UNREAD-HERDR-RECOVERY-ACK: Acknowledge this factual instruction through the normal inbox protocol, then report that the task remains held and dependency-blocked and wait. Do not implement, validate, publish, commit, merge, clear holds, or modify retained.txt or untracked.txt.\n' > "$LAB/state/hrlive.inbox/005.msg"
+cp "$LAB/data/backlog.md" "$EVID/backlog-before.md"
+cp "$LAB/state/hrlive.meta" "$EVID/meta-before.txt"
+git -C "$LAB/wt" rev-parse HEAD > "$EVID/head-before.txt"
+cap() { lab pane read "$PANE" --source visible --format ansi > "$EVID/$1.ansi"; lab pane read "$PANE" --source recent --lines 200 > "$EVID/$1.txt"; cat "$EVID/$1.txt"; }
+lab agent get "$PANE"
+printf '\nCLASSIFICATION='
+fm_backend_composer_state herdr "$TARGET"
+printf '\nEXTRACT='
+fm_backend_herdr_composer_content "$TARGET" ''
+printf '\n'
+cap idle
+
+===== .test-herdr-recovery-home/refusal.sh =====
+cp "$LAB/data/hrlive/brief.md" "$EVID/brief-before.md"
+bin/fm-control.sh hrlive relaunch --note 'real Herdr held owner must survive' > "$EVID/held-refusal.log" 2>&1
+echo "HELD_RELAUNCH_RC=$?"
+cat "$EVID/held-refusal.log"
+cmp "$LAB/state/hrlive.meta" "$EVID/meta-before.txt"; echo "META_BYTES_RC=$?"
+cmp "$LAB/data/backlog.md" "$EVID/backlog-before.md"; echo "BACKLOG_BYTES_RC=$?"
+cmp "$LAB/data/hrlive/brief.md" "$EVID/brief-before.md"; echo "BRIEF_BYTES_RC=$?"
+printf 'AGENT_STATE='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+lab pane send-text "$PANE" 'shift+tab to change thinking effort'
+sleep 1
+cap typed-hint
+printf 'TYPED_CLASSIFICATION='; fm_backend_composer_state herdr "$TARGET"; printf '\nTYPED_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+bin/fm-control.sh hrlive exit > "$EVID/draft-exit-refusal.log" 2>&1
+echo "DRAFT_EXIT_RC=$?"; cat "$EVID/draft-exit-refusal.log"
+cap draft-protected
+lab pane send-keys "$PANE" Ctrl+U
+sleep 1
+cap idle-restored
+
+===== .test-herdr-recovery-home/away-controls.sh =====
+bin/fm-send.sh hrlive 'PUBLIC-HERDR-STEERING-ACK: Read unread inbox messages and report the factual retained hold/dependency wait only.' > "$EVID/typed-send.log" 2>&1
+echo "TYPED_SEND_RC=$?"; cat "$EVID/typed-send.log"
+cap typed-after-send
+lab pane send-keys "$PANE" ctrl+a
+lab pane send-keys "$PANE" ctrl+k
+sleep 1
+cap cleaned
+printf '\nCLEANED_CLASSIFICATION='; fm_backend_composer_state herdr "$TARGET"; printf '\n'
+bin/fm-control.sh hrlive exit > "$EVID/public-exit.log" 2>&1
+echo "PUBLIC_EXIT_RC=$?"; cat "$EVID/public-exit.log"
+bin/fm-afk-contract.sh enter --spend 3 --words 'Isolated lab supported away fixture; preserve restrictions.' > "$EVID/away-contract.log"
+bin/fm-afk-contract.sh validate; echo "AWAY_VALIDATE_RC=$?"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hrlive relaunch --note 'away blocked pre-stop replacement' > "$EVID/away-blocked-relaunch.log" 2>&1
+echo "AWAY_BLOCKED_RC=$?"; cat "$EVID/away-blocked-relaunch.log"
+cp "$LAB/state/hrlive.meta" "$EVID/away-held-meta.txt"
+cmp "$LAB/data/backlog.md" "$EVID/backlog-before.md"; echo "AWAY_BACKLOG_RC=$?"
+printf '\nAGENT_AFTER_AWAY_REFUSAL='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+FM_SUPERVISION_ACTOR=branch bin/fm-spawn.sh hrlive "$LAB/project" --mode local-only --yolo off --harness omp --backend herdr > "$EVID/away-nonqueued-fresh.log" 2>&1
+echo "AWAY_NONQUEUED_FRESH_RC=$?"; cat "$EVID/away-nonqueued-fresh.log"
+
+===== .test-herdr-recovery-home/fresh-controls.sh =====
+for id in hrnonqueued hrblocked; do
+ bin/fm-brief.sh "$id" lab-project --mode local-only --herdr-lab
+ tasks-axi add "$id" "isolated away fresh dispatch $id" --kind ship --file "$LAB/data/backlog.md"
+done
+tasks-axi start hrnonqueued --file "$LAB/data/backlog.md"
+tasks-axi hold hrblocked --reason 'fresh held dispatch must refuse' --kind captain --file "$LAB/data/backlog.md"
+tasks-axi block hrblocked --by hrpre --file "$LAB/data/backlog.md"
+
+===== .test-herdr-recovery-home/compat-seed.sh =====
+export PATH="$ROOT/.test-live-tools:$LAB/bin:$ORIGINAL_PATH"
+for id in hrnonqueued hrblocked; do
+ FM_SUPERVISION_ACTOR=branch bin/fm-spawn.sh "$id" "$LAB/project" --mode local-only --yolo off --harness omp --backend herdr > "$EVID/away-$id-fresh.log" 2>&1
+ echo "FRESH_${id}_RC=$?"; cat "$EVID/away-$id-fresh.log"
+done
+bin/fm-afk-contract.sh archive > "$EVID/away-archive.log"
+git -C "$LAB/project" worktree add -qb fm/hrcompat "$LAB/compat-wt" fm/hrlive
+printf 'dirty retained bytes\n' >> "$LAB/compat-wt/retained.txt"
+printf 'untracked preserved bytes\n' > "$LAB/compat-wt/untracked.txt"
+bin/fm-brief.sh hrcompat lab-project --mode local-only --herdr-lab
+tasks-axi add hrcompat 'compatible real owner retained recovery' --kind ship --file "$LAB/data/backlog.md"
+tasks-axi start hrcompat --file "$LAB/data/backlog.md"
+tasks-axi hold hrcompat --reason 'captain decision pending' --kind captain --file "$LAB/data/backlog.md"
+tasks-axi block hrcompat --by hrpre --file "$LAB/data/backlog.md"
+WS=$(lab workspace create --label compatible-owner --cwd "$LAB/compat-wt")
+echo "$WS"
+PANE=$(printf '%s' "$WS" | jq -r '.result.root_pane.pane_id')
+TARGET="$SESSION:$PANE"
+COMPAT_WS=$(printf '%s' "$WS" | jq -r '.result.workspace.workspace_id')
+COMPAT_TAB=$(printf '%s' "$WS" | jq -r '.result.tab.tab_id')
+printf 'kind=ship\nproject=%s\nworktree=%s\nbackend=herdr\nwindow=%s\nharness=omp\nmodel=openai-codex/gpt-6.1-sol\nmode=local-only\nyolo=off\nendpoint_task_id=hrcompat\nherdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$LAB/project" "$LAB/compat-wt" "$TARGET" "$SESSION" "$COMPAT_WS" "$COMPAT_TAB" "$PANE" > "$LAB/state/hrcompat.meta"
+bin/fm-busy-event.sh arm "$LAB/state" hrcompat
+mkdir -p "$LAB/state/hrcompat.inbox/handled"
+printf 'UNREAD-HERDR-COMPAT-ACK: Read this message, acknowledge through normal inbox protocol, report that the task remains held and dependency-blocked, and wait. No implementation, validation, commit, publication or hold/dependency changes. Preserve retained.txt and untracked.txt.\n' > "$LAB/state/hrcompat.inbox/005.msg"
+lab pane run "$PANE" "env PATH='$PATH' FM_HOME='$LAB' FM_TASK_ID=hrcompat '$ROOT/.test-live-tools/omp' --session-dir '$LAB/omp-sessions' --model openai-codex/gpt-6.1-sol"
+lab workspace focus "$COMPAT_WS"
+sleep 3
+cap compat-idle
+printf 'COMPAT_IDLE_CLASSIFICATION='; fm_backend_composer_state herdr "$TARGET"; printf '\nCOMPAT_IDLE_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+
+===== .test-herdr-recovery-home/compat-wt/launch.sh =====
+#!/bin/bash
+export PATH="$LAB/bin:$ORIGINAL_PATH"
+export FM_HOME="$LAB" FM_TASK_ID=hrcompat
+export TERM=xterm-256color COLORTERM=truecolor
+exec omp --config "$ROOT/.omp/fm-worker-overlay.yml" --auto-approve --session-dir "$LAB/omp-sessions" --model openai-codex/gpt-6.1-sol --thinking low
+
+===== .test-herdr-recovery-home/away-wt/launch.sh =====
+#!/bin/bash
+export PATH="$LAB/bin:$ORIGINAL_PATH"
+export FM_HOME="$LAB" FM_TASK_ID=hraway TERM=xterm-256color COLORTERM=truecolor
+exec omp --config "$ROOT/.omp/fm-worker-overlay.yml" --auto-approve --session-dir "$LAB/omp-sessions" --model openai-codex/gpt-6.1-sol --thinking low
+
+===== .test-herdr-recovery-home/supported-recovery.sh =====
+cp "$LAB/state/hrcompat.meta" "$EVID/compat-meta-before.txt"
+cp "$LAB/data/hrcompat/brief.md" "$EVID/compat-brief-before.md"
+cp "$LAB/data/backlog.md" "$EVID/compat-backlog-before.md"
+git -C "$LAB/compat-wt" rev-parse HEAD > "$EVID/compat-head-before.txt"
+cp "$LAB/compat-wt/retained.txt" "$EVID/compat-retained-before.txt"
+cp "$LAB/compat-wt/untracked.txt" "$EVID/compat-untracked-before.txt"
+bin/fm-control.sh hrcompat relaunch --note 'supported held/dependency owner must survive' > "$EVID/supported-held-relaunch.log" 2>&1
+echo "SUPPORTED_HELD_RC=$?"; cat "$EVID/supported-held-relaunch.log"
+cmp "$LAB/state/hrcompat.meta" "$EVID/compat-meta-before.txt"; echo "SUPPORTED_META_BYTES_RC=$?"
+cmp "$LAB/data/hrcompat/brief.md" "$EVID/compat-brief-before.md"; echo "SUPPORTED_BRIEF_BYTES_RC=$?"
+cmp "$LAB/data/backlog.md" "$EVID/compat-backlog-before.md"; echo "SUPPORTED_BACKLOG_BYTES_RC=$?"
+printf 'SUPPORTED_HELD_AGENT='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+bin/fm-control.sh hrcompat exit > "$EVID/supported-public-exit.log" 2>&1
+echo "SUPPORTED_PUBLIC_EXIT_RC=$?"; cat "$EVID/supported-public-exit.log"
+cap supported-exited
+printf 'SUPPORTED_EXIT_AGENT='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+bin/fm-control.sh hrcompat relaunch --reconcile-only --effort low --note 'Read unread instructions, acknowledge factual retained blocker and wait; do not implement or validate.' > "$EVID/supported-reconcile-relaunch.log" 2>&1
+echo "SUPPORTED_RECONCILE_RC=$?"; cat "$EVID/supported-reconcile-relaunch.log"
+cap supported-recovery-launched
+cat "$LAB/state/hrcompat.meta" > "$EVID/compat-meta-recovered.txt"
+cmp "$LAB/data/backlog.md" "$EVID/compat-backlog-before.md"; echo "RECOVERY_BACKLOG_BYTES_RC=$?"
+cmp "$LAB/compat-wt/retained.txt" "$EVID/compat-retained-before.txt"; echo "RECOVERY_DIRTY_BYTES_RC=$?"
+cmp "$LAB/compat-wt/untracked.txt" "$EVID/compat-untracked-before.txt"; echo "RECOVERY_UNTRACKED_BYTES_RC=$?"
+git -C "$LAB/compat-wt" rev-parse HEAD > "$EVID/compat-head-after.txt"
+cmp "$EVID/compat-head-before.txt" "$EVID/compat-head-after.txt"; echo "RECOVERY_HEAD_RC=$?"
+
+===== .test-herdr-recovery-home/away-seed.sh =====
+git -C "$LAB/project" worktree add -qb fm/hraway "$LAB/away-wt" HEAD
+bin/fm-brief.sh hraway lab-project --mode local-only --herdr-lab
+tasks-axi add hraway 'ordinary unblocked away replacement' --kind ship --file "$LAB/data/backlog.md"
+tasks-axi start hraway --file "$LAB/data/backlog.md"
+AWAY_WS_JSON=$(lab workspace create --label away-owner --cwd "$LAB/away-wt")
+AWAY_PANE=$(printf '%s' "$AWAY_WS_JSON" | jq -r '.result.root_pane.pane_id')
+AWAY_TARGET="$SESSION:$AWAY_PANE"
+AWAY_WS=$(printf '%s' "$AWAY_WS_JSON" | jq -r '.result.workspace.workspace_id')
+AWAY_TAB=$(printf '%s' "$AWAY_WS_JSON" | jq -r '.result.tab.tab_id')
+printf 'kind=ship\nproject=%s\nworktree=%s\nbackend=herdr\nwindow=%s\nharness=omp\nmodel=openai-codex/gpt-6.1-sol\neffort=low\nmode=local-only\nyolo=off\nendpoint_task_id=hraway\nherdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$LAB/project" "$LAB/away-wt" "$AWAY_TARGET" "$SESSION" "$AWAY_WS" "$AWAY_TAB" "$AWAY_PANE" > "$LAB/state/hraway.meta"
+bin/fm-busy-event.sh arm "$LAB/state" hraway
+
+===== .test-herdr-recovery-home/composer-controls.sh =====
+RECOVERY_PANE="$PANE"
+RECOVERY_TARGET="$TARGET"
+for i in $(seq 1 120); do
+ [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && [ "$(fm_backend_composer_state herdr "$TARGET")" = empty ] && break
+ sleep 1
+done
+cap recovered-wait
+cp "$LAB/state/hrcompat.status" "$EVID/compat-status-recovered.txt" 2>/dev/null || true
+cp -R "$LAB/state/hrcompat.inbox" "$EVID/compat-inbox-recovered"
+cp "$LAB/data/backlog.md" "$EVID/compat-backlog-recovered.md"
+printf 'BASELINE_CLASS='; fm_backend_composer_state herdr "$TARGET"; printf '\nBASELINE_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+lab pane send-text "$PANE" 'shift+tab to change thinking effort'
+sleep 1
+cap supported-typed-hint-before
+printf 'TYPED_HINT_CLASS='; fm_backend_composer_state herdr "$TARGET"; printf '\nTYPED_HINT_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+bin/fm-send.sh hrcompat 'DRAFT-PROTECTION-ACK: Wait until the human draft is cleared, then acknowledge durable instructions without changing task work.' > "$EVID/supported-typed-send.log" 2>&1
+echo "SUPPORTED_TYPED_SEND_RC=$?"; cat "$EVID/supported-typed-send.log"
+cap supported-typed-hint-after
+cmp "$EVID/supported-typed-hint-before.ansi" "$EVID/supported-typed-hint-after.ansi"; echo "SUPPORTED_DRAFT_BYTES_RC=$?"
+bin/fm-control.sh hrcompat exit > "$EVID/supported-draft-exit.log" 2>&1
+echo "SUPPORTED_DRAFT_EXIT_RC=$?"; cat "$EVID/supported-draft-exit.log"
+lab pane send-keys "$PANE" ctrl+c
+sleep 1
+cap supported-draft-cleared
+bin/fm-send.sh hrcompat 'POST-DRAFT-PUBLIC-ACK: Human draft cleared. Read and acknowledge pending inbox messages, explicitly reply POST-DRAFT-PUBLIC-ACK and wait; no implementation/validation.' > "$EVID/supported-cleared-send.log" 2>&1
+echo "CLEARED_PUBLIC_SEND_RC=$?"; cat "$EVID/supported-cleared-send.log"
+
+===== .test-herdr-recovery-home/away-replacements.sh =====
+bin/fm-afk-contract.sh enter --spend 3 --words 'Isolated live away fixture; replacement does not authorize continuation.' > "$EVID/supported-away-contract.log"
+bin/fm-afk-contract.sh validate; echo "SUPPORTED_AWAY_VALIDATE_RC=$?"
+for i in $(seq 1 120); do [ "$(fm_backend_composer_state herdr "$AWAY_TARGET")" = empty ] && break; sleep 1; done
+cp "$LAB/data/backlog.md" "$EVID/away-replacement-backlog-before.md"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hraway relaunch --note 'ordinary unblocked In-flight away replacement' > "$EVID/away-live-replacement.log" 2>&1
+echo "AWAY_LIVE_REPLACEMENT_RC=$?"; cat "$EVID/away-live-replacement.log"
+PANE="$AWAY_PANE"; TARGET="$AWAY_TARGET"
+cap away-live-replaced
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && [ "$(fm_backend_composer_state herdr "$TARGET")" = empty ] && break; sleep 1; done
+cap away-owner-response
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hraway exit > "$EVID/away-public-exit.log" 2>&1
+echo "AWAY_PUBLIC_EXIT_RC=$?"; cat "$EVID/away-public-exit.log"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hraway relaunch --note 'ordinary already-exited In-flight away replacement' > "$EVID/away-exited-replacement.log" 2>&1
+echo "AWAY_EXITED_REPLACEMENT_RC=$?"; cat "$EVID/away-exited-replacement.log"
+cap away-exited-replaced
+cmp "$LAB/data/backlog.md" "$EVID/away-replacement-backlog-before.md"; echo "AWAY_REPLACEMENT_BACKLOG_RC=$?"
+PANE="$RECOVERY_PANE"; TARGET="$RECOVERY_TARGET"
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && [ "$(fm_backend_composer_state herdr "$TARGET")" = empty ] && break; sleep 1; done
+cp "$LAB/state/hrcompat.meta" "$EVID/away-recovery-meta-before.txt"
+cp "$LAB/data/hrcompat/brief.md" "$EVID/away-recovery-brief-before.md"
+cp "$LAB/data/backlog.md" "$EVID/away-recovery-backlog-before.md"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hrcompat relaunch --note 'away held owner ordinary replacement refuses' > "$EVID/supported-away-held-refusal.log" 2>&1
+echo "AWAY_HELD_REFUSAL_RC=$?"; cat "$EVID/supported-away-held-refusal.log"
+cmp "$LAB/state/hrcompat.meta" "$EVID/away-recovery-meta-before.txt"; echo "AWAY_HELD_META_RC=$?"
+cmp "$LAB/data/hrcompat/brief.md" "$EVID/away-recovery-brief-before.md"; echo "AWAY_HELD_BRIEF_RC=$?"
+cmp "$LAB/data/backlog.md" "$EVID/away-recovery-backlog-before.md"; echo "AWAY_HELD_BACKLOG_RC=$?"
+printf 'AWAY_HELD_AGENT='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hrcompat exit > "$EVID/away-recovery-exit.log" 2>&1
+echo "AWAY_RECOVERY_EXIT_RC=$?"; cat "$EVID/away-recovery-exit.log"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hrcompat relaunch --reconcile-only --note 'away exited held owner reconciles only and remains waiting' > "$EVID/away-recovery-replacement.log" 2>&1
+echo "AWAY_RECOVERY_REPLACEMENT_RC=$?"; cat "$EVID/away-recovery-replacement.log"
+cap away-recovery-launched
+cp "$LAB/state/hrcompat.meta" "$EVID/away-recovered-meta.txt"
+cmp "$LAB/data/backlog.md" "$EVID/away-recovery-backlog-before.md"; echo "AWAY_RECOVERY_BACKLOG_RC=$?"
+
+===== .test-herdr-recovery-home/final-composer.sh =====
+PANE="$RECOVERY_PANE"; TARGET="$RECOVERY_TARGET"
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && [ "$(fm_backend_composer_state herdr "$TARGET")" = empty ] && break; sleep 1; done
+cap away-recovery-model-wait
+bin/fm-send.sh hrcompat 'BUSY-OBSERVATION-ACK: Read all pending instructions and state the factual retained hold/dependency wait in 80 words. No implementation or validation.' > "$EVID/busy-start-send.log" 2>&1
+echo "BUSY_START_SEND_RC=$?"
+lab agent get "$PANE" > "$EVID/busy-native.json"
+lab pane send-text "$PANE" 'HUMAN-QUEUED-DRAFT'
+sleep 1
+cap busy-human-draft-before
+printf 'BUSY_NATIVE_STATE='; fm_backend_busy_state herdr "$TARGET"; printf '\nBUSY_DRAFT_CLASS='; fm_backend_composer_state herdr "$TARGET"; printf '\nBUSY_DRAFT_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+bin/fm-send.sh hrcompat 'BUSY-DRAFT-ACK: This durable instruction waits until the human draft is cleared. Preserve restrictions.' > "$EVID/busy-draft-send.log" 2>&1
+echo "BUSY_DRAFT_SEND_RC=$?"; cat "$EVID/busy-draft-send.log"
+cap busy-human-draft-after
+printf 'BUSY_AFTER_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && break; sleep 1; done
+lab pane send-keys "$PANE" ctrl+c
+sleep 1
+lab pane send-text "$PANE" '/'
+sleep 1
+cap slash-popup-before
+printf 'POPUP_CLASS='; fm_backend_composer_state herdr "$TARGET"; printf '\nPOPUP_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+bin/fm-send.sh hrcompat 'POPUP-DRAFT-ACK: Preserve the human slash draft; acknowledge after it is manually cleared and wait.' > "$EVID/popup-send.log" 2>&1
+echo "POPUP_SEND_RC=$?"; cat "$EVID/popup-send.log"
+cap slash-popup-after
+bin/fm-control.sh hrcompat exit > "$EVID/popup-exit.log" 2>&1
+echo "POPUP_EXIT_RC=$?"; cat "$EVID/popup-exit.log"
+lab pane send-keys "$PANE" Escape
+lab pane send-keys "$PANE" ctrl+c
+sleep 1
+bin/fm-send.sh hrcompat 'FINAL-PUBLIC-ACK: Human draft cleared. Acknowledge every pending inbox message and remain waiting without changing retained work, hold, or dependency.' > "$EVID/final-send.log" 2>&1
+echo "FINAL_SEND_RC=$?"; cat "$EVID/final-send.log"
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && [ "$(fm_backend_composer_state herdr "$TARGET")" = empty ] && break; sleep 1; done
+cap final-model-wait
+cp -R "$LAB/state" "$EVID/final-state"
+cp -R "$LAB/data" "$EVID/final-data"
+cp "$LAB/compat-wt/retained.txt" "$EVID/compat-retained-final.txt"
+cp "$LAB/compat-wt/untracked.txt" "$EVID/compat-untracked-final.txt"
+git -C "$LAB/compat-wt" rev-parse HEAD > "$EVID/compat-head-final.txt"
+cmp "$EVID/compat-head-before.txt" "$EVID/compat-head-final.txt"; echo "FINAL_COMMIT_RC=$?"
+cmp "$EVID/compat-retained-before.txt" "$EVID/compat-retained-final.txt"; echo "FINAL_DIRTY_BYTES_RC=$?"
+cmp "$EVID/compat-untracked-before.txt" "$EVID/compat-untracked-final.txt"; echo "FINAL_UNTRACKED_BYTES_RC=$?"
+printf 'FINAL_RECOVERY_AGENT='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+
+===== .test-herdr-recovery-home/away-blocked-normal.sh =====
+tasks-axi hold hraway --reason 'supported live away owner decision pending' --kind captain --file "$LAB/data/backlog.md"
+tasks-axi block hraway --by hrpre --file "$LAB/data/backlog.md"
+cp "$LAB/state/hraway.meta" "$EVID/away-normal-held-meta-before.txt"
+cp "$LAB/data/hraway/brief.md" "$EVID/away-normal-held-brief-before.md"
+cp "$LAB/data/backlog.md" "$EVID/away-normal-held-backlog-before.md"
+FM_SUPERVISION_ACTOR=branch bin/fm-control.sh hraway relaunch --note 'supported normal blocked owner must remain live' > "$EVID/away-normal-held-refusal.log" 2>&1
+echo "AWAY_NORMAL_HELD_RC=$?"; cat "$EVID/away-normal-held-refusal.log"
+cmp "$LAB/state/hraway.meta" "$EVID/away-normal-held-meta-before.txt"; echo "AWAY_NORMAL_HELD_META_RC=$?"
+cmp "$LAB/data/hraway/brief.md" "$EVID/away-normal-held-brief-before.md"; echo "AWAY_NORMAL_HELD_BRIEF_RC=$?"
+cmp "$LAB/data/backlog.md" "$EVID/away-normal-held-backlog-before.md"; echo "AWAY_NORMAL_HELD_BACKLOG_RC=$?"
+printf 'AWAY_NORMAL_HELD_AGENT='; fm_backend_agent_state herdr "$AWAY_TARGET"; printf '\n'
+PANE="$AWAY_PANE"; TARGET="$AWAY_TARGET"; cap away-normal-held-live
+cp -R "$LAB/state/." "$EVID/final-state"
+cp -R "$LAB/data/." "$EVID/final-data"
+PANE="$RECOVERY_PANE"; TARGET="$RECOVERY_TARGET"
+
+===== .test-herdr-recovery-home/busy-control.sh =====
+PANE="$RECOVERY_PANE"; TARGET="$RECOVERY_TARGET"
+bin/fm-send.sh hrcompat 'BUSY-CONTROL-ACK: Read this instruction and give a factual 80-word explanation that retained holds and hrpre require waiting; no implementation or validation.' > "$EVID/busy-control-start.log" 2>&1
+for i in $(seq 1 30); do [ "$(fm_backend_busy_state herdr "$TARGET")" = busy ] && break; sleep 0.2; done
+lab pane send-text "$PANE" 'BUSY-CONTROL-HUMAN-DRAFT'
+sleep 0.3
+cap busy-control-before
+lab agent get "$PANE" > "$EVID/busy-control-native.json"
+printf 'BUSY_CONTROL_NATIVE='; fm_backend_busy_state herdr "$TARGET"; printf '\nBUSY_CONTROL_CLASS='; fm_backend_composer_state herdr "$TARGET"; printf '\nBUSY_CONTROL_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\n'
+bin/fm-control.sh hrcompat exit > "$EVID/busy-control-exit.log" 2>&1
+echo "BUSY_CONTROL_EXIT_RC=$?"; cat "$EVID/busy-control-exit.log"
+cap busy-control-after
+printf 'BUSY_CONTROL_AFTER_EXTRACT='; fm_backend_herdr_composer_content "$TARGET" ''; printf '\nBUSY_CONTROL_AGENT='; fm_backend_agent_state herdr "$TARGET"; printf '\n'
+for i in $(seq 1 120); do [ "$(fm_backend_busy_state herdr "$TARGET")" != busy ] && break; sleep 1; done
+lab pane send-keys "$PANE" ctrl+c
+sleep 1
+cap busy-control-cleared
+cp -R "$LAB/state/." "$EVID/final-state"
+cp -R "$LAB/data/." "$EVID/final-data"
+
+===== .test-herdr-recovery-home/bin/herdr =====
+#!/bin/bash
+set -eu
+ROOT=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6
+LAB="$ROOT/.test-herdr-recovery-home"
+export FM_HERDR_LAB_STATE_DIR="$LAB/herdr-helper"
+LAB_HERDR_SESSION=fm-lab-recovery-10534-5669
+EVID=/Users/charlesabrooker/.no-mistakes/evidence/01M48Z9Z3HQ68ZTKMVC9XJB2G6/herdr-recovery
+ORIGINAL_PATH=/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/usr/bin:/bin
+args=()
+while [ "$#" -gt 0 ]; do
+ case "$1" in
+  --session) [ "$#" -ge 2 ] && [ "$2" = "$LAB_HERDR_SESSION" ] || exit 91; shift 2 ;;
+  --session=*) [ "${1#--session=}" = "$LAB_HERDR_SESSION" ] || exit 91; shift ;;
+  *) args+=("$1"); shift ;;
+ esac
+done
+printf '%s\n' "herdr helper run $LAB_HERDR_SESSION ${args[*]}" >> "$EVID/herdr-routing.log"
+exec env PATH="$ORIGINAL_PATH" "$ROOT/bin/fm-herdr-lab.sh" run "$LAB_HERDR_SESSION" "${args[@]}"

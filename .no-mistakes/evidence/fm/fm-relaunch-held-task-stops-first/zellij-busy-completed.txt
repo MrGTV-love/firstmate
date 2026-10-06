@@ -1,0 +1,30 @@
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89
+   ├─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/home/state
+   └─ ~/.no-mistakes/worktrees/32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6/.test-zellij-mr7fpa89/home/state/zellijfresh.inbox/001.msg
+
+ ZELLIJ_WRAPPED_ACK_09
+
+
+ Runtime busy protection check: use your bash tool to run sleep 15; after it finishes reply exactly ZELLIJ_BUSY_DONE_10. Do not run any
+ other command.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 15                                                                                                                               │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Backgrounded early to handle an incoming message; the command keeps running.                                                             │
+│ ⟦Backgrounded: bg_1 | Timeout: 30s⟧                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+ Reply exactly ZELLIJ_QUEUE_ACK_10 after the current task finishes.
+
+
+ • Background job completed [bash] bg_1 (15.0s)
+
+ ZELLIJ_QUEUE_ACK_10
+
+❯
+ π · ◔ GPT-6.1-Sol 👁 · 🌳 32d18ed9638d/01M48Z9Z3HQ68ZTKMVC9XJB2G6 · ⑂ detached ?5 · ◫ 4.8%/272K ⟲ · S0.04 + 👁 0.04              🆔 01a1123c
+
+
