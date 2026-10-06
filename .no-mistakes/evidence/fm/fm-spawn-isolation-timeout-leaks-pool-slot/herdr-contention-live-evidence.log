@@ -1,0 +1,182 @@
+Herdr serialized-close live scenario
+
+--- real-herdr-scenario-transcript.log ---
+11:44:06 A pane w2:p5, real Treehouse shell 65875: actual slot in-use; foreground startup helper remains in the project.
+11:44:43 B native launcher holds session presentation lock pid 94098; real Treehouse slot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b is in-use.
+11:45:10 A isolation refusal at elapsed 70.6s. Holding B for ten more seconds, beyond old five-second cleanup timeout.
+11:45:23 Ten seconds after refusal, both real leases and all three panes survive; A cleanup is still waiting. Release only B startup delay.
+11:45:35 A exit 1: exact pane and real shell gone, slot available with no processes. B exit 0: worker runs in its isolated slot. Protected worker and slot survive. Session lock released.
+
+
+--- real-herdr-contended-timeout.log ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/home-a
+notice: live-contended-refusal ships mode=local-only while the standing posture for project-a is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a'); aborting acquisition
+
+
+--- real-herdr-projected-launch.log ---
+notice: live-contended-survivor ships mode=local-only while the standing posture for project-b is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+spawned live-contended-survivor harness=bash kind=ship mode=local-only yolo=off window=fm-lab-lease-live-8411-10538:w5:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b
+
+
+--- real-herdr-pool-contention.json ---
+{
+  "a": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a",
+      "status": "in-use",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": [
+        {
+          "pid": 56300,
+          "name": "bash"
+        },
+        {
+          "pid": 85143,
+          "name": "bash"
+        }
+      ]
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/2/project-a",
+      "status": "available",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": []
+    },
+    {
+      "name": "3",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/3/project-a",
+      "status": "in-use",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": [
+        {
+          "pid": 65875,
+          "name": "bash"
+        }
+      ]
+    }
+  ],
+  "b": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b",
+      "status": "in-use",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": [
+        {
+          "pid": 1776,
+          "name": "bash"
+        }
+      ]
+    }
+  ],
+  "presentation_lock_owner": "94098"
+}
+
+--- real-herdr-pool-after.json ---
+{
+  "a": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a",
+      "status": "in-use",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": [
+        {
+          "pid": 56300,
+          "name": "bash"
+        },
+        {
+          "pid": 75476,
+          "name": "sleep"
+        },
+        {
+          "pid": 85143,
+          "name": "bash"
+        }
+      ]
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/2/project-a",
+      "status": "available",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": []
+    },
+    {
+      "name": "3",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/3/project-a",
+      "status": "available",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": []
+    }
+  ],
+  "b": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b",
+      "status": "in-use",
+      "branch": "",
+      "detached": true,
+      "flavor": "git",
+      "lease_id": "",
+      "lease_holder": "",
+      "leased_at": null,
+      "processes": [
+        {
+          "pid": 1776,
+          "name": "bash"
+        },
+        {
+          "pid": 64353,
+          "name": "bash"
+        },
+        {
+          "pid": 77719,
+          "name": "sleep"
+        }
+      ]
+    }
+  ]
+}
+
+--- real-herdr-exact-pane-close.json ---
+{"error":{"code":"pane_not_found","message":"pane w2:p5 not found"},"id":"cli:pane:get"}

@@ -1,0 +1,4 @@
+notice: live-projected-timeout ships mode=local-only while the standing posture for project-b is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-b': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-b'); aborting acquisition
+warning: herdr presentation cleanup could not verify the exact pane; refusing focus-unsafe pane close

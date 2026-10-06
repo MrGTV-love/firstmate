@@ -1,0 +1,53 @@
+$ FM_HOME=<lab home-a> bin/fm-spawn.sh live-protected --relaunch --harness "<model-free worker>"
+Temporarily unavailable disposable worktree Git marker (restored after this probe).
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/home-a
+notice: live-protected ships mode=local-only while the standing posture for project-a is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: relaunch did not yield an isolated worktree (resolved '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a'; worktree root '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4'; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a'); refusing to launch to avoid tangling the primary checkout. Inspect target fm-lab-lease-live-8411-10538:w2:p2
+
+Adopted endpoint after refusal:
+{"id":"cli:pane:get","result":{"pane":{"agent_status":"unknown","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a","pane_id":"w2:p2","revision":0,"scroll":{"max_offset_from_bottom":7,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w2:t2","terminal_id":"term_65d2e9a2eedfc4","workspace_id":"w2"},"type":"pane_info"}}
+
+After restoring worktree marker, original lease remains:
+[
+  {
+    "name": "1",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 56300,
+        "name": "bash"
+      }
+    ]
+  },
+  {
+    "name": "2",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/2/project-a",
+    "status": "available",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": []
+  },
+  {
+    "name": "3",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/3/project-a",
+    "status": "available",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": []
+  }
+]

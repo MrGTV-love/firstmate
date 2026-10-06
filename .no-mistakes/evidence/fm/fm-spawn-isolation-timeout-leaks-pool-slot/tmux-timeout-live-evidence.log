@@ -1,0 +1,65 @@
+Private tmux timeout
+
+--- real-tmux-timeout.log ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/home-tmux
+notice: live-tmux-timeout ships mode=local-only while the standing posture for project-a is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a'); aborting acquisition
+
+
+--- real-tmux-timeout-after.log ---
+Surviving private socket windows:
+@0 sentinel
+
+Real pool status:
+[
+  {
+    "name": "1",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 56300,
+        "name": "bash"
+      },
+      {
+        "pid": 75830,
+        "name": "sleep"
+      },
+      {
+        "pid": 76331,
+        "name": "bash"
+      }
+    ]
+  },
+  {
+    "name": "2",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/2/project-a",
+    "status": "available",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": []
+  },
+  {
+    "name": "3",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/3/project-a",
+    "status": "available",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": []
+  }
+]
+Acquisition shell 36086 no longer exists.

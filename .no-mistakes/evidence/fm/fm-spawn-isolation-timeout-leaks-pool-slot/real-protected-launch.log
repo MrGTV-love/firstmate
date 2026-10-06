@@ -1,0 +1,4 @@
+$ FM_HOME=<disposable home-a> bin/fm-spawn.sh live-protected <project-a> --backend herdr --harness "<model-free worker>" --mode local-only --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/home-a
+notice: live-protected ships mode=local-only while the standing posture for project-a is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned live-protected harness=bash kind=ship mode=local-only yolo=off window=fm-lab-lease-live-8411-10538:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a

@@ -1,0 +1,5 @@
+11:44:06 A pane w2:p5, real Treehouse shell 65875: actual slot in-use; foreground startup helper remains in the project.
+11:44:43 B native launcher holds session presentation lock pid 94098; real Treehouse slot /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b is in-use.
+11:45:10 A isolation refusal at elapsed 70.6s. Holding B for ten more seconds, beyond old five-second cleanup timeout.
+11:45:23 Ten seconds after refusal, both real leases and all three panes survive; A cleanup is still waiting. Release only B startup delay.
+11:45:35 A exit 1: exact pane and real shell gone, slot available with no processes. B exit 0: worker runs in its isolated slot. Protected worker and slot survive. Session lock released.

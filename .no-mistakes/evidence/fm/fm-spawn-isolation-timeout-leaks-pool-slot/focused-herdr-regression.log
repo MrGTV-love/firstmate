@@ -1,0 +1,6 @@
+$ bash tests/fm-spawn-acquisition-herdr-e2e.test.sh
+not ok - clean acquisition did not launch: warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.keUQNG/home/data/get-cleanup-success-68960/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-success-68960
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.keUQNG/home/data/get-cleanup-success-68960/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.keUQNG/project': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.keUQNG/project'); aborting acquisition: expected exit 0, got 1
+
+exit=1; elapsed=25.47s

@@ -1,0 +1,8 @@
+$ bash tests/fm-spawn-acquisition-cleanup.test.sh tmux
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+
+exit=0; elapsed=23.01s

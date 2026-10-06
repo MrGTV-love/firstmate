@@ -1,0 +1,13 @@
+$ bin/fm-herdr-lab.sh teardown fm-lab-lease-live-8411-10538
+exit=0
+
+$ TMUX_TMPDIR=<helper-owned private socket> tmux kill-server
+exit=0
+
+$ bin/fm-lab-home.sh teardown <disposable home-tmux>
+exit=0
+
+Disposable worker pid 76331: no longer exists after guarded teardown.
+Disposable worker pid 64353: no longer exists after guarded teardown.
+
+Disposable validation tree removed after adding user-write permission only to its generated read-only git-hooks directories. `test ! -e .live-validation` exited 0.

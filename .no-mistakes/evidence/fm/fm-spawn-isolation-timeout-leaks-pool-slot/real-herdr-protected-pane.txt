@@ -1,0 +1,19 @@
+V3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a'
+Mac-Studio:project-a charlesabrooker$ export GOTMPDIR=/tmp/fm-live-protected/gotmp
+Mac-Studio:project-a charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:project-a charlesabrooker$ export FM_TASK_ID=live-protected
+Mac-Studio:project-a charlesabrooker$ . '/tmp/fm-live-protected+96a2b3063349ea47f1b9b08a967b8b233dad06bae500d0380fcff35d
+a0ca5a75/launch.s1791304600.54909.22591.sh'
+Worker running task=live-protected cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR07
+8DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a pid=60954
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/worker.sh: l
+ine 4: FM_HOME: unbound variable
+Mac-Studio:project-a charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MV
+V3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a'
+Mac-Studio:project-a charlesabrooker$ export GOTMPDIR=/tmp/fm-live-protected/gotmp
+Mac-Studio:project-a charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:project-a charlesabrooker$ export FM_TASK_ID=live-protected
+Mac-Studio:project-a charlesabrooker$ . '/tmp/fm-live-protected+96a2b3063349ea47f1b9b08a967b8b233dad06bae500d0380fcff35d
+a0ca5a75/launch.s1791304657.71110.14359.sh'
+Worker running task=live-protected cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR07
+8DV4/.live-validation/real/shared-pool/.treehouse/project-a-988a0f/1/project-a pid=85143

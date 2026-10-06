@@ -1,0 +1,96 @@
+Projected Herdr timeout
+
+--- real-herdr-projected-timeout.log ---
+notice: live-projected-timeout ships mode=local-only while the standing posture for project-b is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-b': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-b'); aborting acquisition
+warning: herdr presentation cleanup could not verify the exact pane; refusing focus-unsafe pane close
+
+
+--- real-herdr-projected-timeout-before.json ---
+[
+  {
+    "name": "1",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 1776,
+        "name": "bash"
+      },
+      {
+        "pid": 20810,
+        "name": "sleep"
+      },
+      {
+        "pid": 64353,
+        "name": "bash"
+      }
+    ]
+  },
+  {
+    "name": "2",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/2/project-b",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 23743,
+        "name": "bash"
+      }
+    ]
+  }
+]
+
+--- real-herdr-projected-timeout-after.json ---
+[
+  {
+    "name": "1",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 1776,
+        "name": "bash"
+      },
+      {
+        "pid": 54053,
+        "name": "sleep"
+      },
+      {
+        "pid": 64353,
+        "name": "bash"
+      }
+    ]
+  },
+  {
+    "name": "2",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/2/project-b",
+    "status": "available",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": []
+  }
+]
+{"error":{"code":"pane_not_found","message":"pane w6:p2 not found"},"id":"cli:pane:get"}

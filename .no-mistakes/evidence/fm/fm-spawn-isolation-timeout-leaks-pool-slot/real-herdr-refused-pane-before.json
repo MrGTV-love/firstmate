@@ -1,0 +1,22 @@
+{
+  "id": "cli:pane:get",
+  "result": {
+    "pane": {
+      "agent_status": "unknown",
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a",
+      "focused": false,
+      "foreground_cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/project-a",
+      "pane_id": "w2:p4",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w2:t4",
+      "terminal_id": "term_65d2ea7f611868",
+      "workspace_id": "w2"
+    },
+    "type": "pane_info"
+  }
+}

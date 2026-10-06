@@ -1,0 +1,44 @@
+[
+  {
+    "name": "1",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/1/project-b",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 1776,
+        "name": "bash"
+      },
+      {
+        "pid": 20810,
+        "name": "sleep"
+      },
+      {
+        "pid": 64353,
+        "name": "bash"
+      }
+    ]
+  },
+  {
+    "name": "2",
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/real/shared-pool/.treehouse/project-b-ac8c96/2/project-b",
+    "status": "in-use",
+    "branch": "",
+    "detached": true,
+    "flavor": "git",
+    "lease_id": "",
+    "lease_holder": "",
+    "leased_at": null,
+    "processes": [
+      {
+        "pid": 23743,
+        "name": "bash"
+      }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/pre-fix/tests/fm-spawn-acquisition-cleanup.test.sh herdr off
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+not ok - contention A exact pane was not confirmed gone: warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.vTHkuD/home/data/get-cleanup-contention-a-6915/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-contention-a-6915
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.vTHkuD/home/data/get-cleanup-contention-a-6915/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.vTHkuD/project': it is the spawning project itself; spawning project '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YC9D9DMR0MVV3SR078DV4/.live-validation/fm-spawn-acquisition.vTHkuD/project'); aborting acquisition
+warning: herdr task kill could not acquire its session presentation lock; refusing an unlocked pane close
+error: Treehouse acquisition pane fm-lab-fm-spawn-isolati-7989-25462:w2:p7 was not confirmed closed; reconcile this attempt before retrying
+
+exit=1; elapsed=65.68s
