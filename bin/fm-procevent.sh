@@ -56,7 +56,7 @@
 #            follows the relisten rule below.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
-#            drains its owned process group before releasing the claim, unless
+#            drains its owned process group in EXIT cleanup, unless
 #            the adapter's `relisten` command says to poll again in this same
 #            runner. It blocks for as long as the source blocks and is meant
 #            to run as a supervised background process, never in a conversational
