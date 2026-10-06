@@ -1902,7 +1902,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # Every launch shares ONE window rather than taking a window each, so a whole
 # fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state current_identity claim final_read=0
+  local deadline window entry id rest identity before final_read=0
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1925,24 +1925,7 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
         continue
       fi
-      state=1
-      # An absent record cannot prove readiness. Do not take the publisher's
-      # lock just to confirm absence and delay the runner trying to claim.
-      if claim=$(fm_procevent_claim_path "$id") \
-        && { [ -e "$claim" ] || [ -L "$claim" ]; } \
-        && fm_procevent_source_lock_try_acquire "$id"; then
-        fm_procevent_claim_state_locked "$id"
-        state=$?
-        if [ "$state" -eq 0 ] && [ -n "$identity" ] \
-          && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
-          current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
-          if [ "$current_identity" = "$identity" ]; then
-            rm -f -- "$(launch_failed_file "$id")"
-          fi
-        fi
-        fm_procevent_source_lock_release "$id"
-      fi
-      if [ "$state" -eq 0 ]; then
+      if generation_is_listening "$id" "$identity"; then
         continue
       fi
       # A failed try-lock can outlast the stamp snapshot while the runner
@@ -1980,17 +1963,27 @@ launch_stamp_advanced() {  # <source-id> <registration-identity> <stamp-before>
 # 0 when this registration generation holds a live claim, 3 when another
 # generation does, 1 otherwise. A held lock is unproved, not permission to wait.
 generation_is_listening() {  # <source-id> <registration-identity>
-  local id=$1 identity=$2 state result=1 claim
-  # Avoid contending with startup while there is no ownership to validate.
-  # Presence is only a hint: every readiness verdict still uses the locked read.
-  claim=$(fm_procevent_claim_path "$id") || return 1
-  [ -e "$claim" ] || [ -L "$claim" ] || return 1
+  local id=$1 identity=$2 state current_identity result=1
+  # An unlocked snapshot can only rule out readiness. An absent or stale
+  # claim must not make the reader delay the runner trying to replace it.
+  # A live hint still requires a fresh, full generation proof under the lock.
+  fm_procevent_claim_load_locked "$id" || return 1
+  fm_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" || return 1
   fm_procevent_source_lock_try_acquire "$id" || return 1
   fm_procevent_claim_state_locked "$id"
   state=$?
   if [ "$state" -eq 0 ]; then
     result=3
     [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
+    # Observing any live owner ends this local registration's failure episode,
+    # but an obsolete snapshot must not clear a replacement's episode.
+    if [ -n "$identity" ] \
+      && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+      current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+      if [ "$current_identity" = "$identity" ]; then
+        rm -f -- "$(launch_failed_file "$id")"
+      fi
+    fi
   fi
   fm_procevent_source_lock_release "$id"
   return "$result"
