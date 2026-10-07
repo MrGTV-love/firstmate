@@ -1247,8 +1247,8 @@ When `config/launch-env-allowlist` is active, a variable name the allowlist does
 
 On the tmux backend, creating a fresh server checks the caller credentials it will inherit; an existing server checks only the destination environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment.
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
-The global environment is checked even before the `firstmate` session exists.
-The refusal names the scope and the `tmux set-environment` command that clears it.
+Before `firstmate` exists, the effective environment also includes the caller variables imported by tmux's configured `update-environment` patterns; an absent configured variable creates a session removal marker instead of retaining its global value.
+The refusal names the credential's source and how to clear it.
 The same pin and allowlist exemptions apply.
 Variables that the pane shell's rc files or a direnv `.envrc` export after the window opens are not detected.
 Before stopping a worker, `fm-control.sh relaunch` checks the replacement harness, account pin, launch allowlist, and tmux environment against the same guard.
@@ -1393,7 +1393,7 @@ An OMP Codex profile that omits its model retains unknown, unranked capacity wit
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
-For new tmux panes, credential binding resolves the launch backend and applies the launch allowlist to the destination session/global environment, with explicit forwarded stores and account-pin credential shedding taking precedence; caller-only API credentials, filtered credentials, and empty credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
+For new tmux panes, credential binding resolves the launch backend and applies the launch allowlist to the effective destination environment, including configured caller imports and removals when creating a session, with explicit forwarded stores and account-pin credential shedding taking precedence; caller-only API credentials not imported by tmux, filtered credentials, and empty credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
 Native Claude default-store quota is bound only when the destination's absolute `HOME` is established as matching the measuring process's `HOME`; a different, absent, removed, empty, or relative destination `HOME` keeps capacity unknown.
 An adopted pane retains its existing shell environment, which current tmux session/global settings cannot establish, so its native Claude and OMP quota remain unknown.
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.

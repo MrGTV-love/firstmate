@@ -29,22 +29,11 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fm_dispatch_omp_query_scoped() {
   local config=$1 session=$2 backend=$3 cwd=$4 executable=$5
   shift 5
-  local global_env session_env= name names= present entry value
+  local destination_env name names= present entry value
   local assignments=() discovered=()
   case "$session" in *:*) return 125 ;; esac
   [ "$backend" = tmux ] || return 125
-  if [ -z "$session" ]; then
-    if [ -n "${TMUX:-}" ]; then
-      session=$(tmux display-message -p '#S' 2>/dev/null) || return 125
-      [ -n "$session" ] || return 125
-    elif tmux has-session -t firstmate 2>/dev/null; then
-      session=firstmate
-    fi
-  fi
-  global_env=$(tmux show-environment -g 2>/dev/null) || return 125
-  if [ -n "$session" ]; then
-    session_env=$(tmux show-environment -t "$session" 2>/dev/null) || return 125
-  fi
+  destination_env=$(fm_worker_account_tmux_env '' "$session" names) || return 125
   present=$(fm_config_source_present "$config/launch-env-allowlist") || return 125
   if [ "$present" = 1 ]; then
     names=$(fm_config_launch_env_names "$config") || return 125
@@ -70,8 +59,7 @@ fm_dispatch_omp_query_scoped() {
         ;;
     esac
     assignments+=("$entry")
-  done <<<"$global_env
-$session_env"
+  done <<<"$destination_env"
   [ -z "$cwd" ] || cd "$cwd" || return 125
   /usr/bin/env -i "${assignments[@]+"${assignments[@]}"}" OMP_SKIP_SETUP=1 "$executable" "$@"
 }

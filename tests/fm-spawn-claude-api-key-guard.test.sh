@@ -76,6 +76,12 @@ if [ -f "$state.server" ]; then
   done
 fi
 case "${1:-}" in
+  show-options)
+    [ "$server" != fresh ] || exit 1
+    [ "${2:-}" = -gv ] && [ "${3:-}" = update-environment ] || exit 1
+    printf '%s\n' "${FM_TEST_TMUX_UPDATE_ENVIRONMENT:-}"
+    exit 0
+    ;;
   has-session)
     [ "$server" = existing ] || [ -f "$state.session" ]
     exit $?
@@ -85,10 +91,37 @@ case "${1:-}" in
     if [ "${2:-}" = -t ]; then
       [ "$server" = existing ] || [ -f "$state.session" ] || exit 1
     fi
+    scope=FM_FAKE_TMUX_GLOBAL_ENV_
+    [ "${2:-}" != -t ] || scope=FM_FAKE_TMUX_ENV_
+    if { [ "${2:-}" = -g ] && [ "$#" = 2 ]; } || { [ "${2:-}" = -t ] && [ "$#" = 3 ]; }; then
+      while IFS= read -r knob; do
+        name=${knob#"$scope"}
+        if [ "${!knob}" = - ]; then printf -- '-%s\n' "$name"
+        else printf '%s=%s\n' "$name" "${!knob}"; fi
+      done < <(compgen -A variable "$scope")
+      if [ "${2:-}" = -t ] && [ -f "$state.imports" ]; then cat "$state.imports"; fi
+      exit 0
+    fi
+    if [ "${2:-}" = -t ] && [ -f "$state.imports" ]; then
+      name=${!#}
+      while IFS= read -r entry; do
+        case "$entry" in "$name="*|"-$name") printf '%s\n' "$entry"; exit 0 ;; esac
+      done < "$state.imports"
+    fi
     ;;
   new-session)
     [ "$server" != fresh ] || : > "$state.server"
     : > "$state.session"
+    : > "$state.imports"
+    for pattern in ${FM_TEST_TMUX_UPDATE_ENVIRONMENT:-}; do
+      matched=0
+      while IFS= read -r name; do
+        case "$name" in
+          $pattern) printf '%s=%s\n' "$name" "${!name}" >> "$state.imports"; matched=1 ;;
+        esac
+      done < <(compgen -e)
+      [ "$matched" = 1 ] || printf -- '-%s\n' "$pattern" >> "$state.imports"
+    done
     ;;
 esac
 exec "$(dirname "$0")/tmux-base" "$@"
@@ -491,6 +524,7 @@ test_existing_tmux_ignores_caller_credentials() {
       rec=$(make_case "$id" claude "$id")
       read_case "$rec"
       out=$(export "$name=sk-ant-caller-only"
+        [ "$server" != existing ] || export FM_TEST_TMUX_UPDATE_ENVIRONMENT='ANTHROPIC_*'
         FM_TEST_TMUX_SERVER="$server" \
           run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
       status=$?
@@ -547,6 +581,60 @@ test_fresh_tmux_auth_token_exceptions() {
   done
   pass "fresh tmux honors auth-token filtering, pin shedding, and explicit opt-in"
 }
+test_prospective_tmux_credentials() {
+  local name pattern variant rec out status id
+  for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+    for pattern in "$name" 'ANTHROPIC_*' 'ANTHROPIC_?*_*' 'ANTHROPIC_[A-Z]*'; do
+      id="prospective-${name##*_}-${pattern//[^a-zA-Z0-9]/x}"
+      rec=$(make_case "$id" claude "$id")
+      read_case "$rec"
+      out=$(export "$name=sk-ant-imported"
+        FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
+          run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+      status=$?
+      [ "$status" -ne 0 ] || fail "prospective tmux must refuse $name imported by $pattern"$'\n'"$out"
+      assert_contains "$out" "$name" "the imported credential refusal must name its variable"
+      assert_contains "$out" "tmux update-environment" "the refusal must identify the prospective import"
+      assert_not_contains "$out" sk-ant-imported "the refusal must not disclose the imported credential"
+      [ ! -s "$LAUNCH_LOG" ] || fail "an imported credential refusal must not launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "an imported credential refusal must not create metadata"
+    done
+    for variant in removed empty filtered listed pin allowed; do
+      id="prospective-${name##*_}-$variant"
+      rec=$(make_case "$id" claude "$id")
+      read_case "$rec"
+      case "$variant" in
+        filtered) printf 'HOME\nPATH\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+        listed) printf 'HOME\nPATH\n%s\n' "$name" > "$HOME_DIR/config/launch-env-allowlist" ;;
+        pin) install_signed_in_pin ;;
+      esac
+      out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+        export "FM_FAKE_TMUX_GLOBAL_ENV_$name=sk-ant-global"
+        if [ "$variant" = empty ]; then
+          export "$name="
+        elif [ "$variant" != removed ]; then
+          export "$name=sk-ant-imported"
+        fi
+        if [ "$variant" = allowed ]; then
+          FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$name" \
+            run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1
+        else
+          FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$name" \
+            run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
+        fi)
+      status=$?
+      if [ "$variant" = listed ]; then
+        [ "$status" -ne 0 ] || fail "prospective tmux must refuse an allowlisted imported $name"$'\n'"$out"
+        assert_contains "$out" "$name" "the allowlisted import refusal must identify the credential"
+      else
+        [ "$status" -eq 0 ] || fail "prospective tmux must honor $variant for $name"$'\n'"$out"
+        assert_contains "$out" spawned "the prospective credential exception must launch"
+      fi
+    done
+  done
+  pass "prospective tmux imports both credentials with glob patterns and honors removal, emptiness, filtering, pins, and opt-in"
+}
+
 
 test_refuse_api_key_no_allowlist
 test_refuse_auth_token_no_allowlist
@@ -569,3 +657,4 @@ test_teamclaude_launcher_keeps_the_api_key_guard
 test_existing_tmux_ignores_caller_credentials
 test_existing_tmux_without_firstmate_checks_global_credentials
 test_fresh_tmux_auth_token_exceptions
+test_prospective_tmux_credentials

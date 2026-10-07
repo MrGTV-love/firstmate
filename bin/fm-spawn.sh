@@ -2727,16 +2727,7 @@ spawn_profile_preflight() {
         fi
       done
     fi
-    # Also check the environment a new tmux window gives the worker. The window
-    # inherits the tmux session environment layered over the tmux global
-    # environment, which can hold a key the spawning process no longer has (the
-    # server started while the shell exported it). A session entry wins, and a
-    # session removal marker (-NAME) means unset; otherwise the global value
-    # applies. The global environment is checked even before the target session
-    # exists, because a session created later inherits it. The pin shed
-    # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
-    # Pane rc files and direnv .envrc exports are not detected by this check.
-    if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
+    if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ] && tmux show-environment -g >/dev/null 2>&1; then
       tmux_session=
       if [ "$RELAUNCH" -eq 1 ]; then
         tmux_session=${RELAUNCH_TARGET%%:*}
@@ -2752,8 +2743,15 @@ spawn_profile_preflight() {
           *) continue ;;  # Allowlist filters it out at launch time
           esac
         fi
-        tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session")
+        tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session") || {
+          echo "error: cannot establish the destination tmux environment for the claude API key guard" >&2
+          exit 1
+        }
         case "$tmux_env_scope" in
+        client)
+          echo "error: $check_var is set and would reach the claude worker through tmux update-environment; unset it or pass --allow-api-key to deliberately bill the API" >&2
+          exit 1
+          ;;
         session)
           echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
           exit 1

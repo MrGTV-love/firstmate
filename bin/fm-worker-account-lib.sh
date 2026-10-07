@@ -322,25 +322,55 @@ fm_worker_account_claude_shed() {
 
 fm_worker_account_tmux_env() {
   local name=$1 session=${2:-} mode=${3:-scope} entry= scope=
+  local updates= pattern exported_names=
   if [ -z "$session" ]; then
     if [ -n "${TMUX:-}" ]; then
-      session=$(tmux display-message -p '#S' 2>/dev/null) || {
-        [ "$mode" != readable ] || return 1
-        session=
-      }
+      session=$(tmux display-message -p '#S' 2>/dev/null) || return 1
+      [ -n "$session" ] || return 1
     elif tmux has-session -t firstmate 2>/dev/null; then
       session=firstmate
     fi
+  fi
+  if [ -z "$session" ]; then
+    updates=$(tmux show-options -gv update-environment 2>/dev/null) || return 1
+    exported_names=$(compgen -e)
   fi
   if [ "$mode" = readable ]; then
     tmux show-environment -g >/dev/null 2>&1 || return 1
     [ -z "$session" ] || tmux show-environment -t "$session" >/dev/null 2>&1 || return 1
     return 0
   fi
-  if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then
-    scope=session
-  elif entry=$(tmux show-environment -g "$name" 2>/dev/null); then
-    scope=global
+  if [ "$mode" = names ]; then
+    tmux show-environment -g || return 1
+    if [ -n "$session" ]; then
+      tmux show-environment -t "$session" || return 1
+    else
+      printf '%s\n' "$exported_names"
+    fi
+    return 0
+  fi
+  if [ -z "$session" ]; then
+    while IFS= read -r pattern; do
+      case "$name" in
+        $pattern)
+          case $'\n'"$exported_names"$'\n' in
+            *$'\n'"$name"$'\n'*) entry="$name=${!name}"; scope=client; break ;;
+          esac
+          if [ "$name" = "$pattern" ]; then
+            entry="-$name"
+            scope=client
+            break
+          fi
+          ;;
+      esac
+    done <<<"${updates// /$'\n'}"
+  fi
+  if [ -z "$scope" ]; then
+    if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then
+      scope=session
+    elif entry=$(tmux show-environment -g "$name" 2>/dev/null); then
+      scope=global
+    fi
   fi
   [ -n "$scope" ] || return 0
   if [ "$mode" = assignment ]; then

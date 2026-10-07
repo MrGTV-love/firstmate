@@ -65,10 +65,17 @@ export PATH="$FAKEBIN:$PATH"
 cat > "$FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  has-session) exit 0 ;;
+  has-session)
+    [ "${FM_TEST_TMUX_SERVER:-existing}" != existing-no-firstmate ] || [ "${!#}" = recorded ]
+    exit $? ;;
+  show-options)
+    [ "${2:-}" = -gv ] && [ "${3:-}" = update-environment ] || exit 1
+    printf '%s\n' "${FM_TEST_TMUX_UPDATE_ENVIRONMENT:-}"
+    exit 0 ;;
   show-environment)
     [ "${FM_FAKE_TMUX_UNREADABLE:-0}" != 1 ] || exit 1
     if [ "$2" = -t ]; then
+      [ "${FM_TEST_TMUX_SERVER:-existing}" != existing-no-firstmate ] || [ "$3" = recorded ] || exit 1
       file="$FM_HOME/tmux-session-env"
       [ "$3" != recorded ] || file="$FM_HOME/tmux-recorded-env"
     else
@@ -474,6 +481,43 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   assert_equals exhausted "$(jq -r .status <<<"$out")" "retained destination $selector must measure its own pool"
   rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
+printf 'PI_CODING_AGENT_DIR\n' > "$FAKEBIN/auth-selector"
+printf '%s\n' "$TMP_ROOT/exhausted-scope" > "$FAKEBIN/auth-value"
+for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]*'; do
+  for direction in imported-exhausted imported-usable removed empty; do
+    case "$direction" in
+      imported-exhausted)
+        global_store="$TMP_ROOT/usable-scope"; caller_store="$TMP_ROOT/exhausted-scope"; expected=exhausted; switched=true ;;
+      imported-usable)
+        global_store="$TMP_ROOT/exhausted-scope"; caller_store="$TMP_ROOT/usable-scope"; expected=usable; switched=false ;;
+      removed|empty)
+        [ "$pattern" = PI_CODING_AGENT_DIR ] || continue
+        global_store="$TMP_ROOT/exhausted-scope"; caller_store=; expected=usable; switched=false ;;
+    esac
+    printf 'PI_CODING_AGENT_DIR=%s\n' "$global_store" > "$TMP_ROOT/tmux-global-env"
+    out=$(unset PI_CODING_AGENT_DIR
+      [ "$direction" = removed ] || export PI_CODING_AGENT_DIR="$caller_store"
+      FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
+        "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+    assert_equals "$expected" "$(jq -r .status <<<"$out")" "prospective $pattern $direction must measure the effective store rather than the global store"
+    out=$(unset PI_CODING_AGENT_DIR
+      [ "$direction" = removed ] || export PI_CODING_AGENT_DIR="$caller_store"
+      FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
+        fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT")
+    assert_equals "$switched" "$(jq -r .switched <<<"$out")" "prospective $pattern $direction must use effective-store exhaustion for fallback"
+  done
+done
+out=$(PI_CODING_AGENT_DIR="$TMP_ROOT/usable-scope" \
+  FM_TEST_TMUX_UPDATE_ENVIRONMENT=PI_CODING_AGENT_DIR \
+  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+assert_equals exhausted "$(jq -r .status <<<"$out")" "existing firstmate must retain its global exhausted store despite update-environment"
+printf 'PI_CODING_AGENT_DIR=%s\n' "$TMP_ROOT/usable-scope" > "$TMP_ROOT/tmux-global-env"
+out=$(PI_CODING_AGENT_DIR="$TMP_ROOT/exhausted-scope" \
+  FM_TEST_TMUX_UPDATE_ENVIRONMENT=PI_CODING_AGENT_DIR \
+  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+assert_equals usable "$(jq -r .status <<<"$out")" "existing firstmate must not import the caller's exhausted store"
+rm "$TMP_ROOT/tmux-global-env"
+pass "prospective OMP capacity resolves imported, absent, and empty stores before fallback while existing sessions stay isolated"
 export OMP_AUTH_SELECTOR=OMP_PROFILE OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile
 printf '%s\n' "$OMP_AUTH_SELECTOR" > "$FAKEBIN/auth-selector"
 printf '%s\n' "$OMP_AUTH_EXHAUSTED_VALUE" > "$FAKEBIN/auth-value"
@@ -730,6 +774,45 @@ out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet
 assert_equals exhausted "$(jq -r .status <<<"$out")" "readable empty destination restores measured native exhaustion"
 out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
 assert_equals true "$(jq -r .switched <<<"$out")" "native default exhaustion authorizes a permitted fallback"
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR; do
+  for direction in imported removed empty; do
+    : > "$TMP_ROOT/tmux-global-env"
+    [ "$direction" = imported ] || printf '%s=global-alternate-auth\n' "$credential" > "$TMP_ROOT/tmux-global-env"
+    out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR
+      if [ "$direction" = imported ]; then
+        export "$credential=caller-alternate-auth"
+      elif [ "$direction" = empty ]; then
+        export "$credential="
+      fi
+      FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$credential" \
+        "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+    if [ "$direction" = imported ]; then expected=unknown; switched=false
+    else expected=exhausted; switched=true; fi
+    assert_equals "$expected" "$(jq -r .status <<<"$out")" "prospective $direction $credential must bind native quota to effective authentication"
+    out=$(unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR
+      if [ "$direction" = imported ]; then
+        export "$credential=caller-alternate-auth"
+      elif [ "$direction" = empty ]; then
+        export "$credential="
+      fi
+      FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$credential" \
+        fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
+    if [ "$switched" = true ]; then
+      assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r .profile.model <<<"$out")" "bound exhaustion must select the permitted stand-in"
+    else
+      assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "unbound prospective authentication must disclose unknown capacity"
+      assert_equals claude-sonnet-5-5 "$(jq -r .profile.model <<<"$out")" "unbound prospective authentication must retain the primary"
+    fi
+    assert_equals "$switched" "$(jq -r .switched <<<"$out")" "only bound native exhaustion may authorize prospective $direction $credential fallback"
+  done
+  rm "$TMP_ROOT/tmux-global-env"
+  out=$(export "$credential=caller-alternate-auth"
+    FM_TEST_TMUX_UPDATE_ENVIRONMENT="$credential" \
+      "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
+  if [ "$credential" = CLAUDE_CONFIG_DIR ]; then expected=unknown; else expected=exhausted; fi
+  assert_equals "$expected" "$(jq -r .status <<<"$out")" "existing firstmate must isolate caller credentials while retaining the explicit CLAUDE_CONFIG_DIR launch override"
+done
+pass "prospective native Claude alternate authentication stays unknown while removal and emptiness restore mapped subscription quota"
 for remaining in 0 70; do
   jq --argjson remaining "$remaining" \
     '(.providers[] | select(.accountKey=="default").quotaSemantics.effectiveAvailability[0].effectivePercentRemaining)=$remaining' \
