@@ -3039,8 +3039,10 @@ test_secondmate_liveness_tick_launch_policy_preserves_recovery_records() {
     pid=$LIVENESS_PID
     rc=0
     wait_for_exit "$pid" 300 || rc=$?
-    expect_code 1 "$rc" "watcher did not refuse the forbidden recovery"
-    assert_contains "$(cat "$dir/watch-policy.err")" "config/session-launch-policy" \
+    expect_code 0 "$rc" "watcher did not deliver the forbidden recovery wake successfully"
+    assert_contains "$(cat "$dir/watch-policy.out")" "check: secondmate sm1 auto-relaunch refused:" \
+      "watcher lost the actionable recovery policy refusal"
+    assert_contains "$(cat "$dir/watch-policy.out")" "config/session-launch-policy" \
       "watcher lost the recovery policy refusal"
     [ ! -s "$dir/tmux.log" ] || fail "watcher refusal removed or launched an endpoint"
     cmp -s "$dir/meta-before" "$state/sm1.meta" || fail "watcher refusal rewrote endpoint metadata"
