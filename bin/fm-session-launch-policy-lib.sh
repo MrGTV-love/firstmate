@@ -28,8 +28,10 @@ fm_session_launch_policy_refusal_notify() {
   local state=$1 id=$2 generation=$3 reason=$4 error=$5 file fingerprint key notified
   shift 5
   FM_SESSION_LAUNCH_REFUSAL_WAKE=
+  # The wake owner is analyzed as a canonical lint root; do not duplicate its
+  # large source graph through every launch-policy consumer.
   if ! declare -F fm_wake_append_locked >/dev/null 2>&1; then
-    # shellcheck source=bin/fm-wake-lib.sh
+    # shellcheck source=/dev/null
     . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-wake-lib.sh"
   fi
   fingerprint=$(

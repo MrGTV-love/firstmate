@@ -199,16 +199,14 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
-# shellcheck source=bin/fm-session-launch-policy-lib.sh
-. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}

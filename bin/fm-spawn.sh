@@ -588,8 +588,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 fm_api_key_guard_launch_env_config "$CONFIG" || exit 1
@@ -980,8 +980,6 @@ fi
 # Refuse restricted launches before guards, locks, remote inheritance, endpoint
 # creation, or worktree allocation. Recheck the authoritative resolved launch
 # below, after locked adoption of a relaunch record.
-# shellcheck source=bin/fm-session-launch-policy-lib.sh
-. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 SESSION_LAUNCH_POLICY=$(fm_session_launch_policy_enabled "$CONFIG") || exit 1
 if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   policy_harness=$HARNESS_ARG

@@ -33,8 +33,6 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-compact-adviser-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
