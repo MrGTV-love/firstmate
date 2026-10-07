@@ -1163,7 +1163,7 @@ The index must contain exactly one JSON object; empty files and concatenated doc
 Each role contains one or more verified harness names, each with a required `model` string and an optional `stand_in` string, with no other entry fields.
 Names and ids cannot contain whitespace or control characters.
 Use the exact selector returned by that harness's current catalog; the example is illustrative, not a guarantee that every installation offers those ids.
-A retired bare id also refuses a provider-qualified selector ending in that id; a qualified retired id refuses that exact selector.
+A retired id refuses the exact selector or its base after removing a trailing context suffix such as `[1m]`; a bare retired id also refuses any provider-qualified selector with that base id.
 Catalog aliases whose resolved underlying id is retired are also refused.
 Retired ids are historical prohibitions, not active entries that must remain in a vendor catalog.
 
@@ -1174,7 +1174,6 @@ Stand-ins never become automatic catalog-failure or quota fallbacks.
 The existing profile-array quota decision remains responsible for choosing among concrete candidates.
 An unknown role, absent harness mapping, missing requested stand-in, malformed index, or retired id refuses resolution.
 Literal profiles and homes without an index retain their existing behavior, except that a configured retired list also applies to literals.
-A retired id also matches an id carrying a trailing context suffix, so retiring `claude-sonnet-5-5` refuses `claude-sonnet-5-5[1m]`.
 Claude's catalog lists some ids only with or only without that suffix, so a Claude id is available when the catalog lists an id with the same base: `opus[1m]` when `opus` is listed, and `claude-sonnet-5-5` when only `claude-sonnet-5-5[1m]` is listed.
 
 Run `bin/fm-model-index.sh check` after every index edit; it checks every active id, including stand-ins, against its own harness catalog.

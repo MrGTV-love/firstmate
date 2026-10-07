@@ -23,18 +23,13 @@
 # entry emits true or false for exact primary/stand-in membership, offline.
 # check-registry requires an index and exactly one readable JSON registry file.
 # It scans string values and object keys that are whole identifier tokens (no
-# whitespace or control characters), using the same retirement rule below;
+# whitespace or control characters), using the retirement rule in the schema owner;
 # it never matches a substring in prose. Every distinct retired identifier is
 # reported on stderr and makes the command fail; current-only registries pass.
 # Invalid JSON (including empty or multiple documents) refuses. This check is
 # offline and read-only: it fetches no catalog and writes neither input file.
-# Stand-ins are explicit selections, never automatic failure or quota fallbacks.
-# Literal models work without an index; with one they cannot name a retired id,
-# and a literal that is not an index entry for its harness draws a warning.
-# A retired id also matches a provider-qualified selector ending in it and an
-# id carrying a trailing [...] context suffix such as [1m]. Claude's picker
-# lists some ids only with or only without that suffix, so a Claude id matches
-# a catalog entry with the same base id.
+# Stand-in selection, literal warnings, retirement matching, and Claude context
+# suffix matching are owned by docs/configuration.md "Fleet model index".
 # model passes a literal through unchanged, without jq, when no index exists.
 # FM_HOME / FM_CONFIG_OVERRIDE select the index like other home configuration.
 # FM_MODEL_CATALOG_DIR optionally supplies authoritative catalog exports (or test

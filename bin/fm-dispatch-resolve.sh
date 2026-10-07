@@ -20,7 +20,7 @@
 #   ONE Choice question whose options are every rule's `when` from
 #   config/crew-dispatch.json plus one fixed generic none option. Jev returns
 #   the matched rule, a probability per option, and a confidence. Everything
-#   after that is jq: the confidence floor (0.6 on the answer confidence, or a
+#   after that uses local policy: the confidence floor (0.6 on the answer confidence, or a
 #   rule's declared `min_confidence` on that rule's probability, falling to the
 #   most probable other option that clears its own floor), the rule's declared
 #   `approval` and `floor`, each profile's declared `provider` and `floor`, the
@@ -28,6 +28,8 @@
 #   the operator contract below. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
+#   The chosen profile also passes the selected-entry preflight owned by
+#   docs/configuration.md "Fleet model index" before publication.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
@@ -70,12 +72,12 @@
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, no candidate rankable, a genuine tie, or
 #                a winner whose established runway is shorter than the task horizon
-#   error     -> API, network, response, quota-axi, or chosen-model catalog
-#                failure; decide as today
+#   error     -> API, network, response, quota-axi, or chosen-profile model-index
+#                preflight failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
-#   existing unreadable rules file, malformed rules, or missing jq), which is
-#   actionable, never selected around.
+#   existing unreadable rules file, malformed rules, model-index/profile
+#   resolution failure, or missing jq), which is actionable, never selected around.
 #
 # Environment:
 #   TYPESAFE_API_KEY is the only resolver-specific environment setting.
