@@ -198,44 +198,20 @@ fm_operational_input_classify() {  # <message> <result-var>
   return 1
 }
 
-# 0 iff <text>, read back from a composer, is nothing but one or more current
-# watcher wakes: no operator draft before, between, or after them. A composer
-# re-wraps text and some strip the invisible mark, so whitespace and U+2063 are
-# ignored; the producers in .omp/extensions/fm-primary-omp-watch.ts and
-# .pi/extensions/fm-primary-pi-watch.ts own the wake text, and every wake they
-# send begins with the typed header and ends with the continuity sentence below.
-# The watcher uses this to submit a wake that a harness put back into the
-# composer unsubmitted, so a miss must always mean "leave it alone".
-fm_operational_watcher_wakes_only() {  # <text>
-  local text=${1-} squeezed rest block body
-  local head='FIRSTMATE_OP:v1watcher:FIRSTMATEWATCHERWAKE:'
-  local tail='Watchercontinuityisextension-owned.'
+fm_operational_watcher_wakes_only() {
+  local text=${1-} record_dir=${2-} squeezed record saved
+  [ -n "$record_dir" ] && [ -d "$record_dir" ] || return 1
   squeezed=${text//"$FM_OPERATIONAL_MARK"/}
   squeezed=${squeezed//[[:space:]]/}
-  case "$squeezed" in
-    "$head"*"$tail") ;;
-    *) return 1 ;;
-  esac
-  rest=$squeezed
-  while [ -n "$rest" ]; do
-    case "$rest" in
-      "$head"*) ;;
-      *) return 1 ;;
-    esac
-    rest=${rest#"$head"}
-    block=${rest%%"$head"*}
-    case "$block" in
-      *"$tail") ;;
-      *) return 1 ;;
-    esac
-    body=${block%"$tail"}
-    [ -n "$body" ] || return 1
-    case "$body" in
-      *"$tail"*) return 1 ;;
-    esac
-    rest=${rest#"$block"}
+  [ -n "$squeezed" ] || return 1
+  for record in "$record_dir"/unconsumed-*.wake; do
+    [ -f "$record" ] || continue
+    saved=$(cat "$record" 2>/dev/null) || continue
+    saved=${saved//"$FM_OPERATIONAL_MARK"/}
+    saved=${saved//[[:space:]]/}
+    [ "$squeezed" = "$saved" ] && return 0
   done
-  return 0
+  return 1
 }
 
 fm_message_from_firstmate() {  # <message>

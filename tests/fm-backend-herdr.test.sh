@@ -4517,7 +4517,7 @@ test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box() {
   omp_busy_box_screen 'hello captain' > "$resp/5.out"
   omp_busy_box_screen 'hello captain' > "$resp/6.out"
   omp_busy_box_screen '' > "$resp/8.out"
-  herdr_submit_identity_prefix "$resp" codex
+  herdr_submit_identity_prefix "$resp" omp
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
@@ -4538,7 +4538,7 @@ test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame() {
   printf '  ready\n' > "$resp/3.out"
   omp_busy_box_screen 'hello captain' > "$resp/5.out"
   omp_busy_box_screen '' > "$resp/6.out"
-  herdr_submit_identity_prefix "$resp" codex
+  herdr_submit_identity_prefix "$resp" omp
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 3 0.01 0.01' "$ROOT" )
@@ -4546,6 +4546,28 @@ test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame() {
   enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
   [ "$enter_count" -eq 1 ] || fail "a stale frame must not provoke a second Enter into an empty composer, sent $enter_count Enter(s)"
   pass "fm_backend_herdr_send_text_submit: a stale pending frame in a busy omp box never earns a second Enter"
+}
+
+test_send_text_submit_exhausted_busy_omp_payload_stays_pending() {
+  local dir log resp fb out enter_count status
+  for status in working blocked; do
+  dir="$TMP_ROOT/submit-omp-busy-held-$status"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$status" > "$resp/2.out"
+  printf '  ready\n' > "$resp/3.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/5.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/6.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/8.out"
+  { [ "$status" != blocked ] || printf 'Working…\n'; omp_busy_box_screen 'hello captain'; } > "$resp/9.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/10.out"
+  herdr_submit_identity_prefix "$resp" omp
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 2 0.01 0.01' "$ROOT" )
+  [ "$out" = pending ] || fail "omp holding the payload after both Enter attempts must stay pending, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 2 ] || fail "held omp payload must consume exactly two Enter attempts, got $enter_count"
+  pass "fm_backend_herdr_send_text_submit: exhausted busy omp payload remains pending"
+  done
 }
 
 test_send_text_submit_preexisting_working_pending_is_queued_enter() {
@@ -4557,11 +4579,11 @@ test_send_text_submit_preexisting_working_pending_is_queued_enter() {
   # because the pre-Enter native status is already working.
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/2.out"
   printf '  ready\n' > "$resp/3.out"
-  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
+  printf '┃ hello captain\n┃ Build model\n' > "$resp/5.out"
   # The pending read is repeated once before any retry may press Enter again.
-  printf '  \xe2\x9d\xaf hello captain\n' > "$resp/6.out"
+  printf '┃ hello captain\n┃ Build model\n' > "$resp/6.out"
   printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
-  herdr_submit_identity_prefix "$resp" codex
+  herdr_submit_identity_prefix "$resp" opencode
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0.01 0.01' "$ROOT" )
@@ -4625,11 +4647,9 @@ test_send_text_submit_idle_native_empty_composer_confirms_delivery() {
   pass "fm_backend_herdr_send_text_submit: idle native agent-state plus empty composer reports empty (landed Claude turn)"
 }
 
-test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued() {
+test_send_text_submit_idle_native_retained_payload_stays_pending() {
   local dir log resp fb out
   dir="$TMP_ROOT/submit-idle-native-rendered-busy-queued"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  # Idle native baseline (Claude never leaves idle) with proven pending text
-  # and a generating footer after retries is a queued follow-up Enter.
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/2.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/4.out"
   printf '  \xe2\x9d\xaf hello captain\n' > "$resp/5.out"
@@ -4639,8 +4659,8 @@ test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued() {
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "hello captain" 1 0.01 0.01' "$ROOT" )
-  [ "$out" = empty ] || fail "idle native + proven pending + rendered busy after retries is a queued Enter, got '$out'"
-  pass "fm_backend_herdr_send_text_submit: idle native baseline uses a rendered busy footer to confirm a queued Enter"
+  [ "$out" = pending ] || fail "an unsupported harness with retained payload must stay pending despite rendered busy, got '$out'"
+  pass "fm_backend_herdr_send_text_submit: unsupported retained payload does not borrow rendered busy as queue proof"
 }
 
 # --- the never-idle-native-state harness (real cursor on herdr) --------------
@@ -6206,11 +6226,12 @@ test_send_text_submit_popup_autocomplete_requires_second_enter
 test_send_text_submit_confirms_blocked_after_enter
 test_send_text_submit_retries_a_dropped_enter_in_a_busy_omp_box
 test_send_text_submit_never_double_presses_on_a_stale_busy_omp_frame
+test_send_text_submit_exhausted_busy_omp_payload_stays_pending
 test_send_text_submit_preexisting_working_pending_is_queued_enter
 test_send_text_submit_preexisting_working_does_not_confirm_failed_enter
 test_send_text_submit_idle_baseline_does_not_confirm_failed_enter
 test_send_text_submit_idle_native_empty_composer_confirms_delivery
-test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued
+test_send_text_submit_idle_native_retained_payload_stays_pending
 test_composer_state_cursor_midturn_row_reads_pending
 test_rendered_busy_state_reads_the_cursor_busy_token
 test_send_text_submit_confirms_never_idle_native_state_via_footer_transition

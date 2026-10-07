@@ -930,18 +930,19 @@ secondmate_idle_ring_safe() {  # <window>
   return 0
 }
 
-# 0 iff the mate's pending composer held nothing but injected watcher wakes and
-# one bare Enter submitted them. A harness can put a queued wake back into the
-# composer unsubmitted (omp does when a run is interrupted), which leaves the
-# mate idle with its queue frozen and, because the composer is pending, outside
-# secondmate_idle_ring_safe. fm_task_inbox_submit_held_wake owns the safety: it
-# refuses any composer that holds anything besides wakes and types nothing.
-secondmate_submit_held_wake() {  # <window>
-  local w=$1 backend
+secondmate_submit_held_wake() {
+  local w=$1 backend task meta home
   [ -n "$w" ] || return 1
+  task=$(window_to_task "$w" "$STATE")
+  [ -n "$task" ] || return 1
+  meta="$STATE/$task.meta"
+  [ -f "$meta" ] || return 1
+  home=$(fm_meta_get "$meta" home)
+  [ -n "$home" ] || return 1
   backend=$(window_backend "$w")
   [ "$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)" = alive ] || return 1
-  fm_task_inbox_submit_held_wake "$backend" "$w" "$(window_label "$w")"
+  fm_task_inbox_submit_held_wake "$backend" "$w" \
+    "$home/state/extensions/omp-primary-watch" secondmate_busy_class "$(window_label "$w")"
 }
 
 # Write one fire-and-forget drain steer and ring the child's doorbell. The
