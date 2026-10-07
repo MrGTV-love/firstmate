@@ -1607,6 +1607,7 @@ families_for_changed_path() {
     bin/fm-launch-proof-lib.sh|bin/fm-reboot-recover.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' session-bootstrap
+      printf '%s\n' "__script__:fm-supervision-events.test.sh"
       printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
       ;;
     bin/fm-composer-lib.sh)

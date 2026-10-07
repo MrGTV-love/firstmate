@@ -2363,6 +2363,7 @@ The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-rest
 Historical focused executable regressions reproduced lifecycle input to stale recorded panes before the ownership correction, then passed after it. The maintained ownership regression and launch-proof check can now be selected with:
 
 ```bash
+mkdir -p "$PWD/state/.ownership-regression-tmp"
 TMPDIR="$PWD/state/.ownership-regression-tmp" \
   FM_TEST_ONLY=test_reboot_recovery_inspects_without_native_attribution \
   bash tests/fm-control-relaunch.test.sh
