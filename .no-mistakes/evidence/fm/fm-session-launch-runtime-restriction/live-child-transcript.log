@@ -1,0 +1,1248 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+
+
+Exact target snapshot 92bdd9ab842c1c3698dc7072708bb36202fca689; tar sha256=789475c58761ccd02fc5a88ca36ebf9ca3f6d926d1099157832572f18b5a1baa. Materialized only inside this worktree; no additional worktree or operational clone.
+
+$ tar -xf /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/current-source.tar -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code
+exit=0
+
+
+$ git init -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code
+exit=0
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/.git/
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code add --all
+exit=0
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code -c user.name=Owned Lab -c user.email=lab@example.invalid commit -m Exact target source snapshot fixture
+exit=0
+[main (root-commit) 2a60022] Exact target source snapshot fixture
+ 688 files changed, 386743 insertions(+)
+ create mode 100644 .agents/skills/afk/SKILL.md
+ create mode 100644 .agents/skills/agent-skill-trigger-index/SKILL.md
+ create mode 100644 .agents/skills/ahoy/SKILL.md
+ create mode 100644 .agents/skills/ask-user-authority/SKILL.md
+ create mode 100644 .agents/skills/away-quiet-supervision/SKILL.md
+ create mode 100644 .agents/skills/bearings/SKILL.md
+ create mode 100644 .agents/skills/bearings/assets/board-template.html
+ create mode 100644 .agents/skills/bootstrap-diagnostics/SKILL.md
+ create mode 100644 .agents/skills/captain-hold-lifecycle/SKILL.md
+ create mode 100644 .agents/skills/decision-hold-lifecycle/SKILL.md
+ create mode 100644 .agents/skills/diagnostic-reasoning/SKILL.md
+ create mode 120000 .agents/skills/firstmate-calm
+ create mode 100644 .agents/skills/firstmate-codexapp/SKILL.md
+ create mode 100644 .agents/skills/firstmate-codexapp/agents/openai.yaml
+ create mode 100644 .agents/skills/firstmate-coding-guidelines/SKILL.md
+ create mode 100644 .agents/skills/firstmate-orca/SKILL.md
+ create mode 100644 .agents/skills/fmx-respond/SKILL.md
+ create mode 100644 .agents/skills/harness-adapters/SKILL.md
+ create mode 100644 .agents/skills/harness-adapters/references/common/control-and-recovery.md
+ create mode 100644 .agents/skills/harness-adapters/references/common/dispatch.md
+ create mode 100644 .agents/skills/harness-adapters/references/common/model-and-effort.md
+ create mode 100644 .agents/skills/harness-adapters/references/common/primary-hooks.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/agy.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/claude.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/codex.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/cursor.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/devin.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/gemini.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/grok.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/kimi.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/muse.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/omp.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/opencode.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/pi.md
+ create mode 100644 .agents/skills/harness-adapters/references/harness/rovo.md
+ create mode 100644 .agents/skills/operational-home-layout/SKILL.md
+ create mode 100644 .agents/skills/process-event-sources/SKILL.md
+ create mode 100644 .agents/skills/project-management/SKILL.md
+ create mode 100644 .agents/skills/quiet/SKILL.md
+ create mode 100644 .agents/skills/quota-array-dispatch/SKILL.md
+ create mode 100644 .agents/skills/scout-completion/SKILL.md
+ create mode 100644 .agents/skills/secondmate-provisioning/SKILL.md
+ create mode 100644 .agents/skills/session-start-recovery/SKILL.md
+ create mode 100644 .agents/skills/ship-landing/SKILL.md
+ create mode 100644 .agents/skills/stow/SKILL.md
+ create mode 100644 .agents/skills/stuck-crewmate-recovery/SKILL.md
+ create mode 100644 .agents/skills/updatefirstmate/SKILL.md
+ create mode 100644 .agents/skills/validation-supervision/SKILL.md
+ create mode 100644 .claude/mods/firstmate-calm/.claude-plugin/plugin.json
+ create mode 100644 .claude/mods/firstmate-calm/hooks/hooks.json
+ create mode 100644 .claude/mods/firstmate-calm/hooks/register.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-branch-notes.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-calm-presentation.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-calm-preservation.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-calm-ship-raster.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-calm-working-ship-sprite.ts
+ create mode 100644 .claude/mods/firstmate-calm/lib/fm-operational-input.ts
+ create mode 100644 .claude/mods/firstmate-calm/tests/branch-notes.test.ts
+ create mode 100644 .claude/mods/firstmate-calm/tests/calm.test.ts
+ create mode 100644 .claude/mods/firstmate-calm/tests/support.ts
+ create mode 100644 .claude/mods/firstmate-calm/tests/working-ship.test.ts
+ create mode 100644 .claude/settings.json
+ create mode 120000 .claude/skills
+ create mode 100644 .codex/hooks.json
+ create mode 100644 .cursor/hooks.json
+ create mode 100644 .gitattributes
+ create mode 100644 .github/workflows/ci.yml
+ create mode 100644 .github/workflows/no-mistakes-required.yml
+ create mode 100644 .github/workflows/windows-herdr-spike.yml
+ create mode 100644 .gitignore
+ create mode 100644 .greptile/rules.md
+ create mode 100644 .grok/hooks/fm-primary-cd-check.json
+ create mode 100644 .grok/hooks/fm-primary-pretool-check.json
+ create mode 100644 .grok/hooks/fm-primary-sessionstart-nudge.json
+ create mode 100644 .grok/hooks/fm-primary-turnend-guard.json
+ create mode 100644 .live-validation/omp-state/predict/ngram/cursor.json
+ create mode 100644 .live-validation/omp-state/predict/ngram/ngram.snapshot
+ create mode 100644 .no-mistakes.yaml
+ create mode 100644 .omp/extensions/fm-jev-guardrail.ts
+ create mode 100644 .omp/extensions/fm-primary-omp-watch.ts
+ create mode 100644 .omp/extensions/fm-primary-turnend-guard.ts
+ create mode 100644 .omp/fm-session-overlay.yml
+ create mode 100644 .omp/fm-worker-overlay.yml
+ create mode 100644 .opencode/plugins/fm-primary-cd-check.js
+ create mode 100644 .opencode/plugins/fm-primary-pretool-check.js
+ create mode 100644 .opencode/plugins/fm-primary-sessionstart-nudge.js
+ create mode 100644 .opencode/plugins/fm-primary-turnend-guard.js
+ create mode 100644 .opencode/plugins/fm-primary-watch-arm.js
+ create mode 100644 .opencode/plugins/lib/fm-operational-input.js
+ create mode 100644 .opencode/plugins/package.json
+ create mode 100644 .pi/extensions/fm-branch-supervision.ts
+ create mode 100644 .pi/extensions/fm-calm.ts
+ create mode 100644 .pi/extensions/fm-primary-pi-watch.ts
+ create mode 100644 .pi/extensions/fm-primary-turnend-guard.ts
+ create mode 100644 .pi/extensions/lib/fm-async-exec.ts
+ create mode 100644 .pi/extensions/lib/fm-branch-dispatch.ts
+ create mode 100644 .pi/extensions/lib/fm-branch-model-picker.ts
+ create mode 100644 .pi/extensions/lib/fm-calm-assistant-layout.ts
+ create mode 100644 .pi/extensions/lib/fm-calm-operational-user-layout.ts
+ create mode 100644 .pi/extensions/lib/fm-calm-pending-operational-layout.ts
+ create mode 120000 .pi/extensions/lib/fm-calm-preservation.ts
+ create mode 100644 .pi/extensions/lib/fm-calm-visibility.ts
+ create mode 120000 .pi/extensions/lib/fm-calm-working-ship-sprite.ts
+ create mode 100644 .pi/extensions/lib/fm-calm-working-ship.ts
+ create mode 100644 .pi/extensions/lib/fm-native-contract.ts
+ create mode 100644 .pi/extensions/lib/fm-operational-input.ts
+ create mode 100644 .pi/extensions/lib/fm-sessionstart-supervisor.mjs
+ create mode 100644 .tasks.toml
+ create mode 100644 AGENTS.md
+ create mode 100644 CLAUDE.md
+ create mode 100644 CONTRIBUTING.md
+ create mode 100644 GROK_BOT.md
+ create mode 100644 LICENSE
+ create mode 100644 README.md
+ create mode 100644 VISION.md
+ create mode 100644 assets/banner.png
+ create mode 100644 bin/backends/cmux.sh
+ create mode 100755 bin/backends/herdr-eventwait.py
+ create mode 100755 bin/backends/herdr-workspace-move.py
+ create mode 100644 bin/backends/herdr.sh
+ create mode 100644 bin/backends/orca.sh
+ create mode 100644 bin/backends/tmux.sh
+ create mode 100644 bin/backends/zellij.sh
+ create mode 100755 bin/fm-afk-contract.sh
+ create mode 100755 bin/fm-afk-launch.sh
+ create mode 100755 bin/fm-afk-return.sh
+ create mode 100755 bin/fm-afk-start.sh
+ create mode 100644 bin/fm-agent-process-lib.sh
+ create mode 100755 bin/fm-agy-trust.sh
+ create mode 100644 bin/fm-api-key-guard-lib.sh
+ create mode 100755 bin/fm-arm-command-policy.mjs
+ create mode 100755 bin/fm-arm-pretool-check.sh
+ create mode 100644 bin/fm-backend-hometag-lib.sh
+ create mode 100644 bin/fm-backend.sh
+ create mode 100755 bin/fm-backlog-handoff.sh
+ create mode 100755 bin/fm-backlog-receive.sh
+ create mode 100644 bin/fm-backlog-transition-lib.sh
+ create mode 100755 bin/fm-bearings-board.sh
+ create mode 100755 bin/fm-bearings-snapshot.sh
+ create mode 100755 bin/fm-bootstrap.sh
+ create mode 100755 bin/fm-branch-dispatch.mjs
+ create mode 100755 bin/fm-branch-outcome.sh
+ create mode 100755 bin/fm-branch-prompt.sh
+ create mode 100755 bin/fm-branch-report.sh
+ create mode 100644 bin/fm-brief-heading-lib.sh
+ create mode 100755 bin/fm-brief.sh
+ create mode 100755 bin/fm-busy-event.sh
+ create mode 100755 bin/fm-busy-lib.sh
+ create mode 100755 bin/fm-captain-hold.sh
+ create mode 100755 bin/fm-cd-command-policy.mjs
+ create mode 100755 bin/fm-cd-pretool-check.sh
+ create mode 100755 bin/fm-check-lib.sh
+ create mode 100755 bin/fm-check-register.sh
+ create mode 100755 bin/fm-check-unregister.sh
+ create mode 100755 bin/fm-classify-lib.sh
+ create mode 100644 bin/fm-claude-launcher-lib.sh
+ create mode 100755 bin/fm-claude-stop-autoarm.sh
+ create mode 100755 bin/fm-claude-trust.sh
+ create mode 100644 bin/fm-composer-lib.sh
+ create mode 100644 bin/fm-config-inherit-lib.sh
+ create mode 100755 bin/fm-config-push.sh
+ create mode 100644 bin/fm-contributions.jq
+ create mode 100755 bin/fm-contributions.sh
+ create mode 100644 bin/fm-control-lib.sh
+ create mode 100755 bin/fm-control.sh
+ create mode 100755 bin/fm-crew-state.sh
+ create mode 100755 bin/fm-cursor-lib.sh
+ create mode 100755 bin/fm-decision-hold.sh
+ create mode 100755 bin/fm-devin-config.sh
+ create mode 100755 bin/fm-dispatch-resolve.sh
+ create mode 100755 bin/fm-doc-audience-check.sh
+ create mode 100755 bin/fm-dod-lib.sh
+ create mode 100755 bin/fm-ensure-agents-md.sh
+ create mode 100644 bin/fm-env-lib.sh
+ create mode 100755 bin/fm-extension-launch-barrier.mjs
+ create mode 100755 bin/fm-extension.mjs
+ create mode 100755 bin/fm-extension.sh
+ create mode 100644 bin/fm-ff-lib.sh
+ create mode 100755 bin/fm-fleet-ledger.sh
+ create mode 100755 bin/fm-fleet-snapshot.sh
+ create mode 100755 bin/fm-fleet-sync.sh
+ create mode 100755 bin/fm-fleet-view.sh
+ create mode 100755 bin/fm-forge-detect.sh
+ create mode 100644 bin/fm-gate-refuse-lib.sh
+ create mode 100644 bin/fm-gemini-lib.sh
+ create mode 100755 bin/fm-git-strip-ai-trailers.sh
+ create mode 100755 bin/fm-guard.sh
+ create mode 100755 bin/fm-harness.sh
+ create mode 100755 bin/fm-herdr-ci-cleanup.sh
+ create mode 100755 bin/fm-herdr-lab-viewer.py
+ create mode 100755 bin/fm-herdr-lab.sh
+ create mode 100755 bin/fm-herdr-session-cleanup.sh
+ create mode 100755 bin/fm-home-seed.sh
+ create mode 100755 bin/fm-home-summary-refresh.sh
+ create mode 100644 bin/fm-hook-host-lib.sh
+ create mode 100755 bin/fm-host-mirror.sh
+ create mode 100755 bin/fm-inactive-reconcile.sh
+ create mode 100755 bin/fm-inbox.sh
+ create mode 100755 bin/fm-install-actionlint.sh
+ create mode 100755 bin/fm-install-herdr.sh
+ create mode 100755 bin/fm-install-shellcheck.sh
+ create mode 100755 bin/fm-install-treehouse.sh
+ create mode 100755 bin/fm-jev-guardrail.mjs
+ create mode 100755 bin/fm-kimi-turnend-hook.sh
+ create mode 100755 bin/fm-lab-home.sh
+ create mode 100644 bin/fm-landed-lib.sh
+ create mode 100755 bin/fm-lease-lib.sh
+ create mode 100755 bin/fm-lease.sh
+ create mode 100644 bin/fm-line-cap-lib.sh
+ create mode 100755 bin/fm-lint-cache.pl
+ create mode 100755 bin/fm-lint-workflows.sh
+ create mode 100755 bin/fm-lint.sh
+ create mode 100644 bin/fm-lock-lib.sh
+ create mode 100755 bin/fm-lock.sh
+ create mode 100755 bin/fm-mail-check.sh
+ create mode 100755 bin/fm-mail.py
+ create mode 100755 bin/fm-mail.sh
+ create mode 100644 bin/fm-marker-lib.sh
+ create mode 100755 bin/fm-mem-guard.py
+ create mode 100755 bin/fm-mem-guard.sh
+ create mode 100755 bin/fm-merge-authority-lib.sh
+ create mode 100755 bin/fm-merge-local.sh
+ create mode 100755 bin/fm-merge-outcome-lib.sh
+ create mode 100644 bin/fm-nm-run-lib.sh
+ create mode 100755 bin/fm-on.sh
+ create mode 100755 bin/fm-operational-input.sh
+ create mode 100644 bin/fm-parent-channel-lib.sh
+ create mode 100644 bin/fm-path-lib.sh
+ create mode 100755 bin/fm-peek.sh
+ create mode 100755 bin/fm-pending-reply-lib.sh
+ create mode 100755 bin/fm-pr-check.sh
+ create mode 100755 bin/fm-pr-lib.sh
+ create mode 100755 bin/fm-pr-merge.sh
+ create mode 100755 bin/fm-pr-poll.sh
+ create mode 100755 bin/fm-pr-reviewers.sh
+ create mode 100755 bin/fm-pr-state.sh
+ create mode 100755 bin/fm-primary-scope-lib.sh
+ create mode 100644 bin/fm-procevent-extension-capture.pl
+ create mode 100755 bin/fm-procevent-lavish.sh
+ create mode 100644 bin/fm-procevent-lib.sh
+ create mode 100755 bin/fm-procevent-quota.sh
+ create mode 100755 bin/fm-procevent-remote-reply.sh
+ create mode 100755 bin/fm-procevent-when.sh
+ create mode 100755 bin/fm-procevent.sh
+ create mode 100755 bin/fm-project-mode.sh
+ create mode 100644 bin/fm-project-origin-lib.sh
+ create mode 100755 bin/fm-promote.sh
+ create mode 100755 bin/fm-public-followup-collect.sh
+ create mode 100755 bin/fm-public-followup-emit.sh
+ create mode 100644 bin/fm-public-followup-lib.sh
+ create mode 100755 bin/fm-public-followup.sh
+ create mode 100644 bin/fm-push-transition-lib.sh
+ create mode 100644 bin/fm-quota-axi-lib.sh
+ create mode 100755 bin/fm-quota-choose.sh
+ create mode 100755 bin/fm-remote-delta-read.sh
+ create mode 100755 bin/fm-remote-doctor.sh
+ create mode 100755 bin/fm-remote-entrypoint.sh
+ create mode 100755 bin/fm-remote-file.sh
+ create mode 100755 bin/fm-remote-herdr-guard.sh
+ create mode 100755 bin/fm-remote-herdr-owner-lib.sh
+ create mode 100755 bin/fm-remote-home-provision.sh
+ create mode 100755 bin/fm-remote-home-seed.sh
+ create mode 100755 bin/fm-remote-inherit-push.sh
+ create mode 100755 bin/fm-remote-inherit.sh
+ create mode 100755 bin/fm-remote-job-lib.sh
+ create mode 100755 bin/fm-remote-job-reap-orphans.sh
+ create mode 100755 bin/fm-remote-job-worker.sh
+ create mode 100644 bin/fm-remote-readiness-lib.sh
+ create mode 100755 bin/fm-remote-secondmate-control.sh
+ create mode 100755 bin/fm-remote-secondmate-relaunch.sh
+ create mode 100755 bin/fm-review-diff.sh
+ create mode 100755 bin/fm-secondmate-charter-lib.sh
+ create mode 100644 bin/fm-secondmate-liveness-lib.sh
+ create mode 100644 bin/fm-secondmate-nudge-lib.sh
+ create mode 100644 bin/fm-secondmate-parent-lib.sh
+ create mode 100755 bin/fm-secondmate-reconcile.sh
+ create mode 100644 bin/fm-secondmate-registry-lib.sh
+ create mode 100755 bin/fm-secondmate-report.sh
+ create mode 100644 bin/fm-secondmate-restart-lib.sh
+ create mode 100755 bin/fm-secondmate-restart.sh
+ create mode 100755 bin/fm-send.sh
+ create mode 100755 bin/fm-session-end-relaunch-lib.sh
+ create mode 100755 bin/fm-session-launch-policy-lib.sh
+ create mode 100644 bin/fm-session-lock-lib.sh
+ create mode 100755 bin/fm-session-start.sh
+ create mode 100755 bin/fm-sessionstart-cursor.sh
+ create mode 100755 bin/fm-sessionstart-nudge.sh
+ create mode 100755 bin/fm-sessionstart-run.sh
+ create mode 100644 bin/fm-skill-catalog.jq
+ create mode 100755 bin/fm-skill-suggest.sh
+ create mode 100755 bin/fm-spawn.sh
+ create mode 100644 bin/fm-startup-memory-budget-lib.sh
+ create mode 100755 bin/fm-startup-memory-budget.sh
+ create mode 100755 bin/fm-startup-network.sh
+ create mode 100755 bin/fm-status-decision-lib.sh
+ create mode 100755 bin/fm-status-event-lib.sh
+ create mode 100755 bin/fm-status-io-lib.sh
+ create mode 100755 bin/fm-status-record-lib.sh
+ create mode 100755 bin/fm-status-wake-lib.sh
+ create mode 100755 bin/fm-stow-cascade.sh
+ create mode 100755 bin/fm-supervise-daemon.sh
+ create mode 100644 bin/fm-supervision-engine-lib.sh
+ create mode 100755 bin/fm-supervision-host.sh
+ create mode 100755 bin/fm-supervision-instructions.sh
+ create mode 100644 bin/fm-supervision-lib.sh
+ create mode 100755 bin/fm-supervisor-target-lib.sh
+ create mode 100644 bin/fm-tangle-lib.sh
+ create mode 100644 bin/fm-task-inbox-lib.sh
+ create mode 100644 bin/fm-tasks-axi-lib.sh
+ create mode 100755 bin/fm-tasks-axi.sh
+ create mode 100755 bin/fm-teamclaude-launch.sh
+ create mode 100755 bin/fm-teardown.sh
+ create mode 100755 bin/fm-test-isolation-proof.sh
+ create mode 100755 bin/fm-test-run.sh
+ create mode 100644 bin/fm-timeout-lib.sh
+ create mode 100644 bin/fm-timing-lib.sh
+ create mode 100755 bin/fm-tmux-lib.sh
+ create mode 100755 bin/fm-tool-update-check.sh
+ create mode 100644 bin/fm-trace-context-lib.sh
+ create mode 100644 bin/fm-transition-lib.sh
+ create mode 100755 bin/fm-turnend-guard-cursor.sh
+ create mode 100755 bin/fm-turnend-guard-grok.sh
+ create mode 100755 bin/fm-turnend-guard.sh
+ create mode 100644 bin/fm-typesafe-lib.sh
+ create mode 100755 bin/fm-update.sh
+ create mode 100755 bin/fm-utc-lib.sh
+ create mode 100755 bin/fm-vendor-auth-probe.sh
+ create mode 100755 bin/fm-voice-client.py
+ create mode 100755 bin/fm-voice-relay.py
+ create mode 100755 bin/fm-wake-drain.sh
+ create mode 100755 bin/fm-wake-grant.sh
+ create mode 100755 bin/fm-wake-lib.sh
+ create mode 100755 bin/fm-watch-arm.sh
+ create mode 100755 bin/fm-watch-checkpoint.sh
+ create mode 100755 bin/fm-watch.sh
+ create mode 100644 bin/fm-worker-account-lib.sh
+ create mode 100755 bin/fm-x-dismiss.sh
+ create mode 100755 bin/fm-x-followup.sh
+ create mode 100644 bin/fm-x-lib.sh
+ create mode 100755 bin/fm-x-link.sh
+ create mode 100755 bin/fm-x-poll.sh
+ create mode 100755 bin/fm-x-reply.sh
+ create mode 100644 bin/fm_voice_frame.py
+ create mode 100755 bin/fm_voice_records.py
+ create mode 100644 docs/agent-control.md
+ create mode 100644 docs/architecture.md
+ create mode 100644 docs/arm-pretool-check.md
+ create mode 100644 docs/calm-mode-feasibility.md
+ create mode 100644 docs/calm.md
+ create mode 100644 docs/captain-hold-lifecycle.md
+ create mode 100644 docs/cd-guard.md
+ create mode 100644 docs/cmux-backend.md
+ create mode 100644 docs/codex-app-backend.md
+ create mode 100644 docs/configuration.md
+ create mode 100644 docs/documentation-audiences.json
+ create mode 100644 docs/documentation-audiences.md
+ create mode 100644 docs/examples/crew-dispatch.json
+ create mode 100755 docs/examples/process-event-extension/file-signal.mjs
+ create mode 100644 docs/examples/process-event-extension/firstmate-extension.json
+ create mode 100644 docs/examples/watched-tools.json
+ create mode 100644 docs/examples/wedge-alarm
+ create mode 100644 docs/extension-bindings.md
+ create mode 100644 docs/fleet-ledger.md
+ create mode 100644 docs/fm-test-isolation-proof.json
+ create mode 100644 docs/fm-test-isolation-proof.md
+ create mode 100644 docs/fm-test-portable-shards.md
+ create mode 100644 docs/gerrit-change-watch.md
+ create mode 100644 docs/gerrit-forge-integration.md
+ create mode 100644 docs/gitlab-merge-watch.md
+ create mode 100644 docs/herdr-backend.md
+ create mode 100644 docs/host-guards.md
+ create mode 100644 docs/orca-backend.md
+ create mode 100644 docs/pi-supervision-branch-poster.svg
+ create mode 100644 docs/pi-supervision-branch.md
+ create mode 100644 docs/remote-secondmates.md
+ create mode 100644 docs/scripts.md
+ create mode 100644 docs/secondmate-parent-channel.md
+ create mode 100644 docs/sessionstart-nudge.md
+ create mode 100644 docs/subagent-guard.md
+ create mode 100644 docs/supervision-host.md
+ create mode 100644 docs/supervision-protocols/claude.md
+ create mode 100644 docs/supervision-protocols/codex.md
+ create mode 100644 docs/supervision-protocols/cursor.md
+ create mode 100644 docs/supervision-protocols/grok.md
+ create mode 100644 docs/supervision-protocols/omp.md
+ create mode 100644 docs/supervision-protocols/opencode.md
+ create mode 100644 docs/supervision-protocols/pi.md
+ create mode 100644 docs/supervision-protocols/supervision-host.md
+ create mode 100644 docs/supervision-protocols/unknown.md
+ create mode 100644 docs/tmux-backend.md
+ create mode 100644 docs/trace-context.md
+ create mode 100644 docs/turnend-guard.md
+ create mode 100644 docs/verification/agy.md
+ create mode 100644 docs/verification/devin.md
+ create mode 100644 docs/verification/dispatch-auth.md
+ create mode 100644 docs/verification/dispatch-resolve.md
+ create mode 100644 docs/verification/muse.md
+ create mode 100644 docs/verification/process-event-sources.md
+ create mode 100644 docs/verification/public-followup.md
+ create mode 100644 docs/verification/rovo.md
+ create mode 100644 docs/verification/runtime-backends.md
+ create mode 100644 docs/verification/secondmate-parent-channel.md
+ create mode 100644 docs/verification/stow-memory.md
+ create mode 100644 docs/verification/supervision.md
+ create mode 100644 docs/verification/trace-context.md
+ create mode 100644 docs/voice-relay.md
+ create mode 100644 docs/watcher-continuity.md
+ create mode 100644 docs/wedge-alarm.md
+ create mode 100644 docs/zellij-backend.md
+ create mode 100644 extensions/omp-jev-entry.mjs
+ create mode 100644 extensions/omp-jev-pipeline.mjs
+ create mode 100644 skills/stow/SKILL.md
+ create mode 100644 tests/assets/board-render-harness.mjs
+ create mode 100644 tests/assets/omp-jev-pipeline.test.mjs
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/README.md
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/completed.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/failed.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/overview.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/parked.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/replacement.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/same-branch-inventory.json
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/superseded.toon
+ create mode 100644 tests/captures/no-mistakes-v1.70.1/uninitialized.toon
+ create mode 100644 tests/cmux-test-safety.sh
+ create mode 100755 tests/fixtures.sh
+ create mode 100644 tests/fixtures/jev-guardrail-new-cases.json
+ create mode 100755 tests/fm-afk-contract.test.sh
+ create mode 100755 tests/fm-afk-inject-e2e.test.sh
+ create mode 100755 tests/fm-afk-inject-herdr-e2e.test.sh
+ create mode 100755 tests/fm-afk-launch.test.sh
+ create mode 100755 tests/fm-afk-pi-herdr-return-e2e.test.sh
+ create mode 100755 tests/fm-afk-return.test.sh
+ create mode 100755 tests/fm-agy-harness.test.sh
+ create mode 100755 tests/fm-agy-signals-live-e2e.test.sh
+ create mode 100755 tests/fm-arm-pretool-check.test.sh
+ create mode 100755 tests/fm-ask-user-authority.test.sh
+ create mode 100755 tests/fm-backend-autodetect-smoke.test.sh
+ create mode 100755 tests/fm-backend-cmux-smoke.test.sh
+ create mode 100755 tests/fm-backend-cmux.test.sh
+ create mode 100755 tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-eventwait-smoke.test.sh
+ create mode 100644 tests/fm-backend-herdr-eventwait.test.py
+ create mode 100755 tests/fm-backend-herdr-focus-flash-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-launcher-workspace-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-presentation-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-prune-safety-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-respawn-idem-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-smoke.test.sh
+ create mode 100755 tests/fm-backend-herdr-stale-active-tab-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr-workspace-per-home-e2e.test.sh
+ create mode 100755 tests/fm-backend-herdr.test.sh
+ create mode 100755 tests/fm-backend-orca.test.sh
+ create mode 100755 tests/fm-backend-tmux-smoke.test.sh
+ create mode 100755 tests/fm-backend-zellij-smoke.test.sh
+ create mode 100755 tests/fm-backend-zellij.test.sh
+ create mode 100755 tests/fm-backend.test.sh
+ create mode 100755 tests/fm-backlog-atomicity.test.sh
+ create mode 100755 tests/fm-backlog-handoff.test.sh
+ create mode 100755 tests/fm-backlog-read-bound.test.sh
+ create mode 100755 tests/fm-bearings-board-lavish-live-e2e.test.sh
+ create mode 100755 tests/fm-bearings-board-render.test.sh
+ create mode 100644 tests/fm-bearings-board.test.sh
+ create mode 100755 tests/fm-bearings-snapshot.test.sh
+ create mode 100755 tests/fm-bootstrap-network-parallel.test.sh
+ create mode 100755 tests/fm-bootstrap.test.sh
+ create mode 100644 tests/fm-branch-supervision.test.sh
+ create mode 100755 tests/fm-brief.test.sh
+ create mode 100755 tests/fm-busy-adapter-wiring.test.sh
+ create mode 100755 tests/fm-busy-state.test.sh
+ create mode 100644 tests/fm-calm-claude-mod-live-e2e.test.sh
+ create mode 100644 tests/fm-calm-claude-mod-plugin.test.sh
+ create mode 100644 tests/fm-calm-claude-mod.test.sh
+ create mode 100755 tests/fm-calm-pi-extension.test.sh
+ create mode 100755 tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+ create mode 100755 tests/fm-captain-hold-lifecycle.test.sh
+ create mode 100755 tests/fm-cd-pretool-check.test.sh
+ create mode 100755 tests/fm-check-unregister.test.sh
+ create mode 100755 tests/fm-ci-workflow.test.sh
+ create mode 100755 tests/fm-classify-corr-token.test.sh
+ create mode 100755 tests/fm-classify-decision-key.test.sh
+ create mode 100755 tests/fm-claude-stop-autoarm-live-e2e.test.sh
+ create mode 100755 tests/fm-claude-stop-autoarm.test.sh
+ create mode 100755 tests/fm-claude-trust.test.sh
+ create mode 100755 tests/fm-cmux-claude-composer-live-e2e.test.sh
+ create mode 100755 tests/fm-codex-continuity-live-e2e.test.sh
+ create mode 100755 tests/fm-codex-hook-layer-live-e2e.test.sh
+ create mode 100755 tests/fm-composer-codex-idle-live-e2e.test.sh
+ create mode 100755 tests/fm-composer-ghost.test.sh
+ create mode 100755 tests/fm-composer-lib.test.sh
+ create mode 100755 tests/fm-composer-matrix-live-e2e.test.sh
+ create mode 100755 tests/fm-contributions.test.sh
+ create mode 100755 tests/fm-control-herdr-smoke.test.sh
+ create mode 100755 tests/fm-control-relaunch.test.sh
+ create mode 100755 tests/fm-control.test.sh
+ create mode 100755 tests/fm-crew-state.test.sh
+ create mode 100755 tests/fm-cursor-harness.test.sh
+ create mode 100755 tests/fm-cursor-primary-live-e2e.test.sh
+ create mode 100755 tests/fm-cursor-primary.test.sh
+ create mode 100755 tests/fm-daemon.test.sh
+ create mode 100755 tests/fm-devin-harness.test.sh
+ create mode 100755 tests/fm-devin-signals-live-e2e.test.sh
+ create mode 100755 tests/fm-dispatch-resolve.test.sh
+ create mode 100755 tests/fm-documentation-audiences.test.sh
+ create mode 100644 tests/fm-dod-lib.test.sh
+ create mode 100755 tests/fm-ensure-agents-md.test.sh
+ create mode 100644 tests/fm-extension-binding.test.sh
+ create mode 100755 tests/fm-fleet-ledger.test.sh
+ create mode 100755 tests/fm-fleet-snapshot-view.test.sh
+ create mode 100755 tests/fm-fleet-sync.test.sh
+ create mode 100755 tests/fm-forge-detect.test.sh
+ create mode 100755 tests/fm-fork-free-helpers.test.sh
+ create mode 100755 tests/fm-gate-refuse.test.sh
+ create mode 100644 tests/fm-gemini-harness.test.sh
+ create mode 100644 tests/fm-git-strip-ai-trailers.test.sh
+ create mode 100755 tests/fm-gitignore-config.test.sh
+ create mode 100755 tests/fm-gotmp.test.sh
+ create mode 100755 tests/fm-grok-continuity-live-e2e.test.sh
+ create mode 100755 tests/fm-grok-harness.test.sh
+ create mode 100755 tests/fm-grok-stop-live-e2e.test.sh
+ create mode 100755 tests/fm-guard-stale-banner.test.sh
+ create mode 100644 tests/fm-harness-adapter-instructions-live-e2e.test.sh
+ create mode 100755 tests/fm-harness-adapter-references.test.sh
+ create mode 100755 tests/fm-harness-liveness-drift-live-e2e.test.sh
+ create mode 100755 tests/fm-harness-precedence.test.sh
+ create mode 100755 tests/fm-herdr-attached-viewer-live-e2e.test.sh
+ create mode 100755 tests/fm-herdr-lab.test.sh
+ create mode 100755 tests/fm-herdr-pi-stale-registration-live-e2e.test.sh
+ create mode 100755 tests/fm-herdr-session-cleanup-e2e.test.sh
+ create mode 100755 tests/fm-herdr-session-cleanup.test.sh
+ create mode 100755 tests/fm-herdr-submit-confirm-live-e2e.test.sh
+ create mode 100755 tests/fm-herdr-version-floor-live-e2e.test.sh
+ create mode 100755 tests/fm-home-summary-refresh.test.sh
+ create mode 100755 tests/fm-host-mirror-live-e2e.test.sh
+ create mode 100755 tests/fm-host-mirror.test.sh
+ create mode 100755 tests/fm-inactive-reconcile.test.sh
+ create mode 100644 tests/fm-inbox.test.sh
+ create mode 100755 tests/fm-jev-guardrail-home.test.sh
+ create mode 100755 tests/fm-jev-guardrail.test.sh
+ create mode 100755 tests/fm-kimi-harness.test.sh
+ create mode 100644 tests/fm-launch-prompt-signals-live-e2e.test.sh
+ create mode 100755 tests/fm-lint-workflows.test.sh
+ create mode 100755 tests/fm-lint.test.sh
+ create mode 100755 tests/fm-live-gate.test.sh
+ create mode 100644 tests/fm-mail-check.test.sh
+ create mode 100644 tests/fm-mail.test.sh
+ create mode 100755 tests/fm-mem-guard.test.sh
+ create mode 100755 tests/fm-muse-harness.test.sh
+ create mode 100755 tests/fm-muse-signals-live-e2e.test.sh
+ create mode 100755 tests/fm-nm-test-contract.test.sh
+ create mode 100755 tests/fm-no-mistakes-required.test.sh
+ create mode 100755 tests/fm-omp-composer-box-live-e2e.test.sh
+ create mode 100755 tests/fm-omp-harness.test.sh
+ create mode 100755 tests/fm-omp-jev-pipeline.test.sh
+ create mode 100755 tests/fm-omp-primary-live-e2e.test.sh
+ create mode 100755 tests/fm-on.test.sh
+ create mode 100755 tests/fm-opencode-primary-live-e2e.test.sh
+ create mode 100755 tests/fm-operational-input.test.sh
+ create mode 100755 tests/fm-peek-remote.test.sh
+ create mode 100755 tests/fm-pending-reply.test.sh
+ create mode 100644 tests/fm-pi-branch-extension.test.sh
+ create mode 100644 tests/fm-pi-branch-live-e2e.test.sh
+ create mode 100755 tests/fm-pi-branch-responsiveness-live-e2e.test.sh
+ create mode 100755 tests/fm-pi-codex-native.test.sh
+ create mode 100755 tests/fm-pi-primary-live-e2e.test.sh
+ create mode 100755 tests/fm-pi-primary-types.test.sh
+ create mode 100755 tests/fm-pi-watch-extension.test.sh
+ create mode 100755 tests/fm-pi-windows-shell-invocation.test.sh
+ create mode 100755 tests/fm-pr-check-security.test.sh
+ create mode 100755 tests/fm-pr-merge.test.sh
+ create mode 100755 tests/fm-pr-reviewers.test.sh
+ create mode 100755 tests/fm-pr-state-live-e2e.test.sh
+ create mode 100755 tests/fm-pr-state.test.sh
+ create mode 100755 tests/fm-procevent-quota.test.sh
+ create mode 100755 tests/fm-procevent-when.test.sh
+ create mode 100755 tests/fm-procevent.test.sh
+ create mode 100755 tests/fm-project-origin.test.sh
+ create mode 100755 tests/fm-public-followup.test.sh
+ create mode 100755 tests/fm-quota-array-dispatch-live-e2e.test.sh
+ create mode 100755 tests/fm-quota-choose.test.sh
+ create mode 100755 tests/fm-remote-backlog-handoff.test.sh
+ create mode 100755 tests/fm-remote-doctor.test.sh
+ create mode 100755 tests/fm-remote-entrypoint.test.sh
+ create mode 100755 tests/fm-remote-herdr-guard.test.sh
+ create mode 100755 tests/fm-remote-job-orphan-reap.test.sh
+ create mode 100755 tests/fm-remote-job.test.sh
+ create mode 100755 tests/fm-remote-reply.test.sh
+ create mode 100755 tests/fm-remote-secondmate-lifecycle-e2e.test.sh
+ create mode 100755 tests/fm-remote-secondmate-parent-binding.test.sh
+ create mode 100755 tests/fm-remote-secondmate-relaunch.test.sh
+ create mode 100755 tests/fm-remote-secondmate-trace-context.test.sh
+ create mode 100755 tests/fm-remote-transport-lanes.test.sh
+ create mode 100755 tests/fm-review-diff.test.sh
+ create mode 100644 tests/fm-rovo-harness.test.sh
+ create mode 100644 tests/fm-rovo-signals-live-e2e.test.sh
+ create mode 100755 tests/fm-secondmate-harness.test.sh
+ create mode 100755 tests/fm-secondmate-lifecycle-e2e.test.sh
+ create mode 100755 tests/fm-secondmate-liveness.test.sh
+ create mode 100755 tests/fm-secondmate-reconcile.test.sh
+ create mode 100755 tests/fm-secondmate-restart.test.sh
+ create mode 100755 tests/fm-secondmate-safety.test.sh
+ create mode 100755 tests/fm-secondmate-sync.test.sh
+ create mode 100755 tests/fm-send-agy-confirm.test.sh
+ create mode 100644 tests/fm-send-inbox-doorbell-live-e2e.test.sh
+ create mode 100644 tests/fm-send-inbox.test.sh
+ create mode 100755 tests/fm-send-popup-settle.test.sh
+ create mode 100755 tests/fm-send-remote-delivery.test.sh
+ create mode 100755 tests/fm-send-resolve-key.test.sh
+ create mode 100755 tests/fm-send-secondmate-marker-herdr-e2e.test.sh
+ create mode 100755 tests/fm-send-secondmate-marker.test.sh
+ create mode 100755 tests/fm-send-settle.test.sh
+ create mode 100755 tests/fm-send-strict.test.sh
+ create mode 100755 tests/fm-session-end-relaunch.test.sh
+ create mode 100755 tests/fm-session-launch-policy.test.sh
+ create mode 100755 tests/fm-session-lock-ancestry.test.sh
+ create mode 100755 tests/fm-session-start.test.sh
+ create mode 100755 tests/fm-sessionstart-hook-live-e2e.test.sh
+ create mode 100755 tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh
+ create mode 100755 tests/fm-sessionstart-nudge.test.sh
+ create mode 100755 tests/fm-shared-captain-inheritance.test.sh
+ create mode 100755 tests/fm-skill-suggest.test.sh
+ create mode 100755 tests/fm-spawn-acquisition-cleanup.test.sh
+ create mode 100755 tests/fm-spawn-acquisition-herdr-e2e.test.sh
+ create mode 100755 tests/fm-spawn-batch.test.sh
+ create mode 100755 tests/fm-spawn-claude-api-key-guard.test.sh
+ create mode 100755 tests/fm-spawn-compact-adviser-disable-remote.test.sh
+ create mode 100755 tests/fm-spawn-compact-adviser-disable.test.sh
+ create mode 100755 tests/fm-spawn-dispatch-profile.test.sh
+ create mode 100755 tests/fm-spawn-orca-worktree.test.sh
+ create mode 100755 tests/fm-spawn-pool-base-freshen.test.sh
+ create mode 100755 tests/fm-spawn-worktree-settle.test.sh
+ create mode 100755 tests/fm-startup-memory-budget.test.sh
+ create mode 100755 tests/fm-startup-network.test.sh
+ create mode 100644 tests/fm-stat-shadowing.test.sh
+ create mode 100755 tests/fm-stow-cascade.test.sh
+ create mode 100755 tests/fm-supervision-events.test.sh
+ create mode 100755 tests/fm-supervision-host-attended-live-e2e.test.sh
+ create mode 100755 tests/fm-supervision-host-live-e2e.test.sh
+ create mode 100755 tests/fm-supervision-host.test.sh
+ create mode 100755 tests/fm-supervision-instructions.test.sh
+ create mode 100755 tests/fm-supervision-session-launch-policy.test.sh
+ create mode 100755 tests/fm-tangle-guard.test.sh
+ create mode 100755 tests/fm-task-delivery.test.sh
+ create mode 100644 tests/fm-task-inbox.test.sh
+ create mode 100755 tests/fm-tasks-axi.test.sh
+ create mode 100755 tests/fm-teamclaude-launch-live-e2e.test.sh
+ create mode 100755 tests/fm-teamclaude-launch.test.sh
+ create mode 100755 tests/fm-teardown-endpoint-safety.test.sh
+ create mode 100755 tests/fm-teardown.test.sh
+ create mode 100755 tests/fm-test-fixture-cleanup.test.sh
+ create mode 100755 tests/fm-test-fixtures.test.sh
+ create mode 100755 tests/fm-test-isolation-proof.test.sh
+ create mode 100755 tests/fm-test-run.test.sh
+ create mode 100755 tests/fm-timeout-lib.test.sh
+ create mode 100755 tests/fm-tmux-agent-liveness.test.sh
+ create mode 100755 tests/fm-tmux-submit-busy.test.sh
+ create mode 100755 tests/fm-tool-update-check.test.sh
+ create mode 100755 tests/fm-trace-context-lib.test.sh
+ create mode 100755 tests/fm-trace-context-spawn.test.sh
+ create mode 100755 tests/fm-transition-lib.test.sh
+ create mode 100755 tests/fm-turnend-foreign-owner-arm-fix.test.sh
+ create mode 100755 tests/fm-turnend-foreign-owner-repro.py
+ create mode 100755 tests/fm-turnend-guard.test.sh
+ create mode 100755 tests/fm-update.test.sh
+ create mode 100755 tests/fm-vendor-auth-probe.test.sh
+ create mode 100755 tests/fm-voice-relay.test.sh
+ create mode 100755 tests/fm-wake-daemon-lifecycle-e2e.test.sh
+ create mode 100755 tests/fm-wake-drain-open-decisions-cursor.test.sh
+ create mode 100755 tests/fm-wake-drain-open-decisions.test.sh
+ create mode 100755 tests/fm-wake-drain-outcome-backstop.test.sh
+ create mode 100755 tests/fm-wake-drain-unread-status.test.sh
+ create mode 100755 tests/fm-wake-queue.test.sh
+ create mode 100755 tests/fm-watch-arm.test.sh
+ create mode 100755 tests/fm-watch-checkpoint.test.sh
+ create mode 100755 tests/fm-watch-recovery-loop.test.sh
+ create mode 100755 tests/fm-watch-triage.test.sh
+ create mode 100755 tests/fm-watcher-lock.test.sh
+ create mode 100755 tests/fm-worker-account-live-e2e.test.sh
+ create mode 100755 tests/fm-worker-account.test.sh
+ create mode 100755 tests/fm-x-mode.test.sh
+ create mode 100644 tests/git-config-helpers.sh
+ create mode 100644 tests/herdr-client-pair-fixture.sh
+ create mode 100644 tests/herdr-test-safety.sh
+ create mode 100644 tests/lib.sh
+ create mode 100644 tests/remote-herdr-fixture.sh
+ create mode 100644 tests/secondmate-helpers.sh
+ create mode 100644 tests/wake-helpers.sh
+ create mode 100644 tests/zellij-test-safety.sh
+
+
+$ git init -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+exit=0
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child/.git/
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code
+exit=0
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child fetch origin main
+exit=0
+From /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code
+ * branch            main       -> FETCH_HEAD
+ * [new branch]      main       -> origin/main
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child checkout -b main origin/main
+exit=0
+Already on 'main'
+branch 'main' set up to track 'origin/main'.
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-home-seed.sh owned-native-mate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child --no-projects
+exit=0
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/data/owned-native-mate/brief.md (secondmate charter)
+home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+exit=0
+/tmp/fml.aZ9tKP
+
+
+$ tmux -L fm-lab new-session -d -s firstmate -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF /bin/zsh
+exit=0
+
+
+$ tmux -L fm-lab display-message -p -t firstmate #{socket_path},#{pid},0
+exit=0
+/private/tmp/fml.aZ9tKP/tmux-501/fm-lab,49047,0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-spawn.sh owned-native-mate /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child --secondmate --harness omp --model openai-codex/gpt-6.1-sol --effort low --backend tmux
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+warning: secondmate owned-native-mate sync skipped before launch: dirty working tree
+spawned owned-native-mate harness=omp kind=secondmate mode=secondmate yolo=off window=firstmate:fm-owned-native-mate worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child/bin/fm-spawn.sh descendant-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child/projects/never-created --harness codex --mode local-only --yolo off
+exit=1
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ tmux -L fm-lab capture-pane -p -S -150 -t firstmate:fm-owned-native-mate
+exit=0
+
+charlesabrooker@Mac-Studio child % export GOTMPDIR=/tmp/fm-owned-native-mate/gotmp
+charlesabrooker@Mac-Studio child % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio child % . '/tmp/fm-owned-native-mate+4189dff1b97968a329097d4c966a25a785de3ab0b0ed90068360e7c5
+31780ec3/launch.s1791347203.49124.16554.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ tmux -L fm-lab capture-pane -p -S -150 -t firstmate:fm-owned-native-mate
+exit=0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                        Tip: Bulk data to classify or triage? Say `jevify` in your message — the
+                         eval kernel's `judge()` processes the batch and you read only what it
+                                           flags — watch it glow as you type
+
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◔ GPT-6.1-Sol 👁 · 📁 …0R8RJYQFM4XF/.live-child-rdpnv3zr/child · ⑂ main ?1 · ◫ 8.0%/272K ⟲ · (sub)      🆔 01a1149d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ tmux -L fm-lab capture-pane -p -S -150 -t firstmate:fm-owned-native-mate
+exit=0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                        Tip: Bulk data to classify or triage? Say `jevify` in your message — the
+                         eval kernel's `judge()` processes the batch and you read only what it
+                                           flags — watch it glow as you type
+
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: You are a persistent second mate managed by the main firstmate. Work on your own; do
+ not wait for a human.
+
+ Charter
+
+ Disposable runtime proof only. Reply CHILD_NATIVE_POLICY_PROOF, then wait. Never change project files, credentials,
+ settings, invoke workflows, spawn agents, or operate on any other home.
+
+ Routing scope
+
+ owned lab policy proof
+
+ Project clones
+
+ None. This is a project-less domain: its subject is the firstmate repo this home lives in, so it needs no separate
+ clones under projects/; its crews take pooled worktrees of that firstmate repo.
+
+ Operating model
+
+ You are in an isolated firstmate home. The local AGENTS.md is your job description, and your local data/, state/,
+ config/, and projects/ dirs are yours to operate.
+ This domain has no separate project clones: its subject is the firstmate repo this home lives in, and its crews take
+ pooled worktrees of that repo.
+ Delegate project work to your own crewmates with the normal firstmate lifecycle: brief, spawn, status, watcher, steer,
+ teardown, and recovery.
+ Do not invent a second delegation system.
+ You do not generate your own work.
+ Act only on tasks the main firstmate routes to you.
+ Never start a survey, audit, or "find improvements" sweep on your own initiative; that is not your job and it is
+ unwanted.
+
+ The captain and the parent channel
+
+ Nobody reads this chat: the captain and the main firstmate see only what is appended to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status', and a captain-facing sentence that is not appended there has not been sent.
+ That file is your parent channel, and in this home it IS the captain: every sentence you would say to the captain, and
+ every outcome the local AGENTS.md tells a firstmate to bring to the captain, is one appended line there, never chat.
+ Your own machinery publishes the durable facts about your crew's work for you (bin/fm-parent-channel-lib.sh): a
+ child's terminal done or failed line with its note and PR on every supervision poll, a PR-ready line when you register
+ a PR, a task you hold for the captain and its answer, a merge, and a child's final line at cleanup all reach the
+ parent channel from the scripts that record them, whether or not you append anything.
+ What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered
+ outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
+
+ Requests from the main firstmate
+
+ You are a firstmate in your own home, so an incoming message reaches you in your own chat.
+ You must distinguish who it is from, because the answer goes to a different place.
+ A request relayed to you by the main firstmate is tagged with a leading [fm-from-firstmate] marker followed by an
+ invisible system separator; this marker is untypable, so a human never produces it.
+ When a message carries that marker, do the work, then respond via the STATUS/ESCALATION path below, never only in this
+ chat: the main firstmate does not read your chat, so a chat-only reply is lost.
+ Marked requests also carry a privacy-safe corr=<id> token after the marker; include that exact token in your parent
+ status reply (or in the status pointer to a detailed doc) so the parent can correlate the answer.
+ Optional helper: bin/fm-secondmate-report.sh <verb> <corr_id> <note> appends that correlated line to the parent
+ channel itself - do not pass a status path, and do not write a hand path under this home.
+ A plain echo that includes the same corr=<id> on this parent channel is equally valid; do not depend on the helper
+ being present.
+ For a terse result, a status line is the whole answer.
+ For a detailed answer (an investigation, a plan, an audit), write it to a doc under your home's data/ and append a
+ status line that points to that doc - the scout-report pattern - so the main firstmate is woken and can read it.
+ Before treating an investigation or visual review as complete, load captain-hold-lifecycle from this home's
+ .agents/skills/ and pass its shared completion gate.
+ A message with NO marker is the captain typing directly into your pane: treat it as authoritative captain intervention
+ and stay conversational exactly as you would for any captain message; do not force it onto the status path.
+ A request arriving through the instruction inbox below follows the same marker and reply rules.
+
+ Firstmate instruction inbox
+
+ Firstmate steers you through durable message files in
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'.
+ When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure -
+ list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/*.msg, read and act on each message in numeric order, then acknowledge each handled
+ message by moving it: mv
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/NNN.msg
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/handled/.
+ The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or
+ absent inbox needs no action.
+
+ Escalation to main firstmate
+
+ Handle routine work yourself.
+ Report only true captain-relevant outcomes or a declared external wait by appending one line:
+    echo "{state} [at=<epoch>]: {one short line}" >>
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status' && { [ ! -e
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/con
+ fig/fleet-ledger' ] ||
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/f
+ m-fleet-ledger.sh' appended
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/con
+ fig'
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status' >/dev/null 2>&1 || true; }
+ States: working, needs-decision, blocked, paused, done, failed.
+ Substitute <epoch> with the current Unix time in seconds - run date +%s and write the number it printed; a stamp that
+ is not plain digits records no time at all.
+ Use paused: {why} (distinct from blocked:) only when your domain is deliberately idling on a known external wait you
+ expect to clear on its own, naming when it clears with until <YYYY-MM-DDTHH:MMZ> (UTC) when you know; use blocked:
+ when you are stuck and need firstmate to act.
+ Use this only for material phase changes, a captain decision, a real blocker, a failure, work ready for review, or
+ work you landed.
+ Work you landed includes a merge you performed yourself under standing merge authority and one the captain merged on
+ the forge: under that authority nothing is ever "ready for review", so a landed merge that goes unreported reaches the
+ captain as silence.
+ This is also how you return the answer to a marked from-firstmate request above.
+ A marked request requires one correlated answer after the work; it does not require a separate receipt or start
+ acknowledgement.
+ Never append working: merely to acknowledge receipt or announce that a marked request has started.
+ When a routed-work phase has a supervisor-actionable material change worth reporting under the rule above, give that
+ reported phase a stable key.
+ If its first reportable event is working [key=<work-slug>]: {material phase}, use the same key on its later paused,
+ done, failed, needs-decision, or blocked event so the earlier working phase is superseded.
+ When a keyed phase ends without another reportable state, append resolved [key=<work-slug>] [at=<epoch>]: {why it is
+ no longer active}.
+ resolved separately closes an escalated decision or blocker, and only a resolved line carrying that decision's exact
+ key closes it: a later done or working event never does, even when the answer is what started that work.
+ The main firstmate's answer normally writes that closing line at answer time; when a blocker or wait clears WITHOUT an
+ answer from the main firstmate, append resolved [at=<epoch>]: {how it cleared} yourself (keyed with [key=<slug>] if
+ you opened it with one) as your domain resumes.
+ Routine internal supervision, heartbeats, retries, and crewmate churn stay inside your own home and must not touch
+ that status file.
+
+ Definition of done
+
+ You are persistent by default. Do not exit just because your queue is empty.
+ On startup and restart, run normal firstmate bootstrap and recovery through bin/fm-session-start.sh for your own home,
+ but only to RECONCILE work that is already yours: in-flight crewmates, tracked backlog items, and durable watches
+ recorded in this home.
+ When you have no assigned or in-flight work after that reconciliation, go idle and wait silently for the main
+ firstmate to route you a task.
+ An empty queue is a healthy resting state, not a cue to invent work: never spawn a survey, audit, or any self-directed
+ "find work" task on your own initiative.
+ If this charter cannot be carried out, append blocked [at=<epoch>]: {why} or failed [at=<epoch>]: {why} to the main
+ status file and stop.
+
+
+
+  ⎋ Working…
+
+❯
+ ⠇ 1s · ◔ GPT-6.1-Sol 👁 · 📁 …0R8RJYQFM4XF/.live-child-rdpnv3zr/child · ⑂ main ?1 · ◫ 9.5%/272K ⟲ · (sub)   🆔 01a1149d
+
+
+$ tmux -L fm-lab capture-pane -p -S -150 -t firstmate:fm-owned-native-mate
+exit=0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                        Tip: Bulk data to classify or triage? Say `jevify` in your message — the
+                         eval kernel's `judge()` processes the batch and you read only what it
+                                           flags — watch it glow as you type
+
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: You are a persistent second mate managed by the main firstmate. Work on your own; do
+ not wait for a human.
+
+ Charter
+
+ Disposable runtime proof only. Reply CHILD_NATIVE_POLICY_PROOF, then wait. Never change project files, credentials,
+ settings, invoke workflows, spawn agents, or operate on any other home.
+
+ Routing scope
+
+ owned lab policy proof
+
+ Project clones
+
+ None. This is a project-less domain: its subject is the firstmate repo this home lives in, so it needs no separate
+ clones under projects/; its crews take pooled worktrees of that firstmate repo.
+
+ Operating model
+
+ You are in an isolated firstmate home. The local AGENTS.md is your job description, and your local data/, state/,
+ config/, and projects/ dirs are yours to operate.
+ This domain has no separate project clones: its subject is the firstmate repo this home lives in, and its crews take
+ pooled worktrees of that repo.
+ Delegate project work to your own crewmates with the normal firstmate lifecycle: brief, spawn, status, watcher, steer,
+ teardown, and recovery.
+ Do not invent a second delegation system.
+ You do not generate your own work.
+ Act only on tasks the main firstmate routes to you.
+ Never start a survey, audit, or "find improvements" sweep on your own initiative; that is not your job and it is
+ unwanted.
+
+ The captain and the parent channel
+
+ Nobody reads this chat: the captain and the main firstmate see only what is appended to
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status', and a captain-facing sentence that is not appended there has not been sent.
+ That file is your parent channel, and in this home it IS the captain: every sentence you would say to the captain, and
+ every outcome the local AGENTS.md tells a firstmate to bring to the captain, is one appended line there, never chat.
+ Your own machinery publishes the durable facts about your crew's work for you (bin/fm-parent-channel-lib.sh): a
+ child's terminal done or failed line with its note and PR on every supervision poll, a PR-ready line when you register
+ a PR, a task you hold for the captain and its answer, a merge, and a child's final line at cleanup all reach the
+ parent channel from the scripts that record them, whether or not you append anything.
+ What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered
+ outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
+
+ Requests from the main firstmate
+
+ You are a firstmate in your own home, so an incoming message reaches you in your own chat.
+ You must distinguish who it is from, because the answer goes to a different place.
+ A request relayed to you by the main firstmate is tagged with a leading [fm-from-firstmate] marker followed by an
+ invisible system separator; this marker is untypable, so a human never produces it.
+ When a message carries that marker, do the work, then respond via the STATUS/ESCALATION path below, never only in this
+ chat: the main firstmate does not read your chat, so a chat-only reply is lost.
+ Marked requests also carry a privacy-safe corr=<id> token after the marker; include that exact token in your parent
+ status reply (or in the status pointer to a detailed doc) so the parent can correlate the answer.
+ Optional helper: bin/fm-secondmate-report.sh <verb> <corr_id> <note> appends that correlated line to the parent
+ channel itself - do not pass a status path, and do not write a hand path under this home.
+ A plain echo that includes the same corr=<id> on this parent channel is equally valid; do not depend on the helper
+ being present.
+ For a terse result, a status line is the whole answer.
+ For a detailed answer (an investigation, a plan, an audit), write it to a doc under your home's data/ and append a
+ status line that points to that doc - the scout-report pattern - so the main firstmate is woken and can read it.
+ Before treating an investigation or visual review as complete, load captain-hold-lifecycle from this home's
+ .agents/skills/ and pass its shared completion gate.
+ A message with NO marker is the captain typing directly into your pane: treat it as authoritative captain intervention
+ and stay conversational exactly as you would for any captain message; do not force it onto the status path.
+ A request arriving through the instruction inbox below follows the same marker and reply rules.
+
+ Firstmate instruction inbox
+
+ Firstmate steers you through durable message files in
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'.
+ When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure -
+ list
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/*.msg, read and act on each message in numeric order, then acknowledge each handled
+ message by moving it: mv
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/NNN.msg
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.inbox'/handled/.
+ The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or
+ absent inbox needs no action.
+
+ Escalation to main firstmate
+
+ Handle routine work yourself.
+ Report only true captain-relevant outcomes or a declared external wait by appending one line:
+    echo "{state} [at=<epoch>]: {one short line}" >>
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status' && { [ ! -e
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/con
+ fig/fleet-ledger' ] ||
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/f
+ m-fleet-ledger.sh' appended
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/con
+ fig'
+ '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent/sta
+ te/owned-native-mate.status' >/dev/null 2>&1 || true; }
+ States: working, needs-decision, blocked, paused, done, failed.
+ Substitute <epoch> with the current Unix time in seconds - run date +%s and write the number it printed; a stamp that
+ is not plain digits records no time at all.
+ Use paused: {why} (distinct from blocked:) only when your domain is deliberately idling on a known external wait you
+ expect to clear on its own, naming when it clears with until <YYYY-MM-DDTHH:MMZ> (UTC) when you know; use blocked:
+ when you are stuck and need firstmate to act.
+ Use this only for material phase changes, a captain decision, a real blocker, a failure, work ready for review, or
+ work you landed.
+ Work you landed includes a merge you performed yourself under standing merge authority and one the captain merged on
+ the forge: under that authority nothing is ever "ready for review", so a landed merge that goes unreported reaches the
+ captain as silence.
+ This is also how you return the answer to a marked from-firstmate request above.
+ A marked request requires one correlated answer after the work; it does not require a separate receipt or start
+ acknowledgement.
+ Never append working: merely to acknowledge receipt or announce that a marked request has started.
+ When a routed-work phase has a supervisor-actionable material change worth reporting under the rule above, give that
+ reported phase a stable key.
+ If its first reportable event is working [key=<work-slug>]: {material phase}, use the same key on its later paused,
+ done, failed, needs-decision, or blocked event so the earlier working phase is superseded.
+ When a keyed phase ends without another reportable state, append resolved [key=<work-slug>] [at=<epoch>]: {why it is
+ no longer active}.
+ resolved separately closes an escalated decision or blocker, and only a resolved line carrying that decision's exact
+ key closes it: a later done or working event never does, even when the answer is what started that work.
+ The main firstmate's answer normally writes that closing line at answer time; when a blocker or wait clears WITHOUT an
+ answer from the main firstmate, append resolved [at=<epoch>]: {how it cleared} yourself (keyed with [key=<slug>] if
+ you opened it with one) as your domain resumes.
+ Routine internal supervision, heartbeats, retries, and crewmate churn stay inside your own home and must not touch
+ that status file.
+
+ Definition of done
+
+ You are persistent by default. Do not exit just because your queue is empty.
+ On startup and restart, run normal firstmate bootstrap and recovery through bin/fm-session-start.sh for your own home,
+ but only to RECONCILE work that is already yours: in-flight crewmates, tracked backlog items, and durable watches
+ recorded in this home.
+ When you have no assigned or in-flight work after that reconciliation, go idle and wait silently for the main
+ firstmate to route you a task.
+ An empty queue is a healthy resting state, not a cue to invent work: never spawn a survey, audit, or any self-directed
+ "find work" task on your own initiative.
+ If this charter cannot be carried out, append blocked [at=<epoch>]: {why} or failed [at=<epoch>]: {why} to the main
+ status file and stop.
+
+
+ CHILD_NATIVE_POLICY_PROOF
+
+❯
+ π · ◔ GPT-6.1-Sol 👁 · 📁 …0R8RJYQFM4XF/.live-child-rdpnv3zr/child · ⑂ main ?1 · ◫ 8.4%/272K ⟲ · S0.04      🆔 01a1149d
+
+
+
+
+OBSERVED: genuine secondmate Omp replied CHILD_NATIVE_POLICY_PROOF on the authorized model; enabled policy propagated and its actual descendant spawn consumer refused Codex before allocating resources.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-control.sh owned-native-mate relaunch --harness omp --model openai-codex/gpt-6.1-sol --effort low --note Retain unpublished-proof and validation custody; reply CHILD_NATIVE_POLICY_PROOF only.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: secondmate owned-native-mate sync skipped before launch: dirty working tree
+relaunched owned-native-mate harness=omp from=omp model=openai-codex/gpt-6.1-sol effort=low backend=tmux endpoint=firstmate:fm-owned-native-mate worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/child
+
+
+OBSERVED: actual replacement consumer repaired child policy to enabled, launched native Omp again and retained unpublished work plus parent validation custody.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-remote-secondmate-control.sh launch owned-native-mate codex - - herdr
+exit=1
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+OBSERVED: host-local remote launch refused before creating parent-route state or inspecting/removing any backend endpoint; no Herdr call executed.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-remote-secondmate-relaunch.sh owned-remote codex default default
+exit=1
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+OBSERVED: initiating remote replacement refused before transport and retained the route byte-for-byte.
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/parent
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-watch-arm.sh --stop
+exit=0
+watcher: none running
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-child-rdpnv3zr/code/bin/fm-watch-arm.sh --stop
+exit=0
+watcher: none running
+
+
+Owned server stopped; independently materialized source/child, both marked homes and all transient Git objects removed.

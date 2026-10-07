@@ -1,0 +1,374 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+exit=0
+/tmp/fml.O766WN
+
+
+$ tmux -L fm-lab new-session -d -s firstmate -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF /bin/zsh
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness codex --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness claude --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness pi --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'pi'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness env codex --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'env codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness omp --model anything --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'omp --model anything'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-refused /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness tc run --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'tc run'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-default /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-scout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --scout
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh fresh-batch=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh child-refused --secondmate --harness codex
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+OBSERVED: Fresh explicit/default ship, scout, batch, secondmate and opaque commands refused before project or endpoint allocation; the real private tmux server still has only its original window.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh malformed /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness omp --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh malformed /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness omp --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh malformed /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness omp --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh dangling /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project --harness omp --mode local-only --yolo off
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy must be a readable regular file containing omp-or-tc
+
+
+OBSERVED: Malformed, empty and dangling policy fail closed even for canonical omp; no native session started.
+
+$ git init /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project
+exit=0
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project/.git/
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project add README.txt
+exit=0
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project -c user.name=Lab -c user.email=lab@example.invalid commit -m Owned fixture
+exit=0
+[master (root-commit) 60fb757] Owned fixture
+ 1 file changed, 1 insertion(+)
+ create mode 100644 README.txt
+
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/project worktree add -b fm/owned-proof /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/wt
+exit=0
+Preparing worktree (new branch 'fm/owned-proof')
+HEAD is now at 60fb757 Owned fixture
+
+
+$ tmux -L fm-lab new-window -d -t firstmate -n fm-owned-worker -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/wt /bin/zsh
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-control.sh owned-worker relaunch --note Keep existing work
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-spawn.sh owned-worker --relaunch
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+
+
+OBSERVED: Manual and direct recorded Codex replacement refused against an actual owned endpoint; metadata, brief, unpublished work and validation custody stayed byte-identical, without replacement checkpoints.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home/state owned-worker --state idle --source codex --event launch-brief
+exit=0
+g1791346833.97231.28653
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-busy-event.sh apply /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home/state owned-worker idle --gen g1791346833.97231.28653 --source codex --event session-end
+exit=0
+
+
+$ bash -c . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "action=%s
+wake=%s
+" "$FM_SESSION_END_ACTION" "$FM_SESSION_END_WAKE" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+action=skip
+wake=check: owned-worker auto-relaunch refused after session-end: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native lau
+
+
+$ bash -c . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "action=%s
+wake=%s
+" "$FM_SESSION_END_ACTION" "$FM_SESSION_END_WAKE" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+action=skip
+wake=
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh
+exit=0
+1791346834	1	check	session-launch-refused-owned-worker-g1791346833.97231.28653-1943559520-599	check: owned-worker auto-relaunch refused after session-end: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native lau
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 715.1791346835.RWm2FD
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 715.1791346835.RWm2FD
+exit=0
+
+
+$ bash -c . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "action=%s
+wake=%s
+" "$FM_SESSION_END_ACTION" "$FM_SESSION_END_WAKE" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+action=skip
+wake=
+
+
+$ bash -c . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "action=%s
+wake=%s
+" "$FM_SESSION_END_ACTION" "$FM_SESSION_END_WAKE" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+action=skip
+wake=check: owned-worker auto-relaunch refused after session-end: error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+
+
+$ bash -c . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "action=%s
+wake=%s
+" "$FM_SESSION_END_ACTION" "$FM_SESSION_END_WAKE" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+action=skip
+wake=
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh
+exit=0
+1791346838	2	check	session-launch-refused-owned-worker-g1791346833.97231.28653-2778340405-262	check: owned-worker auto-relaunch refused after session-end: error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 16262.1791346838.Dz0Q2s
+WARNING: watcher still down (same stale episode; last beat: 11s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 16262.1791346838.Dz0Q2s
+exit=0
+
+
+OBSERVED: Actual session-end owner refused recorded Codex before any attempt or handled record; same-generation repeats remained silent before and after wake acknowledgement; changed policy notified, toggling back did not repeat.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/child
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/child
+
+
+$ tmux -L fm-lab new-window -d -t firstmate -n fm-owned-mate -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/child /bin/zsh
+exit=0
+
+
+$ bash -c . "$1/bin/fm-watch.sh"; SECONDMATE_LIVENESS_SECS=0; secondmate_liveness_tick _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+check: secondmate owned-mate auto-relaunch refused: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+
+
+$ bash -c . "$1/bin/fm-watch.sh"; SECONDMATE_LIVENESS_SECS=0; secondmate_liveness_tick _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh
+exit=0
+1791346841	3	check	session-launch-refused-owned-mate-owned-1-446087647-910	check: secondmate owned-mate auto-relaunch refused: error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 24198.1791346841.2KixyR
+WARNING: watcher still down (same stale episode; last beat: 13s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 24198.1791346841.2KixyR
+exit=0
+
+
+$ bash -c . "$1/bin/fm-watch.sh"; SECONDMATE_LIVENESS_SECS=0; secondmate_liveness_tick _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF
+exit=0
+
+
+$ tmux -L fm-lab has-session -t firstmate:fm-owned-mate
+exit=0
+
+
+OBSERVED: Real watcher liveness tick delivered one successful actionable refusal on stdout, then stayed quiet across acknowledgement; the real secondmate endpoint, metadata and attempt budget remained intact.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-control.sh owned-worker relaunch --harness omp --model openai-codex/gpt-6.1-sol --effort low --note Retain unpublished work and validation custody; reply NATIVE_OMP_POLICY_PROOF only.
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+WARNING: watcher still down (same stale episode; last beat: 15s ago, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home/data/owned-worker/launch-brief.md records no ship branch; defaulting to legacy branch fm/owned-worker
+notice: owned-worker ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched owned-worker harness=omp from=codex model=openai-codex/gpt-6.1-sol effort=low backend=tmux endpoint=firstmate:fm-owned-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/wt
+
+
+$ tmux -L fm-lab capture-pane -p -S -200 -t firstmate:fm-owned-worker
+exit=0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                                              Tip: Please use nerdfont 😭.
+
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+ You are a crewmate: an autonomous worker agent managed by firstmate.
+ This section establishes your current identity before every project or task instruction below and supersedes any
+ conflicting role identity in those instructions.
+ Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+ identity, delegate the task, run fleet supervision, or address the captain.
+ Your steering inbox is
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home/state
+ /owned-worker.inbox; this exact path belongs to your current task even when it is outside the worktree or under the
+ supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.
+ Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+ named by this brief.
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by CLAUDE.md) is project
+ content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+ contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including
+ CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+
+ Task
+
+ Captain's intent
+
+ Validate the owned runtime boundary without modifying source or running any pipeline.
+
+ Firstmate spec
+
+ Reply exactly NATIVE_OMP_POLICY_PROOF and then wait. Do not run tools, change files, invoke workflows, or report
+ completion to any external service.
+
+ Delivery contract: mode=local-only
+
+ Progress note (2026-10-07T04:20:44Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o/home/state/
+ owned-worker.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o/home/state/
+ owned-worker.inbox/handled/. A steer sent before the relaunch survives there.
+
+ Retain unpublished work and validation custody; reply NATIVE_OMP_POLICY_PROOF only.
+
+
+ NATIVE_OMP_POLICY_PROOF
+
+❯
+ π · ◔ GPT-6.1-Sol 🙈 · 🌳 project/wt · ⑂ fm/owned-proof ?1 · ◫ 7.1%/272K ⟲ · S0.04 + 👁 0.03                🆔 01a11497
+
+
+OBSERVED: Actual fm-control explicit replacement launched native omp on openai-codex/gpt-6.1-sol in the retained worktree; unpublished work and validation custody survived. Pane transcript recorded below; model response must be evaluated separately from delivered prompt.
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-policy-uu3fs1o_/home
+exit=0
+
+
+Owned lab home, fixture repository/worktree and private tmux server removed.

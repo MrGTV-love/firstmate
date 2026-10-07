@@ -1,0 +1,60 @@
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/home
+exit=0
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/home
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/home
+exit=0
+/tmp/fml.o372OA
+
+
+$ bash -c . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-supervision-engine-lib.sh"; _fm_engine_identity "$2" _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF 78890
+exit=0
+Tue Oct  6 23:23:59 2026     /bin/sleep 300
+
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/home exec omp --model openai-codex/gpt-6.1-sol --thinking low --no-extensions --no-skills --no-rules --no-title --session-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/sessions -p 'You are an isolated live validation primary. Use the bash tool once to run exactly the following shell command. No other tools, commands, files, sessions, credentials or workflow operations. Do not edit anything or invoke any pipeline. This command targets only a disposable marked FM_HOME already provided in your environment. Then reply SUPERVISION_PRIMARY_FINISHED.
+{
+bin/fm-lock.sh
+printf '"'"'HOST_REFUSAL_BEGIN\n'"'"'
+FM_SUPERVISION_HOST_PRIMARY=omp bin/fm-supervision-host.sh park --restart
+printf '"'"'HOST_REFUSAL_EXIT=%s\n'"'"' "$?"
+printf '"'"'AWAY_ENTRY_BEGIN\n'"'"'
+bin/fm-afk-launch.sh enter --words '"'"'owned lab watch only'"'"'
+printf '"'"'AWAY_ENTRY_EXIT=%s\n'"'"' "$?"
+bin/fm-afk-launch.sh start
+printf '"'"'AWAY_START_EXIT=%s\n'"'"' "$?"
+} > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/actions.log 2>&1
+printf '"'"'LIVE_SUPERVISION_DONE\n'"'"' > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/done
+' > /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/primary.log 2>&1
+exit=0
+
+
+ACTUAL CLI OUTPUT EXECUTED BY OMP PRIMARY
+lock acquired: harness pid 78992
+HOST_REFUSAL_BEGIN
+supervision-host: launch policy refused: no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes
+HOST_REFUSAL_EXIT=1
+AWAY_ENTRY_BEGIN
+Away posture recorded at 2026-10-07T04:24:07Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-07T04:24:07Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    owned lab watch only
+Supervision host: no engine runs the away session on this home (error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper), so every away wake reaches this conversation; continue main-side supervision until a permitted native engine is verified.
+AWAY_ENTRY_EXIT=0
+fm-afk-launch: the away daemon is not launched on this omp home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)
+AWAY_START_EXIT=1
+
+
+OBSERVED: actual Omp primary host refusal preserved the live predecessor and all host/turn/engine custody byte-for-byte, invoked no engine and started no host watcher. Away entry retained its posture and printed policy-aware main-side remediation; daemon start refused.
+
+$ tmux -L fm-lab kill-server
+exit=0
+
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.live-supervision-_92mrk5s/home
+exit=0
+
