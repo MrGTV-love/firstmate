@@ -382,7 +382,7 @@ assert_inheritance_refusal() {
     unwritable-*)
       status=error
       grep -Fx 'config-write' "$CASE/inherit-failures" >/dev/null || fail 'config-write fixture was not reached' ;;
-    gitignore-*) status=skipped ;;
+    gitignore-*) status=error ;;
     skip-*)
       [ ! -s "$INHERIT_REPORT" ] || fail 'host-local inheritance skip propagated config'
       return 0 ;;
