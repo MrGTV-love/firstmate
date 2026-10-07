@@ -183,7 +183,7 @@ assert_preserved
 pass 'separate authoritative root and capable dirty remote home support policy convergence'
 
 new_home legacy-local
-rm -rf "$CHILD/bin"
+rm -rf "${CHILD:?}/bin"
 rm "$PRIMARY/config/session-launch-policy"
 printf 'omp-or-tc\n' > "$CHILD/config/session-launch-policy"
 snapshot
@@ -195,7 +195,7 @@ run_local
 pass 'local primary absence clears policy without capable owners'
 
 new_home legacy-remote
-rm -rf "$CHILD/bin"
+rm -rf "${CHILD:?}/bin"
 printf 'omp-or-tc\n' > "$CHILD/config/session-launch-policy"
 snapshot
 : > "$CASE/empty"

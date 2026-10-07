@@ -19,8 +19,8 @@ for transition in first replacement addition; do
       # shellcheck source=bin/fm-wake-lib.sh
       . "$ROOT/bin/fm-wake-lib.sh"
       MARKER="$STATE/.session-launch-refused-worker"
-      old_generation=receipt-generation-1
-      next_generation=receipt-generation-2
+      old_generation='receipt-generation-1'
+      next_generation='receipt-generation-2'
       expected_keys=1
       expected_wakes=1
       if [ "$transition" != first ]; then
@@ -34,7 +34,9 @@ for transition in first replacement addition; do
         expected_keys=2
       fi
       inject=1
+      # shellcheck disable=SC2329 # Sourced receipt code invokes this fault-injection override.
       printf() {
+        # shellcheck disable=SC2031 # Read new inside the receipt-writing subshell that sets it.
         if [ "$inject" = 1 ] && [ "${new:-0}" = 1 ] && [ "${1:-}" = '%s\n' ]; then
           if { [ "$failure" = generation ] && [ "${2:-}" = "$next_generation" ]; } \
             || { [ "$failure" = key ] && [ "${2:-}" = "${key:-}" ]; }; then
@@ -42,6 +44,7 @@ for transition in first replacement addition; do
             return 73
           fi
         fi
+        # shellcheck disable=SC2059 # Preserve printf's format and arguments when forwarding to the builtin.
         builtin printf "$@"
       }
       _fm_atomic_replace() {

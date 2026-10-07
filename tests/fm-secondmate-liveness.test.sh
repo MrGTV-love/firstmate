@@ -815,6 +815,7 @@ SH
 
 recover_remote() {
   local w=$1 mode=$2; shift 2
+  # shellcheck disable=SC2016 # Variables expand in the child shell.
   env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
     FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$w/home/config" FM_STATE_OVERRIDE="$w/home/state" \
     FM_WAKE_QUEUE="$w/home/state/.wake-queue" FM_WAKE_QUEUE_LOCK="$w/home/state/.wake-queue.lock" \
@@ -926,6 +927,7 @@ test_remote_relaunch_rechecks_probe_admission() {
   w=$(make_remote_readiness_world remote-policy-recheck)
   printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
   printf 'omp explicit-model high\n' > "$w/home/config/secondmate-harness"
+  # shellcheck disable=SC2016 # Variables expand in the child shell.
   out=$(env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
     FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$w/home/config" FM_STATE_OVERRIDE="$w/home/state" \
     FM_WAKE_QUEUE="$w/home/state/.wake-queue" FM_WAKE_QUEUE_LOCK="$w/home/state/.wake-queue.lock" \
