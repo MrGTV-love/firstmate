@@ -16,6 +16,9 @@ export LAVISH_AXI_STATE_DIR="$TMP_ROOT/lavish-state"
 export TMPDIR="$TMP_ROOT"
 mkdir -p "$LAVISH_AXI_STATE_DIR"
 NATIVE_BIN=$(fm_fakebin "$TMP_ROOT/native")
+export FM_TEST_REAL_PS
+FM_TEST_REAL_PS=$(command -v ps)
+export FM_TEST_PS_FAILURE_PATH="$TMP_ROOT/ps-failure"
 export PATH="$NATIVE_BIN:$PATH"
 OWNED_PID=''
 OWNED_MEMBERS=()
@@ -57,6 +60,17 @@ cleanup() {
   fm_test_cleanup
 }
 trap cleanup EXIT
+
+cat > "$NATIVE_BIN/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 2 ] && [ "$1" = -axo ] && [ "$2" = pid=,pgid= ] \
+  && [ -f "$FM_TEST_PS_FAILURE_PATH" ]; then
+  mv -- "$FM_TEST_PS_FAILURE_PATH" "$FM_TEST_PS_FAILURE_PATH.observed" || exit 2
+  exit 1
+fi
+exec "$FM_TEST_REAL_PS" "$@"
+SH
+chmod +x "$NATIVE_BIN/ps"
 
 cat > "$NATIVE_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
@@ -167,10 +181,17 @@ answer_and_capture() {  # <token>
   forget_group "$RUNNER_PID"
 }
 
-for resist in 0 1; do
+for scenario in term-0 term-1 inspection-failure-0 inspection-failure-1; do
+  resist=${scenario##*-}
   export FM_TEST_NATIVE_TERM_RESISTANT=$resist
-  new_board "term-$resist"
+  new_board "$scenario"
   old_runner=$RUNNER_PID
+  case "$scenario" in
+    inspection-failure-*)
+      rm -f -- "$FM_TEST_PS_FAILURE_PATH.observed"
+      : > "$FM_TEST_PS_FAILURE_PATH"
+      ;;
+  esac
   kill -TERM "$old_runner" || fail "TERM could not reach the owned runner"
   # Never observe a free claim while any nonleader from this generation is
   # still alive. On the old implementation this was the exact custody break.
@@ -195,6 +216,12 @@ for resist in 0 1; do
     fail "TERM-only runner exit released custody while its native poll and descendants survived"
   fi
   group_gone "$old_runner" || fail "TERM-only runner exit left its native poll group alive"
+  case "$scenario" in
+    inspection-failure-*)
+      assert_absent "$FM_TEST_PS_FAILURE_PATH" "shutdown consumed the one-shot inspection failure"
+      assert_present "$FM_TEST_PS_FAILURE_PATH.observed" "shutdown encountered a failed group inspection"
+      ;;
+  esac
   kill -0 "$NATIVE_PID" 2>/dev/null && fail "old native listener survived TERM-only shutdown"
   kill -0 "$DESCENDANT_PID" 2>/dev/null && fail "old descendant survived TERM-only shutdown"
   forget_group "$old_runner"
@@ -211,8 +238,8 @@ for resist in 0 1; do
   while IFS= read -r member_pid; do NATIVE_PID=$member_pid; done < "$ARTIFACT.native-pids"
   while IFS= read -r member_pid; do DESCENDANT_PID=$member_pid; done < "$ARTIFACT.descendant-pids"
   own_group "$RUNNER_PID" "$NATIVE_PID" "$DESCENDANT_PID"
-  answer_and_capture "term-only-answer-$resist"
-  pass "TERM-only runner shutdown preserves custody and replacement answer (resistant=$resist)"
+  answer_and_capture "$scenario-answer"
+  pass "TERM-only runner shutdown preserves custody and replacement answer ($scenario)"
 done
 
 export FM_TEST_NATIVE_TERM_RESISTANT=0
