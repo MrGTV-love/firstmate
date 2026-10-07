@@ -1125,7 +1125,6 @@ With the classifier change reverted, the same run stopped at `an idle empty box 
 
 Verified on 2026-10-06 on macOS arm64 against Claude Code 2.1.292 in an isolated Herdr 0.9.1 lab session, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
 Claude draws the session's name inside the prompt box's top rule once the session has one: `claude --name <name>`, `/rename`, a hook-supplied session title, or the title it generates from the first prompt.
-A worker whose first prompt was the steering doorbell line was titled with that line, punctuation stripped, so every steered worker can draw this shape.
 The observed idle composer, with the title right-aligned in the top rule and a plain closing rule:
 
 ```text
@@ -1134,13 +1133,18 @@ The observed idle composer, with the title right-aligned in the top rule and a p
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
-The titled rule is not a solid `─` row, so the cursorless profiles lost the rule pair around the `❯` row and read the closing rule as an unproven separator.
-The verdict was `unknown`, which made `fm-send` skip its doorbell and made `fm-control exit` and `relaunch` refuse an idle worker.
-The current classification is owned by `_fm_composer_titled_rule_row` in `bin/fm-composer-lib.sh`: a titled rule opens a rule pair only when it starts with at least eight `─`, ends with `─`, and holds a space-separated title with no structural edge glyph, and the pair is recorded only when an agent glyph row sits inside it.
-`test_matrix_claude_titled_top_border` and `test_claude_titled_top_border_needs_glyph_proof_and_exact_shape` in `tests/fm-composer-lib.test.sh` carry the idle, typed, and refused shapes.
-`test_multiline_rule_pair_retains_all_interior_rows` also covers titled and plain rule pairs containing `❯ keep this unsent text` followed by a pasted `❯`, with blank and ordinary continuation rows. Classification and extraction retain the entire rule-pair interior and strip only the proving prompt glyph: any nonblank content surviving the capture's styling policy reads `pending`, including on plain captures. The focused composer test and direct classifier/extractor smoke check passed; the concrete draft extracts as `keep this unsent text ❯`. The live guard now includes multiline content and exit-refusal checks, but those added live checks were not executed in this review round.
-Rule-like continuations that would replace a proven prompt envelope are refused as `unknown`, rather than allowing a later glyph to prove the draft empty. Bare rule-pair readers preserve literal `│`, `┃`, `║`, and `|` characters instead of treating them as box sides; `test_rule_pair_continuations_never_prove_empty` exercises classification with and without a cursor, selected-content refusal for ambiguous rules, and literal-character extraction for titled, plain, and identity-backed Pi pairs.
-Prompt-proven rule pairs take precedence over nested boxes, omp boxes, and left bars when they enclose the cursor or are the bottom-most candidate. Classification and extraction share the same interior reader, preserving literal side borders and Braille instead of applying nested-container or Codex animation rules. `test_rule_pair_pasted_containers_remain_literal` exercises every box family, folded and multiline omp boxes, left bars, and newer genuine composers; `test_rule_pair_braille_is_literal_content` covers singleton and multiline Braille drafts and empty single-line pairs, with and without a cursor, in both locales. The focused test file and direct classifier/extractor smoke passed; no live terminal guard was run for these review fixes. Unpaired Codex animation handling and native Pi's identity-backed treatment of user-entered prompt glyphs remain unchanged.
+The operator safety contract is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact titled-rule predicates and rule-pair content handling are owned by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh).
+The focused regressions in [`tests/fm-composer-lib.test.sh`](../../tests/fm-composer-lib.test.sh) cover:
+
+- `test_matrix_claude_titled_top_border` and `test_claude_titled_top_border_needs_glyph_proof_and_exact_shape`: idle, typed, and refused titled-border shapes.
+- `test_multiline_rule_pair_retains_all_interior_rows`: blank and ordinary continuation rows, including a pasted `❯` after `❯ keep this unsent text`.
+- `test_rule_pair_continuations_never_prove_empty`: ambiguous rule continuations and literal side characters in titled, plain, and identity-backed Pi pairs.
+- `test_rule_pair_pasted_containers_remain_literal`: complete pasted box families, folded and multiline omp boxes, left bars, and newer genuine composers.
+- `test_rule_pair_braille_is_literal_content`: singleton and multiline Braille drafts and empty single-line pairs.
+
+The recorded focused test and direct classifier/extractor smoke passed, including cursor and cursorless profiles in both locales; the concrete multiline draft extracted as `keep this unsent text ❯`.
+These portable results do not establish live coverage for multiline, pasted-container, or Braille drafts.
+The live guard includes multiline content and exit-refusal checks, but the recorded live output below predates those checks.
 
 The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
 Its default-on checks spend no tokens wherever claude, herdr, jq, and git are installed.

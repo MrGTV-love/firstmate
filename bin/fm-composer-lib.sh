@@ -24,10 +24,11 @@
 #   styled=1    the capture preserves ANSI styling, so ghost/placeholder text
 #               is detectable and can be stripped (tmux -e, herdr --format
 #               ansi, zellij dump-screen --ansi). With styled=0 (cmux, orca)
-#               ghost text is unreadable, so a bare glyph row or left-bar row
-#               carrying trailing non-idle text degrades to `unknown` rather
-#               than `pending`: the text may be the harness's own idle
-#               suggestion, and a false `pending` blocks every safe caller.
+#               ghost text is unreadable, so an unpaired bare glyph row or
+#               left-bar row carrying trailing non-idle text degrades to
+#               `unknown` rather than `pending`: the text may be the harness's
+#               own idle suggestion. Proven rule-pair interiors instead use
+#               _fm_composer_rule_pair_row_content.
 #   cursor=1    a cursor row is supplied (tmux #{cursor_y} only). The cursor
 #               anchors shape selection: the shape containing the cursor is the
 #               composer. Without it, the bottom-most shape wins.
@@ -102,9 +103,8 @@
 # ENVELOPE that CLOSED over an agent prompt glyph is a proven composer
 # container, so a BARE candidate among the contiguous non-blank rows below its
 # closing row is that composer's own footer furniture and not a composer. The
-# proven envelope is selected instead; when its proving glyph row is itself
-# borderless, that row is the bare candidate it stood for, and the envelope's
-# staleness probe resumes past the zone.
+# proven envelope is selected instead, retaining its interior; footer-aware
+# staleness checks resume past the zone.
 #
 # THE ASYMMETRY that bounds it: `empty` is the one verdict that authorizes
 # fm-send to type into a pane, so this rule may move a verdict only toward
@@ -797,8 +797,7 @@ _fm_composer_pi_separator_row() {  # <trimmed-row>
 # session title): `──────── <title> ─`. The rule must open with a solid run of
 # at least 8 `─`, close with a `─` run, and hold its title set apart by spaces
 # with no structural edge glyph inside. A row that is not exactly that shape
-# stays an ordinary row, so a transcript heading or a table rule is never read
-# as a composer border.
+# stays an ordinary row; accepting an opener alone does not prove a composer.
 _fm_composer_titled_rule_row() {  # <trimmed-row>
   local row=$1 inner lead=0
   # Literal prefix/suffix removal only: `${v#?}` and bracket classes cut single
@@ -1297,6 +1296,11 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
   printf '%s' "$stripped"
 }
 
+# A proven rule pair owns its whole interior, so nested container edges and
+# Codex Braille animation patterns are literal draft content here. Apart from
+# whitespace normalization, only the capture's ghost policy and the single
+# proving prompt glyph are removed. Native Pi classification passes
+# prompt_row=-1 because its glyph-like text is user input.
 _fm_composer_rule_pair_row_content() {
   local raw=$1 styled=$2 row=$3 prompt_row=${4:-$FM_COMPOSER_SCAN_PI_GLYPH_ROW} content glyph
   if [ "$styled" = 1 ]; then
