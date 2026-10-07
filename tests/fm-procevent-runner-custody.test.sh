@@ -17,14 +17,32 @@ export TMPDIR="$TMP_ROOT"
 mkdir -p "$LAVISH_AXI_STATE_DIR"
 NATIVE_BIN=$(fm_fakebin "$TMP_ROOT/native")
 export PATH="$NATIVE_BIN:$PATH"
-OWNED_GROUPS=()
+OWNED_PID=''
+OWNED_IDENTITY=''
+own_group() {
+  local pid=$1 identity
+  [ -z "$OWNED_PID" ] || fail "previous owned generation was not released"
+  identity=$(fm_test_pid_identity "$pid") || fail "could not identify owned runner $pid"
+  [ -n "$identity" ] || fail "owned runner $pid has no identity"
+  assert_equals "$pid" "$(ps -o pgid= -p "$pid" | tr -d '[:space:]')" \
+    "owned runner leads its current process group"
+  OWNED_PID=$pid
+  OWNED_IDENTITY=$identity
+}
+forget_group() {
+  assert_equals "$OWNED_PID" "$1" "released group is the current owned generation"
+  OWNED_PID=''
+  OWNED_IDENTITY=''
+}
 cleanup() {
-  local pid
-  # These are exactly the groups this fixture observed while their owned
-  # leaders were live. The crash case deliberately needs fixture-only cleanup.
-  for pid in "${OWNED_GROUPS[@]:-}"; do
-    [ -n "$pid" ] && kill -KILL -"$pid" 2>/dev/null || true
-  done
+  local identity pgid
+  if [ -n "$OWNED_PID" ] && [ -n "$OWNED_IDENTITY" ]; then
+    identity=$(fm_test_pid_identity "$OWNED_PID" 2>/dev/null) || identity=''
+    pgid=$(ps -o pgid= -p "$OWNED_PID" 2>/dev/null | tr -d '[:space:]')
+    if [ "$identity" = "$OWNED_IDENTITY" ] && [ "$pgid" = "$OWNED_PID" ]; then
+      kill -KILL -"$OWNED_PID" 2>/dev/null || true
+    fi
+  fi
   fm_test_cleanup
 }
 trap cleanup EXIT
@@ -115,7 +133,7 @@ new_board() {
     IFS= read -r _
     IFS= read -r RUNNER_PID
   } < "$FM_PROCEVENT_CLAIM_ROOT/$SOURCE_ID.claim"
-  OWNED_GROUPS+=("$RUNNER_PID")
+  own_group "$RUNNER_PID"
   assert_equals "$RUNNER_PID" "$(ps -o pgid= -p "$NATIVE_PID" | tr -d '[:space:]')" \
     "$name native poll belongs to its owned runner group"
   assert_equals "$RUNNER_PID" "$(ps -o pgid= -p "$DESCENDANT_PID" | tr -d '[:space:]')" \
@@ -126,7 +144,9 @@ answer_and_capture() {  # <token>
   local token=$1 result="$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result"
   printf 'session:\n  status: feedback\n  session_ended: true\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","%s","","message",""\n' "$token" \
     > "$ARTIFACT.expected"
-  cp "$ARTIFACT.expected" "$ARTIFACT.answer"
+  cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
+    && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer" \
+    || fail "$token answer publication failed"
   wait_for nonempty "$result" || fail "$token was not captured by the replacement listener"
   cmp -s "$ARTIFACT.expected" "$result" || fail "$token capture changed the native answer bytes"
   wait_for nonempty "$HOME_FIXTURE/state/.wake-queue" || fail "$token produced no durable wake"
@@ -135,6 +155,8 @@ answer_and_capture() {  # <token>
   assert_contains "$(FM_HOME="$HOME_FIXTURE" "$ROOT/bin/fm-procevent-lavish.sh" read "$result")" \
     "$token" "$token reaches the public result consumer"
   wait_for claim_gone "$SOURCE_ID" || fail "$token terminal capture did not release custody"
+  wait_for group_gone "$RUNNER_PID" || fail "$token terminal capture left its group alive"
+  forget_group "$RUNNER_PID"
 }
 
 for resist in 0 1; do
@@ -167,6 +189,7 @@ for resist in 0 1; do
   group_gone "$old_runner" || fail "TERM-only runner exit left its native poll group alive"
   kill -0 "$NATIVE_PID" 2>/dev/null && fail "old native listener survived TERM-only shutdown"
   kill -0 "$DESCENDANT_PID" 2>/dev/null && fail "old descendant survived TERM-only shutdown"
+  forget_group "$old_runner"
   out=$(pe reconcile)
   assert_contains "$out" "started=1" "TERM-only shutdown lets reconcile confirm one replacement"
   wait_for nonempty "$ARTIFACT.listener/pid" || fail "replacement native listener did not start"
@@ -174,7 +197,8 @@ for resist in 0 1; do
     IFS= read -r _
     IFS= read -r replacement_runner
   } < "$FM_PROCEVENT_CLAIM_ROOT/$SOURCE_ID.claim"
-  OWNED_GROUPS+=("$replacement_runner")
+  RUNNER_PID=$replacement_runner
+  own_group "$RUNNER_PID"
   answer_and_capture "term-only-answer-$resist"
   pass "TERM-only runner shutdown preserves custody and replacement answer (resistant=$resist)"
 done
@@ -195,6 +219,7 @@ kill -0 "$DESCENDANT_PID" 2>/dev/null || fail "crashed-leader refusal signalled 
 assert_absent "$ARTIFACT.signals" "crashed-leader refusal never sends TERM"
 kill -KILL -"$crashed_runner" 2>/dev/null || true
 wait_for group_gone "$crashed_runner" || fail "fixture-only crash cleanup left a group alive"
+forget_group "$crashed_runner"
 pe retire "$SOURCE_ID" >/dev/null || fail "empty crashed group could not be retired"
 pass "crashed-leader group remains claimed and un-signalled by reconcile and public start"
 
@@ -220,7 +245,9 @@ pass "an outputless killed native poll relistens under the same runner and captu
 
 new_board unknown-error
 printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n' > "$ARTIFACT.expected"
-cp "$ARTIFACT.expected" "$ARTIFACT.answer"
+cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
+  && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer" \
+  || fail "unknown native error publication failed"
 unknown_result="$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result"
 wait_for nonempty "$unknown_result" || fail "unknown native error was not captured"
 cmp -s "$ARTIFACT.expected" "$unknown_result" || fail "unknown native error bytes changed"
@@ -228,6 +255,8 @@ wait_for nonempty "$HOME_FIXTURE/state/.wake-queue" || fail "unknown native erro
 assert_grep "procevent lavish $SOURCE_ID 1" "$HOME_FIXTURE/state/.wake-queue" \
   "unknown native error capture reaches the consumer wake queue"
 wait_for claim_gone "$SOURCE_ID" || fail "unknown native error incorrectly relistened indefinitely"
+wait_for group_gone "$RUNNER_PID" || fail "unknown native error capture left its group alive"
+forget_group "$RUNNER_PID"
 assert_present "$HOME_FIXTURE/state/procevent/$SOURCE_ID.source" "unknown native error remains registered"
 pass "unknown native error remains exact, announced, and available for reconciliation"
 

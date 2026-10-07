@@ -25,6 +25,11 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-procevent-lib.sh"
 
 PAYLOAD=$(cat 2>/dev/null || true)
+printf '%s' "$PAYLOAD" | perl -MJSON::PP=decode_json -e '
+  local $/;
+  my $payload = eval { decode_json(<STDIN>) };
+  exit(ref($payload) eq "HASH" && exists($payload->{agent_id}) ? 0 : 1);
+' 2>/dev/null && exit 0
 [ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0
 fm_hook_payload_is_foreign_host "$PAYLOAD" && exit 0
 if [ -n "$PAYLOAD" ] && command -v jq >/dev/null 2>&1; then
@@ -39,10 +44,23 @@ if fm_procevent_any_registered "$STATE"; then
   fm_procevent_owner_lease_touch "$STATE" 2>/dev/null || true
 fi
 
-perl -MJSON::PP=encode_json -MEncode=decode,FB_CROAK -e '
+perl -MJSON::PP=encode_json -MEncode=decode,FB_CROAK -MFile::Spec -e '
   use strict;
   use warnings;
-  my $dir = "$ARGV[0]/procevent-inbox";
+  my ($state, $home, $root, $scripts) = map { File::Spec->rel2abs($_) } @ARGV;
+  my $quote = sub {
+    my $value = shift;
+    $value = decode("UTF-8", $value, FB_CROAK);
+    $value =~ s/\x27/\x27\x22\x27\x22\x27/g;
+    return chr(39) . $value . chr(39);
+  };
+  my $selectors = "FM_HOME=" . $quote->($home)
+    . " FM_STATE_OVERRIDE=" . $quote->($state)
+    . " FM_ROOT_OVERRIDE=" . $quote->($root) . " ";
+  my $drain = $selectors . $quote->("$scripts/fm-wake-drain.sh");
+  my $read = $selectors . $quote->("$scripts/fm-procevent-lavish.sh") . " read ";
+  my $handled = $selectors . $quote->("$scripts/fm-procevent.sh") . " handled ";
+  my $dir = "$state/procevent-inbox";
   -d $dir && !-l $dir or exit 0;
   opendir my $entries, $dir or exit 0;
   while (my $name = readdir $entries) {
@@ -58,15 +76,12 @@ perl -MJSON::PP=encode_json -MEncode=decode,FB_CROAK -e '
     read($adapter, my $kind, 16) or next;
     close $adapter;
     next unless $kind eq "lavish\n";
-    my $result = decode("UTF-8", "$base.result", FB_CROAK);
-    $result =~ s/\x27/\x27\x22\x27\x22\x27/g;
-    my $quoted_result = chr(39) . $result . chr(39);
-    my $notice = "A captured Lavish result is waiting: $id $sequence. Run bin/fm-wake-drain.sh now. ";
-    $notice .= "If the drain has no row for this result, read it directly with bin/fm-procevent-lavish.sh read ";
-    $notice .= $quoted_result . ". ";
-    $notice .= "Handle the result, then acknowledge it with bin/fm-procevent.sh handled $id $sequence before continuing.";
+    my $notice = "A captured Lavish result is waiting: $id $sequence. Run `$drain` now. ";
+    $notice .= "If the drain has no row for this result, read it directly with `";
+    $notice .= $read . $quote->("$base.result") . "`. ";
+    $notice .= "Handle the result, then acknowledge it with `$handled$id $sequence` before continuing.";
     print encode_json({ hookSpecificOutput => { hookEventName => "PostToolUse", additionalContext => $notice } }), "\n";
     last;
   }
-' "$STATE" 2>/dev/null
+' "$STATE" "$FM_HOME" "$FM_ROOT" "$SCRIPT_DIR" 2>/dev/null
 exit 0
