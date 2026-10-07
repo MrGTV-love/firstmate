@@ -1,0 +1,1347 @@
+{
+  "name": "live-tail-small-read",
+  "expectation": "compact",
+  "events": [
+    {
+      "at": 1791338411975,
+      "phase": "live",
+      "event": "start",
+      "version": "18.6.3",
+      "agentDir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-tail-small-read/home/.omp/agent",
+      "mode": "tui",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex"
+    },
+    {
+      "at": 1791338412014,
+      "phase": "live",
+      "event": "prompt_isolated",
+      "sha256": "2dc9252b4e5c4cb7ea07faaa06fdf91e9e2ce1ac16bee738ebc6752d92df79fe"
+    },
+    {
+      "at": 1791338414357,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_8viHDAh8M1f7k4MZXD7QrmWb|fc_06a290904d1e9ea0016ac5a7adf89c87d1a4fc46ecb3bfec38",
+      "name": "read",
+      "input": {
+        "path": "early.txt"
+      }
+    },
+    {
+      "at": 1791338414364,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_8viHDAh8M1f7k4MZXD7QrmWb|fc_06a290904d1e9ea0016ac5a7adf89c87d1a4fc46ecb3bfec38",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338414366,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1019,
+        "output": 25,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 1044,
+        "cost": {
+          "input": 0.002038,
+          "output": 0.00025,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.002288
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338416554,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_ONpCEYaH7aiz1qcZtZJWncEV|fc_06a290904d1e9ea0016ac5a7b0387087d1b3d9ef374a35915f",
+      "name": "read",
+      "input": {
+        "path": "newer-00.txt"
+      }
+    },
+    {
+      "at": 1791338416557,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_ONpCEYaH7aiz1qcZtZJWncEV|fc_06a290904d1e9ea0016ac5a7b0387087d1b3d9ef374a35915f",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338416579,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1154,
+        "output": 30,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 1184,
+        "cost": {
+          "input": 0.0023079999999999997,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.0026079999999999996
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338418272,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_OlIHhLTMtZVJlWCCGO9h4P9h|fc_06a290904d1e9ea0016ac5a7b1fd3487d1bbf65ce1ddeb2ae2",
+      "name": "read",
+      "input": {
+        "path": "newer-01.txt"
+      }
+    },
+    {
+      "at": 1791338418274,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_OlIHhLTMtZVJlWCCGO9h4P9h|fc_06a290904d1e9ea0016ac5a7b1fd3487d1bbf65ce1ddeb2ae2",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338418297,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2567,
+        "output": 30,
+        "cacheRead": 1024,
+        "cacheWrite": 0,
+        "totalTokens": 3621,
+        "cost": {
+          "input": 0.005134,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.00010240000000000001,
+          "cacheWrite": 0,
+          "total": 0.0055363999999999995
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338419895,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_hAYFYhRlYXQTkbnftglSdhGg|fc_06a290904d1e9ea0016ac5a7b39ed887d1be4d865985683287",
+      "name": "read",
+      "input": {
+        "path": "newer-02.txt"
+      }
+    },
+    {
+      "at": 1791338419933,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_hAYFYhRlYXQTkbnftglSdhGg|fc_06a290904d1e9ea0016ac5a7b39ed887d1be4d865985683287",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338419969,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2581,
+        "output": 30,
+        "cacheRead": 3456,
+        "cacheWrite": 0,
+        "totalTokens": 6067,
+        "cost": {
+          "input": 0.005162,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.00034560000000000005,
+          "cacheWrite": 0,
+          "total": 0.0058076
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338421777,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_VqzJPVaCZ1SbWAIiLsIig0BR|fc_06a290904d1e9ea0016ac5a7b5731087d1ae978ed7af5964f7",
+      "name": "read",
+      "input": {
+        "path": "newer-03.txt"
+      }
+    },
+    {
+      "at": 1791338421780,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_VqzJPVaCZ1SbWAIiLsIig0BR|fc_06a290904d1e9ea0016ac5a7b5731087d1ae978ed7af5964f7",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338421782,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2547,
+        "output": 30,
+        "cacheRead": 5888,
+        "cacheWrite": 0,
+        "totalTokens": 8465,
+        "cost": {
+          "input": 0.005094,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0005888,
+          "cacheWrite": 0,
+          "total": 0.0059828
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338424173,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_rhAVMUNNL2NysKwonErj4XcM|fc_06a290904d1e9ea0016ac5a7b7d97087d1b1e5497e3a7c9b1e",
+      "name": "read",
+      "input": {
+        "path": "newer-04.txt"
+      }
+    },
+    {
+      "at": 1791338424175,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_rhAVMUNNL2NysKwonErj4XcM|fc_06a290904d1e9ea0016ac5a7b7d97087d1b1e5497e3a7c9b1e",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338424176,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2508,
+        "output": 30,
+        "cacheRead": 8320,
+        "cacheWrite": 0,
+        "totalTokens": 10858,
+        "cost": {
+          "input": 0.005016,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0008320000000000001,
+          "cacheWrite": 0,
+          "total": 0.006148
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338427165,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_TcKbA8fLHMRI8U3TV5NL6qpp|fc_06a290904d1e9ea0016ac5a7bae05887d1a675c6b025acf168",
+      "name": "read",
+      "input": {
+        "path": "newer-05.txt"
+      }
+    },
+    {
+      "at": 1791338427167,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_TcKbA8fLHMRI8U3TV5NL6qpp|fc_06a290904d1e9ea0016ac5a7bae05887d1a675c6b025acf168",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338427168,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2618,
+        "output": 30,
+        "cacheRead": 10624,
+        "cacheWrite": 0,
+        "totalTokens": 13272,
+        "cost": {
+          "input": 0.005235999999999999,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0010624,
+          "cacheWrite": 0,
+          "total": 0.006598399999999999
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338429082,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_YKzJy0HEqMc2Ep1ZfItPVIVa|fc_06a290904d1e9ea0016ac5a7bcc9ac87d1b1367f4c4f925473",
+      "name": "read",
+      "input": {
+        "path": "newer-06.txt"
+      }
+    },
+    {
+      "at": 1791338429084,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_YKzJy0HEqMc2Ep1ZfItPVIVa|fc_06a290904d1e9ea0016ac5a7bcc9ac87d1b1367f4c4f925473",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338429084,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2606,
+        "output": 30,
+        "cacheRead": 13056,
+        "cacheWrite": 0,
+        "totalTokens": 15692,
+        "cost": {
+          "input": 0.005212,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0013056,
+          "cacheWrite": 0,
+          "total": 0.0068176
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338430764,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_douYODsZG2Fa1eWKKxATJGET|fc_06a290904d1e9ea0016ac5a7be799c87d1977c82455db4b6d2",
+      "name": "read",
+      "input": {
+        "path": "newer-07.txt"
+      }
+    },
+    {
+      "at": 1791338430766,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_douYODsZG2Fa1eWKKxATJGET|fc_06a290904d1e9ea0016ac5a7be799c87d1977c82455db4b6d2",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338430767,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2586,
+        "output": 30,
+        "cacheRead": 15488,
+        "cacheWrite": 0,
+        "totalTokens": 18104,
+        "cost": {
+          "input": 0.0051719999999999995,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0015488000000000001,
+          "cacheWrite": 0,
+          "total": 0.0070208
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338432653,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_CxFaL6TK0VNBmDZREsJebvbW|fc_06a290904d1e9ea0016ac5a7c058d887d1975d07bd92d53be4",
+      "name": "read",
+      "input": {
+        "path": "newer-08.txt"
+      }
+    },
+    {
+      "at": 1791338432656,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_CxFaL6TK0VNBmDZREsJebvbW|fc_06a290904d1e9ea0016ac5a7c058d887d1975d07bd92d53be4",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338432677,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2564,
+        "output": 30,
+        "cacheRead": 17920,
+        "cacheWrite": 0,
+        "totalTokens": 20514,
+        "cost": {
+          "input": 0.005128,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0017920000000000002,
+          "cacheWrite": 0,
+          "total": 0.00722
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338434415,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_PAwS2ukdM5yDQ2hiKFsa5QD0|fc_06a290904d1e9ea0016ac5a7c2214887d185300e817db40a2d",
+      "name": "read",
+      "input": {
+        "path": "newer-09.txt"
+      }
+    },
+    {
+      "at": 1791338434417,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_PAwS2ukdM5yDQ2hiKFsa5QD0|fc_06a290904d1e9ea0016ac5a7c2214887d185300e817db40a2d",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338434418,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2513,
+        "output": 30,
+        "cacheRead": 20352,
+        "cacheWrite": 0,
+        "totalTokens": 22895,
+        "cost": {
+          "input": 0.005026,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0020352,
+          "cacheWrite": 0,
+          "total": 0.0073612
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338436539,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_jgMqiEyp4gCeYmylMb5rTDoH|fc_06a290904d1e9ea0016ac5a7c4325087d1931b5e1fe6f8d7d2",
+      "name": "read",
+      "input": {
+        "path": "newer-10.txt"
+      }
+    },
+    {
+      "at": 1791338436541,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_jgMqiEyp4gCeYmylMb5rTDoH|fc_06a290904d1e9ea0016ac5a7c4325087d1931b5e1fe6f8d7d2",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338436563,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2492,
+        "output": 30,
+        "cacheRead": 22784,
+        "cacheWrite": 0,
+        "totalTokens": 25306,
+        "cost": {
+          "input": 0.004984,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0022784000000000003,
+          "cacheWrite": 0,
+          "total": 0.0075624
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338438369,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_9b7QxHT8gQCf9u7J2lD4oDs0|fc_06a290904d1e9ea0016ac5a7c611c087d1a2ae7c95c91cd221",
+      "name": "read",
+      "input": {
+        "path": "newer-11.txt"
+      }
+    },
+    {
+      "at": 1791338438371,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_9b7QxHT8gQCf9u7J2lD4oDs0|fc_06a290904d1e9ea0016ac5a7c611c087d1a2ae7c95c91cd221",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338438394,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2598,
+        "output": 30,
+        "cacheRead": 25088,
+        "cacheWrite": 0,
+        "totalTokens": 27716,
+        "cost": {
+          "input": 0.005196,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0025088000000000003,
+          "cacheWrite": 0,
+          "total": 0.0080048
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338440149,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_3wIijIK8Iw9KvPih8Knos3lw|fc_06a290904d1e9ea0016ac5a7c7db4487d19e2900ad5ff39b38",
+      "name": "read",
+      "input": {
+        "path": "newer-12.txt"
+      }
+    },
+    {
+      "at": 1791338440152,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_3wIijIK8Iw9KvPih8Knos3lw|fc_06a290904d1e9ea0016ac5a7c7db4487d19e2900ad5ff39b38",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338440152,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2571,
+        "output": 30,
+        "cacheRead": 27520,
+        "cacheWrite": 0,
+        "totalTokens": 30121,
+        "cost": {
+          "input": 0.005142,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.002752,
+          "cacheWrite": 0,
+          "total": 0.008194
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338441838,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_n9IZsgXVEEQo4jbu5CN1bnVT|fc_06a290904d1e9ea0016ac5a7c9869c87d1aa8b6c0464e53272",
+      "name": "read",
+      "input": {
+        "path": "newer-13.txt"
+      }
+    },
+    {
+      "at": 1791338441846,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_n9IZsgXVEEQo4jbu5CN1bnVT|fc_06a290904d1e9ea0016ac5a7c9869c87d1aa8b6c0464e53272",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338441871,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2528,
+        "output": 30,
+        "cacheRead": 29952,
+        "cacheWrite": 0,
+        "totalTokens": 32510,
+        "cost": {
+          "input": 0.005056,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0029952000000000004,
+          "cacheWrite": 0,
+          "total": 0.0083512
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338443619,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_gCT8pjDOt4uS8ZfPYKOiYEn5|fc_06a290904d1e9ea0016ac5a7cb3c1487d19288b7f405a2fe2f",
+      "name": "read",
+      "input": {
+        "path": "newer-14.txt"
+      }
+    },
+    {
+      "at": 1791338443622,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_gCT8pjDOt4uS8ZfPYKOiYEn5|fc_06a290904d1e9ea0016ac5a7cb3c1487d19288b7f405a2fe2f",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338443644,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2503,
+        "output": 30,
+        "cacheRead": 32384,
+        "cacheWrite": 0,
+        "totalTokens": 34917,
+        "cost": {
+          "input": 0.005006,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0032384000000000002,
+          "cacheWrite": 0,
+          "total": 0.0085444
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338446324,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_ZXdYkiLv0OTKXtsDQssKQE8b|fc_06a290904d1e9ea0016ac5a7ce0b1c87d1aff7b069d17e58f2",
+      "name": "read",
+      "input": {
+        "path": "newer-15.txt"
+      }
+    },
+    {
+      "at": 1791338446327,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_ZXdYkiLv0OTKXtsDQssKQE8b|fc_06a290904d1e9ea0016ac5a7ce0b1c87d1aff7b069d17e58f2",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338446327,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2612,
+        "output": 30,
+        "cacheRead": 34688,
+        "cacheWrite": 0,
+        "totalTokens": 37330,
+        "cost": {
+          "input": 0.0052239999999999995,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0034688,
+          "cacheWrite": 0,
+          "total": 0.008992799999999999
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338447984,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_sVUcUJTsAF5ml550N1QAGcRw|fc_06a290904d1e9ea0016ac5a7cfa4c487d192d2eb6c7b7f16de",
+      "name": "read",
+      "input": {
+        "path": "newer-16.txt"
+      }
+    },
+    {
+      "at": 1791338448001,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_sVUcUJTsAF5ml550N1QAGcRw|fc_06a290904d1e9ea0016ac5a7cfa4c487d192d2eb6c7b7f16de",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338448029,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2580,
+        "output": 30,
+        "cacheRead": 37120,
+        "cacheWrite": 0,
+        "totalTokens": 39730,
+        "cost": {
+          "input": 0.00516,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0037120000000000005,
+          "cacheWrite": 0,
+          "total": 0.009172
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338450721,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_l5AQ3JMXwe1a5vSOcqYJ8X9B|fc_06a290904d1e9ea0016ac5a7d2729087d18650fea85830c813",
+      "name": "read",
+      "input": {
+        "path": "newer-17.txt"
+      }
+    },
+    {
+      "at": 1791338450724,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_l5AQ3JMXwe1a5vSOcqYJ8X9B|fc_06a290904d1e9ea0016ac5a7d2729087d18650fea85830c813",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338450725,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2557,
+        "output": 30,
+        "cacheRead": 39552,
+        "cacheWrite": 0,
+        "totalTokens": 42139,
+        "cost": {
+          "input": 0.005114,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.003955200000000001,
+          "cacheWrite": 0,
+          "total": 0.009369200000000001
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338453984,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_rVvhG8C4dtexzAbYyklEeP9X|fc_06a290904d1e9ea0016ac5a7d5b08487d18e07f12ed818bba6",
+      "name": "read",
+      "input": {
+        "path": "newer-18.txt"
+      }
+    },
+    {
+      "at": 1791338453986,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_rVvhG8C4dtexzAbYyklEeP9X|fc_06a290904d1e9ea0016ac5a7d5b08487d18e07f12ed818bba6",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338454008,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2545,
+        "output": 30,
+        "cacheRead": 41984,
+        "cacheWrite": 0,
+        "totalTokens": 44559,
+        "cost": {
+          "input": 0.00509,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.004198400000000001,
+          "cacheWrite": 0,
+          "total": 0.0095884
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338455759,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_1M6UutOhlBg450LoLce2ECdV|fc_06a290904d1e9ea0016ac5a7d7792487d18727d71ba5177814",
+      "name": "read",
+      "input": {
+        "path": "newer-19.txt"
+      }
+    },
+    {
+      "at": 1791338455761,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_1M6UutOhlBg450LoLce2ECdV|fc_06a290904d1e9ea0016ac5a7d7792487d18727d71ba5177814",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338455782,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2503,
+        "output": 30,
+        "cacheRead": 44416,
+        "cacheWrite": 0,
+        "totalTokens": 46949,
+        "cost": {
+          "input": 0.005006,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0044416,
+          "cacheWrite": 0,
+          "total": 0.0097476
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338457871,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_4Hn8adEKCdpEGwxdafuTxuRb|fc_06a290904d1e9ea0016ac5a7d996ec87d1874aeb24910c4c9e",
+      "name": "read",
+      "input": {
+        "path": "newer-20.txt"
+      }
+    },
+    {
+      "at": 1791338457873,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_4Hn8adEKCdpEGwxdafuTxuRb|fc_06a290904d1e9ea0016ac5a7d996ec87d1874aeb24910c4c9e",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338457894,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2607,
+        "output": 30,
+        "cacheRead": 46720,
+        "cacheWrite": 0,
+        "totalTokens": 49357,
+        "cost": {
+          "input": 0.005214,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.004672000000000001,
+          "cacheWrite": 0,
+          "total": 0.010186
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338459587,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_1oUFLTM8J8GxsBR0cydcv1AV|fc_06a290904d1e9ea0016ac5a7db4d3487d183e08539379c0d0e",
+      "name": "read",
+      "input": {
+        "path": "newer-21.txt"
+      }
+    },
+    {
+      "at": 1791338459589,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_1oUFLTM8J8GxsBR0cydcv1AV|fc_06a290904d1e9ea0016ac5a7db4d3487d183e08539379c0d0e",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338459611,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2609,
+        "output": 30,
+        "cacheRead": 49152,
+        "cacheWrite": 0,
+        "totalTokens": 51791,
+        "cost": {
+          "input": 0.0052179999999999995,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.004915200000000001,
+          "cacheWrite": 0,
+          "total": 0.0104332
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338477086,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_21YN6qIVJdrsChiwMwe0bsZ6|fc_06a290904d1e9ea0016ac5a7eccd0887d1afccd727f8e160db",
+      "name": "read",
+      "input": {
+        "path": "newer-22.txt"
+      }
+    },
+    {
+      "at": 1791338477089,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_21YN6qIVJdrsChiwMwe0bsZ6|fc_06a290904d1e9ea0016ac5a7eccd0887d1afccd727f8e160db",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338477111,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2609,
+        "output": 30,
+        "cacheRead": 51584,
+        "cacheWrite": 0,
+        "totalTokens": 54223,
+        "cost": {
+          "input": 0.0052179999999999995,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0051584000000000005,
+          "cacheWrite": 0,
+          "total": 0.010676399999999999
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338479340,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_r0PShWYI57brADQpV2VpMO4f|fc_06a290904d1e9ea0016ac5a7ef090087d1af4c255c53e30787",
+      "name": "read",
+      "input": {
+        "path": "newer-23.txt"
+      }
+    },
+    {
+      "at": 1791338479342,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_r0PShWYI57brADQpV2VpMO4f|fc_06a290904d1e9ea0016ac5a7ef090087d1af4c255c53e30787",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338479364,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2574,
+        "output": 30,
+        "cacheRead": 54016,
+        "cacheWrite": 0,
+        "totalTokens": 56620,
+        "cost": {
+          "input": 0.005148,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0054016,
+          "cacheWrite": 0,
+          "total": 0.010849600000000001
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338481685,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_aW2IaWiT4CyWH1m4Xg8hZHj4|fc_06a290904d1e9ea0016ac5a7f1633c87d192c1699282e01cca",
+      "name": "read",
+      "input": {
+        "path": "newer-24.txt"
+      }
+    },
+    {
+      "at": 1791338481688,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_aW2IaWiT4CyWH1m4Xg8hZHj4|fc_06a290904d1e9ea0016ac5a7f1633c87d192c1699282e01cca",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338481712,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2531,
+        "output": 30,
+        "cacheRead": 56448,
+        "cacheWrite": 0,
+        "totalTokens": 59009,
+        "cost": {
+          "input": 0.005062,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.0056448,
+          "cacheWrite": 0,
+          "total": 0.0110068
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338483737,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_tG6g8uePrIG0IIyvdV6Xv6Xs|fc_06a290904d1e9ea0016ac5a7f3712c87d18ae3c5e08bbee720",
+      "name": "read",
+      "input": {
+        "path": "newer-25.txt"
+      }
+    },
+    {
+      "at": 1791338483738,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_tG6g8uePrIG0IIyvdV6Xv6Xs|fc_06a290904d1e9ea0016ac5a7f3712c87d18ae3c5e08bbee720",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338483761,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2511,
+        "output": 30,
+        "cacheRead": 58880,
+        "cacheWrite": 0,
+        "totalTokens": 61421,
+        "cost": {
+          "input": 0.0050219999999999996,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.005888000000000001,
+          "cacheWrite": 0,
+          "total": 0.011210000000000001
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338485513,
+      "phase": "live",
+      "event": "tool_call",
+      "id": "call_kRPz96PC42v6KMyCZEDBtgL4|fc_06a290904d1e9ea0016ac5a7f5374c87d19c50b93d437ff033",
+      "name": "read",
+      "input": {
+        "path": "newer-26.txt"
+      }
+    },
+    {
+      "at": 1791338485516,
+      "phase": "live",
+      "event": "tool_result",
+      "id": "call_kRPz96PC42v6KMyCZEDBtgL4|fc_06a290904d1e9ea0016ac5a7f5374c87d19c50b93d437ff033",
+      "name": "read",
+      "isError": false
+    },
+    {
+      "at": 1791338485538,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2495,
+        "output": 30,
+        "cacheRead": 61312,
+        "cacheWrite": 0,
+        "totalTokens": 63837,
+        "cost": {
+          "input": 0.00499,
+          "output": 0.00030000000000000003,
+          "cacheRead": 0.006131200000000001,
+          "cacheWrite": 0,
+          "total": 0.0114212
+        }
+      },
+      "stopReason": "toolUse",
+      "text": ""
+    },
+    {
+      "at": 1791338488311,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2549,
+        "output": 7,
+        "cacheRead": 63616,
+        "cacheWrite": 0,
+        "totalTokens": 66172,
+        "cost": {
+          "input": 0.005098,
+          "output": 7.000000000000001e-05,
+          "cacheRead": 0.0063616,
+          "cacheWrite": 0,
+          "total": 0.011529600000000001
+        }
+      },
+      "stopReason": "stop",
+      "text": "Final answer ready"
+    },
+    {
+      "at": 1791338488321,
+      "phase": "live",
+      "event": "idle",
+      "idle": true,
+      "pending": false,
+      "context": {
+        "tokens": 66165,
+        "contextWindow": 272000,
+        "percent": 24.325367647058822
+      }
+    },
+    {
+      "at": 1791338494927,
+      "phase": "live",
+      "event": "compacted",
+      "entry": {
+        "type": "compaction",
+        "id": "75bf64e1",
+        "parentId": "6ff67bdf",
+        "timestamp": "2026-10-07T02:01:34.918Z",
+        "summary": "Remote compaction preserved provider-native history for this session. Compaction processed 66176 input tokens.\n\n<files>\nearly.txt (Read)\nnewer-00.txt (Read)\nnewer-01.txt (Read)\nnewer-02.txt (Read)\nnewer-03.txt (Read)\nnewer-04.txt (Read)\nnewer-05.txt (Read)\nnewer-06.txt (Read)\nnewer-07.txt (Read)\nnewer-08.txt (Read)\nnewer-09.txt (Read)\nnewer-10.txt (Read)\nnewer-11.txt (Read)\nnewer-12.txt (Read)\nnewer-13.txt (Read)\nnewer-14.txt (Read)\nnewer-15.txt (Read)\nnewer-16.txt (Read)\nnewer-17.txt (Read)\nnewer-18.txt (Read)\n</files>",
+        "shortSummary": "Remote compaction",
+        "firstKeptEntryId": "a82bad89",
+        "tokensBefore": 66172,
+        "tokensAfter": 1501,
+        "method": "remote",
+        "details": {
+          "readFiles": [
+            "early.txt",
+            "newer-00.txt",
+            "newer-01.txt",
+            "newer-02.txt",
+            "newer-03.txt",
+            "newer-04.txt",
+            "newer-05.txt",
+            "newer-06.txt",
+            "newer-07.txt",
+            "newer-08.txt",
+            "newer-09.txt",
+            "newer-10.txt",
+            "newer-11.txt",
+            "newer-12.txt",
+            "newer-13.txt",
+            "newer-14.txt",
+            "newer-15.txt",
+            "newer-16.txt",
+            "newer-17.txt",
+            "newer-18.txt"
+          ],
+          "modifiedFiles": []
+        },
+        "fromExtension": false,
+        "preserveData": {
+          "openaiRemoteCompaction": {
+            "version": "v2",
+            "provider": "openai-codex",
+            "replacementHistory": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "First read the entire early.txt using the read tool. Then read all these files with the read tool IN THE LISTED ORDER: newer-00.txt, newer-01.txt, newer-02.txt, newer-03.txt, newer-04.txt, newer-05.txt, newer-06.txt, newer-07.txt, newer-08.txt, newer-09.txt, newer-10.txt, newer-11.txt, newer-12.txt, newer-13.txt, newer-14.txt, newer-15.txt, newer-16.txt, newer-17.txt, newer-18.txt, newer-19.txt, newer-20.txt, newer-21.txt, newer-22.txt, newer-23.txt, newer-24.txt, newer-25.txt, newer-26.txt. Read the ENTIRE content of each file once without limits or filtering. Do not use any other tools. No commentary between reads. All work is complete after these reads; reply exactly Final answer ready and stop."
+                  }
+                ]
+              },
+              {
+                "id": "cmp_08eac451d5c7880a016ac5a7fb648887d1900bd3ba15039c8d",
+                "type": "compaction",
+                "encrypted_content": "gAAAAABqxaf-G8Dr1x7urEwE-8cveT-ToH2eaVsrC43xWWybiltv2FVWBq60Cs-i4V03EvmKFIDH1Q0gJd9Xj9dcgoOR4LN163bec08NUi38cMiuawWaP0oUbFLsX5zSHcDfFWLmO54JZxFTjiQ5Nw5FX5KVWgu1O5bKjPADf4TeWG7wZOo--pZofz2ckanNgxzU8ZQ5pJgFBkRKeejXOmBNIy_k8uZTBQTlnwbNJiNh19rwnjaxY0HH9V6NpdHayk42duHzMRrZel4AKWX5IC7aimPeq2ZPUmvKo2KTiKXSqVNvLgaagT9eV2cone9VC84enapq4InSQTDgajZQ3a3F0ajjGY1Ktwv4nToyLUgln21G56wTBVuc5r0dgfv1v_huxGV6AUuudKYXLJ1M19IB5tDyA4dAkWMHC0t-estOGonlbIDHpFrJn-_SUZykzfnw9GcwjHdKF_hR4l1bVRTWZTQbU3L8XY9C_ngROPlUfpLLpAOZQQyK3cVgmlSmBB93f4rbM5ezgTJqkr8CnA6RHtARvLIP2RMxYadLIQoVo_99YsM_o3B5VaPUw8wd4cjC9BZ8CyLgv5s1kxhZFieZMSGgsIJQFvFjfRpkzhRL4YaDSdjK9wMrVPpx3iX8km8YLdmlOaCC2PYdDXqD2isz5Po7A6qoQi7jNVTrY2G8CPMkmu5VCiAQAaRQuRoSiRD6ZyBf6Nfto9svgfHLhLkG1E61HK_jbEvTcZS-Lr6-27TCJ6pxmJrD2bSzX4bYsn-xoGR7Z59G3tZcMERwozQY1P16aPnYH9P_6P3y8exc-wKAQLkXWl1n5v7p4zOqSsNq1TqmB5AQCge9p6hZfz6B_QP_CMyrpT3RLBe9hTJW8hoWIaJSB7nQOkg580sAawBUk7LuIL2l07G58FuXAaho7yKc3pm6cWeregF4BhVwhKJXmWq_IOmMDHyH8i81KbYv6KaFa7aq7QNlFJKxXUrhq6wJj7ad_RqzIh37PWOBKMUhbC7DPA-3pQWznvqPKXdObvk9RTeGMaZ25cQdVs1sJavodrWg04kuijtLP19HoNP5n5espL1bZJ1vPLviZJq7fxhtm95t1Cs9f6t4acN0W49OBBv7hMJFOpK-paK1jbdbr3UmO88BD_EgymyLHtjHwI4v9LWR_fvUo3MLh3Oa6tRPkmlmCQnn5aLwyFN6A3ljAn8T71OC146OA87ss9VoD6bthzIgltToKu8rqjL8YcsjnKKHAHzKM4n7rmFFrdJGbnENzXxZhDldgcyZJRHwm83UoUxT8To_zTeYCiqMbEFkr9j_ouWSy853lJIGOXAVfKWL2HoFcgLJ-q1O1D0J4ymcKwMYARA1cuolzkGDJZBVojvwCCFAeWEk7KdJG6dmP_3_04rF7i4AFzQwBw35W9dIPmdM99UGWGJ2zAJS0oa6h1IspmFfRvTu27Sevj9R_IMRLitgQSRP7JrwJ0NppGhhXTi3GZyQ2B5L8-iitnd3JWpmqqMezc-PETyBZhoMxxY15dppWVhCzy5aXmg_QrPsftJSmJn-HiDVAgjwlXLPyp36qKB0u7yWgvvi_aqVw5u_BDfjeBKPiPlzBCdxpCF5WfOzEMgpQsm9VJoUJ4u5Vh9Q8WfDm17R1ksA1VDj8YbNflhKK25Uz8QTX2RC7-jkF1e0oBdpQHF7qTuh4c1KOZEQHOlNXGB6LwaKy6sM0JmU5HyyK6SkgCPmEjedv8lJ_vpevZYJUySs3mGGq6kPMi5dfvAoiG5FGKqyjlydBZIycCD0WbXZFpzb0ZXQwNRJBgLV1p5vBjYrR_R7ekGmk4NXKLy07uepJCZc_CIh1hYQHzQEtKDD7KmtepiuOJknJieN5cBntefp0p411BwJIIU8U4xwVzl09ieZ-sDPT2-V4QpbZs7eaoGHctjly7dUFJPLZUmTuALaCqA75wLpuyLLsoMh0Ygo1FaS5tk-iv1qblOuE0YB3rrPytcP-QVnIeBCrLAOCFYbWxl5fbZ4l-Z2hYDV4QyGOhhjb9nrrGqvJ8S-vrETTkMB9pfdyIxkj8Dfk0mb2z6J1BbpMyp6T054TJnfq2prjjOscVclMy-FtmCCseCfzCeCJQowh2OGRAKWjrMM1B6vC752jCETQb_Rwg==",
+                "internal_chat_message_metadata_passthrough": {
+                  "turn_id": "38b49f29-ef5f-45fc-ac51-4c5a1ff88409"
+                },
+                "metadata": {
+                  "turn_id": "38b49f29-ef5f-45fc-ac51-4c5a1ff88409"
+                }
+              }
+            ],
+            "usedTokens": 66176,
+            "usage": {
+              "inputTokens": 66176,
+              "outputTokens": 173,
+              "totalTokens": 66349,
+              "cachedInputTokens": 0,
+              "reasoningOutputTokens": 0
+            },
+            "retainedImageCount": 0
+          }
+        }
+      },
+      "context": {
+        "tokens": 837,
+        "contextWindow": 272000,
+        "percent": 0.30772058823529413
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791338411902
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791338488321,
+      "waitMs": 3
+    },
+    {
+      "event": "judge-start",
+      "at": 1791338488328,
+      "attestedResults": 28,
+      "attestedBytes": 112693
+    },
+    {
+      "event": "judge-result",
+      "at": 1791338488524,
+      "apiMs": 196,
+      "inputTokens": 4735,
+      "outputTokens": 81,
+      "estimatedCostUsd": 0.00019887,
+      "inputUsdPerMillion": 0.042,
+      "model": "jev-1.13.0"
+    },
+    {
+      "event": "judgment",
+      "at": 1791338488524,
+      "finished": true
+    },
+    {
+      "event": "checkpoint-compact",
+      "at": 1791338488524,
+      "contextTokens": 66165
+    },
+    {
+      "event": "native-precedence",
+      "at": 1791338488526,
+      "reason": "manual"
+    },
+    {
+      "event": "native-persisted",
+      "at": 1791338494928,
+      "tokensBefore": 66172,
+      "tokensAfter": 1501,
+      "fromExtension": false,
+      "method": "remote"
+    },
+    {
+      "event": "checkpoint-complete",
+      "at": 1791338494938,
+      "elapsedMs": 6414
+    }
+  ],
+  "isolated": true,
+  "pass": true
+}

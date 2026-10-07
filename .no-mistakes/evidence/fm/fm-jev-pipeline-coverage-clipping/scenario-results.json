@@ -1,0 +1,1975 @@
+{
+  "note": "Live evidence comes from newly driven real omp TUIs with real Codex turns and real Jev API responses. Saved-native-protocol analysis is a supplementary offline check, not a claim of live execution. Guard histories are disposable seeded native records; per-result, ASCII-tail, small-shell-tail, and ephemeral checks generated their reads in this run.",
+  "results": [
+    {
+      "name": "live-long-reads",
+      "live": true,
+      "expectation": "compact",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "DISCOVERY_COMPLETE",
+          "usage": {
+            "input": 12365,
+            "output": 7,
+            "cacheRead": 61824,
+            "cacheWrite": 0,
+            "totalTokens": 74196,
+            "cost": {
+              "input": 0.02473,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0.0061824,
+              "cacheWrite": 0,
+              "total": 0.0309824
+            }
+          }
+        }
+      ],
+      "tools": [
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        }
+      ],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338369475
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338384019,
+          "waitMs": 1
+        },
+        {
+          "event": "judge-start",
+          "at": 1791338384021,
+          "attestedResults": 6,
+          "attestedBytes": 130800
+        },
+        {
+          "event": "judge-result",
+          "at": 1791338384138,
+          "apiMs": 117,
+          "inputTokens": 1609,
+          "outputTokens": 81,
+          "estimatedCostUsd": 6.757800000000001e-05,
+          "inputUsdPerMillion": 0.042,
+          "model": "jev-1.13.0"
+        },
+        {
+          "event": "judgment",
+          "at": 1791338384139,
+          "finished": true
+        },
+        {
+          "event": "checkpoint-compact",
+          "at": 1791338384139,
+          "contextTokens": 74189
+        },
+        {
+          "event": "native-precedence",
+          "at": 1791338384141,
+          "reason": "manual"
+        },
+        {
+          "event": "native-persisted",
+          "at": 1791338389633,
+          "tokensBefore": 74196,
+          "tokensAfter": 1288,
+          "fromExtension": false,
+          "method": "remote"
+        },
+        {
+          "event": "checkpoint-complete",
+          "at": 1791338389633,
+          "elapsedMs": 5494
+        }
+      ],
+      "terminal": "live-long-reads/terminal.log",
+      "session": "live-long-reads/2026-10-07T01-59-29-267Z_01a11416-50f3-7253-83b8-496234b12ec7.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32857,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 13,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": false,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true,
+          "recentBulkAttested": 6
+        },
+        "attested": 6,
+        "attestedBytes": 130800,
+        "restoredAutoCoverage": true,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": true
+      }
+    },
+    {
+      "name": "live-tail-small-read",
+      "live": true,
+      "expectation": "compact",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 2549,
+            "output": 7,
+            "cacheRead": 63616,
+            "cacheWrite": 0,
+            "totalTokens": 66172,
+            "cost": {
+              "input": 0.005098,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0.0063616,
+              "cacheWrite": 0,
+              "total": 0.011529600000000001
+            }
+          }
+        }
+      ],
+      "tools": [
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        }
+      ],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338411902
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338488321,
+          "waitMs": 3
+        },
+        {
+          "event": "judge-start",
+          "at": 1791338488328,
+          "attestedResults": 28,
+          "attestedBytes": 112693
+        },
+        {
+          "event": "judge-result",
+          "at": 1791338488524,
+          "apiMs": 196,
+          "inputTokens": 4735,
+          "outputTokens": 81,
+          "estimatedCostUsd": 0.00019887,
+          "inputUsdPerMillion": 0.042,
+          "model": "jev-1.13.0"
+        },
+        {
+          "event": "judgment",
+          "at": 1791338488524,
+          "finished": true
+        },
+        {
+          "event": "checkpoint-compact",
+          "at": 1791338488524,
+          "contextTokens": 66165
+        },
+        {
+          "event": "native-precedence",
+          "at": 1791338488526,
+          "reason": "manual"
+        },
+        {
+          "event": "native-persisted",
+          "at": 1791338494928,
+          "tokensBefore": 66172,
+          "tokensAfter": 1501,
+          "fromExtension": false,
+          "method": "remote"
+        },
+        {
+          "event": "checkpoint-complete",
+          "at": 1791338494938,
+          "elapsedMs": 6414
+        }
+      ],
+      "terminal": "live-tail-small-read/terminal.log",
+      "session": "live-tail-small-read/2026-10-07T02-00-11-697Z_01a11416-f6b1-7142-bc17-eb959b8d8590.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 28780,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 57,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": false,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true,
+          "recentBulkAttested": 28
+        },
+        "attested": 28,
+        "attestedBytes": 112693,
+        "restoredAutoCoverage": true,
+        "originalToolResultByteLengths": [
+          158,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          400,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159
+        ],
+        "attestationsVerified": true
+      }
+    },
+    {
+      "name": "live-tail-small-shell-retry",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 66218,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 66225,
+            "cost": {
+              "input": 0.132436,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.13250599999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338894752
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338897211,
+          "waitMs": 1
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338897214,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-tail-small-shell-retry/terminal.log",
+      "session": "live-tail-small-shell-retry/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 28811,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 58,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          140,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          425,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159,
+          4159
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-assistant",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 75375,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 75382,
+            "cost": {
+              "input": 0.15075,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.15081999999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338527040
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338530282,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338530284,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-guard-assistant/terminal.log",
+      "session": "live-guard-assistant/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 35166,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 15,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-user",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 78747,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 78754,
+            "cost": {
+              "input": 0.157494,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.15756399999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338527021
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338530440,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338530442,
+          "reasons": [
+            "user-text-clipped",
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-guard-user/terminal.log",
+      "session": "live-guard-user/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 35166,
+        "originalCoverage": {
+          "omittedUserMessages": 2,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 2,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-error",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74243,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74250,
+            "cost": {
+              "input": 0.148486,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.148556
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338542283
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338545378,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338545381,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-guard-error/terminal.log",
+      "session": "live-guard-error/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32916,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-shell",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74234,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74241,
+            "cost": {
+              "input": 0.148468,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.14853799999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338542167
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338544987,
+          "waitMs": 7
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338544997,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-guard-shell/terminal.log",
+      "session": "live-guard-shell/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32911,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-redacted",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74253,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74260,
+            "cost": {
+              "input": 0.148506,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.14857599999999999
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338555829
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338558628,
+          "waitMs": 3
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338558631,
+          "reasons": [
+            "recent-text-clipped",
+            "redacted"
+          ]
+        }
+      ],
+      "terminal": "live-guard-redacted/terminal.log",
+      "session": "live-guard-redacted/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32925,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": true,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": true,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21836,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-image",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74245,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74252,
+            "cost": {
+              "input": 0.14848999999999998,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.14855999999999997
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338556452
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338563205,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338563208,
+          "reasons": [
+            "recent-text-clipped",
+            "images"
+          ]
+        }
+      ],
+      "terminal": "live-guard-image/terminal.log",
+      "session": "live-guard-image/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 34116,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": true,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": true,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-unknown",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74256,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74263,
+            "cost": {
+              "input": 0.148512,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.148582
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338570712
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338575672,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338575675,
+          "reasons": [
+            "recent-text-clipped",
+            "unknown-context"
+          ]
+        }
+      ],
+      "terminal": "live-guard-unknown/terminal.log",
+      "session": "live-guard-unknown/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32926,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": true,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": true,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-guard-unrecoverable",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "DISCOVERY_COMPLETE",
+          "usage": {
+            "input": 12367,
+            "output": 7,
+            "cacheRead": 61824,
+            "cacheWrite": 0,
+            "totalTokens": 74198,
+            "cost": {
+              "input": 0.024734,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0.0061824,
+              "cacheWrite": 0,
+              "total": 0.0309864
+            }
+          }
+        }
+      ],
+      "tools": [
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        },
+        {
+          "name": "read",
+          "isError": false
+        }
+      ],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338574833
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338590376,
+          "waitMs": 1
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338590378,
+          "reasons": [
+            "recent-text-clipped",
+            "transcript-unrecoverable"
+          ]
+        }
+      ],
+      "terminal": "live-guard-unrecoverable/terminal.log",
+      "session": null,
+      "driverResult": true
+    },
+    {
+      "name": "live-incompatible-registry",
+      "live": true,
+      "expectation": "unsupported",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74234,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74241,
+            "cost": {
+              "input": 0.148468,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.14853799999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338608872
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338611820,
+          "waitMs": 2
+        },
+        {
+          "event": "snapshot-unavailable",
+          "at": 1791338611821
+        }
+      ],
+      "terminal": "live-incompatible-registry/terminal.log",
+      "session": "live-incompatible-registry/seed.jsonl",
+      "driverResult": true
+    },
+    {
+      "name": "live-shell-native-fallback",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 74225,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 74232,
+            "cost": {
+              "input": 0.14845,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.14851999999999999
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338657204
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338659891,
+          "waitMs": 2
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338659894,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        },
+        {
+          "event": "native-precedence",
+          "at": 1791338662979,
+          "reason": "manual"
+        },
+        {
+          "event": "native-persisted",
+          "at": 1791338668182,
+          "tokensBefore": 74232,
+          "tokensAfter": 1396,
+          "fromExtension": false,
+          "method": "remote"
+        }
+      ],
+      "terminal": "live-shell-native-fallback/terminal.log",
+      "session": "live-shell-native-fallback/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 32897,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 14,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          21800,
+          21800,
+          21800,
+          21800,
+          21800,
+          21800
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-tail-small-error",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 65449,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 65456,
+            "cost": {
+              "input": 0.130898,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.13096799999999997
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338726278
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338729162,
+          "waitMs": 1
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338729165,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-tail-small-error/terminal.log",
+      "session": "live-tail-small-error/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 28737,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 58,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          140,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          400,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-tail-small-assistant",
+      "live": true,
+      "expectation": "reject",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 65426,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 65433,
+            "cost": {
+              "input": 0.130852,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.13092199999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338739584
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338742219,
+          "waitMs": 1
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338742222,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-tail-small-assistant/terminal.log",
+      "session": "live-tail-small-assistant/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 28729,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 57,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512,
+          512
+        ],
+        "actualReadBodyByteLengths": [
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200,
+          4200
+        ],
+        "attestationsVerified": null
+      }
+    },
+    {
+      "name": "live-tail-unicode-retry",
+      "live": true,
+      "expectation": "judge",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 109839,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 109846,
+            "cost": {
+              "input": 0.21967799999999998,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.21974799999999997
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338907943
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338911857,
+          "waitMs": 2
+        },
+        {
+          "event": "judge-start",
+          "at": 1791338911860,
+          "attestedResults": 28,
+          "attestedBytes": 324400
+        },
+        {
+          "event": "judge-result",
+          "at": 1791338911994,
+          "apiMs": 134,
+          "inputTokens": 4710,
+          "outputTokens": 81,
+          "estimatedCostUsd": 0.00019782000000000003,
+          "inputUsdPerMillion": 0.042,
+          "model": "jev-1.13.0"
+        },
+        {
+          "event": "judgment",
+          "at": 1791338911994,
+          "finished": false
+        }
+      ],
+      "terminal": "live-tail-unicode-retry/terminal.log",
+      "session": "live-tail-unicode-retry/seed.jsonl",
+      "driverResult": true,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 27337,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 58,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": false,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true,
+          "recentBulkAttested": 28
+        },
+        "attested": 28,
+        "attestedBytes": 324400,
+        "restoredAutoCoverage": true,
+        "originalToolResultByteLengths": [
+          59,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515
+        ],
+        "actualReadBodyByteLengths": [
+          400,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000
+        ],
+        "attestationsVerified": true
+      }
+    },
+    {
+      "name": "live-tail-unicode-adjacent",
+      "live": true,
+      "expectation": "judge",
+      "isolatedAgentDirVerified": true,
+      "realFinalAnswers": [
+        {
+          "text": "Final answer ready",
+          "usage": {
+            "input": 109841,
+            "output": 7,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 109848,
+            "cost": {
+              "input": 0.219682,
+              "output": 7.000000000000001e-05,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.21975199999999998
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "metrics": [
+        {
+          "event": "pipeline-loaded",
+          "at": 1791338976269
+        },
+        {
+          "event": "settled-idle",
+          "at": 1791338981163,
+          "waitMs": 1
+        },
+        {
+          "event": "coverage-ineligible",
+          "at": 1791338981166,
+          "reasons": [
+            "recent-text-clipped"
+          ]
+        }
+      ],
+      "terminal": "live-tail-unicode-adjacent/terminal.log",
+      "session": "live-tail-unicode-adjacent/seed.jsonl",
+      "driverResult": false,
+      "savedNativeProtocolAnalysis": {
+        "conversationTokens": 27337,
+        "originalCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "originalRecent": 58,
+        "restoredCoverage": {
+          "omittedUserMessages": 0,
+          "olderMessagesOmitted": 0,
+          "recentTextTruncated": true,
+          "hasImages": false,
+          "redacted": false,
+          "unknownContext": false,
+          "transcriptRecoverable": true
+        },
+        "attested": 0,
+        "attestedBytes": 0,
+        "restoredAutoCoverage": false,
+        "originalToolResultByteLengths": [
+          64,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515,
+          515
+        ],
+        "actualReadBodyByteLengths": [
+          400,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000,
+          12000
+        ],
+        "attestationsVerified": null
+      }
+    }
+  ],
+  "executionNotes": [
+    {
+      "scenario": "live-tail-small-shell",
+      "issue": "The concurrent driver timed out during teardown after the real product had already recorded coverage-ineligible. The same saved native history was re-driven sequentially in live-tail-small-shell-retry and completed successfully. No matching orphan TUI remained."
+    },
+    {
+      "scenario": "live-tail-unicode",
+      "issue": "The initial driver incorrectly required native compaction even when a real Jev response said finished=false. The corrected judge expectation was re-driven in live-tail-unicode-retry; Jev engagement passed and unfinished work was not compacted."
+    }
+  ]
+}

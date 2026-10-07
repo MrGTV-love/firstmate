@@ -1,0 +1,5 @@
+{"event":"pipeline-loaded","at":1791338657204}
+{"event":"settled-idle","at":1791338659891,"waitMs":2}
+{"event":"coverage-ineligible","at":1791338659894,"reasons":["recent-text-clipped"]}
+{"event":"native-precedence","at":1791338662979,"reason":"manual"}
+{"event":"native-persisted","at":1791338668182,"tokensBefore":74232,"tokensAfter":1396,"fromExtension":false,"method":"remote"}

@@ -1,0 +1,51 @@
+{
+  "command": [
+    "omp",
+    "--cwd",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/work",
+    "--no-extensions",
+    "-e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/observer.ts",
+    "-e",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/registry/omp-jev-entry.mjs",
+    "--config",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/overlay.json",
+    "--no-skills",
+    "--no-rules",
+    "--no-title",
+    "--no-lsp",
+    "--no-pty",
+    "--no-prewalk",
+    "--auto-approve",
+    "--tools",
+    "read,bash",
+    "--session-dir",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/sessions",
+    "--model",
+    "openai-codex/gpt-6.1-sol",
+    "--thinking",
+    "low",
+    "--system-prompt",
+    "You are participating in an isolated compaction validation. Follow the user request exactly. Use only the supplied synthetic files in this working directory. No delegation, credentials, network, project discovery, or other files. Do not create reports or summaries. Stop when done.",
+    "--max-time",
+    "10m",
+    "--resume",
+    "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/sessions/seed.jsonl",
+    "The preceding history is a synthetic validation record. Do not use tools or continue old work. All work is complete; reply exactly Final answer ready and stop."
+  ],
+  "pty_grid": [
+    40,
+    140
+  ],
+  "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/work",
+  "isolated_agent_dir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-incompatible-registry/home/.omp/agent",
+  "expectation": "unsupported",
+  "provider": "real Codex + real Jev",
+  "auth": "in-memory existing approved references",
+  "controller_sha256": "d81416b156e0f72213d42acf20d4f59580af0b136147cdbfa7d24b317ad774a6",
+  "helper_package": {
+    "version": "0.1.12",
+    "origin": "npm registry compact-adviser@0.1.12 (deliberately incompatible with omp)",
+    "context_sha256": "a6aaa20ac38231a402ed7ba4e392eeb177dcf290b99ec58ec85cd3f805d66395"
+  }
+}

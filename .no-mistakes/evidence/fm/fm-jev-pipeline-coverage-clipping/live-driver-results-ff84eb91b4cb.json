@@ -1,0 +1,452 @@
+{
+  "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+  "fixture": true,
+  "realJevEvaluation": false,
+  "runId": "ff84eb91b4cb",
+  "ok": true,
+  "results": [
+    {
+      "scenario": "utf8-36-x",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/utf8-36-x",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/utf8-36-x",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "utf8-37-x",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/utf8-37-x",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/utf8-37-x",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "small-error",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/small-error",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/small-error",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "small-bash",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/small-bash",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/small-bash",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "large-error",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/large-error",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/large-error",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "large-bash",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/large-bash",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/large-bash",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "assistant-clipped",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/assistant-clipped",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/assistant-clipped",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "user-clipped",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/user-clipped",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/user-clipped",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "redacted",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/redacted",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/redacted",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "image",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/image",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/image",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "unknown-context",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/unknown-context",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/unknown-context",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "session-removed",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/session-removed",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/session-removed",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "sessionFileAbsentAfterLoad": true,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted",
+        "actual loaded session file removed after final persistence",
+        "missing file rejects transcript recovery"
+      ]
+    },
+    {
+      "scenario": "missing-host",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/missing-host",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/missing-host",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "coverage-ineligible"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 0,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "incomplete checkpoint coverage-ineligible",
+        "rejected checkpoint never compacted"
+      ]
+    },
+    {
+      "scenario": "no-credentials",
+      "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+      "fixture": true,
+      "ok": true,
+      "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/no-credentials",
+      "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/no-credentials",
+      "ptySizeBeforeExec": [
+        35,
+        120,
+        0,
+        0
+      ],
+      "ompExitAfterDriverStop": 143,
+      "metricsEvents": [
+        "pipeline-loaded",
+        "settled-idle",
+        "checkpoint-ineligible",
+        "native-precedence",
+        "native-persisted"
+      ],
+      "httpRequests": 0,
+      "nativeCompactions": 1,
+      "assertions": [
+        "actual pipeline static entry loaded",
+        "actual host mode is tui",
+        "exact 18-byte final answer emitted once",
+        "final answer persisted in native branch",
+        "zero HTTP requests for ineligible/configuration scenario",
+        "no-credential configuration safely ineligible",
+        "manual native compaction has precedence without credentials",
+        "native session file contains persisted compaction",
+        "compaction persisted by native host, not an extension override",
+        "host selected and persisted its runnable native method",
+        "pipeline observes native persisted compaction"
+      ]
+    }
+  ]
+}

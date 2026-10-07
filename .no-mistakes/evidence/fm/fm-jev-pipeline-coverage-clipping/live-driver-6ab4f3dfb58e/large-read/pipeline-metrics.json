@@ -1,0 +1,55 @@
+[
+  {
+    "event": "pipeline-loaded",
+    "at": 1791339957789
+  },
+  {
+    "event": "settled-idle",
+    "at": 1791339958036,
+    "waitMs": 1
+  },
+  {
+    "event": "judge-start",
+    "at": 1791339958040,
+    "attestedResults": 6,
+    "attestedBytes": 172134
+  },
+  {
+    "event": "judge-result",
+    "at": 1791339958042,
+    "apiMs": 2,
+    "inputTokens": 2000,
+    "outputTokens": 60,
+    "estimatedCostUsd": 8.4e-05,
+    "inputUsdPerMillion": 0.042,
+    "model": null
+  },
+  {
+    "event": "judgment",
+    "at": 1791339958042,
+    "finished": true
+  },
+  {
+    "event": "checkpoint-compact",
+    "at": 1791339958042,
+    "contextTokens": 45000
+  },
+  {
+    "event": "native-precedence",
+    "at": 1791339958044,
+    "reason": "manual"
+  },
+  {
+    "event": "native-persisted",
+    "at": 1791339958079,
+    "tokensBefore": 45004,
+    "tokensAfter": 60859,
+    "fromExtension": false,
+    "method": "snapcompact"
+  },
+  {
+    "event": "checkpoint-complete",
+    "at": 1791339958079,
+    "elapsedMs": 37
+  }
+]

@@ -1,0 +1,53 @@
+{
+  "description": "Actual adviser snapshot reconstructed from real omp pre-checkpoint branch, compared with observed live loopback HTTP payload. Jev responses are fixture responses, not real evaluation.",
+  "rows": [
+    {
+      "scenario": "ascii-cumulative",
+      "realAdviserConversationTokens": 44535,
+      "originalAutoCoverage": false,
+      "originalRecentTextTruncated": true,
+      "originalRecentMessageCount": 63,
+      "earlyClippedReadBytes": 158,
+      "newerClippedReadBytes": 512,
+      "originalTailSumBytes": 14000,
+      "unclampedBudget": 0,
+      "liveRequestBytes": 8325,
+      "liveRecentMessageCount": 63,
+      "liveAttestedResults": 28,
+      "liveEarlyReadAttestation": "[read result fully received, body not sent: 400 bytes, 1 lines, sha256 52c18dd0ed33ab63fbbcaa832ba8ffda790fe026843a158e48754aa501f98e83]",
+      "liveFinalAnswer": "Final answer ready"
+    },
+    {
+      "scenario": "utf8-36",
+      "realAdviserConversationTokens": 52320,
+      "originalAutoCoverage": false,
+      "originalRecentTextTruncated": true,
+      "originalRecentMessageCount": 63,
+      "earlyClippedReadBytes": 59,
+      "newerClippedReadBytes": 515,
+      "originalTailSumBytes": 14000,
+      "unclampedBudget": 0,
+      "liveRequestBytes": 8343,
+      "liveRecentMessageCount": 63,
+      "liveAttestedResults": 28,
+      "liveEarlyReadAttestation": "[read result fully received, body not sent: 400 bytes, 1 lines, sha256 5da50ebba74058ac2912f38f18a43353259be36c54d8a96a2cd54357b0660500]",
+      "liveFinalAnswer": "Final answer ready"
+    },
+    {
+      "scenario": "utf8-37",
+      "realAdviserConversationTokens": 52320,
+      "originalAutoCoverage": false,
+      "originalRecentTextTruncated": true,
+      "originalRecentMessageCount": 63,
+      "earlyClippedReadBytes": 64,
+      "newerClippedReadBytes": 515,
+      "originalTailSumBytes": 14006,
+      "unclampedBudget": -6,
+      "liveRequestBytes": 8344,
+      "liveRecentMessageCount": 63,
+      "liveAttestedResults": 28,
+      "liveEarlyReadAttestation": "[read result fully received, body not sent: 400 bytes, 1 lines, sha256 5da50ebba74058ac2912f38f18a43353259be36c54d8a96a2cd54357b0660500]",
+      "liveFinalAnswer": "Final answer ready"
+    }
+  ]
+}

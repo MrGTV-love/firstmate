@@ -1,0 +1,73 @@
+{
+  "scenario": "live-tail-unicode-adjacent",
+  "result": "fail",
+  "live": true,
+  "observedMetrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791338976269
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791338981163,
+      "waitMs": 1
+    },
+    {
+      "event": "coverage-ineligible",
+      "at": 1791338981166,
+      "reasons": [
+        "recent-text-clipped"
+      ]
+    }
+  ],
+  "completeReadBodiesPersisted": [
+    400,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000,
+    12000
+  ],
+  "coverage": {
+    "omittedUserMessages": 0,
+    "olderMessagesOmitted": 0,
+    "recentTextTruncated": true,
+    "hasImages": false,
+    "redacted": false,
+    "unknownContext": false,
+    "transcriptRecoverable": true
+  },
+  "conversationTokens": 27337,
+  "originalTailBudget": 14000,
+  "newerClippedReadBytes": 13905,
+  "newerAssistantBytes": 37,
+  "remainingBeforeOldestRead": 58,
+  "oldestReadFullBytes": 400,
+  "oldestReadClippedBytes": 64,
+  "controllerRemainingAfterOldestRead": -6,
+  "adviserRemainingAfterOldestRead": 0,
+  "nextEarlierAssistantTextBytes": 0,
+  "explanation": "Real helper UTF-8 clipping emits replacement characters: each 512-byte newer read window is 515 bytes, and the oldest 58-byte window is 64 bytes. Adviser clamps its remaining budget to zero; target controller subtraction reaches -6, causing the next empty assistant to be rejected rather than retaining it verbatim. No successful read result is unrecoverable, and no other coverage exclusion is set."
+}

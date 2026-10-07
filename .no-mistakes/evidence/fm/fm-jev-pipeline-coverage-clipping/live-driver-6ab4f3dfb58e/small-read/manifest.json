@@ -1,0 +1,222 @@
+{
+  "scenario": "small-read",
+  "fixture": true,
+  "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+  "directory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/6ab4f3dfb58e/small-read",
+  "sessionFile": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/6ab4f3dfb58e/small-read/sessions/2026-10-07T02-25-59-906Z_01a1142e-9662-74b1-9c39-66041089cc6b.jsonl",
+  "positive": true,
+  "nativeOnly": false,
+  "removeSession": false,
+  "missingHost": false,
+  "expectedAttested": 0,
+  "expectedRecent": [
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "assistant"
+    },
+    {
+      "role": "toolResult",
+      "tool": "read",
+      "error": false
+    },
+    {
+      "role": "assistant"
+    }
+  ],
+  "reads": [
+    {
+      "id": "small",
+      "tool": "read",
+      "path": "source-small.txt",
+      "text": "small result",
+      "bytes": 12,
+      "lines": 1,
+      "sha256": "451980289ee66781d26333b7c849490245ca2b675f6d1cb19fb0e1ed37404fc3",
+      "error": false
+    }
+  ],
+  "finalAnswer": "Final answer ready",
+  "finalAnswerBytes": 18,
+  "seedEntries": 70,
+  "olderAssistantCharacters": 100000,
+  "olderEmptyAssistants": 65
+}

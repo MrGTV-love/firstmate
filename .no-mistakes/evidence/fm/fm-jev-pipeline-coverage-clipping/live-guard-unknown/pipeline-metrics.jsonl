@@ -1,0 +1,3 @@
+{"event":"pipeline-loaded","at":1791338570712}
+{"event":"settled-idle","at":1791338575672,"waitMs":2}
+{"event":"coverage-ineligible","at":1791338575675,"reasons":["recent-text-clipped","unknown-context"]}

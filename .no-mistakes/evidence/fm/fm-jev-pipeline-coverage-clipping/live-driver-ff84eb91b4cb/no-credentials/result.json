@@ -1,0 +1,37 @@
+{
+  "scenario": "no-credentials",
+  "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+  "fixture": true,
+  "ok": true,
+  "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/no-credentials",
+  "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/no-credentials",
+  "ptySizeBeforeExec": [
+    35,
+    120,
+    0,
+    0
+  ],
+  "ompExitAfterDriverStop": 143,
+  "metricsEvents": [
+    "pipeline-loaded",
+    "settled-idle",
+    "checkpoint-ineligible",
+    "native-precedence",
+    "native-persisted"
+  ],
+  "httpRequests": 0,
+  "nativeCompactions": 1,
+  "assertions": [
+    "actual pipeline static entry loaded",
+    "actual host mode is tui",
+    "exact 18-byte final answer emitted once",
+    "final answer persisted in native branch",
+    "zero HTTP requests for ineligible/configuration scenario",
+    "no-credential configuration safely ineligible",
+    "manual native compaction has precedence without credentials",
+    "native session file contains persisted compaction",
+    "compaction persisted by native host, not an extension override",
+    "host selected and persisted its runnable native method",
+    "pipeline observes native persisted compaction"
+  ]
+}

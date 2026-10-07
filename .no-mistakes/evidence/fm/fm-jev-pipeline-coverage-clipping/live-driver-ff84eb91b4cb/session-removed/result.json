@@ -1,0 +1,34 @@
+{
+  "scenario": "session-removed",
+  "classification": "fixture-assisted real omp runtime; not real Jev evaluation",
+  "fixture": true,
+  "ok": true,
+  "workDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.validation-jev/live/ff84eb91b4cb/session-removed",
+  "evidenceDirectory": "/Users/charlesabrooker/.no-mistakes/evidence/01M49Z3HDRT372QCEKK8ARM4G3/live-driver-ff84eb91b4cb/session-removed",
+  "ptySizeBeforeExec": [
+    35,
+    120,
+    0,
+    0
+  ],
+  "ompExitAfterDriverStop": 143,
+  "sessionFileAbsentAfterLoad": true,
+  "metricsEvents": [
+    "pipeline-loaded",
+    "settled-idle",
+    "coverage-ineligible"
+  ],
+  "httpRequests": 0,
+  "nativeCompactions": 0,
+  "assertions": [
+    "actual pipeline static entry loaded",
+    "actual host mode is tui",
+    "exact 18-byte final answer emitted once",
+    "final answer persisted in native branch",
+    "zero HTTP requests for ineligible/configuration scenario",
+    "incomplete checkpoint coverage-ineligible",
+    "rejected checkpoint never compacted",
+    "actual loaded session file removed after final persistence",
+    "missing file rejects transcript recovery"
+  ]
+}

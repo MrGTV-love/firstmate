@@ -1,0 +1,10 @@
+{"event":"pipeline-loaded","at":1791339867508}
+{"event":"settled-idle","at":1791339867677,"waitMs":1}
+{"event":"judge-start","at":1791339867680,"attestedResults":16,"attestedBytes":45424}
+{"event":"judge-result","at":1791339867682,"apiMs":2,"inputTokens":2000,"outputTokens":60,"estimatedCostUsd":0.000084,"inputUsdPerMillion":0.042,"model":null}
+{"event":"judgment","at":1791339867682,"finished":true}
+{"event":"checkpoint-compact","at":1791339867682,"contextTokens":45000}
+{"event":"native-precedence","at":1791339867684,"reason":"manual"}
+{"event":"native-precedence","at":1791339867732,"reason":"manual"}
+{"event":"native-persisted","at":1791339867737,"tokensBefore":45004,"tokensAfter":25960,"fromExtension":false,"method":"soft"}
+{"event":"checkpoint-complete","at":1791339867737,"elapsedMs":55}

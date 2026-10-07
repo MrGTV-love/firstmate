@@ -1,0 +1,77 @@
+{
+  "name": "live-guard-assistant",
+  "expectation": "reject",
+  "events": [
+    {
+      "at": 1791338527106,
+      "phase": "live",
+      "event": "start",
+      "version": "18.6.3",
+      "agentDir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-guard-assistant/home/.omp/agent",
+      "mode": "tui",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex"
+    },
+    {
+      "at": 1791338527171,
+      "phase": "live",
+      "event": "prompt_isolated",
+      "sha256": "2dc9252b4e5c4cb7ea07faaa06fdf91e9e2ce1ac16bee738ebc6752d92df79fe"
+    },
+    {
+      "at": 1791338530276,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 75375,
+        "output": 7,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 75382,
+        "cost": {
+          "input": 0.15075,
+          "output": 7.000000000000001e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.15081999999999998
+        }
+      },
+      "stopReason": "stop",
+      "text": "Final answer ready"
+    },
+    {
+      "at": 1791338530281,
+      "phase": "live",
+      "event": "idle",
+      "idle": true,
+      "pending": false,
+      "context": {
+        "tokens": 75375,
+        "contextWindow": 272000,
+        "percent": 27.71139705882353
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791338527040
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791338530282,
+      "waitMs": 2
+    },
+    {
+      "event": "coverage-ineligible",
+      "at": 1791338530284,
+      "reasons": [
+        "recent-text-clipped"
+      ]
+    }
+  ],
+  "isolated": true,
+  "pass": true
+}

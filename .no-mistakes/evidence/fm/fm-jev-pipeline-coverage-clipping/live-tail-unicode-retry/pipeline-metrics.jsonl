@@ -1,0 +1,5 @@
+{"event":"pipeline-loaded","at":1791338907943}
+{"event":"settled-idle","at":1791338911857,"waitMs":2}
+{"event":"judge-start","at":1791338911860,"attestedResults":28,"attestedBytes":324400}
+{"event":"judge-result","at":1791338911994,"apiMs":134,"inputTokens":4710,"outputTokens":81,"estimatedCostUsd":0.00019782000000000003,"inputUsdPerMillion":0.042,"model":"jev-1.13.0"}
+{"event":"judgment","at":1791338911994,"finished":false}

@@ -1,0 +1,30 @@
+[
+  {
+    "event": "pipeline-loaded",
+    "at": 1791340083469
+  },
+  {
+    "event": "settled-idle",
+    "at": 1791340083696,
+    "waitMs": 2
+  },
+  {
+    "event": "checkpoint-ineligible",
+    "at": 1791340083697,
+    "reason": "configuration",
+    "contextTokens": 45000
+  },
+  {
+    "event": "native-precedence",
+    "at": 1791340083819,
+    "reason": "manual"
+  },
+  {
+    "event": "native-persisted",
+    "at": 1791340083859,
+    "tokensBefore": 45004,
+    "tokensAfter": 60859,
+    "fromExtension": false,
+    "method": "snapcompact"
+  }
+]

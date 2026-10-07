@@ -1,0 +1,9 @@
+{"event":"pipeline-loaded","at":1791338411902}
+{"event":"settled-idle","at":1791338488321,"waitMs":3}
+{"event":"judge-start","at":1791338488328,"attestedResults":28,"attestedBytes":112693}
+{"event":"judge-result","at":1791338488524,"apiMs":196,"inputTokens":4735,"outputTokens":81,"estimatedCostUsd":0.00019887,"inputUsdPerMillion":0.042,"model":"jev-1.13.0"}
+{"event":"judgment","at":1791338488524,"finished":true}
+{"event":"checkpoint-compact","at":1791338488524,"contextTokens":66165}
+{"event":"native-precedence","at":1791338488526,"reason":"manual"}
+{"event":"native-persisted","at":1791338494928,"tokensBefore":66172,"tokensAfter":1501,"fromExtension":false,"method":"remote"}
+{"event":"checkpoint-complete","at":1791338494938,"elapsedMs":6414}

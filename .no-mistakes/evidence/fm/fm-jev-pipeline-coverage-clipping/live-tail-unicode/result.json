@@ -1,0 +1,91 @@
+{
+  "name": "live-tail-unicode",
+  "expectation": "compact",
+  "events": [
+    {
+      "at": 1791338726343,
+      "phase": "live",
+      "event": "start",
+      "version": "18.6.3",
+      "agentDir": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3HDRT372QCEKK8ARM4G3/.live-jev-check/live-tail-unicode/home/.omp/agent",
+      "mode": "tui",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex"
+    },
+    {
+      "at": 1791338726395,
+      "phase": "live",
+      "event": "prompt_isolated",
+      "sha256": "2dc9252b4e5c4cb7ea07faaa06fdf91e9e2ce1ac16bee738ebc6752d92df79fe"
+    },
+    {
+      "at": 1791338730475,
+      "phase": "live",
+      "event": "turn_end",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 109837,
+        "output": 7,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 109844,
+        "cost": {
+          "input": 0.21967399999999998,
+          "output": 7.000000000000001e-05,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.21974399999999997
+        }
+      },
+      "stopReason": "stop",
+      "text": "Final answer ready"
+    },
+    {
+      "at": 1791338730478,
+      "phase": "live",
+      "event": "idle",
+      "idle": true,
+      "pending": false,
+      "context": {
+        "tokens": 109837,
+        "contextWindow": 272000,
+        "percent": 40.38125
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "event": "pipeline-loaded",
+      "at": 1791338726278
+    },
+    {
+      "event": "settled-idle",
+      "at": 1791338730478,
+      "waitMs": 1
+    },
+    {
+      "event": "judge-start",
+      "at": 1791338730481,
+      "attestedResults": 28,
+      "attestedBytes": 324400
+    },
+    {
+      "event": "judge-result",
+      "at": 1791338730626,
+      "apiMs": 145,
+      "inputTokens": 4710,
+      "outputTokens": 81,
+      "estimatedCostUsd": 0.00019782000000000003,
+      "inputUsdPerMillion": 0.042,
+      "model": "jev-1.13.0"
+    },
+    {
+      "event": "judgment",
+      "at": 1791338730626,
+      "finished": false
+    }
+  ],
+  "isolated": true,
+  "pass": false
+}
