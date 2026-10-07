@@ -1673,6 +1673,10 @@ families_for_changed_path() {
     .agents/skills/*/SKILL.md)
       printf '%s\n' pure-contract-unit
       ;;
+    .agents/skills/hyper-jev/*)
+      # Vendored upstream skill files (see SOURCE.md there) have no firstmate
+      # test consumer, so they select no suite instead of refusing as unmapped.
+      ;;
     .github/workflows/ci.yml|.no-mistakes.yaml)
       printf '%s\n' pure-contract-unit
       printf '%s\n' real-herdr-gated
