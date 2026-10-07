@@ -912,10 +912,9 @@ install_omp_extension_fixture() {  # <repo>
 }
 
 test_primary_extension_discovery_preserves_ownership() {
-  local repo home out status mode
-  repo="$TMP_ROOT/discovery-ownership/repo"; home="$TMP_ROOT/discovery-ownership/home"
+  local repo home out status mode selected_home selected_state
+  repo="$TMP_ROOT/discovery-ownership/repo"
   install_omp_extension_fixture "$repo"
-  mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=discovery-test\n' "$$"
@@ -924,17 +923,27 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-sessionstart-run.sh"
   chmod +x "$repo/bin/fm-sessionstart-run.sh"
-  for mode in existing absent; do
-    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FIXTURE_REPO="$repo" MARKER_MODE="$mode" node --input-type=module 2>&1 <<'EOF'
+  for mode in existing absent fresh fresh-override fresh-root fresh-watcher-first; do
+    home="$TMP_ROOT/discovery-ownership/home-$mode"
+    selected_home="$home"; selected_state=
+    [ "$mode" != fresh-root ] || selected_home=
+    [ "$mode" != fresh-override ] || selected_state="$home/nested/runtime"
+    out=$(FM_HOME="$selected_home" FM_STATE_OVERRIDE="$selected_state" FM_ROOT_OVERRIDE="$repo" FIXTURE_REPO="$repo" REAL_ROOT="$ROOT" MARKER_MODE="$mode" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-const state = `${process.env.FM_HOME}/state`;
-writeFileSync(`${state}/.lock`, `${process.ppid}\n`);
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const state = process.env.FM_STATE_OVERRIDE || `${process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE}/state`;
+const fresh = process.env.MARKER_MODE.startsWith("fresh");
+if (!fresh) {
+  mkdirSync(state, { recursive: true });
+  writeFileSync(`${state}/.lock`, `${process.ppid}\n`);
+}
 const extensions = [
-  ["fm-primary-omp-watch.ts", ".omp-watch-extension-loaded"],
   ["fm-primary-turnend-guard.ts", ".omp-turnend-extension-loaded"],
+  ["fm-primary-omp-watch.ts", ".omp-watch-extension-loaded"],
 ];
+if (process.env.MARKER_MODE === "fresh-watcher-first") extensions.reverse();
 const loaded = [];
 for (const [file, markerName] of extensions) {
   const filePath = `${process.env.FIXTURE_REPO}/.omp/extensions/${file}`;
@@ -960,6 +969,7 @@ for (const { markerPath, evidence } of loaded) {
     if (!readFileSync(markerPath).equals(evidence)) throw new Error(`discovery replaced ownership evidence: ${markerPath}`);
   } else if (existsSync(markerPath)) throw new Error(`discovery created ownership evidence: ${markerPath}`);
 }
+if (fresh && existsSync(state)) throw new Error("discovery created the state directory");
 try {
   for (const { handlers } of loaded) {
     await handlers.get("session_start")({ type: "session_start" }, { sessionManager: { getSessionId: () => "discovery-session" } });
@@ -968,6 +978,9 @@ try {
     const expected = `${version}\n${process.pid}\n`;
     if (readFileSync(markerPath, "utf8") !== expected) throw new Error(`session_start did not publish valid ownership evidence: ${markerPath}`);
   }
+  writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+  const proof = spawnSync("bash", ["-c", '. "$1/bin/fm-wake-lib.sh"; fm_omp_extension_owns_supervision "$2" "$3"', "_", process.env.REAL_ROOT, state, process.env.FIXTURE_REPO], { encoding: "utf8" });
+  if (proof.status !== 0) throw new Error(`session_start ownership proof failed: ${proof.stderr}`);
 } finally {
   for (const { handlers } of loaded) await handlers.get("session_shutdown")({}, {});
 }
@@ -977,7 +990,7 @@ EOF
     expect_code 0 "$status" "omp discovery ownership ($mode): $out"
     [ -z "$out" ] || fail "omp discovery ownership test printed output: $out"
   done
-  pass ".omp discovery leaves existing and absent ownership markers untouched; session_start publishes both"
+  pass ".omp discovery preserves ownership; session_start publishes both markers independently of state and extension order"
 }
 
 test_turnend_guard_extension_compels_one_continuation() {

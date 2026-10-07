@@ -28,7 +28,7 @@
 // for the Run tier.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // Shared with the Pi extensions; the owner resolves bin/fm-operational-input.sh
@@ -91,7 +91,8 @@ function lockOwnership(): LockOwnership {
 // next restart. Writes only on a change, and only for the lock owner or while
 // no live session holds the lock.
 function markLoaded(): void {
-  if (!existsSync(state) || lockOwnership() === "other") return;
+  if (lockOwnership() === "other") return;
+  mkdirSync(state, { recursive: true });
   const record = `${extensionVersion}\n${process.pid}\n`;
   try {
     if (readFileSync(marker, "utf8") === record) return;

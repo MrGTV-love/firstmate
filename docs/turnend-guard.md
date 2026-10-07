@@ -161,6 +161,9 @@ The proof requires all of these:
 omp never inherits the Pi tolerance because its proof is keyed on its own two files and markers.
 Requiring the turn-end guard extension as well as the watch extension is deliberate, because a home without that structural backstop has no benign hand-off to tolerate.
 
+Each omp primary extension creates its effective state directory, if absent, when publishing its marker at `session_start`, so first-start ownership evidence does not depend on extension order.
+Standalone extension discovery neither creates that directory nor changes ownership markers.
+
 Without that proof an unheld lock alarms exactly as it did before.
 An unloaded, version-drifted, or exited Pi or omp session is therefore loud immediately.
 A cycle the extension never restores is loud once the beacon passes grace.
