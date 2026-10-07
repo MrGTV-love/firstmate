@@ -2651,7 +2651,10 @@ RACE_BLOCKER="$TMP_ROOT/race-blocker.sh"
 cat > "$RACE_BLOCKER" <<'SH'
 #!/usr/bin/env bash
 printf 'started\n' >> "$1"
-while [ ! -e "$2" ]; do sleep 0.05; done
+while [ ! -e "$2" ]; do
+  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  sleep 0.05
+done
 printf 'race result\n'
 SH
 chmod +x "$RACE_BLOCKER"
@@ -2670,6 +2673,7 @@ done
 # not a settle sleep that lets late contenders arrive after ownership is released.
 # A second runner also blocks, and stops this wait on its second start marker.
 race_expected_losers=$((${#race_pids[@]} - 1))
+race_deadline=$((SECONDS + 30))
 while :; do
   race_running=0
   for race_pid in "${race_pids[@]}"; do
@@ -2677,6 +2681,10 @@ while :; do
   done
   [ "$race_running" -le 1 ] && break
   [ ! -e "$RACE_LOG" ] || [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
+  if [ "$SECONDS" -ge "$race_deadline" ]; then
+    cat "$TMP_ROOT"/race-contender-*.out >&2
+    fail "stale-claim contenders did not finish observing the winning owner"
+  fi
   sleep 0.1
 done
 if ! wait_for "$RACE_LOG" 300; then
@@ -3698,6 +3706,7 @@ cat > "$HOST_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 [ "${1-}" = poll ] || exit 2
 printf '%s:%s\n' "${LAVISH_AXI_HOST-unset}" "${LAVISH_AXI_PORT-unset}" >> "$HOST_SEEN"
+printf '%s\0' "$@" >> "$HOST_SEEN.argv"
 if [ -n "${HOST_RETRY-}" ] && [ "$(wc -l < "$HOST_SEEN" | tr -d ' ')" = 1 ]; then
   rm -f "$HOST_CONFIG_FILE"
   printf 'error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n'
@@ -3783,6 +3792,8 @@ for shape in empty partial; do
   esac
   printf 'reply to deliver\n' > "$HOST_HOME/reply"
   : > "$HOST_SEEN"
+  : > "$HOST_SEEN.argv"
+  printf '%s\0' poll "$HOST_ART" --agent-reply 'reply to deliver' > "$TORN_STORE/expected-argv"
   PATH="$TORN_BIN:$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
     TORN_REAL_PERL="$TORN_REAL_PERL" TORN_RETRY_SEEN="$TORN_STORE/$shape.retry" \
     LAVISH_AXI_STATE_DIR="$TORN_STORE" FM_LAVISH_POLL_RETRY_DELAY=1 FM_HOME="$HOST_HOME" \
@@ -3799,6 +3810,8 @@ for shape in empty partial; do
   wait "$torn_pid" || fail "poll did not recover once the $shape session store was rewritten"
   [ "$(cat "$HOST_SEEN")" = '127.0.0.1:14387' ] \
     || fail "poll did not route to the board session after a $shape snapshot"
+  cmp -s "$TORN_STORE/expected-argv" "$HOST_SEEN.argv" \
+    || fail "the recovered $shape poll did not receive the exact staged reply in exactly one CLI invocation"
   assert_contains "$(cat "$TORN_STORE/out")" 'status: ended' \
     "the recovered poll returns the published result"
   assert_not_contains "$(cat "$TORN_STORE/out")" NOT_FOUND \
