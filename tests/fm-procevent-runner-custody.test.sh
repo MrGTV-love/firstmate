@@ -151,9 +151,10 @@ answer_and_capture() {  # <token>
   local token=$1 result="$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result"
   printf 'session:\n  status: feedback\n  session_ended: true\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","%s","","message",""\n' "$token" \
     > "$ARTIFACT.expected"
-  cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
-    && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer" \
-    || fail "$token answer publication failed"
+  if ! { cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
+    && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer"; }; then
+    fail "$token answer publication failed"
+  fi
   wait_for nonempty "$result" || fail "$token was not captured by the replacement listener"
   cmp -s "$ARTIFACT.expected" "$result" || fail "$token capture changed the native answer bytes"
   wait_for nonempty "$HOME_FIXTURE/state/.wake-queue" || fail "$token produced no durable wake"
@@ -256,9 +257,10 @@ pass "an outputless killed native poll relistens under the same runner and captu
 
 new_board unknown-error
 printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n' > "$ARTIFACT.expected"
-cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
-  && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer" \
-  || fail "unknown native error publication failed"
+if ! { cp "$ARTIFACT.expected" "$ARTIFACT.answer.tmp" \
+  && mv -f -- "$ARTIFACT.answer.tmp" "$ARTIFACT.answer"; }; then
+  fail "unknown native error publication failed"
+fi
 unknown_result="$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result"
 wait_for nonempty "$unknown_result" || fail "unknown native error was not captured"
 cmp -s "$ARTIFACT.expected" "$unknown_result" || fail "unknown native error bytes changed"
