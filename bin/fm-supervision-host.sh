@@ -33,9 +33,10 @@
 # cycle only, for owners that start their own successor after every close
 # (OpenCode, omp).
 # A launch-policy refusal returns 1 with an actionable "supervision-host:"
-# close and a recovery episode; it never implies ownership transferred.
-# Both refusal closes are terminal for the unchanged configuration: the owner
-# restores the ordinary watcher arm instead of retrying the denied host.
+# close and attempts to publish a recovery episode; publication failure is
+# reported in the close, and neither outcome implies ownership transferred.
+# Both closes are terminal for the unchanged configuration: omp and OpenCode
+# restore the ordinary watcher arm; other owners deliver the refusal to main.
 #
 # THE LOOP. It owns watcher cycles through bin/fm-watch-arm.sh. The posture is
 # the away-posture record state/.afk-contract, read at every close and again

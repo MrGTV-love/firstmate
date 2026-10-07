@@ -3,16 +3,18 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.js";
 
-// Supervision host: a home opted in with config/supervision-host
-// (docs/configuration.md "Supervision host" owns the opt-in) spawns
-// bin/fm-supervision-host.sh park --restart in the arm's place, which takes
-// away-posture wakes itself and closes only when main is needed; its header
-// owns the output read here. A "supervision-host:" line is actionable like a
-// wake line, and the delivered message carries every such line in order while
-// wake lines keep an eight-line cap. The host prints the first cycle's status
-// line as soon as it is verified, so readiness and the handling handoff work
-// as they do for the arm, with a longer readiness budget for the host's own
-// startup. Without the file nothing below changes.
+// Supervision host: with config/supervision-host this plugin tries
+// bin/fm-supervision-host.sh park --restart in the arm's place, subject to the
+// session launch policy (docs/configuration.md owns the opt-in and policy).
+// docs/supervision-host.md owns activation and posture behavior; the host's
+// header owns the output read here. A policy refusal restores the ordinary
+// watcher arm for the unchanged configuration.
+// A "supervision-host:" line is actionable like a wake line, and the delivered
+// message carries every such line in order while wake lines keep an eight-line
+// cap. An active host prints the first cycle's status line as soon as it is
+// verified, so readiness and the handling handoff work as they do for the arm,
+// with a longer readiness budget for the host's own startup.
+// Without the file nothing below changes.
 const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
 // 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
 // bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
