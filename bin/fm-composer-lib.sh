@@ -839,7 +839,7 @@ _fm_composer_titled_rule_row() {  # <trimmed-row>
 
 # Row-scan results are returned through FM_COMPOSER_SCAN_* globals (bash 3.2
 # has no nameref); they are internal to this owner.
-_fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty>
+_fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local pane=$1 cy=${2:-}
   local line indent left_stripped trimmed kind family side_family
   local top_inner top_spaces='' geometry_check=0 geometry_ambiguous=0
@@ -1728,10 +1728,7 @@ _fm_composer_claude_slash_choice() {  # <plain> <bare-row>
 }
 
 _fm_composer_select_cursorless() {
-  local plain=$1 extract_wrap=${2:-0} generic=-1 next boundary raw trimmed glyph bare footer=0 previous='' tail_row tail_text
-  local codex_footer_re='^[[:alnum:]_.-]+ [[:alpha:]]+ · Context [0-9]+% left( · /[^·]+( · [0-9]+…)?)?$'
-  local omp_footer_re='^(π|󰵗)[[:space:]]+·[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh][[:space:]]+·[[:space:]]'
-  local omp_context_re='[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K([[:space:]]|$)'
+  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -1802,47 +1799,15 @@ _fm_composer_select_cursorless() {
     return 1
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
-    boundary=${plain//[!$'\n']/}
-    boundary=${#boundary}
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
-    raw=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$plain")
-    fm_composer_normalize_trim_var raw
-    fm_composer_leading_agent_glyph_var glyph "$raw" || glyph=
-    previous=$raw
-    while [ "$next" -le "$boundary" ]; do
+    while :; do
       raw=$(_fm_composer_screen_row "$next" "$plain")
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
-      [ -n "$trimmed" ] || [ "$extract_wrap" = 1 ] || break
-      if [ "$extract_wrap" = 1 ] \
-         && { { [ "$glyph" = '›' ] && [ -z "$previous" ] \
-                && [[ "$trimmed" =~ $codex_footer_re ]]; } \
-              || { [ "$glyph" = '❯' ] && [ -n "$previous" ] \
-                   && [[ "$trimmed" =~ $omp_footer_re ]] \
-                   && [[ "$trimmed" =~ $omp_context_re ]] \
-                   && _fm_composer_row_is_omp_status "$trimmed"; }; }; then
-        tail_row=$((next + 1))
-        while [ "$tail_row" -le "$boundary" ]; do
-          tail_text=$(_fm_composer_screen_row "$tail_row" "$plain")
-          fm_composer_normalize_trim_var tail_text
-          [ -z "$tail_text" ] || return 1
-          tail_row=$((tail_row + 1))
-        done
-        break
-      fi
-      if fm_composer_row_has_edge "$trimmed" \
-         || _fm_composer_row_is_omp_status "$trimmed" \
-         || _fm_composer_row_is_braille_furniture "$trimmed"; then
-        if [ "$extract_wrap" = 1 ]; then
-          [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-            && [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" = 1 ] \
-            && [ "$FM_COMPOSER_SELECTED_FIRST" -eq "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" ] \
-            && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-            && [ "$next" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ] || return 1
-        fi
-        break
-      fi
-      previous=$trimmed
+      [ -n "$trimmed" ] || break
+      fm_composer_row_has_edge "$trimmed" && break
+      _fm_composer_row_is_omp_status "$trimmed" && break
+      _fm_composer_row_is_braille_furniture "$trimmed" && break
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done
@@ -1884,7 +1849,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1 strip_sides=1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain prefix_end prefix close
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1892,32 +1857,9 @@ fm_composer_extract_selected_content() {  # <caps> <screen>
 $caps
 EOF
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
-  _fm_composer_scan_screen "$plain" ''
-  _fm_composer_select_cursorless "$plain" 1 || return 1
+  _fm_composer_scan_screen "$plain" '' 1
+  _fm_composer_select_cursorless "$plain" || return 1
   case "$FM_COMPOSER_SELECTED_KIND" in bare) strip_sides=0 ;; esac
-  prefix_end=$FM_COMPOSER_SELECTED_FIRST
-  case "$FM_COMPOSER_SELECTED_KIND" in
-    box) prefix_end=$FM_COMPOSER_SCAN_BOX_TOP ;;
-    ompbox) prefix_end=$FM_COMPOSER_SCAN_OMPBOX_TOP ;;
-    pi) prefix_end=$FM_COMPOSER_SCAN_PI_OPEN ;;
-  esac
-  if [ "$prefix_end" -gt 0 ]; then
-    prefix=$(printf '%s\n' "$plain" | awk -v end="$prefix_end" 'NR <= end')
-    (
-      _fm_composer_scan_screen "$prefix" ''
-      close=$FM_COMPOSER_SCAN_BOX_BOTTOM
-      [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -le "$close" ] || close=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
-      [ "$FM_COMPOSER_SCAN_PI_CLOSE" -le "$close" ] || close=$FM_COMPOSER_SCAN_PI_CLOSE
-      raw=$(_fm_composer_screen_row "$((FM_COMPOSER_SCAN_LEFTBAR_END + 1))" "$prefix")
-      fm_composer_normalize_trim_var raw
-      if _fm_composer_leftbar_floor_row "$raw" \
-         && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -ge "$close" ]; then
-        close=$((FM_COMPOSER_SCAN_LEFTBAR_END + 1))
-      fi
-      [ "$FM_COMPOSER_SCAN_BARE_ROW" -le "$close" ] \
-        && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -le "$close" ]
-    ) || return 1
-  fi
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")

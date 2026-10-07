@@ -971,7 +971,8 @@ SH
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, readdirSync, mkdirSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const handlers = new Map(); let tool = null; const sent = [];
+const handlers = new Map(); let tool = null; const sent = []; const turns = [];
+const transcript = [{ role: "assistant" }];
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
@@ -982,6 +983,17 @@ const pi = {
     sent.push({ m, o });
     if (process.env.SCENARIO === "sync-consumed") handlers.get("before_agent_start")({ prompt: m }, ctx);
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
+    if (process.env.SCENARIO === "custom-tail") {
+      if (o?.deliverAs) { queued = true; return undefined; }
+      if (idle) {
+        turns.push({ prompt: m, tail: transcript.at(-1) });
+        transcript.push({ role: "user", content: m });
+        idle = false;
+        handlers.get("before_agent_start")({ prompt: m }, ctx);
+      } else {
+        queued = true;
+      }
+    }
     return undefined;
   },
 };
@@ -1022,6 +1034,7 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await sleep(100);
 if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.length}`);
 const wake = sent[0].m;
+if (sent[0].o?.deliverAs !== "followUp") throw new Error("regular delivery must remain queued as a follow-up");
 const bare = wake.replace(/⁣/g, "");
 const recordDir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
 const records = () => readdirSync(recordDir).filter((name) => /^unconsumed-\d+-\d+-\d+\.wake$/.test(name));
@@ -1032,9 +1045,26 @@ if (process.env.SCENARIO === "sync-consumed") {
 }
 if (records().length !== 1 || readFileSync(`${recordDir}/${records()[0]}`, "utf8") !== wake) throw new Error("emitted wake must have one exact durable identity");
 const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(2500); };
-const same = (item) => item.m === wake && item.o?.deliverAs === "followUp";
+const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "custom-tail": {
+    if (!queued || turns.length !== 0) throw new Error("regular wake did not remain queued");
+    queued = false;
+    const tail = { role: "custom", customType: "advisor", content: "advisor transcript tail" };
+    transcript.push(tail);
+    const draft = "\noperator\u2063 draft\n\n";
+    composer.text = `${wake}\n\n${draft}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1])) throw new Error("idle custom-tail wake was not sent through prompt flow");
+    if (turns.length !== 1 || turns[0].prompt !== wake || turns[0].tail !== tail) throw new Error("idle recovery did not start handling after the advisor tail");
+    if (composer.text !== draft) throw new Error("custom-tail recovery changed operator draft bytes");
+    if (records().length !== 0) throw new Error("started custom-tail turn retained its wake identity");
+    idle = true;
+    await settle();
+    if (sent.length !== 2 || turns.length !== 1 || composer.text !== draft) throw new Error("consumed custom-tail wake was recovered again");
+    break;
+  }
   case "normalized-consumed":
   case "consumed": {
     const prompt = process.env.SCENARIO === "normalized-consumed" ? bare.replace(/\s/g, "").replace(/(.{17})/g, "$1\n \t") : wake;
@@ -1124,7 +1154,7 @@ switch (process.env.SCENARIO) {
     throw new Error(`unknown scenario ${process.env.SCENARIO}`);
 }
 await handlers.get("session_shutdown")({}, ctx);
-if (!["consumed", "normalized-consumed", "draft"].includes(process.env.SCENARIO) && records().length !== 1) throw new Error("shutdown removed an unconsumed wake identity");
+if (!["consumed", "normalized-consumed", "draft", "custom-tail"].includes(process.env.SCENARIO) && records().length !== 1) throw new Error("shutdown removed an unconsumed wake identity");
 process.exit(0);
 EOF
   local status=$?
@@ -1134,7 +1164,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft draft-before draft-after-bytes draft-before-bytes draft-both edited alone busy queued elsewhere limit; do
+  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both edited alone busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"

@@ -899,6 +899,37 @@ test_send_text_submit_detects_swallowed_enter() {
   pass "fm_backend_cmux_send_text_submit: reports 'pending' when the composer never clears after retried Enters (swallowed)"
 }
 
+test_send_text_submit_refreshes_busy_pending_before_retry() {
+  local mode dir fb out fresh
+  for mode in cleared unreadable; do
+    dir="$TMP_ROOT/submit-refresh-$mode"; mkdir -p "$dir/responses"
+    cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
+    cmux_panes_response "$dir" 3 "bbbbbbbb-1111-1111-1111-111111111111"
+    cmux_panes_response "$dir" 5 "bbbbbbbb-1111-1111-1111-111111111111"
+    cmux_panes_response "$dir" 7 "bbbbbbbb-1111-1111-1111-111111111111"
+    cmux_read_screen_response "$dir" 6 $'╭── ⠧ 11s > model ──╮\n╰─ hello captain ─╯'
+    case "$mode" in
+      cleared)
+        cmux_read_screen_response "$dir" 8 $'╭── ⠧ 12s > model ──╮\n╰─              ─╯'
+        fresh=empty
+        ;;
+      unreadable)
+        cmux_read_screen_response "$dir" 8 'Working on request...'
+        fresh=unknown
+        ;;
+    esac
+    fb=$(make_cmux_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+      bash -c '. "$0/bin/backends/cmux.sh"; fm_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "hello captain" 3 0 0' "$ROOT" )
+    [ "$out" = "$fresh" ] || fail "busy pending then $mode must return $fresh, got '$out'"
+    [ "$(grep -c $'\x1fsend-key\x1f' "$dir/log")" -eq 1 ] \
+      || fail "cmux must not retry Enter from stale busy pending"
+    [ "$(grep -c $'\x1fread-screen\x1f' "$dir/log")" -eq 2 ] \
+      || fail "cmux must capture the refreshed composer before deciding whether to retry"
+  done
+  pass "cmux refreshes busy pending through the CLI before any retry Enter"
+}
+
 # The regression test for the popup-placeholder/second-Enter class (mirrors
 # herdr's 2026-07-03 incident test): Enter #1 closes the popup and fills an
 # argument-hint placeholder (still pending); Enter #2 actually submits. The
@@ -1159,6 +1190,7 @@ test_composer_state_unknown_on_capture_failure
 test_composer_state_unknown_when_no_composer_row_found
 test_send_text_submit_detects_landed_send
 test_send_text_submit_detects_swallowed_enter
+test_send_text_submit_refreshes_busy_pending_before_retry
 test_send_text_submit_popup_autocomplete_requires_second_enter
 test_send_text_submit_send_failed_when_target_absent
 test_window_of_workspace_finds_window_and_count

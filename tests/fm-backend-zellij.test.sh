@@ -1025,6 +1025,42 @@ test_send_text_submit_detects_swallowed_enter() {
   pass "fm_backend_zellij_send_text_submit: reports 'pending' when the composer still holds the text after retried Enters (swallowed)"
 }
 
+test_send_text_submit_refreshes_busy_pending_before_retry() {
+  local mode dir fb out fresh
+  for mode in cleared unreadable; do
+    dir="$TMP_ROOT/submit-refresh-$mode"; mkdir -p "$dir/responses"
+    zellij_pane_response "$dir" 1 7 3
+    printf '%s' $'╭── π > model ──╮\n╰─              ─╯' > "$dir/responses/2.out"
+    zellij_pane_response "$dir" 3 7 3
+    zellij_pane_response "$dir" 5 7 3
+    printf '%s' $'╭── ⠧ 11s > model ──╮\n╰─ hello captain ─╯' > "$dir/responses/6.out"
+    zellij_pane_response "$dir" 7 7 3
+    zellij_pane_response "$dir" 9 7 3
+    printf '%s' $'╭── ⠧ 11s > model ──╮\n╰─ hello captain ─╯' > "$dir/responses/10.out"
+    zellij_pane_response "$dir" 11 7 3
+    case "$mode" in
+      cleared)
+        printf '%s' $'╭── ⠧ 12s > model ──╮\n╰─              ─╯' > "$dir/responses/12.out"
+        fresh=empty
+        ;;
+      unreadable)
+        printf '%s' 'Working on request...' > "$dir/responses/12.out"
+        fresh=unknown
+        ;;
+    esac
+    fb=$(make_zellij_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
+      FM_ZELLIJ_SESSION_LIST="firstmate" \
+      bash -c '. "$0/bin/backends/zellij.sh"; fm_backend_zellij_send_text_submit firstmate:7 "hello captain" 3 0 0' "$ROOT" )
+    [ "$out" = "$fresh" ] || fail "busy pending then $mode must return $fresh, got '$out'"
+    [ "$(grep -c $'\x1fsend-keys\x1f' "$dir/log")" -eq 1 ] \
+      || fail "Zellij must not retry Enter from stale busy pending"
+    [ "$(grep -c $'\x1fdump-screen\x1f' "$dir/log")" -eq 4 ] \
+      || fail "Zellij must capture before paste, after paste, after Enter and before retry"
+  done
+  pass "Zellij refreshes busy pending through the CLI before any retry Enter"
+}
+
 test_send_text_submit_unrelated_change_is_not_delivery() {
   # THE false-positive regression (audit fm-composer-consolidation-audit-s1,
   # section 3.5, verified live): a pane whose content changes for reasons
@@ -1405,6 +1441,7 @@ test_send_text_submit_detects_landed_send
 test_send_text_submit_accepts_boundaryless_codex_footer
 test_send_text_submit_ignores_styled_effort_hint
 test_send_text_submit_detects_swallowed_enter
+test_send_text_submit_refreshes_busy_pending_before_retry
 test_send_text_submit_unrelated_change_is_not_delivery
 test_send_text_submit_rejects_unobserved_paste
 test_send_text_submit_rejects_transcript_echo_with_unrelated_draft

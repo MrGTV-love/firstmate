@@ -225,6 +225,34 @@ test_send_text_submit_retries_when_composer_stays_pending() {
   pass "fm_backend_orca_send_text_submit: retries Enter while composer remains pending"
 }
 
+test_send_text_submit_refreshes_busy_pending_before_retry() {
+  local mode out fresh enter_count
+  for mode in cleared unreadable; do
+    orca_case "send-submit-refresh-$mode"
+    printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/1.out"
+    printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/2.out"
+    printf '{"ok":true,"result":{"terminal":{"tail":["╭── ⠧ 11s > model ──╮","╰─ hello captain ─╯"]}}}\n' > "$RESP/3.out"
+    case "$mode" in
+      cleared)
+        printf '{"ok":true,"result":{"terminal":{"tail":["╭── ⠧ 12s > model ──╮","╰─              ─╯"]}}}\n' > "$RESP/4.out"
+        fresh=empty
+        ;;
+      unreadable)
+        printf '{"ok":true,"result":{"terminal":{"tail":["Working on request..."]}}}\n' > "$RESP/4.out"
+        fresh=unknown
+        ;;
+    esac
+    out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+      bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "hello captain" 3 0 0' "$ROOT" )
+    [ "$out" = "$fresh" ] || fail "busy pending then $mode must return $fresh, got '$out'"
+    enter_count=$(grep -c $'orca\x1fterminal\x1fsend\x1f--terminal\x1fterm-123\x1f--text\x1f\x1f--enter\x1f--json' "$LOG")
+    [ "$enter_count" -eq 1 ] || fail "Orca must not retry Enter from stale busy pending"
+    [ "$(grep -c $'orca\x1fterminal\x1fread\x1f' "$LOG")" -eq 2 ] \
+      || fail "Orca must capture the refreshed composer before deciding whether to retry"
+  done
+  pass "Orca refreshes busy pending through the CLI before any retry Enter"
+}
+
 test_composer_state_popup_placeholder_fill_is_pending() {
   local out
   orca_case composer-popup-placeholder
@@ -1390,6 +1418,7 @@ test_send_text_submit_verifies_empty_composer_after_enter
 test_send_text_submit_borderless_claude_confirms
 test_composer_state_stale_banner_never_wins
 test_send_text_submit_retries_when_composer_stays_pending
+test_send_text_submit_refreshes_busy_pending_before_retry
 test_composer_state_popup_placeholder_fill_is_pending
 test_composer_state_bare_shell_prompt_is_unknown
 test_send_text_submit_popup_autocomplete_requires_second_enter
