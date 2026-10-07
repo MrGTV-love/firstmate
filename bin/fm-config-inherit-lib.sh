@@ -46,8 +46,9 @@
 # secondmate spawn (bin/fm-spawn.sh), the bootstrap secondmate sweep
 # (bin/fm-bootstrap.sh), and the focused mid-session config push
 # (bin/fm-config-push.sh). It is PRIMARY-AUTHORITATIVE: the primary's value wins
-# and is re-pushed on every convergence, so the fleet stays converged on the
-# primary; an item the primary does not set is mirrored as absence downstream.
+# and is re-pushed when propagation guards permit; proven absence is mirrored
+# downstream under the same guards. The coupled routing-pair exception is owned
+# by .agents/skills/secondmate-provisioning/SKILL.md.
 # After successful config/* changes under an already-running secondmate, callers
 # invoke fm_config_send_reread_nudge so the live agent re-reads exact post-write
 # bytes (spawn/respawn already re-reads at launch and needs no redundant nudge).

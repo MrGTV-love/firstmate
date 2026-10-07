@@ -14,7 +14,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
 | Interrupt | Single Escape; the composer is left empty, no clear key. |
 | Skill invocation | No separate verified form beyond normal command behavior; use natural language when the exact command is uncertain. |
-| Model flag | `--model <provider>/<id>`; omp also accepts fuzzy patterns. Firstmate selection follows the [fleet model-index contract](../../../../../docs/configuration.md#fleet-model-index-configmodel-indexjson), and native non-entry validation is owned by [`fm-spawn.sh --help`](../../../../../bin/fm-spawn.sh). |
+| Model flag | `--model <provider>/<id>`; omp also accepts fuzzy patterns. Firstmate selection follows the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson), and native non-entry validation is owned by [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh). |
 | Effort flag | `--thinking <off\|minimal\|low\|medium\|high\|xhigh\|max\|auto>`, a superset of the shared vocabulary, so every level including `max` maps straight across. |
 | Model discovery | `omp models [--json]` lists built-in and auto-discovered providers only; extension-registered providers such as `claude-bridge` never appear. `omp usage` shows provider windows; `quota-axi` covers the `claude` provider when the bridge is in use. |
 | Marker | None of omp's own (verified: `PI_CODING_AGENT` absent from the binary, no `PI_CODING_AGENT_DIR` or `OMP_PROFILE` in the default profile). `FM_OMP_HARNESS=omp` is Firstmate's launch marker; ancestry matches the exact process name `omp`. |

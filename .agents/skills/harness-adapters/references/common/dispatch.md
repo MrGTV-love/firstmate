@@ -5,15 +5,11 @@ Load this with the selected tool reference for dispatch, start, or adapter verif
 ## Resolution
 
 Use the router's detection and safety sections for static crew and secondmate harness resolution and all explicit overrides.
-`config/crew-dispatch.json` can override that static default for one crewmate or scout with a profile under the [dispatch configuration contract](../../../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).
+`config/crew-dispatch.json` can override that static default for one crewmate or scout with a profile under the [dispatch configuration contract](../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).
 For a profile array, load `quota-array-dispatch` after establishing harness and provider facts here.
 When the opt-in `bin/fm-dispatch-resolve.sh` is on, its `clear` answer already names the concrete axes; `docs/configuration.md` "Typed dispatch resolution" owns that contract.
 
-`../secondmate-provisioning/SKILL.md` owns inherited local material.
-Its harness consequence is that a secondmate's workers receive literal `config/crew-harness` and `config/crew-dispatch.json`, while the primary-only `config/secondmate-harness` is never inherited because secondmates do not spawn secondmates.
-A concrete crew value such as `codex` carries that runtime into the secondmate home.
-Unset or `default` carries no concrete value, so its workers use that home's own or detected harness rather than the primary's effective crew harness.
-The inherited dispatch file applies the same best-fit profiles there.
+[`secondmate-provisioning`](../secondmate-provisioning/SKILL.md) owns inherited harness defaults and routing configuration.
 
 ## Skill advice at intake
 
@@ -24,7 +20,7 @@ Follow [advisory skill selection](../../../docs/configuration.md#advisory-skill-
 ## Owners
 
 `../../../bin/fm-spawn.sh` owns launch, autonomy, concrete flags, task-kind compatibility, and worker turn-end wiring.
-Natural-language rules stay with firstmate; model references follow the [fleet model-index contract](../../../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
+Natural-language rules stay with firstmate; model references follow the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
 
 `../../../bin/fm-busy-lib.sh` owns semantic busy trust.
 Composer shapes, glyphs, placeholders, popups, rendered delivery signals, and the `empty` / `pending` / `pending-unproven` / `unknown` decision belong only to `../../../bin/fm-composer-lib.sh`.

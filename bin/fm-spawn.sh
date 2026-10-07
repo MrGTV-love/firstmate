@@ -2025,7 +2025,8 @@ pi_supports_tui_mode() {
   printf '%s\n' "$help" | grep -Eq -- '(^|[[:space:]])--tui-mode([[:space:]=]|$)'
 }
 
-# omp pre-launch model validation. `omp models --json` (omp 18.1.11) prints
+# omp pre-launch validation for non-index-entry literals. `omp models --json`
+# (omp 18.1.11) prints
 # {"models":[{"provider","id","selector":"<provider>/<id>",...}]} for built-in and
 # auto-discovered providers only; it never lists a provider an extension
 # registers at runtime (claude-bridge is the verified example), so the check is
@@ -2053,7 +2054,8 @@ omp_model_validate() { # <omp-bin> <model>
   return 1
 }
 
-# agy pre-launch model validation. `agy models` (agy 1.2.0) prints one model per
+# agy pre-launch validation for non-index-entry literals. `agy models`
+# (agy 1.2.0) prints one model per
 # line as "<id>\t<label>" for the account's catalog only; model ids are bare
 # (gemini-3.8-flash-high), never provider-prefixed. A requested model absent
 # from a reachable listing is concrete unsupported evidence and refuses the

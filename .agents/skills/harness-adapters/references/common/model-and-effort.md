@@ -5,7 +5,7 @@ Add `references/common/dispatch.md` for configured profile precedence.
 
 ## Axes and precedence
 
-`../../../bin/fm-spawn.sh` accepts model and effort values selected at intake, including the role references defined by the [fleet model index](../../../../../docs/configuration.md#fleet-model-index-configmodel-indexjson); scripts never parse natural-language dispatch rules.
+`../../../bin/fm-spawn.sh` accepts model and effort values selected at intake, including the role references defined by the [fleet model index](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson); scripts never parse natural-language dispatch rules.
 The tool reference records verified flags, accepted values, omission behavior, and discovery.
 
 Effort precedence is a per-task captain instruction, then applicable dispatch profile or secondmate pin, then the fallback below.
@@ -37,7 +37,7 @@ Treat model and provider knowledge as current discovery, not a permanent namespa
 Use the selected tool reference's authoritative surface in the effective worker's authenticated environment because availability changes by version, account, and configuration.
 
 For an unfamiliar namespace, establish support and provider identity from that harness's CLI help, model listing, or current documentation.
-Catalog verdicts follow the [fleet model-index evidence boundary](../../../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
+Catalog verdicts follow the [fleet model-index evidence boundary](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
 An unreachable surface establishes nothing; report uncertainty instead of a verdict.
 
 For a matched profile array, return to `quota-array-dispatch` only after establishing every candidate's harness support, provider relationship, and uncertainty.

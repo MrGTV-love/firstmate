@@ -101,10 +101,11 @@ The remaining behavior is covered only by the offline tests below: a fenced head
 ## Offline behavior
 
 `tests/fm-dispatch-resolve.test.sh` drives the public interface with a fake `curl` that records argv, the request body, the header read from file descriptor 3, and whether the secret reached its environment, plus a fake `quota-axi` that performs the same environment check.
-It proves firstmate can invoke the resolve path without a preflight, rules are snapshotted once from the isolated home's canonical `config/crew-dispatch.json`, and dynamic output fields are flattened to one line.
+It proves firstmate can invoke the resolve path without a separate caller preflight and dynamic output fields are flattened to one line.
+The [fleet model-index contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns the frozen rules/index and chosen-entry validation exercised by this regression.
 It proves the absent key (environment and `.env`) prints one stderr line, nothing on stdout, exits 0, and never invokes `curl` or `quota-axi`.
 It proves absent, default-only, and empty-rules files return `no rules to match` without a model or quota request, while a broken rules-file symlink exits 2 as unreadable.
-It proves the documented starter configuration resolves its Pi default through the declared Claude provider, a `.env` key turns the tool on, and the environment wins over it.
+It proves the documented starter configuration pair resolves its Pi default through the declared Claude provider, a `.env` key turns the tool on, and the environment wins over it.
 It proves the key is absent from child environments, never appears on `curl` argv, and arrives only as the bearer header on the descriptor.
 It proves the request uses the fixed endpoint and model, carries only the project, the privacy-filtered brief's task sections read by the shared brief-heading parser with a scout line only for a scout brief and never a ship brief's delivery mode (or the whole privacy-filtered brief when it has neither section), and rule Choice with one option per rule plus the fixed neutral none option, and never carries `why`, `use`, or quota.
 Synthetic fixtures cover the [never-send contract](../configuration.md) ("Never-send list") through outgoing-body capture and checks that withheld requests invoke neither `curl` nor `quota-axi`.

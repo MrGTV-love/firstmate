@@ -11,9 +11,10 @@
 #      inherited CLAUDECODE - tests/fm-harness-precedence.test.sh owns the
 #      general boundary.
 #   3. The launch carries the brief via --prompt-interactive with --model,
-#      --effort, and --dangerously-skip-permissions; a requested model a
-#      reachable `agy models` omits refuses loudly instead of wedging a pane,
-#      while a hung or unreachable listing is cut off and never blocks.
+#      --effort, and --dangerously-skip-permissions; a native non-index-entry
+#      literal that reachable `agy models` omits refuses loudly instead of
+#      wedging a pane, while a hung or unreachable listing never blocks.
+#      Indexed selections follow docs/configuration.md "Fleet model index".
 #   4. A fresh worktree would park agy on its folder-trust dialog, so the spawn
 #      pre-registers the worktree in agy's own trustedWorkspaces store through
 #      bin/fm-agy-trust.sh (scope-refused for anything but a linked worktree

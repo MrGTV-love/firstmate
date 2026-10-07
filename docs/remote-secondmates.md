@@ -609,11 +609,7 @@ There is no two-phase journal and no additional tasks-axi release requirement.
 
 ### Inherited-material transfer
 
-Locked startup convergence, remote launch/relaunch, and `bin/fm-config-push.sh` transfer only the declared inherited-material allowlist.
-Startup convergence and config push notify changed live routes with a marked instruction to re-read the transferred files; launch/relaunch reads them at startup.
-The primary records that remote nudge before delivery and retries it during locked startup convergence after a failed send.
-Local secondmates retain their generation-specific local pointer contract.
-Remote transfers do not copy those primary-local instruction paths.
+The [`secondmate-provisioning` inherited-material contract](../.agents/skills/secondmate-provisioning/SKILL.md#charter-and-seed) owns allowlist transfer and the reread lifecycle for startup convergence, config push, and remote launch/relaunch, including retries after a refused or unconfirmed replacement.
 
 ### Relaunch a live remote second mate
 

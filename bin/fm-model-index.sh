@@ -18,8 +18,10 @@
 # unreadable catalog, a harness without discovery, or an omp provider its
 # listing does not know (extension-registered providers are never listed)
 # passes with a notice on stderr.
-# model and profiles resolve offline and never fetch a catalog: a role
-# resolves once, profiles emits concrete JSON, model emits one id.
+# model and profiles resolve offline and never fetch a catalog: model emits
+# one id; profiles <file> requires exactly one JSON object and emits concrete
+# dispatch JSON. profiles with no file validates only the index and emits
+# nothing; omit the file for dispatch absence, never pass an empty sentinel.
 # entry emits true or false for exact primary/stand-in membership, offline.
 # check-registry requires an index and exactly one readable JSON registry file.
 # It scans string values and object keys that are whole identifier tokens (no

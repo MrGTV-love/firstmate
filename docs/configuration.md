@@ -1167,9 +1167,9 @@ A retired id refuses the exact selector or its base after removing a trailing co
 Catalog aliases whose resolved underlying id is retired are also refused.
 Retired ids are historical prohibitions, not active entries that must remain in a vendor catalog.
 
-A dispatch profile names either `role` or a literal `model`, never both.
+A dispatch profile may select a model with either `role` or a literal `model`, never both; omitting both retains the harness default.
 Name the role, never the id, so the next model release is one index edit; with an index present, a literal `model` in a profile or in `fm-spawn.sh --model` that is not an index entry for its harness still works but draws a warning.
-An optional boolean `stand_in: true` selects that harness's explicitly configured stand-in for the role.
+For a role-based profile, an optional boolean `stand_in: true` selects that harness's explicitly configured stand-in for the role.
 Stand-ins never become automatic catalog-failure or quota fallbacks.
 The existing profile-array quota decision remains responsible for choosing among concrete candidates.
 An unknown role, absent harness mapping, missing requested stand-in, malformed index, or retired id refuses resolution.
@@ -1192,7 +1192,7 @@ A relaunch runs the selected-entry catalog check under the replacement's worker 
 Spawn checks only the selected index entry, after worker-account selection, using a declared worker account pin or an authoritative catalog export.
 Only an exact primary or stand-in entry for the selected harness delegates spawn's native model validation to this check; unrelated index entries do not disable the existing validation of literal selectors.
 Spawn, intake, and relaunch checks report unavailable catalog evidence when the destination worker's account and environment cannot be established, including unpinned launches, ordinary Claude's destination-dependent home, and wrapped or raw launch commands; the supervisor's live catalog does not stand in for the worker's.
-Resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and the selected-entry checks at intake and spawn do.
+Offline model/profile resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and selected-entry checks at intake, spawn, and relaunch may fetch them under the evidence contract below.
 The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.
 
 The command's header and `--help` own discovery commands and the authoritative-export interface.
