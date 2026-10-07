@@ -10,6 +10,8 @@
 # hook's launch is healthy.
 # The project and FM_HOME are isolated; Claude keeps using its existing managed
 # authentication. No live fleet home, worktree, or session is touched.
+# Print launches close unused stdin and keep JSON stdout separate from stderr;
+# cleanup reports captured diagnostics on success or failure before removal.
 # shellcheck disable=SC2016 # the model, not this test shell, reads the prompt text
 set -u
 
@@ -50,6 +52,12 @@ LIVE_OWNER_HOME="$LAB/live-owner-home"
 TRANSCRIPT="$LAB/claude.jsonl"
 
 cleanup() {
+  local diagnostic
+  for diagnostic in "$LAB"/*.stderr; do
+    [ -s "$diagnostic" ] || continue
+    printf 'native Claude diagnostics: %s\n' "$diagnostic" >&2
+    cat "$diagnostic" >&2
+  done
   if [ -s "$LAB/opener.log" ]; then
     cat "$LAB/opener.log"
   fi
@@ -97,7 +105,7 @@ POST_PROMPT='This is a bounded hook-integration experiment, not project work. Fi
   FM_HOME="$POST_HOME" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
     "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
-) > "$POST_TRANSCRIPT" 2>&1 || fail "Claude PostToolUse experiment failed"
+) </dev/null > "$POST_TRANSCRIPT" 2> "$LAB/posttool.stderr" || fail "Claude PostToolUse experiment failed"
 [ -f "$POST_HOME/state/procevent-inbox/lavish-midturn.1.handled" ] \
   || fail "real Claude never handled the mid-turn review notice"
 ! tool_result_text "$POST_TRANSCRIPT" | grep -qx 'NO_FEEDBACK_NOTICE' \
@@ -120,7 +128,7 @@ POST_UNPUBLISHED="$LAB/posttool-unpublished.jsonl"
     env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
     "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
-) > "$POST_UNPUBLISHED" 2>&1 || fail "Claude unpublished-capture experiment failed"
+) </dev/null > "$POST_UNPUBLISHED" 2> "$LAB/posttool-unpublished.stderr" || fail "Claude unpublished-capture experiment failed"
 [ -f "$POST_PROJECT/state/procevent-inbox/lavish-unpublished.2.handled" ] \
   || fail "Claude drained an empty queue but did not recover and handle the unpublished answer"
 unpublished_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
@@ -136,7 +144,7 @@ POST_NEGATIVE="$LAB/posttool-handled.jsonl"
     env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
     "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
-) > "$POST_NEGATIVE" 2>&1 || fail "Claude handled-review counterfactual failed"
+) </dev/null > "$POST_NEGATIVE" 2> "$LAB/posttool-handled.stderr" || fail "Claude handled-review counterfactual failed"
 negative_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
   | select(.type == "tool_use") | .input.command // empty' "$POST_NEGATIVE")
 tool_result_text "$POST_NEGATIVE" | grep -qx 'NO_FEEDBACK_NOTICE' \
@@ -229,7 +237,7 @@ PROMPT='After reading the complete session-start digest, reply with exactly CYCL
   FM_HOME="$HOME_DIR" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
     "$PROJECT/bin/fm-teamclaude-launch.sh" -p "$PROMPT" --dangerously-skip-permissions --setting-sources project,local \
     --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
-) > "$TRANSCRIPT" 2>&1 || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
+) </dev/null > "$TRANSCRIPT" 2> "$LAB/claude.stderr" || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
 
 ARM_RUNS=$(wc -l < "$HOME_DIR/state/arm-ran" 2>/dev/null | tr -d ' ')
 [ "$ARM_RUNS" = 2 ] || fail "expected exactly 2 hook-owned arm cycles, got $ARM_RUNS: $(cat "$HOME_DIR/state/arm-ran"); drains=$(cat "$HOME_DIR/state/drain-count" 2>/dev/null); calls=$(cat "$HOME_DIR/state/tool-calls.log" 2>/dev/null)"

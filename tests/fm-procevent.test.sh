@@ -237,11 +237,85 @@ EP_SOURCE="$HEP/state/procevent/episode-src.source"
 cp "$EP_SOURCE" "$TMP_ROOT/episode-good.source"
 awk '/^argv:$/ { print; exit } { print }' "$EP_SOURCE" > "$TMP_ROOT/episode-bad.source" \
   || fail "could not prepare the damaged episode registration"
-ep_damage() { cat "$TMP_ROOT/episode-bad.source" > "$EP_SOURCE"; }
-ep_repair() { cat "$TMP_ROOT/episode-good.source" > "$EP_SOURCE"; }
+ep_damage() { EP_DAMAGED=1; cat "$TMP_ROOT/episode-bad.source" > "$EP_SOURCE"; }
+ep_repair() { EP_DAMAGED=0; cat "$TMP_ROOT/episode-good.source" > "$EP_SOURCE"; }
+# Definitive failure assertions need the detached damaged runner to finish and
+# release its lock, not a longer confirmation window or another reconcile.
+# Its per-launch EXIT marker also precedes gates that let a case repair or
+# replace the registration while finalization is paused.
+EP_HOOK="$TMP_ROOT/episode-hooks.sh"
+cat > "$EP_HOOK" <<'SH'
+ep_failed_start_done() { printf 'done\n' > "$EP_START_DONE"; }
+ep_wait_start_done() {
+  [ -n "${EP_START_DONE:-}" ] || return 0
+  local n
+  for n in $(seq 1 1000); do
+    [ ! -s "$EP_START_DONE" ] || return 0
+    sleep 0.02
+  done
+  printf 'damaged episode runner did not finish: %s\n' "$EP_START_DONE" >&2
+  return 1
+}
+ep_gate_wait() {
+  local gate=$1 n
+  printf 'ready\n' > "$gate.ready"
+  for n in $(seq 1 1000); do
+    [ ! -e "$gate.release" ] || return 0
+    sleep 0.02
+  done
+  return 1
+}
+ep_install_hooks() {
+  local definition
+  definition=$(declare -f confirm_launched_runners)
+  eval "${definition/confirm_launched_runners/ep_original_confirm}"
+  confirm_launched_runners() {
+    local result rc=0
+    if [ -n "${EP_CONFIRM_GATE:-}" ]; then
+      ep_wait_start_done || return 1
+      ep_gate_wait "$EP_CONFIRM_GATE" || return 1
+    fi
+    result=$(ep_original_confirm "$@") || rc=$?
+    ep_wait_start_done || return 1
+    if [ -n "${EP_GATE:-}" ]; then
+      ep_gate_wait "$EP_GATE" || return 1
+    fi
+    [ -z "$result" ] || printf '%s\n' "$result"
+    return "$rc"
+  }
+  if [ -n "${EP_APPEND_GATE:-}" ]; then
+    definition=$(declare -f fm_wake_append)
+    eval "${definition/fm_wake_append/ep_original_append}"
+    fm_wake_append() {
+      case "$2" in
+        procevent:*:launch-failed:*)
+          ep_gate_wait "$EP_APPEND_GATE" || return 1
+          [ "${EP_FAIL_APPEND:-0}" -ne 1 ] || return 1
+          ;;
+      esac
+      ep_original_append "$@"
+    }
+  fi
+}
+trap 'case "$BASH_COMMAND" in
+  '\''cmd_reconcile "$@"'\'') trap - DEBUG; ep_install_hooks ;;
+  '\''cmd_start "$@"'\'')
+    trap - DEBUG
+    [ -z "${EP_START_DONE:-}" ] || trap ep_failed_start_done EXIT
+    ;;
+esac' DEBUG
+SH
+ep_reconcile_attempt=0
 ep_reconcile() {  # <expected-fragment> <expected-exit-nonzero:0|1> <msg>; sets ep_out
-  local rc=0
-  ep_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
+  local rc=0 completion=
+  ep_reconcile_attempt=$((ep_reconcile_attempt + 1))
+  if [ "${EP_DAMAGED:-0}" -eq 1 ]; then
+    completion="$TMP_ROOT/episode-reconcile-$ep_reconcile_attempt.done"
+  fi
+  ep_out=$(EP_START_DONE="$completion" BASH_ENV="$EP_HOOK" \
+    FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
+  [ -z "$completion" ] || [ -s "$completion" ] \
+    || fail "damaged episode runner did not finish: $ep_out"
   assert_contains "$ep_out" "$1" "$3: $ep_out"
   if [ "$2" -eq 1 ]; then
     [ "$rc" -ne 0 ] || fail "$3 (reconcile exited 0): $ep_out"
@@ -292,47 +366,6 @@ esac
 ep_repair
 pe "$HEP" retire episode-src >/dev/null 2>&1 || true
 pass "a launch that cannot confirm is announced once per failure episode"
-EP_HOOK="$TMP_ROOT/episode-hooks.sh"
-cat > "$EP_HOOK" <<'SH'
-ep_gate_wait() {
-  local gate=$1 n
-  printf 'ready\n' > "$gate.ready"
-  for n in $(seq 1 1000); do
-    [ ! -e "$gate.release" ] || return 0
-    sleep 0.02
-  done
-  return 1
-}
-ep_install_hooks() {
-  local definition
-  definition=$(declare -f confirm_launched_runners)
-  eval "${definition/confirm_launched_runners/ep_original_confirm}"
-  confirm_launched_runners() {
-    local result rc=0
-    if [ -n "${EP_CONFIRM_GATE:-}" ]; then
-      ep_gate_wait "$EP_CONFIRM_GATE" || return 1
-    fi
-    result=$(ep_original_confirm "$@") || rc=$?
-    ep_gate_wait "$EP_GATE" || return 1
-    [ -z "$result" ] || printf '%s\n' "$result"
-    return "$rc"
-  }
-  if [ -n "${EP_APPEND_GATE:-}" ]; then
-    definition=$(declare -f fm_wake_append)
-    eval "${definition/fm_wake_append/ep_original_append}"
-    fm_wake_append() {
-      case "$2" in
-        procevent:*:launch-failed:*)
-          ep_gate_wait "$EP_APPEND_GATE" || return 1
-          [ "${EP_FAIL_APPEND:-0}" -ne 1 ] || return 1
-          ;;
-      esac
-      ep_original_append "$@"
-    }
-  fi
-}
-trap 'case "$BASH_COMMAND" in '\''cmd_reconcile "$@"'\'') trap - DEBUG; ep_install_hooks ;; esac' DEBUG
-SH
 ep_new() {
   HEP="$TMP_ROOT/episode-$1"; new_home "$HEP"
   pe_register "$HEP" lavish episode-src -- "$EP_SOURCE_CMD" >/dev/null
@@ -341,9 +374,13 @@ ep_new() {
   awk '/^argv:$/ { print; exit } { print }' "$EP_SOURCE" > "$TMP_ROOT/episode-bad.source"
 }
 ep_pause() {
+  local completion=
   ep_gate="$TMP_ROOT/$1"
+  if [ "${EP_DAMAGED:-0}" -eq 1 ]; then
+    completion="$ep_gate.start-done"
+  fi
   EP_GATE="$ep_gate" EP_APPEND_GATE="${2:-}" EP_FAIL_APPEND="${3:-0}" \
-    EP_CONFIRM_GATE="${EP_CONFIRM_GATE:-}" \
+    EP_CONFIRM_GATE="${EP_CONFIRM_GATE:-}" EP_START_DONE="$completion" \
     BASH_ENV="$EP_HOOK" FM_HOME="$HEP" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
     "$ROOT/bin/fm-procevent.sh" reconcile > "$ep_gate.out" 2>&1 &
   ep_pid=$!
@@ -378,9 +415,12 @@ wait_for "$ep_append.ready" || fail "first failure did not reach its wake append
 [ -s "$HEP/state/procevent/.episode-src.launch-failed" ] \
   || fail "first failure did not reserve its episode before append"
 ep_lock_busy || fail "failure append did not retain the source lock"
-: > "$ep_second_gate.release"
+# Finalization is nonblocking: finish the failed append's rollback and lock
+# release before opening the second reconcile's decision barrier.
 : > "$ep_append.release"
 ep_finish "$ep_first_pid" "$ep_first_gate" 1
+[ ! -e "$HEP/state/procevent/.episode-src.launch-failed" ] \
+  || fail "failed append did not roll back its episode marker"
 ep_finish "$ep_second_pid" "$ep_second_gate" 1
 [ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
   || fail "concurrent failure rollback lost or duplicated the surviving announcement"
