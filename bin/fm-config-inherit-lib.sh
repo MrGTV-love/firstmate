@@ -621,7 +621,7 @@ fm_config_inherit_pair_valid() {
 }
 
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason= pair_stage=
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason='' pair_stage=''
   local FM_CONFIG_INHERIT_PAIR_DIR=${FM_CONFIG_INHERIT_PAIR_DIR:-}
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1

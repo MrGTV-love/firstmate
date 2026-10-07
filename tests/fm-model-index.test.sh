@@ -453,8 +453,8 @@ for boundary_mode in bootstrap launch; do
       boundary_code=0
       (
         unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
-        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
-        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        [ "$boundary_mode" != bootstrap ] || { FM_CONFIG_INHERIT_LIVE=1; export FM_CONFIG_INHERIT_LIVE; }
+        [ "$pair_selection" != staged ] || { FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"; export FM_CONFIG_INHERIT_PAIR_DIR; }
         FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_CONFIG_INHERIT_REPORT="$TMP_ROOT/coherence-local-report" \
           propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$coherence_home"
       ) > "$TMP_ROOT/coherence-local.out" 2>&1 || boundary_code=$?
@@ -477,8 +477,8 @@ for boundary_mode in bootstrap launch; do
       cp "$TMP_ROOT/incoming-dispatch.json" "$selected_pair/crew-dispatch.json"
       (
         unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
-        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
-        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        [ "$boundary_mode" != bootstrap ] || { FM_CONFIG_INHERIT_LIVE=1; export FM_CONFIG_INHERIT_LIVE; }
+        [ "$pair_selection" != staged ] || { FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"; export FM_CONFIG_INHERIT_PAIR_DIR; }
         FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" \
           propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$coherence_home"
       ) > "$TMP_ROOT/coherence-local.out" 2>&1 \
@@ -812,8 +812,8 @@ for boundary_mode in bootstrap launch; do
       boundary_code=0
       (
         unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
-        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
-        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        [ "$boundary_mode" != bootstrap ] || { FM_CONFIG_INHERIT_LIVE=1; export FM_CONFIG_INHERIT_LIVE; }
+        [ "$pair_selection" != staged ] || { FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"; export FM_CONFIG_INHERIT_PAIR_DIR; }
         FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
           FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
           "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation"
@@ -836,8 +836,8 @@ for boundary_mode in bootstrap launch; do
       cp "$TMP_ROOT/incoming-dispatch.json" "$selected_pair/crew-dispatch.json"
       (
         unset FM_CONFIG_INHERIT_LIVE FM_CONFIG_INHERIT_PAIR_DIR
-        [ "$boundary_mode" != bootstrap ] || export FM_CONFIG_INHERIT_LIVE=1
-        [ "$pair_selection" != staged ] || export FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"
+        [ "$boundary_mode" != bootstrap ] || { FM_CONFIG_INHERIT_LIVE=1; export FM_CONFIG_INHERIT_LIVE; }
+        [ "$pair_selection" != staged ] || { FM_CONFIG_INHERIT_PAIR_DIR="$COHERENCE_STAGE"; export FM_CONFIG_INHERIT_PAIR_DIR; }
         FM_HOME="$COHERENCE_SOURCE" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$COHERENCE_SOURCE/config" \
           FM_MODEL_CATALOG_DIR="$COHERENCE_CATALOGS" FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
           "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation"
