@@ -99,6 +99,8 @@ case "$LOCK_ATTEMPTS" in ''|*[!0-9]*|0) LOCK_ATTEMPTS=50 ;; esac
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 # shellcheck source=bin/fm-operational-input.sh
 . "$SCRIPT_DIR/fm-operational-input.sh"
+# shellcheck source=bin/fm-supervision-engine-lib.sh
+. "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
 
 PAYLOAD=$(cat 2>/dev/null || true)
 [ -n "$PAYLOAD" ] || exit 0
@@ -309,10 +311,16 @@ HEALTHY=0
 STAND_DOWN=0
 HOST_MODE=0
 HOST_RC=0
+HOST_REFUSAL=
+HOST_REFUSAL_WAKE=
 ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
-if [ -f "$CONFIG/supervision-host" ]; then
+park_still_ours && current_session_still_ours && [ ! -e "$STATE/.afk" ] || exit 0
+if fm_supervision_host_autoarm_enabled "$CONFIG" cursor "$STATE"; then
   HOST_MODE=1
   ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)'
+else
+  HOST_REFUSAL=$FM_SUPERVISION_HOST_REFUSAL
+  HOST_REFUSAL_WAKE=$FM_SUPERVISION_HOST_REFUSAL_WAKE
 fi
 
 # Never leave an arm child or its capture file behind, on any exit path.
@@ -352,6 +360,19 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
   # Away mode may have been entered while parked: the daemon owns triage now.
   [ -e "$STATE/.afk" ] && exit 0
 
+  if [ "$HOST_MODE" -eq 1 ] && [ -n "$ARM_OUT" ] \
+    && grep -q '^supervision-host: launch policy refused:' "$ARM_OUT" 2>/dev/null; then
+    park_still_ours && current_session_still_ours || exit 0
+    fm_supervision_host_autoarm_enabled "$CONFIG" cursor "$STATE" || true
+    HOST_REFUSAL=$(grep '^supervision-host: launch policy refused:' "$ARM_OUT" 2>/dev/null)
+    HOST_REFUSAL_WAKE=$HOST_REFUSAL
+    HOST_MODE=0
+    ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
+    attempt=$((attempt - 1))
+    rm -f "$ARM_OUT" 2>/dev/null || true
+    ARM_OUT=
+    continue
+  fi
   ACTIONABLE=0
   if [ -n "$ARM_OUT" ]; then
     grep -Eq "$ACTIONABLE_RE" "$ARM_OUT" 2>/dev/null && ACTIONABLE=1
@@ -379,6 +400,7 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
   # this home and is still beating inside the shared grace window.
   if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     HEALTHY=1
+    [ -z "$HOST_REFUSAL_WAKE" ] || ACTIONABLE=1
     break
   fi
   [ "$attempt" -lt "$ARM_ATTEMPTS" ] || break
@@ -402,6 +424,8 @@ This wake comes from automatic supervision under the away-posture record, not fr
     fi
   else
     WAKE=$(grep -E '^(signal:|stale:|check:|heartbeat)' "$ARM_OUT" 2>/dev/null | head -8)
+    [ -z "$HOST_REFUSAL_WAKE" ] || WAKE="$HOST_REFUSAL_WAKE
+$WAKE"
   fi
   emit_followup watcher "firstmate watcher wake - one supervision event needs a handling turn now.
 $WAKE
@@ -433,4 +457,6 @@ rm -f "$GUARD_ERR" 2>/dev/null || true
 [ -n "$REASON" ] || REASON='tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn'
 ARM_TAIL=
 [ -n "$ARM_OUT" ] && ARM_TAIL=$(grep -E '^watcher:' "$ARM_OUT" 2>/dev/null | head -4)
+[ -z "$HOST_REFUSAL" ] || ARM_TAIL="$HOST_REFUSAL
+$ARM_TAIL"
 emit_repair_followup "$REASON" "$ARM_TAIL" "$attempt"

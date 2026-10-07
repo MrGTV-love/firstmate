@@ -64,6 +64,10 @@ When host activation is permitted for an opted-in home, each primary's existing 
 The arm owner delivers a handed-back wake through the wake path that harness already trusts.
 The host's header owns the output contract they read.
 
+OpenCode's watch-arm coordinator owns restoration after a launch-policy refusal.
+Its `refused` readiness status, like `armed`, `wake`, and `failed`, makes the turn-end plugin defer rather than run the generic guard or emit a competing blind-turn prompt.
+The watch-arm plugin delivers the refusal separately through its actionable wake path after restoring ordinary monitoring.
+
 | Primary | Arm owner | A handed-back wake reaches main as |
 |---|---|---|
 | Claude | the Stop auto-arm, `bin/fm-claude-stop-autoarm.sh`, inside its single-flight generation | the hook's exit-2 rewake (`Stop hook feedback`) |

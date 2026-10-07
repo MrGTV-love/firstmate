@@ -114,6 +114,29 @@ EOF
   return 0
 }
 
+# shellcheck disable=SC2034
+fm_supervision_host_autoarm_enabled() {
+  local config=$1 primary=$2 state=$3 enabled problem generation
+  FM_SUPERVISION_HOST_REFUSAL=
+  FM_SUPERVISION_HOST_REFUSAL_WAKE=
+  fm_supervision_host_enabled "$config" || return 1
+  if enabled=$(fm_session_launch_policy_enabled "$config" 2>&1); then
+    [ "$enabled" = 1 ] || return 0
+    fm_supervision_host_config "$config" "$primary"
+    [ -z "$FM_SUPERVISION_ENGINE" ] || return 0
+    problem="no permitted supervision engine: $FM_SUPERVISION_ENGINE_PROBLEM"
+  else
+    problem=$enabled
+  fi
+  FM_SUPERVISION_HOST_REFUSAL="supervision-host: launch policy refused: $problem; restore ordinary primary supervision without retrying this host before configuration changes"
+  generation=$(fm_supervision_host_main_key "$state") || return 1
+  fm_session_launch_policy_refusal_notify "$state" supervision-host "$generation" \
+    "check: $FM_SUPERVISION_HOST_REFUSAL" "$problem" \
+    "$config/session-launch-policy" "$config/supervision-host" || return 1
+  [ -z "$FM_SESSION_LAUNCH_REFUSAL_WAKE" ] || FM_SUPERVISION_HOST_REFUSAL_WAKE=$FM_SUPERVISION_HOST_REFUSAL
+  return 1
+}
+
 # fm_supervision_host_attended_ready <config-dir> <primary-harness>
 # 0 when the attended host's configured engine, executable, node, jq, turn
 # bound (perl, timeout, or gtimeout), and primary's mirror writer are ready;

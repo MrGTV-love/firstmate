@@ -124,6 +124,11 @@ On a non-Pi primary, a home opted into the supervision host selects `bin/fm-supe
 An active host owns successive watcher cycles through the same arm.
 The host's successor and pass-through lifecycle is owned by [supervision-host.md](supervision-host.md#postures); the arm's recovery and acknowledgement contracts below still apply.
 
+Claude and Cursor resolve host launch admission before selecting their Stop-owned park.
+A denied host queues one refusal per main-session identity and policy/host configuration fingerprint, using the existing launch-refusal receipt, and the Stop owner parks on the ordinary watcher instead.
+Acknowledgement does not permit another notification for unchanged configuration; policy repair is reconsidered at the next Stop.
+If configuration changes between admission and host activation, Claude starts an ordinary handling successor and delivers the owned refusal without requiring the host's recovery-marker publication; Cursor switches its park to the ordinary watcher.
+
 ## Actionable wake ordering
 
 This section covers what each re-arm owner does between an actionable close and the wake reaching the model.
