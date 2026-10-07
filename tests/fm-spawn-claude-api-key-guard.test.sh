@@ -113,7 +113,7 @@ case "${1:-}" in
     [ "$server" != fresh ] || : > "$state.server"
     : > "$state.session"
     : > "$state.imports"
-    for pattern in ${FM_TEST_TMUX_UPDATE_ENVIRONMENT:-}; do
+    while IFS= read -r pattern; do
       matched=0
       while IFS= read -r name; do
         case "$name" in
@@ -121,7 +121,7 @@ case "${1:-}" in
         esac
       done < <(compgen -e)
       [ "$matched" = 1 ] || printf -- '-%s\n' "$pattern" >> "$state.imports"
-    done
+    done <<<"${FM_TEST_TMUX_UPDATE_ENVIRONMENT:-}"
     ;;
 esac
 exec "$(dirname "$0")/tmux-base" "$@"
@@ -584,7 +584,7 @@ test_fresh_tmux_auth_token_exceptions() {
 test_prospective_tmux_credentials() {
   local name pattern variant rec out status id
   for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-    for pattern in "$name" 'ANTHROPIC_*' 'ANTHROPIC_?*_*' 'ANTHROPIC_[A-Z]*'; do
+    for pattern in "$name" 'ANTHROPIC_*' 'ANTHROPIC_?*_*' 'ANTHROPIC_[A-Z]*' 'ANTHROPIC_[A-Z ]*'; do
       id="prospective-${name##*_}-${pattern//[^a-zA-Z0-9]/x}"
       rec=$(make_case "$id" claude "$id")
       read_case "$rec"

@@ -1597,7 +1597,7 @@ jq -n --argjson now "$(date +%s)" '{reports:[
 ]}' > "$OMP_USAGE_FIXTURE"
 write_response "$RESPONSE" rule_4 0.9
 reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
 assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
@@ -1612,7 +1612,7 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION"
   printf '%s=%s\n' "$selector" "$caller" > "$FM_AUTH_DESTINATION.global"
   reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector destination headroom retains Luna despite caller exhaustion"
   reset_log
   TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
@@ -1620,17 +1620,17 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   printf '%s\n' PATH > "$HOME_DIR/config/launch-env-allowlist"
   if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
   reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector follows the launch allowlist with HOME retained"
   rm "$HOME_DIR/config/launch-env-allowlist"
   printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION"
   reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed $selector suppresses caller and global auth"
   rm "$FM_AUTH_DESTINATION"
   printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
   reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "absent session $selector inherits destination global auth"
   rm "$FM_AUTH_DESTINATION.global"
   unset "$selector"
@@ -1639,24 +1639,24 @@ done
 printf '%s\n' 'OMP_PROFILE=' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
 reset_log
 TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller PI_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
-  run code out err "$BRIEF"
+  run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "explicit empty canonical profile suppresses legacy profile"
 printf '%s\n' '-OMP_PROFILE' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
 reset_log
 TYPESAFE_API_KEY=$KEY OMP_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
-  run code out err "$BRIEF"
+  run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "removed canonical profile permits destination legacy profile"
 rm "$FM_AUTH_DESTINATION"
 for scope_failure in unreadable backend relative usage empty invalid; do
   reset_log
   case "$scope_failure" in
-    unreadable) TYPESAFE_API_KEY=$KEY FM_AUTH_UNREADABLE=1 run code out err "$BRIEF" ;;
-    backend) TYPESAFE_API_KEY=$KEY FM_BACKEND=herdr run code out err "$BRIEF" ;;
+    unreadable) TYPESAFE_API_KEY=$KEY FM_AUTH_UNREADABLE=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
+    backend) TYPESAFE_API_KEY=$KEY FM_BACKEND=herdr run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
     relative) printf '%s\n' 'PI_CODING_AGENT_DIR=relative-root' > "$FM_AUTH_DESTINATION"
-      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"; rm "$FM_AUTH_DESTINATION" ;;
-    usage) TYPESAFE_API_KEY=$KEY OMP_USAGE_FAIL=1 run code out err "$BRIEF" ;;
-    empty) TYPESAFE_API_KEY=$KEY OMP_USAGE_EMPTY=1 run code out err "$BRIEF" ;;
-    invalid) TYPESAFE_API_KEY=$KEY OMP_USAGE_INVALID=1 run code out err "$BRIEF" ;;
+      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"; rm "$FM_AUTH_DESTINATION" ;;
+    usage) TYPESAFE_API_KEY=$KEY OMP_USAGE_FAIL=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
+    empty) TYPESAFE_API_KEY=$KEY OMP_USAGE_EMPTY=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
+    invalid) TYPESAFE_API_KEY=$KEY OMP_USAGE_INVALID=1 run code out err "$BRIEF" --cwd "$CATALOG_PROJECT" ;;
   esac
   assert_contains "$out" '  status: escalate' "$scope_failure OMP evidence is unknown"
   assert_not_contains "$out" '  profile:' "$scope_failure cannot authorize primary or paid stand-in"
@@ -1668,16 +1668,26 @@ reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
 assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
-for unknown_scope in absent label; do
+for unknown_scope in absent label empty; do
   reset_log
   case "$unknown_scope" in
     absent) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" ;;
     label) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --project "$CATALOG_PROJECT" ;;
+    empty) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd '' ;;
   esac
   assert_contains "$out" '  status: escalate' "$unknown_scope destination scope retains escalation despite exhausted pool"
   assert_not_contains "$out" '  profile:' "$unknown_scope destination scope cannot approve a catalog stand-in"
   assert_absent "$LOG/catalog-cwd" "$unknown_scope destination scope does not query a caller catalog"
+  assert_absent "$LOG/usage-cwd" "$unknown_scope destination scope does not query caller usage"
+  assert_contains "$out" '"status":"unknown"' "$unknown_scope destination scope leaves pool capacity unknown"
+  assert_contains "$out" 'destination OMP authentication scope is not established' "$unknown_scope destination scope is disclosed"
 done
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$TMP_ROOT/missing destination"
+expect_code 2 "$code" "invalid resolver cwd remains a configuration error"
+assert_contains "$err" '--cwd must name an existing project directory' "invalid resolver cwd names its configuration error"
+assert_absent "$LOG/usage-cwd" "invalid resolver cwd does not invoke usage"
+assert_absent "$LOG/catalog-cwd" "invalid resolver cwd does not invoke models"
 saved_cwd=$PWD
 for destination_enabled in false true; do
   if [ "$destination_enabled" = false ]; then
@@ -1738,7 +1748,7 @@ for summary_choice in rule_4 default; do
     .answers.rule.probabilities[$choice] = 0.96' "$RESPONSE" > "$TMP_ROOT/summary-response.json"
   cp "$TMP_ROOT/summary-response.json" "$RESPONSE"
   reset_log
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   expect_code 0 "$code" "exhausted pool summary resolves for $summary_choice"
   assert_contains "$out" '  status: clear' "measured capacity clears $summary_choice with an exhausted pool"
   assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$summary_choice chooses the measured Cursor candidate"
@@ -1764,7 +1774,7 @@ for gate in profile rule; do
     jq --argjson serving "$serving" '
       .reports[].metadata.meterStates.chat={allowed:$serving,limitReached:($serving|not)}
     ' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/floor-pool.json"
-    TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/floor-pool.json" QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+    TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/floor-pool.json" QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
     assert_contains "$out" '  status: escalate' "an unverifiable $gate floor gates serving=$serving pool"
     assert_not_contains "$out" '  profile:' "pool exhaustion cannot bypass the $gate floor"
   done
@@ -1812,7 +1822,7 @@ pass "omitted-model OMP Codex rule floors gate picked and runner-up rules withou
 jq '.reports[1].fetchedAt=0' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/stale-pool.json"
 mv "$TMP_ROOT/stale-pool.json" "$OMP_USAGE_FIXTURE"
 reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" '  status: escalate' "unknown pooled capacity does not authorize paid fallback"
 assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use the stand-in"
 cp "$BASE_RULES" "$RULES"

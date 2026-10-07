@@ -1248,7 +1248,7 @@ When `config/launch-env-allowlist` is active, a variable name the allowlist does
 
 On the tmux backend, creating a fresh server checks the caller credentials it will inherit; an existing server checks only the destination environment a new worker window inherits, which can differ from `fm-spawn.sh`'s own environment.
 It reads the tmux session environment of the session the worker will join, and the tmux global environment: a session entry wins, a session removal marker (`-NAME`) means unset, and otherwise the global value applies.
-Before `firstmate` exists, the effective environment also includes the caller variables imported by tmux's configured `update-environment` patterns; an absent configured variable creates a session removal marker instead of retaining its global value.
+Before `firstmate` exists, the effective environment also includes the caller variables imported by tmux's configured `update-environment` patterns; each newline-separated entry is one complete glob pattern, including any embedded spaces, and an absent matching variable creates a session removal marker instead of retaining its global value.
 The refusal names the credential's source and how to clear it.
 The same pin and allowlist exemptions apply.
 Variables that the pane shell's rc files or a direnv `.envrc` export after the window opens are not detected.
@@ -1381,8 +1381,9 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ### Pooled OMP capacity and declared stand-ins
 
-`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
-OMP's own `usage --provider openai-codex --json`, measured with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
+`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> --cwd <destination-path> [--json]` reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
+OMP's own `usage --provider openai-codex --json`, measured in an established destination working directory with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
+All shared OMP usage and model-catalog queries require a nonempty, resolvable destination directory; absent or invalid `--cwd` leaves OMP capacity unknown without probing the caller's directory or its `.env`, and classification consumes only explicitly supplied usage JSON.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 Chat and Spark consume independent windows and meter verdicts; negative shared meter flags alone cannot prove exhaustion without a current model-scoped limit, and paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify regardless of model-ID casing.
@@ -1517,8 +1518,8 @@ Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFI
 bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name> --cwd <project-path>
 ```
 
-The project name is a task label, not a filesystem scope; supply the intended destination directory when asking intake to establish fallback catalog support.
-Without that directory, catalog support remains unestablished and typed intake does not approve an OMP stand-in from the caller's project settings; fresh spawn performs selection in the acquired worker worktree.
+The project name is a task label, not a filesystem scope; supply the intended destination directory when asking intake to establish OMP usage or fallback catalog support.
+Without a resolvable destination directory, OMP pool capacity remains unknown and catalog support remains unestablished; typed intake does not approve an OMP primary or stand-in from the caller's project settings, and fresh spawn performs selection in the acquired worker worktree.
 
 **When firstmate invokes the resolver**
 

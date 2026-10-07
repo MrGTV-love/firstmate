@@ -16,6 +16,7 @@ export FM_FAKE_TMUX_HOME="$HOME"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 OMP_USAGE_FIXTURE="${0%/*}/../usage.json"
+[ ! -f "$PWD/.env" ] || . "$PWD/.env"
 OMP_AUTH_EXHAUSTED_FIXTURE="${0%/*}/../auth-exhausted.json"
 if [ -f "${0%/*}/auth-selector" ]; then
   IFS= read -r OMP_AUTH_SELECTOR < "${0%/*}/auth-selector"
@@ -118,12 +119,12 @@ write_pool() {
     ]}' > "$OMP_USAGE_FIXTURE"
 }
 write_pool 98
-out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
 assert_equals usable "$(jq -r .status <<<"$out")" "an exhausted account must not exhaust the pool"
 assert_equals 1 "$(jq -r '.accounts[0].savedResets' <<<"$out")" "saved resets remain reported rather than redeemed"
 assert_not_contains "$out" '@' "public evidence must not expose account identities"
 write_pool 0
-out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol)
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$OMP_USAGE_FIXTURE")")
 assert_equals exhausted "$(jq -r .status <<<"$out")" "a saved reset is not current headroom"
 jq '.accountsWithoutUsage=[{provider:"openai-codex"}]' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/missing.json"
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/missing.json")")
@@ -156,9 +157,9 @@ for chat in 0 80; do
   if [ "$chat" = 0 ]; then spark=80; chat_status=exhausted; spark_status=usable
   else spark=0; chat_status=usable; spark_status=exhausted; fi
   write_model_pool "$chat" "$spark" pro
-  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
   assert_equals "$chat_status" "$(jq -r .status <<<"$out")" "chat only consumes its native primary and secondary meters"
-  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --json)
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --cwd "$TMP_ROOT" --json)
   assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "Spark uses native display-name windows rather than chat"
   jq '(.reports[].limits[]) |= del(.id)' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/scoped.json"
   out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/scoped.json")")
@@ -189,7 +190,7 @@ for tier in chat spark legacy; do
               amount:{unit:"percent",remaining:(if $current=="healthy" then 80 else 0 end)}}] end)}]}' > "$OMP_USAGE_FIXTURE"
       if [ "$tier" = spark ]; then model=gpt-5.3-codex-spark; else model=gpt-6.1-sol; fi
       case "$current" in absent) expected=unknown ;; exhausted|zero) expected=exhausted ;; *) expected=usable ;; esac
-      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --cwd "$TMP_ROOT" --json)
       assert_equals "$expected" "$(jq -r .status <<<"$out")" "$tier $negative shared flags require current scoped exhaustion with $current bounds"
       if [ "$expected" != exhausted ]; then
         selected=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 \
@@ -212,7 +213,7 @@ for model in gpt-6.1-sol GPT-6.1-SOL; do
         {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
           limits:[{scope:({modelId:$scope} + if $tier=="chat" then {tier:"chat"} else {} end),
             status:"exhausted",amount:{unit:"percent",remaining:0}}]}]}' > "$OMP_USAGE_FIXTURE"
-      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --cwd "$TMP_ROOT" --json)
       assert_equals exhausted "$(jq -r .status <<<"$out")" "$model matches explicit $tier scoped model ID $scope case-insensitively"
     done
   done
@@ -228,18 +229,18 @@ for plan in pro ' ChatGPT-Pro ' CHATGPT_PRO plus business team enterprise edu ed
   esac
   write_model_pool 80 80 "$plan"
   for model in gpt-5.6 gpt-5.6-sol gpt-5.6-sol-pro gpt-5.6-luna gpt-5.6-luna-pro GPT-5.6 GPT-5.6-SOL GPT-5.6-SOL-PRO GPT-5.6-LUNA GPT-5.6-LUNA-PRO; do
-    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --cwd "$TMP_ROOT" --json)
     assert_equals "$paid_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for $model"
     if [ "$paid_status" = exhausted ]; then
       assert_equals ineligible "$(jq -r '.accounts[0].status' <<<"$out")" "a known free account is excluded rather than unmeasured"
     fi
   done
   for model in gpt-5.3-codex-spark GPT-5.3-CODEX-SPARK; do
-    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --cwd "$TMP_ROOT" --json)
     assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for Pro-only $model"
   done
   for model in gpt-6.1-sol gpt-5.6-terra gpt-5.6-sol-fast; do
-    out=$(fm_omp_codex_capacity "openai-codex/$model")
+    out=$(fm_omp_codex_capacity "openai-codex/$model" "$(cat "$OMP_USAGE_FIXTURE")")
     assert_equals usable "$(jq -r .status <<<"$out")" "$model must not inherit an unlisted plan requirement"
   done
 done
@@ -277,7 +278,7 @@ for tier in chat spark; do
               amount:{unit:"percent",remaining:(if $current=="positive" then 80 else 0 end)}}] end)}]}' > "$OMP_USAGE_FIXTURE"
     if [ "$tier" = spark ]; then model=gpt-5.3-codex-spark; else model=gpt-6.1-sol; fi
     if [ "$current" = exhausted ] || [ "$current" = zero ]; then expected=exhausted; else expected=unknown; fi
-    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --cwd "$TMP_ROOT" --json)
     assert_equals "$expected" "$(jq -r .status <<<"$out")" "$tier expired exhaustion with $current current bound must not invent renewed capacity"
     if [ "$current" = absent ]; then
       assert_equals null "$(jq -r '.accounts[0].remaining' <<<"$out")" "obsolete exhaustion is removed from remaining evidence"
@@ -307,9 +308,9 @@ for source in ratelimit-headers usage-endpoint; do
           {id:"openai-codex:spark:primary",scope:{tier:"spark"},status:"exhausted",
             window:{resetsAt:(($at-1)*1000)},amount:{unit:"percent",remaining:0}}]}]}' > "$OMP_USAGE_FIXTURE"
     if [ "$current" = exhausted ]; then expected=exhausted; else expected=usable; fi
-    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
     assert_equals "$expected" "$(jq -r .status <<<"$out")" "merged $source chat $current supersedes retained meter verdicts"
-    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --json)
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-5.3-codex-spark --cwd "$TMP_ROOT" --json)
     assert_equals unknown "$(jq -r .status <<<"$out")" "chat ingestion cannot re-date retained Spark exhaustion"
     assert_equals null "$(jq -r '.accounts[0].remaining' <<<"$out")" "retained Spark limits have no current measurement provenance"
   done
@@ -458,12 +459,61 @@ write_pool 0
 export OMP_AUTH_EXHAUSTED_FIXTURE="$TMP_ROOT/auth-exhausted.json"
 cp "$OMP_USAGE_FIXTURE" "$OMP_AUTH_EXHAUSTED_FIXTURE"
 write_pool 98
+mkdir -p "$TMP_ROOT/caller pool" "$TMP_ROOT/destination pool"
+printf 'OMP_PROFILE\n' > "$FAKEBIN/auth-selector"
+printf 'exhausted-profile\n' > "$FAKEBIN/auth-value"
+(
+  cd "$TMP_ROOT/caller pool" || exit 1
+  for destination_status in usable exhausted; do
+    if [ "$destination_status" = usable ]; then
+      printf 'OMP_PROFILE=exhausted-profile\n' > .env
+      printf 'OMP_PROFILE=usable-profile\n' > "$TMP_ROOT/destination pool/.env"
+    else
+      printf 'OMP_PROFILE=usable-profile\n' > .env
+      printf 'OMP_PROFILE=exhausted-profile\n' > "$TMP_ROOT/destination pool/.env"
+    fi
+    rm -f "$TMP_ROOT/usage-process-cwd" "$TMP_ROOT/catalog-process-cwd"
+    out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "classification without explicit usage stays unknown"
+    [ ! -e "$TMP_ROOT/usage-process-cwd" ] || fail "classification must never acquire caller usage"
+    for destination_cwd in '' "$TMP_ROOT/missing destination"; do
+      out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$destination_cwd")
+      assert_equals unknown "$(jq -r .status <<<"$out")" "unestablished destination cwd never measures either project pool"
+      assert_contains "$out" 'destination OMP authentication scope is not established' "unknown scope is disclosed"
+      for operation in usage models; do
+        rc=0
+        fm_dispatch_omp_query "$TMP_ROOT/config" '' "$destination_cwd" omp "$operation" --json > "$TMP_ROOT/result" || rc=$?
+        assert_equals 125 "$rc" "$operation query rejects empty or invalid destination cwd"
+        rc=0
+        (fm_dispatch_omp_query_scoped "$TMP_ROOT/config" '' tmux "$destination_cwd" "$FAKEBIN/omp" "$operation" --json) > "$TMP_ROOT/result" || rc=$?
+        assert_equals 125 "$rc" "shared scoped $operation query rejects empty or invalid destination cwd"
+      done
+      [ ! -e "$TMP_ROOT/usage-process-cwd" ] || fail "unknown destination must not invoke usage in caller cwd"
+      [ ! -e "$TMP_ROOT/catalog-process-cwd" ] || fail "unknown destination must not invoke models in caller cwd"
+    done
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "public capacity without cwd remains unknown"
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT/missing destination" --json)
+    assert_equals unknown "$(jq -r .status <<<"$out")" "public capacity with invalid cwd remains unknown"
+    [ ! -e "$TMP_ROOT/usage-process-cwd" ] || fail "public unscoped inspection must not invoke caller usage"
+    out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+    assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "unscoped selection retains unknown primary capacity"
+    assert_equals false "$(jq -r .switched <<<"$out")" "caller pool exhaustion cannot authorize unscoped fallback"
+    [ ! -e "$TMP_ROOT/usage-process-cwd" ] || fail "unscoped selection must not probe caller usage"
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT/destination pool/." --json)
+    assert_equals "$destination_status" "$(jq -r .status <<<"$out")" "destination .env selects its own pool despite opposite caller .env"
+    destination=$(cd "$TMP_ROOT/destination pool" && pwd -P)
+    assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "scoped public usage executes in normalized destination cwd"
+  done
+) || fail "OMP usage scope must never borrow caller project pool"
+rm "$FAKEBIN/auth-selector" "$FAKEBIN/auth-value"
+pass "all OMP queries require destination cwd and classification never acquires usage"
 for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME OMP_AUTH_BROKER_URL OMP_AUTH_BROKER_TOKEN; do
   export OMP_AUTH_SELECTOR="$selector" OMP_AUTH_EXHAUSTED_VALUE="$TMP_ROOT/exhausted-scope"
   case "$selector" in OMP_PROFILE|PI_PROFILE) export OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile ;; esac
   printf '%s\n' "$OMP_AUTH_SELECTOR" > "$FAKEBIN/auth-selector"
   printf '%s\n' "$OMP_AUTH_EXHAUSTED_VALUE" > "$FAKEBIN/auth-value"
-  out=$(env "$selector=$OMP_AUTH_EXHAUSTED_VALUE" "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  out=$(env "$selector=$OMP_AUTH_EXHAUSTED_VALUE" "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
   assert_equals usable "$(jq -r .status <<<"$out")" "caller-only $selector must not select the worker's authentication"
   printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-global-env"
   out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT")
@@ -473,17 +523,17 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   assert_equals false "$(jq -r .switched <<<"$out")" "session removal must override global $selector"
   printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-session-env"
   printf '# filtered selectors\n' > "$TMP_ROOT/config/launch-env-allowlist"
-  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT")
   if [ "$selector" = HOME ]; then expected=exhausted; else expected=usable; fi
   assert_equals "$expected" "$(jq -r .status <<<"$out")" "$selector must follow launch filtering and the HOME floor"
   printf '%s\n' "$selector" > "$TMP_ROOT/config/launch-env-allowlist"
-  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+  out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT")
   assert_equals exhausted "$(jq -r .status <<<"$out")" "retained destination $selector must measure its own pool"
   rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
 printf 'PI_CODING_AGENT_DIR\n' > "$FAKEBIN/auth-selector"
 printf '%s\n' "$TMP_ROOT/exhausted-scope" > "$FAKEBIN/auth-value"
-for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]*'; do
+for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]*' 'PI_[A-Z ]*'; do
   for direction in imported-exhausted imported-usable removed empty; do
     case "$direction" in
       imported-exhausted)
@@ -500,7 +550,7 @@ for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]
     out=$(unset PI_CODING_AGENT_DIR
       [ "$direction" = removed ] || export PI_CODING_AGENT_DIR="$caller_store"
       FM_TEST_TMUX_SERVER=existing-no-firstmate FM_TEST_TMUX_UPDATE_ENVIRONMENT="$pattern" \
-        "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+        "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
     assert_equals "$expected" "$(jq -r .status <<<"$out")" "prospective $pattern $direction must measure the effective store rather than the global store"
     # This separate command substitution deliberately recreates the caller environment.
     # shellcheck disable=SC2031
@@ -513,12 +563,12 @@ for pattern in PI_CODING_AGENT_DIR 'PI_CODING_*' 'PI_?ODING_AGENT_DIR' 'PI_[A-Z]
 done
 out=$(PI_CODING_AGENT_DIR="$TMP_ROOT/usable-scope" \
   FM_TEST_TMUX_UPDATE_ENVIRONMENT=PI_CODING_AGENT_DIR \
-  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
 assert_equals exhausted "$(jq -r .status <<<"$out")" "existing firstmate must retain its global exhausted store despite update-environment"
 printf 'PI_CODING_AGENT_DIR=%s\n' "$TMP_ROOT/usable-scope" > "$TMP_ROOT/tmux-global-env"
 out=$(PI_CODING_AGENT_DIR="$TMP_ROOT/exhausted-scope" \
   FM_TEST_TMUX_UPDATE_ENVIRONMENT=PI_CODING_AGENT_DIR \
-  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
 assert_equals usable "$(jq -r .status <<<"$out")" "existing firstmate must not import the caller's exhausted store"
 rm "$TMP_ROOT/tmux-global-env"
 pass "prospective OMP capacity resolves imported, absent, and empty stores before fallback while existing sessions stay isolated"
@@ -527,19 +577,19 @@ printf '%s\n' "$OMP_AUTH_SELECTOR" > "$FAKEBIN/auth-selector"
 printf '%s\n' "$OMP_AUTH_EXHAUSTED_VALUE" > "$FAKEBIN/auth-value"
 printf 'PI_PROFILE=exhausted-profile\n' > "$TMP_ROOT/tmux-global-env"
 printf 'OMP_PROFILE=\n' > "$TMP_ROOT/tmux-session-env"
-out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT")
 assert_equals usable "$(jq -r .status <<<"$out")" "explicit empty OMP_PROFILE must override the legacy PI_PROFILE"
 printf -- '-OMP_PROFILE\n' > "$TMP_ROOT/tmux-session-env"
-out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
+out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT")
 assert_equals exhausted "$(jq -r .status <<<"$out")" "removed OMP_PROFILE must allow destination PI_PROFILE selection"
 rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env"
 unset OMP_AUTH_SELECTOR OMP_AUTH_EXHAUSTED_VALUE OMP_AUTH_EXHAUSTED_FIXTURE
 rm "$FAKEBIN/auth-selector" "$FAKEBIN/auth-value"
 for scope in adopted unreadable daemon; do
   case "$scope" in
-    adopted) out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" recorded:fm-existing.0) ;;
-    unreadable) out=$(FM_FAKE_TMUX_UNREADABLE=1 fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config") ;;
-    daemon) out=$(BACKEND=herdr fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config") ;;
+    adopted) out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" recorded:fm-existing.0 "$TMP_ROOT") ;;
+    unreadable) out=$(FM_FAKE_TMUX_UNREADABLE=1 fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT") ;;
+    daemon) out=$(BACKEND=herdr fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" '' "$TMP_ROOT") ;;
   esac
   assert_equals unknown "$(jq -r .status <<<"$out")" "$scope authentication must not borrow caller capacity"
   assert_contains "$(jq -r .reason <<<"$out")" 'authentication scope' "unknown capacity must disclose its binding limitation"
@@ -609,10 +659,10 @@ printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
   assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "disabled catalog must be queried in the destination"
   assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "disabled destination must still scope primary usage"
   rm "$TMP_ROOT/catalog-process-cwd"
-  if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" \
-    > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
-    fail "missing explicit project cwd must not approve a fallback from caller catalog"
-  fi
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed") ||
+    fail "missing explicit project cwd must retain unknown primary capacity"
+  assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "missing project cwd leaves usage unknown"
+  assert_equals false "$(jq -r .switched <<<"$out")" "missing project cwd never approves caller fallback"
   resolved=$(type -P omp)
   if fm_dispatch_omp_query "$TMP_ROOT/config" '' '' "$resolved" models --json \
     > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -632,10 +682,10 @@ pass "OMP fallback approval uses explicit destination project configuration"
   printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
   printf 'OPENROUTER_API_KEY\n' > "$TMP_ROOT/config/launch-env-allowlist"
   write_pool 98
-  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
   assert_equals usable "$(jq -r .status <<<"$out")" "relative PATH executables must measure healthy pooled capacity"
   write_pool 0
-  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
+  out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --cwd "$TMP_ROOT" --json)
   assert_equals exhausted "$(jq -r .status <<<"$out")" "relative PATH executables must measure whole-pool exhaustion"
   resolved="$(cd "$(dirname "$(type -P omp)")" && pwd -P)/$(basename "$(type -P omp)")"
   catalog=$(fm_dispatch_omp_query "$TMP_ROOT/config" '' 'destination enabled' "$resolved" models --json)

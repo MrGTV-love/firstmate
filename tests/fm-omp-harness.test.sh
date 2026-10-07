@@ -122,6 +122,11 @@ test_lock_identity_and_liveness_classification() {
 make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
 #!/usr/bin/env bash
+if [ -f "${0%/*}/scope-fixtures/project-env" ] && [ -f "$PWD/.env" ]; then
+  set -a
+  . "$PWD/.env"
+  set +a
+fi
 record_scope() {
   printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
     "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" \
@@ -366,6 +371,59 @@ JSON
     done
   done
   pass "OMP fresh capacity follows destination authentication, profile precedence, and the launch allowlist rather than caller credentials"
+}
+
+test_spawn_without_fallback_uses_destination_project_capacity() {
+  local rec id scenario out status caller_profile destination_profile launch catalog_env
+  for scenario in healthy exhausted; do
+    id="omp-no-fallback-$scenario"
+    rec=$(make_spawn_case "no-fallback-$scenario" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$FAKEBIN_DIR/scope-fixtures" "$CASE_DIR/caller"
+    : > "$FAKEBIN_DIR/scope-fixtures/project-env"
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' \
+      > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
+    jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
+      "$FAKEBIN_DIR/scope-fixtures/exhausted.json" > "$FAKEBIN_DIR/scope-fixtures/healthy.json"
+    destination_profile=$scenario
+    caller_profile=exhausted
+    [ "$scenario" != exhausted ] || caller_profile=healthy
+    printf 'OMP_PROFILE=%s\n' "$caller_profile" > "$CASE_DIR/caller/.env"
+    printf '.env\n' >> "$PROJ_DIR/.git/info/exclude"
+    printf 'OMP_PROFILE=%s\n' "$destination_profile" > "$WT_DIR/.env"
+    out=$(cd "$CASE_DIR/caller" && \
+      FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR= FM_FAKE_TMUX_ENV_OMP_PROFILE=- FM_FAKE_TMUX_ENV_PI_PROFILE=- \
+      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
+    status=$?
+    if [ "$scenario" = exhausted ]; then
+      expect_code 1 "$status" "exhausted destination must refuse despite healthy caller: $out"
+    else
+      expect_code 0 "$status" "healthy destination must launch despite exhausted caller: $out"
+    fi
+    assert_grep "OMP_PROFILE=$destination_profile" "$FAKEBIN_DIR/usage.env" "no-fallback capacity must load destination .env, not caller .env"
+    assert_grep "process=$(cd "$WT_DIR" && pwd -P)" "$FAKEBIN_DIR/usage.cwd" "no-fallback capacity must run in the established worktree"
+    if [ "$scenario" = exhausted ]; then
+      assert_contains "$out" 'no supported permitted fallback' "no-fallback exhaustion must remain a refusal"
+      assert_absent "$HOME_DIR/state/$id.meta" "no-fallback exhaustion must publish no worker record"
+      assert_equals '' "$(cat "$LAUNCH_LOG")" "no-fallback exhaustion must send no worker launch"
+      continue
+    fi
+    assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "no-fallback healthy destination must retain the chosen route"
+    launch=$(cat "$LAUNCH_LOG")
+    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" \
+      -u PI_CONFIG_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME \
+      -u OMP_PROFILE -u PI_PROFILE -u OPENROUTER_API_KEY -u CUSTOM_MODEL_TOKEN \
+      HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR= \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "no-fallback generated OMP command could not be consumed"
+    cmp -s "$FAKEBIN_DIR/usage.env" "$FAKEBIN_DIR/worker.env" || fail "no-fallback usage authentication differs from executed worker"
+    cmp -s "$FAKEBIN_DIR/usage.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "no-fallback usage project scope differs from executed worker"
+    for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
+      cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "no-fallback catalog authentication differs from executed worker"
+      cmp -s "${catalog_env%.env}.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "no-fallback catalog project scope differs from executed worker"
+    done
+  done
+  pass "OMP without a fallback measures destination project capacity rather than caller .env"
 }
 
 test_spawn_catalog_matches_destination_provider_auth() {
@@ -1652,6 +1710,7 @@ test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_catalog_matches_destination_provider_auth
 test_spawn_capacity_matches_destination_auth_and_allowlist
+test_spawn_without_fallback_uses_destination_project_capacity
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

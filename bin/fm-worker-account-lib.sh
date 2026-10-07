@@ -364,7 +364,7 @@ fm_worker_account_tmux_env() {
           fi
           ;;
       esac
-    done <<<"${updates// /$'\n'}"
+    done <<<"$updates"
   fi
   if [ -z "$scope" ]; then
     if [ -n "$session" ] && entry=$(tmux show-environment -t "$session" "$name" 2>/dev/null); then

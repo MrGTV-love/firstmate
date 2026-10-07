@@ -3032,7 +3032,7 @@ effort_flag_for_harness() {
 }
 
 SPAWN_PREFLIGHT_DEFERRED=0
-if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ] && [ "$DISPATCH_FALLBACK" != '[]' ]; then
+if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ] && { { [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]]; } || [ "$DISPATCH_FALLBACK" != '[]' ]; }; then
   SPAWN_PREFLIGHT_DEFERRED=1
 else
   spawn_profile_preflight

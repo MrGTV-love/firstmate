@@ -3,9 +3,9 @@
 # Sourced by routing, spawn, and recovery; docs/configuration.md owns the matrix
 # schema. Never reads stored tokens, changes account pins, redeems saved resets, or
 # ranks accounts by a fabricated spendPriority. OMP owns credential rotation.
-# fm_dispatch_omp_query <config-dir> <tmux-session|empty> <cwd|empty> <executable> <args...>
+# fm_dispatch_omp_query <config-dir> <tmux-session|empty> <cwd> <executable> <args...>
 # prints destination-scoped OMP output; unestablished scope exits 125.
-# fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
+# fm_omp_codex_capacity <model> <usage-json> prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> [config-dir] [tmux-session] [cwd] prints evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
 # prints {rule, fallback}; without a rule, identical matching lists are safe,
@@ -29,6 +29,8 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fm_dispatch_omp_query_scoped() {
   local config=$1 session=$2 backend=$3 cwd=$4 executable=$5
   shift 5
+  [ -n "$cwd" ] || return 125
+  cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
   local destination_env name names='' present entry value
   local assignments=() discovered=()
   case "$session" in *:*) return 125 ;; esac
@@ -60,18 +62,15 @@ fm_dispatch_omp_query_scoped() {
     esac
     assignments+=("$entry")
   done <<<"$destination_env"
-  [ -z "$cwd" ] || cd "$cwd" || return 125
+  cd "$cwd" || return 125
   /usr/bin/env -i "${assignments[@]+"${assignments[@]}"}" OMP_SKIP_SETUP=1 "$executable" "$@"
 }
 
 fm_dispatch_omp_query() {
   local config=$1 session=$2 cwd=$3 executable=$4 backend=${BACKEND:-} shell_bin dir
   shift 4
-  if [ -n "$cwd" ]; then
-    cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
-  elif [ "${1:-}" = models ]; then
-    return 125
-  fi
+  [ -n "$cwd" ] || return 125
+  cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
   executable=$(type -P -- "$executable" 2>/dev/null) || return 127
   [ -x "$executable" ] || return 127
   case "$executable" in
@@ -113,9 +112,6 @@ fm_dispatch_omp_usage() {
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
-  if [ -z "$usage" ]; then
-    usage=$(fm_dispatch_omp_usage)
-  fi
   now=$(date +%s)
   printf '%s\n' "$usage" | jq -sc --arg model "${model#*/}" --argjson now "$now" '
     def percent:
