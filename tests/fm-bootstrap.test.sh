@@ -44,7 +44,7 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
 make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
-  fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
+  fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi python3
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.77
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
@@ -612,6 +612,39 @@ zellij^zellij
 cmux^cmux
 ROWS
   pass "bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement"
+}
+
+test_python3_is_required_only_for_herdr() {
+  local backend case_dir fakebin bash_env out expected
+  expected="MISSING: python3 (install: brew install python3  # or the platform's package manager)"
+  for backend in herdr tmux zellij cmux orca; do
+    case_dir="$TMP_ROOT/$backend-missing-python3"
+    mkdir -p "$case_dir/home/config"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+    printf '%s\n' "$backend" > "$case_dir/home/config/backend"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    fm_fake_exit0 "$fakebin" herdr jq zellij cmux orca
+    bash_env="$case_dir/no-python3.bash"
+    cat > "$bash_env" <<'SH'
+command() {
+  if [ "${1:-}" = -v ] && [ "${2:-}" = python3 ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+python3() {
+  return 127
+}
+SH
+    out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+    if [ "$backend" = herdr ]; then
+      [ "$out" = "$expected" ] || fail "Herdr without python3 must report supported install guidance, got: $out"
+    else
+      [ -z "$out" ] || fail "backend=$backend must not require Herdr's python3 dependency, got: $out"
+    fi
+  done
+  pass "bootstrap: python3 is required for Herdr, never for an inactive backend"
 }
 
 test_herdr_install_requires_manual_action() {
@@ -1251,6 +1284,7 @@ test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux
+test_python3_is_required_only_for_herdr
 test_herdr_install_requires_manual_action
 test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration

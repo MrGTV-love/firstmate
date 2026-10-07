@@ -417,7 +417,7 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
-On macOS, the remote Herdr backend requires `python3` on both the remote runtime PATH and the Aqua launch agent PATH to read process environments and prove server ownership. Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available. Ownership remains unproven rather than being accepted from an unreadable environment.
+Every admitted Herdr runtime requires `python3` on its runtime PATH to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform. On macOS, remote Herdr also requires `python3` on the Aqua launch agent PATH to prove server ownership. Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available. Ownership remains unproven rather than being accepted from an unreadable environment.
 
 ### Backend selection order
 
@@ -452,7 +452,7 @@ The compatibility helper `fm_backend_agent_alive` continues to collapse those de
 
 ### Dependency and socket checks
 
-- A herdr spawn additionally version-gates against the installed `herdr` binary's protocol and requires `jq`, refusing loudly on an incompatible or missing installation.
+- A herdr spawn additionally version-gates against the installed `herdr` binary's protocol and requires `jq` and `python3`, refusing loudly on an incompatible or missing installation.
 
 - A zellij spawn additionally version-gates against the installed `zellij` binary's version and requires `jq`, refusing loudly when either is missing or the version is older than 0.44.
 
@@ -1551,7 +1551,7 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 | Resolved backend | Additional tools |
 | --- | --- |
 | `tmux` | `tmux`, `treehouse` |
-| `herdr` | `herdr`, `jq`, `treehouse` |
+| `herdr` | `herdr`, `jq`, `python3`, `treehouse` |
 | `zellij` | `zellij`, `jq`, `treehouse` |
 | `orca` | `orca` |
 | `cmux` | `cmux`, `jq`, `treehouse` |

@@ -2307,6 +2307,8 @@ The helper's default-session tripwire remains unchanged through cleanup.
 Both replacement agents visibly answer their instructions before the test stops them.
 
 The fixture pins `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, `FM_CONFIG_OVERRIDE`, and `FM_PROJECTS_OVERRIDE` to its private home before lifecycle calls and profile setup.
+Both native task and secondmate launches also use an owned HOME and private XDG config, data, state, and cache roots. Their omp config directory, agent directory, and profile selectors are pinned independently of inherited operator settings; the real Herdr omp integration is installed into that private profile.
+The private profile selects the native boxed composer, and the seeded session selects a built-in model with a fixture-only placeholder key, so it can render without operator settings or authentication; the preservation check never submits a model request.
 It uses an invocation-unique task identifier and exclusively reserves the task-temp and home-hashed launch namespaces; cleanup removes only successfully reserved namespaces.
 A focused live rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
 The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns the fixture's teardown-gated dependency cleanup.

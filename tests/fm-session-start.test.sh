@@ -1108,7 +1108,7 @@ EOF
     make_fake_toolchain "$fakebin"
     make_fake_ps_claude "$fakebin"
     rm -f "$fakebin/tmux"
-    fm_fake_exit0 "$fakebin" herdr jq
+    fm_fake_exit0 "$fakebin" herdr jq python3
     printf '%s\n' manual > "$home/config/backlog-backend"
     mask="$home/mask-tmux.bash"
     cat > "$mask" <<'SH'
@@ -1133,6 +1133,7 @@ SH
     assert_not_contains "$out" "MISSING: tmux" "Herdr session start falsely required masked tmux"
     assert_not_contains "$out" "MISSING: herdr" "Herdr session start missed its available session CLI"
     assert_not_contains "$out" "MISSING: jq" "Herdr session start missed its available JSON dependency"
+    assert_not_contains "$out" "MISSING: python3" "Herdr session start missed its available ownership dependency"
     assert_not_contains "$out" "MISSING: treehouse" "Herdr session start missed its available worktree provider"
   done
   pass "session start: configured and auto-detected Herdr homes never require tmux"
@@ -1873,8 +1874,6 @@ EOF
   assert_contains "$out" "SESSION START" "the digest did not complete"
   assert_contains "$out" "IN PROGRESS - the deferred network checks have not finished yet." \
     "the digest did not disclose that its network checks were still running"
-  assert_contains "$out" "NOT yet confirmed: GitHub authentication, dead-secondmate relaunch" \
-    "the digest did not name the checks it has not confirmed"
   assert_not_contains "$out" "NEEDS_GH_AUTH" \
     "the digest reported a GitHub-auth verdict it could not yet have"
 

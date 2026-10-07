@@ -67,7 +67,7 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-remote-herdr-owner-lib.sh
 . "$SCRIPT_DIR/fm-remote-herdr-owner-lib.sh"
-REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse)
+REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse python3)
 HARNESS_TOOLS=(claude codex opencode pi pi-signed grok kimi)
 OPTIONAL_TOOLS=(tmux no-mistakes gh)
 LAUNCH_AGENT_LABEL=dev.firstmate.herdr.fm-remote
@@ -451,7 +451,7 @@ report_required_tools() {
 
 report_required_tools_from_worker() {
   local job_id probe_stdout probe_stderr probe_exit line fact name value
-  local expected=6 count=0 valid=1 seen=' '
+  local expected=$((${#REQUIRED_TOOLS[@]} + 1)) count=0 valid=1 seen=' '
   if ! job_id=$(fm_remote_job_stage "${HOME:-}" "$FM_ROOT" "${FM_HOME:-}" \
     fm-remote-doctor.sh --worker-tool-probe </dev/null); then
     set_check remote-job-probe "fixable: the remote job worker could not accept the required-tool probe" \
@@ -475,7 +475,7 @@ report_required_tools_from_worker() {
     fact=${line#required }
     name=${fact%%=*}
     value=${fact#*=}
-    case "$name" in git|jq|herdr|tasks-axi|treehouse|harness) ;; *) valid=0; continue ;; esac
+    case "$name" in git|jq|herdr|tasks-axi|treehouse|python3|harness) ;; *) valid=0; continue ;; esac
     case "$seen" in *" $name "*) valid=0; continue ;; esac
     seen="$seen$name "
     count=$((count + 1))
@@ -658,18 +658,16 @@ check_launch_agent_loaded() { # <resolved-login-shell>
 }
 
 check_herdr_owner_reader() {
-  if [ "$PLATFORM" != darwin ]; then
-    record herdr-owner-reader "skip: Aqua server ownership applies only on darwin"
-  elif fm_remote_herdr_owner_reader_available; then
+  if fm_remote_herdr_owner_reader_available; then
     record herdr-owner-reader "ok: python3 resolves on the runtime PATH"
   else
     record herdr-owner-reader "human: python3 prerequisite does not resolve on the runtime PATH" \
-      "install Python 3 on that account and expose python3 on the remote runtime and launch agent PATH; server reload cannot repair a missing ownership reader"
+      "install Python 3 on that account and expose python3 on the remote runtime PATH; server reload cannot repair a missing ownership reader"
   fi
 }
 
 check_herdr_server() {
-  if [ "$PLATFORM" = darwin ] && ! check_is_ok herdr-owner-reader; then
+  if ! check_is_ok herdr-owner-reader; then
     record herdr-server "human: server ownership cannot be proven without the python3 prerequisite" \
       "close the herdr-owner-reader prerequisite gap first; the current server will not be reloaded or taken over"
     return 0
@@ -880,7 +878,7 @@ apply_fixes() { # <resolved-login-shell>
         reload_launch_agent launchagent-loaded || true
         ;;
       herdr-server)
-        [ "$PLATFORM" != darwin ] || check_is_ok herdr-owner-reader || continue
+        check_is_ok herdr-owner-reader || continue
         # On darwin the launch agent owns the server, so restart it through
         # launchd rather than starting a stray one outside the Aqua session. A
         # reload earlier in this same pass has already done that.

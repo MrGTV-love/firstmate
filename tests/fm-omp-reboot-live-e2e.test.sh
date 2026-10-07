@@ -31,9 +31,20 @@ unset HERDR_PANE_ID HERDR_SOCKET_PATH HERDR_ENV TMUX TMUX_PANE FM_SPAWN_GEN
 OWNED_SESSION=1
 mkdir -p "$FM_STATE_OVERRIDE" "$FM_DATA_OVERRIDE/$TASK_ID" "$FM_CONFIG_OVERRIDE" \
   "$FM_PROJECTS_OVERRIDE" "$TMP/fakebin"
+NATIVE_HOME="$TMP/native-home"
+mkdir -p "$NATIVE_HOME/.omp/agent" "$NATIVE_HOME/.config" \
+  "$NATIVE_HOME/.local/share/omp" "$NATIVE_HOME/.local/state/omp" "$NATIVE_HOME/.cache/omp"
+printf 'composer:\n  shape: box\n' > "$NATIVE_HOME/.omp/agent/config.yml"
+NATIVE_ENV=("HOME=$NATIVE_HOME"
+  "XDG_CONFIG_HOME=$NATIVE_HOME/.config" "XDG_DATA_HOME=$NATIVE_HOME/.local/share"
+  "XDG_STATE_HOME=$NATIVE_HOME/.local/state" "XDG_CACHE_HOME=$NATIVE_HOME/.cache"
+  PI_CONFIG_DIR=.omp "PI_CODING_AGENT_DIR=$NATIVE_HOME/.omp/agent"
+  OMP_PROFILE=default PI_PROFILE=default OMP_SKIP_SETUP=1
+  OPENAI_API_KEY=fm-non-submitting-fixture)
 META="$FM_STATE_OVERRIDE/$TASK_ID.meta"
 "$HELPER" provision "$SESSION"
 run() { PATH="$REAL_PATH" "$HELPER" run "$SESSION" "$@"; }
+env "${NATIVE_ENV[@]}" PI_CODING_AGENT_DIR= PATH="$REAL_PATH" "$HELPER" run "$SESSION" integration install omp
 printf 'manual\n' > "$FM_CONFIG_OVERRIDE/backlog-backend"
 printf 'off\n' > "$FM_CONFIG_OVERRIDE/herdr-presentation-spaces"
 fm_git_worktree "$TMP/proj" "$TMP/wt" "$TASK_ID"
@@ -103,7 +114,10 @@ with open(sys.argv[1], 'w') as f:
     f.write(json.dumps(slot, separators=(',', ':')) + '\n')
     f.write(json.dumps({'type':'session','version':3,'id':str(uuid.uuid4()),
                        'timestamp':now.isoformat(),'cwd':sys.argv[2]}) + '\n')
-    f.write(json.dumps({'type':'message','id':uuid.uuid4().hex[:8],'parentId':None,
+    model_id = uuid.uuid4().hex[:8]
+    f.write(json.dumps({'type':'model_change','id':model_id,'parentId':None,
+                       'timestamp':now.isoformat(),'model':'openai/gpt-4.1'}) + '\n')
+    f.write(json.dumps({'type':'message','id':uuid.uuid4().hex[:8],'parentId':model_id,
                        'timestamp':now.isoformat(),
                        'message':{'role':'user','content':[{
                            'type':'text','text':pathlib.Path(sys.argv[3]).read_text()}],
@@ -185,8 +199,11 @@ exercise_native_refusals() {
 }
 
 exercise_native_pane() {
-  local proof composer live environment
-  run pane send-text "$PANE" "OMP_SKIP_SETUP=1 omp --resume='$REF'"
+  local proof composer live environment launch
+  printf -v launch '%q ' env "${NATIVE_ENV[@]}" omp "--resume=$REF"
+  printf '#!/usr/bin/env bash\nexec %s\n' "$launch" > "$TMP/native-launch.sh"
+  printf -v launch '%q ' bash "$TMP/native-launch.sh"
+  run pane send-text "$PANE" "$launch"
   run pane send-keys "$PANE" Enter
   for _ in $(seq 1 60); do
     proof=$(fm_launch_proof_herdr "$META")
@@ -196,7 +213,7 @@ exercise_native_pane() {
     sleep 0.2
   done
   [ "$proof" = unmanaged ] && [ "$composer" = empty ] && [ "$live" = alive ] \
-    || fail "omp $(omp --version): bare resume did not reach a live unmanaged empty composer ($proof/$composer/$live)"
+    || fail "native omp: bare resume did not reach a live unmanaged empty composer ($proof/$composer/$live)"
   PID=$(native_pid) || fail 'native omp live PID could not be identified'
   environment=$(fm_remote_herdr_process_env "$PID") || fail 'native omp live environment could not be read'
   printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' \
@@ -204,6 +221,25 @@ exercise_native_pane() {
   if printf '%s\n' "$environment" | grep -q '^FM_SPAWN_GEN='; then
     fail 'native omp unexpectedly inherited a Firstmate spawn pin'
   fi
+  python3 - "$NATIVE_HOME" "$environment" <<'PY'
+import sys
+home = sys.argv[1]
+environment = dict(line.split("=", 1) for line in sys.argv[2].splitlines())
+expected = {
+    "HOME": home,
+    "XDG_CONFIG_HOME": home + "/.config",
+    "XDG_DATA_HOME": home + "/.local/share",
+    "XDG_STATE_HOME": home + "/.local/state",
+    "XDG_CACHE_HOME": home + "/.cache",
+    "PI_CONFIG_DIR": ".omp",
+    "PI_CODING_AGENT_DIR": home + "/.omp/agent",
+    "OMP_PROFILE": "default",
+    "PI_PROFILE": "default",
+    "OPENAI_API_KEY": "fm-non-submitting-fixture",
+}
+for key, value in expected.items():
+    assert environment.get(key) == value, (key, environment.get(key), value)
+PY
   RETAINED_GEN=$("$ROOT/bin/fm-busy-event.sh" arm "$FM_STATE_OVERRIDE" "$TASK_ID" \
     --state busy --source omp-ext --event agent_start)
   printf 'busy_gen=%s\n' "$RETAINED_GEN" >> "$META"
@@ -278,4 +314,4 @@ PRESERVED+=("$WT/.fm-secondmate-home" "$WT/AGENTS.md" "$WT/data/charter.md" "$WT
 exercise_native_pane
 printf 'Herdr lab runtime: '
 run status --json
-pass "omp $(omp --version): native task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep"
+pass "native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep"

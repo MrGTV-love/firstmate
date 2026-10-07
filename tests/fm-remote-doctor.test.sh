@@ -824,6 +824,36 @@ assert_contains "$DOCTOR_OUT" 'check herdr-server=ok:' "the started server was n
 [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "the linux path invoked launchctl"
 pass "a non-darwin host skips launch agents and starts its herdr server directly"
 
+for running in true false; do
+  new_case Linux with-herdr no-gui
+  printf '%s\n' "$running" > "$CASE_HERDR_RUNNING"
+  CASE_BASE_PATH=$NO_PYTHON_TOOLS
+  doctor
+  expect_code 1 "$DOCTOR_RC" "linux accepted a $running server without Python"
+  assert_contains "$DOCTOR_OUT" 'required python3=MISSING' "linux did not report Python as required"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite' "linux did not name the reader prerequisite"
+  assert_contains "$DOCTOR_OUT" 'check herdr-server=human:' "linux admitted a server without the ownership reader"
+  assert_not_contains "$DOCTOR_OUT" 'check herdr-server=fixable:' "linux treated missing Python as server repair"
+  doctor --fix
+  expect_code 1 "$DOCTOR_RC" "linux repair accepted a $running server without Python"
+  assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "linux repaired a server without Python"
+  [ "$(cat "$CASE_HERDR_RUNNING")" = "$running" ] || fail "linux repair changed server state without Python"
+  [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "linux missing-Python repair invoked launchctl"
+  unset CASE_BASE_PATH
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "restoring Python did not restore linux readiness"
+  assert_contains "$DOCTOR_OUT" 'required python3=' "restored Python was not reported"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=ok:' "restored linux reader was not confirmed"
+  assert_contains "$DOCTOR_OUT" 'check herdr-server=ok:' "restored linux server was not admitted"
+  if [ "$running" = false ]; then
+    assert_contains "$DOCTOR_OUT" 'fix herdr-server=applied:' "restored Python did not permit linux server startup"
+  else
+    assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "restored Python restarted a running linux server"
+  fi
+  [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "restored linux path invoked launchctl"
+done
+pass "linux requires Python before admitting or repairing running and stopped servers"
+
 # --- --fix may add only owned wrappers for version-manager tools -------------
 
 new_case Linux with-herdr no-gui
@@ -896,6 +926,8 @@ assert_contains "$DOCTOR_OUT" 'fix remote-job-worker=applied:' "--fix did not re
 assert_contains "$DOCTOR_OUT" 'check remote-job-worker=ok:' "the refreshed worker was not confirmed ready"
 assert_contains "$DOCTOR_OUT" 'check remote-job-probe=ok: the remote job worker completed the required-tool probe' \
   "doctor did not probe tools through the refreshed worker"
+assert_contains "$DOCTOR_OUT" 'required python3=' "the actual worker probe omitted its Python fact"
+assert_not_contains "$DOCTOR_OUT" 'required python3=MISSING' "the actual worker did not resolve Python"
 DOCTOR_WORKER_PID=$(cat "$CASE_HOME/.firstmate/remote-job/worker.pid")
 kill -TERM "$DOCTOR_WORKER_PID"
 for _ in $(seq 1 100); do

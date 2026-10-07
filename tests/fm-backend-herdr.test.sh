@@ -331,6 +331,35 @@ test_version_check_refuses_missing_herdr() {
   pass "fm_backend_herdr_version_check: refuses loudly when herdr is not installed"
 }
 
+test_admission_refuses_missing_python3_before_runtime_access() {
+  local entrypoint dir log resp fb out status
+  for entrypoint in fm_backend_herdr_tool_check fm_backend_herdr_version_check \
+    fm_backend_herdr_container_ensure fm_backend_herdr_projection_create_task; do
+    dir="$TMP_ROOT/$entrypoint-missing-python3"
+    mkdir -p "$dir/responses"
+    log="$dir/log"; resp="$dir/responses"; : > "$log"
+    fb=$(make_herdr_fakebin "$dir")
+    out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '
+        . "$0/bin/backends/herdr.sh"
+        command() {
+          if [ "${1:-}" = -v ] && [ "${2:-}" = python3 ]; then
+            return 1
+          fi
+          builtin command "$@"
+        }
+        python3() { return 127; }
+        "$1" /tmp firstmate fm-task
+      ' "$ROOT" "$entrypoint" 2>&1)
+    status=$?
+    expect_code 1 "$status" "$entrypoint must refuse missing python3"
+    assert_contains "$out" "'python3' is not installed" "$entrypoint did not name the missing prerequisite"
+    assert_contains "$out" "prove runtime ownership" "$entrypoint did not explain the ownership prerequisite"
+    [ ! -s "$log" ] || fail "$entrypoint accessed the Herdr runtime before refusing missing python3"
+  done
+  pass "Herdr admission: every shared gate refuses missing python3 before runtime access"
+}
+
 # --- workspace_label: per-firstmate-HOME resolution (P3, herdr-sm-spaces-k4) -
 
 test_workspace_label_primary_home_no_marker() {
@@ -5963,6 +5992,7 @@ test_wait_transition_clean_timeout_returns_1() {
 test_version_check_accepts_current_protocol
 test_version_check_refuses_old_protocol
 test_version_check_refuses_missing_herdr
+test_admission_refuses_missing_python3_before_runtime_access
 test_workspace_label_primary_home_no_marker
 test_workspace_label_secondmate_home_uses_marker_id
 test_workspace_label_secondmate_marker_trims_whitespace

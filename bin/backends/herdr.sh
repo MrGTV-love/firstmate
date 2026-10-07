@@ -56,7 +56,7 @@
 # stored pane id blindly: fm_backend_herdr_list_live. The presentation journal
 # is deliberately excluded from that path.
 #
-# Requires: herdr (CLI + socket), jq (JSON parsing). Bootstrap detects these
+# Requires: herdr (CLI + socket), jq (JSON parsing), python3 (process ownership). Bootstrap detects these
 # through fm_backend_required_tools only when herdr is the resolved backend;
 # this adapter also gates them again before spawning.
 
@@ -507,10 +507,11 @@ fm_backend_herdr_client_select() {  # <session> [force]
   return 0
 }
 
-# fm_backend_herdr_tool_check: refuse loudly if herdr or jq is missing.
+# fm_backend_herdr_tool_check: refuse loudly if herdr, jq, or python3 is missing.
 fm_backend_herdr_tool_check() {
   command -v herdr >/dev/null 2>&1 || { echo "error: backend=herdr selected but the 'herdr' CLI is not installed (https://herdr.dev) (dual-licensed AGPL-3.0-or-later/commercial)" >&2; return 1; }
   command -v jq >/dev/null 2>&1 || { echo "error: backend=herdr selected but 'jq' is not installed (required to parse herdr's JSON output)" >&2; return 1; }
+  command -v python3 >/dev/null 2>&1 || { echo "error: backend=herdr selected but 'python3' is not installed (required to read process environments and prove runtime ownership)" >&2; return 1; }
   return 0
 }
 
