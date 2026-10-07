@@ -596,10 +596,155 @@ done
 pass "foreign live recovery closes only the current registration's local episode"
 }
 
+# Public regression for the exact restart response observed in the installed CLI.
+# This fixture proves adapter continuation, not the originating transport fault.
+test_restart_connection_failure() {
+  local fixture="$TMP_ROOT/restart-connection" native home artifact id claim
+  local before after gap variant rc n
+  mkdir -p "$fixture/bin"
+  native="$fixture/bin"
+  home="$fixture/home"; new_home "$home"
+  artifact="$fixture/board.html"
+  printf '<h1>connection restart</h1>\n' > "$artifact"
+  lavish_session "$artifact"
+  cat > "$native/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+set -u
+[ "${1-}" = poll ] || exit 2
+fixture=$CONNECTION_FIXTURE
+n=$(cat "$fixture/count" 2>/dev/null || echo 0)
+n=$((n + 1))
+printf '%s\n' "$n" > "$fixture/count"
+case "${CONNECTION_MODE:-continue}" in
+  continue)
+    perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
+      'print clock_gettime(CLOCK_MONOTONIC), "\n"' > "$fixture/began-at-$n"
+    printf 'started\n' > "$fixture/started-$n"
+    while [ ! -e "$fixture/release-$n" ]; do
+      [ "$SECONDS" -lt 120 ] || exit 75
+      sleep 0.05
+    done
+    if [ "$n" -eq 1 ]; then
+      perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
+        'print clock_gettime(CLOCK_MONOTONIC), "\n"' > "$fixture/failed-at"
+    else
+      printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer %s\n' "$((n - 1))"
+      exit 0
+    fi
+    ;;
+  whitespace)
+    printf 'error: Lavish Editor server connection failed \ncode: SERVER_ERROR\n'; exit 1 ;;
+  footer)
+    printf 'error: Lavish Editor server connection failed\ncode: SERVER_ERROR\nhelp[1]: inspect connection\n'; exit 1 ;;
+  other)
+    printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n'; exit 1 ;;
+  wrong-code)
+    printf 'error: Lavish Editor server connection failed\ncode: VALIDATION_ERROR\n'; exit 1 ;;
+esac
+printf 'error: Lavish Editor server connection failed\ncode: SERVER_ERROR\n'
+if [ "${CONNECTION_MODE:-continue}" != exhaust ]; then
+  printf '%s%s%s\n' 'help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`' \
+    ' (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,' \
+    'Re-run the last `lavish-axi poll <html-file>` command after the server is healthy'
+fi
+exit 1
+SH
+  chmod +x "$native/lavish-axi"
+  id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$artifact")
+  fm_test_track_procevent_home "$home"
+  PATH="$native:$PATH" CONNECTION_FIXTURE="$fixture" FM_HOME="$home" \
+    FM_LAVISH_POLL_RETRY_DELAY='' \
+    "$ROOT/bin/fm-procevent-lavish.sh" arm "$artifact" >/dev/null \
+    || fail "connection fixture could not arm"
+  wait_for "$fixture/started-1" || fail "connection fixture never began polling"
+  claim="$FM_PROCEVENT_CLAIM_ROOT/$id.claim"
+  before=$(cat "$claim") || fail "armed connection fixture has no claim"
+  printf 'release\n' > "$fixture/release-1"
+  wait_for "$fixture/started-2" 150 \
+    || fail "the exact connection failure stranded the still-open source"
+  after=$(cat "$claim") || fail "connection retry released the claim"
+  assert_equals "$before" "$after" "connection retry retains the same runner and claim"
+  gap=$(perl -e '
+    my $start = <>;
+    my $next = <>;
+    print $next - $start;
+  ' "$fixture/failed-at" "$fixture/began-at-2")
+  perl -e 'exit($ARGV[0] >= 5 ? 0 : 1)' "$gap" \
+    || fail "connection retry bypassed the shipped five-second floor: $gap"
+  assert_equals 0 "$(count_results "$home" "$id")" "connection failure is not captured as feedback"
+  for n in 2 3; do
+    printf 'release\n' > "$fixture/release-$n"
+    wait_for "$fixture/started-$((n + 1))" \
+      || fail "answer $((n - 1)) did not resume listening without reconciliation"
+    assert_equals "$before" "$(cat "$claim")" "later answer retains the original runner claim"
+    assert_grep "answer $((n - 1))" "$home/state/procevent-inbox/$id.$((n - 1)).result" \
+      "later answer is captured without ensure-listening or reconcile"
+    assert_absent "$home/state/procevent-inbox/$id.$((n - 1)).handled" \
+      "continued listening does not acknowledge the answer"
+  done
+  assert_equals 2 "$(count_results "$home" "$id")" "only the two later answers are captured"
+  wait_for "$home/state/.wake-queue" || fail "later answers were not announced"
+  assert_contains "$(wake_payloads "$home")" "procevent lavish $id 1" "first later answer is announced"
+  assert_contains "$(wake_payloads "$home")" "procevent lavish $id 2" "second later answer is announced"
+  pass "the exact connection failure keeps the same runner through two later answers (retry gap ${gap}s)"
+  pe "$home" handled "$id" 1 >/dev/null || fail "could not acknowledge first fixture answer"
+  pe "$home" handled "$id" 2 >/dev/null || fail "could not acknowledge second fixture answer"
+  pe "$home" retire "$id" >/dev/null || fail "could not retire completed fixture"
+
+  # Direct public polls prove exact bytes and the existing bound at exhaustion.
+  # Nearby SERVER_ERROR responses must still surface on their first attempt.
+  for variant in exhaust exhaust-help whitespace footer other wrong-code; do
+    rm -f "$fixture/count"
+    rc=0
+    PATH="$native:$PATH" CONNECTION_FIXTURE="$fixture" CONNECTION_MODE="$variant" \
+      FM_LAVISH_POLL_RETRY_DELAY=1 \
+      "$ROOT/bin/fm-procevent-lavish.sh" poll "$artifact" > "$fixture/actual" \
+      || rc=$?
+    assert_equals 1 "$rc" "$variant retains the CLI failure exit"
+    case "$variant" in
+      exhaust|exhaust-help)
+        printf 'error: Lavish Editor server connection failed\ncode: SERVER_ERROR\n' > "$fixture/expected"
+        if [ "$variant" = exhaust-help ]; then
+          printf '%s%s%s\n' 'help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`' \
+            ' (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,' \
+            'Re-run the last `lavish-axi poll <html-file>` command after the server is healthy' >> "$fixture/expected"
+        fi
+        assert_equals 13 "$(cat "$fixture/count")" "connection failure exhausts the existing twelve retries"
+        ;;
+      whitespace)
+        printf 'error: Lavish Editor server connection failed \ncode: SERVER_ERROR\n' > "$fixture/expected" ;;
+      footer)
+        printf 'error: Lavish Editor server connection failed\ncode: SERVER_ERROR\nhelp[1]: inspect connection\n' > "$fixture/expected" ;;
+      other)
+        printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n' > "$fixture/expected" ;;
+      wrong-code)
+        printf 'error: Lavish Editor server connection failed\ncode: VALIDATION_ERROR\n' > "$fixture/expected" ;;
+    esac
+    cmp -s "$fixture/expected" "$fixture/actual" || fail "$variant changed the unknown-error bytes"
+    case "$variant" in
+      exhaust|exhaust-help) ;;
+      *) assert_equals 1 "$(cat "$fixture/count")" "$variant is not retried" ;;
+    esac
+    assert_equals unknown "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$fixture/actual")" \
+      "$variant remains an unknown captured failure"
+    if "$ROOT/bin/fm-procevent-lavish.sh" relisten "$fixture/actual"; then
+      fail "$variant unexpectedly permits relisten after capture"
+    fi
+  done
+  pass "connection retries are bounded; other error variants retain exact bytes and refuse relisten"
+}
+
+if [ "${FM_TEST_ONLY:-}" = restart-connection-failure ]; then
+  test_restart_connection_failure
+  exit 0
+fi
+
 if [ "${FM_TEST_ONLY:-}" = launch-episodes ]; then
   test_launch_episodes
   exit 0
 fi
+
+test_restart_connection_failure
 
 # --- inert with nothing configured ------------------------------------------
 IDLE="$TMP_ROOT/idle"; mkdir -p "$IDLE"

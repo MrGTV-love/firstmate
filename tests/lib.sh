@@ -584,6 +584,7 @@ SH
 # its harness with a marker (CLAUDECODE=1 and friends) needs this, because a structural
 # ancestor of a DIFFERENT harness outranks a marker - without it, the harness the SUITE
 # was launched from decides the verdict.
+# PID 1 has parent 0, so walkers that inspect the root must terminate there.
 # Every other ps query reaches the real ps untouched, and the pid-first form is
 # deliberately among them: bin/fm-tmux-lib.sh and bin/backends/tmux.sh read pane and
 # cursor identity with `ps -p <pid> -o args=`, so intercepting that shape too would make
@@ -596,6 +597,7 @@ fm_fake_blind_ancestry() {
 case "\$*" in
   '-o comm= -p '*) printf '%s\n' bash ;;
   '-o args= -p '*) printf '%s\n' bash ;;
+  '-o ppid= -p 1') printf '%s\n' 0 ;;
   '-o ppid= -p '*) printf '%s\n' 1 ;;
   *) exec "$real_ps" "\$@" ;;
 esac
