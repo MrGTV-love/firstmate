@@ -788,6 +788,70 @@ case "$repeat_out" in
 esac
 pass "an unhandled result survives restart and repeat drains, and only explicit acknowledgement stops its re-announcement"
 
+# --- reconcile coalesces a presented capture until exact snapshot acknowledgement ---
+(
+  HCOALESCE="$TMP_ROOT/hcoalesce"; new_home "$HCOALESCE"
+  export FM_HOME="$HCOALESCE"
+  fm_test_track_procevent_home "$HCOALESCE"
+  terminal_payload='session:\n  status: feedback\n  session_ended: true\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","final answer","","message",""\n'
+  pe_register "$HCOALESCE" lavish coalesced-src -- /usr/bin/printf "$terminal_payload" >/dev/null \
+    || fail "coalescing source registration failed"
+  pe "$HCOALESCE" start coalesced-src >/dev/null 2>&1 || fail "coalescing terminal capture failed"
+  assert_absent "$HCOALESCE/state/procevent/coalesced-src.source" "terminal capture retires its registration"
+  notice=$("$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "initial capture presentation failed: $notice"
+  assert_contains "$notice" "procevent lavish coalesced-src 1" "initial drain presents the captured identity"
+  ack=$(printf '%s\n' "$notice" | awk '/^WAKE_ACK_REQUIRED:/ {for (i=1;i<=NF;i++) if ($i=="--ack-through") {print $(i+1),$(i+3);exit}}')
+  read -r cutoff generation <<< "$ack"
+  [ "$cutoff" = 1 ] && [ -n "$generation" ] || fail "initial drain omitted its exact snapshot acknowledgement: $notice"
+  pe "$HCOALESCE" reconcile > "$TMP_ROOT/coalesce-first.out" &
+  first_pid=$!
+  pe "$HCOALESCE" reconcile > "$TMP_ROOT/coalesce-second.out" &
+  second_pid=$!
+  wait "$first_pid" || fail "first concurrent reconcile failed"
+  wait "$second_pid" || fail "second concurrent reconcile failed"
+  assert_contains "$(cat "$TMP_ROOT/coalesce-first.out")" "published=1" "a queued result counts as successfully published"
+  assert_contains "$(cat "$TMP_ROOT/coalesce-second.out")" "published=1" "concurrent coalescing counts as successfully published"
+  [ "$(cat "$HCOALESCE/state/.wake-queue.seq")" = "$cutoff" ] \
+    || fail "reconcile advanced the wake sequence for an already queued capture"
+  [ "$(awk -F '\t' '$3 == "check" && $4 == "procevent:coalesced-src:1" {n++} END {print n+0}' "$HCOALESCE/state/.wake-queue")" = 1 ] \
+    || fail "concurrent reconcile duplicated the presented capture"
+
+  # This unseen completion belongs to the next snapshot, not the one being handled.
+  pe_register "$HCOALESCE" lavish unseen-src -- /usr/bin/printf "$terminal_payload" >/dev/null \
+    || fail "unseen source registration failed"
+  pe "$HCOALESCE" start unseen-src >/dev/null 2>&1 || fail "unseen terminal capture failed"
+  [ "$(cat "$HCOALESCE/state/.wake-queue.seq")" = 2 ] || fail "a different capture did not append exactly one new row"
+  actions="$TMP_ROOT/coalesce-actions"
+  handled_out=$(pe "$HCOALESCE" handled coalesced-src 1) || fail "initial capture handling failed"
+  case "$handled_out" in handled:*) printf 'coalesced-src\n' >> "$actions" ;; *) fail "initial handling did not authorize its action: $handled_out" ;; esac
+  "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "exact initial snapshot acknowledgement failed"
+  [ "$(awk -F '\t' 'NF >= 5 {n++; key=$4} END {print n ":" key}' "$HCOALESCE/state/.wake-queue")" = "1:procevent:unseen-src:1" ] \
+    || fail "snapshot acknowledgement removed unseen work or left a duplicate owning wake"
+  repeat_out=$(pe "$HCOALESCE" handled coalesced-src 1) || fail "repeat handling failed"
+  case "$repeat_out" in handled:*) printf 'coalesced-src\n' >> "$actions" ;; esac
+  assert_contains "$repeat_out" "already-handled: coalesced-src 1" "repeat handling cannot authorize the owning action again"
+  [ "$(wc -l < "$actions" | tr -d ' ')" = 1 ] || fail "the owning action ran more than once"
+  pe "$HCOALESCE" reconcile >/dev/null || fail "post-handling reconcile failed"
+  [ "$(cat "$HCOALESCE/state/.wake-queue.seq")" = 2 ] || fail "handled or still-queued captures were appended again"
+  sup=$(bash -c '. "$1/bin/fm-supervision-lib.sh"; fm_supervision_needed "$2" && echo yes || echo no' _ "$ROOT" "$HCOALESCE/state")
+  assert_contains "$sup" yes "unseen pending work still requires supervision"
+  notice=$("$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "unseen capture presentation failed: $notice"
+  assert_contains "$notice" "procevent lavish unseen-src 1" "the next drain presents unseen work"
+  assert_not_contains "$notice" "procevent lavish coalesced-src 1" "the owning capture is not presented for repeat action"
+  ack=$(printf '%s\n' "$notice" | awk '/^WAKE_ACK_REQUIRED:/ {for (i=1;i<=NF;i++) if ($i=="--ack-through") {print $(i+1),$(i+3);exit}}')
+  read -r cutoff generation <<< "$ack"
+  [ "$cutoff" = 2 ] && [ -n "$generation" ] || fail "unseen drain omitted its exact snapshot acknowledgement: $notice"
+  pe "$HCOALESCE" handled unseen-src 1 >/dev/null || fail "unseen capture handling failed"
+  "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+    || fail "unseen snapshot acknowledgement failed"
+  pe "$HCOALESCE" reconcile >/dev/null || fail "final reconcile failed"
+  [ ! -s "$HCOALESCE/state/.wake-queue" ] || fail "finished captures left pending wake rows"
+  sup=$(bash -c '. "$1/bin/fm-supervision-lib.sh"; fm_supervision_needed "$2" && echo yes || echo no' _ "$ROOT" "$HCOALESCE/state")
+  assert_contains "$sup" no "handling both terminal captures and exact snapshots releases Stop supervision"
+) || fail "presented capture coalescing regression failed"
+pass "concurrent reconcile coalesces presented captures, exact acknowledgements preserve unseen work, and final handling releases supervision"
+
 HRACE="$TMP_ROOT/hrace"; new_home "$HRACE"
 mkdir -p "$HRACE/state/procevent-inbox"
 printf 'racing result\n' > "$HRACE/state/procevent-inbox/racing-src.1.result"

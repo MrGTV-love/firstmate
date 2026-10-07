@@ -351,21 +351,59 @@ test_hook_blocks_when_dead_lock_has_fresh_beacon() {
 }
 
 test_hook_silent_with_live_lock_and_fresh_beacon() {
-  local dir pid identity out status
+  local dir pid identity out status ready hold signal current alive
   dir=$(make_primary_dir "$TMP_ROOT/hook-live-lock-fresh")
   : > "$dir/state/task1.meta"
-  sleep 60 &
+  ready="$dir/holder-ready"
+  hold="$dir/holder-hold"
+  mkfifo "$ready" "$hold" || fail "could not create live watcher holder FIFOs"
+  exec 3<>"$ready"
+  # Signal only after bash has exec'd and opened its bounded, builtin-only wait.
+  bash -c '
+    exec 4<>"$1"
+    printf "ready\n" >&3
+    exec 3>&-
+    IFS= read -r -t 60 -u 4 _
+  ' _ "$hold" &
   pid=$!
-  identity=$(watcher_identity "$dir" "$pid") || {
+  signal=''
+  if ! IFS= read -r -t 10 -u 3 signal || [ "$signal" != ready ]; then
+    printf 'live watcher holder readiness failed: pid=%s ready=%s hold=%s\n' "$pid" "$ready" "$hold" >&2
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
+    exec 3>&-
+    rm -f "$ready" "$hold"
+    fail "live watcher holder did not become ready"
+  fi
+  exec 3>&-
+  identity=$(watcher_identity "$dir" "$pid") || {
+    printf 'could not identify ready live watcher holder: pid=%s home=%s\n' "$pid" "$dir" >&2
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    rm -f "$ready" "$hold"
     fail "could not identify live watcher holder"
   }
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   out=$(run_hook "$dir" false); status=$?
+  if [ "$status" -ne 0 ] || [ -n "$out" ]; then
+    current=$(watcher_identity "$dir" "$pid" 2>&1) || true
+    alive=false
+    kill -0 "$pid" 2>/dev/null && alive=true
+    fm_supervision_unhealthy "$dir/state" 300 || true
+    {
+      printf 'live watcher hook failure: status=%s pid=%s alive=%s\n' "$status" "$pid" "$alive"
+      printf 'hook output:\n%s\nrecorded identity: %s\ncurrent identity: %s\n' "$out" "$identity" "$current"
+      printf 'home=%s state=%s lock=%s watcher=%s beacon=%s beacon-age=%s\n' \
+        "$dir" "$dir/state" "$dir/state/.watch.lock" "$dir/bin/fm-watch.sh" \
+        "$dir/state/.last-watcher-beat" "$FM_SUP_BEACON_DESC"
+      printf 'hook env: FM_HOME=%s CLAUDECODE=1 PATH=%s\n' "$dir" "$BLIND_BIN:$PATH"
+      printf 'identity env: FM_STATE_OVERRIDE=%s\n' "$dir/state"
+    } >&2
+  fi
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
+  rm -f "$ready" "$hold"
   expect_code 0 "$status" "hook must exit 0 with a live identity-matched watcher lock and fresh beacon"
   [ -z "$out" ] || fail "hook produced output despite a live fresh watcher lock: $out"
   pass "fm-turnend-guard: silent no-op with a live watcher lock and fresh beacon"
