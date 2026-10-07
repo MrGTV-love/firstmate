@@ -1186,7 +1186,7 @@ Manual intake can use `bin/fm-model-index.sh profiles config/crew-dispatch.json`
 Typed intake performs this offline transformation before model-aware effort checks and quota matching.
 Typed intake freezes the index alongside its rules snapshot, applies the never-send filter before any live catalog request, and checks only the chosen profile's id, under that harness's `config/claude-account` or `config/pi-account` pin when one is set.
 For a manually selected profile, pass `--model role:<role>` or `--model stand-in:<role>` to `fm-spawn.sh`, or use the concrete id returned by `fm-model-index.sh model <harness> role:<role>`.
-Spawn freezes the routing pair before resolving role references, including a model token in `config/secondmate-harness`, and reuses that generation for membership, catalog checks, and secondmate inheritance; metadata and launch flags contain only the resulting concrete id.
+For an actual model selection, spawn freezes the routing pair before resolving role references, including a model token in `config/secondmate-harness`, and reuses that generation for membership, catalog checks, and secondmate inheritance; metadata and launch flags contain only the resulting concrete id.
 `fm-control.sh relaunch` and the remote secondmate spawn and restart paths resolve the same way before anything stops, so a role pin launches and a since-retired id refuses on the pre-stop side.
 A relaunch runs the selected-entry catalog check under the replacement's worker account before it stops the running agent, and carries the same frozen routing pair into replacement spawn.
 Spawn checks only the selected index entry, after worker-account selection, using a declared worker account pin or an authoritative catalog export.
@@ -1205,6 +1205,7 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
+When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
 Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes the selected profile to `fm-spawn.sh`.
 

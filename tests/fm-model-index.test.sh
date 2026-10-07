@@ -67,6 +67,18 @@ jq '.roles.strong.codex.model = "next"' "$BASE" > "$INDEX"
 cp "$BASE" "$INDEX"
 pass 'one index edit changes the next selection; literal ids work but warn while an index exists'
 
+for envelope in '' 'null' '[]' '{"default":{"harness":"codex","role":"strong"}} {"default":{"harness":"codex","role":"strong"},"approval":"captain"}'; do
+  printf '%s\n' "$envelope" > "$TMP_ROOT/bad-dispatch.json"
+  refuses profiles "$TMP_ROOT/bad-dispatch.json"
+done
+refuses profiles /dev/null
+"$TOOL" profiles > "$TMP_ROOT/index-only.out"
+[ ! -s "$TMP_ROOT/index-only.out" ] || fail 'index-only validation emitted dispatch profiles'
+printf '%s\n' '{"version":2,"roles":{},"retired":[]}' > "$INDEX"
+refuses profiles
+cp "$BASE" "$INDEX"
+pass 'present dispatch requires one object and explicit absence still validates the index offline'
+
 refuses model codex old
 refuses model omp provider/old
 refuses model claude 'old[1m]'
@@ -493,6 +505,24 @@ for boundary_mode in bootstrap launch; do
 done
 pass 'bootstrap and local launch refuse removed-role and missing-index pairs offline, preserve resolvable destination routing, and honor selected frozen pairs'
 
+for envelope in empty concatenated; do
+  malformed_home="$TMP_ROOT/local-dispatch-envelope-$envelope"
+  seed_coherent_destination "$malformed_home"
+  git -C "$malformed_home" init -q
+  printf 'config/\n' > "$malformed_home/.gitignore"
+  cp "$TMP_ROOT/incoming-index.json" "$COHERENCE_SOURCE/config/model-index.json"
+  : > "$COHERENCE_SOURCE/config/crew-dispatch.json"
+  if [ "$envelope" = concatenated ]; then
+    cat "$TMP_ROOT/incoming-dispatch.json" "$TMP_ROOT/incoming-dispatch.json" > "$COHERENCE_SOURCE/config/crew-dispatch.json"
+  fi
+  boundary_code=0
+  propagate_secondmate_inheritance "$COHERENCE_SOURCE" "$malformed_home" > "$TMP_ROOT/envelope.out" 2>&1 || boundary_code=$?
+  [ "$boundary_code" = 1 ] || fail "inheritance accepted $envelope dispatch"
+  assert_retained_pair "$malformed_home" "$envelope dispatch"
+  assert_unrelated_coherence_material "$malformed_home" launch
+done
+pass 'malformed present dispatch retains both routing members without blocking unrelated inheritance'
+
 # fm-config-push runs the full index check before the index reaches any home.
 fm_git_identity fmtest fmtest@example.invalid
 PUSH="$TMP_ROOT/push"
@@ -543,6 +573,18 @@ cmp -s "$PUSH/home/config/crew-dispatch.json" "$PUSH/sm/config/crew-dispatch.jso
 # An index with no entries still has to be well formed to push.
 cp "$PUSH/sm/config/model-index.json" "$PUSH/prior-index.json"
 cp "$PUSH/sm/config/crew-dispatch.json" "$PUSH/prior-dispatch.json"
+cp "$BASE" "$PUSH/home/config/model-index.json"
+for envelope in empty concatenated; do
+  : > "$PUSH/home/config/crew-dispatch.json"
+  if [ "$envelope" = concatenated ]; then
+    cat "$PUSH/prior-dispatch.json" "$PUSH/prior-dispatch.json" > "$PUSH/home/config/crew-dispatch.json"
+  fi
+  config_push "$CATALOGS"
+  assert_contains "$(cat "$TMP_ROOT/push.out")" 'model-index.json and crew-dispatch.json not pushed' "config-push accepted $envelope dispatch"
+  cmp -s "$PUSH/prior-index.json" "$PUSH/sm/config/model-index.json" || fail "$envelope dispatch replaced the retained index"
+  cmp -s "$PUSH/prior-dispatch.json" "$PUSH/sm/config/crew-dispatch.json" || fail "$envelope dispatch replaced the retained dispatch"
+done
+printf '%s\n' '{"default":{"harness":"codex","role":"fast"}}' > "$PUSH/home/config/crew-dispatch.json"
 for malformed in '{"version":1,"roles":{}}' '{"version":2,"roles":{},"retired":[]}'; do
   printf '%s\n' "$malformed" > "$PUSH/home/config/model-index.json"
   config_push "$CATALOGS"

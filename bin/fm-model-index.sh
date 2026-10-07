@@ -3,7 +3,7 @@
 # Usage: fm-model-index.sh check [<harness> [<model>]]
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
 #        fm-model-index.sh entry <harness> <concrete-model>
-#        fm-model-index.sh profiles <crew-dispatch.json>
+#        fm-model-index.sh profiles [<crew-dispatch.json>]
 #        fm-model-index.sh check-registry <path-to-json>
 # Schema owner: docs/configuration.md "Fleet model index".
 # check with no arguments is the index-edit check: every active id, including
@@ -57,7 +57,7 @@ usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|check:1|check:2|check-registry:1|model:2|entry:2|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+case "$VERB:$#" in check:0|check:1|check:2|check-registry:1|model:2|entry:2|profiles:0|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
   case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
   printf '%s\n' "$2"
@@ -252,10 +252,14 @@ case "$VERB" in
     jq -er --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ profile | .model" <<< "$p"
     ;;
   profiles)
+    [ "$#" != 0 ] || exit 0
+    jq -s 'if length == 1 and (.[0] | type == "object") then .[0]
+      else error("dispatch must contain exactly one JSON object") end' "$1" > "$TMP/dispatch.json" \
+      || die "malformed dispatch: $1"
     jq --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
       if (.rules | type) == \"array\" then .rules |= map(if type == \"object\" and has(\"use\") then .use |= profile_set else . end) else . end |
-      if type == \"object\" and has(\"default\") then .default |= profile_set else . end" "$1"
+      if type == \"object\" and has(\"default\") then .default |= profile_set else . end" "$TMP/dispatch.json"
     [ "$HAVE_INDEX" = 0 ] || jq -r --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
-      [(.rules[]? | objects | .use), .default] | .[] | (if type == \"array\" then .[] else . end) | literal_warning" "$1" >&2
+      [(.rules[]? | objects | .use), .default] | .[] | (if type == \"array\" then .[] else . end) | literal_warning" "$TMP/dispatch.json" >&2
     ;;
 esac

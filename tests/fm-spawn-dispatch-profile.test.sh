@@ -1186,6 +1186,31 @@ test_claude_secondmate_launch_omits_task_control_channel_authority() {
   pass "a persistent claude secondmate keeps its supervisor contract without a task-worker authority overlay"
 }
 
+test_default_secondmate_launch_survives_unsafe_routing_sources() {
+  local rec id sm out status source_kind
+  for source_kind in dangling directory; do
+    id="profile-default-routing-$source_kind"
+    rec=$(make_spawn_case "$id" claude "$id")
+    read_case_record "$rec"
+    printf 'claude\n' > "$HOME_DIR/config/secondmate-harness"
+    printf 'codex\n' > "$HOME_DIR/config/crew-harness"
+    case "$source_kind" in
+      dangling) ln -s "$HOME_DIR/missing-index" "$HOME_DIR/config/model-index.json" ;;
+      directory) mkdir "$HOME_DIR/config/crew-dispatch.json" ;;
+    esac
+    sm="$CASE_DIR/secondmate-home"
+    make_seeded_secondmate_home "$sm" "$id"
+    out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+      run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+    status=$?
+    expect_code 0 "$status" "default secondmate launch must survive $source_kind routing source"$'\n'"$out"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
+    [ "$(cat "$sm/config/crew-harness")" = codex ] || fail 'routing refusal blocked unrelated launch inheritance'
+    assert_contains "$out" 'inheritance failed' 'unsafe routing source must remain a warning'
+  done
+  pass 'fresh default-model secondmates retain warning-only routing inheritance'
+}
+
 test_claude_crewmate_launch_carries_the_attribution_policy() {
   local rec id out status launch
   id=profile-claude-attribution-z22
@@ -2136,5 +2161,6 @@ test_teamclaude_config_paths_reach_only_teamclaude
 test_teamclaude_snapshot_overrides_stale_pane_configuration
 test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
+test_default_secondmate_launch_survives_unsafe_routing_sources
 
 echo "# all fm-spawn-dispatch-profile tests passed"

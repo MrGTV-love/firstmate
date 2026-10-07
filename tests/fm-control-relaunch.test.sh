@@ -1907,6 +1907,42 @@ test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
   pass "fm-control relaunch: a secondmate's child work is accounted for and its charter is left alone"
 }
 
+test_default_secondmate_relaunch_survives_unsafe_routing_sources() {
+  local dir home source_kind out rc
+  for source_kind in dangling directory; do
+    dir=$(new_case "default-routing-$source_kind" sm-default)
+    home="$dir/home"
+    mkdir -p "$home/config"
+    printf 'claude\n' > "$home/config/secondmate-harness"
+    printf 'codex\n' > "$home/config/crew-harness"
+    case "$source_kind" in
+      dangling) ln -s "$home/missing-index" "$home/config/model-index.json" ;;
+      directory) mkdir "$home/config/crew-dispatch.json" ;;
+    esac
+    fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+    mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/config" "$dir/smhome/bin"
+    printf 'sm-default\n' > "$dir/smhome/.fm-secondmate-home"
+    printf '# charter\n' > "$dir/smhome/data/charter.md"
+    printf '# agents\n' > "$dir/smhome/AGENTS.md"
+    printf 'config/\n' > "$dir/smhome/.gitignore"
+    {
+      printf 'window=fmses:fm-sm-default\nendpoint_task_id=sm-default\n'
+      printf 'worktree=%s\nproject=%s\nhome=%s\n' "$dir/smhome" "$dir/smhome" "$dir/smhome"
+      printf 'harness=claude\nkind=secondmate\nmode=secondmate\nyolo=off\nmodel=default\neffort=default\n'
+    } > "$home/state/sm-default.meta"
+    printf 'fm-sm-default\n' > "$dir/fake/windows"
+    printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+    out=$(run_control "$dir" sm-default relaunch); rc=$?
+    expect_code 0 "$rc" "default secondmate relaunch must survive $source_kind routing source"$'\n'"$out"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail 'default-model replacement left no running agent'
+    [ "$(journal_field "$dir" sm-default phase)" = complete ] || fail 'default-model replacement did not complete'
+    [ "$(meta_field "$dir" sm-default model)" = default ] || fail 'default-model replacement changed model selection'
+    [ "$(cat "$dir/smhome/config/crew-harness")" = codex ] || fail 'routing refusal blocked unrelated inheritance'
+    assert_contains "$out" 'inheritance failed' 'unsafe routing source must remain a warning'
+  done
+  pass 'default-model secondmate replacements keep warning-only routing inheritance'
+}
+
 test_secondmate_relaunch_refuses_an_unmarked_home() {
   local dir home out rc
   dir=$(new_case smbad sm2)
@@ -3865,6 +3901,7 @@ test_complete_journal_failure_rolls_back_from_durable_phase
 test_prepublication_abort_retires_replacement_wiring_and_busy_state
 test_journal_records_the_checkpoint_it_proved
 test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter
+test_default_secondmate_relaunch_survives_unsafe_routing_sources
 test_secondmate_relaunch_refuses_an_unmarked_home
 test_secondmate_checkpoint_refuses_unreadable_child_state
 test_secondmate_checkpoint_ignores_a_vanished_scratch_find_walk

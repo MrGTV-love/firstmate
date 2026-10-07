@@ -603,7 +603,7 @@ fm_config_inherit_pair_stage() {
 }
 
 fm_config_inherit_pair_valid() {
-  local config=$1 item src present dispatch=/dev/null any_present=0
+  local config=$1 item src present dispatch='' any_present=0
   for item in model-index.json crew-dispatch.json; do
     src="$config/$item"
     present=$(fm_config_source_present "$src") || return 1
@@ -616,8 +616,13 @@ fm_config_inherit_pair_valid() {
     [ "$item" != crew-dispatch.json ] || dispatch=$src
   done
   [ "$any_present" = 1 ] || return 0
-  FM_CONFIG_OVERRIDE="$config" \
-    "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles "$dispatch" >/dev/null
+  if [ -n "$dispatch" ]; then
+    FM_CONFIG_OVERRIDE="$config" \
+      "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles "$dispatch" >/dev/null
+  else
+    FM_CONFIG_OVERRIDE="$config" \
+      "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles >/dev/null
+  fi
 }
 
 propagate_inheritable_config() {

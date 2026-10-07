@@ -2436,8 +2436,7 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } ||
-  { [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; }; then
+if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
   FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
     fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
