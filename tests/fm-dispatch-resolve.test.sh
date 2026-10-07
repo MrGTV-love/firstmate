@@ -11,6 +11,7 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+unset FM_MODEL_CATALOG_DIR
 
 TOOL="$ROOT/bin/fm-dispatch-resolve.sh"
 TMP_ROOT=$(fm_test_tmproot fm-dispatch-resolve)
@@ -128,7 +129,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 cat > "$FAKE_CURL_LOG/body"
-sleep "${FAKE_CURL_DELAY:-0}"
+if [ "${FAKE_CURL_DELAY:-0}" != 0 ]; then sleep "$FAKE_CURL_DELAY"; fi
 cat /dev/fd/3 > "$FAKE_CURL_LOG/header" 2>/dev/null || printf 'fd3 unreadable\n' > "$FAKE_CURL_LOG/header"
 if [ -n "${FAKE_CURL_MUTATE_SOURCE:-}" ]; then
   cp "$FAKE_CURL_MUTATE_SOURCE" "${FAKE_CURL_MUTATE_TARGET:?}"
@@ -159,7 +160,7 @@ else
   printf 'quota-axi:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
 printf '%s\n' "$*" >> "${QUOTA_AXI_CALLS:?}"
-sleep "${FAKE_QUOTA_DELAY:-0}"
+if [ "${FAKE_QUOTA_DELAY:-0}" != 0 ]; then sleep "$FAKE_QUOTA_DELAY"; fi
 [ "${FAKE_QUOTA_FAIL:-0}" = 1 ] && exit 1
 [ "${1:-}" = --json ] || exit 2
 cat "${QUOTA_AXI_FIXTURE:?}"
@@ -744,14 +745,19 @@ assert_contains "$out" 'candidate: gemini:gemini-3.8-flash-high  provider=google
 assert_contains "$out" "  profile: --harness 'gemini' --model 'gemini-3.8-flash-high'" "Gemini is a typed verified dispatch harness"
 
 cp "$ROOT/docs/examples/crew-dispatch.json" "$RULES"
+cp "$ROOT/docs/examples/model-index.json" "$HOME_DIR/config/model-index.json"
+mkdir -p "$TMP_ROOT/no-catalogs"
 cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"default","confidence":0.9,"probabilities":{"rule_1":0.02,"rule_2":0.02,"rule_3":0.02,"default":0.94}}},"usage":{"input_tokens":812,"output_tokens":60}}
 JSON
 reset_log
-TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/no-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "the documented example passes opted-in resolution"
-assert_contains "$out" 'candidate: pi:anthropic/claude-sonnet-5  provider=claude' "the documented Pi default uses its declared Claude provider"
+assert_contains "$out" 'candidate: pi:anthropic/claude-sonnet-5-5  provider=claude' "the documented Pi default uses its declared Claude provider"
 assert_not_contains "$err" 'malformed rules file' "the documented example reaches resolution"
+assert_not_contains "$err" 'warning: literal model' "the documented example names roles, never literal ids"
+assert_contains "$err" 'catalog unavailable' "an unavailable chosen-model catalog is a notice, not a refusal"
+rm "$HOME_DIR/config/model-index.json"
 cp "$BASE_RULES" "$RULES"
 pass "no-rule fallback, Agy, Gemini, and documented configurations resolve"
 
@@ -1236,9 +1242,10 @@ for name in early-short early-long unknown; do
   assert_contains "$out" '  status: clear' "$name runway is a disclosed warning, not a veto"
   assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-6-luna'" "$name runway keeps the highest-ranked profile"
   assert_contains "$out" '-> eligible [warning: ' "$name runway is disclosed on the candidate"
+  if [ "$name" = early-short ]; then
+    assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]' "an early projection names its confidence"
+  fi
 done
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-short.json" run code out err "$BRIEF"
-assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]' "an early projection names its confidence"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "a projection without confidence is a warning, not a veto"
 assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=unknown)]' "absent projection fields are disclosed as unknown"
@@ -1294,9 +1301,10 @@ for name in long early-long early-short unknown; do
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
   assert_contains "$out" '  status: clear' "a $name visible reading ranks the pool"
   assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "a $name visible reading authorizes the pooled profile"
+  if [ "$name" = early-long ]; then
+    assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
+  fi
 done
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-long.json" run code out err "$BRIEF"
-assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "an established short visible projection is not viable"
 assert_contains "$out" '  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon' "a short pool escalates like a single account"
@@ -1496,5 +1504,125 @@ run code out err --help
 expect_code 0 "$code" "--help exits 0"
 assert_contains "$out" 'Usage:' "--help prints usage"
 pass "configuration errors exit 2 before any network call"
+
+# Role resolution feeds concrete model ids into quota matching and publication.
+cp "$BASE_RULES" "$RULES"
+write_quota "$QUOTA" 0.7597
+write_response "$RESPONSE" rule_4 0.9
+mkdir -p "$TMP_ROOT/model-catalogs"
+printf '%s\n' '{"models":[{"id":"cursor-grok-4.6-medium"}]}' > "$TMP_ROOT/model-catalogs/cursor.json"
+printf '%s\n' '{"version":1,"roles":{"routine":{"cursor":{"model":"cursor-grok-4.6-medium"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+jq '.rules[3].use[1] |= (del(.model) | .role = "routine")' "$BASE_RULES" > "$RULES"
+# Withheld intakes must not even try to read live catalog exports.
+printf '%s\n' 'New feature work on the app.' > "$HOME_DIR/config/dispatch-never-send"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/absent-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "never-send suppresses catalog validation as well as the rule request"
+[ -z "$out" ] || fail "withheld indexed intake emitted a profile: $out"
+assert_contains "$err" 'dispatch-resolve: off' "withheld indexed intake must stay off"
+assert_absent "$LOG/argv" "withheld indexed intake must not reach a request"
+rm "$HOME_DIR/config/dispatch-never-send"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "role-based typed intake resolves"
+assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "typed intake publishes a concrete id"
+assert_contains "$err" "literal model 'sonnet' for claude is not an index entry" "literal profile ids warn while an index exists"
+mkdir -p "$TMP_ROOT/other-catalogs"
+printf '%s\n' '{"models":[{"id":"cursor-other"}]}' > "$TMP_ROOT/other-catalogs/cursor.json"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/other-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "a chosen id absent from its catalog never blocks intake"
+assert_contains "$out" '  status: error' "a chosen id absent from its catalog returns the decision to firstmate"
+assert_not_contains "$out" '  profile:' "a chosen id absent from its catalog publishes no profile"
+assert_contains "$err" "id 'cursor-grok-4.6-medium' absent or retired in cursor catalog" "the catalog refusal names the chosen id"
+# An index edit during the rule request cannot change this intake's resolved id.
+cp "$HOME_DIR/config/model-index.json" "$TMP_ROOT/original-index.json"
+jq '.roles.routine.cursor.model = "new-model-not-in-catalog"' "$TMP_ROOT/original-index.json" > "$TMP_ROOT/changed-index.json"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY \
+  FAKE_CURL_MUTATE_SOURCE="$TMP_ROOT/changed-index.json" FAKE_CURL_MUTATE_TARGET="$HOME_DIR/config/model-index.json" \
+  run code out err "$BRIEF"
+expect_code 0 "$code" "in-flight index edit must not re-resolve the role"
+assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "intake must keep the id resolved from its frozen index"
+cp "$TMP_ROOT/original-index.json" "$HOME_DIR/config/model-index.json"
+# A role and a literal that resolve to the same candidate remain duplicates.
+jq '.rules[3].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$RULES" > "$TMP_ROOT/duplicate-role.json"
+mv "$TMP_ROOT/duplicate-role.json" "$RULES"
+reset_log
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 2 "$code" "duplicate concrete role/literal profiles refuse intake"
+assert_absent "$LOG/argv" "duplicate candidates must refuse before the rule request"
+rm "$HOME_DIR/config/model-index.json"
+pass "typed intake resolves roles before quota ranking and detects concrete duplicates"
+
+# The chosen id is checked against the catalog of the account a pinned worker
+# would launch under, not the intake's ambient account.
+mkdir -p "$TMP_ROOT/pinned-claude" "$TMP_ROOT/ambient-claude"
+printf 'pinned-only\n' > "$TMP_ROOT/pinned-claude/catalog"
+printf 'ambient-only\n' > "$TMP_ROOT/ambient-claude/catalog"
+cat > "$FAKEBIN/claude" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\${CLAUDE_CONFIG_DIR-unset}" >> '$TMP_ROOT/claude-catalog-roots'
+jq -Rsc '{type:"control_response",response:{subtype:"success",request_id:"model-index",
+  response:{models:[split("\\n")[] | select(length > 0) | {value:., resolvedModel:.}]}}}' "\${CLAUDE_CONFIG_DIR}/catalog"
+SH
+chmod +x "$FAKEBIN/claude"
+printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"pinned-only"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+printf '%s\n' "$TMP_ROOT/pinned-claude" > "$HOME_DIR/config/claude-account"
+printf '%s\n' '{"rules":[{"when":"Claude work.","use":{"harness":"claude","role":"routine"}}]}' > "$RULES"
+cat > "$RESPONSE" <<'JSON'
+{"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"rule_1","confidence":0.99,"probabilities":{"rule_1":0.99,"default":0.01}}},"usage":{"input_tokens":100,"output_tokens":60}}
+JSON
+reset_log
+CLAUDE_CONFIG_DIR="$TMP_ROOT/ambient-claude" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "pinned-account intake exits 0"
+assert_contains "$out" "  profile: --harness 'claude' --model 'pinned-only'" "the pinned account's catalog must decide the chosen id: $err"
+[ "$(cat "$TMP_ROOT/claude-catalog-roots")" = "$TMP_ROOT/pinned-claude" ] \
+  || fail "the chosen-id catalog must be read from the pinned root only: $(cat "$TMP_ROOT/claude-catalog-roots")"
+rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/claude-account" "$FAKEBIN/claude"
+cp "$BASE_RULES" "$RULES"
+pass "typed intake checks the chosen id against the pinned worker account's catalog"
+
+mkdir -p "$TMP_ROOT/supervisor-account"
+printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$TMP_ROOT/supervisor-account/models_cache.json"
+printf 'openai-codex  supervisor-only  272K  32K  yes  no\n' > "$TMP_ROOT/supervisor-account/listed"
+cat > "$FAKEBIN/pi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\${PI_CODING_AGENT_DIR-unset}" >> '$TMP_ROOT/unpinned-catalog-calls'
+printf 'provider model context\n'
+cat "\$PI_CODING_AGENT_DIR/listed"
+SH
+chmod +x "$FAKEBIN/pi"
+: > "$HOME_DIR/config/launch-env-allowlist"
+for context_harness in codex pi; do
+  for context_model in pane-only supervisor-only; do
+    context_id=$context_model
+    [ "$context_harness" != pi ] || context_id="openai-codex/$context_model"
+    jq -n --arg h "$context_harness" --arg m "$context_id" \
+      '{version:1,roles:{chosen:{($h):{model:$m}}},retired:[]}' > "$HOME_DIR/config/model-index.json"
+    jq -n --arg h "$context_harness" \
+      '{rules:[{when:"Indexed work.",use:{harness:$h,role:"chosen",provider:"codex"}}]}' > "$RULES"
+    reset_log
+    CODEX_HOME="$TMP_ROOT/supervisor-account" PI_CODING_AGENT_DIR="$TMP_ROOT/supervisor-account" \
+      TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+    expect_code 0 "$code" "unknown chosen context keeps intake available"
+    assert_contains "$out" '  status: clear' "supervisor listing or omission must not decide the chosen entry: $err"
+    assert_contains "$out" "--model '$context_id'" "the chosen profile must retain the indexed model"
+    assert_contains "$err" "effective worker account context is not established" "chosen context uncertainty must be precise"
+    assert_contains "$err" "not validated" "a matching supervisor listing must not imply validation"
+    assert_absent "$TMP_ROOT/unpinned-catalog-calls" "chosen Pi must not query the supervisor catalog"
+  done
+done
+mkdir -p "$TMP_ROOT/context-exports"
+printf '%s\n' '{"models":[{"id":"openai-codex/supervisor-only","resolved_id":"retired-target"}]}' > "$TMP_ROOT/context-exports/pi.json"
+jq '.retired = ["retired-target"]' "$HOME_DIR/config/model-index.json" > "$TMP_ROOT/context-index.json"
+cp "$TMP_ROOT/context-index.json" "$HOME_DIR/config/model-index.json"
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/context-exports" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+assert_contains "$out" '  status: error' "an authoritative export must still refuse an alias resolved to a retired id"
+assert_not_contains "$out" '  profile:' "an export-backed retirement must not publish a profile"
+assert_contains "$err" "absent or retired in pi catalog" "explicit export evidence remains authoritative despite unknown pane context"
+rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/launch-env-allowlist" "$FAKEBIN/pi"
+cp "$BASE_RULES" "$RULES"
+pass "chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks"
 
 printf '# all fm-dispatch-resolve tests passed\n'

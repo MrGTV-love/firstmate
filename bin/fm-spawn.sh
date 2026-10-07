@@ -85,6 +85,8 @@
 #   only a shell that will not go refuses.
 #   --harness <name> is the explicit per-spawn harness/profile adapter. The old
 #   positional harness arg still works for back-compat.
+#   --model role:<role> or stand-in:<role> resolves the home model index before
+#   validation; metadata and launch flags always contain the concrete id.
 #   --model <name> and --effort <low|medium|high|xhigh|max|ultra> are concrete profile
 #   axes chosen by firstmate at intake. They are only threaded into harnesses whose
 #   installed CLIs were verified to support that axis; unsupported axes are omitted
@@ -225,12 +227,14 @@
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
-#   A model written as <provider>/<id> is validated against `omp models --json`
-#   only when that provider appears in the listing; a provider absent from the
-#   listing (an extension-registered provider such as claude-bridge, which omp
-#   never lists) passes through unvalidated with a stderr notice, and a bare
-#   fuzzy pattern is left to omp's own matcher. A crewmate or scout loads its
-#   per-task busy-state extension with -e from state/ (outside the worktree, so
+#   A non-index-entry literal <provider>/<id> is validated against
+#   `omp models --json` only when that provider appears in the listing; a
+#   provider absent from the listing (an extension-registered provider such as
+#   claude-bridge, which omp never lists) passes through unvalidated with a
+#   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
+#   own matcher. Indexed selections follow docs/configuration.md "Fleet model
+#   index". A crewmate or scout loads its per-task busy-state extension with -e
+#   from state/ (outside the worktree, so
 #   auto-discovery cannot load it a second time); a secondmate passes no -e at
 #   all and relies on omp auto-discovering the home's tracked .omp/extensions/
 #   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
@@ -371,7 +375,7 @@
 #   refuses before any endpoint, worktree, or record exists when the file is
 #   malformed, the root is unusable, or the runner's own check says it is not
 #   signed in. A pinned Claude launch sheds the environment credentials Claude
-#   ranks above the root's login; a pinned Pi launch needs --model
+#   ranks above the root's login; a pinned Pi launch needs a resolved model
 #   <provider>/<id> for a declared provider and also carries --provider, and a
 #   raw Pi command refuses. The pin is recorded as account= (and Pi's
 #   account_provider=) in the task record and on the spawned line. A local
@@ -1004,6 +1008,18 @@ spawn_remote_secondmate() {
     fm_lock_release "$SPAWN_TASK_LOCK" || true
     return 3
   fi
+  SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || {
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  }
+  if ! FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" 1 ||
+    ! fm_config_inherit_pair_valid "$SPAWN_ROUTING_PAIR"; then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  fi
   host=$(secondmate_registry_field "$DATA/secondmates.md" "$id" host)
   root=$(secondmate_registry_field "$DATA/secondmates.md" "$id" root)
   home=$(secondmate_registry_field "$DATA/secondmates.md" "$id" home)
@@ -1064,6 +1080,11 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
+  if [ "$model" != - ] && ! model=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$harness" "$model"); then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    return 1
+  fi
   if [ "$effort" = ultra ] && ! "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$harness" "$model" "$effort"; then
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
@@ -1133,7 +1154,7 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id inheritance generation could not be published" >&2
     return 1
   fi
-  if "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" >/dev/null; then
+  if FM_CONFIG_INHERIT_PAIR_DIR="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" >/dev/null; then
     :
   else
     rc=$?
@@ -1298,6 +1319,7 @@ GIT_HOOKS_DIR=
 SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
+SPAWN_ROUTING_PAIR=
 
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
@@ -1484,6 +1506,7 @@ spawn_abort_cleanup() {
     CONFIG_INHERIT_LOCK_HELD=0
     fm_lock_release "$CONFIG_INHERIT_LOCK" || true
   fi
+  [ -z "$SPAWN_ROUTING_PAIR" ] || rm -rf -- "$SPAWN_ROUTING_PAIR"
   # The per-id spawn lock is retaken so a concurrent spawn of the same id, which
   # reinstalls this strip dir, is never undone. A launched agent whose endpoint
   # was not closed may still be committing, so it keeps its strip.
@@ -2002,7 +2025,8 @@ pi_supports_tui_mode() {
   printf '%s\n' "$help" | grep -Eq -- '(^|[[:space:]])--tui-mode([[:space:]=]|$)'
 }
 
-# omp pre-launch model validation. `omp models --json` (omp 18.1.11) prints
+# omp pre-launch validation for non-index-entry literals. `omp models --json`
+# (omp 18.1.11) prints
 # {"models":[{"provider","id","selector":"<provider>/<id>",...}]} for built-in and
 # auto-discovered providers only; it never lists a provider an extension
 # registers at runtime (claude-bridge is the verified example), so the check is
@@ -2030,7 +2054,8 @@ omp_model_validate() { # <omp-bin> <model>
   return 1
 }
 
-# agy pre-launch model validation. `agy models` (agy 1.2.0) prints one model per
+# agy pre-launch validation for non-index-entry literals. `agy models`
+# (agy 1.2.0) prints one model per
 # line as "<id>\t<label>" for the account's catalog only; model ids are bare
 # (gemini-3.8-flash-high), never provider-prefixed. A requested model absent
 # from a reachable listing is concrete unsupported evidence and refuses the
@@ -2392,6 +2417,51 @@ if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; t
   fi
 fi
 
+# config/secondmate-harness may carry optional model/effort tokens alongside the
+# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
+# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
+# the harness itself came from the secondmate config fallback chain. Resolving
+# here on every spawn makes the pin durable across respawns. Precedence: explicit
+# --model/--effort flags still win over the file's tokens.
+if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
+  if [ "$MODEL_SET" -eq 0 ]; then
+    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
+    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
+  fi
+  if [ "$EFFORT_SET" -eq 0 ]; then
+    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
+    if [ -n "$SM_EFFORT" ]; then
+      case "$SM_EFFORT" in
+      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
+      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
+      esac
+    fi
+  fi
+fi
+if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
+fi
+# Resolve a role exactly once, after every model source and before any
+# model-aware launch validation. Resolution is offline; with an index, a retired
+# literal refuses here and the selected entry's catalog check runs below under
+# the worker account that will actually launch it.
+MODEL_INDEXED=0
+[ ! -e "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] && [ ! -L "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || MODEL_INDEXED=1
+case "$MODEL" in role:*|stand-in:*)
+  [ "$RAW_LAUNCH" = 0 ] || { echo "error: model roles require a canonical harness launch" >&2; exit 1; }
+  MODEL_INDEXED=1
+  ;;
+esac
+if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
+  MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+  MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+  if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+else
+  MODEL_INDEXED=0
+fi
+
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
   exit 1
@@ -2458,7 +2528,7 @@ cursor)
   # missing install a loud spawn refusal instead of a pane that dies with a
   # command-not-found the supervisor would read as a wedged worker.
   CURSOR_BIN=$(fm_cursor_resolve_binary) || exit 1
-  if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  if [ "$MODEL_INDEXED" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
     if CURSOR_MODELS=$(fm_cursor_list_models "$CURSOR_BIN"); then
       if ! printf '%s\n' "$CURSOR_MODELS" | fm_cursor_catalog_has_model "$MODEL"; then
         echo "error: Cursor model '$MODEL' is not available from '$CURSOR_BIN --list-models'; choose an id listed by that command or omit --model" >&2
@@ -2491,27 +2561,6 @@ agy)
   ;;
 esac
 
-# config/secondmate-harness may carry optional model/effort tokens alongside the
-# harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
-# --secondmate spawn and no explicit per-spawn harness/raw launch was supplied, so
-# the harness itself came from the secondmate config fallback chain. Resolving
-# here on every spawn makes the pin durable across respawns. Precedence: explicit
-# --model/--effort flags still win over the file's tokens.
-if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
-  if [ "$MODEL_SET" -eq 0 ]; then
-    SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
-    [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
-  fi
-  if [ "$EFFORT_SET" -eq 0 ]; then
-    SM_EFFORT=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort)
-    if [ -n "$SM_EFFORT" ]; then
-      case "$SM_EFFORT" in
-      low | medium | high | xhigh | max | ultra) EFFORT=$SM_EFFORT ;;
-      *) echo "warning: config/secondmate-harness effort token '$SM_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2 ;;
-      esac
-    fi
-  fi
-fi
 # Ultra is an explicit native capability, never a Pi thinking-level alias.
 # Validate the fully resolved profile before worktree or endpoint provisioning.
 if [ "$EFFORT" = ultra ]; then
@@ -2521,10 +2570,10 @@ if [ "$EFFORT" = ultra ]; then
     exit 1
   }
 fi
-if [ "$HARNESS" = omp ]; then
+if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
 fi
-if [ "$HARNESS" = agy ]; then
+if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
 fi
 # Worker account pin (header above): resolved before any endpoint, worktree, or
@@ -2544,6 +2593,14 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   else
     unset CLAUDE_CONFIG_DIR
   fi
+fi
+
+if [ "$MODEL_INDEXED" = 1 ]; then
+  MODEL_CATALOG_CONTEXT=selected
+  if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
+    MODEL_CATALOG_CONTEXT=unavailable
+  fi
+  FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
@@ -3145,7 +3202,7 @@ if [ "$KIND" = secondmate ]; then
     CONFIG_INHERIT_LOCK_HELD=1
     # Inheritance propagation: push the primary-authoritative live-safe local inheritance
     # surface into this secondmate home (fm-config-inherit-lib.sh).
-    FM_CONFIG_INHERIT_LIVE=1 \
+    FM_CONFIG_INHERIT_PAIR_DIR="${SPAWN_ROUTING_PAIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" FM_CONFIG_INHERIT_LIVE=1 \
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
   fi

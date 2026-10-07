@@ -225,6 +225,7 @@ CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
+RELAUNCH_PAIR_DIR=
 
 control_cleanup() {
   local status=$?
@@ -233,6 +234,7 @@ control_cleanup() {
     relaunch_rollback || true
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
+  [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
     CONTROL_META_LOCK_HELD=0
     fm_lock_release "$CONTROL_META_LOCK" || true
@@ -949,20 +951,34 @@ resolve_relaunch_profile() {
   else
     TARGET_EFFORT=default
   fi
+  # A role reference, or a model the index has since retired, is resolved or
+  # refused here, before the stop, exactly as the launch owner would.
+  if [ "$TARGET_MODEL" != default ]; then
+    RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
+    FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+      fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
+    TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
+      "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+  fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi
   # The launch owner applies this home's worker account pin too, but only after
   # the old agent has been stopped, so a pin that no longer resolves or is
   # signed out must refuse here, while nothing has changed yet.
-  local account_model=$TARGET_MODEL
+  local account_model=$TARGET_MODEL config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} launcher=claude catalog_context=selected
   [ "$account_model" != default ] || account_model=
-  TARGET_WORKER_ACCOUNT=$(fm_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+  TARGET_WORKER_ACCOUNT=$(fm_worker_account_select "$TARGET_HARNESS" "$config" \
     "$account_model" "$TARGET_HARNESS") || return 1
   # The same holds for config/claude-launcher: a malformed file or a stopped
   # TeamClaude proxy must refuse before the old agent stops.
   if [ "$TARGET_HARNESS" = claude ]; then
-    fm_claude_launcher_select "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" >/dev/null || return 1
+    launcher=$(fm_claude_launcher_select "$config") || return 1
+    [ "$launcher" = claude ] || catalog_context=unavailable
+  fi
+  if [ -n "$account_model" ] && { [ -e "$RELAUNCH_PAIR_DIR/model-index.json" ] || [ -L "$RELAUNCH_PAIR_DIR/model-index.json" ]; }; then
+    FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" fm_worker_account_check_entry "$TARGET_WORKER_ACCOUNT" \
+      "$SCRIPT_DIR/fm-model-index.sh" "$TARGET_HARNESS" "$account_model" "$catalog_context" || return 1
   fi
 }
 
@@ -1160,6 +1176,7 @@ do_relaunch() {
     spawn_args+=(--allow-api-key)
   fi
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
+      FM_CONFIG_INHERIT_PAIR_DIR="${RELAUNCH_PAIR_DIR:-${FM_CONFIG_INHERIT_PAIR_DIR:-}}" \
       "$SCRIPT_DIR/fm-spawn.sh" "${spawn_args[@]}" >/dev/null; then
     RELAUNCH_META_PUBLISHED=1
     # $T was resolved from the record before the launch. When the recorded

@@ -46,8 +46,9 @@
 # secondmate spawn (bin/fm-spawn.sh), the bootstrap secondmate sweep
 # (bin/fm-bootstrap.sh), and the focused mid-session config push
 # (bin/fm-config-push.sh). It is PRIMARY-AUTHORITATIVE: the primary's value wins
-# and is re-pushed on every convergence, so the fleet stays converged on the
-# primary; an item the primary does not set is mirrored as absence downstream.
+# and is re-pushed when propagation guards permit; proven absence is mirrored
+# downstream under the same guards. The coupled routing-pair exception is owned
+# by .agents/skills/secondmate-provisioning/SKILL.md.
 # After successful config/* changes under an already-running secondmate, callers
 # invoke fm_config_send_reread_nudge so the live agent re-reads exact post-write
 # bytes (spawn/respawn already re-reads at launch and needs no redundant nudge).
@@ -80,7 +81,7 @@ FM_SHARED_CAPTAIN_MODE="444"
 # The declared inheritable set (space-separated, config-dir-relative item paths).
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
-FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser claude-permission-mode claude-launcher lavish-axi-host keep-ai-trailers}"
+FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-model-index.json crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist compact-adviser claude-permission-mode claude-launcher lavish-axi-host keep-ai-trailers}"
 
 # Items whose value is a home-SESSION enablement decision rather than durable
 # local configuration. They are inherited at the launch convergence point, where
@@ -197,6 +198,17 @@ destination_allows_inherited_item() {
   git -C "$top" check-ignore -q -- "$rel_path" 2>/dev/null
 }
 
+destination_allows_inherited_pair() {
+  local dest_config=$1 item dest
+  for item in model-index.json crew-dispatch.json; do
+    destination_allows_inherited_item "$dest_config" "$item" || return 1
+    dest="$dest_config/$item"
+    if [ -e "$dest" ] && [ ! -f "$dest" ] && [ ! -L "$dest" ]; then
+      return 1
+    fi
+  done
+}
+
 # propagate_inheritable_config <src-config-dir> <dest-config-dir>
 # Copy each declared inheritable item from the primary's config dir (src) into a
 # secondmate home's config dir (dest). SILENT on stdout - callers parse stdout,
@@ -206,15 +218,17 @@ destination_allows_inherited_item() {
 # churns mtimes). A source item proven absent is mirrored as a missing
 # destination item, so clearing the primary's value clears it downstream too
 # (primary-authoritative). Inspection errors or existing nonregular sources
-# leave that destination item unchanged and report an error; inaccessible paths
-# and dangling source links must never silently remove an inherited grant.
+# leave destinations unchanged; inaccessible paths and dangling source links
+# must never silently remove an inherited grant. The coupled routing-pair
+# exception is owned by .agents/skills/secondmate-provisioning/SKILL.md.
 # The destination dir is created lazily, only when there is something to copy;
 # absence on both sides is a no-op. When FM_CONFIG_INHERIT_REPORT points at a writable
 # file, one tab-separated line per item is appended there:
 #   <item> <status> <reason>
-# Status is pushed, unchanged, skipped, or error. Skipped items are warnings and
-# do not affect the exit code. Returns non-zero only when a real propagation
-# error, such as copy or remove failure, occurs.
+# Status is pushed, unchanged, skipped, or error. Destination-guard skips are
+# warnings and do not affect the exit code. Routing-source staging or validation
+# refusal reports both members as skipped but returns non-zero, as do copy,
+# remove, and other propagation errors.
 record_inheritable_config_result() {
   local item=$1 status=$2 reason=${3:-}
   [ -n "${FM_CONFIG_INHERIT_REPORT:-}" ] || return 0
@@ -550,20 +564,114 @@ propagate_secondmate_inheritance() {
   return "$rc"
 }
 
+fm_config_inherit_source() {
+  local config=$1 item=$2
+  case "$item" in
+    model-index.json|crew-dispatch.json)
+      config=${FM_CONFIG_INHERIT_PAIR_DIR:-$config}
+      ;;
+  esac
+  printf '%s/%s\n' "$config" "$item"
+}
+
+fm_config_inherit_pair_stage() {
+  local config=$1 staging=$2 remote=${3:-0} item source present bytes
+  for item in model-index.json crew-dispatch.json; do
+    case " $FM_INHERITABLE_CONFIG " in *" $item "*) ;; *) continue ;; esac
+    source=$(fm_config_inherit_source "$config" "$item") || return 1
+    present=$(fm_config_source_present "$source") || return 1
+    [ "$present" = 1 ] || continue
+    if [ ! -f "$source" ] || [ ! -r "$source" ]; then
+      printf 'routing source is not a readable regular file: %s\n' "$source" >&2
+      return 1
+    fi
+    if [ "$remote" = 1 ]; then
+      if [ -L "$source" ] || [ "$(fm_inherit_file_link_count "$source")" != 1 ]; then
+        printf 'routing source has unsafe links: %s\n' "$source" >&2
+        return 1
+      fi
+    fi
+    cp -p -- "$source" "$staging/$item" || return 1
+    [ -f "$staging/$item" ] && [ -r "$staging/$item" ] && [ ! -L "$staging/$item" ] || return 1
+    if [ "$remote" = 1 ]; then
+      bytes=$(LC_ALL=C wc -c < "$staging/$item" | tr -d ' ') || return 1
+      if [ "$bytes" -gt 1048576 ]; then
+        printf 'routing source exceeds 1048576 bytes: %s\n' "$source" >&2
+        return 1
+      fi
+    fi
+  done
+}
+
+fm_config_inherit_pair_valid() {
+  local config=$1 item src present dispatch='' any_present=0
+  for item in model-index.json crew-dispatch.json; do
+    src="$config/$item"
+    present=$(fm_config_source_present "$src") || return 1
+    [ "$present" = 1 ] || continue
+    any_present=1
+    if [ ! -f "$src" ] || [ ! -r "$src" ]; then
+      printf 'routing source is not a readable regular file: %s\n' "$src" >&2
+      return 1
+    fi
+    [ "$item" != crew-dispatch.json ] || dispatch=$src
+  done
+  [ "$any_present" = 1 ] || return 0
+  if [ -n "$dispatch" ]; then
+    FM_CONFIG_OVERRIDE="$config" \
+      "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles "$dispatch" >/dev/null
+  else
+    FM_CONFIG_OVERRIDE="$config" \
+      "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-model-index.sh" profiles >/dev/null
+  fi
+}
+
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc pair_allowed=1 pair_reason='' pair_stage=''
+  local FM_CONFIG_INHERIT_PAIR_DIR=${FM_CONFIG_INHERIT_PAIR_DIR:-}
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
+  case " $FM_INHERITABLE_CONFIG " in
+    *" model-index.json "*|*" crew-dispatch.json "*)
+      if ! destination_allows_inherited_pair "$dest_config"; then
+        pair_allowed=0
+        pair_reason=$(inheritable_config_skip_reason)
+      elif pair_stage=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-inherit-pair.XXXXXX") &&
+        pair_reason=$(fm_config_inherit_pair_stage "$src_config" "$pair_stage" 2>&1) &&
+        pair_reason=$(fm_config_inherit_pair_valid "$pair_stage" 2>&1); then
+        FM_CONFIG_INHERIT_PAIR_DIR=$pair_stage
+      else
+        pair_allowed=0
+        rc=1
+      fi
+      ;;
+  esac
   for item in $FM_INHERITABLE_CONFIG; do
     case "$item" in
-      ''|/*|.|..|../*|*/../*|*/..) return 1 ;;
+      ''|/*|.|..|../*|*/../*|*/..)
+        [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
+        return 1
+        ;;
     esac
     if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ] && fm_config_inherit_item_session_scoped "$item"; then
       record_inheritable_config_result "$item" unchanged "session-scoped"
       continue
     fi
-    src="$src_config/$item"
+    case "$item" in
+      model-index.json|crew-dispatch.json)
+        if [ "$pair_allowed" = 0 ]; then
+          reason=$pair_reason
+          warn_inheritable_config_skip "$item" "$dest_config" "$reason"
+          record_inheritable_config_result "$item" skipped "$reason"
+          continue
+        fi
+        ;;
+    esac
+    if ! src=$(fm_config_inherit_source "$src_config" "$item"); then
+      [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
+      return 1
+    fi
     dest="$dest_config/$item"
     if ! source_present=$(fm_config_source_present "$src"); then
       reason="cannot inspect primary source"
@@ -657,6 +765,7 @@ propagate_inheritable_config() {
       record_inheritable_config_result "$item" unchanged ""
     fi
   done
+  [ -z "$pair_stage" ] || rm -rf -- "$pair_stage"
   return "$rc"
 }
 
