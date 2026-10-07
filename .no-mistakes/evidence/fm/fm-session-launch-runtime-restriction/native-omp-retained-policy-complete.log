@@ -1,0 +1,53 @@
+/Users/charlesabrooker/tmp/fm-lab.Ct4iQB
+/Users/charlesabrooker/tmp/fm-lab.b0ru5v
+SCENARIO: Real canonical Omp replacement starts under retained enabled child policy
+spawned labmate harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-labmate worktree=/Users/charlesabrooker/tmp/fm-lab.b0ru5v
+ACTUAL NATIVE PANE:
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                         Tip: Pair up live: `/collab` shares your session through an end-to-end
+                          encrypted relay link — a teammate runs `/join <link>` to watch tool
+                                  calls stream and prompt the agent from their own omp
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: This is an isolated launch validation, not an operational task. Do not call any tools,
+ do not bootstrap, do not launch agents, do not modify any files. Reply exactly LAB_NATIVE_OMP_READY_71 and then wait
+ for further instructions.
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ LAB_NATIVE_OMP_READY_71
+
+❯
+ π · ◒ GPT-6.1-Sol 👁 · 🗑 fm-lab.b0ru5v · ⑂ main ?3 · ◫ 6.9%/272K ⟲ · S0.04                                  🆔 01a1166d
+REAL PANE PROCESS: omp
+SCENARIO: Manual replacement refuses Codex while actual Omp stays running
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ct4iQB
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.b0ru5v/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+POST-REFUSAL ACTUAL OMP STATE:
+backend_agent_state=alive
+CLEANUP: owned private tmux server and disposable homes removed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Ct4iQB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.b0ru5v/config: destination does not allow inherited item (not gitignored or guard failed)
+
+DRIVER EXIT: 0

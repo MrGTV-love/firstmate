@@ -1,0 +1,10 @@
+/Users/charlesabrooker/tmp/fm-lab.wGfM3V
+/Users/charlesabrooker/tmp/fm-lab.lEfu6E
+SCENARIO: Shared effective-child admission permits canonical Omp and successful writable policy removal
+canonical_omp_admitted=true retained_policy=omp-or-tc
+writable_child_policy_removed=true canonical_omp_admitted=true
+ALL TARGETED BOUNDARY SCENARIOS PASSED
+CLEANUP: owned private tmux server and disposable homes removed
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.lEfu6E/config: destination does not allow inherited item (not gitignored or guard failed)
+
+DRIVER EXIT: 0

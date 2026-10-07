@@ -1,0 +1,63 @@
+/Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+/Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+TOOLING ADVERSARY: child retains enabled policy but its control owner is obsolete
+SCENARIO: Direct replacement refuses retained-child Codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Direct replacement refuses opaque raw Omp command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Manual relaunch refuses configured Codex before stop
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate session-launch-policy inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Automatic dead-endpoint recovery refuses configured Codex before attempts/removal
+probe_state=dead probe_status=relaunchable
+recovery_status=skipped policy_refused=1 reason=fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate session-launch-policy inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Fresh secondmate refuses retained-child Codex before allocating endpoint
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Fresh secondmate refuses retained-child opaque raw command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: error: error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying session-launch-policy at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/config/session-launch-policy
+warning: secondmate labmate inheritance failed for /Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+error: secondmate session-launch-policy tooling is not verified at /Users/charlesabrooker/tmp/fm-lab.ZXNw0j/bin/fm-control.sh; restore this policy owner from the primary without discarding the child checkout or work before retrying
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+CLEANUP: owned private tmux server and disposable homes removed
+
+DRIVER EXIT: 0

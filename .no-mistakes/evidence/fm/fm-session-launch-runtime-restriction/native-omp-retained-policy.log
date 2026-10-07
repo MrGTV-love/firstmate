@@ -1,0 +1,75 @@
+/Users/charlesabrooker/tmp/fm-lab.RftTHx
+/Users/charlesabrooker/tmp/fm-lab.7GxzTK
+SCENARIO: Real canonical Omp replacement starts under retained enabled child policy
+spawned labmate harness=omp kind=secondmate mode=secondmate yolo=off window=primary:fm-labmate worktree=/Users/charlesabrooker/tmp/fm-lab.7GxzTK
+ACTUAL NATIVE PANE:
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.7.0
+
+                        Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                     parallel subagents — watch it glow as you type
+
+
+ ⁣FIRSTMATE_OP: v1 launch-brief: This is an isolated launch validation, not an operational task. Do not call any tools,
+ do not bootstrap, do not launch agents, do not modify any files. Reply exactly LAB_NATIVE_OMP_READY_71 and then wait
+ for further instructions.
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  ⎋ Working…
+
+❯
+ ⠏ 0s · ◒ GPT-6.1-Sol 👁 · 🗑 fm-lab.7GxzTK · ⑂ main ?3 · ◫ 7.7%/272K ⟲ · (sub)                               🆔 01a1166d
+REAL PANE PROCESS: omp
+SCENARIO: Manual replacement refuses Codex while actual Omp stays running
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.RftTHx
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.7GxzTK/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+POST-REFUSAL ACTUAL OMP STATE:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.RftTHx
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.7GxzTK/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.RftTHx
+error: 'state' is not a control verb
+allowed verbs:
+  interrupt
+  exit
+  relaunch
+  authorize-continuation
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state/labmate.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.RftTHx: Directory not empty
+
+DRIVER EXIT: 1

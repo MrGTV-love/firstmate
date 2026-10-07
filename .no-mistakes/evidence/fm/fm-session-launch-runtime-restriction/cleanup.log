@@ -1,1 +1,12 @@
-All owned private tmux servers were stopped using their own socket; fm-lab-home.sh teardown removed each socket directory. No default server or Herdr fleet operation was used. The targeted runner completed with exit 0. Owned scratch fixture directories removed; test-only source fix retained.
+All exact owned lab homes removed:
+/Users/charlesabrooker/tmp/fm-lab.BjQxwH
+/Users/charlesabrooker/tmp/fm-lab.AdFTDD
+/Users/charlesabrooker/tmp/fm-lab.wGfM3V
+/Users/charlesabrooker/tmp/fm-lab.lEfu6E
+/Users/charlesabrooker/tmp/fm-lab.RftTHx
+/Users/charlesabrooker/tmp/fm-lab.7GxzTK
+/Users/charlesabrooker/tmp/fm-lab.Ct4iQB
+/Users/charlesabrooker/tmp/fm-lab.b0ru5v
+/Users/charlesabrooker/tmp/fm-lab.Y6G0Um
+/Users/charlesabrooker/tmp/fm-lab.ZXNw0j
+Transient worktree driver removed. Private tmux servers killed through their owned sockets; fm-lab-home teardown completed. No permanent source or test changes.

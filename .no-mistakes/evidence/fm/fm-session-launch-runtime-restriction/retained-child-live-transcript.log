@@ -1,0 +1,59 @@
+/Users/charlesabrooker/tmp/fm-lab.BjQxwH
+/Users/charlesabrooker/tmp/fm-lab.AdFTDD
+SCENARIO: Direct replacement refuses retained-child Codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BjQxwH
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Direct replacement refuses opaque raw Omp command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BjQxwH
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'omp'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Manual relaunch refuses configured Codex before stop
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BjQxwH
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Automatic dead-endpoint recovery refuses configured Codex before attempts/removal
+probe_state=dead probe_status=relaunchable
+recovery_status=skipped policy_refused=1 reason=fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Fresh secondmate refuses retained-child Codex before allocating endpoint
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BjQxwH
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'codex'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Fresh secondmate refuses retained-child opaque raw command
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BjQxwH
+fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/tmp/fm-lab.AdFTDD/config: destination does not allow inherited item (not gitignored or guard failed)
+error: config/session-launch-policy=omp-or-tc refuses launch 'omp'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+exit=1
+PRESERVED: parent policy absent; child enabled policy, endpoint @1/%1, recovery ledger, metadata, HEAD, unpublished work, charter and custody unchanged; no forbidden executable reached
+SCENARIO: Shared effective-child admission permits canonical Omp and successful writable policy removal
+CLEANUP: owned private tmux server and disposable homes removed
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin/fm-session-launch-policy-lib.sh: line 113: fm_lock_try_acquire: command not found
+error: cannot acquire secondmate session-launch-policy inheritance lock: /Users/charlesabrooker/tmp/fm-lab.AdFTDD
+
+DRIVER EXIT: 1

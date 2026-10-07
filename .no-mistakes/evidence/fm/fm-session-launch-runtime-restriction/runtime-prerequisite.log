@@ -1,0 +1,5 @@
+command: command -v tc
+exit: 1
+stdout: 
+stderr: 
+No standalone Codex or Claude sessions were launched. Native tc adapter remains an accepted unavailable prerequisite (docs/configuration.md:801-805).
