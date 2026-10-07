@@ -1,9 +1,10 @@
 ---
 name: diagnostic-reasoning
 description: >-
-  Agent-only procedure for diagnosing reported bugs.
+  Agent-only procedure for diagnosing reported bugs and recurring mistakes.
   Use before scoping a reported bug and before acting on a diagnostic report.
-  Owns end-user-aligned reproduction, causal separation, divergent-path and history inspection, counterfactual testing, and disconfirming evidence.
+  Also use when the captain asks what agents keep getting wrong or for a repeat-mistake sweep, and when a second instance of an already-seen mistake class surfaces.
+  Owns end-user-aligned reproduction, causal separation, divergent-path and history inspection, counterfactual testing, disconfirming evidence, the strongest-guard-first remedy order, and the repeat-mistake sweep.
 user-invocable: false
 metadata:
   internal: true
@@ -51,3 +52,40 @@ Before acting on the report, verify that its claimed cause explains the end-user
 If a load-bearing element is missing, route a focused follow-up investigation instead of treating confidence or implementation detail as proof.
 A diagnosis or implementation-ready recommendation is evidence, not authorization to change code.
 Implementation still requires the captain's request or another existing lifecycle authority, and the reproduction should become the regression test when a fix is authorized.
+
+## Recurring mistakes: strongest guard first
+
+When one class of mistake recurs, a one-time fix or a new prose prohibition is the weakest remedy.
+Prefer the strongest guard that makes the mistake impossible or loudly rejected, in this order:
+
+1. **Architecture** - change the structure so the mistake cannot be expressed, such as one owner for a contract, one entry point, or removing the option.
+2. **Types** - make the wrong shape fail validation, such as a schema, an enum, or a typed interface.
+3. **Lint** - add a check whose error message names the fix, in the project's own lint owner.
+4. **Behavioral test** - add an executable test that fails on the recorded mistake; the diagnostic reproduction becomes that regression test.
+5. **Docs** - use only where no mechanical guard can express the rule, and place it through the `firstmate-coding-guidelines` knowledge-placement tree.
+
+Choose the first rung that would have rejected a recorded instance of the mistake, and name that instance.
+A guard that would not have caught a recorded instance is not a remedy.
+When a guard already exists and missed the instance, the remedy is repairing that guard.
+Stop at the first rung that works rather than stacking several.
+Some judgments cannot be reduced to a deterministic check; say so and use the strongest rung that honestly applies.
+This ladder only orders remedies, so the diagnosis-is-evidence rule above still holds and every remedy ships through a normal task and its delivery mode.
+
+## Repeat-mistake sweep
+
+Run the sweep when the captain asks what agents keep getting wrong, or when you notice a second instance of a mistake class while handling other work.
+Nothing schedules it automatically.
+The sweep reads and files; it never fixes.
+
+1. Read the evidence: `data/learnings.md` and `data/memory-archive.md`, the `state/*.status` events still on disk, scout reports under `data/<id>/report.md`, no-mistakes findings snapshots under `data/<id>/nm-*-findings.txt`, and failed CI runs and review findings on recent task PRs read through `gh-axi`.
+2. Group instances into mistake classes by root cause, using the trigger, masking condition, and symptom separation above, not by matching wording.
+3. Count evidence per class: list every instance with its source and date.
+   A class qualifies for a guard at two or more instances from different tasks.
+   Report every class found, including single-instance watch items, so nothing is hidden by the threshold.
+4. For each qualifying class, pick the ladder rung, name the recorded instance it would have rejected, and name any existing guard that missed.
+5. File each proposed guard as an ordinary backlog task through `bin/fm-tasks-axi.sh add`, after checking the backlog for an existing item on the same class.
+   Dispatch follows normal intake and the project's delivery mode.
+   Never fix inline, and never edit a project's `AGENTS.md` or `CLAUDE.md`; guidance for firstmate's own material goes through `firstmate-coding-guidelines`.
+6. Report every class with its evidence count, chosen rung, and filed task id.
+
+A learnings entry records the gotcha until a guard lands; it is never the remedy for a class that qualified for one.
