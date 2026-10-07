@@ -2534,7 +2534,8 @@ In supported steady state, a home with no registered source runs nothing, genera
 
 Whether a captured result is a routine no-op is adapter knowledge too, and the runner names no adapter-specific condition for it either.
 
-- Before publishing, the runner asks the immutable captured owner through the built-in `silent` command or external `result.silent` operation and treats exit 0 as the only silence verdict: the result is recorded as durably handled and never announced, so it neither wakes a handler now nor returns on a later reconcile.
+- Built-in capture asks the adapter's `silent` command about the completed private staging payload and installs its durable handled marker before the result becomes visible; an interrupted marker-only capture cannot lend its acknowledgement to a later result.
+- Publication retains the immutable captured owner's built-in `silent` command or external `result.silent` operation for recovery, treating exit 0 as the only silence verdict: a durably handled result is never announced, so it neither wakes a handler now nor returns on a later reconcile.
 - The task-owned terminal exception is evaluated first, so an empty terminal board round goes to its owner's steering inbox for the required conclusion instead of entering this generic silence path.
 - A missing command, an error, any other exit, or a silence the runner cannot durably record all publish the `check` wake exactly as before, so an adapter with no notion of a no-op needs no change and an unknown or degraded result always reaches its handler.
 - For built-ins, silence remains independent of the keyed-answer feed below: suppressing an announcement never suppresses the captain's own answer.
