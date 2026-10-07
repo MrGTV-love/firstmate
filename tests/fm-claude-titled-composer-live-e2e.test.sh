@@ -48,6 +48,9 @@ if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND:-0}" = 1 ]; then
 fi
 if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH:-0}" = 1 ]; then
   LIVE_CONTROLS="$LIVE_CONTROLS,FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH"
+  if [ -n "${ANTHROPIC_API_KEY:-}" ] || [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+    fail "live Claude relaunch does not authorize API billing; unset ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and use the subscription route"
+  fi
 fi
 fm_live_gate default-on "$LIVE_CONTROLS" herdr jq claude git node
 
