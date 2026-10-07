@@ -1381,11 +1381,11 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ### Pooled OMP capacity and declared stand-ins
 
-Fresh-spawn routing reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
-OMP's own `usage --provider openai-codex --json`, measured through the owned initialized worker pane in its destination working directory under the same authentication boundary as launch, is authoritative for that surface, not quota-axi's single-account Codex row.
-Shared OMP usage and model-catalog queries require that initialized endpoint and a nonempty, resolvable destination directory; standalone capacity inspection and typed intake have no owned worker endpoint, so their OMP capacity remains unknown without probing a reconstructed environment or the caller's directory, and classification consumes only explicitly supplied usage JSON.
+Fresh-spawn routing internally classifies the pool and accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model.
+OMP's own `usage --provider openai-codex --json`, measured through the owned initialized worker pane in its destination working directory under the same authentication boundary as launch, is authoritative for that classification, not quota-axi's single-account Codex row.
+Shared OMP usage and model-catalog queries require that initialized endpoint and a nonempty, resolvable destination directory; typed intake has no owned worker endpoint, so its OMP capacity remains unknown without probing a reconstructed environment or the caller's directory, and classification consumes only explicitly supplied usage JSON.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
-Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
+Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; classification retains saved resets but never redeems them or counts them as present capacity.
 Chat and Spark consume independent windows and meter verdicts; negative shared meter flags alone cannot prove exhaustion without a current model-scoped limit, and paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify regardless of model-ID casing.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
 When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
@@ -1519,10 +1519,10 @@ This section is the single owner of the tool's operator contract; the script hea
 Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFIG_OVERRIDE` selects the config directory for tests and specialized setup like the other scripts.
 
 ```sh
-bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name> --cwd <project-path>
+bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>
 ```
 
-The project name is a task label, not a filesystem scope; `--cwd` names the intended destination directory but does not establish an initialized worker's authentication environment.
+The project name is a task label, not a filesystem scope.
 Typed intake therefore retains unknown native Claude and OMP capacity and cannot activate their stand-ins from reconstructed credentials; fresh spawn performs authoritative selection through the acquired worker pane.
 
 **When firstmate invokes the resolver**

@@ -27,11 +27,6 @@ BRIEF="$TMP_ROOT/brief.md"
 BASE_RULES="$TMP_ROOT/rules.json"
 RULES="$HOME_DIR/config/crew-dispatch.json"
 QUOTA="$TMP_ROOT/quota.json"
-CATALOG_PROJECT="$TMP_ROOT/destination project"
-CATALOG_CALLER="$TMP_ROOT/caller project"
-mkdir -p "$CATALOG_PROJECT/.omp" "$CATALOG_CALLER/.omp"
-CATALOG_PROJECT=$(cd "$CATALOG_PROJECT" && pwd -P)
-CATALOG_CALLER=$(cd "$CATALOG_CALLER" && pwd -P)
 BASE_PATH=$PATH
 mkdir -p "$HOME_DIR/config" "$LOG" "$NO_CURL_BIN"
 export FM_BACKEND=tmux
@@ -1617,7 +1612,7 @@ for serving in false true; do
       esac
       reset_log
       TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/projected-pool.json" \
-        QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+        QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
       expect_code 0 "$code" "unowned $selector $policy serving=$serving resolves normally"
       assert_contains "$out" '  status: escalate' "projected OMP auth never establishes usable or exhausted capacity"
       assert_contains "$out" 'pool={"status":"unknown","accounts":[],' "unowned pool remains unknown"
@@ -1630,43 +1625,17 @@ for serving in false true; do
     rm -f "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global" "$HOME_DIR/config/launch-env-allowlist"
   done
 done
-for unknown_scope in absent label empty; do
+for unknown_scope in absent label; do
   reset_log
   case "$unknown_scope" in
     absent) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" ;;
-    label) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --project "$CATALOG_PROJECT" ;;
-    empty) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd '' ;;
+    label) TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --project "destination project" ;;
   esac
   assert_contains "$out" '  status: escalate' "$unknown_scope destination scope stays unranked"
   assert_not_contains "$out" '  profile:' "$unknown_scope destination scope never authorizes fallback"
   assert_absent "$LOG/catalog-cwd" "unowned destination scope never queries catalog"
   assert_absent "$LOG/usage-cwd" "unowned destination scope never queries usage"
 done
-reset_log
-TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$TMP_ROOT/missing destination"
-expect_code 2 "$code" "invalid resolver cwd remains a configuration error"
-assert_contains "$err" '--cwd must name an existing project directory' "invalid resolver cwd names its configuration error"
-assert_absent "$LOG/usage-cwd" "invalid resolver cwd does not invoke usage"
-assert_absent "$LOG/catalog-cwd" "invalid resolver cwd does not invoke models"
-saved_cwd=$PWD
-for destination_enabled in false true; do
-  if [ "$destination_enabled" = false ]; then
-    destination_disabled='["openrouter"]'; caller_disabled='[]'
-  else
-    destination_disabled='[]'; caller_disabled='["openrouter"]'
-  fi
-  printf '{"disabledProviders":%s}\n' "$destination_disabled" > "$CATALOG_PROJECT/.omp/config.yml"
-  printf '{"disabledProviders":%s}\n' "$caller_disabled" > "$CATALOG_CALLER/.omp/config.yml"
-  reset_log
-  cd "$CATALOG_CALLER" || exit 1
-  TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT/."
-  cd "$saved_cwd" || exit 1
-  assert_contains "$out" '  status: escalate' "project catalog enabled=$destination_enabled is not initialized endpoint evidence"
-  assert_not_contains "$out" '  profile:' "neither caller nor destination config establishes fallback support"
-  assert_absent "$LOG/catalog-cwd" "unowned project config never invokes models"
-  assert_absent "$LOG/usage-cwd" "unowned project config never invokes usage"
-done
-rm "$CATALOG_PROJECT/.omp/config.yml" "$CATALOG_CALLER/.omp/config.yml"
 pass "typed OMP probes stay unknown and never query projected auth or catalogs"
 cp "$RULES" "$TMP_ROOT/exhausted-primary-rules.json"
 jq '.rules[3].use = [
@@ -1681,7 +1650,7 @@ for summary_choice in rule_4 default; do
     .answers.rule.probabilities[$choice] = 0.96' "$RESPONSE" > "$TMP_ROOT/summary-response.json"
   cp "$TMP_ROOT/summary-response.json" "$RESPONSE"
   reset_log
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
   expect_code 0 "$code" "unowned pool summary resolves for $summary_choice"
   assert_contains "$out" '  status: clear' "measured sibling clears $summary_choice beside an unowned pool"
   assert_contains "$out" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "$summary_choice chooses the measured Cursor candidate"
@@ -1708,7 +1677,7 @@ for gate in profile rule; do
     jq --argjson serving "$serving" '
       .reports[].metadata.meterStates.chat={allowed:$serving,limitReached:($serving|not)}
     ' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/floor-pool.json"
-    TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/floor-pool.json" QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+    TYPESAFE_API_KEY=$KEY OMP_USAGE_FIXTURE="$TMP_ROOT/floor-pool.json" QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
     assert_contains "$out" '  status: escalate' "an unverifiable $gate floor gates serving=$serving pool"
     assert_not_contains "$out" '  profile:' "pool exhaustion cannot bypass the $gate floor"
   done
@@ -1756,7 +1725,7 @@ pass "omitted-model OMP Codex rule floors gate picked and runner-up rules withou
 jq '.reports[1].fetchedAt=0' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/stale-pool.json"
 mv "$TMP_ROOT/stale-pool.json" "$OMP_USAGE_FIXTURE"
 reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "unknown pooled capacity does not authorize paid fallback"
 assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use the stand-in"
 cp "$BASE_RULES" "$RULES"
@@ -1774,7 +1743,7 @@ for exhaustion in runway percent healthy; do
       (.effectivePercentRemaining=(if $exhaustion=="healthy" then 100 else 0 end) |
        .runway.status=(if $exhaustion=="runway" then "exhausted_now" elif $exhaustion=="healthy" then "through_reset" else "unknown" end))
   ' "$QUOTA" > "$TMP_ROOT/direct-claude-empty.json"
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
   assert_contains "$out" '  status: escalate' "unbound Claude $exhaustion quota cannot authorize dispatch"
   assert_contains "$out" 'pool={"status":"unknown"}  -> eligible, unranked:' "projected native quota stays unbound"
   assert_not_contains "$out" '  profile:' "unbound native Claude never activates its permitted stand-in"
@@ -1790,7 +1759,7 @@ for exhaustion in runway percent healthy; do
       .rules[3].use.floor={scope:$scope,min_percent:$min}
     ' "$RULES" > "$TMP_ROOT/claude-profile-floor.json"
     cp "$TMP_ROOT/claude-profile-floor.json" "$RULES"
-    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
+    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
     assert_contains "$out" '  status: escalate' "an unbound $floor_state profile floor cannot authorize $exhaustion routing"
     assert_contains "$out" 'pool={"status":"unknown"}  -> eligible, unranked:' "profile floors never borrow unbound default quota"
     assert_not_contains "$out" '  profile:' "neither failing nor passing projected floor establishes authentication"

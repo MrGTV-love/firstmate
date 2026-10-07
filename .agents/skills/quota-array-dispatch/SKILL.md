@@ -52,7 +52,7 @@ Below-floor is rare: bootstrap enforces `FM_QUOTA_AXI_MIN` and normally reports 
 `--json` is a defensive belt, not a habit; never reach for it because it feels more complete.
 Read `quota-axi auth --json` only when a candidate's credential surface is in question.
 
-For an OMP `openai-codex/` candidate, follow the [pooled-capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins); standalone capacity inspection cannot establish initialized worker authentication or authorize the selected rule's stand-ins.
+For an OMP `openai-codex/` candidate, follow the [pooled-capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins); typed intake has no initialized worker authentication evidence and cannot authorize the selected rule's stand-ins.
 Quota-axi's single Codex account cannot veto a usable OMP sibling.
 Disclose pool economics as unknown and apply the [selection procedure below](#rank-by-spendpriority), not the exhausted sibling's economics.
 Provider-level quota notifications from `fm-procevent-quota.sh` are not proof that an OMP account pool is exhausted; reconcile the concrete OMP route before parking it.

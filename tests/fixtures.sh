@@ -127,12 +127,13 @@ pane_consume() {
     . "$1/env.sh" || exit
     IFS= read -r pane_cwd < "$1/cwd"
     cd -- "$pane_cwd" || exit
+    [ "$3" != 1 ] || set -e
     eval "$2"
     pane_status=$?
     export -p > "$1/env.sh"
     pwd -P > "$1/cwd"
     exit "$pane_status"
-  ' _ "$pane_state" "$1"
+  ' _ "$pane_state" "$1" "${FM_FAKE_PANE_ERREXIT:-0}"
 }
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;

@@ -2626,7 +2626,7 @@ fm_dispatch_endpoint_query() {
   command="$(shell_quote "$runner") -c $(shell_quote '. "$1"; shift; fm_run_timed 20 /bin/sh -c "$1"') _ $(shell_quote "$SCRIPT_DIR/fm-timeout-lib.sh") $(shell_quote "$command")"
   command=$(spawn_launch_env_wrap "$command")
   query_dir=$(mktemp -d "$STATE/.dispatch-query.XXXXXX") || return 125
-  if ! printf '%s\n' "( $command ) >$(shell_quote "$query_dir/stdout") 2>/dev/null; printf '%s\\n' \"\$?\" >$(shell_quote "$query_dir/status.tmp"); mv -- $(shell_quote "$query_dir/status.tmp") $(shell_quote "$query_dir/status")" > "$query_dir/script"; then
+  if ! printf '%s\n' "if ( $command ) >$(shell_quote "$query_dir/stdout") 2>/dev/null; then printf '0\\n'; else printf '%s\\n' \"\$?\"; fi >$(shell_quote "$query_dir/status.tmp"); mv -- $(shell_quote "$query_dir/status.tmp") $(shell_quote "$query_dir/status")" > "$query_dir/script"; then
     rm -rf "$query_dir"
     return 125
   fi

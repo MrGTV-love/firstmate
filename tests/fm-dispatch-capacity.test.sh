@@ -513,10 +513,6 @@ for projected in healthy exhausted; do
         fm_dispatch_omp_query "$TMP_ROOT/config" "$session" "$cwd" omp "$operation" --json > "$TMP_ROOT/result" || rc=$?
         assert_equals 125 "$rc" "unowned $operation query must fail closed"
       done
-      capacity_args=(--harness omp --model openai-codex/gpt-6.1-sol --json)
-      [ -z "$cwd" ] || capacity_args+=(--cwd "$cwd")
-      out=$("$ROOT/bin/fm-dispatch-capacity.sh" "${capacity_args[@]}")
-      assert_equals unknown "$(jq -r .status <<<"$out")" "public $scope $projected projection stays unknown"
       assert_absent "$TMP_ROOT/usage-process-cwd" "unowned probes never invoke usage"
       assert_absent "$TMP_ROOT/catalog-process-cwd" "unowned probes never invoke models"
     ) || fail "unowned capacity must ignore projected authentication"
@@ -526,7 +522,7 @@ rm "$FAKEBIN/auth-selector" "$FAKEBIN/auth-value" \
   "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/tmux-recorded-env"
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol)
 assert_equals unknown "$(jq -r .status <<<"$out")" "classification without supplied usage never acquires it"
-pass "public and library probes reject tmux projections without an owned initialized endpoint"
+pass "library probes reject tmux projections without an owned initialized endpoint"
 
 if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '{"status":"exhausted"}' '' "$TMP_ROOT" \
   > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -656,9 +652,6 @@ for remaining in 0 70; do
     out=$(BACKEND="$backend" FM_FAKE_TMUX_UNREADABLE="$unreadable" \
       fm_dispatch_capacity claude claude-sonnet-5-5 "$TMP_ROOT/config" "$session" "$TMP_ROOT")
     assert_equals unknown "$(jq -r .status <<<"$out")" "$scope Claude quota $remaining needs owned endpoint binding"
-    out=$(BACKEND="$backend" FM_FAKE_TMUX_UNREADABLE="$unreadable" \
-      "$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
-    assert_equals unknown "$(jq -r .status <<<"$out")" "public $scope Claude quota $remaining is unbound"
     out=$(BACKEND="$backend" FM_FAKE_TMUX_UNREADABLE="$unreadable" \
       fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' "$session" "$TMP_ROOT")
     assert_equals false "$(jq -r .switched <<<"$out")" "$scope projected quota cannot switch Claude"

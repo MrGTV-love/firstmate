@@ -145,6 +145,7 @@ record_scope() {
 record_project() {
   printf 'process=%s\n' "$(pwd -P)" > "$1"
 }
+if [ -f "${0%/*}/fail-${1:-}" ]; then exit 1; fi
 case "$1" in
   models)
     if [ -d "${0%/*}/scope-fixtures" ]; then
@@ -273,7 +274,7 @@ JSON
     {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
     {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
   ]}' > "$CASE_DIR/usage.json"
-  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  out=$(FM_FAKE_PANE_ERREXIT=1 OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
   expect_code 0 $? "a healthy pooled sibling must permit launch: $out"
   assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "pooled launch must retain Luna"
 
@@ -285,7 +286,7 @@ JSON
 {"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
 JSON
   jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' > "$CASE_DIR/usage.json"
-  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  out=$(FM_FAKE_PANE_ERREXIT=1 OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
   status=$?
   expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
   assert_grep 'model=openrouter/z-ai/glm-5.3-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
@@ -565,6 +566,41 @@ test_spawn_unobserved_endpoint_probe_refuses_launch() {
   assert_absent "$HOME_DIR/state/$id.meta" "missing endpoint completion must publish no worker metadata"
   assert_equals '' "$(cat "$LAUNCH_LOG")" "missing endpoint completion must type no worker launch"
   pass "fresh spawn refuses missing endpoint completion rather than treating pending pane input as unknown capacity"
+}
+
+test_spawn_completed_probe_failure_with_errexit() {
+  local scenario rec id out status
+  for scenario in usage catalog fallback-catalog; do
+    id="omp-errexit-$scenario"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
+      > "$HOME_DIR/config/crew-dispatch.json"
+    if [ "$scenario" = usage ]; then
+      : > "$FAKEBIN_DIR/fail-usage"
+    else
+      : > "$FAKEBIN_DIR/fail-models"
+    fi
+    if [ "$scenario" = fallback-catalog ]; then
+      jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' \
+        > "$FAKEBIN_DIR/usage.json"
+    fi
+    out=$(FM_FAKE_PANE_ERREXIT=1 run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+      "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    assert_not_contains "$out" 'destination authentication query did not complete' "$scenario completed failure must not be mistaken for a missing completion"
+    if [ "$scenario" = fallback-catalog ]; then
+      expect_code 1 "$status" "exhaustion with a failed fallback catalog must refuse: $out"
+      assert_contains "$out" 'has exhausted capacity and no supported permitted fallback' "failed catalog cannot establish fallback support"
+      assert_absent "$HOME_DIR/state/$id.meta" "unsupported fallback must publish no worker metadata"
+      assert_equals '' "$(cat "$LAUNCH_LOG")" "unsupported fallback must type no worker launch"
+    else
+      expect_code 0 "$status" "$scenario completed failure must leave unknown evidence eligible: $out"
+      assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "$scenario completed failure must retain the primary model"
+      assert_not_contains "$out" 'fallback launched' "$scenario unknown evidence cannot activate fallback"
+    fi
+  done
+  pass "completed OMP usage and catalog failures publish status under pane errexit"
 }
 
 test_spawn_dirty_worktree_preserves_unlanded_work() {
@@ -1741,6 +1777,7 @@ test_spawn_launch_line_and_worker_wiring
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_exhausted_strongest_route_without_stand_in
 test_spawn_unobserved_endpoint_probe_refuses_launch
+test_spawn_completed_probe_failure_with_errexit
 test_spawn_dirty_worktree_preserves_unlanded_work
 test_spawn_catalog_matches_destination_provider_auth
 test_spawn_capacity_matches_destination_auth_and_allowlist
