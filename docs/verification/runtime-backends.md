@@ -1232,6 +1232,7 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
 - **A descendant omp must not take the markers.**
   An `omp --print` child that a turn ran loaded the same `.omp/extensions` from the same directory, wrote its own pid into `state/.omp-turnend-extension-loaded`, and died, leaving the supervision proof reading `not loaded` under a healthy session.
   Only the process named in `state/.lock` records itself or arms a watcher now, and the turn-end guard re-asserts its marker at every turn boundary.
+  The strengthened live guard requires a fresh lab-local success record written only after the requested child command exits successfully before checking either marker. It also brackets each busy-composer observation with semantic busy evidence and checks that evidence immediately before adapter submission.
 
 `tests/fm-omp-harness.test.sh` (restored-wake recovery, descendant sessions, marker self-repair), `tests/fm-composer-lib.test.sh` (the working-box fixtures are captures from this verification), `tests/fm-backend-herdr.test.sh` (the dropped-Enter and stale-frame submit cases), `tests/fm-operational-input.test.sh`, and `tests/fm-wake-queue.test.sh` (the stalled-loop Enter) carry the portable regressions.
 The scoped review correction passed the composer, tmux-submit, Orca/cmux/Zellij adapter, omp-harness, and wake-queue portable test files. A direct recovery API smoke submitted a footer-bearing borderless recorded wake once, confirmed the styled empty hint, and refused an earlier draft-glyph paragraph without another Enter. The strengthened live guard passed Bash syntax checking only; no new live recovery claim is made.
@@ -1242,7 +1243,7 @@ The live guard that refreshes this entry submits real prompts and stays opt-in:
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-Historical output from the earlier guard (the restored-wake probes lacked per-interruption freshness and queued-state assertions; the strengthened guard has not been rerun here):
+Historical output from the earlier guard (the restored-wake probes lacked per-interruption freshness and queued-state assertions, the marker probe lacked successful child-command evidence, and the busy-composer probes lacked current semantic busy assertions at their observations and submission; the strengthened guard has not been rerun here):
 
 ```text
 ok - live omp wake restore: omp (omp/18.7.0) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
