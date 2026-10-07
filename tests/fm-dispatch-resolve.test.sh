@@ -129,7 +129,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 cat > "$FAKE_CURL_LOG/body"
-sleep "${FAKE_CURL_DELAY:-0}"
+if [ "${FAKE_CURL_DELAY:-0}" != 0 ]; then sleep "$FAKE_CURL_DELAY"; fi
 cat /dev/fd/3 > "$FAKE_CURL_LOG/header" 2>/dev/null || printf 'fd3 unreadable\n' > "$FAKE_CURL_LOG/header"
 if [ -n "${FAKE_CURL_MUTATE_SOURCE:-}" ]; then
   cp "$FAKE_CURL_MUTATE_SOURCE" "${FAKE_CURL_MUTATE_TARGET:?}"
@@ -160,7 +160,7 @@ else
   printf 'quota-axi:clean\n' >> "${CHILD_ENV_LOG:?}"
 fi
 printf '%s\n' "$*" >> "${QUOTA_AXI_CALLS:?}"
-sleep "${FAKE_QUOTA_DELAY:-0}"
+if [ "${FAKE_QUOTA_DELAY:-0}" != 0 ]; then sleep "$FAKE_QUOTA_DELAY"; fi
 [ "${FAKE_QUOTA_FAIL:-0}" = 1 ] && exit 1
 [ "${1:-}" = --json ] || exit 2
 cat "${QUOTA_AXI_FIXTURE:?}"
@@ -1242,9 +1242,10 @@ for name in early-short early-long unknown; do
   assert_contains "$out" '  status: clear' "$name runway is a disclosed warning, not a veto"
   assert_contains "$out" "  profile: --harness 'codex' --model 'gpt-6-luna'" "$name runway keeps the highest-ranked profile"
   assert_contains "$out" '-> eligible [warning: ' "$name runway is disclosed on the candidate"
+  if [ "$name" = early-short ]; then
+    assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]' "an early projection names its confidence"
+  fi
 done
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-short.json" run code out err "$BRIEF"
-assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=early)]' "an early projection names its confidence"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$GUARD_QUOTA" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "a projection without confidence is a warning, not a veto"
 assert_contains "$out" '[warning: projected_exhaustion at all_models (usableRunwaySeconds=unknown projectionConfidence=unknown)]' "absent projection fields are disclosed as unknown"
@@ -1300,9 +1301,10 @@ for name in long early-long early-short unknown; do
   TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$name.json" run code out err "$BRIEF"
   assert_contains "$out" '  status: clear' "a $name visible reading ranks the pool"
   assert_contains "$out" "  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna'" "a $name visible reading authorizes the pooled profile"
+  if [ "$name" = early-long ]; then
+    assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
+  fi
 done
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-early-long.json" run code out err "$BRIEF"
-assert_contains "$out" 'candidate: omp:openai-codex/gpt-6-luna  provider=codex  scope=all_models  remaining=6%  spendPriority=0.9  runway=projected_exhaustion  -> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=80796 projectionConfidence=early)]' "an early pool projection is a disclosed warning"
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-short.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: escalate' "an established short visible projection is not viable"
 assert_contains "$out" '  reason: highest-ranked candidate omp:openai-codex/gpt-6-luna has established runway shorter than the 240-minute task horizon' "a short pool escalates like a single account"

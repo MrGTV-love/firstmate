@@ -289,6 +289,7 @@ pass 'native Codex, Claude initialization with a context-suffixed alias, omp sel
 
 # The inherited file is consumed in the destination home, proving policy
 # convergence rather than just allowlist membership or copied text.
+export FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json dispatch-never-send crew-harness trace-context keep-ai-trailers'
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$ROOT/bin/fm-config-inherit-lib.sh"
 SECOND="$TMP_ROOT/second"
@@ -363,18 +364,21 @@ for guarded in model-index.json crew-dispatch.json; do
         esac
       fi
       assert_retained_pair "$guard_home" "local $guarded $local_guard $presence"
-      printf 'config/\n' > "$guard_home/.gitignore"
-      propagate_inheritable_config "$PAIR_SOURCE" "$guard_home/config"
-      for member in model-index.json crew-dispatch.json; do
-        if [ -f "$PAIR_SOURCE/$member" ]; then
-          cmp -s "$PAIR_SOURCE/$member" "$guard_home/config/$member" || fail 'allowed local pair payload did not converge'
-        else
-          [ ! -e "$guard_home/config/$member" ] || fail 'allowed local pair absence did not converge'
+      # Guard removal convergence depends on source presence, not the former guard.
+      if [ "$guarded" = model-index.json ] && [ "$local_guard" = gitignore ]; then
+        printf 'config/\n' > "$guard_home/.gitignore"
+        propagate_inheritable_config "$PAIR_SOURCE" "$guard_home/config"
+        for member in model-index.json crew-dispatch.json; do
+          if [ -f "$PAIR_SOURCE/$member" ]; then
+            cmp -s "$PAIR_SOURCE/$member" "$guard_home/config/$member" || fail 'allowed local pair payload did not converge'
+          else
+            [ ! -e "$guard_home/config/$member" ] || fail 'allowed local pair absence did not converge'
+          fi
+        done
+        if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
+          [ "$(FM_HOME="$guard_home" "$TOOL" profiles "$guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+            || fail 'allowed local pair did not reach the destination profiles consumer'
         fi
-      done
-      if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
-        [ "$(FM_HOME="$guard_home" "$TOOL" profiles "$guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
-          || fail 'allowed local pair did not reach the destination profiles consumer'
       fi
     done
   done
@@ -771,25 +775,28 @@ for guarded in model-index.json crew-dispatch.json; do
           ;;
       esac
       set_pair_source "$presence"
-      for attempted in model-index.json crew-dispatch.json; do
-        for command in put absent; do
-          payload="$TMP_ROOT/incoming-index.json"
-          [ "$attempted" != crew-dispatch.json ] || payload="$TMP_ROOT/incoming-dispatch.json"
-          bytes=$(LC_ALL=C wc -c < "$payload" | tr -d ' ')
-          hash=$(fm_inherit_sha256 "$payload")
-          if [ "$command" = absent ]; then
-            payload="$TMP_ROOT/empty-inheritance"
-            bytes=0
-            hash=$empty_hash
-          fi
-          receiver_code=0
-          FM_HOME="$remote_guard_home" FM_STATE_OVERRIDE="$remote_guard_home/state" \
-            "$ROOT/bin/fm-remote-inherit.sh" "$command" "config/$attempted" "$bytes" "$hash" "$remote_generation" \
-            < "$payload" > "$TMP_ROOT/receiver-guard.out" 2>&1 || receiver_code=$?
-          [ "$receiver_code" -ne 0 ] || fail "direct receiver accepted $command $attempted with $guarded $remote_guard"
-          assert_contains "$(cat "$TMP_ROOT/receiver-guard.out")" 'inherited destination' 'direct receiver refusal must name its destination guard'
+      # Direct receiver guards do not inspect the sender's source-presence axis.
+      if [ "$presence" = both ]; then
+        for attempted in model-index.json crew-dispatch.json; do
+          for command in put absent; do
+            payload="$TMP_ROOT/incoming-index.json"
+            [ "$attempted" != crew-dispatch.json ] || payload="$TMP_ROOT/incoming-dispatch.json"
+            bytes=$(LC_ALL=C wc -c < "$payload" | tr -d ' ')
+            hash=$(fm_inherit_sha256 "$payload")
+            if [ "$command" = absent ]; then
+              payload="$TMP_ROOT/empty-inheritance"
+              bytes=0
+              hash=$empty_hash
+            fi
+            receiver_code=0
+            FM_HOME="$remote_guard_home" FM_STATE_OVERRIDE="$remote_guard_home/state" \
+              "$ROOT/bin/fm-remote-inherit.sh" "$command" "config/$attempted" "$bytes" "$hash" "$remote_generation" \
+              < "$payload" > "$TMP_ROOT/receiver-guard.out" 2>&1 || receiver_code=$?
+            [ "$receiver_code" -ne 0 ] || fail "direct receiver accepted $command $attempted with $guarded $remote_guard"
+            assert_contains "$(cat "$TMP_ROOT/receiver-guard.out")" 'inherited destination' 'direct receiver refusal must name its destination guard'
+          done
         done
-      done
+      fi
       printf -- '- remote - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-10-06)\n' \
         "$ROOT" "$remote_guard_home" > "$PUSH/home/data/secondmates.md"
       printf 'retain-trailers\n' > "$remote_guard_home/config/keep-ai-trailers"
@@ -821,22 +828,25 @@ for guarded in model-index.json crew-dispatch.json; do
       cp "$remote_guard_home/guarded-payload" "$remote_guard_home/config/$guarded"
       assert_retained_pair "$remote_guard_home" "remote $guarded $remote_guard $presence"
       remote_generation=$((remote_generation + 1))
-      FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" FM_CONFIG_OVERRIDE="$PAIR_SOURCE" \
-        FM_CONFIG_INHERIT_LIVE=1 FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
-        "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
-        > "$TMP_ROOT/sender-success.out" 2>&1 || fail "unguarded remote pair was refused: $(cat "$TMP_ROOT/sender-success.out")"
-      for member in model-index.json crew-dispatch.json; do
-        if [ -f "$PAIR_SOURCE/$member" ]; then
-          cmp -s "$PAIR_SOURCE/$member" "$remote_guard_home/config/$member" || fail 'allowed remote pair payload did not converge'
-        else
-          [ ! -e "$remote_guard_home/config/$member" ] || fail 'allowed remote pair absence did not converge'
+      # Guard removal convergence depends on source presence, not the former guard.
+      if [ "$guarded" = model-index.json ] && [ "$remote_guard" = symlink ]; then
+        FM_HOME="$PUSH/home" FM_ROOT_OVERRIDE="$PUSH/root" FM_CONFIG_OVERRIDE="$PAIR_SOURCE" \
+          FM_CONFIG_INHERIT_LIVE=1 FM_SSH_BIN="$PUSH/jqbin/inherit-ssh" \
+          "$ROOT/bin/fm-remote-inherit-push.sh" remote "$remote_generation" \
+          > "$TMP_ROOT/sender-success.out" 2>&1 || fail "unguarded remote pair was refused: $(cat "$TMP_ROOT/sender-success.out")"
+        for member in model-index.json crew-dispatch.json; do
+          if [ -f "$PAIR_SOURCE/$member" ]; then
+            cmp -s "$PAIR_SOURCE/$member" "$remote_guard_home/config/$member" || fail 'allowed remote pair payload did not converge'
+          else
+            [ ! -e "$remote_guard_home/config/$member" ] || fail 'allowed remote pair absence did not converge'
+          fi
+        done
+        if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
+          [ "$(FM_HOME="$remote_guard_home" "$TOOL" profiles "$remote_guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
+            || fail 'allowed remote pair did not reach the destination profiles consumer'
         fi
-      done
-      if [ "$presence" = both ] || [ "$presence" = dispatch-only ]; then
-        [ "$(FM_HOME="$remote_guard_home" "$TOOL" profiles "$remote_guard_home/config/crew-dispatch.json" | jq -r '.default.model')" = current ] \
-          || fail 'allowed remote pair did not reach the destination profiles consumer'
+        remote_generation=$((remote_generation + 1))
       fi
-      remote_generation=$((remote_generation + 1))
     done
   done
 done

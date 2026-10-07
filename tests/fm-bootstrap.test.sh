@@ -1265,32 +1265,22 @@ test_model_roles_preserve_offline_bootstrap() {
 }
 
 test_remote_guarded_pair_notifications() {
-  local caller dir home primary remote fakebin marker out rc mode records python_bin
+  local caller dir home primary remote fakebin marker out rc mode records python_bin shared
   python_bin=$(command -v python3) || fail "python3 is required for remote notification tests"
-  for caller in fm-config-push.sh fm-bootstrap.sh; do
-    dir="$TMP_ROOT/guarded-notify-$caller"
-    home="$dir/home"
-    primary="$dir/primary"
-    remote="$dir/remote"
-    mkdir -p "$home/config" "$home/data" "$home/state" "$primary" "$remote/config" "$remote/state"
-    git init -q -b main "$primary"
-    printf 'primary\n' > "$primary/AGENTS.md"
-    mkdir -p "$primary/bin"
-    cp "$ROOT"/bin/fm-remote-*.sh "$primary/bin/"
-    git -C "$primary" add AGENTS.md bin
-    git -C "$primary" -c user.name=Test -c user.email=test@example.invalid commit -qm seed
-    printf 'retained index\n' > "$dir/index-target"
-    ln -s "$dir/index-target" "$remote/config/model-index.json"
-    printf 'retained dispatch\n' > "$remote/config/crew-dispatch.json"
-    printf 'codex\n' > "$home/config/crew-harness"
-    printf -- '- mate - remote fixture (host: host-mate; root: %s; home: %s; scope: test; projects: alpha; added 2026-08-02)\n' \
-      "$ROOT" "$remote" > "$home/data/secondmates.md"
-    fm_write_secondmate_meta "$home/state/mate.meta" "$remote"
-    printf 'remote_host=host-mate\n' >> "$home/state/mate.meta"
-    fakebin=$(make_fake_toolchain "$dir")
-    add_real_jq "$fakebin"
-    ln -s "$python_bin" "$fakebin/python3"
-    cat > "$fakebin/fake-ssh" <<'SH'
+  # Tracked code and tool installation are immutable; each caller owns its
+  # separate config, notification log, and durable retry state.
+  shared="$TMP_ROOT/guarded-notify-shared"
+  primary="$shared/primary"
+  mkdir -p "$primary/bin"
+  git init -q -b main "$primary"
+  printf 'primary\n' > "$primary/AGENTS.md"
+  cp "$ROOT"/bin/fm-remote-*.sh "$primary/bin/"
+  git -C "$primary" add AGENTS.md bin
+  git -C "$primary" -c user.name=Test -c user.email=test@example.invalid commit -qm seed
+  fakebin=$(make_fake_toolchain "$shared")
+  add_real_jq "$fakebin"
+  ln -s "$python_bin" "$fakebin/python3"
+  cat > "$fakebin/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
@@ -1323,7 +1313,20 @@ if args[0] == "fm-remote-secondmate-control.sh":
             f.write(args[3] + "\n")
 ' "$@"
 SH
-    chmod +x "$fakebin/fake-ssh"
+  chmod +x "$fakebin/fake-ssh"
+  for caller in fm-config-push.sh fm-bootstrap.sh; do
+    dir="$TMP_ROOT/guarded-notify-$caller"
+    home="$dir/home"
+    remote="$dir/remote"
+    mkdir -p "$home/config" "$home/data" "$home/state" "$remote/config" "$remote/state"
+    printf 'retained index\n' > "$dir/index-target"
+    ln -s "$dir/index-target" "$remote/config/model-index.json"
+    printf 'retained dispatch\n' > "$remote/config/crew-dispatch.json"
+    printf 'codex\n' > "$home/config/crew-harness"
+    printf -- '- mate - remote fixture (host: host-mate; root: %s; home: %s; scope: test; projects: alpha; added 2026-08-02)\n' \
+      "$ROOT" "$remote" > "$home/data/secondmates.md"
+    fm_write_secondmate_meta "$home/state/mate.meta" "$remote"
+    printf 'remote_host=host-mate\n' >> "$home/state/mate.meta"
     marker="$home/state/.secondmate-nudge-pending/mate.pending"
     : > "$dir/notifications"
     for mode in changed send-fail retry unchanged sync-fail sync-retry; do

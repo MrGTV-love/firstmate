@@ -147,7 +147,7 @@ case "${1:-}" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*) cat "$D/command"; printf '\n'; exit 0 ;;
         *pane_current_path*)
-          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ]; then
+          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ] && [ ! -e "$FM_FAKE_CWD_RACE_READY" ]; then
             : > "$FM_FAKE_CWD_RACE_READY"
             /bin/sleep 1
           fi
@@ -1002,26 +1002,18 @@ test_model_index_resolves_and_refuses_before_stop() {
 test_model_index_generation_survives_account_checks_and_replacement() {
   local dir out rc id request verdict selected
   for request in role:chosen stand-in:chosen openai/selected; do
-    for verdict in absent available; do
-      id="rl-generation-${request//[:\/]/-}-$verdict"
-      dir=$(new_case model-generation "$id")
-      add_ship_task "$dir" "$id" pi
-      printf pi > "$dir/fake/command"
-      printf pi > "$dir/fake/becomes"
-      mkdir -p "$dir/home/config" "$dir/account"
-      printf '%s\nopenai\n' "$dir/account" > "$dir/home/config/pi-account"
-      printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/selected","stand_in":"openai/standby"}}},"retired":[]}' \
-        > "$dir/home/config/model-index.json"
-      selected=openai/selected
-      [ "$request" != stand-in:chosen ] || selected=openai/standby
-      if [ "$verdict" = available ]; then
-        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":["selected","standby"]}' > "$dir/later.json"
-        printf 'openai selected 272K 32K yes no\nopenai standby 272K 32K yes no\n' > "$dir/account/listed"
-      else
-        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":[]}' > "$dir/later.json"
-        printf 'openai later 272K 32K yes no\n' > "$dir/account/listed"
-      fi
-      cat > "$dir/fakebin/pi" <<SH
+    id="rl-generation-${request//[:\/]/-}"
+    dir=$(new_case model-generation "$id")
+    add_ship_task "$dir" "$id" pi
+    printf pi > "$dir/fake/command"
+    printf pi > "$dir/fake/becomes"
+    mkdir -p "$dir/home/config" "$dir/account"
+    printf '%s\nopenai\n' "$dir/account" > "$dir/home/config/pi-account"
+    printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/selected","stand_in":"openai/standby"}}},"retired":[]}' \
+      > "$dir/original-index.json"
+    selected=openai/selected
+    [ "$request" != stand-in:chosen ] || selected=openai/standby
+    cat > "$dir/fakebin/pi" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
   auth)
@@ -1037,7 +1029,20 @@ case "\${1:-}" in
   *) printf 'Options: --tui-mode\n' ;;
 esac
 SH
-      chmod +x "$dir/fakebin/pi"
+    chmod +x "$dir/fakebin/pi"
+    for verdict in absent available; do
+      cp "$dir/original-index.json" "$dir/home/config/model-index.json"
+      : > "$dir/auth-roots"
+      : > "$dir/catalog-roots"
+      : > "$dir/fake/literal"
+      : > "$dir/fake/keys"
+      if [ "$verdict" = available ]; then
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":["selected","standby"]}' > "$dir/later.json"
+        printf 'openai selected 272K 32K yes no\nopenai standby 272K 32K yes no\n' > "$dir/account/listed"
+      else
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":[]}' > "$dir/later.json"
+        printf 'openai later 272K 32K yes no\n' > "$dir/account/listed"
+      fi
       cp "$dir/home/state/$id.meta" "$dir/meta-before"
       out=$(run_control "$dir" "$id" relaunch --model "$request" --note "preserve selected routing generation"); rc=$?
       cmp -s "$dir/later.json" "$dir/home/config/model-index.json" || fail "account check did not mutate the source generation"

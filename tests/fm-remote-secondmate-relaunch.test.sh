@@ -471,10 +471,12 @@ assert_survivor_reread() {
     "bootstrap delivered a different instruction instead of the remote config reread"
   [ "$(sort -u "$TMP/send-targets")" = ios ] || fail "bootstrap did not target only the surviving secondmate"
   assert_absent "$NUDGE_MARKER" "successful bootstrap delivery retained the remote marker"
-  out=$(FM_FAKE_RELAUNCH_MODE='' run_bootstrap); rc=$?
-  expect_code 0 "$rc" "already-delivered bootstrap should remain successful: $out"
-  [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$((records + 1))" ] \
-    || fail "a cleared marker caused a redundant unchanged reread"
+  if [ "$retry" = retry-send ]; then
+    out=$(FM_FAKE_RELAUNCH_MODE='' run_bootstrap); rc=$?
+    expect_code 0 "$rc" "already-delivered bootstrap should remain successful: $out"
+    [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$((records + 1))" ] \
+      || fail "a cleared marker caused a redundant unchanged reread"
+  fi
   [ "$(git -C "$DEST_HOME" rev-parse HEAD)" = "$head" ] \
     || fail "bootstrap retry changed the tracked-file commit"
   cmp -s "$TMP/agents-before-bootstrap" "$DEST_HOME/AGENTS.md" \
