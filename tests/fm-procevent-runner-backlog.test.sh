@@ -3,6 +3,7 @@
 set -u
 BOOTSTRAP=$(mktemp -d "$(dirname "${BASH_SOURCE[0]}")/../.fm-backlog-test.XXXXXX") || exit 1
 export TMPDIR="$BOOTSTRAP"
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-procevent-runner-backlog)
 export FM_HOME="$TMP_ROOT/home" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
@@ -27,8 +28,8 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 trap 'exit 131' QUIT
 wait_for() {
-  local i
-  for i in $(seq 1 100); do "$@" && return 0; sleep 0.1; done
+  local _
+  for _ in $(seq 1 100); do "$@" && return 0; sleep 0.1; done
   return 1
 }
 nonempty() { [ -s "$1" ]; }
@@ -87,9 +88,10 @@ HOLDER_PID=$!
 wait_for nonempty "$TMP_ROOT/lock-ready" || fail 'could not hold unrelated exact source lock'
 for round in 1 2; do
   printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","backlog round %s","","message",""\n' "$round" > "$ARTIFACT.expected$round"
-  cp "$ARTIFACT.expected$round" "$ARTIFACT.answer$round.tmp" \
-    && mv -f -- "$ARTIFACT.answer$round.tmp" "$ARTIFACT.answer$round" \
-    || fail "round $round answer publication failed"
+  if ! { cp "$ARTIFACT.expected$round" "$ARTIFACT.answer$round.tmp" \
+    && mv -f -- "$ARTIFACT.answer$round.tmp" "$ARTIFACT.answer$round"; }; then
+    fail "round $round answer publication failed"
+  fi
   result="$FM_HOME/state/procevent-inbox/$SOURCE_ID.$round.result"
   wait_for nonempty "$result" || fail "round $round was not captured while unrelated source stayed locked"
   cmp -s "$ARTIFACT.expected$round" "$result" || fail "round $round native bytes changed"
@@ -185,6 +187,8 @@ capture_pe() {
     "$ROOT/bin/fm-procevent.sh" "$@"
 }
 capture_posttool() {
+  # Expand variables in the child shell, not in this parent shell.
+  # shellcheck disable=SC2016
   printf '{"session_id":"capture-visibility"}\n' \
     | env -u GROK_AGENT -u GROK_HOOK_EVENT -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
         -u FM_PROCEVENT_IN_RUNNER \
@@ -226,9 +230,10 @@ start_capture() {
     capture_pe start "$CAPTURE_ID" > "$CAPTURE_DIR/runner.log" 2>&1 &
   CAPTURE_RUN_PID=$!
   wait_for nonempty "$CAPTURE_ARTIFACT.poll1" || fail 'capture fixture did not enter its native poll'
-  cp "$CAPTURE_DIR/payload" "$CAPTURE_ARTIFACT.answer1.tmp" \
-    && mv -f -- "$CAPTURE_ARTIFACT.answer1.tmp" "$CAPTURE_ARTIFACT.answer1" \
-    || fail 'could not supply capture fixture answer'
+  if ! { cp "$CAPTURE_DIR/payload" "$CAPTURE_ARTIFACT.answer1.tmp" \
+    && mv -f -- "$CAPTURE_ARTIFACT.answer1.tmp" "$CAPTURE_ARTIFACT.answer1"; }; then
+    fail 'could not supply capture fixture answer'
+  fi
   wait_for nonempty "$CAPTURE_DIR/ready" || fail 'runner did not reach the result-rename barrier'
   assert_equals "$CAPTURE_BASE.result" "$(cat "$CAPTURE_DIR/ready")" \
     'capture commits at the expected fresh sequence'
