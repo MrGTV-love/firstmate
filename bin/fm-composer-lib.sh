@@ -1897,6 +1897,33 @@ _fm_composer_locate_footer_zone() {  # <plain>
     && [ "$FM_COMPOSER_SCAN_BARE_ROW" -le "$FM_COMPOSER_FOOTER_LAST" ]
 }
 
+# Claude's slash popup repeats its prompt glyph on the selected menu row.
+# Demote only an immediately adjacent, more-indented choice with a padded
+# description matching the nonempty slash token inside a proven rule pair.
+# An empty parent, a same-glyph draft, or unrelated lower activity gains nothing.
+_fm_composer_claude_slash_choice() {  # <plain> <bare-row>
+  local plain=$1 bare=$2 parent choice parent_indent choice_indent
+  local token_re='^/[^[:space:]]+$' choice_re='^(/[^[:space:]]+)[[:space:]]{2,}[^[:space:]]'
+  [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" = 1 ] \
+    && [ "$FM_COMPOSER_SCAN_PI_GLYPH" = '❯' ] \
+    && [ "$bare" -eq "$((FM_COMPOSER_SCAN_PI_CLOSE + 1))" ] || return 1
+  parent=$(_fm_composer_screen_row "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" "$plain")
+  choice=$(_fm_composer_screen_row "$bare" "$plain")
+  fm_composer_normalize_spaces_var parent
+  fm_composer_normalize_spaces_var choice
+  parent_indent=${parent%%[![:space:]]*}
+  choice_indent=${choice%%[![:space:]]*}
+  [ "${#choice_indent}" -gt "${#parent_indent}" ] || return 1
+  fm_composer_normalize_trim_var parent
+  fm_composer_normalize_trim_var choice
+  case "$parent" in '❯'*) parent=${parent#❯} ;; *) return 1 ;; esac
+  case "$choice" in '❯'*) choice=${choice#❯} ;; *) return 1 ;; esac
+  fm_composer_normalize_trim_var parent
+  fm_composer_normalize_trim_var choice
+  [[ "$parent" =~ $token_re ]] && [[ "$choice" =~ $choice_re ]] || return 1
+  case "${BASH_REMATCH[1]}" in "$parent"*) return 0 ;; *) return 1 ;; esac
+}
+
 _fm_composer_select_cursorless() {
   local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0
   FM_COMPOSER_SELECTED_KIND=
@@ -1937,6 +1964,8 @@ _fm_composer_select_cursorless() {
     else
       bare=-1
     fi
+  elif _fm_composer_claude_slash_choice "$plain" "$bare"; then
+    bare=$FM_COMPOSER_SCAN_PI_GLYPH_ROW
   fi
   if [ "$bare" -gt "$generic" ]; then
     generic=$bare

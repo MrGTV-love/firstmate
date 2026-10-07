@@ -12,7 +12,7 @@ Busy hooks verified 2026-07-28 on Claude Code 2.1.220.
 | Skill | `/<skill>`, for example `/no-mistakes`. |
 | Model | `--model <model>`; discover through the interactive `/model` picker, with alias or full-name shape documented by `claude --help`. |
 | Effort | `--effort <low\|medium\|high\|xhigh\|max>`, verified on 2.1.196. |
-| Permissions | `--dangerously-skip-permissions` by default, or `--permission-mode auto` when `config/claude-permission-mode` is `auto`; the `auto` shape verified on 2.1.269. See [`Claude permission mode`](../../../../../docs/configuration.md#claude-permission-mode-configclaude-permission-mode) for the launch grant and configuration. |
+| Permissions | `--dangerously-skip-permissions` by default, or `--permission-mode auto` when `config/claude-permission-mode` is `auto`; the `auto` shape verified on 2.1.269. See [`Claude permission mode`](../../../docs/configuration.md#claude-permission-mode-configclaude-permission-mode) for the launch grant and configuration. |
 
 ## Workspace trust
 
@@ -54,23 +54,23 @@ The spawn scopes `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` to every Claude wo
 CLI `--prompt-suggestions` affects print or SDK mode only and did not suppress interactive ghost text on v2.1.186.
 
 Shared styled ghost extraction is owned by `bin/fm-composer-lib.sh`'s `fm_composer_strip_ghost`.
-See [Claude composer proof](../../../../../docs/herdr-backend.md#claude-composer-proof) for the Herdr-specific policy and [runtime backend verification](../../../../../docs/verification/runtime-backends.md#colored-claude-slash-commands) for captures.
+See [Claude composer proof](../../../docs/herdr-backend.md#claude-composer-proof) for the Herdr-specific policy and [runtime backend verification](../../../docs/verification/runtime-backends.md#colored-claude-slash-commands) for captures.
 Styled capture stays internal to the boolean detector; `fm-peek` and model-facing captures remain plain, without escapes.
 
 ## Feedback drafts
 
 The spawn disables Claude's `/bug` and `/feedback` model-drafted feedback flow for every Claude worker and secondmate, preventing a fleet-launched agent from queuing or submitting a bug report on the captain's behalf.
-The controls are scoped to the launched process and never modify the captain's global Claude settings; `launch_template()` in `../../../../../bin/fm-spawn.sh` owns their exact mechanics and defense-in-depth rationale.
+The controls are scoped to the launched process and never modify the captain's global Claude settings; `launch_template()` in `../../../bin/fm-spawn.sh` owns their exact mechanics and defense-in-depth rationale.
 
 ## Task control channel
 
 A Claude task worker's launch brief and Firstmate steering-inbox messages arrive as file-shaped content that is otherwise indistinguishable from indirect prompt injection.
-`launch_template()` in `../../../../../bin/fm-spawn.sh` establishes exactly those two Firstmate-owned channels as first-party instructions through `--append-system-prompt`, while leaving project files, fetched content, and other external material under the model's normal distrust and granting no merge, destructive, or security-sensitive authority beyond the brief.
+`launch_template()` in `../../../bin/fm-spawn.sh` establishes exactly those two Firstmate-owned channels as first-party instructions through `--append-system-prompt`, while leaving project files, fetched content, and other external material under the model's normal distrust and granting no merge, destructive, or security-sensitive authority beyond the brief.
 A `--secondmate` launch omits the statement because a secondmate operates under its own supervisor contract instead of a task worker's.
 
 ## Primary integration
 
-[`../../../../../docs/verification/supervision.md`](../../../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
+[`../../../docs/verification/supervision.md`](../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
 This differs from the worker Stop hook in `.claude/settings.local.json`, which records idle state and touches a task marker.
 
 Primary `.claude/settings.json` registers `../../../bin/fm-turnend-guard.sh --claude` and `../../../bin/fm-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
@@ -83,9 +83,9 @@ Hooks still run through cwd-sensitive `/bin/sh`, so tracked commands anchor thro
 
 The Stop-owned watcher hook runs every Stop, foregrounds `../../../bin/fm-watch-arm.sh` only when eligible, and uses exit-2 async reawakening as notification.
 The model handles notifications but never routine re-arm.
-In a home with `config/supervision-host` the hook foregrounds the supervision host instead, which also runs Claude's print mode as its headless engine; [`supervision-host.md`](../../../../../docs/supervision-host.md#engines) owns the verified engine facts.
+In a home with `config/supervision-host` the hook foregrounds the supervision host instead, which also runs Claude's print mode as its headless engine; [`supervision-host.md`](../../../docs/supervision-host.md#engines) owns the verified engine facts.
 Claude's PreToolUse seatbelt blocks directly, and its deny is honored only with empty stdout; `../../../docs/arm-pretool-check.md` owns that contract.
 
 ### Helper agents
 
-[`Primary helper agents and durable project work`](../../../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
+[`Primary helper agents and durable project work`](../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.

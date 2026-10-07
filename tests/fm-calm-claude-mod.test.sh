@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Portable checks for the Claude Code Calm mod (.claude/mods/firstmate-calm) that need
 # no Claude Code binary, so CI enforces them wherever Node runs:
-#   - the plugin's declared shape: one hooks module and nothing else, reached from the
-#     project's .claude/skills auto-load path through the tracked symlink, so nothing
-#     of it can load while CLAUDE_CODE_ENABLE_FUNCTION_HOOKS is off;
+#   - the plugin's loading declarations: one hooks module and no other entry points,
+#     reached from the project's .claude/skills auto-load path through the tracked
+#     symlink; validator-generated tooling files are not loading declarations;
 #   - the harness-neutral sprite core both harnesses share: the Pi widget's rendering
 #     is byte-for-byte the shared frame painted with standard ANSI codes, so extracting
 #     the core changed nothing Pi draws;
@@ -48,7 +48,7 @@ test_plugin_shape() {
     || fail "the Pi sprite path does not resolve to the mod's shared core"
   [ ! -e "$MOD/SKILL.md" ] || fail "the mod carries a SKILL.md and would load as a skill on every harness"
   cat >"$TMP_ROOT/shape.mjs" <<JS
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 const mod = ${MOD@Q};
 const manifest = JSON.parse(readFileSync(\`\${mod}/.claude-plugin/plugin.json\`, "utf8"));
 if (manifest.name !== "firstmate-calm") throw new Error(\`manifest name \${manifest.name}\`);
@@ -62,10 +62,6 @@ if (JSON.stringify(keys) !== JSON.stringify(["description", "modules"])) {
 }
 if (JSON.stringify(hooks.modules) !== JSON.stringify(["./register.ts"])) throw new Error("hooks.json names a different module");
 if (!existsSync(\`\${mod}/hooks/register.ts\`)) throw new Error("the hooks module is missing");
-const entries = readdirSync(mod).filter((name) => name !== ".claude-plugin").sort();
-if (JSON.stringify(entries) !== JSON.stringify(["hooks", "lib", "tests"])) {
-  throw new Error(\`the mod folder holds \${entries.join(", ")}: only hooks, lib, and tests may exist\`);
-}
 console.log("shape-ok");
 JS
   out=$(run_node "$TMP_ROOT/shape.mjs" 2>&1) || fail "plugin shape: $out"

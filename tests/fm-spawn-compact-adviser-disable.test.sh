@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# tests/fm-spawn-compact-adviser-disable.test.sh - every agent this fleet
-# launches must start with COMPACT_ADVISER_DISABLE=1 in its environment.
+# tests/fm-spawn-compact-adviser-disable.test.sh - the default-off and opted-in
+# automatic adviser policies must reach the actual launched process.
 #
 # The assertions never read bin/fm-spawn.sh's source. They drive the real spawn
 # against a fake pane and a real isolated git worktree, then EXECUTE the launch
@@ -15,7 +15,6 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-CONTROL="$ROOT/bin/fm-control.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-compact-adviser)
 
 # A synthetic pane value the launch must override rather than inherit: the
@@ -35,6 +34,7 @@ make_case() {
   launchlog="$case_dir/launch.log"
   panelog="$case_dir/pane.log"
   fakebin=$(fm_test_make_spawn_fakebin "$case_dir/fake")
+  fm_test_fake_sleep_noop "$fakebin"
   fm_test_spawn_home "$home" "$harness"
   fm_git_worktree "$proj" "$wt" "wt-$name"
   for id in "$@"; do
@@ -67,6 +67,16 @@ SH
   chmod +x "$1/$2"
 }
 
+install_launch_state_probe() {
+  cat > "$1/$2" <<'SH'
+#!/bin/sh
+printf '%s|%s|%s|%s|%s\n' "${FM_TASK_ID-unset}" "${COMPACT_ADVISER_DISABLE-unset}" \
+  "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" "${FM_COMPACT_ADVISER_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_DISABLE-unset}"
+SH
+  chmod +x "$1/$2"
+}
+
 # Run the emitted launch command in a synthetic pane shell. The pane carries the
 # CONTRARY value, so a launch that merely forwarded the ambient environment
 # would be caught here rather than reported as a pass.
@@ -84,22 +94,6 @@ emitted_launch_env() {
 $launch"
 }
 
-pane_export_lines() { grep -c '^export COMPACT_ADVISER_DISABLE=1$' "$1" || true; }
-
-assert_pane_export_precedes_launch() {  # <pane-log> <label>
-  local panelog=$1 label=$2
-  [ "$(pane_export_lines "$panelog")" = 1 ] \
-    || fail "$label: the pane shell should receive exactly one compact-adviser export, got $(pane_export_lines "$panelog")"
-  # Ordering: the export must ride the same pre-launch site as GOTMPDIR, which
-  # is what makes it set before the agent process starts.
-  local gotmp switch
-  gotmp=$(grep -n '^export GOTMPDIR=' "$panelog" | tail -1 | cut -d: -f1)
-  switch=$(grep -n '^export COMPACT_ADVISER_DISABLE=1$' "$panelog" | tail -1 | cut -d: -f1)
-  [ -n "$gotmp" ] && [ -n "$switch" ] \
-    || fail "$label: the pane log is missing the pre-launch exports"
-  [ "$switch" -gt "$gotmp" ] \
-    || fail "$label: the compact-adviser export must ride the GOTMPDIR pre-launch site (gotmp=$gotmp switch=$switch)"
-}
 
 test_ship_allowlist_absent() {
   local rec out status seen
@@ -108,7 +102,6 @@ test_ship_allowlist_absent() {
   out=$(run_case_spawn ship-open-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "ship spawn without an allowlist should succeed: $out"
-  assert_pane_export_precedes_launch "$PANE_LOG" "ship, allowlist absent"
   install_env_probe "$FAKEBIN_DIR" codex
   seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") \
     || fail "ship, allowlist absent: the emitted launch failed to run"
@@ -118,7 +111,7 @@ test_ship_allowlist_absent() {
 }
 
 test_ship_allowlist_enabled() {
-  local rec out status seen launch
+  local rec out status seen
   rec=$(make_case ship-filtered codex ship-filtered-a1)
   read_case "$rec"
   # An empty file is the strictest opt-in: the launch keeps Firstmate's own
@@ -128,10 +121,6 @@ test_ship_allowlist_enabled() {
   out=$(run_case_spawn ship-filtered-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "ship spawn under an allowlist should succeed: $out"
-  assert_pane_export_precedes_launch "$PANE_LOG" "ship, allowlist enabled"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" '/usr/bin/env -i' \
-    "an enabled allowlist should launch under a cleared environment"
   install_env_probe "$FAKEBIN_DIR" codex
   seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") \
     || fail "ship, allowlist enabled: the emitted launch failed to run"
@@ -180,7 +169,6 @@ test_secondmate_launch() {
     out=$(run_case_spawn "sm-$setting" "$sm" --secondmate)
     status=$?
     expect_code 0 "$status" "secondmate spawn with allowlist=$setting should succeed: $out"
-    assert_pane_export_precedes_launch "$PANE_LOG" "secondmate, allowlist $setting"
     install_env_probe "$FAKEBIN_DIR" codex
     seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") \
       || fail "secondmate, allowlist $setting: the emitted launch failed to run"
@@ -192,11 +180,9 @@ test_secondmate_launch() {
 
 # --- relaunch ---------------------------------------------------------------
 #
-# bin/fm-control.sh relaunch stops the agent and rebuilds the launch through
-# bin/fm-spawn.sh --relaunch, so this drives the operator-facing verb rather
-# than the rebuild alone. The stub below models just enough pane lifecycle for
-# that transaction: the harness exit command leaves a bare shell behind, and the
-# launch literal starts the harness again.
+# Drive the replacement-launch boundary with an agent-free pane. Capture the
+# staged command when the pane sources it, independently of the harness's
+# initial-prompt carrier, then execute it to observe the replacement environment.
 make_relaunch_stub() {  # <case-dir>
   local fb="$1/fakebin"
   mkdir -p "$fb"
@@ -223,12 +209,8 @@ case "${1:-}" in
           staged=${staged%"'"}
           [ ! -f "$staged" ] || payload=$(cat "$staged")
           printf '%s\n' "$payload" > "$D/launch"
+          cat "$D/harness" > "$D/command"
           ;;
-      esac
-      printf '%s\n' "$payload" >> "$D/literal"
-      case "$payload" in
-        /exit|/quit) printf 'zsh' > "$D/command" ;;
-        *'encode launch-brief'*) printf 'codex' > "$D/command" ;;
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
@@ -257,22 +239,30 @@ SH
 }
 
 test_relaunch_rebuilds_the_switch() {
-  local setting dir home proj wt id out status seen launch preamble
+  local setting dir home proj wt id out status seen launch preamble harness expected
+  local driver=()
+  for harness in codex claude omp; do
   for setting in absent enabled; do
-    id="relaunch-$setting-a1"
-    dir="$TMP_ROOT/relaunch-$setting"
+    id="relaunch-$harness-$setting-a1"
+    dir="$TMP_ROOT/relaunch-$harness-$setting"
     home="$dir/home"
     proj="$dir/proj"
     wt="$dir/wt"
     mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects" "$dir/fake"
     touch "$home/state/.last-watcher-beat"
     [ "$setting" = absent ] || : > "$home/config/launch-env-allowlist"
+    expected=1
+    printf '{"claude":"auto","omp":"auto"}\n' > "$home/config/compact-adviser"
+    [ "$harness" = codex ] || expected=0
     make_relaunch_stub "$dir"
-    fm_git_worktree "$proj" "$wt" "wt-relaunch-$setting"
+    install_env_probe "$dir/fakebin" "$harness"
+    fm_git_worktree "$proj" "$wt" "wt-relaunch-$harness-$setting"
     fm_test_spawn_brief "$home" "$id"
-    : > "$dir/fake/literal"
+    : > "$dir/fake/launch"
     : > "$dir/fake/keys"
-    printf 'codex' > "$dir/fake/command"
+    # --relaunch accepts the task id only and requires an agent-free endpoint.
+    printf 'zsh' > "$dir/fake/command"
+    printf '%s' "$harness" > "$dir/fake/harness"
     printf '%s\n' "fm-$id" > "$dir/fake/windows"
     printf '%s' "$wt" > "$dir/fake/cwd"
     {
@@ -280,7 +270,7 @@ test_relaunch_rebuilds_the_switch() {
       echo "endpoint_task_id=$id"
       echo "worktree=$wt"
       echo "project=$proj"
-      echo "harness=codex"
+      echo "harness=$harness"
       echo "kind=ship"
       echo "mode=no-mistakes"
       echo "yolo=off"
@@ -290,28 +280,30 @@ test_relaunch_rebuilds_the_switch() {
     } > "$home/state/$id.meta"
 
     mkdir -p "$dir/user-home"
+    # Process-liveness classification belongs to fm-control's own tests.
+    # Drive the actual replacement-launch boundary for every harness.
+    driver=("$ROOT/bin/fm-spawn.sh" "$id" --relaunch)
     out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$home" FM_FAKE_DIR="$dir/fake" \
-      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
+      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 COMPACT_ADVISER_DISABLE=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
-      "$CONTROL" "$id" relaunch --note 'replacement continues the same task' 2>&1)
+      "${driver[@]}" 2>&1)
     status=$?
     expect_code 0 "$status" "relaunch with allowlist=$setting should succeed: $out"
 
-    grep -qx 'export COMPACT_ADVISER_DISABLE=1' "$dir/fake/keys" \
-      || fail "relaunch with allowlist=$setting did not re-export the compact-adviser switch into the pane"
     launch=$(cat "$dir/fake/launch")
-    [ -n "$launch" ] || fail "relaunch with allowlist=$setting sent no replacement launch command"
-    install_env_probe "$dir/fakebin" codex
+    [ -n "$launch" ] || fail "$harness relaunch with allowlist=$setting sent no replacement launch command"
+    install_env_probe "$dir/fakebin" "$harness"
     preamble=$(grep '^export ' "$dir/fake/keys")
     seen=$(env -i HOME="$dir/user-home" PATH="$dir/fakebin:$PATH" TERM=xterm \
       TMUX=synthetic-pane COMPACT_ADVISER_DISABLE="$CONTRARY" \
       /bin/sh -c "$preamble
 $launch") \
       || fail "relaunch with allowlist=$setting: the replacement launch failed to run"
-    assert_equals 1 "$seen" \
-      "a relaunched agent with allowlist=$setting must start with the compact adviser disabled, exactly as a fresh spawn does"
+    assert_equals "$expected" "$seen" \
+      "a relaunched $harness agent must preserve its adviser policy with allowlist=$setting"
   done
-  pass "relaunch rebuilds the compact-adviser switch for the replacement agent in both allowlist postures"
+  done
+  pass "relaunch rebuilds default-off and automatic adviser policies in both allowlist postures"
 }
 
 # A command-prefix assignment only covers the first simple command. A raw
@@ -348,6 +340,304 @@ SH
   pass "a compound raw launch-command still starts its agent with the compact-adviser switch on"
 }
 
+# The spawning process carries the COMPACT_ADVISER_DISABLE=1 that a default-off
+# secondmate's own launch exported, which must not defeat its children's policy.
+test_auto_launch_policy() {
+  local harness setting kind rec id out status seen expected launch sm
+  for harness in claude omp; do
+    for setting in absent enabled; do
+      for kind in ship secondmate; do
+        id="auto-$harness-$setting-$kind"
+        rec=$(make_case "$id" "$harness" "$id")
+        read_case "$rec"
+        install_env_probe "$FAKEBIN_DIR" "$harness"
+        printf '{"%s":"auto"}\n' "$harness" > "$HOME_DIR/config/compact-adviser"
+        [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+        if [ "$kind" = secondmate ]; then
+          sm="$CASE_DIR/secondmate-home"
+          mkdir -p "$sm/bin" "$sm/data"
+          printf '# Firstmate\n' > "$sm/AGENTS.md"
+          printf '%s\n' "$id" > "$sm/.fm-secondmate-home"
+          printf 'charter\n' > "$sm/data/charter.md"
+          printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
+          git -C "$sm" init -q -b main
+          out=$(COMPACT_ADVISER_DISABLE=1 run_case_spawn "$id" "$sm" --secondmate "$harness")
+        else
+          out=$(COMPACT_ADVISER_DISABLE=1 run_case_spawn "$id" "$PROJ_DIR" "$harness" --mode no-mistakes --yolo off)
+        fi
+        status=$?
+        expect_code 0 "$status" "$id: automatic policy spawn should succeed: $out"
+        cat > "$FAKEBIN_DIR/$harness" <<'SH'
+#!/bin/sh
+printf '%s|%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}"
+SH
+        chmod +x "$FAKEBIN_DIR/$harness"
+        expected='0|unset|unset'
+        [ "$harness" != claude ] || expected='0|1|1'
+        launch=$(cat "$LAUNCH_LOG")
+        seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+          COMPACT_ADVISER_DISABLE=1 /bin/sh -c "$launch") || fail "$id: launch replay failed"
+        assert_equals "$expected" "$seen" "$id: launch policy did not override a contrary pane value"
+        seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") || fail "$id: pane replay failed"
+        assert_equals "$expected" "$seen" "$id: automatic mode was lost through the pane"
+        # A shell that already opted into function hooks keeps that opt-in whole,
+        # except where the cleared environment drops the unlisted flag.
+        [ "$setting" != absent ] || expected='0|1|unset'
+        seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 /bin/sh -c "$launch") || fail "$id: opted-in replay failed"
+        assert_equals "$expected" "$seen" "$id: a pre-existing function-hooks opt-in was not preserved"
+        if [ "$kind" = secondmate ]; then
+          cmp -s "$HOME_DIR/config/compact-adviser" "$sm/config/compact-adviser" \
+            || fail "$id: secondmate workers did not inherit adviser policy"
+        fi
+      done
+    done
+  done
+  pass "automatic policy reaches Claude and omp ships and secondmates without implicitly enabling Calm"
+}
+
+# The same pane shell sources an automatic launch, then an off and an
+# emergency-off replacement. Only the automatic one may run with the flag
+# Firstmate marked as adviser-only; a captain's unmarked opt-in stays whole. The
+# backend never sees the operator's per-invocation override or that marker.
+test_reused_endpoint_drops_adviser_hooks() {
+  local setting rec id seen expected script kind pre launch out
+  for setting in absent enabled; do
+    rec=$(make_case "reuse-$setting" claude "reuse-$setting-auto" "reuse-$setting-off" "reuse-$setting-kill")
+    read_case "$rec"
+    [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+    mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux-backend"
+    cat > "$FAKEBIN_DIR/tmux" <<'SH'
+#!/usr/bin/env bash
+printf '%s|%s|%s\n' "${FM_COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}" >> "$(dirname "$0")/backend-env"
+exec "$(dirname "$0")/tmux-backend" "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/tmux"
+    script=
+    for kind in auto off kill; do
+      id="reuse-$setting-$kind"
+      if [ "$kind" = off ]; then
+        printf '{"claude":"off"}\n' > "$HOME_DIR/config/compact-adviser"
+      else
+        printf '{"claude":"auto"}\n' > "$HOME_DIR/config/compact-adviser"
+      fi
+      if [ "$kind" = kill ]; then
+        : > "$FAKEBIN_DIR/backend-env"
+        out=$(FM_COMPACT_ADVISER_DISABLE=1 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1 \
+          run_case_spawn "$id" "$PROJ_DIR" claude --mode no-mistakes --yolo off) \
+          || fail "$id: spawn failed: $out"
+        [ -s "$FAKEBIN_DIR/backend-env" ] || fail "$id: the backend was never invoked"
+        [ "$(sort -u "$FAKEBIN_DIR/backend-env")" = 'unset|unset|unset' ] \
+          || fail "$id: the backend inherited per-invocation adviser state: $(sort -u "$FAKEBIN_DIR/backend-env" | tr '\n' ' ')"
+      else
+        out=$(run_case_spawn "$id" "$PROJ_DIR" claude --mode no-mistakes --yolo off) \
+          || fail "$id: spawn failed: $out"
+      fi
+      pre=$(grep '^export ' "$PANE_LOG")
+      launch=$(cat "$LAUNCH_LOG")
+      script="$script$pre
+$launch
+"
+    done
+    cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/bin/sh
+printf '%s|%s|%s\n' "${COMPACT_ADVISER_DISABLE-unset}" "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" \
+  "${FM_COMPACT_ADVISER_HOOKS-unset}"
+SH
+    chmod +x "$FAKEBIN_DIR/claude"
+    seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm TMUX=synthetic-pane \
+      /bin/sh -c "$script" | tr '\n' ' ') || fail "reuse, allowlist $setting: replay failed"
+    assert_equals '0|1|1 1|unset|unset 1|unset|unset ' "$seen" \
+      "reuse, allowlist $setting: an off or emergency-off relaunch kept the adviser-only hooks flag"
+    expected='0|1|unset 1|1|unset 1|1|unset '
+    [ "$setting" = absent ] || expected='0|1|1 1|unset|unset 1|unset|unset '
+    seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm TMUX=synthetic-pane \
+      CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 /bin/sh -c "$script" | tr '\n' ' ') \
+      || fail "reuse, allowlist $setting: opted-in replay failed"
+    assert_equals "$expected" "$seen" "reuse, allowlist $setting: a captain's own function-hooks opt-in was not preserved"
+  done
+  pass "a reused endpoint drops adviser-only hooks on off and emergency-off relaunches, and the backend never inherits the override"
+}
+
+test_invalid_policy_refuses_before_launch() {
+  local policy rec out status
+  rec=$(make_case invalid-policy codex invalid-policy-a1)
+  read_case "$rec"
+  for policy in '{"codex":"auto"}' '{"grok":"auto"}' '{"claude":"hint"}' \
+    '{"cluade":"auto"}' '{"codex":"off"}' '{"claude":"auto","grok":"off"}' \
+    '[]' '{} {}' '{bad json'; do
+    printf '%s\n' "$policy" > "$HOME_DIR/config/compact-adviser"
+    out=$(run_case_spawn invalid-policy-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
+    status=$?
+    expect_code 1 "$status" "unsupported adviser policy must refuse: $out"
+    assert_contains "$out" 'config/compact-adviser' "policy refusal should identify the setting"
+    [ ! -s "$LAUNCH_LOG" ] || fail "invalid policy launched a worker"
+    [ ! -f "$HOME_DIR/state/invalid-policy-a1.meta" ] || fail "invalid policy published a task"
+  done
+  pass "malformed policy and keys other than claude or omp refuse before launch"
+}
+
+test_auto_emergency_override() {
+  local rec out status seen
+  rec=$(make_case auto-kill claude auto-kill-a1)
+  read_case "$rec"
+  printf '{"claude":"auto"}\n' > "$HOME_DIR/config/compact-adviser"
+  out=$(FM_COMPACT_ADVISER_DISABLE=' YES ' COMPACT_ADVISER_DISABLE=0 \
+    run_case_spawn auto-kill-a1 "$PROJ_DIR" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "emergency-disabled launch should still succeed: $out"
+  install_env_probe "$FAKEBIN_DIR" claude
+  seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") || fail "emergency launch replay failed"
+  assert_equals 1 "$seen" "the operator's emergency switch must defeat automatic policy"
+  pass "the operator's emergency kill switch overrides opted-in auto"
+}
+
+test_batch_launch_policy_survives_reexec() {
+  local harness setting kind policy rec name id1 id2 out status expected switch hooks marker
+  local launchlog panelog seen rows
+  local args=()
+  for harness in claude omp; do
+    for setting in absent enabled; do
+      for kind in ship scout; do
+        for policy in auto emergency; do
+          name="batch-$harness-$setting-$kind-$policy"
+          id1="$name-a"
+          id2="$name-b"
+          rec=$(make_case "$name" "$harness" "$id1" "$id2")
+          read_case "$rec"
+          printf '{"%s":"auto"}\n' "$harness" > "$HOME_DIR/config/compact-adviser"
+          [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+          install_launch_state_probe "$FAKEBIN_DIR" "$harness"
+          mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux-backend"
+          mkdir -p "$FAKEBIN_DIR/children"
+          cat > "$FAKEBIN_DIR/tmux" <<'SH'
+#!/usr/bin/env bash
+dir=$(dirname "$0")
+printf '%s\n' "${FM_COMPACT_ADVISER_DISABLE-unset}" >> "$dir/backend-env"
+if [ "${1:-}" = send-keys ]; then
+  prev=
+  for arg in "$@"; do
+    if [ "$prev" = -t ]; then
+      export FM_FAKE_LAUNCH_LOG="$dir/children/$arg.launch"
+      export FM_FAKE_PANE_LOG="$dir/children/$arg.pane"
+      break
+    fi
+    prev=$arg
+  done
+fi
+exec "$dir/tmux-backend" "$@"
+SH
+          chmod +x "$FAKEBIN_DIR/tmux"
+          args=("$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness "$harness")
+          if [ "$kind" = scout ]; then
+            args+=(--scout)
+          else
+            args+=(--mode no-mistakes --yolo off)
+          fi
+          if [ "$policy" = emergency ]; then
+            out=$(FM_COMPACT_ADVISER_DISABLE=' YES ' run_case_spawn "${args[@]}")
+          else
+            out=$(run_case_spawn "${args[@]}")
+          fi
+          status=$?
+          expect_code 0 "$status" "$name: batch spawn should succeed: $out"
+          [ -s "$FAKEBIN_DIR/backend-env" ] || fail "$name: the backend was never invoked"
+          assert_equals unset "$(sort -u "$FAKEBIN_DIR/backend-env")" \
+            "$name: the backend inherited the per-invocation emergency override"
+          switch=0
+          hooks='unset'
+          marker='unset'
+          if [ "$policy" = emergency ]; then
+            switch=1
+          elif [ "$harness" = claude ]; then
+            hooks=1
+            marker=1
+          fi
+          rows=
+          for launchlog in "$FAKEBIN_DIR"/children/*.launch; do
+            [ -f "$launchlog" ] || fail "$name: no child launch was captured"
+            panelog="${launchlog%.launch}.pane"
+            seen=$(emitted_launch_env "$FAKEBIN_DIR" "$launchlog" "$panelog") \
+              || fail "$name: a captured child launch failed to execute"
+            rows="$rows$seen
+"
+          done
+          expected=$(printf '%s\n' "$id1|$switch|$hooks|$marker|unset" "$id2|$switch|$hooks|$marker|unset" | sort)
+          seen=$(printf '%s' "$rows" | sort)
+          assert_equals "$expected" "$seen" \
+            "$name: each distinct batch child must receive its own identity, adviser policy, and no raw emergency override"
+        done
+      done
+    done
+  done
+  pass "ship and scout batch reexecs preserve emergency-off and ordinary auto for every Claude and omp child"
+}
+
+test_raw_function_hooks_assignment_is_operator_owned() {
+  local setting policy variant rec id raw hook switch out status launch seen expected prior
+  for setting in absent enabled; do
+    for policy in auto off emergency; do
+      for variant in plain quoted other repeated zero; do
+        id="raw-hooks-$setting-$policy-$variant"
+        rec=$(make_case "$id" claude "$id")
+        read_case "$rec"
+        [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+        if [ "$policy" = off ]; then
+          printf '{"claude":"off"}\n' > "$HOME_DIR/config/compact-adviser"
+        else
+          printf '{"claude":"auto"}\n' > "$HOME_DIR/config/compact-adviser"
+        fi
+        install_launch_state_probe "$FAKEBIN_DIR" claude
+        hook=1
+        case "$variant" in
+          plain) raw='CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude' ;;
+          quoted) raw="CLAUDE_CODE_ENABLE_FUNCTION_HOOKS='1' claude" ;;
+          other) raw='FM_RAW_ASSIGNMENT=owned CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude' ;;
+          repeated) raw='CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=0 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude' ;;
+          zero) raw='CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=0 claude'; hook=0 ;;
+        esac
+        if [ "$policy" = emergency ]; then
+          out=$(FM_COMPACT_ADVISER_DISABLE=1 run_case_spawn "$id" "$PROJ_DIR" \
+            --mode no-mistakes --yolo off "$raw")
+        else
+          out=$(run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off "$raw")
+        fi
+        status=$?
+        expect_code 0 "$status" "$id: raw-assignment spawn should succeed: $out"
+        launch="$(grep '^export ' "$PANE_LOG")
+$(cat "$LAUNCH_LOG")"
+        switch=1
+        [ "$policy" != auto ] || switch=0
+        expected="$id|$switch|$hook|unset|unset"
+        for prior in clean marked; do
+          if [ "$prior" = marked ]; then
+            seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+              TMUX=synthetic-pane COMPACT_ADVISER_DISABLE="$CONTRARY" \
+              CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1 \
+              /bin/sh -c "$launch") \
+              || fail "$id: launch replay in a previously marked pane failed"
+          else
+            seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+              TMUX=synthetic-pane COMPACT_ADVISER_DISABLE="$CONTRARY" /bin/sh -c "$launch") \
+              || fail "$id: launch replay in a clean pane failed"
+          fi
+          assert_equals "$expected" "$seen" \
+            "$id ($prior pane): the raw hook assignment must keep its shell value without an adviser marker"
+        done
+      done
+    done
+  done
+  pass "raw leading hook assignments remain operator-owned in auto, off, and emergency launches, including reused panes"
+}
+
+test_auto_launch_policy
+test_reused_endpoint_drops_adviser_hooks
+test_invalid_policy_refuses_before_launch
+test_auto_emergency_override
+test_batch_launch_policy_survives_reexec
+test_raw_function_hooks_assignment_is_operator_owned
 test_ship_allowlist_absent
 test_ship_allowlist_enabled
 test_launch_command_carries_the_switch_without_the_pane_export

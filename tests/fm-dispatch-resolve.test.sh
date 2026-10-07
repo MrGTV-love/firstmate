@@ -14,6 +14,8 @@ set -u
 
 TOOL="$ROOT/bin/fm-dispatch-resolve.sh"
 TMP_ROOT=$(fm_test_tmproot fm-dispatch-resolve)
+denied=
+trap '[ -z "$denied" ] || chmod 700 "$denied"; fm_test_cleanup' EXIT
 HOME_DIR="$TMP_ROOT/home"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 NO_CURL_BIN="$TMP_ROOT/no-curl-bin"
@@ -164,6 +166,20 @@ cat "${QUOTA_AXI_FIXTURE:?}"
 SH
 chmod +x "$FAKEBIN/quota-axi"
 
+REAL_DIRNAME=$(command -v dirname)
+export REAL_DIRNAME
+cat > "$FAKEBIN/dirname" <<'SH'
+#!/usr/bin/env bash
+set -u
+if [ "${TYPESAFE_API_KEY+x}${TYPESAFE_API_KEY_PRIVATE+x}" != "" ]; then
+  printf 'secret-present\n' >> "${FAKE_CURL_LOG:?}/dirname-env"
+else
+  printf 'clean\n' >> "${FAKE_CURL_LOG:?}/dirname-env"
+fi
+exec "$REAL_DIRNAME" "$@"
+SH
+chmod +x "$FAKEBIN/dirname"
+
 RESPONSE="$TMP_ROOT/response.json"
 export FAKE_CURL_LOG="$LOG" FAKE_CURL_RESPONSE="$RESPONSE" QUOTA_AXI_CALLS="$LOG/quota-axi.calls" QUOTA_AXI_FIXTURE="$QUOTA" CHILD_ENV_LOG="$LOG/child-env"
 
@@ -208,6 +224,20 @@ assert_absent "$LOG/argv" "absent key never calls curl"
 assert_absent "$LOG/quota-axi.calls" "absent key never reads quota-axi"
 pass "absent key is off: one stderr line, exit 0, no network call"
 
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err --help
+expect_code 0 "$code" "help exits 0 with an environment key"
+assert_contains "$out" 'Usage:' "help retains the public interface"
+assert_contains "$(cat "$LOG/dirname-env")" clean "startup child environment is observed"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "help scrubs the key before its first child"
+assert_absent "$LOG/argv" "help never calls curl"
+reset_log
+out=$(cd "$ROOT/bin" && PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" bash fm-dispatch-resolve.sh --help)
+assert_contains "$out" 'Usage:' "a bare script filename resolves its shared library"
+assert_contains "$(cat "$LOG/dirname-env")" clean "bare-filename startup child environment is observed"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "bare-filename startup scrubs the key before children"
+pass "help and bare-filename startup isolate environment credentials"
+
 # --- .env key, and the environment wins over it ------------------------------
 printf '%s\n' '# local secrets' 'FMX_PAIRING_TOKEN=abc' "export TYPESAFE_API_KEY=\"$KEY\"" > "$HOME_DIR/.env"
 reset_log
@@ -247,6 +277,8 @@ assert_contains "$argv" $'--max-time\n5' "the request uses the fixed five-second
 assert_contains "$argv" '@/dev/fd/3' "the header is read from a file descriptor"
 assert_equals "Authorization: Bearer $KEY" "$(cat "$LOG/header")" "curl receives the bearer header on fd 3"
 assert_equals $'curl:clean\nquota-axi:clean' "$(cat "$LOG/child-env")" "the API key is absent from every child environment"
+assert_contains "$(cat "$LOG/dirname-env")" clean "ordinary startup child environment is observed"
+assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "ordinary requests scrub the key before startup children"
 body=$(cat "$LOG/body")
 assert_equals 'jev-latest' "$(jq -r .model <<<"$body")" "default model is jev-latest"
 assert_equals 'pager' "$(jq -r .state.task.project <<<"$body")" "project rides in the state"
@@ -423,6 +455,8 @@ expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...
   assert_absent "$LOG/argv" "$label never calls curl"
   assert_absent "$LOG/quota-axi.calls" "$label never reads quota"
   assert_not_contains "$err" "$KEY" "$label never prints the API key"
+  assert_contains "$(cat "$LOG/dirname-env")" clean "$label startup child environment is observed"
+  assert_not_contains "$(cat "$LOG/dirname-env")" secret-present "$label scrubs the key before startup children"
   local value
   for value in "$@"; do
     assert_not_contains "$err" "$value" "$label never prints the listed value"
@@ -489,6 +523,28 @@ reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
 expect_withheld "a broken symlink at the list path" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rm -f "$NEVER_SEND"
+
+POLICY_TARGET_DIR="$TMP_ROOT/policy-target"
+mkdir -p "$POLICY_TARGET_DIR"
+printf 'Acme-Ledger\n' > "$POLICY_TARGET_DIR/policy"
+ln -s "$POLICY_TARGET_DIR/policy" "$NEVER_SEND"
+reset_log
+denied=$POLICY_TARGET_DIR
+chmod 400 "$denied"
+[ ! -x "$denied" ] || fail "policy target fixture must deny ancestor search"
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+chmod 700 "$denied"
+denied=
+expect_withheld "a policy link with an inaccessible target ancestor" "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+expect_withheld "a readable policy link" "brief text matches $NEVER_SEND line 1" 'Acme-Ledger' '4417-2290'
+printf 'Unlisted-Value\n' > "$POLICY_TARGET_DIR/policy"
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
+assert_contains "$out" '  status: clear' "readable nonmatching policy link permits normal dispatch"
+assert_contains "$(jq -r .state.task.brief "$LOG/body")" 'Acme-Ledger' "readable policy target is checked without changing task text"
+rm "$NEVER_SEND"
 
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager

@@ -12,7 +12,9 @@ HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; cleanup_all; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
+if [ "${1:-}" != --sandbox-only ]; then
+  command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
+fi
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 command -v treehouse >/dev/null 2>&1 || { echo "skip: treehouse not found"; exit 0; }
 [ -x "$HERDR_LAB_HELPER" ] || { echo "skip: Herdr lab helper not executable at $HERDR_LAB_HELPER"; exit 0; }
@@ -20,7 +22,21 @@ command -v treehouse >/dev/null 2>&1 || { echo "skip: treehouse not found"; exit
 REAL_HERDR=$(command -v herdr)
 REAL_TREEHOUSE=$(command -v treehouse)
 HERDR_ORIGINAL_PATH=$PATH
-TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-presentation.XXXXXX")
+# Keep every disposable allocation inside this worktree, including a pane whose
+# daemon did not inherit the controller's TREEHOUSE_ROOT.
+mkdir -p "$ROOT/.no-mistakes/test-tmp"
+TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+# The code root and operational homes must be siblings: secondmate safety
+# correctly refuses homes inside the declared Firstmate repository.
+FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
+mkdir -p "$FIXTURE_ROOT"
+cp -R "$ROOT/bin" "$FIXTURE_ROOT/bin"
+git -C "$FIXTURE_ROOT" init -q
+export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/herdr-lab-state"
+export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
+mkdir -p "$CLAUDE_CONFIG_DIR"
+# Ambient path templates can otherwise bypass even an explicitly confined root.
+unset TREEHOUSE_ROOT TREEHOUSE_WORKTREE_PATH
 FAKEBIN="$TMP_ROOT/fakebin"
 HERDR_CALL_LOG="$TMP_ROOT/herdr-calls.log"
 TREEHOUSE_CALL_LOG="$TMP_ROOT/treehouse-calls.log"
@@ -297,14 +313,11 @@ EOF
       "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" >/dev/null 2>&1 || true
     LAB_READY=0
   fi
+  # Spawn-owned Git-hook directories are intentionally read-only.
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
 }
 trap cleanup_all EXIT
-
-PATH="$HERDR_ORIGINAL_PATH" \
-  "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
-  || fail "could not provision the isolated Herdr lab"
-LAB_READY=1
 
 lab() {
   PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
@@ -378,6 +391,10 @@ remember_meta_worktree() {  # <meta>
   local wt
   wt=$(grep '^worktree=' "$1" | cut -d= -f2-)
   [ -n "$wt" ] || fail "metadata did not record a worktree"
+  case "$wt" in
+    "$TMP_ROOT"/*) : ;;
+    *) fail "Treehouse allocated outside the disposable sandbox: $wt" ;;
+  esac
   RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   printf '%s' "$wt"
 }
@@ -387,11 +404,50 @@ make_project() {  # <dir>
   mkdir -p "$dir"
   git -C "$dir" init -q
   printf '# Herdr projection E2E fixture\n' > "$dir/README.md"
-  git -C "$dir" add README.md
+  printf 'root = "%s"\n' "$TMP_ROOT" > "$dir/treehouse.toml"
+  git -C "$dir" add README.md treehouse.toml
   git -C "$dir" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$dir" "$dir.origin.git"
   git -C "$dir" remote add origin "file://$dir.origin.git"
 }
+
+# Bounded behavioral regression: the same real allocator and pre-launch trust
+# interface used by spawn, without the unrelated presentation lifecycle cases.
+# Removing the project config regresses this assertion when the pane lacks the
+# controller's TREEHOUSE_ROOT; a private fallback HOME keeps that failure safe.
+if [ "${1:-}" = --sandbox-only ]; then
+  SANDBOX_PROJECT="$TMP_ROOT/sandbox-project"
+  SANDBOX_FALLBACK_HOME="$TMP_ROOT/alternate-root"
+  mkdir -p "$SANDBOX_FALLBACK_HOME"
+  printf '{"sandboxSentinel":true}\n' > "$SANDBOX_FALLBACK_HOME/.claude.json"
+  make_project "$SANDBOX_PROJECT"
+  # shellcheck disable=SC2016 # positional params expand in the child shell.
+  SANDBOX_WT=$(env -u TREEHOUSE_ROOT -u TREEHOUSE_WORKTREE_PATH \
+    HOME="$SANDBOX_FALLBACK_HOME" bash -c \
+    'cd "$1" && "$2" get --lease --no-fetch' \
+    _ "$SANDBOX_PROJECT" "$REAL_TREEHOUSE") \
+    || fail "real sandbox allocation failed"
+  case "$SANDBOX_WT" in
+    "$TMP_ROOT"/*) : ;;
+    *) fail "Treehouse allocated outside the disposable sandbox: $SANDBOX_WT" ;;
+  esac
+  RECORDED_WORKTREES="${RECORDED_WORKTREES}${SANDBOX_WT}"$'\n'
+  case "$SANDBOX_WT" in
+    "$TMP_ROOT"/.treehouse/*) : ;;
+    *) fail "allocator without controller environment escaped configured pool: $SANDBOX_WT" ;;
+  esac
+  HOME="$SANDBOX_FALLBACK_HOME" "$ROOT/bin/fm-claude-trust.sh" \
+    "$SANDBOX_WT" "$SANDBOX_PROJECT" \
+    || fail "sandbox pre-launch Claude trust registration failed"
+  jq -e --arg wt "$SANDBOX_WT" --arg project "$SANDBOX_PROJECT" \
+    '.projects[$wt].hasTrustDialogAccepted == true and .projects[$project].hasTrustDialogAccepted == true' \
+    "$CLAUDE_CONFIG_DIR/.claude.json" >/dev/null \
+    || fail "pre-launch trust did not land in the isolated Claude store"
+  [ "$(cat "$SANDBOX_FALLBACK_HOME/.claude.json")" = '{"sandboxSentinel":true}' ] \
+    || fail "pre-launch trust mutated the fallback HOME store"
+  pass "real allocator stays in the configured sandbox without controller environment; pre-launch Claude trust uses its private store"
+  exit 0
+fi
 
 write_ship_brief() {  # <home> <id> [description]
   local home=$1 id=$2 description=${3:-Herdr presentation fixture $2}
@@ -408,8 +464,8 @@ EOF
 
 spawn_task() {  # <id> <home> <project>
   local id=$1 home=$2 project=$3
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$project" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
+  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
+    "$FIXTURE_ROOT/bin/fm-spawn.sh" "$id" "$project" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
 }
 
 finish_concurrent_spawn() {  # <id> <status> <stdout> <stderr>
@@ -433,16 +489,16 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
 
 spawn_secondmate_task() {
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
+  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
+    "$FIXTURE_ROOT/bin/fm-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
 }
 
 teardown_task() {  # <id> <home>
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" --force
+    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force
 }
 
 finish_concurrent_teardown() {  # <id> <status> <stdout> <stderr>
@@ -503,6 +559,11 @@ assert_no_projection_mutation_since() {  # <line-count> <case-name>
     fail "$name performed a create, close, delete, rename, or lifecycle call during recovery inspection"
   fi
 }
+
+PATH="$HERDR_ORIGINAL_PATH" \
+  "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
+  || fail "could not provision the isolated Herdr lab"
+LAB_READY=1
 
 HOME_DIR="$TMP_ROOT/home"
 PROJECT_DIR="$TMP_ROOT/project"

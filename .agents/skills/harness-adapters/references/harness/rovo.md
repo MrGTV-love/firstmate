@@ -42,7 +42,7 @@ rovo leaves no worktree-resident artifact and no firstmate-owned sidecar at all,
 ## Composer ghost text: a known, unfixed gap
 
 Rovo has no verified harness-specific ghost policy; do not raise the shared threshold to strip its placeholder, because doing so would erase Muse's real prompt glyph.
-The [Rovo verification owner](../../../../../docs/verification/rovo.md#composer-ghost-text-measured-deliberately-left-unfixed) records measured colors and the backend-specific readiness and delivery limits.
+The [Rovo verification owner](../../../docs/verification/rovo.md#composer-ghost-text-measured-deliberately-left-unfixed) records measured colors and the backend-specific readiness and delivery limits.
 
 ## Interrupt: confirmed under real tmux
 

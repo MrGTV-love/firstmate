@@ -185,9 +185,11 @@ Claude Code's early-access function-hooks surface is off by default.
 Claude Code can load modules through its rollout flag, or per session with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 The mod independently requires that environment variable to equal `1` before doing anything.
 Firstmate never sets that flag in any project or user settings.
-Enabling it is each captain's own explicit opt-in.
+Automatic [compact-adviser policy](configuration.md#compact-adviser-setting-configcompact-adviser) can enable function hooks for the adviser without enabling Calm.
+An explicit opt-in in the worker's shell or a leading raw-command assignment remains unmarked.
+Enabling Calm is each captain's own explicit opt-in.
 
-Without that exact value, the mod is a complete no-op, even if Claude Code's rollout flag loads the module:
+Without that exact value, or with `FM_COMPACT_ADVISER_HOOKS=1`, the mod is a complete no-op, even if Claude Code's rollout flag loads the module:
 
 - There is no `/calm` command.
 - The mod reads neither the preference nor the transcript.
@@ -196,7 +198,7 @@ Without that exact value, the mod is a complete no-op, even if Claude Code's rol
 
 ### Toggling Calm on Claude Code
 
-With the flag on, the mod registers `/calm`.
+With the mod [activated](#enabling-function-hooks), it registers `/calm`.
 It toggles the same per-home preference Pi's `/calm` uses, so one choice applies on both harnesses.
 The toggle answers with a transient "Calm on" or "Calm off" notice under the prompt rather than a transcript row.
 A preference that cannot be written leaves the current choice unchanged, and the notice says so.
@@ -223,7 +225,7 @@ The Pi extension keeps its standard ANSI blue and yellow.
 
 ### Supervision notes on Claude Code
 
-With the flag on, the mod shows the supervision notes Pi shows, whether Calm is on or off, because on Pi they are supervision UI rather than Calm UI.
+With the mod [activated](#enabling-function-hooks), it shows the supervision notes Pi shows, whether Calm is on or off, because on Pi they are supervision UI rather than Calm UI.
 Each note is appended to the transcript as its own system-notice row, which Claude Code draws in gray behind a `⏺` bullet and the mod's name (`firstmate-calm:`), and never sends to the model:
 
 | Line | When |

@@ -3,7 +3,8 @@
 // A Claude Code "mod" is a plugin whose behavior lives in one hooks module. Claude Code
 // may load this module through its rollout flag or `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`,
 // but every handler requires that environment variable to equal `1`, so rollout-only
-// loading remains a complete no-op.
+// loading remains a complete no-op. `FM_COMPACT_ADVISER_HOOKS=1` marks a flag Firstmate
+// supplied only for the compact adviser, which leaves this mod inert too.
 // The plugin carries no command, skill, agent, or classic hook of its own; the `/calm`
 // command below exists only once this module has registered it. docs/calm.md owns the
 // captain-facing contract and docs/calm-mode-feasibility.md the version-scoped evidence.
@@ -130,7 +131,8 @@ let notesPolling = false;
 function isActivated($: EngineInterface): Promise<boolean> {
   if (activation === undefined) {
     activation = $.env.get("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS").then(
-      (value) => value === "1",
+      async (value) =>
+        value === "1" && (await $.env.get("FM_COMPACT_ADVISER_HOOKS").catch(() => undefined)) !== "1",
       () => false,
     );
   }

@@ -20,7 +20,7 @@ Supported primaries deny watcher-arm anti-patterns before execution, including s
 The tool reference names the integration form.
 Validate changes against the real harness in a scratch project before trusting them.
 
-[`Primary helper agents and durable project work`](../../../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
+[`Primary helper agents and durable project work`](../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
 
 ## Session start
 

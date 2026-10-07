@@ -2,8 +2,8 @@
 # Host-local lifecycle control for the remote secondmate home selected by fm-on.
 #
 # Usage:
-#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent]
-#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|->
+#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--compact-adviser-disable]
+#   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
 #   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
@@ -52,6 +52,9 @@
 # the default-off path. print_route echoes the carrier the endpoint actually
 # holds, including for an already-alive endpoint that was not relaunched, so the
 # parent records the identity the agent really received rather than an intent.
+# The optional --compact-adviser-disable carries the parent's normalized
+# emergency override across the transport's cleared environment, scoped to the
+# host-local spawn or control call. It never changes an already-alive session.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -160,8 +163,20 @@ cmd_route() {
 }
 
 cmd_launch() {
-  local id=$1 harness=$2 model=$3 effort=$4 selected_backend=$5 traceparent=${6:-}
-  local current meta out herdr_session
+  local id=$1 harness=$2 model=$3 effort=$4 selected_backend=$5 traceparent=
+  local current meta out herdr_session compact_disable=0 arg
+  shift 5
+  for arg in "$@"; do
+    case "$arg" in
+    --compact-adviser-disable)
+      [ "$compact_disable" = 0 ] || die "duplicate --compact-adviser-disable"
+      compact_disable=1 ;;
+    --*) die "unknown launch option: $arg" ;;
+    *)
+      [ -z "$traceparent" ] || die "launch accepts only one traceparent"
+      traceparent=$arg ;;
+    esac
+  done
 
   validate_id "$id"
   validate_home "$id"
@@ -206,7 +221,7 @@ cmd_launch() {
   if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
-    FM_SKIP_SECONDMATE_SYNC=1 \
+    FM_SKIP_SECONDMATE_SYNC=1 FM_COMPACT_ADVISER_DISABLE="$compact_disable" \
     "$SCRIPT_DIR/fm-spawn.sh" "${ARGS[@]}" 2>&1); then
     [ -z "$out" ] || printf '%s\n' "$out" >&2
     die "remote host-local secondmate launch failed"
@@ -233,6 +248,11 @@ cmd_launch() {
 # explicitly clears an absent parent pin; `-` remains its compatibility spelling.
 cmd_relaunch() {
   local id=$1 harness=$2 model=$3 effort=$4
+  local compact_disable=0
+  if [ "$#" -eq 5 ]; then
+    [ "$5" = --compact-adviser-disable ] || die "unknown relaunch option: $5"
+    compact_disable=1
+  fi
   local -a control_args
 
   validate_id "$id"
@@ -257,7 +277,7 @@ cmd_relaunch() {
   HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
-    FM_SKIP_SECONDMATE_SYNC=1 \
+    FM_SKIP_SECONDMATE_SYNC=1 FM_COMPACT_ADVISER_DISABLE="$compact_disable" \
     "$SCRIPT_DIR/fm-control.sh" "${control_args[@]}"
   # A parent tracking this route needs the identity the relaunch actually
   # produced, not the one it asked for, so it can republish its own record the
@@ -435,8 +455,8 @@ cmd_retire() {
 }
 
 case "${1:-}" in
-  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 6 ] || usage; cmd_launch "$@" ;;
-  relaunch) shift; [ "$#" -eq 4 ] || usage; cmd_relaunch "$@" ;;
+  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 7 ] || usage; cmd_launch "$@" ;;
+  relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
   send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;

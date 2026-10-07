@@ -9,8 +9,9 @@ import * as config from "compact-adviser/src/config.ts";
 import * as env from "compact-adviser/src/env.ts";
 import * as profile from "compact-adviser/src/profile.ts";
 import * as state from "compact-adviser/src/state.ts";
+import { buildSessionContext } from "@earendil-works/pi-coding-agent";
 import { startPipeline } from "../extensions/omp-jev-pipeline.mjs";
 
 export default function ompJevPipeline(api) {
-  startPipeline(api, { ...judge, ...context, ...config, ...env, ...profile, ...state });
+  startPipeline(api, { ...judge, ...context, ...config, ...env, ...profile, ...state, buildSessionContext });
 }

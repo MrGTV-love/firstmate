@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { installPipeline } from "../../extensions/omp-jev-pipeline.mjs";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { installPipeline, completeCoverage } from "../../extensions/omp-jev-pipeline.mjs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 function deferred() {
@@ -216,4 +217,348 @@ test("snapshot scrubs escaped and nested saved-key JSON fields before any Jev re
       assert.equal(view.autoCoverage, false, "redacted context cannot authorize eager compaction");
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+// Match the adviser's byte slicing, including UTF-8 replacement characters.
+function adviserClipMiddle(text, limit) {
+  const raw = Buffer.from(text);
+  if (raw.byteLength <= limit) return text;
+  if (limit <= 0) return "";
+  let omitted = raw.byteLength, head = 0, tail = 0;
+  const marker = () => `...[truncated ${omitted} bytes]...`;
+  for (let i = 0; i < 5; i++) {
+    const markerBytes = Buffer.byteLength(marker());
+    if (markerBytes >= limit) return raw.subarray(0, Math.max(0, limit - 3)).toString("utf8");
+    const keep = limit - markerBytes;
+    head = Math.ceil(keep / 2);
+    tail = Math.floor(keep / 2);
+    omitted = Math.max(0, raw.byteLength - head - tail);
+  }
+  return Buffer.concat([raw.subarray(0, head), Buffer.from(marker()),
+    raw.subarray(raw.byteLength - tail)]).toString("utf8");
+}
+
+function clippedView(messages, over = {}) {
+  let remaining = 14000, recentTextTruncated = false;
+  const recent = [];
+  for (const m of messages.slice(-64).reverse()) {
+    if (m.role !== "assistant" && m.role !== "toolResult") continue;
+    const text = typeof m.content === "string" ? m.content
+      : m.content.filter(c => c.type === "text").map(c => c.text).join("\n");
+    const limit = Math.min(m.role === "toolResult" ? 512 : 8000, remaining);
+    let retained = text;
+    if (Buffer.byteLength(text) > limit) {
+      recentTextTruncated = true;
+      retained = m.role === "toolResult" ? adviserClipMiddle(text, limit)
+        : Buffer.from(text).subarray(0, Math.max(0, limit - 3)).toString("utf8");
+    }
+    remaining = Math.max(0, remaining - Buffer.byteLength(retained));
+    recent.unshift({ role: m.role, text: retained,
+      ...(m.role === "toolResult" ? { tool: m.toolName, error: m.isError } : {}) });
+  }
+  return { state: { userConstraints: [], recent, previousSummary: "", savedArtifacts: [],
+    coverage: { omittedUserMessages: 0, olderMessagesOmitted: Math.max(0, messages.length - 64),
+      recentTextTruncated, hasImages: false,
+      redacted: false, unknownContext: false, transcriptRecoverable: true, ...over } },
+  conversationTokens: 50000, checkpointKey: "k", autoCoverage: !recentTextTruncated };
+}
+const reading = (id, text, extra = {}) => [
+  { role: "assistant", content: [{ type: "toolCall", id, name: "read", arguments: { path: "source.txt" } }] },
+  { role: "toolResult", toolCallId: id, toolName: "read", isError: false, content: [{ type: "text", text }], ...extra },
+];
+const longRead = n => Array.from({ length: n }, (_, i) => `ledger row ${i} ${"x".repeat(80)}`).join("\n");
+const finalAnswer = { role: "assistant", content: [{ type: "text", text: "DISCOVERY_COMPLETE" }], stopReason: "stop" };
+function transcript(...parts) { return [{ role: "user", content: "Read everything." }, ...parts.flat(), finalAnswer]; }
+function withHost(f, messages, over, wrap) {
+  Object.assign(f.adviser, {
+    RECENT_TAIL_MESSAGES: 64, redact: text => ({ text, redacted: false }),
+    scrubKnownSecrets: text => ({ text, redacted: false }),
+    buildSessionContext: () => ({ messages }),
+    snapshot: () => { const view = clippedView(messages, over); return wrap ? wrap(view) : view; },
+  });
+  f.ctx.sessionManager.getBranch = () => [];
+}
+async function checkpoint(f) {
+  f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+  const work = f.fireTimer();
+  return work;
+}
+
+test("a long tool-result transcript is attested complete, judged, and then natively compacted", async () => {
+  const f = fixture();
+  const bodies = [longRead(300), longRead(310), longRead(20)];
+  const messages = transcript(...bodies.map((b, i) => reading(`c${i}`, b)));
+  let sent;
+  withHost(f, messages);
+  f.adviser.judge = (state, _key, signal) => {
+    sent = state; const call = deferred(); f.evaluations.push({ ...call, signal }); return call.promise;
+  };
+  f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+  const work = f.fireTimer();
+  assert.ok(f.evaluations[0], "the previously rejected checkpoint now produces a Jev request");
+  f.evaluations[0].resolve({ finished: true, model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+  await work;
+  const tools = sent.recent.filter(m => m.role === "toolResult");
+  assert.equal(tools.length, 3);
+  for (const [i, entry] of tools.entries()) {
+    const digest = createHash("sha256").update(bodies[i]).digest("hex");
+    assert.ok(entry.text.includes(`${Buffer.byteLength(bodies[i])} bytes`), "exact size is stated");
+    assert.ok(entry.text.includes(`${bodies[i].split("\n").length} lines`), "exact line count is stated");
+    assert.ok(entry.text.includes(`sha256 ${digest}`), "digest covers the complete body");
+    assert.ok(!entry.text.includes("ledger row"), "bulk body is not sent");
+  }
+  assert.equal(sent.recent.at(-1).text, "DISCOVERY_COMPLETE");
+  assert.equal(sent.coverage.recentTextTruncated, false);
+  assert.equal(sent.coverage.recentBulkAttested, 3);
+  assert.ok(Buffer.byteLength(JSON.stringify(sent)) < 4000, "bounded view stays far below the request cap");
+  assert.equal(f.compactions.length, 1, "a qualifying judgment still requests native compaction");
+  const start = f.records.find(row => row.event === "judge-start");
+  assert.equal(start.attestedResults, 3);
+  assert.ok(f.records.some(row => row.event === "judgment" && row.finished));
+  assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
+});
+
+test("original tail-budget clipping of a small successful read is attested before judging and native compaction", async () => {
+  for (const blocks of [false, true]) {
+    const small = blocks ? "\u{1f642}".repeat(100) : "s".repeat(400);
+    const large = blocks ? "€".repeat(400) : longRead(30);
+    const encode = text => blocks ? [{ type: "text", text }] : text;
+    const reads = [small, ...Array(27).fill(large)].flatMap((body, i) =>
+      reading(`budget-${i}`, body, { content: encode(body) }));
+    const answer = "Final answer ready";
+    const messages = [{ role: "user", content: "Read everything." }, ...reads,
+      { role: "assistant", content: encode(answer), stopReason: "stop" }];
+    assert.equal(Buffer.byteLength(small), 400);
+    assert.equal(Buffer.byteLength(answer), 18);
+    const f = fixture();
+    let sent;
+    withHost(f, messages);
+    f.adviser.judge = (state, _key, signal) => {
+      sent = state;
+      const call = deferred(); f.evaluations.push({ ...call, signal }); return call.promise;
+    };
+    f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+    const work = f.fireTimer();
+    assert.equal(f.evaluations.length, 1, `${blocks ? "blocks" : "strings"}: Jev receives the checkpoint`);
+    f.evaluations[0].resolve({ finished: true, model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+    await work;
+    assert.equal(sent.recent.length, 57, "all assistant and tool-result entries are retained");
+    assert.deepEqual(sent.recent.map(entry => entry.role), messages.slice(1).map(message => message.role));
+    const tools = sent.recent.filter(entry => entry.role === "toolResult");
+    assert.equal(tools.length, 28);
+    const digest = createHash("sha256").update(small).digest("hex");
+    assert.ok(tools[0].text === small || tools[0].text.includes(`sha256 ${digest}`),
+      "the original 400-byte result is fully present or digest-attested");
+    assert.ok(!tools[0].text.includes("\ufffd"), "multibyte boundaries do not produce replacement characters");
+    assert.equal(sent.recent.at(-1).text, answer);
+    const attested = tools.filter(entry => entry.text.includes("sha256 ")).length;
+    assert.equal(attested, 28, "the small originally clipped result is attested with the newer large reads");
+    assert.equal(sent.coverage.recentBulkAttested, attested);
+    assert.equal(sent.coverage.recentTextTruncated, false);
+    assert.equal(f.records.find(row => row.event === "judge-start")?.attestedResults, attested);
+    assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
+    assert.equal(f.compactions.length, 1);
+    assert.ok(f.records.some(row => row.event === "native-persisted"));
+  }
+});
+
+test("UTF-8 tail-budget exhaustion judges recoverable reads but rejects clipped assistant text", async () => {
+  for (const assistantBytes of [36, 37]) {
+    for (const earlierText of ["", "x"]) {
+      const small = "\u{1f642}".repeat(100);
+      const large = "€".repeat(4000);
+      const messages = [
+        { role: "user", content: "Read everything." },
+        { role: "assistant", content: [{ type: "text", text: earlierText },
+          { type: "toolCall", id: "early", name: "read", arguments: { path: "source.txt" } }] },
+        { role: "toolResult", toolCallId: "early", toolName: "read", isError: false, content: small },
+        ...Array.from({ length: 27 }, (_, i) => reading(`unicode-${i}`, large)).flat(),
+        { role: "assistant", content: "h".repeat(assistantBytes - 18) },
+        { role: "assistant", content: "Final answer ready", stopReason: "stop" },
+      ];
+      const original = clippedView(messages);
+      const tools = original.state.recent.filter(entry => entry.role === "toolResult");
+      assert.equal(Buffer.byteLength(tools[1].text), 515, "byte slicing expands split UTF-8 sequences");
+      const remaining = 14000 - assistantBytes - 27 * 515;
+      assert.equal(remaining, assistantBytes === 36 ? 59 : 58);
+      assert.equal(Buffer.byteLength(tools[0].text), assistantBytes === 36 ? 59 : 64);
+      assert.equal(original.state.recent[0].text, "", "the original budget is exhausted");
+      const f = fixture();
+      let sent;
+      withHost(f, messages);
+      f.adviser.judge = (state, _key, signal) => {
+        sent = state;
+        const call = deferred(); f.evaluations.push({ ...call, signal }); return call.promise;
+      };
+      f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+      const work = f.fireTimer();
+      if (earlierText) {
+        await work;
+        assert.equal(f.evaluations.length, 0, "genuinely clipped assistant text cannot reach Jev");
+        assert.ok(f.records.some(row => row.event === "coverage-ineligible"));
+      } else {
+        assert.equal(f.evaluations.length, 1, `${assistantBytes} assistant bytes: Jev receives the checkpoint`);
+        f.evaluations[0].resolve({ finished: false, model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+        await work;
+        assert.equal(sent.recent.length, messages.length - 1);
+        assert.equal(sent.recent[0].text, "");
+        assert.equal(sent.recent.at(-1).text, "Final answer ready");
+        assert.equal(sent.coverage.recentTextTruncated, false);
+        assert.equal(sent.coverage.recentBulkAttested, 28);
+        const digest = createHash("sha256").update(small).digest("hex");
+        assert.ok(sent.recent[1].text.includes(`sha256 ${digest}`), "the full early read is attested");
+        assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
+      }
+      assert.equal(f.compactions.length, 0, "rejection or an unfinished judgment does not compact");
+    }
+  }
+});
+
+test("genuinely incomplete views are still rejected and name their reason", async () => {
+  const bigRead = reading("r", longRead(300));
+  const cases = {
+    "errored read": [transcript(reading("r", longRead(300), { isError: true })), {}, ["recent-text-clipped"]],
+    "shell output": [transcript([
+      { role: "assistant", content: [{ type: "toolCall", id: "b", name: "bash", arguments: { command: "pytest" } }] },
+      { role: "toolResult", toolCallId: "b", toolName: "bash", isError: false, content: [{ type: "text", text: longRead(300) }] },
+    ]), {}, ["recent-text-clipped"]],
+    "clipped assistant text": [transcript(bigRead, [{ role: "assistant", content: [{ type: "text", text: "y".repeat(9000) }], stopReason: "stop" }]), {}, ["recent-text-clipped"]],
+    "clipped user text": [transcript(bigRead), { omittedUserMessages: 1 }, ["user-text-clipped", "recent-text-clipped"]],
+    redacted: [transcript(bigRead), { redacted: true }, ["recent-text-clipped", "redacted"]],
+    images: [transcript(bigRead), { hasImages: true }, ["recent-text-clipped", "images"]],
+    "unknown context": [transcript(bigRead), { unknownContext: true }, ["recent-text-clipped", "unknown-context"]],
+    "unrecoverable transcript": [transcript(bigRead), { transcriptRecoverable: false }, ["recent-text-clipped", "transcript-unrecoverable"]],
+  };
+  for (const [name, [messages, over, reasons]] of Object.entries(cases)) {
+    const f = fixture(); withHost(f, messages, over);
+    await checkpoint(f);
+    assert.equal(f.evaluations.length, 0, `${name}: no Jev request`);
+    assert.equal(f.compactions.length, 0, `${name}: no compaction`);
+    const rejected = f.records.find(row => row.event === "coverage-ineligible");
+    assert.deepEqual(rejected?.reasons, reasons, name);
+  }
+});
+
+test("original tail-budget clipping still rejects small errors, non-read tools, and assistants", async () => {
+  for (const blocks of [false, true]) {
+    const encode = text => blocks ? [{ type: "text", text }] : text;
+    const small = "s".repeat(400);
+    const newer = Array.from({ length: 27 }, (_, i) =>
+      reading(`newer-${i}`, longRead(30), { content: encode(longRead(30)) })).flat();
+    const cases = {
+      "small errored read": reading("early", small, { isError: true, content: encode(small) }),
+      "small non-read tool": [
+        { role: "assistant", content: [{ type: "toolCall", id: "early", name: "bash", arguments: { command: "pwd" } }] },
+        { role: "toolResult", toolCallId: "early", toolName: "bash", isError: false, content: encode(small) },
+      ],
+      "small earliest assistant": [{ role: "assistant", content: encode(small), stopReason: "stop" }],
+    };
+    for (const [name, earliest] of Object.entries(cases)) {
+      const messages = [{ role: "user", content: "Read everything." }, ...earliest, ...newer,
+        { role: "assistant", content: encode("Final answer ready"), stopReason: "stop" }];
+      const f = fixture(); withHost(f, messages);
+      await checkpoint(f);
+      assert.equal(f.evaluations.length, 0, `${name}: no Jev request`);
+      assert.equal(f.compactions.length, 0, `${name}: no compaction`);
+      assert.deepEqual(f.records.find(row => row.event === "coverage-ineligible")?.reasons,
+        ["recent-text-clipped"], name);
+    }
+  }
+});
+
+test("altered non-attested package text cannot authorize a checkpoint", async () => {
+  for (const blocks of [false, true]) {
+    const small = "unchanged small read";
+    const messages = transcript(reading("large", longRead(300)),
+      reading("small", small, { content: blocks ? [{ type: "text", text: small }] : small }));
+    const f = fixture();
+    withHost(f, messages, {}, view => {
+      view.state.recent.find(entry => entry.role === "toolResult" && entry.text === small).text = "altered small read";
+      return view;
+    });
+    await checkpoint(f);
+    assert.equal(f.evaluations.length, 0, "a mismatched non-attested result never reaches Jev");
+    assert.equal(f.compactions.length, 0);
+    assert.deepEqual(f.records.find(row => row.event === "coverage-ineligible")?.reasons,
+      ["recent-text-clipped"]);
+  }
+});
+
+test("attestation refuses an unexpected package shape or host", async () => {
+  const messages = transcript(reading("r", longRead(300)));
+  const variants = {
+    "missing host session rebuilder": f => { delete f.adviser.buildSessionContext; },
+    "rebuilt window differs from the package window": f => { f.adviser.buildSessionContext = () => ({ messages: [...messages, ...reading("x", "extra")] }); },
+    "secrets found while rebuilding": f => { f.adviser.scrubKnownSecrets = text => ({ text, redacted: true }); },
+  };
+  for (const [name, change] of Object.entries(variants)) {
+    const f = fixture(); withHost(f, messages); change(f);
+    await checkpoint(f);
+    assert.equal(f.evaluations.length, 0, name);
+    assert.equal(f.compactions.length, 0, name);
+    assert.ok(f.records.some(row => row.event === "coverage-ineligible"), name);
+  }
+});
+
+test("attestation leaves already complete views and mid-size results untouched", () => {
+  const messages = transcript(reading("r", "small result"));
+  const f = fixture(); withHost(f, messages, { recentTextTruncated: false },
+    view => ({ ...view, autoCoverage: true }));
+  const view = completeCoverage(f.adviser, f.ctx, []);
+  assert.equal(view.autoCoverage, true);
+  assert.equal(view.attested, undefined, "nothing was summarized when nothing was clipped");
+});
+
+test("real adviser snapshot over a long read-result transcript is eligible and fits the request cap", {
+  skip: !process.env.FM_JEV_ADVISER_DIR && "set FM_JEV_ADVISER_DIR to the dependency-complete adviser package root",
+}, async () => {
+  const source = resolve(process.env.FM_JEV_ADVISER_DIR);
+  const context = await import(pathToFileURL(join(source, "src/context.ts")).href);
+  const judge = await import(pathToFileURL(join(source, "src/judge.ts")).href);
+  let directory = source, sdk;
+  for (;;) {
+    const candidate = join(directory, "node_modules/@earendil-works/pi-coding-agent/dist/index.js");
+    if (existsSync(candidate)) { sdk = await import(pathToFileURL(candidate).href); break; }
+    const parent = dirname(directory);
+    assert.notEqual(parent, directory, "pi-coding-agent must be installed beside the adviser package");
+    directory = parent;
+  }
+  const adviser = { ...context, buildSessionContext: sdk.buildSessionContext };
+  const work = mkdtempSync(join(tmpdir(), "fm-jev-coverage-"));
+  const sessionFile = join(work, "session.jsonl");
+  writeFileSync(sessionFile, "");
+  let serial = 0, parent = null;
+  const entry = message => {
+    const row = { type: "message", id: `e${++serial}`, parentId: parent, timestamp: new Date(0).toISOString(),
+      message: { ...message, timestamp: 0 } };
+    parent = row.id; return row;
+  };
+  const build = (toolName, isError, text) => [
+    entry({ role: "user", content: [{ type: "text", text: "Read the whole file, then stop." }] }),
+    ...Array.from({ length: 6 }, (_, i) => [
+      entry({ role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: `t${i}`, name: toolName, arguments: toolName === "read" ? { path: "source.txt" } : { command: "cat source.txt" } }] }),
+      entry({ role: "toolResult", toolCallId: `t${i}`, toolName, isError, content: [{ type: "text", text }] }),
+    ]).flat(),
+    entry({ role: "assistant", stopReason: "stop", content: [{ type: "text", text: "DISCOVERY_COMPLETE" }] }),
+  ];
+  const body = longRead(300);
+  try {
+    const view = (toolName, isError, text) => {
+      const branch = build(toolName, isError, text);
+      return completeCoverage(adviser, {
+        cwd: work, sessionManager: { getBranch: () => branch, getSessionFile: () => sessionFile },
+      }, []);
+    };
+    const control = view("read", false, body);
+    assert.equal(control.attested, 6);
+    assert.equal(control.autoCoverage, true, "the bake-off's long read results are now eligible");
+    assert.equal(control.state.coverage.recentTextTruncated, false);
+    const digest = createHash("sha256").update(body).digest("hex");
+    assert.ok(control.state.recent.filter(m => m.role === "toolResult").every(m => m.text.includes(digest)));
+    assert.ok(Buffer.byteLength(judge.requestBody(control.state)) <= judge.MAX_REQUEST_BYTES,
+      "the attested request is a valid Jev request");
+    assert.throws(() => judge.requestBody({ recent: [{ text: body.repeat(10) }] }), "an unbounded view cannot be sent");
+    assert.equal(view("bash", false, body).autoCoverage, false, "large shell output is not attested");
+    assert.equal(view("read", true, body).autoCoverage, false, "an errored result is not attested");
+  } finally { rmSync(work, { recursive: true, force: true }); }
 });

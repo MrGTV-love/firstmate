@@ -419,7 +419,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-skill-suggest.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -1504,11 +1504,19 @@ families_for_changed_path() {
     bin/fm-dispatch-resolve.sh)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       ;;
+    bin/fm-typesafe-lib.sh)
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      ;;
+    bin/fm-skill-suggest.sh|bin/fm-skill-catalog.jq)
+      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
+      ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
-      # bin/fm-dispatch-resolve.sh (TYPESAFE_API_KEY).
+      # bin/fm-typesafe-lib.sh (dispatch and skill-advice TYPESAFE_API_KEY).
       printf '%s\n' pr-forge
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-skill-suggest.test.sh"
       ;;
     .pi/extensions/fm-branch-supervision.ts|.pi/extensions/lib/fm-async-exec.ts|\
     .pi/extensions/lib/fm-branch-dispatch.ts|.pi/extensions/lib/fm-native-contract.ts)

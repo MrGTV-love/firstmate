@@ -539,6 +539,8 @@ Any of these preserves the candidate and lets session startup continue with at m
 | `tests/fm-backend-herdr-stale-active-tab-e2e.test.sh` | Proves a persisted-focused tab still closes when no foreground client is attached. |
 | `tests/fm-herdr-attached-viewer-live-e2e.test.sh` | Proves the other half against a real attached viewer, which `bin/fm-herdr-lab.sh viewer start` supplies over a pty sized before the fork. |
 
+Run `bash tests/fm-backend-herdr-presentation-e2e.test.sh --sandbox-only` to check real allocator confinement without inherited controller configuration and private pre-launch Claude trust registration, without starting a Herdr session.
+
 [`verification/runtime-backends.md`](verification/runtime-backends.md#workspace-removal-focus-safety) owns the active versioned evidence for the focus-flash test.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#attached-foreground-viewer) owns the active versioned evidence and the re-run trigger for the attached-viewer test.
 
@@ -583,8 +585,9 @@ When the selected named server is not running, the adapter launches it without t
 - Firstmate home and directory overrides.
 - Harness identity markers.
 - The supervision-model override.
+- Per-launch [compact-adviser](configuration.md#compact-adviser-setting-configcompact-adviser) state, including a function-hooks flag Firstmate marked as adviser-only; an unmarked flag is the captain's own opt-in and stays.
 
-Herdr passes its server startup environment to every later pane, so retaining those values could misroute panes for another Firstmate home or harness.
+Herdr passes its server startup environment to every later pane, so retaining those values could misroute panes for another Firstmate home or harness, or make one launch's adviser policy sticky for every later pane.
 An already-running server is reused without restart or environment changes.
 Explicit named-session routing and unrelated launch environment remain intact.
 
@@ -619,6 +622,7 @@ Dim or faint suggestions are still removed, and other harnesses retain their exi
 `fm_backend_herdr_composer_ghost_luma` owns that policy; a state read consults identity for it only when the two policies strip the selected composer rows differently.
 A submission reuses the identity it already probed for its post-Enter confirmation and clear reads, so a failed later probe cannot turn a swallowed colored command into a reported delivery; a Pi status is still read live, because only a live idle or done status proves its composer.
 Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
+The shared selector keeps an indented selected slash-menu row out of payload proof when it matches the nonempty command inside Claude's proven composer; ordinary lower drafts and empty-parent ambiguity retain their existing refusals.
 Dated measurements: [Claude exit behind the slash-command popup](verification/runtime-backends.md#claude-exit-behind-the-slash-command-popup) and [Colored Claude slash commands](verification/runtime-backends.md#colored-claude-slash-commands).
 
 That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
