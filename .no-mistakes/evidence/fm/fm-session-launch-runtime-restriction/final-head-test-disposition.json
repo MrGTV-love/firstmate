@@ -1,0 +1,39 @@
+{
+  "target_head": "5cc48c278337efdb487d11e846f6cd19d3bf564c",
+  "targeted_commands": [
+    {
+      "command": "bash tests/fm-session-launch-policy.test.sh",
+      "exit": 0
+    },
+    {
+      "command": "bash tests/fm-supervision-session-launch-policy.test.sh",
+      "exit": 0
+    },
+    {
+      "command": "bash tests/fm-supervision-instructions.test.sh",
+      "exit": 0
+    }
+  ],
+  "new_live_child_admission_evidence": "final-head-child-refusals-live.json",
+  "new_emitted_protocol_evidence": "final-head-rendered-omp-supervision.txt",
+  "retained_actual_runtime_head": "b6998beb2ed31a5c324941f4f73d3c06bf2ff71f",
+  "retained_actual_runtime_evidence": [
+    "targeted-native-worker.json",
+    "targeted-live-recovery.json",
+    "test-evidence-completion.json",
+    "monitoring-restoration-result.json"
+  ],
+  "setup_corrections": [
+    "Completed the product distribution after bin-only fixture lacked the owning omp session overlay.",
+    "Corrected the launch sentinel to permit the real read-only omp models --json discovery while still refusing every session launch."
+  ],
+  "new_live_refusal_result": "pass",
+  "cleanup": {
+    "scratch_removed": true,
+    "private_tmux_stopped": true,
+    "lab_teardown_exit": 0
+  },
+  "source_or_permanent_test_changes": "none",
+  "runtime_limitations": "The previously declined genuine standalone, native tc adapter, and authenticated OpenCode scenarios remain explicitly untested; no new finding or proxy substitution.",
+  "verification_limits": "No full suite, unchanged known remote timing test, lint, formatter, static analysis, push, PR or CI phase. Retained remote timing failures are not green full-test or CI evidence."
+}

@@ -1,0 +1,2113 @@
+{
+  "head": "5cc48c278337efdb487d11e846f6cd19d3bf564c",
+  "result": "pass",
+  "error": null,
+  "scenarios": [
+    {
+      "entry": "fresh",
+      "boundary": "gitignore-absent",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-fresh-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "339ef0f978eb749eb6467412d236925180e8f89c6c6766337fbc1e177e0ff052",
+        "parent/data/fh-90725-fresh-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+      },
+      "after": {
+        "parent/data/secondmates.md": "339ef0f978eb749eb6467412d236925180e8f89c6c6766337fbc1e177e0ff052",
+        "parent/data/fh-90725-fresh-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "fresh",
+      "boundary": "gitignore-malformed",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-fresh-gitignore-malformed sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n",
+      "before": {
+        "parent/data/secondmates.md": "a2dcb18375caf94403d05df9f08a8a01cfcf73df676cbd01bfc07dff88748f0a",
+        "parent/data/fh-90725-fresh-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "fh-90725-fresh-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "after": {
+        "parent/data/secondmates.md": "a2dcb18375caf94403d05df9f08a8a01cfcf73df676cbd01bfc07dff88748f0a",
+        "parent/data/fh-90725-fresh-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "fh-90725-fresh-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": null,
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "fresh",
+      "boundary": "unwritable-absent",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-fresh-unwritable-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: error: failed to copy crew-harness at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/crew-harness\nfm-config-inherit: error: failed to copy backlog-backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/backlog-backend\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-fresh-unwritable-absent inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "fc690d5b31467e760d3ff12ca76e3cb8a8929a9dfc2f51d9107eed3d4cad1d48",
+        "parent/data/fh-90725-fresh-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+      },
+      "after": {
+        "parent/data/secondmates.md": "fc690d5b31467e760d3ff12ca76e3cb8a8929a9dfc2f51d9107eed3d4cad1d48",
+        "parent/data/fh-90725-fresh-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-fresh-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-fresh-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-fresh-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-fresh-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-fresh-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-fresh-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": null,
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "direct",
+      "boundary": "gitignore-absent",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-direct-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "ae16552f645860e447c2dc24b26ad5b5ba3e40028b15ae80cd826b80bd2530ca",
+        "parent/data/fh-90725-direct-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-gitignore-absent.meta": "c3a842f5edb38d7c2f04ab5577eb96e926a8b6bd30c5efba46d8c1db4ef4e7d8"
+      },
+      "after": {
+        "parent/data/secondmates.md": "ae16552f645860e447c2dc24b26ad5b5ba3e40028b15ae80cd826b80bd2530ca",
+        "parent/data/fh-90725-direct-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-gitignore-absent.meta": "c3a842f5edb38d7c2f04ab5577eb96e926a8b6bd30c5efba46d8c1db4ef4e7d8"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%1 25114 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "direct",
+      "boundary": "gitignore-malformed",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-direct-gitignore-malformed sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n",
+      "before": {
+        "parent/data/secondmates.md": "b55c552f7cc9fcfbd78505ee510801461e7112b0ba39d9c8443bbf8f0701132b",
+        "parent/data/fh-90725-direct-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-gitignore-malformed.meta": "b4b6bacfe34970b35fb2896d28d543e89821476ccf740b4d3a380d8ca2415682",
+        "fh-90725-direct-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "after": {
+        "parent/data/secondmates.md": "b55c552f7cc9fcfbd78505ee510801461e7112b0ba39d9c8443bbf8f0701132b",
+        "parent/data/fh-90725-direct-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-gitignore-malformed.meta": "b4b6bacfe34970b35fb2896d28d543e89821476ccf740b4d3a380d8ca2415682",
+        "fh-90725-direct-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%2 29221 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "direct",
+      "boundary": "unwritable-absent",
+      "exit": 1,
+      "output": "warning: secondmate fh-90725-direct-unwritable-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: error: failed to copy crew-harness at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/crew-harness\nfm-config-inherit: error: failed to copy backlog-backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/backlog-backend\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-direct-unwritable-absent inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "dc7f98f1012d7f3ce2c16c6a47e8f7d9e33edf1a588978f73ba70d5d4e57aa46",
+        "parent/data/fh-90725-direct-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-unwritable-absent.meta": "67d5bac4494b1942dc8bcc3fa34defc3f196b40106beb7dd23f3b4ca37c4fd7a"
+      },
+      "after": {
+        "parent/data/secondmates.md": "dc7f98f1012d7f3ce2c16c6a47e8f7d9e33edf1a588978f73ba70d5d4e57aa46",
+        "parent/data/fh-90725-direct-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-direct-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-direct-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-direct-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-direct-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-direct-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-direct-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-direct-unwritable-absent.meta": "67d5bac4494b1942dc8bcc3fa34defc3f196b40106beb7dd23f3b4ca37c4fd7a"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%3 33221 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "control",
+      "boundary": "gitignore-absent",
+      "exit": 1,
+      "output": "fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "b1d64b2dfd2206604b9072cc17af154b2ea27bc8618b10a66d47ef550b5fb77e",
+        "parent/data/fh-90725-control-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-gitignore-absent.meta": "a0051637f97fcc585ff872ea050faa52fd0d01dbb29b70e9910521dcca3171d1"
+      },
+      "after": {
+        "parent/data/secondmates.md": "b1d64b2dfd2206604b9072cc17af154b2ea27bc8618b10a66d47ef550b5fb77e",
+        "parent/data/fh-90725-control-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-gitignore-absent.meta": "a0051637f97fcc585ff872ea050faa52fd0d01dbb29b70e9910521dcca3171d1"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%4 39317 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "control",
+      "boundary": "gitignore-malformed",
+      "exit": 1,
+      "output": "fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n",
+      "before": {
+        "parent/data/secondmates.md": "07e998ace1afe1417e28761b2646dbba43f96dabcad24b00b13a2afcbe551780",
+        "parent/data/fh-90725-control-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-gitignore-malformed.meta": "f7ef781a79ffa4092f5239cb6c094f8e7d9da79d5350576e6d888f9f6d048081",
+        "fh-90725-control-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "after": {
+        "parent/data/secondmates.md": "07e998ace1afe1417e28761b2646dbba43f96dabcad24b00b13a2afcbe551780",
+        "parent/data/fh-90725-control-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-gitignore-malformed.meta": "f7ef781a79ffa4092f5239cb6c094f8e7d9da79d5350576e6d888f9f6d048081",
+        "fh-90725-control-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%5 42444 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "control",
+      "boundary": "unwritable-absent",
+      "exit": 1,
+      "output": "fm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-control-unwritable-absent session-launch-policy inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent/config before launch\n",
+      "before": {
+        "parent/data/secondmates.md": "acacd9211d55d3800bf843d53e737ccb25bfa8da35aeb12fe2a1d4eca704b3d3",
+        "parent/data/fh-90725-control-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-unwritable-absent.meta": "28e7aefd76d0841bc5b5467c9fca98f278067ce8f44f64c9d03848a29990ff68"
+      },
+      "after": {
+        "parent/data/secondmates.md": "acacd9211d55d3800bf843d53e737ccb25bfa8da35aeb12fe2a1d4eca704b3d3",
+        "parent/data/fh-90725-control-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-control-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-control-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-control-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-control-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-control-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-control-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-control-unwritable-absent.meta": "28e7aefd76d0841bc5b5467c9fca98f278067ce8f44f64c9d03848a29990ff68"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%6 45444 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "auto",
+      "boundary": "gitignore-absent",
+      "exit": 1,
+      "output": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent/config before launch\nrecovery status=skipped\n",
+      "before": {
+        "parent/data/secondmates.md": "1560a8fffc5c1c03f10a4cebc020c490ff4730abc7d8482a44d72866aff64e1b",
+        "parent/data/fh-90725-auto-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-gitignore-absent.meta": "31891fb90acc04ef6a51119781417d0c1015e5c24e412e42016e89abd6b06d90"
+      },
+      "after": {
+        "parent/data/secondmates.md": "1560a8fffc5c1c03f10a4cebc020c490ff4730abc7d8482a44d72866aff64e1b",
+        "parent/data/fh-90725-auto-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-gitignore-absent.meta": "31891fb90acc04ef6a51119781417d0c1015e5c24e412e42016e89abd6b06d90"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%7 48597 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "auto",
+      "boundary": "gitignore-malformed",
+      "exit": 1,
+      "output": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\nrecovery status=skipped\n",
+      "before": {
+        "parent/data/secondmates.md": "ddf4f73453ac4de4d9f2cbed2200686b547da355294e3d33af3a3c59d33da764",
+        "parent/data/fh-90725-auto-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-gitignore-malformed.meta": "23b8a704f6db0f87a52fad348f17af4b6eeffa870df772dd185a913ff70a56e3",
+        "fh-90725-auto-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "after": {
+        "parent/data/secondmates.md": "ddf4f73453ac4de4d9f2cbed2200686b547da355294e3d33af3a3c59d33da764",
+        "parent/data/fh-90725-auto-gitignore-malformed/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-gitignore-malformed.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-gitignore-malformed": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-gitignore-malformed/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-gitignore-malformed/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-gitignore-malformed/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-gitignore-malformed/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-gitignore-malformed.meta": "23b8a704f6db0f87a52fad348f17af4b6eeffa870df772dd185a913ff70a56e3",
+        "fh-90725-auto-gitignore-malformed/config/session-launch-policy": "28fca28ef02d08bd61931c03999b7a5b822392132867682e88b2db492ee9f087"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%8 51838 zsh\n",
+      "no_launch_or_resource_effects": true
+    },
+    {
+      "entry": "auto",
+      "boundary": "unwritable-absent",
+      "exit": 1,
+      "output": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-auto-unwritable-absent session-launch-policy inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent/config before launch\nrecovery status=skipped\n",
+      "before": {
+        "parent/data/secondmates.md": "6ed94a34458cc4713b59fb5a88f4914253ddb3574b5fe8cb8c549869865199e6",
+        "parent/data/fh-90725-auto-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-unwritable-absent.meta": "5ec5777922c8477d84745bdf7cce252b7c809bea622a41aa90bac5b833a7b410"
+      },
+      "after": {
+        "parent/data/secondmates.md": "6ed94a34458cc4713b59fb5a88f4914253ddb3574b5fe8cb8c549869865199e6",
+        "parent/data/fh-90725-auto-unwritable-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+        "parent/state/fh-90725-auto-unwritable-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+        "parent/state/.secondmate-relaunch-fh-90725-auto-unwritable-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+        "fh-90725-auto-unwritable-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+        "fh-90725-auto-unwritable-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+        "fh-90725-auto-unwritable-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+        "fh-90725-auto-unwritable-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491",
+        "parent/state/fh-90725-auto-unwritable-absent.meta": "5ec5777922c8477d84745bdf7cce252b7c809bea622a41aa90bac5b833a7b410"
+      },
+      "sentinel": "",
+      "result": "pass",
+      "live": true,
+      "preserved_endpoint": "%9 54977 zsh\n",
+      "no_launch_or_resource_effects": true
+    }
+  ],
+  "commands": [
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/parent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/parent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "tmux-dir",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/parent"
+      ],
+      "exit": 0,
+      "stdout": "/tmp/fml.HknjtQ\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-session",
+        "-d",
+        "-s",
+        "firstmate",
+        "-n",
+        "primary",
+        "-x",
+        "120",
+        "-y",
+        "40",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:primary",
+        "#{pane_id} #{pane_pid} #{window_width}x#{window_height} #{socket_path}"
+      ],
+      "exit": 0,
+      "stdout": "%0 22502 120x40 /private/tmp/fml.HknjtQ/tmux-501/fm-lab\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-gitignore-absent",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-fresh-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-gitignore-absent",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-fresh-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-gitignore-malformed",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-fresh-gitignore-malformed sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-unwritable-absent",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-fresh-unwritable-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: error: failed to copy crew-harness at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/crew-harness\nfm-config-inherit: error: failed to copy backlog-backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/backlog-backend\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-fresh-unwritable-absent inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-unwritable-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-direct-gitignore-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%1 25114 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-direct-gitignore-absent",
+        "--relaunch"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-direct-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%1 25114 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-direct-gitignore-malformed",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%2 29221 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-direct-gitignore-malformed",
+        "--relaunch"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-direct-gitignore-malformed sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%2 29221 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-direct-unwritable-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%3 33221 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-spawn.sh",
+        "fh-90725-direct-unwritable-absent",
+        "--relaunch"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-direct-unwritable-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: error: failed to copy crew-harness at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/crew-harness\nfm-config-inherit: error: failed to copy backlog-backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/backlog-backend\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-direct-unwritable-absent inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-direct-unwritable-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-direct-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%3 33221 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-control-gitignore-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%4 39317 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-control.sh",
+        "fh-90725-control-gitignore-absent",
+        "relaunch",
+        "--note",
+        "retain progress"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%4 39317 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-control-gitignore-malformed",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%5 42444 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-control.sh",
+        "fh-90725-control-gitignore-malformed",
+        "relaunch",
+        "--note",
+        "retain progress"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%5 42444 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-control-unwritable-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%6 45444 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-control.sh",
+        "fh-90725-control-unwritable-absent",
+        "relaunch",
+        "--note",
+        "retain progress"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "fm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-control-unwritable-absent session-launch-policy inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-control-unwritable-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-control-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%6 45444 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-auto-gitignore-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%7 48597 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -eu\nFM_ROOT=$1; STATE=\"$FM_HOME/state\"; id=$2; meta=\"$STATE/$id.meta\"\n. \"$FM_ROOT/bin/fm-secondmate-liveness-lib.sh\"\nfm_secondmate_liveness_lock \"$id\"\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'actual liveness: state=%s status=%s kill=%s\n' \"$FM_SM_LIVE_STATE\" \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_KILL\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ]\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf '%s\nrecovery status=%s\n' \"$FM_SM_LIVE_OUT\" \"$FM_SM_LIVE_STATUS\"\nexit \"$rc\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product",
+        "fh-90725-auto-gitignore-absent"
+      ],
+      "exit": 1,
+      "stdout": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-absent/config before launch\nrecovery status=skipped\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-gitignore-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%7 48597 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-auto-gitignore-malformed",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n@8 fm-fh-90725-auto-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%8 51838 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -eu\nFM_ROOT=$1; STATE=\"$FM_HOME/state\"; id=$2; meta=\"$STATE/$id.meta\"\n. \"$FM_ROOT/bin/fm-secondmate-liveness-lib.sh\"\nfm_secondmate_liveness_lock \"$id\"\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'actual liveness: state=%s status=%s kill=%s\n' \"$FM_SM_LIVE_STATE\" \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_KILL\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ]\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf '%s\nrecovery status=%s\n' \"$FM_SM_LIVE_OUT\" \"$FM_SM_LIVE_STATUS\"\nexit \"$rc\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product",
+        "fh-90725-auto-gitignore-malformed"
+      ],
+      "exit": 1,
+      "stdout": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-gitignore-malformed/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\nrecovery status=skipped\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n@8 fm-fh-90725-auto-gitignore-malformed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-gitignore-malformed",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%8 51838 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-window",
+        "-d",
+        "-t",
+        "firstmate",
+        "-n",
+        "fm-fh-90725-auto-unwritable-absent",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n@8 fm-fh-90725-auto-gitignore-malformed\n@9 fm-fh-90725-auto-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%9 54977 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -eu\nFM_ROOT=$1; STATE=\"$FM_HOME/state\"; id=$2; meta=\"$STATE/$id.meta\"\n. \"$FM_ROOT/bin/fm-secondmate-liveness-lib.sh\"\nfm_secondmate_liveness_lock \"$id\"\ntrap 'fm_secondmate_liveness_unlock \"$id\"' EXIT\nfm_secondmate_liveness_probe \"$meta\" \"$id\" poll\nprintf 'actual liveness: state=%s status=%s kill=%s\n' \"$FM_SM_LIVE_STATE\" \"$FM_SM_LIVE_STATUS\" \"$FM_SM_LIVE_KILL\"\n[ \"$FM_SM_LIVE_STATUS\" = relaunchable ]\nrc=0; fm_secondmate_liveness_relaunch \"$meta\" \"$id\" || rc=$?\nprintf '%s\nrecovery status=%s\n' \"$FM_SM_LIVE_OUT\" \"$FM_SM_LIVE_STATUS\"\nexit \"$rc\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product",
+        "fh-90725-auto-unwritable-absent"
+      ],
+      "exit": 1,
+      "stdout": "actual liveness: state=dead status=relaunchable kill=1\nfm-config-inherit: error: failed to copy session-launch-policy at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent/config/session-launch-policy\nwarning: secondmate fh-90725-auto-unwritable-absent session-launch-policy inheritance failed for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-auto-unwritable-absent/config before launch\nrecovery status=skipped\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n@1 fm-fh-90725-direct-gitignore-absent\n@2 fm-fh-90725-direct-gitignore-malformed\n@3 fm-fh-90725-direct-unwritable-absent\n@4 fm-fh-90725-control-gitignore-absent\n@5 fm-fh-90725-control-gitignore-malformed\n@6 fm-fh-90725-control-unwritable-absent\n@7 fm-fh-90725-auto-gitignore-absent\n@8 fm-fh-90725-auto-gitignore-malformed\n@9 fm-fh-90725-auto-unwritable-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:fm-fh-90725-auto-unwritable-absent",
+        "#{pane_id} #{pane_pid} #{pane_current_command}"
+      ],
+      "exit": 0,
+      "stdout": "%9 54977 zsh\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "kill-server"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/product/bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/parent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "isolation": "Exact tracked current-head product archive; disposable worktree-local stock marked homes; real private tmux 120x40 shell endpoints. No product mocks or path overrides. FM_SPAWN_NO_GUARD skips unrelated primary watcher readiness. Runtime sentinels permit only real read-only omp models --json discovery; no session executables launched.",
+  "cleanup": {
+    "scratch_removed": true,
+    "private_tmux_stopped": true,
+    "lab_teardown_exit": 0
+  }
+}

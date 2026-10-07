@@ -1,0 +1,30 @@
+{
+  "diagnosis": "The original sentinel wrongly classified read-only omp models --json discovery as a session launch. Durable hashes were preserved and policy refused. Corrected sentinel permits only the real read-only model-catalog query; every session launch still fails closed.",
+  "observed": {
+    "entry": "fresh",
+    "boundary": "gitignore-absent",
+    "exit": 1,
+    "output": "warning: secondmate fh-90725-fresh-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/fh-90725-fresh-gitignore-absent/config before launch\n",
+    "before": {
+      "parent/data/secondmates.md": "339ef0f978eb749eb6467412d236925180e8f89c6c6766337fbc1e177e0ff052",
+      "parent/data/fh-90725-fresh-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+      "parent/state/fh-90725-fresh-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+      "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+      "fh-90725-fresh-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+      "fh-90725-fresh-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+      "fh-90725-fresh-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+      "fh-90725-fresh-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+    },
+    "after": {
+      "parent/data/secondmates.md": "339ef0f978eb749eb6467412d236925180e8f89c6c6766337fbc1e177e0ff052",
+      "parent/data/fh-90725-fresh-gitignore-absent/brief.md": "8ea96accd082687ee048eee690ec963ee75615a5e0d567cd97c9d7e5ed836a2a",
+      "parent/state/fh-90725-fresh-gitignore-absent.validation": "43266bef42103b757d8a417a2dae70685fbef66b000c0b73967f41602f6b173f",
+      "parent/state/.secondmate-relaunch-fh-90725-fresh-gitignore-absent": "bde384c0a5463750f739754ad1102205fa1e2148b270187835576f3be0bc708a",
+      "fh-90725-fresh-gitignore-absent/data/charter.md": "82667753bd6215fde1bfa72b610d0beded3a25f80f256d2ebe3c7e4285e942fd",
+      "fh-90725-fresh-gitignore-absent/state/task.meta": "169087de0309aa9e04438471125eb52242d16aadf2323393b926f56915c8a97c",
+      "fh-90725-fresh-gitignore-absent/state/task.validation": "646d2777a5cfb679e7467b177df972554b522ad903ca747ce989fa637fe44cc8",
+      "fh-90725-fresh-gitignore-absent/unpublished": "991887566af5c969ccf939cd89fef31fcf1f045817fff13b0816d596050e8491"
+    },
+    "sentinel": "unexpected executable: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-vfulbcyj/sentinels/omp args=models --json\n"
+  }
+}

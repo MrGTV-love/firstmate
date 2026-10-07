@@ -1,0 +1,188 @@
+{
+  "head": "5cc48c278337efdb487d11e846f6cd19d3bf564c",
+  "result": "fail",
+  "error": "AssertionError({'command': ['bash', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-spawn.sh', 'fh-90725-fresh-gitignore-absent', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent', '--secondmate'], 'exit': 1, 'stdout': '', 'stderr': \"error: omp session posture overlay missing at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/.omp/fm-session-overlay.yml; a session launched without it can park on the captain's own approval or plan-mode settings\\n\"})",
+  "scenarios": [],
+  "commands": [
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/parent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/parent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-lab-home.sh",
+        "tmux-dir",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/parent"
+      ],
+      "exit": 0,
+      "stdout": "/tmp/fml.H75Nss\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-session",
+        "-d",
+        "-s",
+        "firstmate",
+        "-n",
+        "primary",
+        "-x",
+        "120",
+        "-y",
+        "40",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:primary",
+        "#{pane_id} #{pane_pid} #{window_width}x#{window_height} #{socket_path}"
+      ],
+      "exit": 0,
+      "stdout": "%0 80523 120x40 /private/tmp/fml.H75Nss/tmux-501/fm-lab\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-gitignore-absent",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/fh-90725-fresh-gitignore-absent",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: omp session posture overlay missing at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/.omp/fm-session-overlay.yml; a session launched without it can park on the captain's own approval or plan-mode settings\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "kill-server"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/product/bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-20n9rbjb/parent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "isolation": "Exact current-head bin source copied into a disposable worktree-local product fixture; marked stock homes; real private tmux 120x40 shell endpoints; no path overrides or gate bypass. Forbidden-executable sentinels were not invoked. Existing FM_SPAWN_NO_GUARD seam skips unrelated primary watcher readiness. No model session launched.",
+  "cleanup": {
+    "scratch_removed": true,
+    "private_tmux_stopped": true,
+    "lab_teardown_exit": 0
+  }
+}

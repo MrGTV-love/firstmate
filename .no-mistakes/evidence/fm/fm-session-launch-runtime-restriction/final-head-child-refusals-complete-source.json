@@ -1,0 +1,188 @@
+{
+  "head": "5cc48c278337efdb487d11e846f6cd19d3bf564c",
+  "result": "fail",
+  "error": "AssertionError()",
+  "scenarios": [],
+  "commands": [
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/parent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/parent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product/bin/fm-lab-home.sh",
+        "tmux-dir",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/parent"
+      ],
+      "exit": 0,
+      "stdout": "/tmp/fml.1TfOdz\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "new-session",
+        "-d",
+        "-s",
+        "firstmate",
+        "-n",
+        "primary",
+        "-x",
+        "120",
+        "-y",
+        "40",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product",
+        "/bin/zsh -f"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "display-message",
+        "-p",
+        "-t",
+        "firstmate:primary",
+        "#{pane_id} #{pane_pid} #{window_width}x#{window_height} #{socket_path}"
+      ],
+      "exit": 0,
+      "stdout": "%0 34203 120x40 /private/tmp/fml.1TfOdz/tmux-501/fm-lab\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "init",
+        "-q",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent",
+        "add",
+        "AGENTS.md",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent",
+        "-c",
+        "user.name=Disposable Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "isolated descendant"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "list-windows",
+        "-t",
+        "firstmate",
+        "-F",
+        "#{window_id} #{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "@0 primary\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product/bin/fm-spawn.sh",
+        "fh-90725-fresh-gitignore-absent",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent",
+        "--secondmate"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "warning: secondmate fh-90725-fresh-gitignore-absent sync skipped before launch: primary default-branch commit cannot be resolved\nfm-config-inherit: warning: skipped session-launch-policy for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent/config: destination does not allow inherited item (not gitignored or guard failed)\nerror: secondmate config/session-launch-policy must be enabled at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/fh-90725-fresh-gitignore-absent/config before launch\n"
+    },
+    {
+      "command": [
+        "tmux",
+        "-L",
+        "fm-lab",
+        "kill-server"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/product/bin/fm-lab-home.sh",
+        "teardown",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.test-child-live-imuqebw6/parent"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "isolation": "Exact tracked current-head product archive, worktree-local stock marked homes, real private tmux 120x40 shell endpoints. No product mocks or path overrides. FM_SPAWN_NO_GUARD skips unrelated primary watcher readiness; sentinels only prevent accidental runtime launches and were not invoked.",
+  "cleanup": {
+    "scratch_removed": true,
+    "private_tmux_stopped": true,
+    "lab_teardown_exit": 0
+  }
+}

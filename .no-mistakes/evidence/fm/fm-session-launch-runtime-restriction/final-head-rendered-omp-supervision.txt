@@ -1,0 +1,55 @@
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: omp
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Supervision host: configured; when activation succeeds, it takes away-posture wakes and, where the dialog mirror is verified, eligible attended wakes itself, and hands the rest to you (protocol at the end of this block).
+- Ordinary wake: the omp extension already owns watcher continuity; do not arm another cycle.
+
+Mode: omp (Oh My Pi) extension background wake.
+
+When this session owns supervision and away mode is not active:
+1. Drain first with `bin/fm-wake-drain.sh`.
+   After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
+2. Confirm the omp primary auto-loaded both project extensions from `.omp/extensions/`; omp has no project-trust gate, so a plain `omp` started with this home as its working directory loads them with no dialog.
+   If `bin/fm-session-start.sh` reported the omp extensions as not loaded, restart omp inside this home; pass `-e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-turnend-guard.ts -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-omp-watch.ts` only when omp must start from another directory, because omp loads a file named both ways twice.
+3. Initial process cycle only: make the one required `fm_watch_arm_omp` call; if startup already owned the fleet lock, this is an ownership-based no-op.
+   Use `/fm-watch-arm-omp` only as a human-entered fallback.
+   Never run `bin/fm-watch-arm.sh` through omp's bash tool because that foreground arm can wedge the agent and bypasses extension-owned cleanup.
+4. If the extension says no live session holds the lock, run `bin/fm-session-start.sh` to reclaim the session lock, then call `fm_watch_arm_omp` again.
+5. The extension starts `bin/fm-watch-arm.sh --restart`, keeps the child attached to the live omp process, and owns every later successor launch.
+6. Ordinary same-process session replacement (`/new`, `/resume`, `/fork`) retires only the prior generation; when the replacement owns the fleet lock, its `session_start` arms the new generation without a model turn or another `fm_watch_arm_omp` call.
+   The generation-owner contract and in-flight actionable-close handoff live in `.omp/extensions/fm-primary-omp-watch.ts`; because omp reports no shutdown reason, every shutdown with a pending actionable close persists the handoff, and the next owning `session_start` in any process replays it.
+7. After an actionable child close, the extension rechecks session-lock ownership and verifies one successor before it delivers the follow-up wake; its bounded fallback is defined in `docs/watcher-continuity.md`.
+8. Ordinary work, turn completion, and ordinary signal, stale, check, heartbeat, or other wake handling: do not call `fm_watch_arm_omp` again because continuity is extension-owned rather than model-memory-owned.
+9. An unexpected child close enters bounded exponential retry, and an exhausted retry or lost session lock is surfaced as a watcher failure instead of disappearing.
+10. Missing, failed, or unhealthy cycle only: if a later notification explicitly reports one of those repair conditions, drain queued wakes, inspect the failure text, call `fm_watch_arm_omp`, and restart omp inside this home if the extensions are not loaded.
+   A redundant call while the extension owns an arm child or scheduled retry is an ownership-based `watcher: unchanged` no-op, not an independent health claim.
+11. Never use shell `&` for watcher supervision.
+   The arm mechanism above is extension-owned, not a model tool call, but a manual recovery probe that backgrounds, pipes, or bundles the arm is denied automatically by the pre-tool seatbelt (`bin/fm-arm-pretool-check.sh`, wired into the turn-end guard extension at `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-turnend-guard.ts`).
+
+The turn-end guard on omp is structural, not advisory: `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-turnend-guard.ts` answers omp's blocking `session_stop` hook, and when `bin/fm-turnend-guard.sh` returns 2 it forces one continuation carrying the guard text, bounded to one per turn by the `stop_hook_active` flag omp sets on the continuation's own stop.
+An interrupted turn never raises `session_stop`, so a supervisor-initiated interrupt is not guarded; `bin/fm-control.sh` owns that postcondition.
+
+The Pi supervision branch (`docs/pi-supervision-branch.md`) is Pi's in-process conversation and does not run on omp: without an active supervision host every actionable wake is delivered to this conversation and the lease, outcome-store, and `fm_branch_processed` contracts do not apply here; [`supervision-host.md`](../supervision-host.md) owns host activation and away behavior.
+
+The turn-end guard extension lives at `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-turnend-guard.ts`.
+The watcher extension lives at `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48YHW4X1N5R5ANWST7WZR3J/.omp/extensions/fm-primary-omp-watch.ts`.
+Both are tracked, project-local `.omp/extensions/*.ts` files that omp auto-discovers from this home with no trust dialog; `bin/fm-session-start.sh` reports when the running omp session has not loaded both required extensions.
+
+Supervision host: configured for this home (`config/supervision-host`; [`supervision-host.md`](../supervision-host.md) owns the design, and the [session launch policy](../configuration.md#session-launch-policy-configsession-launch-policy) governs activation).
+The wake-handling additions below assume an active host; the primary supervision rules above remain in force when activation is refused.
+The omp watch extension runs the supervision host in the arm's place, and everything above still holds with these additions:
+1. Attended (no away-posture record `state/.afk-contract`): every wake reaches you exactly as above, because no verified dialog mirror feeds a supervision session from this harness yet.
+2. Away (the record exists and no daemon runs): the host hands each wake to a headless away session that runs the supervision branch's contract under the record, and you are parked.
+   Only a wake the host hands back reaches you, as a `watcher` follow-up carrying the close plus one `supervision-host: <why>` line.
+   That wake is automatic supervision, not the captain's return: drain and handle it under the away posture, and never run the return from it.
+   After the return, a `supervision-host:` line naming the captain's return during a turn means that turn has visible outcomes missing from the return brief, whether the wake was handled or handed back: relay every following `supervision-host: outcome ...` line to the captain (the rows also remain in `bin/fm-branch-outcome.sh list`), then drain and handle any queued wake before acknowledging.
+   Each such visible outcome is also a queued `check: supervision-host outcome <n> ... was recorded after the captain returned` wake, which the drain presents until acknowledged: relay each outcome once, whichever arrives first, and acknowledge its `BRANCH OUTCOMES` entry too when it has one. Silent outcomes remain in the store but do not generate a handoff line or check wake.
+3. `supervision-host: cycle boundary ...` means the host ended its park at its bound and the next park has already started: run `bin/fm-wake-drain.sh`, handle whatever it presents, and run its printed acknowledgement (an empty queue prints `--ack-through 0`).
+4. A guarded command that exits 6 naming the branch actor's lease means the supervision session is handling that task right now: leave the lease alone and retry after it releases, which it does when its turn ends.
+5. Captain outcomes the away session records stay in the outcome store until the return drain presents them; the return brief (`bin/fm-afk-return.sh`) counts them and points you to the `BRANCH OUTCOMES` section for processing and acknowledgement ([Captain outcomes](../supervision-host.md#captain-outcomes)).
+6. `/afk` writes only the record here (`bin/fm-afk-launch.sh start` refuses the away daemon on this home); for `/quiet`, follow the [quiet skill](../../.agents/skills/quiet/SKILL.md).
+
