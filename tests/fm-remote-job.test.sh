@@ -50,7 +50,7 @@ cleanup_remote_job_fixture() {
   if [ -f "$STATE_ROOT/worker.pid" ]; then
     fm_remote_job_stop_worker_tree "$(cat "$STATE_ROOT/worker.pid")" || true
   fi
-  rm -rf -- "$TMP_ROOT"
+  fm_test_cleanup
 }
 trap cleanup_remote_job_fixture EXIT
 

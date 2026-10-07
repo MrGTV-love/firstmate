@@ -914,10 +914,6 @@ secondmate_busy_class() {  # <window>
   printf '%s' "${verdict%% *}"
 }
 
-# 0 iff a child ring is authorized: exact idle, a live agent, and a composer
-# that is not proven pending. Busy, unknown, dead, missing, and pending
-# composer all refuse, so a Kimi or Claude pane without an exact idle
-# verdict is never typed into.
 secondmate_idle_ring_safe() {  # <window>
   local w=$1 backend agent_state cstate
   [ -n "$w" ] || return 1
@@ -926,8 +922,7 @@ secondmate_idle_ring_safe() {  # <window>
   agent_state=$(fm_backend_agent_state "$backend" "$w" 2>/dev/null || true)
   [ "$agent_state" = alive ] || return 1
   cstate=$(fm_backend_composer_state "$backend" "$w" "$(window_label "$w")" 2>/dev/null) || cstate=unknown
-  [ "$cstate" != pending ] || return 1
-  return 0
+  [ "$cstate" = empty ]
 }
 
 secondmate_submit_held_wake() {

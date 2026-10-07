@@ -1728,7 +1728,8 @@ _fm_composer_claude_slash_choice() {  # <plain> <bare-row>
 }
 
 _fm_composer_select_cursorless() {
-  local plain=$1 extract_wrap=${2:-0} generic=-1 next boundary raw trimmed glyph bare footer=0
+  local plain=$1 extract_wrap=${2:-0} generic=-1 next boundary raw trimmed glyph bare footer=0 previous='' tail_row tail_text
+  local codex_footer_re='^[[:alnum:]_.-]+ [[:alpha:]]+ · Context [0-9]+% left( · /[^·]+( · [0-9]+…)?)?$'
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -1802,14 +1803,39 @@ _fm_composer_select_cursorless() {
     boundary=${plain//[!$'\n']/}
     boundary=${#boundary}
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
+    raw=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$plain")
+    fm_composer_normalize_trim_var raw
+    fm_composer_leading_agent_glyph_var glyph "$raw" || glyph=
+    previous=$raw
     while [ "$next" -le "$boundary" ]; do
       raw=$(_fm_composer_screen_row "$next" "$plain")
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
       [ -n "$trimmed" ] || [ "$extract_wrap" = 1 ] || break
-      fm_composer_row_has_edge "$trimmed" && break
-      _fm_composer_row_is_omp_status "$trimmed" && break
-      _fm_composer_row_is_braille_furniture "$trimmed" && break
+      if [ "$extract_wrap" = 1 ] && [ "$glyph" = '›' ] \
+         && [ -z "$previous" ] && [[ "$trimmed" =~ $codex_footer_re ]]; then
+        tail_row=$((next + 1))
+        while [ "$tail_row" -le "$boundary" ]; do
+          tail_text=$(_fm_composer_screen_row "$tail_row" "$plain")
+          fm_composer_normalize_trim_var tail_text
+          [ -z "$tail_text" ] || return 1
+          tail_row=$((tail_row + 1))
+        done
+        break
+      fi
+      if fm_composer_row_has_edge "$trimmed" \
+         || _fm_composer_row_is_omp_status "$trimmed" \
+         || _fm_composer_row_is_braille_furniture "$trimmed"; then
+        if [ "$extract_wrap" = 1 ]; then
+          [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+            && [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" = 1 ] \
+            && [ "$FM_COMPOSER_SELECTED_FIRST" -eq "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" ] \
+            && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+            && [ "$next" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ] || return 1
+        fi
+        break
+      fi
+      previous=$trimmed
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done

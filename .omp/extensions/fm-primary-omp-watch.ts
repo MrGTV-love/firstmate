@@ -651,7 +651,7 @@ export default function (pi: ExtensionAPI) {
   // Restored-wake recovery state. The context is whichever one omp passed to
   // the latest event: timers run outside any handler, and a context that went
   // stale with a replaced session throws on use, which only skips the check.
-  const restoreCheckMs = positiveInteger("FM_OMP_WAKE_RESTORE_CHECK_MS", 2000);
+  const restoreCheckMs = 2000;
   const restoreAttemptLimit = 3;
   const restoreAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;

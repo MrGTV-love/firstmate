@@ -231,7 +231,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
 test_secondmate_launch_relies_on_discovery() {
   local world repo home fakebin launchlog out status launch state ext
-  world="$TMP_ROOT/secondmate"
+  world="$TMP_ROOT/"'secondmate\n"paths'
   repo="$world/repo"
   fm_git_init_commit "$repo"
   ln -s "$ROOT/bin" "$repo/bin"
@@ -342,6 +342,36 @@ test_secondmate_config_pinned_model_is_validated() {
 drive_omp_ext() {  # <ext-path> <mode>
   FM_HOME="$TMP_ROOT/ext-home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$TMP_ROOT/ext-home/state" FM_CONFIG_OVERRIDE="$TMP_ROOT/ext-home/config" FM_DATA_OVERRIDE="$TMP_ROOT/ext-home/data" EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
+if (process.env.EXT_PATH.includes("\\")) {
+  const hookSource = `
+import { readFileSync } from "node:fs";
+import { registerHooks, stripTypeScriptTypes } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    const url = specifier.startsWith("/") ? pathToFileURL(specifier).href : specifier;
+    if (url.startsWith("file:") && /%5c/i.test(url)) {
+      return { url, shortCircuit: true };
+    }
+    return nextResolve(specifier, context);
+  },
+  load(url, context, nextLoad) {
+    if (url.startsWith("file:") && /%5c/i.test(url)) {
+      const source = readFileSync(fileURLToPath(url), "utf8");
+      return {
+        format: "module",
+        source: url.endsWith(".ts") ? stripTypeScriptTypes(source) : source,
+        shortCircuit: true,
+      };
+    }
+    return nextLoad(url, context);
+  },
+});
+`;
+  const hookURL = "data:text/javascript;base64," + Buffer.from(hookSource).toString("base64");
+  await import(hookURL);
+  process.env.NODE_OPTIONS = [process.env.NODE_OPTIONS, "--import=" + hookURL].filter(Boolean).join(" ");
+}
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 const handlers = {};
 mod.default({ on: (name, fn) => { handlers[name] = fn; } });
@@ -363,6 +393,7 @@ switch (process.env.MODE) {
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
+  case "tool-call": await handlers["tool_call"]({ type: "tool_call", toolName: "read", input: { path: "/tmp/guardrail-path-proof" } }, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -412,6 +443,52 @@ test_busy_extension_lifecycle() {
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
   fm_busy_source_trusted omp omp-ext || fail "omp must trust its own extension's records"
   pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification"
+}
+
+test_generated_extension_preserves_hostile_paths() {
+  local rec id=omp-path-q6 world repo state ext out
+  rec=$(make_spawn_case generated-paths omp "$id")
+  read_case_record "$rec"
+  world="$CASE_DIR/"'root\n"paths'
+  repo="$world/repo"
+  state="$world/"'parent-state\n"paths'
+  fm_git_init_commit "$repo"
+  mkdir -p "$repo/bin" "$repo/.omp/extensions" "$state" "$HOME_DIR/user-home"
+  ln -s "$ROOT/bin/"* "$repo/bin/"
+  cp "$ROOT/.omp/extensions/fm-jev-guardrail.ts" "$repo/.omp/extensions/fm-jev-guardrail.ts"
+  ln -s "$ROOT/.omp/fm-session-overlay.yml" "$repo/.omp/fm-session-overlay.yml"
+  ln -s "$ROOT/.omp/fm-worker-overlay.yml" "$repo/.omp/fm-worker-overlay.yml"
+  rm "$repo/bin/fm-jev-guardrail.mjs"
+  cat > "$repo/bin/fm-jev-guardrail.mjs" <<'EOF'
+import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+writeFileSync(fileURLToPath(new URL("../guardrail-observed", import.meta.url)), fileURLToPath(import.meta.url));
+EOF
+  out=$(PATH="$FAKEBIN_DIR:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux \
+    FM_ROOT_OVERRIDE="$repo" FM_HOME="$HOME_DIR" HOME="$HOME_DIR/user-home" \
+    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+    "$ROOT/bin/fm-spawn.sh" "$id" "$PROJ_DIR" --harness omp --scout 2>&1)
+  expect_code 0 $? "omp spawn with hostile root and state should succeed: $out"
+  ext="$state/$id.omp-ext.ts"
+  out=$(drive_omp_ext "$ext" tool-call) || fail "hostile-root guardrail drive failed: $out"
+  assert_present "$repo/guardrail-observed" "the real guardrail import did not execute its hostile-root observer"
+  [ "$(cat "$repo/guardrail-observed")" = "$repo/bin/fm-jev-guardrail.mjs" ] \
+    || fail "the guardrail import executed an observer outside the exact hostile root"
+  out=$(drive_omp_ext "$ext" agent-start) || fail "hostile worker agent_start failed: $out"
+  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] \
+    || fail "worker busy evidence was not persisted in the exact hostile parent state"
+  out=$(drive_omp_ext "$ext" end-final) || fail "hostile worker agent_end failed: $out"
+  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] \
+    || fail "worker idle evidence was not persisted in the exact hostile parent state"
+  out=$(drive_omp_ext "$ext" turn-end) || fail "hostile worker turn_end failed: $out"
+  assert_present "$state/$id.turn-ended" "worker did not touch the exact hostile turn-end path"
+  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] \
+    || fail "worker turn-end notification changed settled evidence"
+  assert_absent "$HOME_DIR/state/$id.busy-state" "worker wrote busy evidence outside the hostile parent state"
+  assert_absent "$HOME_DIR/state/$id.turn-ended" "worker touched a turn-end path outside the hostile parent state"
+  pass "fm-spawn: emitted omp worker paths preserve literal backslash-n and quotes for guardrail, busy state, and turn-end"
 }
 
 # --- 4. Control, composer, supervision model -----------------------------------
@@ -888,7 +965,7 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_OMP_WAKE_RESTORE_CHECK_MS=100 \
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
@@ -954,7 +1031,7 @@ if (process.env.SCENARIO === "sync-consumed") {
   process.exit(0);
 }
 if (records().length !== 1 || readFileSync(`${recordDir}/${records()[0]}`, "utf8") !== wake) throw new Error("emitted wake must have one exact durable identity");
-const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(500); };
+const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(2500); };
 const same = (item) => item.m === wake && item.o?.deliverAs === "followUp";
 
 switch (process.env.SCENARIO) {
@@ -1176,6 +1253,7 @@ test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
+test_generated_extension_preserves_hostile_paths
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation

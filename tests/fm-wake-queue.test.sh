@@ -800,7 +800,7 @@ install_secondmate_alive_tmux() {  # <fakebin>
 set -u
 case "${1:-}" in
   list-windows) printf '%s\n' 'fm-mate' ;;
-  capture-pane) exit 0 ;;
+  capture-pane) printf '❯\n' ;;
   display-message)
     case "$*" in
       *pane_current_command*) printf 'claude\n' ;;
@@ -1099,30 +1099,67 @@ test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted() {
 }
 
 test_secondmate_composer_draft_next_to_a_wake_is_never_submitted() {
-  local dir state sub fakebin wake before
+  local dir state sub fakebin wake before shape draft composer direction case_index=0
   wake=$(secondmate_wake_text)
-  setup_secondmate_composer_case secondmate-wake-with-draft "my unsent draft $wake"
-  before=$(cat "$dir/screen")
-  stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-  stall_composer_leg stall 1002 alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-    || fail "a composer holding a draft beside the wake must keep the parent alarm: $(cat "$dir/watch-stall.out")"
-  [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
-  [ "$(cat "$dir/screen")" = "$before" ] \
-    || fail "the composer text changed: $(cat "$dir/screen")"
-  pass "a composer holding an operator draft beside a wake is never submitted and still alarms"
+  for shape in box bare; do
+    for direction in before after; do
+      for draft in 'my unsent draft' '| my unsent draft' '│ my unsent draft' 'π · my unsent draft' '⠁⠂'; do
+        case_index=$((case_index + 1))
+        if [ "$direction" = before ]; then
+          composer="$draft"$'\n\n'"$wake"
+        else
+          composer="$wake"$'\n\n'"$draft"
+        fi
+        setup_secondmate_composer_case "secondmate-wake-with-draft-$case_index" "$composer" "$shape"
+        before=$(cat "$dir/screen")
+        stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+        stall_composer_leg stall 1002 alert
+        grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+          || fail "a $shape composer holding a draft $direction the wake must keep the parent alarm: $(cat "$dir/watch-stall.out")"
+        [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
+        [ "$(cat "$dir/screen")" = "$before" ] \
+          || fail "the composer text changed: $(cat "$dir/screen")"
+        [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+          || fail "draft refusal changed the foreign wake queue"
+        [ ! -e "$state/mate.inbox" ] || fail "draft refusal wrote a drain steer"
+        [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "draft refusal recorded a recovery ring"
+      done
+    done
+  done
+  pass "box and bare composers holding operator drafts before or after wakes remain untouched and alarm"
 }
 
 # Draft-only composers are likewise untouched.
 test_secondmate_composer_holding_only_a_draft_is_never_submitted() {
-  local dir state sub fakebin
-  setup_secondmate_composer_case secondmate-draft-only "my unsent draft"
-  stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-  stall_composer_leg stall 1002 alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-    || fail "a composer holding only a draft must keep the parent alarm: $(cat "$dir/watch-stall.out")"
-  [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
-  pass "a composer holding only an operator draft is never submitted"
+  local dir state sub fakebin shape
+  for shape in box bare; do
+    setup_secondmate_composer_case "secondmate-draft-only-$shape" "my unsent draft" "$shape"
+    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+    stall_composer_leg stall 1002 alert
+    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+      || fail "a $shape composer holding only a draft must keep the parent alarm: $(cat "$dir/watch-stall.out")"
+    [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
+  done
+  pass "box and bare composers holding only operator drafts are never submitted"
+}
+
+test_secondmate_idle_with_unreadable_composer_is_never_rung() {
+  local dir state sub fakebin scenario
+  for scenario in unknown blank unavailable; do
+    setup_secondmate_composer_case "secondmate-idle-composer-$scenario" ''
+    case "$scenario" in
+      unknown) printf 'no identified composer\n' > "$dir/screen" ;;
+      blank) : > "$dir/screen" ;;
+      unavailable) : > "$dir/screen.unavailable" ;;
+    esac
+    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+    stall_composer_leg stall 1002 alert
+    [ ! -e "$dir/sent" ] || fail "$scenario composer received input"
+    [ ! -e "$state/mate.inbox" ] || fail "$scenario composer received a drain steer"
+    [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$scenario composer recorded a ring"
+    [ -s "$sub/state/.wake-queue" ] || fail "$scenario composer changed the foreign queue"
+  done
+  pass "idle records never authorize a drain ring without an affirmatively empty composer"
 }
 
 test_secondmate_modified_or_missing_wake_record_is_never_submitted() {
@@ -3650,6 +3687,7 @@ test_secondmate_genuine_stall_after_idle_ring_still_alarms
 test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted
 test_secondmate_composer_draft_next_to_a_wake_is_never_submitted
 test_secondmate_composer_holding_only_a_draft_is_never_submitted
+test_secondmate_idle_with_unreadable_composer_is_never_rung
 test_secondmate_modified_or_missing_wake_record_is_never_submitted
 test_secondmate_restored_wake_requires_semantic_idle
 test_secondmate_restored_wake_rechecks_semantic_idle_before_retry

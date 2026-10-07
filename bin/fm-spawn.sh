@@ -4870,6 +4870,8 @@ EOF
     # has no trust gate, yet its cwd-only extension auto-discovery would load a
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
+    omp_busy_executable=$(jq -cn --arg path "$FM_ROOT/bin/fm-busy-event.sh" '$path') || exit 1
+    omp_state_path=$(jq -cn --arg path "$STATE_REAL" '$path') || exit 1
     {
       cat <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
@@ -4886,18 +4888,20 @@ EOF
 import { execFile } from "node:child_process";
 EOF
       if [ "$KIND" != secondmate ]; then
+        omp_guardrail_import=$(jq -cn --arg path "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts" '$path') || exit 1
+        omp_turnend_path=$(jq -cn --arg path "$TURNEND" '$path') || exit 1
         guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
           '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
         cat <<EOF
-import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
+import { installGuardrail } from $omp_guardrail_import;
 EOF
       fi
       cat <<EOF
 let busyEvents = Promise.resolve();
 const busyEvent = (state: string, event: string) =>
   busyEvents = busyEvents.then(() => new Promise<void>((resolve) => {
-    execFile("$FM_ROOT/bin/fm-busy-event.sh", [
-      "apply", "$STATE_REAL", "$ID", state,
+    execFile($omp_busy_executable, [
+      "apply", $omp_state_path, "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "omp-ext", "--event", event,
     ], () => resolve());
   }));
@@ -4923,7 +4927,7 @@ EOF
 EOF
       if [ "$KIND" != secondmate ]; then
         cat <<EOF
-  pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
+  pi.on("turn_end", () => execFile("touch", [$omp_turnend_path]));
 EOF
       fi
       printf '}\n'
