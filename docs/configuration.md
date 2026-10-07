@@ -798,9 +798,12 @@ The `openai-codex` provider inside omp remains allowed; the restriction excludes
 Fresh ship, scout, batch, and secondmate spawns check the selected runtime before launch resources or remote inheritance change.
 Manual recovery checks the resolved replacement before checkpointing or stopping the old agent.
 Automatic ship and scout session-end recovery admits the recorded runtime before consuming an attempt or marking the generation handled, and retains the control-plane recheck before replacement.
-Repairing a malformed policy therefore permits recovery of the same generation on the next eligible tick without a refusal-induced cooldown.
+Policy repair is reconsidered immediately on the next eligible tick, permitting recovery of the same generation without a refusal-induced cooldown.
 Remote secondmate replacement checks the initiating home's policy before transport and the destination home's policy before stopping the old agent.
 Automatic secondmate recovery and host-local remote launch check the selected replacement before removing an existing endpoint; a refused automatic recovery records no attempt.
+Automatic session-end and secondmate recovery notify once per task or secondmate generation and refusal fingerprint, derived from the raw policy-source contents and admission diagnostic.
+Acknowledging the queued notification does not make an unchanged refusal recur, and toggling the policy away and back does not re-notify an already-seen fingerprint within that generation.
+This notification deduplication does not skip policy admission checks: repairs remain immediately eligible for reconsideration, while recovery-attempt and handled-generation accounting remain untouched by a refusal.
 The supervision host also refuses a disallowed engine before activation can stop its predecessor or retire its custody, and direct or resumed engine turns repeat the same check.
 Its policy refusal is a terminal actionable close, not an ownership stand-down: Claude's Stop hook and Cursor's park deliver it, while omp and OpenCode restore ordinary watcher monitoring without retrying the denied host.
 Pending refusal replay follows the [omp session replacement contract](watcher-continuity.md#omp-session-replacement).

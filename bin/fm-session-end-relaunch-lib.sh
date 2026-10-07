@@ -180,7 +180,7 @@ fm_session_end_queue_wake() {  # <key> <reason>
 # line or empty. Returns 0 for a completed decision, 1 when a required
 # ledger or wake row could not be written.
 fm_session_end_relaunch_consider() {  # <state-dir> <id>
-  local state=$1 id=$2 meta kind wt backend window agent harness policy_error
+  local state=$1 id=$2 meta kind wt backend window agent harness policy_error config
   local identity gen seq last verb hold_rc marker marker_gen
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
@@ -266,11 +266,12 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     esac
   fi
   harness=$(fm_meta_get "$meta" harness 2>/dev/null || true)
-  if ! policy_error=$(fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$harness" 2>&1); then
+  config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  if ! policy_error=$(fm_session_launch_policy_check "$config" "$harness" 2>&1); then
     reason="check: $id auto-relaunch refused after session-end: $(fm_session_end_first_line "$policy_error")"
-    key="session-end-relaunch-policy-$id-$gen-$seq"
-    fm_session_end_queue_wake "$key" "$reason" || return 1
-    FM_SESSION_END_REASON=$reason
+    fm_session_launch_policy_refusal_notify "$state" "$id" "$gen" "$reason" "$policy_error" \
+      "$config/session-launch-policy" || return 1
+    FM_SESSION_END_REASON=$FM_SESSION_LAUNCH_REFUSAL_WAKE
     return 0
   fi
   if [ -n "$which" ]; then

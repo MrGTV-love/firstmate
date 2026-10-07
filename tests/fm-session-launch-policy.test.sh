@@ -298,6 +298,9 @@ run_secondmate_entry() {
         rc=0
         fm_secondmate_liveness_relaunch "$meta" "$id" || rc=$?
         printf "%s\n" "$FM_SM_LIVE_STATUS" > "$FM_POLICY_CASE/liveness-status"
+        printf "%s\n" "${FM_SM_LIVE_POLICY_REFUSED:-0}" > "$FM_POLICY_CASE/liveness-policy-refused"
+        printf "%s\n" "${FM_SM_LIVE_WAKE:-}" > "$FM_POLICY_CASE/liveness-wake"
+        printf "%s\n" "$FM_SM_LIVE_REASON" > "$FM_POLICY_CASE/liveness-reason"
         printf "%s\n" "$FM_SM_LIVE_OUT"
         exit "$rc"
       ' _ "$ROOT" ;;
@@ -430,7 +433,77 @@ done
 
 session_end_scan() {
   # shellcheck disable=SC2016
-  run_cli bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "%s\n" "$FM_SESSION_END_WAKE"' _ "$ROOT"
+  run_cli bash -c '
+    . "$1/bin/fm-session-end-relaunch-lib.sh"
+    fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?
+    printf "%s\n" "$FM_SESSION_END_WAKE" > "$FM_POLICY_CASE/session-end-wake"
+    printf "%s\n" "$FM_SESSION_END_ACTION" > "$FM_POLICY_CASE/session-end-action"
+    printf "%s\n" "$FM_SESSION_END_WAKE"
+  ' _ "$ROOT"
+}
+
+assert_refusal_queue() {
+  local expected=$1 count=0
+  if [ -s "$HOME_DIR/state/.wake-queue" ]; then
+    count=$(awk 'END { print NR + 0 }' "$HOME_DIR/state/.wake-queue")
+    awk -F '\t' -v id="$ID" 'NF < 5 || $3 != "check" || !index($5, id) || !index($5, "session-launch-policy") { exit 1 }' \
+      "$HOME_DIR/state/.wake-queue" || fail 'refusal queue contains an unexpected wake'
+  fi
+  [ "$count" = "$expected" ] || fail "expected $expected queued policy refusal(s), got $count"
+}
+
+ack_refusal_queue() {
+  local output sequence generation
+  output=$(run_cli "$ROOT/bin/fm-wake-drain.sh") || fail "refusal drain failed: $output"
+  sequence=$(printf '%s\n' "$output" | awk '/^WAKE_ACK_REQUIRED:/ { for (i = 1; i < NF; i++) if ($i == "--ack-through") value = $(i + 1) } END { print value }')
+  generation=$(printf '%s\n' "$output" | awk '/^WAKE_ACK_REQUIRED:/ { for (i = 1; i < NF; i++) if ($i == "--recovery-generation") value = $(i + 1) } END { print value }')
+  [ -n "$sequence" ] && [ -n "$generation" ] || fail "refusal drain omitted acknowledgement: $output"
+  output=$(run_cli "$ROOT/bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation") \
+    || fail "refusal acknowledgement failed: $output"
+  assert_refusal_queue 0
+}
+
+arm_session_end() {
+  local source=$1
+  "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source "$source" --event launch-brief >/dev/null
+  gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source "$source" --event session-end >/dev/null
+}
+
+assert_session_end_refusal() {
+  local notify=$1 queued=$2 output
+  output=$(session_end_scan) || fail "session-end scan failed: $output"
+  if [ "$notify" = first ]; then
+    assert_contains "$output" 'session-launch-policy' 'new automatic refusal reports the policy'
+    [ "$(cat "$CASE/session-end-wake")" = "$output" ] || fail 'new refusal did not set FM_SESSION_END_WAKE'
+  else
+    [ -z "$output" ] || fail "repeated refusal emitted a scan result: $output"
+    [ ! -s "$CASE/session-end-wake" ] || [ -z "$(cat "$CASE/session-end-wake")" ] \
+      || fail 'repeated refusal set FM_SESSION_END_WAKE'
+  fi
+  [ "$(cat "$CASE/session-end-action")" = skip ] || fail 'policy refusal did not skip recovery'
+  assert_refusal_queue "$queued"
+  assert_preserved
+}
+
+exercise_session_end_refusals() {
+  local source=$1 prior_gen=$gen
+  cp "$HOME_DIR/config/session-launch-policy" "$CASE/refusal-policy-prior"
+  assert_session_end_refusal first 1
+  assert_session_end_refusal quiet 1
+  ack_refusal_queue
+  assert_session_end_refusal quiet 0
+  printf 'changed-invalid\n' > "$HOME_DIR/config/session-launch-policy"
+  assert_session_end_refusal first 1
+  assert_session_end_refusal quiet 1
+  cp "$CASE/refusal-policy-prior" "$HOME_DIR/config/session-launch-policy"
+  assert_session_end_refusal quiet 1
+  ack_refusal_queue
+  assert_session_end_refusal quiet 0
+  arm_session_end "$source"
+  [ "$gen" != "$prior_gen" ] || fail 'session-end fixture did not advance the busy generation'
+  assert_session_end_refusal first 1
+  assert_session_end_refusal quiet 1
 }
 
 for harness in codex claude; do
@@ -451,13 +524,9 @@ for harness in codex claude; do
     [ "$rc" -ne 0 ] || fail 'direct recorded runtime relaunched'
     assert_contains "$out" 'session-launch-policy' 'direct refusal identifies policy'
     assert_preserved
-    "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source fm-recovery --event launch-brief >/dev/null
-    gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
-    "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source fm-recovery --event session-end >/dev/null
-    out=$(session_end_scan)
-    assert_contains "$out" 'session-launch-policy' 'automatic recovery reports policy refusal'
-    assert_preserved
-    pass "manual, direct, and automatic $harness $kind recovery preserve work and custody"
+    arm_session_end fm-recovery
+    exercise_session_end_refusals fm-recovery
+    pass "manual, direct, and deduplicated automatic $harness $kind recovery preserve work and custody"
   done
 done
 
@@ -465,14 +534,8 @@ for kind in ship scout; do
   make_case "recovery-malformed-$kind" omp
   seed_task omp "$kind"
   printf 'unknown\n' > "$HOME_DIR/config/session-launch-policy"
-  "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source omp-ext --event launch-brief >/dev/null
-  gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
-  "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source omp-ext --event session-end >/dev/null
-  for _tick in 1 2; do
-    out=$(session_end_scan)
-    assert_contains "$out" 'session-launch-policy' 'malformed policy refuses automatic omp recovery'
-    assert_preserved
-  done
+  arm_session_end omp-ext
+  exercise_session_end_refusals omp-ext
   restrict
   out=$(session_end_scan) || fail "$out"
   assert_contains "$out" "$ID auto-relaunched after session-end" 'policy repair permits immediate recovery of the same generation'
@@ -627,6 +690,129 @@ for entry in fresh direct control auto; do
   grep -Fx 'config-write' "$CASE/inherit-failures" >/dev/null || fail 'legacy best-effort write failure fixture never failed'
   pass "$entry absent parent preserves codex secondmate launch despite unrelated config write failures"
 done
+
+assert_secondmate_auto_refusal() {
+  local notify=$1 queued=$2 output rc=0
+  output=$(run_secondmate_entry auto) || rc=$?
+  [ "$rc" = 1 ] || fail "automatic policy denial returned $rc: $output"
+  assert_contains "$output" 'session-launch-policy' 'automatic secondmate denial retains diagnostics'
+  assert_contains "$(cat "$CASE/liveness-reason")" 'session-launch-policy' 'automatic secondmate denial retains its reason'
+  [ "$(cat "$CASE/liveness-policy-refused")" = 1 ] || fail 'automatic denial did not set FM_SM_LIVE_POLICY_REFUSED'
+  if [ "$notify" = first ]; then
+    assert_contains "$(cat "$CASE/liveness-wake")" 'session-launch-policy' 'new secondmate denial sets FM_SM_LIVE_WAKE'
+  else
+    [ -z "$(cat "$CASE/liveness-wake")" ] || fail 'repeated secondmate denial set FM_SM_LIVE_WAKE'
+  fi
+  assert_refusal_queue "$queued"
+  assert_secondmate_refused auto
+}
+
+for denied in codex claude malformed legacy; do
+  make_secondmate_case "child-auto-repeat-$denied" omp auto
+  EXPECT_CHILD_POLICY=1
+  set_secondmate_endpoint auto omp
+  cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-generation-base"
+  case "$denied" in
+    codex) generation_key=spawn_gen ;;
+    claude) generation_key=busy_gen ;;
+    malformed) generation_key=spawn_gen ;;
+    legacy) generation_key= ;;
+  esac
+  if [ -n "$generation_key" ]; then
+    printf '%s=policy-generation-1\n' "$generation_key" >> "$HOME_DIR/state/$ID.meta"
+  fi
+  cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-prior"
+  if [ "$denied" = malformed ]; then
+    printf 'unknown\n' > "$HOME_DIR/config/session-launch-policy"
+  else
+    restrict
+    case "$denied" in
+      legacy) printf 'codex\n' > "$HOME_DIR/config/secondmate-harness" ;;
+      *) printf '%s\n' "$denied" > "$HOME_DIR/config/secondmate-harness" ;;
+    esac
+  fi
+  cp "$HOME_DIR/config/session-launch-policy" "$CASE/refusal-policy-prior"
+  assert_secondmate_auto_refusal first 1
+  assert_secondmate_auto_refusal quiet 1
+  ack_refusal_queue
+  assert_secondmate_auto_refusal quiet 0
+  if [ "$denied" = codex ]; then
+    printf 'claude\n' > "$HOME_DIR/config/secondmate-harness"
+    assert_secondmate_auto_refusal first 1
+    assert_secondmate_auto_refusal quiet 1
+    printf 'codex\n' > "$HOME_DIR/config/secondmate-harness"
+    assert_secondmate_auto_refusal quiet 1
+    ack_refusal_queue
+    assert_secondmate_auto_refusal quiet 0
+  fi
+  printf 'changed-invalid\n' > "$HOME_DIR/config/session-launch-policy"
+  assert_secondmate_auto_refusal first 1
+  assert_secondmate_auto_refusal quiet 1
+  cp "$CASE/refusal-policy-prior" "$HOME_DIR/config/session-launch-policy"
+  assert_secondmate_auto_refusal quiet 1
+  ack_refusal_queue
+  assert_secondmate_auto_refusal quiet 0
+  if [ -n "$generation_key" ]; then
+    cp "$CASE/meta-generation-base" "$HOME_DIR/state/$ID.meta"
+    printf '%s=policy-generation-2\n' "$generation_key" >> "$HOME_DIR/state/$ID.meta"
+    cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-prior"
+  else
+    cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-replacement"
+    mv "$CASE/meta-replacement" "$HOME_DIR/state/$ID.meta"
+    cmp -s "$CASE/meta-prior" "$HOME_DIR/state/$ID.meta" || fail 'legacy replacement changed metadata contents'
+  fi
+  assert_secondmate_auto_refusal first 1
+  assert_secondmate_auto_refusal quiet 1
+  restrict
+  printf 'omp\n' > "$HOME_DIR/config/secondmate-harness"
+  out=$(run_secondmate_entry auto) || fail "policy repair did not allow immediate secondmate recovery: $out"
+  [ "$(cat "$CASE/liveness-policy-refused")" = 0 ] || fail 'allowed secondmate launch retained the policy refusal flag'
+  [ -z "$(cat "$CASE/liveness-wake")" ] || fail 'allowed secondmate launch retained a refusal wake'
+  assert_secondmate_launched auto omp enabled
+  [ "$(cat "$HOME_DIR/state/$ID.validation")" = 'validation custody' ] || fail 'secondmate recovery changed parent custody'
+  pass "automatic $denied secondmate denial survives acknowledgement, deduplicates policy and generation, and repairs immediately"
+done
+
+assert_secondmate_watcher_refusal() {
+  local wakes=$1 queued=$2 output
+  # shellcheck disable=SC2016
+  output=$(run_cli bash -c '
+    set -eu
+    . "$1/bin/fm-watch.sh"
+    SECONDMATE_LIVENESS_SECS=0
+    wake() { printf "%s\n" "$1" >> "$FM_POLICY_CASE/watcher-wakes"; }
+    rc=0
+    secondmate_liveness_tick || rc=$?
+    printf "%s\n" "$FM_SM_LIVE_STATE" > "$FM_POLICY_CASE/liveness-state"
+    printf "%s\n" "$FM_SM_LIVE_STATUS" > "$FM_POLICY_CASE/liveness-status"
+    printf "%s\n" "$FM_SM_LIVE_POLICY_REFUSED" > "$FM_POLICY_CASE/liveness-policy-refused"
+    printf "%s\n" "$FM_SM_LIVE_WAKE" > "$FM_POLICY_CASE/liveness-wake"
+    exit "$rc"
+  ' _ "$ROOT") || fail "watcher treated policy refusal as a recurring failure: $output"
+  [ -z "$output" ] || fail "watcher emitted an error during policy refusal: $output"
+  [ "$(awk 'END { print NR + 0 }' "$CASE/watcher-wakes")" = "$wakes" ] || fail 'watcher delivered a duplicate policy refusal'
+  assert_contains "$(cat "$CASE/watcher-wakes")" 'session-launch-policy' 'watcher delivers the first actionable refusal'
+  [ "$(cat "$CASE/liveness-policy-refused")" = 1 ] || fail 'watcher lost the policy refusal verdict'
+  [ ! -e "$HOME_DIR/state/.secondmate-relaunch-bound-$ID" ] || fail 'watcher parked a policy-refused secondmate'
+  assert_refusal_queue "$queued"
+  assert_secondmate_refused auto
+}
+
+make_secondmate_case child-auto-watcher-denial omp auto
+restrict
+printf 'codex\n' > "$HOME_DIR/config/secondmate-harness"
+printf 'spawn_gen=watcher-policy-generation\n' >> "$HOME_DIR/state/$ID.meta"
+cp "$HOME_DIR/state/$ID.meta" "$CASE/meta-prior"
+set_secondmate_endpoint auto omp
+: > "$CASE/watcher-wakes"
+assert_secondmate_watcher_refusal 1 1
+assert_contains "$(cat "$CASE/liveness-wake")" 'session-launch-policy' 'first watcher denial exposes its wake'
+assert_secondmate_watcher_refusal 1 1
+[ -z "$(cat "$CASE/liveness-wake")" ] || fail 'repeated watcher denial exposed another wake'
+ack_refusal_queue
+assert_secondmate_watcher_refusal 1 0
+[ -z "$(cat "$CASE/liveness-wake")" ] || fail 'acknowledged watcher denial exposed another wake'
+pass 'real watcher policy refusal succeeds once, stays quiet across acknowledgement, and preserves recovery custody'
 
 make_secondmate_case child-auto-missing-state omp auto
 restrict

@@ -268,8 +268,8 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 # Caller holds the liveness lock and owns reporting.
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
-  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
-  local policy_error
+  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
+  local policy_error config home generation reason
   if ! policy_error=$(
     {
       config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
@@ -288,6 +288,24 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     FM_SM_LIVE_OUT=$policy_error
     FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$policy_error")
     FM_SM_LIVE_RC=1
+    config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+    home=$(fm_meta_get "$meta" home)
+    [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
+    generation=$(fm_meta_get "$meta" spawn_gen)
+    [ -n "$generation" ] || generation=$(fm_meta_get "$meta" busy_gen)
+    if [ -z "$generation" ]; then
+      if [ "$(uname)" = Darwin ]; then
+        generation=$(/usr/bin/stat -f '%d.%i' "$meta") || return 1
+      else
+        generation=$(stat -c '%d.%i' "$meta") || return 1
+      fi
+      generation="legacy-$generation"
+    fi
+    reason="check: secondmate $id auto-relaunch refused: $FM_SM_LIVE_REASON"
+    fm_session_launch_policy_refusal_notify "$STATE" "$id" "$generation" "$reason" "$policy_error" \
+      "$config/session-launch-policy" "$config/secondmate-harness" "$home/config/session-launch-policy" || return 1
+    FM_SM_LIVE_POLICY_REFUSED=1
+    FM_SM_LIVE_WAKE=$FM_SESSION_LAUNCH_REFUSAL_WAKE
     return 1
   fi
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
