@@ -3212,14 +3212,8 @@ if [ "$KIND" = secondmate ]; then
     SECONDMATE_PROJECTS=$SECONDMATE_REGISTRY_MATCH_PROJECTS
   fi
   WT="$PROJ_ABS"
-  # Local-HEAD sync: before launch, fast-forward this secondmate's worktree to the
-  # PRIMARY checkout's current default-branch commit, so a freshly spawned or
-  # recovery-respawned secondmate always runs the primary's version (AGENTS.md
-  # spawn section). Purely local - no fetch: the home is a worktree of this same
-# repo and already holds the commit. The same guarded path can reconcile a clean
-# divergence already present at the target; a dirty, uniquely diverged, or
-# wrong-branch home is left untouched and launches as-is. The agent re-reads
-  # AGENTS.md fresh on launch, so no nudge is needed here.
+  # Guarded tracked sync is owned by .agents/skills/secondmate-provisioning/SKILL.md.
+  # Preserving a skipped checkout does not waive the admission checks below.
   # On a remote host this spawn is the host-local leg of a launch whose parent has
   # already synced the home to ITS primary commit, and $FM_ROOT here is only that
   # host's own Firstmate copy; syncing again would target the wrong checkout, so

@@ -3,7 +3,7 @@ name: updatefirstmate
 description: >-
   Self-update a running firstmate and its secondmates to the latest from origin.
   Use when the captain invokes /updatefirstmate (e.g. "/updatefirstmate", "update firstmate", "pull the latest firstmate").
-  Updates this firstmate repo's default branch and every local or remote secondmate through its guarded convergence path (never forced, never disruptive), then re-reads AGENTS.md and restarts every live second mate through the persist-gated restart, with a fallback re-read nudge only where a restart cannot be proven.
+  Updates this firstmate repo's default branch and every local or remote secondmate through its guarded convergence path (never forced, never disruptive), then re-reads AGENTS.md and requests the persist-gated restart for every live secondmate, with a fallback re-read nudge only where a restart cannot be proven.
 user-invocable: true
 metadata:
   internal: true
@@ -21,9 +21,9 @@ A running agent holds `AGENTS.md` and every skill it has already loaded frozen f
 A re-read cannot substitute: it appends a second copy of the mate's own job description with no defined precedence, and it cannot reach a skill that is already loaded.
 Replacing the agent is also the only thing that re-resolves the launch-time wiring - turn-end hooks, harness flags, per-harness feature switches - which the mate froze when it started and which nothing on disk describes.
 
-That is why **every live second mate is restarted after a successful update, including one that was already on the target commit.**
+That is why **a restart is requested for every live secondmate after a successful update, including one that was already on the target commit.**
 Launch-time wiring is not derivable from a file diff, so an unchanged tracked surface is not evidence the running agent is already on the current behavior.
-The only live mates that do not restart are the ones whose home the update pass had to skip, and the ones whose runtime cannot prove a restart; the updater keeps both cases honest and neither is reported as a reload.
+A requested restart remains subject to the [session launch policy](../../../docs/configuration.md#session-launch-policy-configsession-launch-policy); skipped homes and runtimes that cannot prove a restart also remain unrestarted, and none of these outcomes is reported as a reload.
 
 **One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/fm-secondmate-restart.sh <fm-id>...` once with every live second mate ID, not only the ones that release named; later updates follow the normal flow below.
 

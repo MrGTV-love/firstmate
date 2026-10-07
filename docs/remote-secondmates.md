@@ -413,7 +413,7 @@ bin/fm-spawn.sh <id> --secondmate
 
 The primary then takes these steps:
 
-1. It resolves the verified secondmate harness and optional model and effort.
+1. It resolves the verified secondmate harness and optional model and effort, subject to the initiating home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy).
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `fm-remote`.

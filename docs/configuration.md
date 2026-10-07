@@ -320,7 +320,7 @@ The file may be empty, or hold one line `<engine> [<model>]`:
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
 Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
-The worker and secondmate session launch policy does not restrict supervision-host engine sessions; engine selection follows the rules above.
+Engine sessions follow the [session launch policy's scope](#session-launch-policy-configsession-launch-policy); engine selection follows the rules above.
 
 ### Failures and when changes apply
 
@@ -804,7 +804,7 @@ A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the li
 Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
 The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
 
-Fresh ship, scout, batch, and secondmate spawns check the selected runtime before launch resources or remote inheritance change.
+Fresh ship, scout, batch, and secondmate spawns check the selected runtime against the initiating home's policy before launch resources or remote inheritance change.
 Manual recovery checks the resolved replacement before checkpointing or stopping the old agent.
 Automatic ship and scout session-end recovery admits the recorded runtime before consuming an attempt or marking the generation handled, and retains the control-plane recheck before replacement.
 Policy repair is reconsidered immediately on the next eligible tick, permitting recovery of the same generation without a refusal-induced cooldown.
@@ -887,7 +887,7 @@ Firstmate requires any nonempty override to be an absolute path.
 The launch hands both overrides' presence and values to the launcher's own `teamclaude` calls only, replacing any stale pane selectors so TeamClaude reads the configuration the spawn checked while Claude and the rest of the worker keep their own environment.
 No TeamClaude credential, account name, or quota state enters Firstmate configuration.
 The [Claude API key guard](#claude-api-key-guard) applies unchanged.
-A raw launch command whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
+A raw launch command admitted by the [session launch policy](#session-launch-policy-configsession-launch-policy) whose harness resolves to `claude` passes the same check and runs word for word through the launcher's `--exec`, so it receives the same proxy environment.
 That raw command then runs under `/bin/sh`, not the pane's own shell, so it must be POSIX sh compatible.
 The file is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract.
 `tests/fm-teamclaude-launch-live-e2e.test.sh` checks the launcher against the installed TeamClaude CLI and running proxy.
