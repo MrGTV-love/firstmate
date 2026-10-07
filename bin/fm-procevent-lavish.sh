@@ -13,6 +13,7 @@
 #   fm-procevent-lavish.sh retire <artifact.html>
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh check <artifact.html>
+#   fm-procevent-lavish.sh relisten [<result-file>]
 #
 # classify   Print the lifecycle state a handler should act on: feedback, ended,
 #            waiting, disconnected, missing, or unknown.
@@ -34,8 +35,8 @@
 #            are reported explicitly.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
-#            and prints its response verbatim, absorbing only the one exact
-#            transient interruption described below. A task-owned arm consumes
+#            and prints its response verbatim, absorbing only the exact
+#            transient interruptions described below. A task-owned arm consumes
 #            its staged reply file once - reading and removing it before the
 #            poll - and hands the contents to the published `--agent-reply`
 #            argument; later retries poll without that reply. That post is best
@@ -65,6 +66,13 @@
 #            produce another result, so the runner may retire it; any other exit
 #            keeps it armed. This is the generic adapter contract bin/fm-procevent.sh
 #            calls, and the only place Lavish's notion of "ended" is decided.
+# relisten   Keep the same runner and exclusive claim through feedback,
+#            disconnects, waiting, and empty poll returns, but surface unknown
+#            failures without retrying them forever. The optional result file
+#            is the runner's unhandled-capture continuation check; without one,
+#            it is an empty or handled round. Quiet rounds wait poll_retry_delay
+#            seconds before another poll. Worker-owned feedback still waits for
+#            its owner's acknowledgement.
 # silent     Exit 0 when the captured result is a routine no-op the runner should
 #            record and never announce; any other exit publishes the wake. This
 #            is the generic no-op contract bin/fm-procevent.sh calls, and the
@@ -105,7 +113,11 @@
 # and use its host and port. Opening the board writes that URL; polling does not.
 # This is a routing lookup before the blocking call, not presence polling or a
 # second route record. Ambient/configured addresses must not retarget a reply.
-# An unreadable or missing session stops before the staged reply is consumed.
+# An unreadable session stops before the staged reply is consumed; a valid
+# store with no saved session for the board emits NOT_FOUND for terminal retirement.
+# Lavish rewrites that store in place, so a store that does not decode may be a
+# half-written snapshot: it is re-read under the quiet retry bound below, and is
+# refused only while still undecodable once that bound is spent.
 #
 # `answers` is this adapter's half of the generic keyed-answer contract in
 # bin/fm-procevent.sh. It reports what the captain actually chose, as
@@ -135,15 +147,43 @@
 #   error: Lavish Editor poll response was interrupted
 #   code: SERVER_ERROR
 #
+# lavish-axi 0.1.79 follows those two lines with one generated `help[2]:` footer
+# naming the server log and the poll re-run; that exact three-line form is the
+# same interruption. Every listener sees it when the Lavish server restarts.
+# Their retried polls then race to auto-start that server, and each loser gets
+#
+#   error: Lavish Editor server did not start
+#   code: SERVER_ERROR
+#   help[1]: Run `lavish-axi server --port <port>` to inspect server startup
+#
+# while the winner's server comes up. With <port> exactly the port this poll
+# routes to, that is the same restart and takes the same bounded retry.
+#
+# A supported restart can also return exactly these two lines:
+#
+#   error: Lavish Editor server connection failed
+#   code: SERVER_ERROR
+#
+# This response, bare or followed by the exact generated help[2] footer above,
+# takes the same bounded retry; it does not establish which transport step
+# failed. Other connection-error wording or help text remains an unknown error,
+# not a reconnect signal.
+#
 # That is an internal retry, not news, so registering the raw poll made the
 # generic runner capture it and wake the whole fleet. `poll` therefore re-runs
-# the published poll up to POLL_RETRY_LIMIT times for that exact response, with
-# attempt starts at least POLL_RETRY_DELAY_DEFAULT seconds apart. The match is exact and
-# deliberately narrow: real feedback, ended and missing sessions, any other
-# SERVER_ERROR, and the same interruption still standing after the bound is
-# spent are all printed straight through and captured normally. The retry is a
-# Lavish fact, so the generic runner in bin/fm-procevent.sh stays
-# adapter-agnostic and learns nothing about it.
+# the published poll up to POLL_RETRY_LIMIT times for those exact responses.
+# Each quiet retry waits POLL_RETRY_DELAY_DEFAULT monotonic seconds after the
+# preceding attempt finishes, so delayed routing or CLI startup cannot buy
+# credit for later retries. The match is exact and deliberately narrow: real
+# feedback, ended and missing sessions, any other SERVER_ERROR or help text,
+# and the same interruption still standing after the bound is spent are all
+# printed straight through and captured normally. The retry is a Lavish fact,
+# so the generic runner in bin/fm-procevent.sh stays adapter-agnostic.
+#
+# A blocking poll whose lavish-axi process is killed by a signal before it
+# prints anything exits 75, the runner's existing poll-again status, so the same
+# runner relistens after the quiet-round delay without awaiting reconciliation.
+# Any output, or any other non-zero exit, is handled as before.
 #
 # LOSS LIMITATION, stated plainly. The published poll destructively clears
 # feedback before returning it. A result lost after that clearing and before the
@@ -168,7 +208,7 @@ die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; exit 2; }
 
 apply_session_host() {  # <artifact>
-  local endpoint
+  local endpoint rc
   endpoint=$(perl -MJSON::PP -MCwd=realpath -MEncode=decode,FB_CROAK -e '
     use strict;
     use warnings;
@@ -179,12 +219,13 @@ apply_session_host() {  # <artifact>
     -f $file or die "Lavish session store is not a regular file\n";
     local $/;
     my $state = eval { decode_json(<$file>) };
-    !$@ or die "invalid Lavish session store\n";
+    exit 4 if $@;
     ref($state) eq "HASH" && ref($state->{sessions}) eq "HASH"
       or die "invalid Lavish session store\n";
     my @sessions = grep {
       ref($_) eq "HASH" && defined($_->{file}) && $_->{file} eq $real
     } values %{$state->{sessions}};
+    exit 3 unless @sessions;
     @sessions == 1 or die "board must have one saved Lavish session\n";
     my $url = $sessions[0]->{url} // "";
     $url =~ m{\Ahttp://(\[[0-9a-fA-F:]+\]|[A-Za-z0-9._-]+):([0-9]+)/session/[0-9a-f]{16}(?:\?[^\s#]*)?\z}
@@ -194,8 +235,13 @@ apply_session_host() {  # <artifact>
     $host ne "0.0.0.0" && $host ne "::" && $port >= 1 && $port <= 65535
       or die "invalid saved Lavish server address\n";
     print "$host\n$port\n";
-  ' "${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json" "$1") \
-    || die "cannot resolve the board server from its Lavish session: $1"
+  ' "${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json" "$1")
+  rc=$?
+  case "$rc" in
+    0) ;;
+    3|4) return "$rc" ;;
+    *) die "cannot resolve the board server from its Lavish session: $1" ;;
+  esac
   LAVISH_AXI_HOST=${endpoint%$'\n'*}
   LAVISH_AXI_PORT=${endpoint##*$'\n'}
   export LAVISH_AXI_HOST LAVISH_AXI_PORT
@@ -361,7 +407,7 @@ cmd_check() {
 }
 
 cmd_arm() {
-  local artifact='' task='' reply_file='' id real owner listening
+  local artifact='' task='' reply_file='' id real listening
   local -a listener=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -404,9 +450,9 @@ cmd_arm() {
     FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" register lavish "$id" \
       -- "${listener[@]}" || exit 1
   fi
-  # Registration is not a running listener. Readiness is the process-event
-  # owner's evidence for this generation; a miss retires a source that never
-  # started so arm does not leave it registered.
+  # Registration is not a running listener. A missed confirmation leaves the
+  # registration for the delayed runner or reconcile; cleanup must not wait
+  # behind a still-unclaimed runner's source lock after the readiness window.
   listening=0
   FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" ensure-listening "$id" || listening=$?
   if [ "$listening" -eq 3 ]; then
@@ -417,12 +463,6 @@ cmd_arm() {
     exit 0
   fi
   if [ "$listening" -ne 0 ]; then
-    owner=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" list 2>/dev/null \
-      | awk -v id="$id" '$1 == id { print $3; exit }')
-    case "$owner" in
-      live|orphaned|task:*/listening|task:*/round-open) ;;
-      *) FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" retire "$id" >/dev/null 2>&1 || true ;;
-    esac
     exit 1
   fi
   printf 'armed: %s\n' "$id"
@@ -446,16 +486,27 @@ POLL_RETRY_DELAY_DEFAULT=5
 POLL_RETRY_DELAY_MIN=1
 POLL_RETRY_DELAY_MAX=60
 
-# Exit 0 only for the exact two-line interruption, and nothing else. The whole
-# response must be those two lines with those exact bytes: whitespace variants,
-# a longer response that merely opens with them, and any other SERVER_ERROR are
-# genuine errors this adapter must never swallow.
+# Exit 10 only for the exact restart responses, and nothing else. The whole
+# response must be one of the forms described above with those exact bytes.
+# Whitespace variants, any other help text or port, a longer response that
+# merely opens with them, and any other SERVER_ERROR are genuine errors this
+# adapter must never swallow.
 poll_response_filter() {  # <response-file>
   perl -e '
     use strict;
     use warnings;
     my ($stage) = @ARGV;
-    my $expected = "error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n";
+    my $bare = "error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n";
+    my $help = "help[2]: Run `lavish-axi server --verbose` or inspect `~/.lavish-axi/server.log`"
+      . " (`LAVISH_AXI_STATE_DIR/server.log` when set) for server startup or crash diagnostics,"
+      . "Re-run the last `lavish-axi poll <html-file>` command after the server is healthy\n";
+    my $connection = "error: Lavish Editor server connection failed\ncode: SERVER_ERROR\n";
+    my @forms = ($bare . $help, $connection, $connection . $help);
+    my $port = $ENV{LAVISH_AXI_PORT} // "";
+    # A restart race: another poll auto-started the server on the port this poll routes to.
+    push @forms, "error: Lavish Editor server did not start\ncode: SERVER_ERROR\n"
+      . "help[1]: Run `lavish-axi server --port $port` to inspect server startup\n"
+      if $port =~ /\A[0-9]+\z/;
     open my $staged, ">", $stage or exit 2;
     binmode STDIN;
     binmode STDOUT;
@@ -478,28 +529,32 @@ poll_response_filter() {  # <response-file>
         write_all(*STDOUT, $chunk);
         next;
       }
-      my $room = length($expected) + 1 - length($candidate);
-      my $take = length($chunk) < $room ? length($chunk) : $room;
-      my $prefix = substr($chunk, 0, $take);
-      $candidate .= $prefix;
-      write_all($staged, $prefix);
-      my $matches_prefix = length($candidate) <= length($expected)
-        && substr($expected, 0, length($candidate)) eq $candidate;
-      if (!$matches_prefix) {
-        write_all(*STDOUT, $candidate);
-        write_all(*STDOUT, substr($chunk, $take));
+      # Stage through the first byte that leaves every form, and no further.
+      my $seen = $candidate . $chunk;
+      my $same = 0;
+      for my $form (@forms) {
+        my $span = length($seen) < length($form) ? length($seen) : length($form);
+        (substr($seen, 0, $span) ^ substr($form, 0, $span)) =~ /^(\0*)/;
+        $same = length $1 if length $1 > $same;
+      }
+      my $keep = $same < length($seen) ? $same + 1 : $same;
+      write_all($staged, substr($seen, length($candidate), $keep - length($candidate)));
+      if ($same == length($seen)) {
+        $candidate = $seen;
+      } else {
+        write_all(*STDOUT, $seen);
         $streaming = 1;
       }
     }
-    exit 10 if !$streaming && $candidate eq $expected;
+    exit 10 if !$streaming && grep { $candidate eq $_ } $bare, @forms;
     write_all(*STDOUT, $candidate) unless $streaming;
   ' "$1"
 }
 
-# Minimum seconds between retry attempt starts. FM_LAVISH_POLL_RETRY_DELAY is a
-# bounded test override; a malformed or out-of-range value is refused rather than quietly
-# rounded, because silently changing a retry cadence is how a bound stops
-# meaning anything.
+# Minimum quiet-retry delay after the preceding attempt finishes.
+# FM_LAVISH_POLL_RETRY_DELAY is a bounded test override; malformed or out-of-range
+# values are refused rather than rounded, because silently changing a retry
+# cadence is how a bound stops meaning anything.
 poll_retry_delay() {
   local delay=${FM_LAVISH_POLL_RETRY_DELAY-}
   if [ -z "$delay" ]; then
@@ -514,23 +569,22 @@ poll_retry_delay() {
   printf '%s\n' "$delay"
 }
 
-poll_iteration_started() {
-  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
-    'printf "%.6f\\n", clock_gettime(CLOCK_MONOTONIC)'
-}
-
-poll_iteration_floor_wait() {
+# Back off after the preceding attempt finishes. Timing from before routing and
+# CLI startup lets their variable latency compress neighboring poll starts.
+poll_retry_wait() {  # <minimum-seconds>
   perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
-    my ($started, $floor) = @ARGV;
-    my $remaining = $floor - (clock_gettime(CLOCK_MONOTONIC) - $started);
-    sleep($remaining) if $remaining > 0;
-  ' "$1" "$2"
+    my $deadline = clock_gettime(CLOCK_MONOTONIC) + $ARGV[0];
+    while (my $remaining = $deadline - clock_gettime(CLOCK_MONOTONIC)) {
+      last if $remaining <= 0;
+      sleep($remaining);
+    }
+  ' "$1"
 }
 
 cmd_poll() {
-  local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc iteration_started
+  local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc
   local pipeline_status reply_file=''
-  local reply_text='' reply_pending=0
+  local reply_text='' reply_pending=0 store_attempt=0
   [ -n "$artifact" ] || usage
   if [ "$#" -eq 3 ] && [ "${2-}" = --agent-reply-file ]; then
     reply_file=$3
@@ -553,10 +607,24 @@ cmd_poll() {
     trap "$cleanup_command; trap - $signal; kill -$signal $$" "$signal"
   done
   while :; do
-    iteration_started=$(poll_iteration_started) || die "cannot start the poll rate governor"
     [ -f "$artifact" ] && [ ! -L "$artifact" ] && [ -r "$artifact" ] \
       || die "artifact is no longer a readable file: $artifact"
     apply_session_host "$artifact"
+    case "$?" in
+      0) ;;
+      3)
+        printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n'
+        return 1
+        ;;
+      *)
+        [ "$store_attempt" -lt "$POLL_RETRY_LIMIT" ] \
+          || die "cannot resolve the board server from its Lavish session: $artifact"
+        store_attempt=$((store_attempt + 1))
+        poll_retry_wait "$delay" \
+          || die "cannot enforce the poll rate governor"
+        continue
+        ;;
+    esac
     # Posting a round's reply is BEST EFFORT and deliberately carries no delivery
     # machinery. The staged file is the only record that a reply is owed, so it is
     # consumed HERE - after every non-posting step that could abort this poll has
@@ -585,7 +653,7 @@ cmd_poll() {
       10)
         if [ "$attempt" -lt "$POLL_RETRY_LIMIT" ]; then
           attempt=$((attempt + 1))
-          poll_iteration_floor_wait "$iteration_started" "$delay" \
+          poll_retry_wait "$delay" \
             || die "cannot enforce the poll rate governor"
         else
           cat -- "$response"
@@ -595,6 +663,13 @@ cmd_poll() {
       *) die "cannot classify the poll response" ;;
     esac
   done
+  # An outputless signal termination uses the runner's existing poll-again exit
+  # rather than waiting for reconciliation. No local bytes does not prove the
+  # server retained feedback; the header's destructive-poll loss limit still applies.
+  # A signal to this listener itself never reaches here: the traps above re-raise it.
+  if [ "$rc" -gt 128 ] && [ ! -s "$response" ]; then
+    return 75
+  fi
   return "$rc"
 }
 
@@ -982,6 +1057,19 @@ case "${1-}" in
   source-id) shift; cmd_source_id "$@" ;;
   classify)  shift; cmd_classify "$@" ;;
   terminal)  shift; cmd_terminal "$@" ;;
+  relisten)
+    shift
+    [ "$#" -le 1 ] || usage
+    if [ -n "${1-}" ] && [ -s "$1" ]; then
+      case "$(cmd_classify "$1")" in
+        feedback) exit 0 ;;
+        disconnected|waiting) ;;
+        *) exit 1 ;;
+      esac
+    fi
+    delay=$(poll_retry_delay) || exit 1
+    sleep "$delay"
+    ;;
   silent)    shift; cmd_silent "$@" ;;
   answers)   shift; cmd_answers "$@" ;;
   reconciles) shift; cmd_reconciles "$@" ;;

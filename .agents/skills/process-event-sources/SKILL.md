@@ -43,10 +43,10 @@ Never arm a board that a live task hosts; follow the crew-hosted Lavish board co
 
 Registering a source is not the same fact as listening to it.
 Lavish `arm` waits until this registration's listener is confirmed running and does not report ready without that evidence; other adapters still record the source for the watcher's next reconcile.
-When an earlier registration's listener still holds the board as the confirm window ends, Lavish `arm` prints `still-listening` instead of `armed`; that listener keeps serving the board, and the new registration takes effect only after you retire the source and arm it again.
+The [Lavish readiness contract](../../../docs/configuration.md#crew-hosted-lavish-review-boards) owns `still-listening`; the `bin/fm-procevent.sh` header owns replacement-registration adoption.
 After arming by hand, confirm `bin/fm-procevent.sh list` reports that source as `live`, and run `bin/fm-procevent.sh reconcile` when it does not.
 **Confirm detached launches** and **Report launch failures** in [`docs/configuration.md`](../../../docs/configuration.md#process-to-event-sources-stateprocevent) own launch confirmation and failure reporting.
-If the source stays unowned, run `start` attached to read the runner's refusal, then inspect the source command and adapter binary named in the registration; `start` does not fix that refusal.
+If the source stays unowned after reconciliation, run `start` attached to read the runner's refusal, then inspect the source command and adapter binary named in the registration; `start` does not fix that refusal.
 A source `list` reports as `orphaned` is one reconcile will not relaunch, because something may still be polling it; reconcile wakes you once about it, and that wake's payload says which of two recoveries applies.
 If the claim's recorded pid is alive under a different identity, `bin/fm-procevent.sh start <source-id>` takes the source back once you have checked nothing is still polling it - provided the dead generation's reservation records can still be tidied; otherwise it refuses with `cannot claim source`.
 If the runner itself died and its process group survives, `start` reports `already owned` and takes nothing back: verify whether the dead runner's polling child is still attached to the source, and once that group is empty the next reconcile reclaims the source on its own.
@@ -114,7 +114,9 @@ Two rules the commands cannot enforce for you:
   ```sh
   bin/fm-procevent.sh handled <source-id> <sequence>
   ```
-  This call is atomically deduplicated by the exact source and sequence: it prints `handled: <id> <seq>` only the first time and `already-handled: <id> <seq>` on every repeat, so a paired effect gated on that distinction is never authorized twice. Reading the event line or the result file is not handling - only this call durably retires the wake, so call it every time, including on a repeat wake for a sequence you already acted on.
+  This call is atomically deduplicated by the exact source and sequence: it prints `handled: <id> <seq>` only the first time and `already-handled: <id> <seq>` on every repeat, so a paired effect gated on that distinction is never authorized twice.
+  Reading the event line or the result file is not handling - this call stops the result's future re-announcement, so call it every time, including on a repeat wake for a sequence you already acted on.
+  The [publication contract](../../../docs/configuration.md#process-to-event-sources-stateprocevent) owns the separate acknowledgement of an already-queued wake.
 : Ask the adapter what the result means rather than parsing it yourself.
   `bin/fm-procevent.sh classify <result-file>` routes through the immutable built-in or extension identity captured with that result; for Lavish, its existing direct command returns `feedback`, `ended`, `waiting`, `disconnected`, `missing`, or `unknown`.
   Consume a Lavish capture with `bin/fm-procevent-lavish.sh read <result-file>` rather than grepping the raw file: that command reports declared and presented item counts plus a completeness verdict, enumerates every captured queued item while retaining supplied element identity, and surfaces a `tag=message` freeform message as its own field, labeling it as session-ending only when the session ended.

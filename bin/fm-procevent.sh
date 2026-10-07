@@ -18,7 +18,7 @@
 #   fm-procevent.sh extension-retirement <binding|transfer> <retirement-arguments...>
 #   fm-procevent.sh extension-bind <bind|receive-transfer-bind> <binding-arguments...>
 #   fm-procevent.sh extension-process-event <process-event-arguments...>
-#   fm-procevent.sh list
+#   fm-procevent.sh list [--age]
 #
 # register   Record a built-in source: its adapter, its canonical id, and the
 #            exact argv to execute. argv is stored one argument per line and
@@ -45,16 +45,17 @@
 #            Confirm the current registration generation's listener is running.
 #            Starts one when nothing live is in the way, and returns only after
 #            that generation's live claim or its launch stamp says it started.
-#            The wait is the reconcile confirm window and ends early on evidence.
-#            No evidence within the window is a nonzero result. Exit 3 means a
+#            Polls within the reconcile confirm window, then refreshes evidence
+#            once at its boundary without waiting for a still-unproved claim.
+#            No proof is a nonzero result. Exit 3 means a
 #            live listener from another registration generation still held the
-#            source when the window ended, so this generation cannot start until
-#            it is retired.
+#            source when the window ended. Replacement-registration adoption
+#            follows the relisten rule below.
 # start      Claim the source, run its child to completion, durably capture the
-#            output, and publish normalized wakes for pending results. It then
-#            releases the claim, unless the adapter's `relisten` command says
-#            to poll again in this same runner. It blocks for as long as the
-#            source blocks and is meant
+#            output, and publish normalized wakes for that capture. It then
+#            drains its owned process group in EXIT cleanup, unless
+#            the adapter's `relisten` command says to poll again in this same
+#            runner. It blocks for as long as the source blocks and is meant
 #            to run as a supervised background process, never in a conversational
 #            turn. After publishing, it asks the source's own adapter whether the
 #            captured result ends the source and normally retires the registration
@@ -63,7 +64,7 @@
 #            registered until its owner concludes it with `handled`.
 # reconcile  Idempotent liveness entry the watcher calls on its ordinary cycle:
 #            republish every durably captured result with no handled
-#            acknowledgement yet - regardless of any earlier publication - and
+#            acknowledgement yet unless its wake is still queued, and
 #            start a runner for any registered source that has no live owner and
 #            no open task-owned round. This is liveness repair only - it never
 #            discovers results by
@@ -120,6 +121,8 @@
 #            Serialize tracked binding publication against extension resolution,
 #            registration publication, and retirement in this home.
 # list       Show registered sources, owners, and pending captured results.
+#            --age adds registration age in seconds for deliberate retirement;
+#            age never retires a source automatically.
 #
 # Terminal knowledge is adapter-owned. This runner never inspects a result and
 # never names an adapter-specific status: built-ins keep the existing
@@ -170,14 +173,15 @@
 # go silent. An unhandled result stays eligible for bounded re-announcement on
 # every reconcile in both modes, exactly as before.
 #
-# Polling again is adapter-owned through the same kind of seam. An adapter that
-# answers exit 0 to `bin/fm-procevent-<adapter>.sh relisten` keeps this runner
-# and its claim across an empty result and across a capture, and the runner
-# polls the registration that claim still owns. It adopts a replacement
-# registration only when that same claim still owns it and the registered
-# command is unchanged. A missing command, an error, or any other exit releases
-# the claim after that one result, exactly as before. The runner still does not
-# refresh the owner lease, so a home that has gone still ends the poll.
+# Polling again is adapter-owned through the same kind of seam. Exit 0 from
+# `bin/fm-procevent-<adapter>.sh relisten` keeps this runner and its claim after
+# an empty wait or handled capture. For an unhandled firstmate-owned capture,
+# `relisten <result-file>` must explicitly accept that result; adapters exposing
+# only the no-argument command retain their stop-until-handled behavior.
+# Task-owned open rounds never take this unhandled continuation.
+# The runner adopts a replacement registration only when the command is
+# unchanged and the claim still belongs to it. Any other verdict releases the
+# claim. The runner never refreshes its own home lease.
 #
 # Keyed captain answers from built-in adapters use one more seam of the same kind,
 # and this runner still decides nothing about them. Some sources carry the
@@ -275,8 +279,6 @@ state_root_bind() {  # [create]
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   state_root_bind || die "process-event state root is not a private directory"
 fi
-
-adapter_script() { printf '%s/bin/fm-procevent-%s.sh\n' "$FM_ROOT" "$1"; }
 
 extension_lifecycle_lock_acquire() {
   state_root_bind create || return 1
@@ -772,9 +774,9 @@ cmd_register_extension() {
 
 # Publish every durably captured result with no handled acknowledgement yet.
 # Capture already happened, so this only turns durable state into durable
-# events - and it republishes on every call regardless of any earlier
-# publication, so a result stays eligible for re-announcement across restarts
-# and drains until `fm_procevent_mark_handled` records it.
+# events, coalescing a result's wake while it remains queued.
+# After a drain acknowledges that wake, an unhandled result is eligible for
+# re-announcement until `fm_procevent_mark_handled` records it.
 publish_result() {  # <result-file>
   local result=$1 id seq adapter line status=1 owner_task='' message='' record=''
   local ring_backend ring_target ring_meta inbox_dir handled_dir pre_existing existing new_record
@@ -857,9 +859,15 @@ EOF
       esac
     fi
     unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
-    if fm_wake_append check "procevent:$id:$seq" "check: $line"; then
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    if awk -F '\t' -v key="procevent:$id:$seq" \
+      'NF >= 5 && $3 == "check" && $4 == key { found=1; exit } END { exit !found }' \
+      "$FM_WAKE_QUEUE" 2>/dev/null; then
+      status=0
+    elif fm_wake_append_locked check "procevent:$id:$seq" "check: $line"; then
       status=0
     fi
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   fi
   fm_procevent_source_lock_release "$id"
   return "$status"
@@ -964,7 +972,7 @@ cmd_start_public() {
 }
 
 cmd_start() {
-  local id=${1-} adapter out rc claimed bound_rc published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
+  local id=${1-} adapter out rc claimed bound_rc bound_pid published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
   local extension_owner=0 extension_load_state extension_sequence='' extension_request_id=''
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   require_runner_group
@@ -1046,6 +1054,7 @@ cmd_start() {
   CLAIM_ID=$id
   CLAIM_HOME=$FM_HOME
   CLAIM_PID=$$
+  CLAIM_IDENTITY=$(fm_pid_identity "$$" 2>/dev/null) || die "cannot identify the claimed runner: $id"
   CLAIM_TOKEN=$FM_PROCEVENT_CLAIM_TOKEN
   CLAIM_REG_IDENTITY=$FM_PROCEVENT_CLAIM_REG_IDENTITY
   CLAIM_STATE_DEVICE=$FM_PROCEVENT_CLAIM_STATE_DEVICE
@@ -1056,8 +1065,33 @@ cmd_start() {
   # broken only by KILL. On contention, leave the generation-bound claim for
   # the stopper or subsequent reconciliation to reclaim.
   release_start_claim() {
+    # Keep the identity-matched leader alive until its children are gone. An
+    # EXIT caused by TERM to this pid alone must not orphan the native poll and
+    # advertise a free source while that poll still owns its listener.
+    trap '' INT TERM HUP
     extension_lifecycle_lock_release 2>/dev/null || true
     [ -z "$STAGED_OUTPUT" ] || rm -f -- "$STAGED_OUTPUT"
+    while :; do
+      runner_group_children_gone "$CLAIM_PID" 0
+      case "$?" in
+        0) break ;;
+        1)
+          if runner_group_signal TERM "$CLAIM_PID" "$CLAIM_IDENTITY"; then
+            runner_group_children_gone "$CLAIM_PID" 2
+            case "$?" in
+              0) break ;;
+              1)
+                # This escalation retains the live-leader proof from our TERM.
+                # KILL ends us too, leaving the claim for reconciliation only once
+                # the whole generation is gone; never release ahead of the kill.
+                runner_group_signal KILL "$CLAIM_PID" "$CLAIM_IDENTITY" proved && return 0
+                ;;
+            esac
+          fi
+          ;;
+      esac
+      sleep 0.1
+    done
     fm_procevent_source_lock_try_acquire "$CLAIM_ID" 2>/dev/null || return 0
     if fm_procevent_claim_load_locked "$CLAIM_ID" 2>/dev/null \
       && [ "$FM_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
@@ -1071,6 +1105,9 @@ cmd_start() {
     fm_procevent_source_lock_release "$CLAIM_ID" 2>/dev/null || true
   }
   trap release_start_claim EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   # 0 when this runner should poll again. The adapter's relisten command is the
   # only adapter-specific signal; a replacement registration is adopted only
   # when this claim still owns it and the registered command is unchanged.
@@ -1080,7 +1117,7 @@ cmd_start() {
     [ "$extension_owner" -eq 0 ] || return 1
     script=$(adapter_script "$adapter")
     [ -f "$script" ] && [ ! -L "$script" ] || return 1
-    "$script" relisten >/dev/null 2>&1 || return 1
+    "$script" relisten "$@" >/dev/null 2>&1 || return 1
     registration=$(source_file "$id")
     [ -f "$registration" ] && [ ! -L "$registration" ] || return 1
     fm_procevent_source_lock_acquire "$id" || return 1
@@ -1289,7 +1326,11 @@ EOF
         $truncated = 1 if $take < $count;
       }
       exit($truncated ? 3 : 0);
-    ' "$MAX_OUTPUT_BYTES" <&4 > "$out"
+    ' "$MAX_OUTPUT_BYTES" <&4 > "$out" &
+    bound_pid=$!
+    # A trapped signal interrupts wait immediately. A foreground drain would
+    # defer the TERM trap for as long as the native poll keeps stdout open.
+    wait "$bound_pid"
     bound_rc=$?
     exec 4<&-
     wait "$launch_pid"
@@ -1360,7 +1401,6 @@ EOF
     elif fm_procevent_is_handled "$STATE" "$id" "$(fm_procevent_result_sequence "$durable")"; then
       handled_capture=1
     fi
-    publish_pending "$durable" >/dev/null
   fi
   [ "$extension_owner" -eq 1 ] || rm -f -- "$runner"
   if [ "$self_announcing" -eq 1 ]; then
@@ -1376,7 +1416,6 @@ EOF
     if publish_result "$durable"; then
       published_capture=1
     fi
-    publish_pending "$durable" >/dev/null
   elif [ "$handled_capture" -eq 1 ]; then
     :
   elif [ "$extension_owner" -eq 0 ] \
@@ -1400,8 +1439,10 @@ EOF
     fm_procevent_claim_capture_reservation_remove_locked || true
     exec 6<&-
   fi
-  if [ "$handled_capture" -eq 1 ] && adopt_relisten; then
-    continue
+  if [ "$handled_capture" -eq 1 ]; then
+    adopt_relisten && continue
+  elif [ -z "$task_owner" ]; then
+    adopt_relisten "$durable" && continue
   fi
   break
   done
@@ -1650,7 +1691,7 @@ stranded_leaderless_detail() {  # <source-id>
 
 cmd_reconcile() {
   local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token identity claim_state stop_state task_pending
-  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry
+  local launch_identity launch_stamp launch_mark current_identity current_mark rest unconfirmed entry confirmation_blocked=0
   local -a launched=()
   # Rejected before anything is launched, and by name. A window this command
   # cannot use makes every launch unconfirmable, so validating it later would
@@ -1793,8 +1834,15 @@ cmd_reconcile() {
       rest=${entry#*$'\t'}
       launch_identity=${rest%%$'\t'*}
       launch_mark=${rest#*$'\t'}
-      if ! fm_procevent_source_lock_acquire "$id"; then
-        uncertain=$((uncertain + 1))
+      # Confirmation is bounded; finalization must not wait behind a runner
+      # that holds the publisher's lock but has not yet claimed.
+      if ! fm_procevent_source_lock_try_acquire "$id"; then
+        if launch_entry_listed "$entry" "$unconfirmed"; then
+          uncertain=$((uncertain + 1))
+          confirmation_blocked=1
+        else
+          started=$((started + 1))
+        fi
         continue
       fi
       current_identity=
@@ -1832,7 +1880,7 @@ cmd_reconcile() {
   fi
   printf 'reconciled: published=%s started=%s stopped=%s uncertain=%s failed=%s\n' \
     "$published" "$started" "$stopped" "$uncertain" "$failed"
-  [ "$failed" -eq 0 ]
+  [ "$failed" -eq 0 ] && [ "$confirmation_blocked" -eq 0 ]
 }
 
 launch_entry_listed() {  # <entry> <newline-separated entries>
@@ -1866,7 +1914,7 @@ launch_entry_listed() {  # <entry> <newline-separated entries>
 # Every launch shares ONE window rather than taking a window each, so a whole
 # fleet of failing sources costs a reconcile pass the same bounded wait as one.
 confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><launch-stamp-before>...
-  local deadline window entry id rest identity before state stamp mark current_identity
+  local deadline window entry id rest identity before final_read=0
   local -a pending=("$@") remaining=()
   window=$(fm_procevent_launch_confirm_seconds) || return 1
   # A zero-padded window is a valid value to its validator, which reads base 10;
@@ -1885,50 +1933,69 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
       rest=${entry#*$'\t'}
       identity=${rest%%$'\t'*}
       before=${rest#*$'\t'}
-      state=1
-      if fm_procevent_source_lock_try_acquire "$id"; then
-        fm_procevent_claim_state_locked "$id"
-        state=$?
-        if [ "$state" -eq 0 ] && [ -n "$identity" ] \
-          && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
-          current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
-          if [ "$current_identity" = "$identity" ]; then
-            rm -f -- "$(launch_failed_file "$id")"
-          fi
-        fi
-        fm_procevent_source_lock_release "$id"
-      fi
-      if [ "$state" -eq 0 ]; then
+      ! launch_stamp_advanced "$id" "$identity" "$before" || continue
+      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
         continue
       fi
-      mark=
-      if [ -n "$identity" ] \
-        && stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$identity"); then
-        mark=$(cat -- "$stamp" 2>/dev/null || true)
+      if generation_is_listening "$id" "$identity"; then
+        continue
       fi
-      if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
+      # A failed try-lock can outlast the stamp snapshot while the runner
+      # publishes its launch. Refresh that durable proof after ownership work.
+      if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
         continue
       fi
       remaining+=("$entry")
     done
     pending=("${remaining[@]+"${remaining[@]}"}")
     [ "${#pending[@]}" -gt 0 ] || break
-    [ "$SECONDS" -lt "$deadline" ] || break
+    [ "$final_read" -eq 0 ] || break
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      # External stamp reads can consume the remaining window. Refresh once
+      # before reporting a launch absent, with ownership checked after stamp
+      # work even on that final pass; the polling deadline stays unchanged.
+      final_read=1
+      continue
+    fi
     sleep 0.05
   done
   [ "${#pending[@]}" -eq 0 ] || printf '%s\n' "${pending[@]}"
 }
 
+# 0 when <registration-identity>'s launch-pacing stamp has moved past
+# <stamp-before>, which the runner writes once it has claimed.
+launch_stamp_advanced() {  # <source-id> <registration-identity> <stamp-before>
+  local stamp mark
+  [ -n "$2" ] || return 1
+  stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$1" "$2") || return 1
+  mark=$(cat -- "$stamp" 2>/dev/null || true)
+  [ -n "$mark" ] && [ "$mark" != "$3" ]
+}
+
 # 0 when this registration generation holds a live claim, 3 when another
-# generation does, 1 otherwise.
+# generation does, 1 otherwise. A held lock is unproved, not permission to wait.
 generation_is_listening() {  # <source-id> <registration-identity>
-  local id=$1 identity=$2 state result=1
+  local id=$1 identity=$2 state current_identity result=1
+  # An unlocked snapshot can only rule out readiness. An absent or stale
+  # claim must not make the reader delay the runner trying to replace it.
+  # A live hint still requires a fresh, full generation proof under the lock.
+  fm_procevent_claim_load_locked "$id" || return 1
+  fm_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" || return 1
   fm_procevent_source_lock_try_acquire "$id" || return 1
   fm_procevent_claim_state_locked "$id"
   state=$?
   if [ "$state" -eq 0 ]; then
     result=3
     [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
+    # Observing any live owner ends this local registration's failure episode,
+    # but an obsolete snapshot must not clear a replacement's episode.
+    if [ -n "$identity" ] \
+      && [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ]; then
+      current_identity=$(fm_pr_file_identity "$(source_file "$id")" 2>/dev/null) || current_identity=
+      if [ "$current_identity" = "$identity" ]; then
+        rm -f -- "$(launch_failed_file "$id")"
+      fi
+    fi
   fi
   fm_procevent_source_lock_release "$id"
   return "$result"
@@ -1953,7 +2020,7 @@ generation_can_launch() {  # <source-id>
 # launch stamp advancing. Returns as soon as either appears. A fixed sleep is
 # not success.
 cmd_ensure_listening() {
-  local id=${1-} identity before mark stamp deadline window started_once=0 listening
+  local id=${1-} identity before stamp deadline window started_once=0 listening final_read=0
   [ "$#" -eq 1 ] || usage
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   window=$(fm_procevent_launch_confirm_seconds) \
@@ -1968,21 +2035,29 @@ cmd_ensure_listening() {
   fi
   deadline=$((SECONDS + 10#$window + 1))
   while :; do
+    ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
+    if [ "$final_read" -eq 1 ]; then
+      ! launch_stamp_advanced "$id" "$identity" "$before" || return 0
+    fi
     listening=0
     generation_is_listening "$id" "$identity" || listening=$?
     [ "$listening" -ne 0 ] || return 0
-    mark=
-    if stamp=$(fm_procevent_launch_floor_stamp_path "$STATE" "$id" "$identity"); then
-      mark=$(cat -- "$stamp" 2>/dev/null || true)
-    fi
-    if [ -n "$mark" ] && [ "$mark" != "$before" ]; then
+    # Lock contention may consume the final stamp snapshot's remaining life.
+    # Observe a launch published during that ownership attempt before refusing.
+    if [ "$final_read" -eq 1 ] && launch_stamp_advanced "$id" "$identity" "$before"; then
       return 0
     fi
+    [ "$final_read" -eq 0 ] || break
     if [ "$started_once" -eq 0 ] && generation_can_launch "$id"; then
       detach_runner "$id"
       started_once=1
     fi
-    [ "$SECONDS" -lt "$deadline" ] || break
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      # Also observes a launch made at the end of this iteration before
+      # deciding it failed. Never wait beyond one final evidence pass.
+      final_read=1
+      continue
+    fi
     sleep 0.05
   done
   [ "$listening" -ne 3 ] || return 3
@@ -1991,9 +2066,8 @@ cmd_ensure_listening() {
 }
 
 # Stop a runner and the child it is blocked on. A runner started by reconcile is
-# its own process group leader, so the group signal is what actually reaches the
-# blocking child - signalling only the runner would leave that child alive and
-# reparented, which is exactly how a source that never completes leaks.
+# its own process group leader, so a verified group signal reaches the blocking
+# child and its descendants directly.
 # docs/configuration.md owns the operating contract and unproved-group limits.
 # A leaderless group nobody in this call ever proved remains refused for every
 # caller, and that untouched refusal is what makes a crashed leader's group
@@ -2001,12 +2075,40 @@ cmd_ensure_listening() {
 # assumes: an unresolved question has to be marked unresolved where the decision
 # is made, because a reader who does not know it is open will read a bare refusal
 # as settled design and eventually relax it.
+# Exit cleanup holds its own leader alive, so group quiescence here means no
+# member other than that leader. The inspector moves to a separate group before
+# invoking ps: neither it nor its ps child can look like a surviving source.
+# Return 0 when drained, 1 while children remain, 2 when inspection is uncertain.
+runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
+  perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
+    use strict;
+    use warnings;
+    my ($pid, $wait) = @ARGV;
+    setpgrp(0, 0) or exit 2;
+    my $deadline = clock_gettime(CLOCK_MONOTONIC) + $wait;
+    while (1) {
+      open my $ps, "-|", "ps", "-axo", "pid=,pgid=" or exit 2;
+      my ($leader, $children) = (0, 0);
+      while (my $line = <$ps>) {
+        $line =~ /\A\s*(\d+)\s+(\d+)\s*\z/ or exit 2;
+        next unless $2 == $pid;
+        $1 == $pid ? $leader++ : $children++;
+      }
+      close $ps or exit 2;
+      exit 2 unless $leader;
+      exit 0 unless $children;
+      exit 1 if clock_gettime(CLOCK_MONOTONIC) >= $deadline;
+      sleep 0.1;
+    }
+  ' "$1" "$2"
+}
+
 runner_group_signal() {  # <signal> <pid> <identity> [proved]
   local signal=$1 pid=$2 identity=$3 proved=${4-} state pgid
   if [ -n "$proved" ]; then
-    # This stop proved ownership before TERM; only its own escalation may reuse
-    # that same proof within the same stop_runner_pid call. Re-reading the leader
-    # as our signal ends it would discard that proof, not disprove ownership.
+    # This shutdown proved ownership before TERM; only its own escalation may
+    # reuse that proof in the same shutdown. Re-reading the leader as our signal
+    # ends it would discard that proof, not disprove ownership.
     # A group encountered without proof remains refused by the unproved path.
     fm_procevent_group_alive "$pid" || return 1
   else
@@ -2400,13 +2502,23 @@ cmd_sweep_home() {
 }
 
 cmd_list() {
-  local rec id adapter owner pending claim_state kind task
+  local rec id adapter owner pending claim_state kind task show_age=0 now born age
+  case "$#" in
+    0) ;;
+    1) [ "$1" = --age ] || usage; show_age=1 ;;
+    *) usage ;;
+  esac
   owner_lease_refresh
   if ! fm_procevent_any_registered "$STATE"; then
     printf 'no sources registered\n'
     return 0
   fi
-  printf '%-28s %-12s %-10s %s\n' SOURCE ADAPTER OWNER PENDING
+  if [ "$show_age" -eq 1 ]; then
+    now=$(date +%s)
+    printf '%-28s %-12s %-10s %s %s\n' SOURCE ADAPTER OWNER PENDING AGE_SECONDS
+  else
+    printf '%-28s %-12s %-10s %s\n' SOURCE ADAPTER OWNER PENDING
+  fi
   for rec in "$REG"/*.source; do
     [ -e "$rec" ] || continue
     id=${rec##*/}; id=${id%.source}
@@ -2443,7 +2555,17 @@ cmd_list() {
         owner="task:$task/dead"
       fi
     fi
-    printf '%-28s %-12s %-10s %s\n' "$id" "$adapter" "$owner" "$pending"
+    if [ "$show_age" -eq 1 ]; then
+      born=$(fm_path_mtime "$rec" 2>/dev/null || true)
+      age=unknown
+      case "$born" in
+        ''|*[!0-9]*) ;;
+        *) age=$((now - born)); [ "$age" -ge 0 ] || age=0 ;;
+      esac
+      printf '%-28s %-12s %-10s %s %s\n' "$id" "$adapter" "$owner" "$pending" "$age"
+    else
+      printf '%-28s %-12s %-10s %s\n' "$id" "$adapter" "$owner" "$pending"
+    fi
   done
 }
 

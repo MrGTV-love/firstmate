@@ -22,6 +22,12 @@ ln -s /bin/bash "$FAKEBIN/claude"
 FAKE_CLAUDE="$FAKEBIN/claude"
 export FAKE_CLAUDE
 
+# Live identity fixtures end on explicit teardown or their suite owner's exit.
+# A fixed sleep can expire inside the hook and falsely look like a signal.
+live_fixture() {
+  exec perl -e 'sleep 1 while getppid() == $ARGV[0]' "$$"
+}
+
 # Copy the hook and its sourced dependencies into a fixture checkout.
 install_autoarm_scripts() {
   local dir=$1
@@ -187,6 +193,18 @@ printf 'signal: task.status done: fixture\n'
 exit 0
 SH
       ;;
+    source-retires)
+      cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
+printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+  "$(date +%s)" > "$FM_HOME/state/.wake-queue"
+rm -f "$FM_HOME/state/procevent/lavish-final.source"
+touch "$FM_HOME/state/.last-watcher-beat"
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+printf 'check: process-event result captured: procevent:lavish-final:1\n'
+exit 0
+SH
+      ;;
     afk-appears)
       cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 : > "$FM_HOME/state/.afk"
@@ -309,9 +327,9 @@ test_inert_when_lock_held_by_other_harness() {
   dir=$(make_primary_dir "$TMP_ROOT/other-lock")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
-  # The trailing no-op keeps the fake harness process alive instead of allowing
-  # bash to exec the final sleep into a non-harness process.
-  "$FAKE_CLAUDE" -c 'sleep 60; :' &
+  # Keep the harness itself alive until teardown or suite exit, without execing
+  # its wait into a non-harness process.
+  "$FAKE_CLAUDE" -c 'while kill -0 "$PPID" 2>/dev/null; do sleep 1; done; :' &
   other=$!
   printf '%s\n' "$other" > "$dir/state/.lock"
   out=$(printf '%s\n' '{"session_id":"s"}' | FM_HOME="$dir" "$FAKE_CLAUDE" -c '"$FM_HOME/bin/fm-claude-stop-autoarm.sh"' 2>&1); status=$?
@@ -408,6 +426,83 @@ test_inert_when_fleet_idle() {
   pass "auto-arm: inert with nothing in flight and no X-mode need"
 }
 
+test_terminal_source_wake_survives_retirement() {
+  local dir when out status before
+  for when in before-stop during-stop; do
+    dir=$(make_primary_dir "$TMP_ROOT/terminal-$when")
+    mkdir -p "$dir/state/procevent"
+    if [ "$when" = during-stop ]; then
+      : > "$dir/state/procevent/lavish-final.source"
+    else
+      printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+        "$(date +%s)" > "$dir/state/.wake-queue"
+    fi
+    write_arm_fixture "$dir" source-retires
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 2 "$status" "the last source's final wake must reach Claude when captured $when"
+    assert_contains "$out" 'procevent:lavish-final:1' "the final capture must be the rewake reason"
+    assert_absent "$dir/state/procevent/lavish-final.source" "the source must have retired"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "final feedback must record a rewake, not clean"
+    : > "$dir/state/.wake-queue"
+    before=$(wc -l < "$dir/state/arm-ran")
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 0 "$status" "acknowledging the final wake must let the idle primary stop"
+    [ -z "$out" ] || fail "acknowledged final feedback caused another notice: $out"
+    [ "$(wc -l < "$dir/state/arm-ran")" = "$before" ] || fail "the idle home armed again after the final acknowledgement"
+  done
+
+  # Keep one native-shaped session alive through two owned captures and the
+  # final idle Stop, rather than replacing the session between hook calls.
+  dir=$(make_primary_dir "$TMP_ROOT/terminal-two-cycles")
+  mkdir -p "$dir/state/procevent" "$dir/state/procevent-inbox"
+  write_arm_fixture "$dir" actionable
+  FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" "$FAKE_CLAUDE" -c '
+    set -eu
+    root=$1
+    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    "$root/bin/fm-procevent.sh" register lavish lavish-final -- /usr/bin/printf "unused fixture poll\n" >/dev/null
+    for round in 1 2; do
+      base="$FM_HOME/state/procevent-inbox/lavish-final.$round"
+      printf "session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,owned answer %s\n" "$round" > "$base.result"
+      printf "lavish\n" > "$base.adapter"
+      printf "%s\t%s\tcheck\tprocevent:lavish-final:%s\tcheck: procevent lavish lavish-final %s\n" \
+        "$(date +%s)" "$round" "$round" "$round" > "$FM_HOME/state/.wake-queue"
+      printf "%s\n" "$round" > "$FM_HOME/state/.wake-queue.seq"
+      if [ "$round" = 2 ]; then "$root/bin/fm-procevent.sh" retire lavish-final >/dev/null; fi
+      rc=0
+      printf "{\"session_id\":\"sess-two-cycles\",\"stop_hook_active\":false,\"transcript_path\":\"/fixture/.claude/projects/primary/session.jsonl\"}\n" \
+        | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/state/stop-$round.out" 2>&1 || rc=$?
+      [ "$rc" = 2 ]
+      "$root/bin/fm-wake-drain.sh" > "$FM_HOME/state/drain-$round.out" 2> "$FM_HOME/state/drain-$round.err"
+      [ -s "$FM_HOME/state/.wake-queue" ]
+      "$root/bin/fm-procevent-lavish.sh" read "$base.result" > "$FM_HOME/state/read-$round.out"
+      [ ! -e "$base.handled" ]
+      "$root/bin/fm-procevent.sh" handled lavish-final "$round" > "$FM_HOME/state/handled-$round.out"
+      cutoff=$(sed -n "s/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p" "$FM_HOME/state/drain-$round.err")
+      generation=$(sed -n "s/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p" "$FM_HOME/state/drain-$round.err")
+      [ "$cutoff" = "$round" ] && [ -n "$generation" ]
+      "$root/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null
+      [ ! -s "$FM_HOME/state/.wake-queue" ]
+    done
+    before=$(wc -l < "$FM_HOME/state/arm-ran")
+    printf "{\"session_id\":\"sess-two-cycles\",\"stop_hook_active\":false,\"transcript_path\":\"/fixture/.claude/projects/primary/session.jsonl\"}\n" \
+      | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/state/stop-idle.out" 2>&1
+    [ "$(wc -l < "$FM_HOME/state/arm-ran")" = "$before" ]
+  ' _ "$ROOT" || fail "same-session owned feedback did not complete two Stop rewakes and an idle finish"
+  for status in 1 2; do
+    assert_contains "$(cat "$dir/state/stop-$status.out")" 'firstmate watcher wake' "each Stop must deliver feedback"
+    assert_contains "$(cat "$dir/state/stop-$status.out")" 'do NOT run bin/fm-watch-arm.sh' "each handling turn must reject model re-arm"
+    assert_contains "$(cat "$dir/state/drain-$status.out")" "procevent lavish lavish-final $status" "drain must expose the exact owned capture"
+    assert_contains "$(cat "$dir/state/read-$status.out")" "owned answer $status" "each handling turn must read its actual result"
+    assert_contains "$(cat "$dir/state/handled-$status.out")" "handled: lavish-final $status" "each capture must receive its exact acknowledgement"
+    assert_present "$dir/state/procevent-inbox/lavish-final.$status.handled" "each handled capture must remain durably acknowledged"
+  done
+  assert_absent "$dir/state/procevent/lavish-final.source" "the final source must remain retired"
+  [ ! -s "$dir/state/.wake-queue" ] || fail "idle finish left owned feedback queued"
+  [ ! -s "$dir/state/stop-idle.out" ] || fail "idle finish emitted another feedback notice"
+  pass "auto-arm: final feedback captured before or during Stop survives source retirement until acknowledged"
+}
+
 # --- the armed cycle ----------------------------------------------------------
 
 test_actionable_close_rewakes_with_reason() {
@@ -471,7 +566,7 @@ test_actionable_close_with_live_successor_rewakes_once() {
   dir=$(make_primary_dir "$TMP_ROOT/actionable-live-successor")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live successor for actionable close"
   record_watcher_lock "$dir" "$pid" "$identity"
@@ -642,7 +737,7 @@ test_benign_cycle_end_with_live_watcher_is_silent() {
   dir=$(make_primary_dir "$TMP_ROOT/benign-live")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" benign-live
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live watcher holder for benign close"
   record_watcher_lock "$dir" "$pid" "$identity"
@@ -671,14 +766,14 @@ test_positive_recovery_budget_contention_preserves_episode() {
   dir=$(make_primary_dir "$TMP_ROOT/recovery-budget-contention")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" benign-live
-  sleep 60 &
+  live_fixture &
   pid=$!
   identity=$(watcher_identity "$dir" "$pid") || fail "could not identify live watcher holder for recovery contention"
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   printf 'session=sess-autoarm\ncount=3\nepoch=9\n' > "$dir/state/.turnend-claude-blocks"
   : > "$dir/state/.claude-autoarm-failure-notified"
-  sleep 60 &
+  live_fixture &
   holder=$!
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
@@ -707,7 +802,7 @@ test_owner_mutex_contention_preserves_failure_episode_reset() {
   : > "$dir/state/.claude-autoarm-failure-notified"
   : > "$dir/state/.claude-autoarm-failure-alarmed"
   write_arm_fixture "$dir" reset-boundary
-  sleep 60 &
+  live_fixture &
   watcher=$!
   watcher_id=$(watcher_identity "$dir" "$watcher") || fail "could not identify reset-contention watcher"
   record_watcher_lock "$dir" "$watcher" "$watcher_id"
@@ -721,7 +816,7 @@ test_owner_mutex_contention_preserves_failure_episode_reset() {
     sleep 0.05
     i=$((i + 1))
   done
-  sleep 60 &
+  live_fixture &
   holder=$!
   mkdir -p "$dir/state/.claude-autoarm.lock"
   printf '%s\n' "$holder" > "$dir/state/.claude-autoarm.lock/pid"
@@ -879,7 +974,7 @@ test_abandoned_owner_claim_is_reclaimed_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_epoch "$dir" 464 "$pid" rewake
@@ -906,7 +1001,7 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
   dir=$(make_primary_dir "$TMP_ROOT/abandoned-claim-dead-steal")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_epoch "$dir" 464 "$pid" rewake
@@ -952,7 +1047,7 @@ test_arming_claim_with_fresh_beacon_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/arming-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   # An owner foregrounds the arm for the whole watcher cycle, so an old "arming"
@@ -978,7 +1073,7 @@ test_fresh_arming_claim_with_stale_beacon_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/fresh-arming-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1000,7 +1095,7 @@ test_claim_not_named_by_the_ledger_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/unnamed-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   # A fresh claimant holds the lock before it writes "arming", so until it does
@@ -1030,7 +1125,7 @@ test_pid_reused_arming_claim_is_reclaimed_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$$" || fail "could not record a claim pid-identity"
@@ -1057,7 +1152,7 @@ test_pid_reused_claim_with_no_ledger_is_reclaimed_and_rearms() {
   dir=$(make_primary_dir "$TMP_ROOT/reused-pid-no-ledger")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$$" || fail "could not record a claim pid-identity"
@@ -1082,7 +1177,7 @@ test_identity_matched_arming_claim_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/identity-matched-arming")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1104,7 +1199,7 @@ test_terminal_check_claim_is_never_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/terminal-check-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   # The synchronous guard takes the same lock under its own role while it decides
   # the attended fail-open. Reclaiming that would race the guard's own decision.
@@ -1128,7 +1223,7 @@ test_stuck_live_legacy_owner_is_retired_and_reclaimed() {
   dir=$(make_primary_dir "$TMP_ROOT/legacy-term")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1153,7 +1248,7 @@ test_stopped_legacy_owner_is_reclaimed_with_term_pending() {
   dir=$(make_primary_dir "$TMP_ROOT/legacy-term-stopped")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_owner_identity "$dir" "$pid" || fail "could not record a claim pid-identity"
@@ -1201,7 +1296,7 @@ test_open_generation_claim_defers_without_any_lock() {
   dir=$(make_primary_dir "$TMP_ROOT/v2-open-claim")
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_v2_claim "$dir" 464 "$pid" arming "$pid" || fail "could not record a v2 claim"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
@@ -1226,7 +1321,7 @@ test_stuck_generation_claim_is_superseded_and_rearms() {
   : > "$dir/state/task1.meta"
   : > "$dir/state/task2.meta"
   write_arm_fixture "$dir" actionable
-  sleep 60 &
+  live_fixture &
   pid=$!
   record_autoarm_v2_claim "$dir" 464 "$pid" arming "$pid" || fail "could not record a v2 claim"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
@@ -1603,6 +1698,7 @@ test_inert_when_afk
 test_stale_lock_recovery_preserves_afk_and_need_gates
 test_resolves_outermost_claude_pid_in_nested_bgspare_chain
 test_inert_when_fleet_idle
+test_terminal_source_wake_survives_retirement
 test_actionable_close_rewakes_with_reason
 test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
@@ -1649,3 +1745,135 @@ test_host_crash_is_retried_then_reported
 test_arguments_never_arm
 test_fm_lock_status_still_works_with_shared_lib
 test_stands_down_only_on_pi_code_transcript_path
+
+# Mid-turn result delivery uses the same primary and session-owner boundary,
+# but it must neither arm supervision nor consume the pending review.
+POST_HOME=$(make_primary_dir "$TMP_ROOT/posttool")
+posttool() {
+  local payload=${1:-'{"session_id":"posttool"}'}
+  printf '%s\n' "$payload" \
+    | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$1/bin/fm-procevent-posttool-check.sh"
+      ' _ "$ROOT"
+}
+[ -z "$(posttool)" ] || fail "empty PostToolUse emitted a notice"
+mkdir -p "$POST_HOME/state/procevent-inbox"
+POST_BASE="$POST_HOME/state/procevent-inbox/lavish-review.1"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,review answer\n' > "$POST_BASE.result"
+printf 'lavish\n' > "$POST_BASE.adapter"
+post_notice=$(posttool)
+[ "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] \
+  || fail "pending review did not use Claude additional-context output"
+assert_contains "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')" \
+  "bin/fm-wake-drain.sh" "pending review directs immediate durable handling"
+assert_absent "$POST_HOME/state/.wake-queue" "the fixture models capture before publication"
+post_context=$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.additionalContext')
+post_read_command=$(printf '%s' "$post_context" | perl -0777 -ne \
+  'm{read it directly with `(.*?)`\. Handle the result,}s and print $1')
+[ -n "$post_read_command" ] || fail "unpublished capture has no executable recovery command"
+post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE bash -c "$post_read_command") \
+  || fail "recovery command depends on selector overrides being exported to the tool"
+assert_contains "$post_read_out" "review answer" "recovery reads the actual unpublished answer"
+assert_contains "$post_context" 'handled lavish-review 1' \
+  "the notice identifies the exact durable acknowledgement"
+[ -z "$(cat "$POST_HOME/state/arm-ran" 2>/dev/null || true)" ] \
+  || fail "PostToolUse launched supervision instead of giving context"
+[ ! -e "$POST_BASE.handled" ] || fail "PostToolUse acknowledged a review without handling it"
+[ -n "$(posttool)" ] || fail "unhandled review became invisible after its first notice"
+printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n' > "$POST_BASE.result"
+post_missing_context=$(posttool | jq -r '.hookSpecificOutput.additionalContext')
+assert_contains "$post_missing_context" 'lavish-review 1' "a captured missing-session result still reaches the primary"
+assert_not_contains "$post_missing_context" feedback "a captured non-feedback result is not announced as feedback"
+printf 'worker-1\n' > "$POST_BASE.owner-task"
+[ -z "$(posttool)" ] || fail "worker-owned review leaked to the primary"
+rm -f "$POST_BASE.owner-task"
+printf 'other\n' > "$POST_BASE.adapter"
+[ -z "$(posttool)" ] || fail "non-Lavish capture was described as review feedback"
+printf 'lavish\n' > "$POST_BASE.adapter"
+mkdir -p "$POST_HOME/state/procevent"
+printf 'adapter=lavish\nargc=1\nargv:\n/bin/true\n' > "$POST_HOME/state/procevent/lavish-review.source"
+printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
+for post_payload in '{"agent_id":"helper-1"}' '{"agent_id":""}' '{"agent_id":null}'; do
+  [ -z "$(posttool "$post_payload")" ] || fail "helper PostToolUse received primary review feedback"
+  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "helper refreshed the primary lease"
+  assert_absent "$POST_BASE.handled" "helper acknowledged a result owned by the primary"
+done
+post_notice=$(posttool)
+[ "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] \
+  || fail "helper events hid the capture from the subsequent primary event"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" != 0 ] \
+  || fail "subsequent primary event did not refresh its owner lease"
+printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
+for post_payload in '{"cursor_version":"2026.09"}' '{"transcript_path":"/home/test/.pi/sessions/test.jsonl"}'; do
+  [ -z "$(posttool "$post_payload")" ] || fail "foreign host received Claude review feedback"
+  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "foreign host refreshed the primary lease"
+done
+[ -z "$(FM_PROCEVENT_IN_RUNNER=1 posttool)" ] || fail "source runner certified its own owner"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "source runner refreshed its own owner lease"
+: > "$POST_HOME/state/.afk"
+[ -z "$(posttool)" ] || fail "away home received attended feedback"
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "away hook took ownership from supervision"
+rm -f "$POST_HOME/state/.afk"
+posttool >/dev/null
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" != 0 ] \
+  || fail "active primary did not keep the listener alive between Stop cycles"
+printf '{"session_id":"competing"}\n' \
+  | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent-posttool-check.sh" \
+      > "$TMP_ROOT/posttool-competing.out"
+[ ! -s "$TMP_ROOT/posttool-competing.out" ] || fail "non-owner primary received another session's review"
+FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent.sh" handled lavish-review 1 >/dev/null
+[ -z "$(posttool)" ] || fail "handled review kept interrupting the primary"
+pass "PostToolUse reveals unhandled reviews only to their active primary, keeps listeners leased, and goes silent after handling"
+
+POST_SCRIPTS="$TMP_ROOT/posttool shipped scripts' directory"
+POST_ROOT=$(make_primary_dir "$TMP_ROOT/posttool root's directory")
+POST_SELECTED_HOME="$TMP_ROOT/posttool home's directory"
+POST_STATE="$TMP_ROOT/posttool selected state's directory"
+POST_OTHER=$(make_primary_dir "$TMP_ROOT/posttool other cwd's directory")
+mkdir -p "$POST_SCRIPTS" "$POST_SELECTED_HOME/state" "$POST_STATE/procevent-inbox" "$POST_OTHER/state/procevent-inbox"
+cp -R "$ROOT/bin" "$POST_SCRIPTS/bin"
+POST_SELECTED_BASE="$POST_STATE/procevent-inbox/lavish-recovery.1"
+POST_OTHER_BASE="$POST_OTHER/state/procevent-inbox/lavish-recovery.1"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,selected home answer\n' > "$POST_SELECTED_BASE.result"
+printf 'lavish\n' > "$POST_SELECTED_BASE.adapter"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,wrong home answer\n' > "$POST_OTHER_BASE.result"
+printf 'lavish\n' > "$POST_OTHER_BASE.adapter"
+printf '%s\t1\tcheck\tprocevent:lavish-recovery:1\tcheck: wrong home wake\n' "$(date +%s)" \
+  > "$POST_OTHER/state/.wake-queue"
+post_other_queue=$(cat "$POST_OTHER/state/.wake-queue")
+post_recovery_notice=$(printf '{"session_id":"posttool-recovery"}\n' \
+  | FM_HOME="posttool home's directory" FM_STATE_OVERRIDE="posttool selected state's directory" \
+    FM_ROOT_OVERRIDE="posttool root's directory" "$FAKE_CLAUDE" -c '
+      cd "$1" || exit 1
+      printf "%s\n" "$$" > "$FM_STATE_OVERRIDE/.lock"
+      "$2/bin/fm-procevent-posttool-check.sh"
+    ' _ "$TMP_ROOT" "$POST_SCRIPTS")
+post_recovery_context=$(printf '%s' "$post_recovery_notice" | jq -r '.hookSpecificOutput.additionalContext')
+post_drain_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne 'm{Run `(.*?)` now\.}s and print $1')
+post_read_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne \
+  'm{read it directly with `(.*?)`\. Handle the result,}s and print $1')
+post_handled_command=$(printf '%s' "$post_recovery_context" | perl -0777 -ne \
+  'm{acknowledge it with `(.*?)` before continuing\.}s and print $1')
+[ -n "$post_drain_command" ] && [ -n "$post_read_command" ] && [ -n "$post_handled_command" ] \
+  || fail "selected home notice omitted an executable recovery command"
+run_post_recovery_command() {
+  FM_HOME="$POST_OTHER" FM_STATE_OVERRIDE="$POST_OTHER/state" FM_ROOT_OVERRIDE="$POST_OTHER" \
+    bash -c 'cd "$1" && eval "$2"' _ "$POST_OTHER" "$1"
+}
+post_drain_out=$(run_post_recovery_command "$post_drain_command") || fail "wrong-cwd recovery drain failed"
+assert_not_contains "$post_drain_out" "wrong home wake" "recovery drain inspected a different home's queue"
+assert_present "$POST_STATE/.wake-queue" "recovery drain did not inspect the selected state override"
+[ ! -s "$POST_STATE/.wake-queue" ] || fail "unpublished selected capture unexpectedly gained a wake row"
+[ "$(cat "$POST_OTHER/state/.wake-queue")" = "$post_other_queue" ] || fail "recovery drain changed the wrong queue"
+assert_absent "$POST_SELECTED_HOME/state/.wake-queue" "recovery drain ignored the selected state override"
+assert_absent "$POST_ROOT/state/.wake-queue" "recovery drain used the root's default state"
+post_read_out=$(run_post_recovery_command "$post_read_command") || fail "wrong-cwd direct recovery read failed"
+assert_contains "$post_read_out" "selected home answer" "wrong-cwd recovery did not read the selected capture"
+assert_not_contains "$post_read_out" "wrong home answer" "wrong-cwd recovery read a different home's capture"
+assert_absent "$POST_SELECTED_BASE.handled" "drain or read acknowledged before handling"
+post_handled_out=$(run_post_recovery_command "$post_handled_command") || fail "wrong-cwd recovery acknowledgement failed"
+assert_contains "$post_handled_out" "handled: lavish-recovery 1" "recovery did not acknowledge the captured round"
+assert_present "$POST_SELECTED_BASE.handled" "recovery acknowledgement missed the selected state override"
+assert_absent "$POST_OTHER_BASE.handled" "recovery acknowledgement changed a different home's capture"
+pass "PostToolUse recovery commands retain the inspected home and state from another cwd with conflicting selectors and quoted paths"

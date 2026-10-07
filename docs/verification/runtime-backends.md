@@ -663,6 +663,10 @@ The missing source is the authentic September 30 blocked and allowed command inp
 Proposal narrative, subsequent native synthetic observations and reconstructed examples cannot replace that source.
 The [configuration owner](../configuration.md#jev-command-screening-shadow-only) defines evaluation dataset rules, legacy-label handling and the separate promotion boundary.
 
+## Claude primary feedback
+
+Claude Code 2.1.291 native feedback was revalidated through TeamClaude 1.1.21-affinity.0 on 2026-10-06; [`supervision.md`](supervision.md#claude-mid-turn-lavish-feedback-2026-09-30) owns the real-review, queued-answer, unpublished-capture, handled-answer and Stop-rewake evidence.
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.
