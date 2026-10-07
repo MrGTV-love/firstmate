@@ -1595,19 +1595,21 @@ This implementation cannot enable blocking or reset that date.
 
 Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
 `bin/fm-spawn.sh` installs one combined Stop command in the worker's gitignored `.claude/settings.local.json`, running `bin/fm-jev-belay-hook.sh` before publishing completion; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
-Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; acceptance (exit 0) clears busy and publishes completion.
+Belay rejection (exit 2) keeps the task busy and publishes no `turn-ended` event; every other exit, including nonblocking failure or timeout, clears busy and publishes completion.
 Secondmate sessions and other harnesses do not run it.
 
 The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
-The wrapper therefore resolves the key at call time with `fm_typesafe_key` (the environment, the home `.env`, then the primary home `.env`) and sets it for the one `node` process it execs.
+The wrapper therefore resolves the key at call time with `fm_typesafe_key` (the environment, the home `.env`, then the primary home `.env`) and sets it for the one upstream `node` process.
 The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
 Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
 Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
+The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's 25-second Stop deadline.
 
 The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
 Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.
 The policy comes from the resolved `FM_CONFIG_OVERRIDE` or `FM_HOME/config`, and each policy-check child runs without credentials; only the upstream Node process receives the resolved TypeSafe key.
 A forbidden value, invalid policy, or policy-check refusal withholds the entire request without network egress, and upstream catches the withheld-request error and allows the stop.
+Each policy check uses the shared one-second process-group deadline and a two-second synchronous-child ceiling, so stalled policy work and its descendants cannot indefinitely delay the stop.
 
 `belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
 Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.

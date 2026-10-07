@@ -275,7 +275,7 @@ test_claude_hooks_semantic_lifecycle() {
 }
 
 test_claude_stop_belay_rejection_keeps_turn_open() {
-  local rec id=busy-cl-belay out rc state settings belay blob seen payload
+  local rec id=busy-cl-belay out rc state settings belay blob seen payload status started elapsed
   rec=$(make_spawn_case claude-belay claude "$id")
   read_case_record "$rec"
   belay="$HOME_DIR/data/vendor/jev-belay/belay.mjs"
@@ -283,12 +283,13 @@ test_claude_stop_belay_rejection_keeps_turn_open() {
   printf 'TYPESAFE_API_KEY=busy-lifecycle-key\n' >"$HOME_DIR/.env"
   cat >"$belay" <<'EOF'
 import { appendFileSync, existsSync } from "node:fs";
-const status = Number(process.env.FM_TEST_BELAY_EXIT);
+const status = process.env.FM_TEST_BELAY_EXIT;
 appendFileSync(process.env.FM_TEST_BELAY_SEEN, JSON.stringify({
   turnEnded: existsSync(process.env.FM_TEST_TURNEND),
 }) + "\n");
-if (status === 2) process.stderr.write("continue this turn\n");
-process.exit(status);
+if (status === "timeout") Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Number(process.env.JEV_BELAY_TIMEOUT_MS));
+if (status === "2") process.stderr.write("continue this turn\n");
+process.exit(status === "timeout" ? 0 : Number(status));
 EOF
   blob=$(git hash-object -- "$belay") || fail "could not pin the synthetic belay hook"
   seen="$CASE_DIR/belay-seen.jsonl"
@@ -333,7 +334,28 @@ EOF
   [ "$out" = "idle claude-hook" ] || fail "an accepted Stop must close the still-open turn, got '$out'"
   jq -se 'length == 2 and all(.[]; .turnEnded == false)' "$seen" >/dev/null \
     || fail "the later Stop did not run belay before closing the same turn"
-  pass "claude Stop keeps belay-rejected turns busy and closes a later accepted Stop without another submit"
+  for status in 1 3 127 timeout; do
+    run_claude_hook "$settings" UserPromptSubmit || fail "UserPromptSubmit hook command failed"
+    rm -f "$state/$id.turn-ended"
+    started=$SECONDS
+    out=$(
+      unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE
+      printf '%s' "$payload" |
+        FM_TEST_SEAM=1 FM_JEV_BELAY_BLOB="$blob" FM_TEST_BELAY_SEEN="$seen" \
+        FM_TEST_BELAY_EXIT="$status" JEV_BELAY_TIMEOUT_MS=60000 \
+        FM_TEST_TURNEND="$state/$id.turn-ended" run_claude_hook "$settings" Stop 2>&1
+    )
+    rc=$?
+    elapsed=$((SECONDS - started))
+    expect_code 0 "$rc" "nonblocking belay result $status must allow Stop"
+    [ "$elapsed" -lt 25 ] || fail "belay result $status exceeded Claude's 25-second deadline"
+    [ -f "$state/$id.turn-ended" ] || fail "belay result $status did not publish completion"
+    out=$(classify claude "$id" "$state")
+    [ "$out" = "idle claude-hook" ] || fail "belay result $status stranded the ended turn: $out"
+  done
+  jq -se 'length == 6 and all(.[]; .turnEnded == false)' "$seen" >/dev/null \
+    || fail "nonblocking Stops did not run belay before publishing completion"
+  pass "claude Stop rejects only exit 2 and closes accepted, failed, and timed-out turns before the host deadline"
 }
 
 test_claude_hooks_stale_incarnation_harmless() {

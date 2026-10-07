@@ -37,12 +37,19 @@ unset JEV_BASE_URL JEV_MODEL JEV_API_KEY CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY
 # shellcheck source=bin/fm-typesafe-lib.sh
 . "$SCRIPT_DIR/fm-typesafe-lib.sh"
 
-home=${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}
-primary=$(fm_firstmate_root_home "$home" 2>/dev/null) || exit 0
-belay="$primary/data/vendor/jev-belay/belay.mjs"
-{ [ -f "$belay" ] && [ ! -L "$belay" ]; } || exit 0
-command -v node >/dev/null 2>&1 || exit 0
-[ "$(git hash-object -- "$belay" 2>/dev/null)" = "$JEV_BELAY_BLOB" ] || exit 0
-fm_typesafe_key "$home" || exit 0
+. "$SCRIPT_DIR/fm-timeout-lib.sh"
 
-FM_HOME=$home TYPESAFE_API_KEY=$TYPESAFE_API_KEY_PRIVATE exec node --import "$SCRIPT_DIR/fm-jev-belay-policy.mjs" "$belay"
+fm_jev_belay_run() {
+  local home primary belay
+  home=${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}
+  primary=$(fm_firstmate_root_home "$home" 2>/dev/null) || exit 0
+  belay="$primary/data/vendor/jev-belay/belay.mjs"
+  { [ -f "$belay" ] && [ ! -L "$belay" ]; } || exit 0
+  command -v node >/dev/null 2>&1 || exit 0
+  [ "$(git hash-object -- "$belay" 2>/dev/null)" = "$JEV_BELAY_BLOB" ] || exit 0
+  fm_typesafe_key "$home" || exit 0
+
+  FM_HOME=$home TYPESAFE_API_KEY=$TYPESAFE_API_KEY_PRIVATE exec node --import "$SCRIPT_DIR/fm-jev-belay-policy.mjs" "$belay" <&3
+}
+
+FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed 20 fm_jev_belay_run 3<&0

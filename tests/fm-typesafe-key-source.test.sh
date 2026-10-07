@@ -214,6 +214,33 @@ run_belay "$LANE" FM_CONFIG_OVERRIDE="$OVERRIDE" \
 [ "$(jq -s length "$REQUESTS")" = 2 ] || fail "home policy incorrectly overrode config override"
 pass "config override selects the effective policy"
 
+STALLBIN="$TMP_ROOT/belay-stall"
+mkdir -p "$STALLBIN"
+cat > "$STALLBIN/jq" <<'JS'
+#!/usr/bin/env node
+const { writeFileSync } = require('node:fs');
+writeFileSync(process.env.FM_TEST_POLICY_PID, String(process.pid));
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 60000);
+JS
+chmod +x "$STALLBIN/jq"
+started=$SECONDS
+run_belay "$LANE" PATH="$STALLBIN:$SHIMBIN:$PATH" FM_TEST_POLICY_PID="$TMP_ROOT/policy-pid" \
+  JEV_BELAY_TIMEOUT_MS=60000 || fail "stalled policy must fail open"
+elapsed=$((SECONDS - started))
+[ "$elapsed" -lt 5 ] || fail "synchronous policy work was not bounded"
+[ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "timed-out policy reached transport"
+[ -s "$TMP_ROOT/policy-pid" ] || fail "stalled policy fixture did not run"
+policy_pid=$(cat "$TMP_ROOT/policy-pid")
+for attempt in 1 2 3 4 5; do
+  kill -0 "$policy_pid" 2>/dev/null || break
+  sleep 0.1
+done
+if kill -0 "$policy_pid" 2>/dev/null; then
+  kill -KILL "$policy_pid" 2>/dev/null || true
+  fail "timed-out policy left its checker running"
+fi
+pass "stalled policy work is bounded, reaped, and withheld without blocking Stop"
+
 printf '# dispatch-never-send malformed directive\n' > "$POLICY"
 run_belay "$LANE" || fail "invalid policy must allow stop"
 [ -f "$SEEN" ] && [ ! -s "$REQUESTS" ] || fail "invalid policy reached transport"
