@@ -1265,8 +1265,8 @@ test_model_roles_preserve_offline_bootstrap() {
 }
 
 test_remote_guarded_pair_notifications() {
-  local caller dir home primary remote fakebin marker out rc mode records
-  command -v python3 >/dev/null 2>&1 || fail "python3 is required for remote notification tests"
+  local caller dir home primary remote fakebin marker out rc mode records python_bin
+  python_bin=$(command -v python3) || fail "python3 is required for remote notification tests"
   for caller in fm-config-push.sh fm-bootstrap.sh; do
     dir="$TMP_ROOT/guarded-notify-$caller"
     home="$dir/home"
@@ -1289,6 +1289,7 @@ test_remote_guarded_pair_notifications() {
     printf 'remote_host=host-mate\n' >> "$home/state/mate.meta"
     fakebin=$(make_fake_toolchain "$dir")
     add_real_jq "$fakebin"
+    ln -s "$python_bin" "$fakebin/python3"
     cat > "$fakebin/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 while [ "$#" -gt 0 ]; do
