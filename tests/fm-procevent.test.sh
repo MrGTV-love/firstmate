@@ -3556,6 +3556,18 @@ TORN_STORE="$TMP_ROOT/torn-lavish-state"
 mkdir -p "$TORN_STORE"
 LAVISH_AXI_STATE_DIR="$TORN_STORE" lavish_session "$HOST_ART"
 mv "$TORN_STORE/state.json" "$TORN_STORE/complete"
+TORN_BIN=$(fm_fakebin "$TMP_ROOT/torn-session-bin")
+TORN_REAL_PERL=$(command -v perl) || fail "this host has no perl to observe routing retry waits"
+cat > "$TORN_BIN/perl" <<'SH'
+#!/usr/bin/env bash
+if [ "${1-}" = '-MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC' ]; then
+  "$TORN_REAL_PERL" "$@" || exit "$?"
+  printf 'waited\n' > "$TORN_RETRY_SEEN"
+  exit 0
+fi
+exec "$TORN_REAL_PERL" "$@"
+SH
+chmod +x "$TORN_BIN/perl"
 for shape in empty partial; do
   case "$shape" in
     empty) : > "$TORN_STORE/state.json" ;;
@@ -3563,12 +3575,14 @@ for shape in empty partial; do
   esac
   printf 'reply to deliver\n' > "$HOST_HOME/reply"
   : > "$HOST_SEEN"
-  PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
+  PATH="$TORN_BIN:$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
+    TORN_REAL_PERL="$TORN_REAL_PERL" TORN_RETRY_SEEN="$TORN_STORE/$shape.retry" \
     LAVISH_AXI_STATE_DIR="$TORN_STORE" FM_LAVISH_POLL_RETRY_DELAY=1 FM_HOME="$HOST_HOME" \
     "$ROOT/bin/fm-procevent-lavish.sh" poll "$HOST_ART" \
     --agent-reply-file "$HOST_HOME/reply" > "$TORN_STORE/out" 2>&1 &
   torn_pid=$!
-  sleep 0.5
+  wait_for "$TORN_STORE/$shape.retry" \
+    || fail "a $shape session-store snapshot never reached the routing retry wait"
   kill -0 "$torn_pid" 2>/dev/null || fail "a $shape session-store snapshot stopped the listener"
   [ ! -s "$HOST_SEEN" ] || fail "a $shape session-store snapshot reached the CLI"
   [ "$(cat "$HOST_HOME/reply")" = 'reply to deliver' ] \
