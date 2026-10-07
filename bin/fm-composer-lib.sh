@@ -1730,6 +1730,8 @@ _fm_composer_claude_slash_choice() {  # <plain> <bare-row>
 _fm_composer_select_cursorless() {
   local plain=$1 extract_wrap=${2:-0} generic=-1 next boundary raw trimmed glyph bare footer=0 previous='' tail_row tail_text
   local codex_footer_re='^[[:alnum:]_.-]+ [[:alpha:]]+ · Context [0-9]+% left( · /[^·]+( · [0-9]+…)?)?$'
+  local omp_footer_re='^(π|󰵗)[[:space:]]+·[[:space:]]|^'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh][[:space:]]+·[[:space:]]'
+  local omp_context_re='[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K([[:space:]]|$)'
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -1812,8 +1814,13 @@ _fm_composer_select_cursorless() {
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
       [ -n "$trimmed" ] || [ "$extract_wrap" = 1 ] || break
-      if [ "$extract_wrap" = 1 ] && [ "$glyph" = '›' ] \
-         && [ -z "$previous" ] && [[ "$trimmed" =~ $codex_footer_re ]]; then
+      if [ "$extract_wrap" = 1 ] \
+         && { { [ "$glyph" = '›' ] && [ -z "$previous" ] \
+                && [[ "$trimmed" =~ $codex_footer_re ]]; } \
+              || { [ "$glyph" = '❯' ] && [ -n "$previous" ] \
+                   && [[ "$trimmed" =~ $omp_footer_re ]] \
+                   && [[ "$trimmed" =~ $omp_context_re ]] \
+                   && _fm_composer_row_is_omp_status "$trimmed"; }; }; then
         tail_row=$((next + 1))
         while [ "$tail_row" -le "$boundary" ]; do
           tail_text=$(_fm_composer_screen_row "$tail_row" "$plain")

@@ -350,7 +350,7 @@ fm_task_inbox_submit_held_wake() {
   idle_class=$("$idle_callback" "$target" 2>/dev/null) || return 1
   [ "$idle_class" = idle ] || return 1
   fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
-  sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
+  sleep 0.5
   if fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label"; then
     match_status=0
   else
@@ -364,7 +364,7 @@ fm_task_inbox_submit_held_wake() {
   idle_class=$("$idle_callback" "$target" 2>/dev/null) || return 3
   [ "$idle_class" = idle ] || return 3
   fm_backend_send_key "$backend" "$target" Enter "$label" >/dev/null 2>&1 || return 2
-  sleep "${FM_TASK_INBOX_SUBMIT_CONFIRM_SECS:-0.5}"
+  sleep 0.5
   if fm_task_inbox_composer_holds_wake "$backend" "$target" "$record_dir" "$label"; then
     return 3
   else

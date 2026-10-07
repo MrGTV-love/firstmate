@@ -1039,11 +1039,12 @@ render_secondmate_composer() {
     printf '╰─ %s ─╯\n' "$text"
   else
     printf '❯ %s\n' "$text"
+    printf ' π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
   fi
 }
 
 setup_secondmate_composer_case() {  # <case> <composer-text>  (sets dir state sub fakebin)
-  local composer=$2 emitted_wake
+  local composer=$2 emitted_wake real_sleep
   dir=$(make_case "$1")
   state="$dir/state"
   sub="$dir/secondmate"
@@ -1057,6 +1058,17 @@ setup_secondmate_composer_case() {  # <case> <composer-text>  (sets dir state su
   printf '%s' "$emitted_wake" > "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake"
   install_secondmate_composer_tmux "$fakebin"
   install_secondmate_stall_date "$fakebin"
+  real_sleep=$(command -v sleep) || fail "sleep is unavailable for the composer fixture"
+  printf '%s\n' "$real_sleep" > "$dir/real-sleep"
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 1 ] && [ "$1" = 0.5 ]; then
+  printf '%s\n' "$1" >> "${FM_FAKE_SUBMIT_SLEEP_LOG:?}"
+  exec "${FM_FAKE_REAL_SLEEP:?}" 0.05
+fi
+exec "${FM_FAKE_REAL_SLEEP:?}" "$@"
+SH
+  chmod +x "$fakebin/sleep"
   render_secondmate_composer "${3:-box}" "$composer" > "$dir/screen"
   "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
@@ -1071,7 +1083,8 @@ stall_composer_leg() {  # <leg> <now> <mode> [arg...]  (uses dir state sub fakeb
   printf '%s\n' "$now" > "$dir/now"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" FM_FAKE_TMUX_SCREEN="$dir/screen" \
-    FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" FM_TASK_INBOX_SUBMIT_CONFIRM_SECS=0.05 \
+    FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
+    FM_FAKE_REAL_SLEEP="$(cat "$dir/real-sleep")" FM_FAKE_SUBMIT_SLEEP_LOG="$dir/submit-sleeps" \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     secondmate_stall_watch_leg "$dir" "$leg" "$mode" "$@"
@@ -1089,6 +1102,8 @@ test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted() {
     LC_ALL=C stall_composer_leg submit 1002 ring mate 100-7
     [ "$(cat "$dir/sent")" = '[ENTER]' ] \
       || fail "an omp $shape wake must get one bare Enter and no typed text: $(cat "$dir/sent" 2>/dev/null)"
+    [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
+      || fail "an omp $shape wake must use the fixed first confirmation wait"
     ! grep -F 'secondmate wake-loop stalled' "$dir/watch-submit.out" >/dev/null \
       || fail "a recovered omp $shape wake still alarmed the parent: $(cat "$dir/watch-submit.out")"
     [ ! -s "$state/.wake-queue" ] || fail "the recovery published a parent stall notification"
@@ -1230,6 +1245,8 @@ test_secondmate_restored_wake_rechecks_semantic_idle_before_retry() {
       stall_composer_leg stall 1002 alert
     [ "$(cat "$dir/sent")" = '[ENTER]' ] \
       || fail "an idle-to-$class transition must prevent the retry: $(cat "$dir/sent" 2>/dev/null)"
+    [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
+      || fail "an idle-to-$class transition must wait once before refusing the retry"
     [ "$(cat "$dir/screen")" = "$before" ] || fail "an idle-to-$class transition changed the held composer"
     [ -s "$sub/state/.wake-queue" ] || fail "an idle-to-$class transition drained the foreign queue"
     [ ! -e "$state/mate.inbox" ] || fail "an idle-to-$class transition typed a drain steer"
@@ -1269,6 +1286,8 @@ test_secondmate_restored_wake_lost_enter_retries_while_idle() {
   FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg submit 1002 ring mate 100-7
   [ "$(cat "$dir/sent")" = "$(printf '[ENTER]\n[ENTER]')" ] \
     || fail "a lost Enter while still idle must get exactly one bare retry: $(cat "$dir/sent" 2>/dev/null)"
+  [ "$(cat "$dir/submit-sleeps")" = "$(printf '0.5\n0.5')" ] \
+    || fail "the first Enter and its idle retry must each use the fixed confirmation wait"
   [ ! -s "$sub/state/.wake-queue" ] || fail "the submitted retry did not drain the foreign queue"
   [ ! -s "$state/.wake-queue" ] || fail "a successful idle retry alarmed the parent"
   [ ! -e "$state/mate.inbox" ] || fail "an idle retry typed a drain steer"

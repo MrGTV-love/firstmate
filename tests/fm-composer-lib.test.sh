@@ -692,7 +692,7 @@ test_extraction_retains_blank_paragraphs() {
 test_extraction_refuses_unproven_suffixes() {
   local caps suffix screen out
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
-    for suffix in '| preserve draft' '| |' '│ preserve draft' 'preserve draft │' \
+    for suffix in '| my unsent draft' '| preserve draft' '| |' '│ preserve draft' 'preserve draft │' \
       '+--------+' '▀▀▀▀▀▀▀▀' 'π · model' '⠋ 12s' 'model · ◫ 7.5%/272K' '⠁⠂'; do
       screen=$'❯ first paragraph\n\nsecond paragraph\n   \n'"$suffix"$'\noperator edit'
       if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
@@ -700,6 +700,13 @@ test_extraction_refuses_unproven_suffixes() {
       fi
       if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
         fail "unproven suffix must refuse extraction under LC_ALL=C: '$suffix'"
+      fi
+      screen=$'❯ exact wake\n\n'"$suffix"
+      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "terminal draft paragraph must not yield only the wake: '$suffix' yielded '$out'"
+      fi
+      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "terminal draft paragraph must refuse extraction under LC_ALL=C: '$suffix'"
       fi
     done
     screen=$'❯ ⠁⠂\n\nexact wake'
@@ -758,6 +765,59 @@ test_extraction_codex_terminal_footer() {
     || fail "plain Codex ghost-looking text must remain extractable"
   [ "$out" = 'Summarize recent commits' ] || fail "plain ghost-looking text must remain content"
   pass "composer extraction scopes terminal Codex footer to its selected glyph"
+}
+
+test_extraction_omp_terminal_footer() {
+  local caps footer screen out out_c prefix glyph
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    for footer in \
+      ' π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%/272K ⟲ · (sub)' \
+      ' 󰵗  ·  qwen3:8b ·  kun-agent-workspace/… ·  detached ?1 ·  36.7%/41K' \
+      ' ⠧ 11s  · ◔ GPT-6-Astra · ◫ 15.4%/272K' \
+      ' ⣾ 3s  · ◔ GPT-6-Astra · ◫ 15.4%/272K'; do
+      for prefix in '❯' '❯ exact wake' $'❯ first paragraph\n\nsecond paragraph'; do
+        screen="$prefix"$'\n'"$footer"$'\n\n'
+        out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "terminal omp footer must permit complete extraction"
+        case "$prefix" in
+          '❯') [ -z "$out" ] || fail "omp footer leaked into empty content: '$out'" ;;
+          '❯ exact wake') [ "$out" = 'exact wake' ] || fail "omp wake extraction lost exact content: '$out'" ;;
+          *) [ "$out" = 'first paragraph second paragraph' ] || fail "omp paragraphs lost content: '$out'" ;;
+        esac
+        out_c=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen") \
+          || fail "terminal omp footer must remain extractable under LC_ALL=C"
+        [ "$out_c" = "$out" ] || fail "omp extraction must preserve complete content under LC_ALL=C"
+      done
+      for screen in \
+        $'❯ exact wake\n\n'"$footer" \
+        $'❯ exact wake\n'"$footer"$'\noperator edit' \
+        $'❯ exact wake\nπ · my unsent draft\n'"$footer"; do
+        if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+          fail "ambiguous omp footer must not truncate a draft: '$out'"
+        fi
+        if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
+          fail "ambiguous omp footer must refuse extraction under LC_ALL=C"
+        fi
+      done
+      for glyph in '›' '⟩' '→' '❭'; do
+        screen="$glyph exact wake"$'\n'"$footer"
+        if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+          fail "foreign composer glyph must not discard omp-looking draft: '$out'"
+        fi
+      done
+    done
+    for footer in 'π · my unsent draft' '󰵗 · my unsent draft' \
+      '⠧ 11s · my unsent draft' 'model · ◫ 7.5%/272K' '⠋ 12s' '⠁⠂'; do
+      screen=$'❯ exact wake\n'"$footer"
+      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "unproven terminal status or animation must not yield only the wake: '$out'"
+      fi
+      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "unproven terminal status or animation must refuse extraction under LC_ALL=C"
+      fi
+    done
+  done
+  pass "composer extraction scopes adjacent terminal omp footer to its selected glyph"
 }
 
 test_matrix_codex_dim_hint_row() {
@@ -932,14 +992,15 @@ test_matrix_omp_effort_hint_remnant() {
   screen=$'transcript\n\n'"$row"$'\n π · ◔ GPT-6.1-Sol · ◫ 7.5%/272K'
   assert_screen "omp styled effort hint on tmux" empty "$CAPS_TMUX" "$screen" 2
   assert_screen "omp styled effort hint cursorless" empty "$CAPS_STYLED_NOID" "$screen"
-  if out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen"); then
-    fail "unbounded omp status must refuse exact-content extraction"
-  fi
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen") \
+    || fail "terminal omp status must permit styled empty extraction"
+  [ -z "$out" ] || fail "omp effort hint and status must not become draft content: '$out'"
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   assert_screen "omp unstyled hint has no emptiness proof" unknown "$CAPS_PLAIN" "$plain"
-  if out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$plain"); then
-    fail "unstyled unbounded omp status must refuse exact-content extraction"
-  fi
+  out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$plain") \
+    || fail "terminal omp status must permit plain content extraction"
+  [ "$out" = '⇧⇥ to change thinking effort' ] \
+    || fail "plain capture must preserve the unproven effort hint: '$out'"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" \
     $'╭────────────────────────╮\n│ ❯ '"$hint"$'\033[0m │\n╰────────────────────────╯')
   [ "$out" = '⇧⇥' ] || fail "boxed effort-like content must not gain bare-hint stripping, got '$out'"
@@ -1674,6 +1735,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
 test_extraction_retains_blank_paragraphs
 test_extraction_refuses_unproven_suffixes
 test_extraction_codex_terminal_footer
+test_extraction_omp_terminal_footer
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
