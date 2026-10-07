@@ -918,6 +918,15 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # closes the preceding candidate and immediately opens the next, so an
     # earlier transcript rule can never outrank the live bottom composer pair.
     if _fm_composer_pi_separator_row "$trimmed"; then
+      if [ -n "$indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
+        FM_COMPOSER_SCAN_UNSAFE=1
+      fi
+      if [ "$pi_glyph_row" -ge 0 ] \
+         && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
+         && [ "$pi_glyph" = "$FM_COMPOSER_SCAN_PI_GLYPH" ] \
+         && [ "$pi_open" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        FM_COMPOSER_SCAN_UNSAFE=1
+      fi
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
       # A pair opened by a TITLED rule (claude draws its session title in the
       # composer's top border) is proven only by the agent glyph row inside it:
@@ -941,6 +950,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       pi_glyph_row=-1
       pi_glyph=''
     elif _fm_composer_titled_rule_row "$trimmed"; then
+      if [ "$pi_glyph_row" -ge 0 ]; then
+        FM_COMPOSER_SCAN_UNSAFE=1
+      fi
       # A titled rule only OPENS a pair; it never closes one, so a titled
       # transcript row can never end a composer region.
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
@@ -952,9 +964,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     else
       if [ "$pi_open" -ge 0 ]; then
         pi_lines=$((pi_lines + 1))
-        if [ "$pi_glyph_row" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
-          pi_glyph_row=$row_glyph_row
-          pi_glyph=$row_glyph
+        if [ "$pi_glyph_row" -lt 0 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+          pi_glyph_row=$row
+          pi_glyph=$glyph
         fi
       fi
     fi
@@ -1243,7 +1255,7 @@ _fm_composer_screen_row() {  # <n> <screen>
 # draft text; plain, boxed, and fully bright typed copies gain no hint removal.
 # See tests/fm-composer-lib.test.sh's effort-hint regression.
 _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
-  local raw=$1 styled=$2 stripped plain suffix hint='⇧⇥ to change thinking effort'
+  local raw=$1 styled=$2 strip_sides=${3:-1} stripped plain suffix hint='⇧⇥ to change thinking effort'
   if [ "$styled" = 1 ]; then
     stripped=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
   else
@@ -1269,12 +1281,14 @@ _fm_composer_row_content() {  # <raw-row> <styled> -> content on stdout
         ;;
     esac
   fi
-  case "$stripped" in
-    '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
-    '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;
-    '║'*'║') stripped=${stripped#║}; stripped=${stripped%║} ;;
-    '|'*'|') stripped=${stripped#|}; stripped=${stripped%|} ;;
-  esac
+  if [ "$strip_sides" = 1 ]; then
+    case "$stripped" in
+      '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
+      '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;
+      '║'*'║') stripped=${stripped#║}; stripped=${stripped%║} ;;
+      '|'*'|') stripped=${stripped#|}; stripped=${stripped%|} ;;
+    esac
+  fi
   fm_composer_normalize_trim_var stripped
   printf '%s' "$stripped"
 }
@@ -1316,8 +1330,8 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
 _fm_composer_classify_bare_row() {  # <screen> <styled> <row>
   local screen=$1 styled=$2 row=$3 raw content plain state
   raw=$(_fm_composer_screen_row "$row" "$screen")
-  content=$(_fm_composer_row_content "$raw" "$styled")
-  plain=$(_fm_composer_row_content "$raw" 0)
+  content=$(_fm_composer_row_content "$raw" "$styled" 0)
+  plain=$(_fm_composer_row_content "$raw" 0 0)
   _fm_composer_bare_row_strip_furniture_var content
   _fm_composer_bare_row_strip_furniture_var plain
   state=$(fm_composer_classify_content 0 "$content" \
@@ -1491,7 +1505,7 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row> 
   row=$g
   while [ "$row" -le "$cy" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" 0)
     if [ "$row" -eq "$prompt_row" ]; then
       _fm_composer_bare_row_strip_furniture_var content
       if fm_composer_leading_agent_glyph_var glyph "$content"; then
@@ -1682,6 +1696,7 @@ _fm_composer_select_cursorless() {
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
   FM_COMPOSER_SELECTED_AMBIG=0
+  [ "$FM_COMPOSER_SCAN_UNSAFE" = 0 ] || return 1
   if _fm_composer_locate_footer_zone "$plain"; then footer=1; fi
   if [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -ge 0 ]; then
     generic=$FM_COMPOSER_SCAN_BOX_BOTTOM
@@ -1719,6 +1734,14 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_FIRST=$bare
     FM_COMPOSER_SELECTED_LAST=$bare
   fi
+  if [ "$FM_COMPOSER_SELECTED_KIND" = bare ] \
+     && [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+     && [ "$bare" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+     && [ "$bare" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    generic=$FM_COMPOSER_SCAN_PI_CLOSE
+    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+    FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  fi
   if [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -gt "$generic" ]; then
     generic=$FM_COMPOSER_SCAN_LEFTBAR_END
     FM_COMPOSER_SELECTED_KIND=leftbar
@@ -1741,14 +1764,6 @@ _fm_composer_select_cursorless() {
      && [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" -gt "$generic" ]; then
     FM_COMPOSER_SELECTED_KIND=
     return 1
-  fi
-  if [ "$FM_COMPOSER_SELECTED_KIND" = bare ] \
-     && [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-     && [ "$bare" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-     && [ "$bare" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-    generic=$FM_COMPOSER_SCAN_PI_CLOSE
-    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
-    FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
   fi
   if [ "$FM_COMPOSER_SCAN_SHELL_ROW" -gt "$generic" ]; then
     FM_COMPOSER_SELECTED_KIND=
@@ -1804,7 +1819,7 @@ _fm_composer_select_cursorless() {
 }
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
-  local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
+  local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1 strip_sides=1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
@@ -1815,10 +1830,11 @@ EOF
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   _fm_composer_scan_screen "$plain" '' 1
   _fm_composer_select_cursorless "$plain" || return 1
+  case "$FM_COMPOSER_SELECTED_KIND" in bare|pi) strip_sides=0 ;; esac
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" "$strip_sides")
     placeholder_position=0
     case "$FM_COMPOSER_SELECTED_KIND" in
       ompbox)
@@ -1917,11 +1933,11 @@ EOF
   fi
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   _fm_composer_scan_screen "$plain" "$cy"
+  if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
+    printf 'unknown'; return 0
+  fi
   if [ -n "$cy" ]; then
     # Cursor mode (tmux): the shape CONTAINING the cursor is the composer.
-    if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
-      printf 'unknown'; return 0
-    fi
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
       _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
         "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))"
@@ -1932,18 +1948,18 @@ EOF
         "$((FM_COMPOSER_SCAN_OMPBOX_TOP + 1))" "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM"
       return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
-       && [ "$cy" -ge "$FM_COMPOSER_SCAN_LEFTBAR_START" ] \
-       && [ "$cy" -le "$FM_COMPOSER_SCAN_LEFTBAR_END" ]; then
-      _fm_composer_classify_leftbar "$screen" "$styled" \
-        "$FM_COMPOSER_SCAN_LEFTBAR_START" "$FM_COMPOSER_SCAN_LEFTBAR_END"
-      return 0
-    fi
     if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
        && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
        && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
        && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
       _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity"
+      return 0
+    fi
+    if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
+       && [ "$cy" -ge "$FM_COMPOSER_SCAN_LEFTBAR_START" ] \
+       && [ "$cy" -le "$FM_COMPOSER_SCAN_LEFTBAR_END" ]; then
+      _fm_composer_classify_leftbar "$screen" "$styled" \
+        "$FM_COMPOSER_SCAN_LEFTBAR_START" "$FM_COMPOSER_SCAN_LEFTBAR_END"
       return 0
     fi
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$FM_COMPOSER_SCAN_BARE_ROW" ]; then
@@ -2067,7 +2083,7 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
   row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
   while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" "$styled" 0)
     fm_composer_normalize_trim_var content
     if [ -n "$content" ]; then
       printf 'pending'

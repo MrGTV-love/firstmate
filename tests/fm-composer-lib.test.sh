@@ -300,6 +300,43 @@ test_multiline_rule_pair_retains_all_interior_rows() {
   pass "multiline rule pairs retain every interior row and strip only the proving prompt glyph"
 }
 
+test_rule_pair_continuations_never_prove_empty() {
+  local top bottom pasted screen caps cursor literal want pi_idle
+  bottom='────────────────'
+  pi_idle=$(printf 'pi\tidle')
+  for top in '──────── Session ─' "$bottom"; do
+    for pasted in ' ──────── pasted title ─' ' ────────────────' '──────── pasted title ─' "$bottom"; do
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top ambiguous pasted rule $pasted" unknown "$caps" "$screen" '' probe-absent
+        if fm_composer_extract_selected_content "$caps" "$screen"; then
+          fail "$top ambiguous pasted rule must refuse extraction"
+        fi
+        if LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"; then
+          fail "$top ambiguous pasted rule must refuse extraction under LC_ALL=C"
+        fi
+      done
+      for cursor in 2 3 4; do
+        assert_screen "$top ambiguous pasted rule on cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+      done
+    done
+    for literal in '││' '┃┃' '║║' '||' '│draft│' '┃draft┃' '║draft║' '|draft|' '│' '┃' '║' '|'; do
+      screen=$'transcript line\n'"$top"$'\n❯\n '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top literal continuation $literal" "$screen" "$literal" 2 3
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n '"$literal"$'\n ❯\n'"$bottom"
+      want="keep this unsent text $literal ❯"
+      assert_multiline_rule_pair "$top literal continuation and later glyph $literal" "$screen" "$want" 2 4
+    done
+  done
+  for literal in '││' '┃┃' '║║' '||' '│draft│' '┃draft┃' '║draft║' '|draft|'; do
+    screen="$bottom"$'\n '"$literal"$'\n'"$bottom"
+    assert_screen "Pi literal rule-pair content $literal" pending "$CAPS_STYLED" "$screen" '' "$pi_idle"
+    assert_screen "Pi literal rule-pair content $literal on cursor" pending "$CAPS_TMUX" "$screen" 1 "$pi_idle"
+    assert_selected_content "Pi literal rule-pair extraction $literal" "$literal" "$CAPS_STYLED" "$screen"
+  done
+  pass "rule-like continuations refuse proof and literal side characters remain draft content"
+}
+
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape() {
   # A titled rule only OPENS a composer pair, and the pair needs the agent glyph
   # row inside it. Anything short of that exact shape keeps the refusal.
@@ -1312,6 +1349,7 @@ test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
 test_multiline_rule_pair_retains_all_interior_rows
+test_rule_pair_continuations_never_prove_empty
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent
