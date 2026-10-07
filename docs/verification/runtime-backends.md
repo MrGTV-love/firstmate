@@ -1139,6 +1139,7 @@ The focused regressions in [`tests/fm-composer-lib.test.sh`](../../tests/fm-comp
 - `test_matrix_claude_titled_top_border` and `test_claude_titled_top_border_needs_glyph_proof_and_exact_shape`: idle, typed, and refused titled-border shapes.
 - `test_multiline_rule_pair_retains_all_interior_rows`: blank and ordinary continuation rows, including a pasted `❯` after `❯ keep this unsent text`.
 - `test_rule_pair_continuations_never_prove_empty`: ambiguous rule continuations and literal side characters in titled, plain, and identity-backed Pi pairs.
+- `test_rule_pair_ambiguity_is_candidate_scoped`: historical indent mismatches, adjacent rule pairs, and pasted titled rules do not poison a newer live composer; ambiguity in the selected pair still refuses classification and extraction.
 - `test_rule_pair_pasted_containers_remain_literal`: complete pasted box families, folded and multiline omp boxes, left bars, and newer genuine composers.
 - `test_rule_pair_braille_is_literal_content`: singleton and multiline Braille drafts and empty single-line pairs.
 
@@ -1146,8 +1147,17 @@ The recorded focused test and direct classifier/extractor smoke passed, includin
 These portable results do not establish live coverage for multiline, pasted-container, or Braille drafts.
 The live guard includes multiline content and exit-refusal checks, but the recorded live output below predates those checks.
 
+On 2026-10-07, the focused composer suite passed with every draft-preservation regression intact.
+A direct classifier smoke changed the reported historical-example/live-composer capture from `unknown` before the fix to `empty` after it.
+An executable guard-preparation smoke used real Git fixtures and trust registration with a disposable lab transport and model-free launch probe.
+It verified isolated trust, unchanged symlinked operator files, file-backed and simulated default/custom Keychain authentication, explicit and empty OAuth overrides, legacy configuration, and secure-storage overrides.
+This smoke stopped after the initial launch; it did not rerun real Herdr, Claude, doorbell, or lifecycle behavior.
+
 The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
-Its default-on checks spend no tokens wherever claude, herdr, jq, and git are installed.
+Its default-on checks spend no tokens wherever claude, herdr, jq, git, and node are installed.
+The guard copies onboarding and settings into a private worktree-contained `CLAUDE_CONFIG_DIR` shared by trust registration and every launch, including lifecycle relaunch.
+It reads the selected account's existing OAuth access token from the environment, settings, matching Keychain entry, or credentials file and retains it only in disposable settings; it does not restore the operator store or refresh the login.
+The configuration copies and lab-helper state are removed after lab teardown.
 The doorbell proof and the relaunch proof each submit a real prompt and remain opt-in:
 
 ```sh

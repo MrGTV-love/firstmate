@@ -21,7 +21,7 @@
 # It fails naming claude and `claude --version`.
 #
 # Launching idle and exiting submit no prompt, so no model tokens are spent and
-# the gate is default-on wherever claude, herdr, jq, and treehouse-free git are
+# the gate is default-on wherever claude, herdr, jq, node, and treehouse-free git are
 # installed (fm_live_gate): FM_CLAUDE_TITLED_COMPOSER_LIVE=1 forces it (an
 # absent tool then fails instead of skipping) and =0 disables it.
 # FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 adds the real fm-send doorbell proof,
@@ -49,7 +49,7 @@ fi
 if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH:-0}" = 1 ]; then
   LIVE_CONTROLS="$LIVE_CONTROLS,FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH"
 fi
-fm_live_gate default-on "$LIVE_CONTROLS" herdr jq claude git
+fm_live_gate default-on "$LIVE_CONTROLS" herdr jq claude git node
 
 [ -x "$LAB_HELPER" ] || fail "FM_CLAUDE_TITLED_COMPOSER_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
 
@@ -59,7 +59,9 @@ herdr_forget_inherited_pane
 
 ORIGINAL_PATH=$PATH
 SESSION=$("$LAB_HELPER" name claude-titled-live)
-TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-claude-titled-live.XXXXXX")
+mkdir -p "$ROOT/.no-mistakes/test-tmp" || fail "could not create the worktree test scratch directory"
+TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-claude-titled-live.XXXXXX") \
+  || fail "could not allocate the isolated test root"
 FAKEBIN="$TMP_ROOT/fakebin"
 mkdir -p "$FAKEBIN"
 TASK_ID="claudetitled$$"
@@ -75,6 +77,80 @@ cleanup() {
   exit "$rc"
 }
 trap cleanup EXIT
+
+SOURCE_CONFIG_ROOT=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+SOURCE_CONFIG_JSON="$HOME/.claude.json"
+if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
+  SOURCE_CONFIG_JSON="$CLAUDE_CONFIG_DIR/.claude.json"
+fi
+if [ -e "$SOURCE_CONFIG_ROOT/.config.json" ] || [ -L "$SOURCE_CONFIG_ROOT/.config.json" ]; then
+  SOURCE_CONFIG_JSON="$SOURCE_CONFIG_ROOT/.config.json"
+fi
+SOURCE_AUTH_ROOT=${CLAUDE_SECURESTORAGE_CONFIG_DIR-${CLAUDE_CONFIG_DIR:-}}
+SOURCE_AUTH_DIR=${SOURCE_AUTH_ROOT:-$HOME/.claude}
+export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
+export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/herdr-lab-state"
+export TMPDIR="$TMP_ROOT/tmp"
+export CLAUDE_SECURESTORAGE_CONFIG_DIR="$CLAUDE_CONFIG_DIR"
+mkdir -m 700 "$CLAUDE_CONFIG_DIR" "$TMPDIR" \
+  || fail "could not create the private Claude configuration"
+
+copy_config_file() {
+  local source=$1 destination=$2
+  if [ -e "$source" ] || [ -L "$source" ]; then
+    [ -f "$source" ] && [ -r "$source" ] \
+      || fail "Claude source configuration is not a readable file: $source"
+    (umask 077; cat "$source" > "$destination") \
+      || fail "could not copy Claude configuration into the disposable store"
+  fi
+}
+copy_config_file "$SOURCE_CONFIG_JSON" "$CLAUDE_CONFIG_DIR/.claude.json"
+copy_config_file "$SOURCE_CONFIG_ROOT/settings.json" "$CLAUDE_CONFIG_DIR/settings.json"
+copy_config_file "$SOURCE_AUTH_DIR/.credentials.json" "$CLAUDE_CONFIG_DIR/.credentials.json"
+
+if [ "$(uname -s)" = Darwin ]; then
+  KEYCHAIN_SERVICE=Claude\ Code
+  if [ -n "${CLAUDE_CODE_CUSTOM_OAUTH_URL:-}" ]; then
+    KEYCHAIN_SERVICE="$KEYCHAIN_SERVICE-custom-oauth"
+  fi
+  KEYCHAIN_SERVICE="$KEYCHAIN_SERVICE-credentials"
+  if [ -n "$SOURCE_AUTH_ROOT" ]; then
+    SOURCE_AUTH_HASH=$(node -e \
+      "process.stdout.write(require('crypto').createHash('sha256').update(process.argv[1].normalize('NFC')).digest('hex').slice(0,8))" "$SOURCE_AUTH_ROOT") \
+      || fail "could not identify the source Claude Keychain entry"
+    KEYCHAIN_SERVICE="$KEYCHAIN_SERVICE-$SOURCE_AUTH_HASH"
+  fi
+  KEYCHAIN_ACCOUNT=${USER:-$(id -un)}
+  if ! [[ "$KEYCHAIN_ACCOUNT" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    KEYCHAIN_ACCOUNT=claude-code-user
+  fi
+  if (umask 077; security find-generic-password -a "$KEYCHAIN_ACCOUNT" -w -s "$KEYCHAIN_SERVICE" \
+      > "$CLAUDE_CONFIG_DIR/keychain-credentials.json" 2>/dev/null); then
+    copy_config_file "$CLAUDE_CONFIG_DIR/keychain-credentials.json" "$CLAUDE_CONFIG_DIR/.credentials.json"
+  fi
+  rm -f "$CLAUDE_CONFIG_DIR/keychain-credentials.json"
+fi
+
+[ -f "$CLAUDE_CONFIG_DIR/settings.json" ] \
+  || (umask 077; printf '{}\n' > "$CLAUDE_CONFIG_DIR/settings.json")
+[ -f "$CLAUDE_CONFIG_DIR/.credentials.json" ] \
+  || (umask 077; printf '{}\n' > "$CLAUDE_CONFIG_DIR/.credentials.json")
+(umask 077; jq --slurpfile credentials "$CLAUDE_CONFIG_DIR/.credentials.json" '
+  .env = (.env // {}) |
+  .env.CLAUDE_CONFIG_DIR = env.CLAUDE_CONFIG_DIR |
+  .env.CLAUDE_SECURESTORAGE_CONFIG_DIR = env.CLAUDE_CONFIG_DIR |
+  ((env.CLAUDE_CODE_OAUTH_TOKEN | select(. != "")) //
+    (.env.CLAUDE_CODE_OAUTH_TOKEN | select(. != "")) //
+    $credentials[0].claudeAiOauth.accessToken // null) as $token |
+  if ($token | type) == "string" and ($token | length) > 0 then
+    .env.CLAUDE_CODE_OAUTH_TOKEN = $token
+  else . end
+' "$CLAUDE_CONFIG_DIR/settings.json" > "$CLAUDE_CONFIG_DIR/settings-copy.json") \
+  || fail "could not retain Claude authentication in the disposable settings"
+mv "$CLAUDE_CONFIG_DIR/settings-copy.json" "$CLAUDE_CONFIG_DIR/settings.json" \
+  || fail "could not install the disposable Claude settings"
+printf -v CLAUDE_CONFIG_QUOTED '%q' "$CLAUDE_CONFIG_DIR"
+CLAUDE_LAUNCH_PREFIX="CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_QUOTED CLAUDE_SECURESTORAGE_CONFIG_DIR=$CLAUDE_CONFIG_QUOTED"
 
 cat > "$FAKEBIN/herdr" <<EOF
 #!/usr/bin/env bash
@@ -153,7 +229,7 @@ if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND:-0}" = 1 ]; then
   # outside its worktree without a permission prompt.
   LAUNCH_FLAGS=' --dangerously-skip-permissions'
 fi
-lab pane run "$PANE" "claude -n '$TITLE'$LAUNCH_FLAGS" >/dev/null \
+lab pane run "$PANE" "$CLAUDE_LAUNCH_PREFIX claude -n '$TITLE'$LAUNCH_FLAGS" >/dev/null \
   || fail "could not launch $SUBJECT in the isolated pane"
 
 control() {  # <fm-control arguments...>
@@ -345,7 +421,7 @@ pass "live claude titled border: $SUBJECT fm-control exit stops the idle titled-
 
 if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH:-0}" = 1 ]; then
   # A second titled launch, then the relaunch through fm-spawn's own launch.
-  lab pane run "$PANE" "claude -n '$TITLE'" >/dev/null \
+  lab pane run "$PANE" "$CLAUDE_LAUNCH_PREFIX claude -n '$TITLE'" >/dev/null \
     || fail "could not relaunch $SUBJECT with a session title"
   i=0
   while [ "$i" -lt 60 ]; do

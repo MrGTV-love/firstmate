@@ -856,6 +856,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_LEFTBAR_END=-1
   FM_COMPOSER_SCAN_PI_PAIR_FOUND=0
   FM_COMPOSER_SCAN_PI_PAIR_VALID=0
+  FM_COMPOSER_SCAN_PI_PAIR_AMBIG=0
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
   FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
@@ -870,7 +871,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_GLYPH=
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
-  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0 pi_open_indent=''
+  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0 pi_open_indent='' pi_ambiguous=0
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   pi_max=$FM_COMPOSER_PI_MAX_LINES
@@ -918,13 +919,14 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # earlier transcript rule can never outrank the live bottom composer pair.
     if _fm_composer_pi_separator_row "$trimmed"; then
       if [ "$indent" != "$pi_open_indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
-        FM_COMPOSER_SCAN_UNSAFE=1
+        pi_ambiguous=1
       fi
       if [ "$pi_glyph_row" -ge 0 ] \
          && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
          && [ "$pi_glyph" = "$FM_COMPOSER_SCAN_PI_GLYPH" ] \
          && [ "$pi_open" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        FM_COMPOSER_SCAN_UNSAFE=1
+        pi_ambiguous=1
+        FM_COMPOSER_SCAN_PI_PAIR_AMBIG=1
       fi
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
       # A pair opened by a TITLED rule (claude draws its session title in the
@@ -939,6 +941,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row
+        FM_COMPOSER_SCAN_PI_PAIR_AMBIG=$pi_ambiguous
         if [ "$pi_lines" -le "$pi_max" ]; then
           FM_COMPOSER_SCAN_PI_PAIR_VALID=1
         else
@@ -950,12 +953,14 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       pi_open=$row
       pi_open_indent=$indent
       pi_open_titled=0
+      pi_ambiguous=0
       pi_lines=0
       pi_glyph_row=-1
       pi_glyph=''
     elif _fm_composer_titled_rule_row "$trimmed"; then
+      pi_ambiguous=0
       if [ "$pi_glyph_row" -ge 0 ]; then
-        FM_COMPOSER_SCAN_UNSAFE=1
+        pi_ambiguous=1
       fi
       # A titled rule only OPENS a pair; it never closes one, so a titled
       # transcript row can never end a composer region.
@@ -1721,7 +1726,6 @@ _fm_composer_select_cursorless() {
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
   FM_COMPOSER_SELECTED_AMBIG=0
-  [ "$FM_COMPOSER_SCAN_UNSAFE" = 0 ] || return 1
   if _fm_composer_locate_footer_zone "$plain"; then footer=1; fi
   if [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -ge 0 ]; then
     generic=$FM_COMPOSER_SCAN_BOX_BOTTOM
@@ -1769,6 +1773,7 @@ _fm_composer_select_cursorless() {
      && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
      && { [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
           || [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; }; then
+    [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 0 ] || return 1
     generic=$FM_COMPOSER_SCAN_PI_CLOSE
     FM_COMPOSER_SELECTED_KIND=pi
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
@@ -1950,11 +1955,17 @@ EOF
   fi
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   _fm_composer_scan_screen "$plain" "$cy"
-  if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
-    printf 'unknown'; return 0
-  fi
   if [ -n "$cy" ]; then
     # Cursor mode (tmux): the shape CONTAINING the cursor is the composer.
+    if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
+      printf 'unknown'; return 0
+    fi
+    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 1 ] \
+       && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+       && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+      printf 'unknown'; return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
        && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
        && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \

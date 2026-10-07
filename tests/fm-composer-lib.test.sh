@@ -303,6 +303,53 @@ test_rule_pair_equal_indentation() {
   pass "equally indented plain and titled rule pairs classify and extract while mismatched closers refuse"
 }
 
+test_rule_pair_ambiguity_is_candidate_scoped() {
+  local history top bottom draft screen caps cursor verdict want
+  bottom='────────────────'
+  for history in \
+    $' ──────── Old example ─\n ❯ old example\n────────────────' \
+    $'──────── Old example ─\n❯ old example\n ────────────────' \
+    $'──────── Old example ─\n❯ old example\n────────────────\n❯ old continuation\n────────────────' \
+    $'──────── Old example ─\n❯ old example\n ──────── pasted title ─\n ❯\n────────────────' \
+    $'╭───╮\n│ ❯ │\n╰────╯'; do
+    cursor=$(printf '%s\n' "$history" | wc -l)
+    cursor=$((cursor + 2))
+    for top in '──────── Live session ─' "$bottom"; do
+      for draft in '' 'live draft'; do
+        verdict=empty
+        [ -z "$draft" ] || verdict=pending
+        want=$draft
+        screen="$history"$'\n\n'"$top"$'\n❯ '"$draft"$'\n'"$bottom"
+        assert_screen "historical ambiguity before $top $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "historical ambiguity before $top $verdict cursorless" "$verdict" "$caps" "$screen" '' probe-absent
+          assert_selected_content "historical ambiguity before $top $verdict extraction" "$want" "$caps" "$screen"
+        done
+        assert_selected_content "historical ambiguity before $top $verdict tmux extraction" "$want" "$CAPS_TMUX" "$screen"
+      done
+    done
+    screen="$history"$'\n\n❯ live draft'
+    assert_screen "historical ambiguity before live bare composer" pending "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "historical ambiguity before live bare composer on cursor" pending "$CAPS_TMUX" "$screen" "$((cursor - 1))" probe-absent
+    assert_selected_content "historical ambiguity before live bare composer extraction" 'live draft' "$CAPS_STYLED_NOID" "$screen"
+    screen="$history"$'\n\n╭──────────────────╮\n│ ❯ live draft     │\n╰──────────────────╯'
+    assert_screen "historical ambiguity before live boxed composer" pending "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "historical ambiguity before live boxed composer on cursor" pending "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    assert_selected_content "historical ambiguity before live boxed composer extraction" 'live draft' "$CAPS_STYLED_NOID" "$screen"
+  done
+  for top in '──────── Live session ─' "$bottom"; do
+    screen="$top"$'\n❯ keep this unsent text\n '"$bottom"
+    assert_screen "selected $top indented closer on cursor" unknown "$CAPS_TMUX" "$screen" 1 probe-absent
+    for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "selected $top indented closer cursorless" unknown "$caps" "$screen" '' probe-absent
+      if fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "selected $top indented closer must refuse extraction"
+      fi
+    done
+  done
+  pass "historical ambiguity does not poison live rule pairs and selected ambiguity still refuses"
+}
+
 test_multiline_rule_pair_retains_all_interior_rows() {
   local top bottom screen earlier later
   bottom='────────────────'
@@ -1468,6 +1515,7 @@ test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
 test_rule_pair_equal_indentation
+test_rule_pair_ambiguity_is_candidate_scoped
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
 test_rule_pair_pasted_containers_remain_literal
