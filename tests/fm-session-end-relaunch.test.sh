@@ -277,8 +277,6 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure() {
     || fail "a previous failed quota attempt suppressed recovery: ${FM_SESSION_END_WAKE:-<empty>}"
   [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
     || fail "quota retry did not invoke control exactly once"
-  grep -F 'permitted matrix fallback' "$dir/control.log" >/dev/null \
-    || fail "quota retry did not pass the fallback recovery note"
   [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-lane" | wc -l | tr -d ' ')" = 3 ] \
     || fail "the original relaunch, failed quota attempt, and successful retry were not ledgered"
   printf '%s\tattempt\n' $(( $(date +%s) - 90000 )) > "$state/.session-end-relaunch-lane"

@@ -414,7 +414,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_CONTROL_LAUNCH_WAIT="$launch_wait" \
     FM_CONTROL_QUOTA_GEN="$(if [ "$quota_event" = 1 ]; then printf '%s' "$gen"; fi)" \
     FM_CONTROL_QUOTA_SEQ="$(if [ "$quota_event" = 1 ]; then printf '%s' "$seq"; fi)" \
-    "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions using the permitted matrix fallback.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
+    "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     FM_SESSION_END_REPLACEMENT_BOUND=1
     FM_SESSION_END_ACTION=relaunch

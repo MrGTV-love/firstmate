@@ -2,7 +2,8 @@
 # Unit tests for bin/fm-quota-choose.sh.
 # Drives the public argv interface with a mocked quota-axi JSON source.
 set -u
-unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+unset CLAUDE_CONFIG_DIR ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID
+unset CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE
 unset PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -286,48 +287,47 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   esac
   export "$selector=$caller"
   printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION"
-  printf '%s=%s\n' "$selector" "$caller" > "$FM_AUTH_DESTINATION.global"
-  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" call_choose --snapshot "$LAB/single-exhausted.json" \
+  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" call_choose --snapshot "$LAB/single-exhausted.json" \
     --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna)
-  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not use destination headroom: $out"
-  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" call_choose --snapshot "$LAB/captured.json" \
-    --candidate omp:openai-codex/gpt-6.1-sol --candidate claude:default)
-  [ "$out" = "claude default" ] || fail "$selector borrowed caller headroom for exhausted destination: $out"
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector lost worker headroom to exhausted destination: $out"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" call_choose --snapshot "$LAB/captured.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "$selector borrowed destination headroom for exhausted worker: $out"
   printf '%s\n' PATH > "$LAB/home/config/launch-env-allowlist"
-  if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
-  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$expected" call_choose --snapshot "$LAB/single-exhausted.json" \
-    --candidate omp:openai-codex/gpt-6.1-sol)
-  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not follow allowlist with HOME retained: $out"
-  rm "$LAB/home/config/launch-env-allowlist"
   printf -- '-%s\n' "$selector" > "$FM_AUTH_DESTINATION"
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector followed future allowlist or session removal: $out"
+  export "$selector="
+  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=" call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not preserve inherited empty value: $out"
+  unset "$selector"
   out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="-$selector" call_choose --snapshot "$LAB/single-exhausted.json" \
     --candidate omp:openai-codex/gpt-6.1-sol)
-  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "removed $selector leaked caller/global auth: $out"
-  rm "$FM_AUTH_DESTINATION"
-  printf '%s=%s\n' "$selector" "$destination" > "$FM_AUTH_DESTINATION.global"
-  out=$(OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" call_choose --snapshot "$LAB/single-exhausted.json" \
-    --candidate omp:openai-codex/gpt-6.1-sol)
-  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "global $selector did not supply absent session entry: $out"
-  rm "$FM_AUTH_DESTINATION.global"
-  unset "$selector"
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$selector did not preserve inherited unset value: $out"
+  rm "$LAB/home/config/launch-env-allowlist" "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global"
   export HOME=$saved_home
 done
-printf '%s\n' 'OMP_PROFILE=' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
-out=$(OMP_PROFILE=caller PI_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
+printf '%s\n' 'OMP_PROFILE=destination' 'PI_PROFILE=destination' > "$FM_AUTH_DESTINATION"
+out=$(OMP_PROFILE='' PI_PROFILE=legacy OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
   call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
-[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "empty OMP_PROFILE inherited legacy/caller profile: $out"
-printf '%s\n' '-OMP_PROFILE' 'PI_PROFILE=legacy' > "$FM_AUTH_DESTINATION"
-out=$(OMP_PROFILE=caller OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "empty worker OMP_PROFILE failed to mask legacy profile: $out"
+out=$(PI_PROFILE=legacy OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile=legacy \
   call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
-[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "removed OMP_PROFILE failed to select destination legacy profile: $out"
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "unset worker OMP_PROFILE failed to use worker legacy profile: $out"
+out=$(OMP_AUTH_SELECTOR=profile OMP_AUTH_EXPECTED=profile= \
+  call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "unset worker profiles borrowed destination profile: $out"
 rm "$FM_AUTH_DESTINATION"
-for scope_failure in unreadable backend relative usage empty invalid; do
+for backend in tmux herdr; do
+  out=$(FM_BACKEND=$backend FM_AUTH_UNREADABLE=1 call_choose --snapshot "$LAB/single-exhausted.json" \
+    --candidate omp:openai-codex/gpt-6.1-sol)
+  [ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "$backend unavailable tmux concealed worker pool: $out"
+done
+for scope_failure in usage empty invalid; do
   case "$scope_failure" in
-    unreadable) out=$(FM_AUTH_UNREADABLE=1 call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null); rc=$? ;;
-    backend) out=$(FM_BACKEND=herdr call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null); rc=$? ;;
-    relative) printf '%s\n' 'PI_CODING_AGENT_DIR=relative-root' > "$FM_AUTH_DESTINATION"
-      out=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null)
-      rc=$?; rm "$FM_AUTH_DESTINATION" ;;
     usage) out=$(OMP_USAGE_FAIL=1 call_choose --snapshot "$LAB/captured.json" \
       --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna 2>/dev/null); rc=$? ;;
     empty) out=$(OMP_USAGE_EMPTY=1 call_choose --snapshot "$LAB/captured.json" \
@@ -335,9 +335,9 @@ for scope_failure in unreadable backend relative usage empty invalid; do
     invalid) out=$(OMP_USAGE_INVALID=1 call_choose --snapshot "$LAB/captured.json" \
       --candidate omp:openai-codex/gpt-6.1-sol --candidate omp:openai-codex/gpt-6-luna 2>/dev/null); rc=$? ;;
   esac
-  [ "$rc:$out" = 1:none ] || fail "$scope_failure OMP scope unexpectedly dispatched: $rc:$out"
+  [ "$rc:$out" = 1:none ] || fail "$scope_failure OMP usage unexpectedly dispatched: $rc:$out"
 done
-ok "OMP chooser acquisition follows destination selectors, precedence, allowlist and uncertainty"
+ok "OMP chooser measures inherited worker selectors independent of destination and backend"
 
 if err=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:ollama/qwen3:8b --candidate claude:claude-3-5-sonnet 2>&1); then
   fail "unmapped omp prefix unexpectedly selected a later candidate"
@@ -449,12 +449,16 @@ for scope_file in claude-launcher claude-account; do
     claude-account) printf 'different-account\n' > "$LAB/home/config/$scope_file" ;;
   esac
   out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
-  [ "$out" = "codex gpt-6.1-sol" ] || fail "unmapped Claude authentication used native account headroom: $out"
+  [ "$out" = "claude default" ] || fail "future Claude account or launcher concealed worker native headroom: $out"
+  out=$(ANTHROPIC_API_KEY=worker-alternate call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+  [ "$out" = "codex gpt-6.1-sol" ] || fail "future Claude account or launcher replaced alternate worker auth: $out"
   rm "$LAB/home/config/$scope_file"
 done
-ok "native Claude headroom cannot rank a proxy or different account pin"
+ok "future Claude account and launcher do not classify worker authentication"
 
 export CLAUDE_CONFIG_DIR="$LAB/alternate-claude"
+printf 'PATH\n' > "$LAB/home/config/launch-env-allowlist"
+printf '%s\n' '-CLAUDE_CONFIG_DIR' > "$FM_AUTH_DESTINATION"
 out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
 [ "$out" = "codex gpt-6.1-sol" ] || fail "ambient alternate Claude authentication used native headroom: $out"
 if out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default 2>/dev/null); then
@@ -465,15 +469,15 @@ export CLAUDE_CONFIG_DIR=''
 out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
 [ "$out" = "claude default" ] || fail "empty ambient config directory discarded native default headroom: $out"
 unset CLAUDE_CONFIG_DIR
+rm "$LAB/home/config/launch-env-allowlist" "$FM_AUTH_DESTINATION"
 ok "ambient alternate Claude authentication has no native default quota mapping"
 
-# Unknown alternate auth is not positive quota; stripped auth uses native quota.
 CLAUDE_EXHAUSTED="$LAB/claude-exhausted.json"
 jq '(.providers[] | select(.provider == "claude").quotaSemantics.effectiveAvailability[]) |=
   (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$LAB/captured.json" > "$CLAUDE_EXHAUSTED"
-for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-  export "$credential=synthetic-alternate-auth"
-  printf '%s=synthetic-alternate-auth\n' "$credential" > "$FM_AUTH_DESTINATION"
+for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE; do
+  export "$credential=worker-alternate"
+  printf -- '-%s\n' "$credential" > "$FM_AUTH_DESTINATION"
   for policy in inherited retained stripped; do
     case "$policy" in
       inherited) rm -f "$LAB/home/config/launch-env-allowlist" ;;
@@ -481,27 +485,57 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
       stripped) printf 'PATH\n' > "$LAB/home/config/launch-env-allowlist" ;;
     esac
     out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
-    if [ "$policy" = stripped ]; then
-      [ "$out" = "claude default" ] || fail "$credential stripped: native headroom was hidden: $out"
-    else
-      [ "$out" = "codex gpt-6.1-sol" ] || fail "$credential $policy: alternate auth inherited native headroom: $out"
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$credential $policy borrowed native quota despite worker auth: $out"
+    if out=$(call_choose --snapshot "$CLAUDE_EXHAUSTED" --candidate claude:default 2>/dev/null); then
+      fail "$credential $policy unexpectedly selected unmapped worker auth: $out"
     fi
-    out=$(call_choose --snapshot "$CLAUDE_EXHAUSTED" --candidate claude:default --candidate codex:gpt-6.1-sol)
-    [ "$out" = "codex gpt-6.1-sol" ] || fail "$credential $policy: exhausted or unrankable Claude displaced the fallback: $out"
-    if [ "$policy" = stripped ]; then
-      if out=$(call_choose --snapshot "$CLAUDE_EXHAUSTED" --candidate claude:default 2>/dev/null); then
-        fail "$credential stripped: exhausted native default unexpectedly selected: $out"
-      fi
-      [ "$out" = none ] || fail "$credential stripped: exhausted native default returned: $out"
-    fi
-    ok "$credential $policy uses only quota mapped to the launch environment"
+    [ "$out" = none ] || fail "$credential $policy unmapped worker auth returned: $out"
   done
   unset "$credential"
-  rm "$FM_AUTH_DESTINATION"
+  printf '%s=destination-alternate\n' "$credential" > "$FM_AUTH_DESTINATION"
+  printf '%s=destination-global\n' "$credential" > "$FM_AUTH_DESTINATION.global"
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "$credential destination-only auth concealed worker quota: $out"
+  rm "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global"
 done
 rm "$LAB/home/config/launch-env-allowlist"
-out=$(ANTHROPIC_API_KEY=caller-only call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
-[ "$out" = "claude default" ] || fail "caller-only key concealed destination native headroom: $out"
+for selector in CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE; do
+  for value in 1 true TRUE yes YeS on ON; do
+    export "$selector=$value"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$selector=$value borrowed native worker quota: $out"
+  done
+  for value in '' 0 false FALSE no off enabled; do
+    export "$selector=$value"
+    printf '%s=true\n' "$selector" > "$FM_AUTH_DESTINATION"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+    [ "$out" = "claude default" ] || fail "$selector=$value lost native worker quota: $out"
+  done
+  unset "$selector"
+  rm "$FM_AUTH_DESTINATION"
+done
+out=$(ANTHROPIC_FEDERATION_RULE_ID=worker-rule ANTHROPIC_ORGANIZATION_ID=worker-org \
+  call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+[ "$out" = "codex gpt-6.1-sol" ] || fail "paired worker federation borrowed native quota: $out"
+for pair in rule-only organization-only empty-rule empty-organization; do
+  case "$pair" in
+    rule-only) out=$(ANTHROPIC_FEDERATION_RULE_ID=worker-rule call_choose --snapshot "$LAB/captured.json" --candidate claude:default) ;;
+    organization-only) out=$(ANTHROPIC_ORGANIZATION_ID=worker-org call_choose --snapshot "$LAB/captured.json" --candidate claude:default) ;;
+    empty-rule) out=$(ANTHROPIC_FEDERATION_RULE_ID='' ANTHROPIC_ORGANIZATION_ID=worker-org call_choose --snapshot "$LAB/captured.json" --candidate claude:default) ;;
+    empty-organization) out=$(ANTHROPIC_FEDERATION_RULE_ID=worker-rule ANTHROPIC_ORGANIZATION_ID='' call_choose --snapshot "$LAB/captured.json" --candidate claude:default) ;;
+  esac
+  [ "$out" = "claude default" ] || fail "$pair federation concealed native worker quota: $out"
+done
+printf '%s\n' 'CLAUDE_CONFIG_DIR=destination' 'ANTHROPIC_FEDERATION_RULE_ID=destination' 'ANTHROPIC_ORGANIZATION_ID=destination' > "$FM_AUTH_DESTINATION"
+for backend in tmux herdr; do
+  out=$(FM_BACKEND=$backend FM_AUTH_UNREADABLE=1 call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "$backend unavailable destination concealed native worker quota: $out"
+  out=$(FM_BACKEND=$backend ANTHROPIC_API_KEY=worker-only call_choose --snapshot "$LAB/captured.json" \
+    --candidate claude:default --candidate codex:gpt-6.1-sol)
+  [ "$out" = "codex gpt-6.1-sol" ] || fail "$backend worker key borrowed native quota: $out"
+done
+rm "$FM_AUTH_DESTINATION"
+ok "native Claude classification uses worker selectors, truth switches and paired federation"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi

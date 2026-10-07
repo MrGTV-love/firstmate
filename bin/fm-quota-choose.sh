@@ -324,7 +324,7 @@ OMP_USAGE=
 for c in "${CANDIDATES[@]}"; do
   case "$c" in
     omp:openai-codex/*)
-      OMP_USAGE=$(fm_dispatch_omp_usage) || OMP_USAGE='{}'
+      OMP_USAGE=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || OMP_USAGE='{}'
       [ -n "$OMP_USAGE" ] || OMP_USAGE='{}'
       break ;;
   esac
@@ -369,6 +369,24 @@ effective_for_provider_model() {
   ' 2>/dev/null
 }
 
+worker_claude_quota_unbound() {
+  local name value
+  [ -z "${CLAUDE_CONFIG_DIR:-}" ] || return 0
+  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+    value=${!name-}
+    case "$name" in
+      CLAUDE_CODE_USE_*)
+        case "$value" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) return 0 ;; esac
+        ;;
+      ANTHROPIC_FEDERATION_RULE_ID)
+        if [ -n "$value" ] && [ -n "${ANTHROPIC_ORGANIZATION_ID:-}" ]; then return 0; fi
+        ;;
+      *) [ -z "$value" ] || return 0 ;;
+    esac
+  done
+  return 1
+}
+
 for c in "${CANDIDATES[@]}"; do
   harness=${c%%:*}
   model=${c#*:}
@@ -395,7 +413,7 @@ for c in "${CANDIDATES[@]}"; do
     fi
     continue
   fi
-  if [ "$harness" = claude ] && fm_dispatch_claude_quota_unbound; then
+  if [ "$harness" = claude ] && worker_claude_quota_unbound; then
     continue
   fi
   scope_model=$model
