@@ -219,6 +219,63 @@ test_matrix_claude_arrow_statusline_footer() {
   pass "matrix: claude's arrow statusline is footer furniture, not a composer holding text"
 }
 
+test_matrix_claude_titled_top_border() {
+  # Real claude 2.x draws the session title (a --name, a /rename, a hook-supplied
+  # or generated title) INSIDE the composer's top rule: `──── <title> ─`. That row
+  # is no longer a solid rule, so the cursorless profiles lost the pair, saw the
+  # lower plain rule as an unproven separator, and refused `unknown` on a visibly
+  # empty composer - every steer to the worker was undeliverable and its
+  # relaunch refused (task fm-claude-titled-composer-unknown, captured live
+  # 2026-10-06 on herdr).
+  local titled plain_rule empty typed claude_idle pi_idle screen
+  claude_idle=$(printf 'claude\tidle'); pi_idle=$(printf 'pi\tidle')
+  titled='──────────────────────── Firstmate operational input waiting read Users ─'
+  plain_rule='────────────────────────────────────────────────────────────────────────'
+  empty=$'transcript line\n'"$titled"$'\n❯'"$NBSP"$'\n'"$plain_rule"$'\n  Sonnet 5.5 ░░░░░░░░░░ 9%\n  ⏵⏵ bypass permissions on'
+  assert_screen "claude titled idle on tmux" empty "$CAPS_TMUX" "$empty" 2 probe-absent
+  assert_screen "claude titled idle on herdr" empty "$CAPS_STYLED" "$empty" '' "$claude_idle"
+  assert_screen "claude titled idle on zellij" empty "$CAPS_STYLED_NOID" "$empty"
+  assert_screen "claude titled idle on cmux/orca" empty "$CAPS_PLAIN" "$empty"
+  typed=$'transcript line\n'"$titled"$'\n❯ fix the login bug\n'"$plain_rule"$'\n  Sonnet 5.5 ░░░░░░░░░░ 9%'
+  assert_screen "claude titled typed on tmux" pending "$CAPS_TMUX" "$typed" 2 probe-absent
+  assert_screen "claude titled typed on herdr" pending "$CAPS_STYLED" "$typed" '' "$claude_idle"
+  assert_screen "claude titled typed on zellij" pending "$CAPS_STYLED_NOID" "$typed"
+  assert_screen "claude titled typed on plain backends" unknown "$CAPS_PLAIN" "$typed"
+  # The same plain-border shapes keep their verdicts beside the titled ones.
+  screen=$'transcript line\n'"$plain_rule"$'\n❯'"$NBSP"$'\n'"$plain_rule"
+  assert_screen "claude plain idle on herdr" empty "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  pass "matrix: claude's titled top border reads empty when idle and pending when typed on every profile"
+}
+
+test_claude_titled_top_border_needs_glyph_proof_and_exact_shape() {
+  # A titled rule only OPENS a composer pair, and the pair needs the agent glyph
+  # row inside it. Anything short of that exact shape keeps the refusal.
+  local titled plain_rule screen claude_idle pi_idle
+  claude_idle=$(printf 'claude\tidle'); pi_idle=$(printf 'pi\tidle')
+  titled='──────────────────────── Some session title ─'
+  plain_rule='────────────────────────────────────────────────────────────────────────'
+  # No glyph row between the titled rule and the closing rule: not a composer,
+  # whatever the agent identity claims.
+  screen=$'transcript line\n'"$titled"$'\n\n'"$plain_rule"
+  assert_screen "titled rule around a blank row (no identity)" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "titled rule around a blank row (idle pi identity)" unknown "$CAPS_STYLED" "$screen" '' "$pi_idle"
+  assert_screen "titled rule around a blank row (idle claude identity)" unknown "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  assert_screen "titled rule around a blank row on tmux" unknown "$CAPS_TMUX" "$screen" 2 probe-absent
+  # Shapes that are not a titled rule stay ordinary rows: a short opening run,
+  # no closing rule glyph, a title without surrounding spaces, an edge glyph
+  # inside the title, and a heading rule carrying only spaces.
+  for titled in \
+    '─────── Some session title ─' \
+    '──────────────────────── Some session title' \
+    '────────────────────────Some session title─' \
+    '──────────────────────── Some │ title ─' \
+    '──────────────────────── ─'; do
+    screen=$'transcript line\n'"$titled"$'\n❯'"$NBSP"$'\n'"$plain_rule"
+    assert_screen "not a titled rule: $titled" unknown "$CAPS_STYLED_NOID" "$screen"
+  done
+  pass "matrix: a titled rule opens a composer pair only with an exact shape and an agent glyph row inside"
+}
+
 test_composer_footer_demotion_needs_a_proven_pair() {
   # The demotion is bounded in three directions, and each bound is a case
   # where a lower glyph row IS the live composer.
@@ -1200,6 +1257,8 @@ test_idle_placeholder_case_mode_is_explicit
 test_real_text_is_pending
 test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
+test_matrix_claude_titled_top_border
+test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent
 test_composer_footer_zone_refuses_rather_than_allows

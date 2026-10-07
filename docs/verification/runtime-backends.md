@@ -1121,6 +1121,45 @@ ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch 
 
 With the classifier change reverted, the same run stopped at `an idle empty box composer read 'unknown', not empty`.
 
+### 2026-10-06 claude titled top border through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against Claude Code 2.1.292 in an isolated Herdr 0.9.1 lab session, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+Claude draws the session's name inside the prompt box's top rule once the session has one: `claude --name <name>`, `/rename`, a hook-supplied session title, or the title it generates from the first prompt.
+A worker whose first prompt was the steering doorbell line was titled with that line, punctuation stripped, so every steered worker can draw this shape.
+The observed idle composer, with the title right-aligned in the top rule and a plain closing rule:
+
+```text
+──────────────────────────────────────────── Firstmate operational input waiting read Users charlesabrooker treehouse ─
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
+The titled rule is not a solid `─` row, so the cursorless profiles lost the rule pair around the `❯` row and read the closing rule as an unproven separator.
+The verdict was `unknown`, which made `fm-send` skip its doorbell and made `fm-control exit` and `relaunch` refuse an idle worker.
+The current classification is owned by `_fm_composer_titled_rule_row` in `bin/fm-composer-lib.sh`: a titled rule opens a rule pair only when it starts with at least eight `─`, ends with `─`, and holds a space-separated title with no structural edge glyph, and the pair is recorded only when an agent glyph row sits inside it.
+`test_matrix_claude_titled_top_border` and `test_claude_titled_top_border_needs_glyph_proof_and_exact_shape` in `tests/fm-composer-lib.test.sh` carry the idle, typed, and refused shapes.
+
+The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
+Its default-on checks spend no tokens wherever claude, herdr, jq, and git are installed.
+The doorbell proof and the relaunch proof each submit a real prompt and remain opt-in:
+
+```sh
+FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 tests/fm-claude-titled-composer-live-e2e.test.sh
+```
+
+Observed output (the run with the doorbell proof and the run with the relaunch proof were separate invocations):
+
+```text
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 draws the session title in the prompt box's top border in isolated session fm-lab-claude-titled-li-74828-13064
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-send doorbell reaches the titled-border worker, which acts on the record and acknowledges it
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-control exit stops the idle titled-border worker and preserves its endpoint
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the titled-border worker with a live agent in the same endpoint
+```
+
+With the classifier change reverted, the same run stopped at `an idle empty titled-border composer read 'unknown', not empty`.
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).

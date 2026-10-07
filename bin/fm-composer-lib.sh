@@ -83,7 +83,11 @@
 #                A separated pair that closes over a bare AGENT-GLYPH row is a
 #                different, self-proving thing: real claude 2.x draws exactly
 #                that (`─` rule, `❯`+NBSP, `─` rule), so the glyph inside the
-#                pair carries the shape and no identity is needed.
+#                pair carries the shape and no identity is needed. Once the
+#                session has a name, claude writes it into the top rule
+#                (`──── <title> ─`); that TITLED rule opens the pair the same
+#                way, but only with the glyph row inside it, and never closes
+#                one (see _fm_composer_titled_rule_row).
 #
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
@@ -787,6 +791,47 @@ _fm_composer_pi_separator_row() {  # <trimmed-row>
   return 1
 }
 
+# _fm_composer_titled_rule_row: 0 when the trimmed row is a `─` rule that
+# carries a TITLE, the shape claude 2.x draws as its composer's top border once
+# the session has a name (`--name`, `/rename`, a hook-supplied or generated
+# session title): `──────── <title> ─`. The rule must open with a solid run of
+# at least 8 `─`, close with a `─` run, and hold its title set apart by spaces
+# with no structural edge glyph inside. A row that is not exactly that shape
+# stays an ordinary row, so a transcript heading or a table rule is never read
+# as a composer border.
+_fm_composer_titled_rule_row() {  # <trimmed-row>
+  local row=$1 inner lead=0
+  # Literal prefix/suffix removal only: `${v#?}` and bracket classes cut single
+  # BYTES under LC_ALL=C, so a multibyte title character could be mistaken for
+  # part of the rule.
+  inner=$row
+  while :; do
+    case "$inner" in
+      ─*) inner=${inner#─}; lead=$((lead + 1)) ;;
+      *) break ;;
+    esac
+  done
+  [ "$lead" -ge 8 ] || return 1
+  case "$inner" in
+    *─) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    case "$inner" in
+      *─) inner=${inner%─} ;;
+      *) break ;;
+    esac
+  done
+  case "$inner" in
+    ' '*[![:space:]]*' ') ;;
+    *) return 1 ;;
+  esac
+  case "$inner" in
+    *│*|*┃*|*║*|*╭*|*╮*|*┌*|*┐*|*╔*|*╗*|*┏*|*┓*|*╰*|*╯*|*└*|*┘*|*╚*|*╝*|*┗*|*┛*|*═*|*━*) return 1 ;;
+  esac
+  return 0
+}
+
 # Row-scan results are returned through FM_COMPOSER_SCAN_* globals (bash 3.2
 # has no nameref); they are internal to this owner.
 _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
@@ -826,7 +871,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_GLYPH=
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
-  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max
+  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   pi_max=$FM_COMPOSER_PI_MAX_LINES
@@ -874,7 +919,11 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # earlier transcript rule can never outrank the live bottom composer pair.
     if _fm_composer_pi_separator_row "$trimmed"; then
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
-      if [ "$pi_open" -ge 0 ]; then
+      # A pair opened by a TITLED rule (claude draws its session title in the
+      # composer's top border) is proven only by the agent glyph row inside it:
+      # the title makes the opener look like transcript text, so without that
+      # glyph the pair is not recorded and the rule below stays unproven.
+      if [ "$pi_open" -ge 0 ] && { [ "$pi_open_titled" = 0 ] || [ "$pi_glyph_row" -ge 0 ]; }; then
         FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row
@@ -887,6 +936,16 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
       fi
       pi_open=$row
+      pi_open_titled=0
+      pi_lines=0
+      pi_glyph_row=-1
+      pi_glyph=''
+    elif _fm_composer_titled_rule_row "$trimmed"; then
+      # A titled rule only OPENS a pair; it never closes one, so a titled
+      # transcript row can never end a composer region.
+      FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
+      pi_open=$row
+      pi_open_titled=1
       pi_lines=0
       pi_glyph_row=-1
       pi_glyph=''
