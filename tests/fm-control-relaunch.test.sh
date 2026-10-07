@@ -3843,7 +3843,9 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
 }
 
 write_recovery_native_session() { # <path> <cwd> <initial-user-message>
-  jq -nc --arg cwd "$2" '{type:"session",version:3,id:"fixture-session",cwd:$cwd}' > "$1"
+  jq -nc '{type:"title",v:1,title:"",updatedAt:"2026-10-06T00:00:00Z",pad:""}
+    | .pad = (" " * (255 - (tojson | length)))' > "$1"
+  jq -nc --arg cwd "$2" '{type:"session",version:3,id:"fixture-session",cwd:$cwd}' >> "$1"
   jq -nc --arg text "$3" \
     '{type:"message",message:{role:"user",content:[{type:"text",text:$text}]}}' >> "$1"
 }

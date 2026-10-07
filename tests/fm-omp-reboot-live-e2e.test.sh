@@ -168,6 +168,9 @@ seed_native_resume() { # <session-path> <launch-body-path>
 import datetime, json, pathlib, sys, uuid
 now = datetime.datetime.now(datetime.timezone.utc)
 with open(sys.argv[1], 'w') as f:
+    slot = {'type':'title','v':1,'title':'','updatedAt':now.isoformat(),'pad':''}
+    slot['pad'] = ' ' * (255 - len(json.dumps(slot, separators=(',', ':')).encode('utf-8')))
+    f.write(json.dumps(slot, separators=(',', ':')) + '\n')
     f.write(json.dumps({'type':'session','version':3,'id':str(uuid.uuid4()),
                        'timestamp':now.isoformat(),'cwd':sys.argv[2]}) + '\n')
     f.write(json.dumps({'type':'message','id':uuid.uuid4().hex[:8],'parentId':None,

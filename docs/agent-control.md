@@ -51,7 +51,7 @@ muse is the one verified adapter that restores the cancelled prompt back into it
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
-The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, blank-boundary ambiguity, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+The [shared composer classifier](../bin/fm-composer-lib.sh) owns continuation containment, including capture-trimmed glyph-only native-root ambiguity, cursor-owned ambiguity across later frames, literal blank and braille continuation extraction, and native omp hint handling; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -106,8 +106,9 @@ Use an explicit `FM_HOME` with `recover` to repair every eligible positively unm
 `recover --one` bounds an automatic supervision tick to one repair attempt.
 The recovery script's [header and help](../bin/fm-reboot-recover.sh) own bounded-scan scheduling and its durable cursor.
 Deferred startup recovery runs the sweep after the existing bootstrap sweeps, which keep their recovery responsibilities.
-The watcher repeats the bounded scan to catch panes restored only after a viewer attaches and emits the current sweep's diagnostics and repair results as a `check` wake.
+The watcher repeats the bounded scan to catch panes restored only after a viewer attaches, waits at least 60 seconds after each attempt finishes, and emits each sweep's diagnostics and repair results as an independently keyed `check` wake.
 Remote secondmates, other backends, missing agents, and stopped agents retain their existing recovery owners.
+Unreadable endpoint inspection is reported as a task-specific recovery failure without lifecycle action, not silently treated as a missing or stopped agent.
 Ship and scout recovery skips lifecycle action when the shared backlog eligibility check refuses: automatic backlog rows must be readable, unheld, unblocked, and queued or In flight; validated away work requires a queued row.
 Existing manual and no-backlog exemptions remain unchanged.
 Recovery also refuses while the task has a pending authoritative backlog close.
@@ -139,7 +140,7 @@ The unique ancestor-most non-shell process in the foreground group supplies the 
 Readable kernel environment with a nonempty matching recorded incarnation proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
 A readable environment with a missing or mismatched incarnation proves unmanaged only for a recorded `harness=omp` with positively attributed native startup provenance.
 The foreground process must have executable basename `omp`, exactly `omp --resume=<file>` argv, and an actual cwd equal to the recorded worktree.
-The resumed native JSONL file must have that same cwd in its session header and an initial user message decoding through the operational-input protocol as `launch-brief`.
+The resumed native JSONL file must begin with its session header, optionally preceded by one validated native title slot, and have that same cwd in the header and an initial user message decoding through the operational-input protocol as `launch-brief`.
 For a ship or scout, that initial body must begin with the complete current worker role contract generated for this home's exact task-owned steering inbox, followed by a paragraph boundary.
 For a local secondmate, that initial body must equal the recorded home's standing charter, or the recorded task brief only when that home has no charter, matching the ordinary launch source.
 Neither a generic launch phrase, an inbox path mentioned in unrelated prose, nor a current Herdr session registration supplies this recorded-task provenance.

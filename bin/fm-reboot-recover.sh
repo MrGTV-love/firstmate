@@ -88,7 +88,16 @@ for ((offset=0; offset<count; offset++)); do
     continue
   fi
   target=$FM_BACKEND_VALIDATED_TARGET
-  [ "$(fm_backend_agent_state herdr "$target")" = alive ] || continue
+  case "$(fm_backend_agent_state herdr "$target")" in
+    alive) ;;
+    dead|missing) continue ;;
+    unreadable)
+      echo "REBOOT_RECOVERY: $id: agent state is unreadable; no lifecycle action taken"
+      result=1
+      continue
+      ;;
+    *) result=1; continue ;;
+  esac
   proof=$(fm_launch_proof_herdr "$meta")
   case "$proof" in
     managed) continue ;;

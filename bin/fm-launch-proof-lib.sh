@@ -42,8 +42,14 @@ fm_launch_proof_native_startup() { # <meta> <session-file> <worktree>
   local meta=$1 ref=$2 worktree=$3 message kind body expected source state id data
   [ -f "$ref" ] && [ -r "$ref" ] || return 1
   message=$(jq -ern --arg cwd "$worktree" '
-    reduce inputs as $entry ({header:null, first:null, header_seen:false, user_seen:false};
-      if .header_seen == false then .header = $entry | .header_seen = true
+    def native_title_slot:
+      type == "object" and .type == "title" and .v == 1
+      and (.title | type == "string") and (.updatedAt | type == "string")
+      and (.pad | type == "string")
+      and ((has("source") | not) or .source == "auto" or .source == "user");
+    reduce inputs as $entry ({header:null, first:null, header_seen:false, user_seen:false, first_entry:true};
+      if .first_entry and ($entry | native_title_slot) then .first_entry = false
+      elif .header_seen == false then .header = $entry | .header_seen = true | .first_entry = false
       elif .user_seen == false and $entry.type == "message" and $entry.message.role == "user"
         then .first = $entry.message.content | .user_seen = true
       else . end)

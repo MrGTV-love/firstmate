@@ -75,6 +75,43 @@ process() { # <argv-json> [pid]
 assert_proof() { [ "$(fm_launch_proof_herdr "$META")" = "$1" ] || fail "$2"; }
 process '["omp","--resume=/a/session.jsonl"]'
 assert_proof unmanaged 'bare restored omp must be recoverable'
+cp "$WORKTREE/recorded.jsonl" "$WORKTREE/header-first.jsonl"
+for slot in \
+  '{"type":"title","v":1,"title":"","updatedAt":"","pad":""}' \
+  '{"type":"title","v":1,"title":"Worker task","source":"auto","updatedAt":"2026-10-06","pad":" "}' \
+  '{"type":"title","v":1,"title":"Named task","source":"user","updatedAt":"","pad":""}'; do
+  printf '%s\n' "$slot" > "$WORKTREE/recorded.jsonl"
+  cat "$WORKTREE/header-first.jsonl" >> "$WORKTREE/recorded.jsonl"
+  assert_proof unmanaged 'a validated native title slot must preserve task-owned startup proof'
+done
+for slot in \
+  '{"type":"custom","v":1,"title":"","updatedAt":"","pad":""}' \
+  '{"type":"title","v":2,"title":"","updatedAt":"","pad":""}' \
+  '{"type":"title","v":1,"title":null,"updatedAt":"","pad":""}' \
+  '{"type":"title","v":1,"title":"","updatedAt":null,"pad":""}' \
+  '{"type":"title","v":1,"title":"","updatedAt":"","pad":null}' \
+  '{"type":"title","v":1,"title":"","updatedAt":""}' \
+  '{"type":"title","v":1,"title":"","updatedAt":"","pad":"","source":null}' \
+  '{"type":"title","v":1,"title":"","updatedAt":"","pad":"","source":"other"}' \
+  '[]' \
+  'malformed'; do
+  printf '%s\n' "$slot" > "$WORKTREE/recorded.jsonl"
+  cat "$WORKTREE/header-first.jsonl" >> "$WORKTREE/recorded.jsonl"
+  assert_proof unknown 'an invalid or arbitrary preamble must not skip to task-owned startup'
+done
+jq -nc '{type:"title",v:1,title:"",updatedAt:"",pad:""}' > "$WORKTREE/title-slot"
+cat "$WORKTREE/title-slot" "$WORKTREE/title-slot" "$WORKTREE/header-first.jsonl" > "$WORKTREE/recorded.jsonl"
+assert_proof unknown 'repeated native title slots must not skip to a later session header'
+cat "$WORKTREE/title-slot" "$WORKTREE/personal.jsonl" > "$WORKTREE/recorded.jsonl"
+assert_proof unknown 'a valid title slot must not authenticate a personal conversation'
+cp "$WORKTREE/header-first.jsonl" "$WORKTREE/recorded.jsonl"
+assert_proof unmanaged 'header-first native sessions must remain compatible'
+pass 'native title slots accept semantic empty and named titles and reject invalid, arbitrary and repeated preambles'
+printf 'kind=scout\n' >> "$META"
+cat "$WORKTREE/title-slot" "$WORKTREE/header-first.jsonl" > "$WORKTREE/recorded.jsonl"
+assert_proof unmanaged 'native title-slot startup must use the shared scout ownership parser'
+proof_meta omp
+cp "$WORKTREE/header-first.jsonl" "$WORKTREE/recorded.jsonl"
 process '["omp","--resume","/a/session.jsonl"]'
 assert_proof unknown 'split omp resume arguments must not authorize native restoration recovery'
 process '["omp","--config","overlay","--auto-approve","--resume=/a/session.jsonl"]'
@@ -232,6 +269,9 @@ for version in legacy env-v1; do
   jq -nc --arg cwd "$WORKTREE" '{type:"session",version:3,id:"secondmate",cwd:$cwd}' > "$WORKTREE/recorded.jsonl"
   jq -nc --arg text "$OTHER_MESSAGE" '{type:"message",message:{role:"user",content:$text}}' >> "$WORKTREE/recorded.jsonl"
   assert_proof unmanaged "$version exact recorded secondmate charter must preserve legitimate native recovery"
+  cp "$WORKTREE/recorded.jsonl" "$WORKTREE/secondmate-header-first.jsonl"
+  cat "$WORKTREE/title-slot" "$WORKTREE/secondmate-header-first.jsonl" > "$WORKTREE/recorded.jsonl"
+  assert_proof unmanaged "$version native title-slot secondmate charter must remain recoverable"
   printf '# A different charter\n' > "$WORKTREE/data/charter.md"
   assert_proof unknown "$version a different secondmate charter must not authenticate native recovery"
   rm "$WORKTREE/data/charter.md"

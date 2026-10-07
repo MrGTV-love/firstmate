@@ -129,3 +129,60 @@ assert_screen "band header cannot claim cursor" unknown "$CAPS_TMUX" "$BAND" 0
 assert_screen "standalone compact omp box stays supported" empty "$CAPS_STYLED" $'╭── π > model > path ─╮\n╰─  ─╯'
 assert_screen "standalone band after independent shell stays supported" empty "$CAPS_STYLED" $'$ command\n'"$BAND"
 pass "native band admission remains narrow and ambiguous continuations refuse classification and extraction"
+
+test_cursor_ambiguity_survives_later_band_continuations() {
+  local prefix screen suffix cursor
+  prefix=$'❯ preface\n\n ╭── π > model > path ─╮\n │ │\n ╰─ ─╯'
+  screen="$prefix"$'\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n\n second line'
+  assert_screen "reported compact floor ambiguity with later band" unknown "$CAPS_TMUX" "$screen" 4
+  for suffix in $'\n\n   second line' $'\n second line' $'\n  second line'; do
+    screen="$prefix"$'\n '"$HEADER"$'\n╰─'"$suffix"
+    for cursor in 0 2 3 4; do
+      assert_screen "cursor-owned compact ambiguity survives later band '$suffix', cursor $cursor" \
+        unknown "$CAPS_TMUX" "$screen" "$cursor"
+    done
+    assert_refused "cursorless compact ambiguity and later band '$suffix'" "$screen"
+  done
+  pass "later band gaps and short gutters cannot replace cursor-owned compact ambiguity"
+}
+
+test_owned_band_blank_and_braille_continuations() {
+  local root frame screen expected continuation caps cursor prefix
+  for prefix in '' '  '; do
+    root="${prefix}❯ preface"
+    for continuation in '     ' '     ⠂⠁'; do
+      frame="${prefix}   $HEADER"$'\n'"${prefix}  ╰─"$'\n'"${prefix}${continuation}"$'\n'"${prefix}     keep tail"
+      screen="$root"$'\n'"$frame"
+      expected="preface $HEADER ╰─"
+      case "$continuation" in *'⠂⠁'*) expected="$expected ⠂⠁" ;; esac
+      expected="$expected keep tail"
+      assert_screen "owned band gutter '$continuation', root '$prefix'" pending "$CAPS_STYLED" "$screen"
+      assert_screen "plain owned band gutter '$continuation', root '$prefix'" unknown "$CAPS_PLAIN" "$screen"
+      for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+        assert_content "owned band gutter '$continuation', root '$prefix'" "$expected" "$caps" "$screen"
+      done
+      for cursor in 0 1 2 3 4; do
+        assert_screen "owned band gutter '$continuation', root '$prefix', cursor $cursor" \
+          pending "$CAPS_TMUX" "$screen" "$cursor"
+      done
+    done
+  done
+  screen=$'❯ preface\n π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n ╰─\n ⠂⠁\n keep tail'
+  assert_refused "reported band and braille capture with unproven gutter" "$screen"
+  for continuation in '   ' '   ⠂⠁'; do
+    screen="$BAND"$'\n'"$continuation"$'\n   keep tail'
+    expected='keep tail'
+    case "$continuation" in *'⠂⠁'*) expected="⠂⠁ $expected" ;; esac
+    for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+      assert_screen "standalone band gutter '$continuation'" pending "$caps" "$screen"
+      assert_content "standalone band gutter '$continuation'" "$expected" "$caps" "$screen"
+    done
+    for cursor in 1 2 3; do
+      assert_screen "standalone band gutter '$continuation', cursor $cursor" pending "$CAPS_TMUX" "$screen" "$cursor"
+    done
+  done
+  pass "owned band blank and braille gutters retain every content row while unproven gutters refuse extraction"
+}
+
+test_cursor_ambiguity_survives_later_band_continuations
+test_owned_band_blank_and_braille_continuations

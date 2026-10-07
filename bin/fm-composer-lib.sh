@@ -875,7 +875,10 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     if [ "$band_top" -ge 0 ]; then
       case "$line" in "$band_indent   "*) band_continuation=1 ;; esac
       if [ "$band_continuation" = 1 ]; then
-        if [ "$band_gap" = 1 ]; then
+        if [ "$band_gap" = 1 ] \
+           && { [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+                || [ "$cy" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+                || [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; }; then
           FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$band_floor
           FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
         fi
@@ -897,8 +900,12 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       else
         case "$indent" in
           "$band_indent "*)
-            FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$band_floor
-            FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
+            if [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
+               || [ "$cy" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+               || [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" ]; then
+              FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=$band_floor
+              FM_COMPOSER_SCAN_BARE_AMBIG_LAST=$row
+            fi
             ;;
         esac
         band_top=-1
@@ -1702,7 +1709,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
     line=$(_fm_composer_screen_row "$row" "$plain")
     trimmed=$line
     fm_composer_normalize_trim_var trimmed
-    if [ -z "$trimmed" ]; then
+    if [ -z "$trimmed" ] && ! _fm_composer_row_is_bare_literal "$row"; then
       [ "$allow_blank" = 1 ] || return 1
       row=$((row + 1))
       continue
@@ -1714,7 +1721,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
     if { [ "$ambiguous" = 0 ] && ! _fm_composer_row_is_bare_literal "$row" \
          && fm_composer_row_has_edge "$trimmed"; } \
        || { ! _fm_composer_row_is_bare_literal "$row" && _fm_composer_row_is_omp_status "$trimmed"; } \
-       || _fm_composer_row_is_braille_furniture "$trimmed" \
+       || { ! _fm_composer_row_is_bare_literal "$row" && _fm_composer_row_is_braille_furniture "$trimmed"; } \
        || { ! _fm_composer_row_is_bare_literal "$row" \
             && { fm_composer_leading_shell_glyph_var glyph "$trimmed" \
                  || { [ "$allow_blank" = 1 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; }; }; }; then
@@ -2021,10 +2028,10 @@ _fm_composer_select_cursorless() {
       raw=$(_fm_composer_screen_row "$next" "$plain")
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
-      [ -n "$trimmed" ] || break
+      [ -n "$trimmed" ] || _fm_composer_row_is_bare_literal "$next" || break
       if ! _fm_composer_row_is_bare_literal "$next" && fm_composer_row_has_edge "$trimmed"; then break; fi
       if ! _fm_composer_row_is_bare_literal "$next" && _fm_composer_row_is_omp_status "$trimmed"; then break; fi
-      _fm_composer_row_is_braille_furniture "$trimmed" && break
+      if ! _fm_composer_row_is_bare_literal "$next" && _fm_composer_row_is_braille_furniture "$trimmed"; then break; fi
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done
