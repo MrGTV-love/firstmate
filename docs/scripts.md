@@ -117,7 +117,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-tasks-axi-lib.sh`    | Shared backlog-backend selector and `tasks-axi` compatibility probe                  |
 | `fm-backlog-transition-lib.sh` | Pair task-record changes with their backlog transitions and replay interrupted closes |
 | `fm-quota-axi-lib.sh`    | Shared `quota-axi` compatibility floor and quota snapshot schema validation           |
-| [`fm-quota-choose.sh`](../bin/fm-quota-choose.sh) | Choose the first eligible candidate from an intake-ordered harness:model list; its header owns quota eligibility |
+| [`fm-quota-choose.sh`](../bin/fm-quota-choose.sh) | Choose the first eligible candidate from an intake-ordered harness:model list using inherited worker authentication; its header owns quota eligibility, and `fm-worker-account-lib.sh` owns the Claude credential list |
 | `fm-vendor-auth-probe.sh`| Run one hard-bounded, non-destructive authentication probe of a named vendor CLI and report the fact |
 | `fm-wake-drain.sh`       | Present and acknowledge the current actor's claimed wake rows alongside status, outcome-backstop, decision, divergence, supervision-host outcome, recovery, and supervision checks |
 | `fm-wake-grant.sh`       | Serialize Pi supervision-branch wake-row claim activation, publication, release, and deactivation |
