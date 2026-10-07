@@ -91,7 +91,7 @@ fm_sm_live_first_line() {
 
 fm_sm_live_replacement_admit() {
   local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} harness
-  harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || return 1
+  harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_SM_LIVE_LIB_DIR/fm-harness.sh" secondmate) || return 1
   fm_session_launch_policy_check "$config" "$harness" || return 1
   printf '%s\n' "$harness"
 }
