@@ -125,9 +125,10 @@ An active host owns successive watcher cycles through the same arm.
 The host's successor and pass-through lifecycle is owned by [supervision-host.md](supervision-host.md#postures); the arm's recovery and acknowledgement contracts below still apply.
 
 Claude and Cursor resolve host launch admission before selecting their Stop-owned park.
-A denied host queues one refusal per main-session identity and policy/host configuration fingerprint, using the existing launch-refusal receipt, and the Stop owner parks on the ordinary watcher instead.
+A denied host queues one refusal per main-session identity and policy/host configuration fingerprint, using the reserved `.supervision-host` launch-refusal receipt owner outside the task-ID namespace, and the Stop owner parks on the ordinary watcher instead.
 Acknowledgement does not permit another notification for unchanged configuration; policy repair is reconsidered at the next Stop.
-If configuration changes between admission and host activation, Claude starts an ordinary handling successor and delivers the owned refusal without requiring the host's recovery-marker publication; Cursor switches its park to the ordinary watcher.
+If configuration changes between admission and host activation, both Stop owners record the current-policy receipt and switch their park to the ordinary watcher while retaining the original refusal diagnostic.
+Claude waits for that ordinary arm to close before starting its handling successor with the closed arm's PID; refusal delivery does not depend on successful recovery-marker publication.
 
 ## Actionable wake ordering
 

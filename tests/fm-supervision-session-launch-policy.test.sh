@@ -75,10 +75,36 @@ cmp -s "$TMP_ROOT/prior-host" "$STATE/.supervision-host" || fail 'restricted hos
 pass 'omp-primary host refusal invocations=0 predecessor=alive host-record=identical turn-custody=unchanged'
 
 ln -s /bin/bash "$TMP_ROOT/primary/claude"
-ln -s /bin/bash "$TMP_ROOT/primary/cursor"
+CC_BIN=$(command -v cc 2>/dev/null || command -v gcc 2>/dev/null || true)
+[ -n "$CC_BIN" ] || fail 'a C compiler is required to build the fake Cursor process'
+cat > "$TMP_ROOT/fake-cursor.c" <<'C'
+#include <errno.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  int status;
+  pid_t child;
+  if (argc != 3 || strcmp(argv[1], "-c") != 0) return 64;
+  child = fork();
+  if (child < 0) return 70;
+  if (child == 0) {
+    execl("/bin/bash", "bash", "-c", argv[2], (char *)0);
+    _exit(127);
+  }
+  while (waitpid(child, &status, 0) < 0) {
+    if (errno != EINTR) return 71;
+  }
+  if (WIFEXITED(status)) return WEXITSTATUS(status);
+  if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+  return 72;
+}
+C
+"$CC_BIN" -o "$TMP_ROOT/primary/cursor-agent" "$TMP_ROOT/fake-cursor.c" \
+  || fail 'could not build the fake Cursor process'
 test_shell_stop_policy() {  # <claude|cursor> <denied|invalid|malformed|runtime> <healthy|wake|afk|lost> [published|failed]
   local consumer=$1 policy=$2 close=$3 publication=${4:-published}
-  local case_dir repo home script out status expected arms refusals
+  local case_dir repo home script primary out status expected arms refusals
   case_dir="$TMP_ROOT/stop-$consumer-$policy-$close-$publication"
   repo="$case_dir/repo"
   home="$case_dir/home"
@@ -143,23 +169,25 @@ fi
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-watch.sh" "$repo/bin/fm-supervision-host.sh"
   case "$consumer" in
-    claude) script=fm-claude-stop-autoarm.sh ;;
-    cursor) script=fm-turnend-guard-cursor.sh ;;
+    claude) script=fm-claude-stop-autoarm.sh; primary="$TMP_ROOT/primary/claude" ;;
+    cursor) script=fm-turnend-guard-cursor.sh; primary="$TMP_ROOT/primary/cursor-agent" ;;
   esac
   status=0
   # shellcheck disable=SC2016 # Both Stop firings share the fixture primary's pid.
   out=$(FM_ROOT_OVERRIDE="$repo" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     FM_CONFIG_OVERRIDE="$home/config" FM_WAKE_QUEUE="$home/state/.wake-queue" \
     FM_WAKE_QUEUE_LOCK="$home/state/.wake-queue.lock" FM_ROOT="$repo" \
-    FIXTURE_CLOSE="$close" FIXTURE_POLICY="$policy" FIXTURE_SCRIPT="$script" \
+    FIXTURE_CLOSE="$close" FIXTURE_POLICY="$policy" FIXTURE_SCRIPT="$script" FIXTURE_CONSUMER="$consumer" FIXTURE_PUBLICATION="$publication" \
     FM_CLAUDE_AUTOARM_ATTEMPTS=1 FM_CURSOR_PARK_ATTEMPTS=1 FM_CURSOR_PARK_POLL=1 \
-    FM_ARM_CONFIRM_TIMEOUT=1 "$TMP_ROOT/primary/$consumer" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    FM_ARM_CONFIRM_TIMEOUT=1 "$primary" -c '
+      owner=$$
+      [ "$FIXTURE_CONSUMER" != cursor ] || owner=$PPID
+      printf "%s\n" "$owner" > "$FM_HOME/state/.lock"
       "$FM_ROOT/bin/fm-watch.sh" &
       export FIXTURE_WATCH_PID=$!
       trap '\''kill -TERM "$FIXTURE_WATCH_PID" 2>/dev/null || true; wait "$FIXTURE_WATCH_PID" 2>/dev/null || true'\'' EXIT
       firings=1
-      [ "$FIXTURE_POLICY" = runtime ] || firings=2
+      if [ "$FIXTURE_POLICY" != runtime ] || { [ "$FIXTURE_PUBLICATION" = published ] && [ "$FIXTURE_CLOSE" != afk ] && [ "$FIXTURE_CLOSE" != lost ]; }; then firings=2; fi
       for ((i=1; i<=firings; i++)); do
         rc=0
         printf '\''{"session_id":"owned-policy-session","stop_hook_active":false,"loop_count":0}'\'' \
@@ -188,7 +216,7 @@ SH
   [ ! -f "$home/ordinary-launches" ] || arms=$(wc -l < "$home/ordinary-launches" | tr -d ' ')
   refusals=0
   if [ -f "$home/state/.wake-queue" ]; then
-    refusals=$(grep -c 'session-launch-refused-supervision-host-' "$home/state/.wake-queue" || true)
+    refusals=$(grep -c 'session-launch-refused-\.supervision-host-' "$home/state/.wake-queue" || true)
   fi
   if [ "$policy" != runtime ]; then
     if [ "$close" = healthy ]; then
@@ -200,7 +228,8 @@ SH
     fi
     [ "$refusals" -eq 1 ] || fail "$consumer unchanged same-session policy queued $refusals refusals"
     expected=2
-    [ "$close" != wake ] || [ "$consumer" != claude ] || expected=3
+    [ "$consumer" != claude ] || expected=3
+    [ "$close" != wake ] || [ "$consumer" != claude ] || expected=4
     [ "$arms" -eq "$expected" ] || fail "$consumer ordinary launches=$arms expected=$expected"
     if [ "$close" = healthy ]; then
       if [ "$consumer" = claude ]; then
@@ -220,27 +249,40 @@ SH
       [ "$arms" -eq 0 ] || fail "$consumer restored ordinary after losing ownership"
       [ "$(cat "$home/statuses")" = 0 ] || fail "$consumer losing hook delivered refusal"
       [ ! -s "$home/stdout-1" ] || fail "$consumer losing hook emitted followup"
+      [ "$refusals" -eq 0 ] || fail "$consumer losing runtime hook recorded a refusal"
     elif [ "$consumer" = claude ]; then
-      [ "$arms" -eq 1 ] || fail 'Claude runtime refusal lacked ordinary successor'
-      [ "$(cat "$home/ordinary-launches")" = '' ] || fail 'Claude runtime successor supplied unrelated predecessor'
-      [ "$(cat "$home/statuses")" = 2 ] || fail 'Claude runtime refusal lost exit 2'
+      [ "$publication" != published ] || [ "$refusals" -eq 1 ] || fail 'Claude runtime refusal not queued exactly once across Stops'
+      expected=2
+      [ "$publication" != published ] || expected=3
+      [ "$arms" -eq "$expected" ] || fail "Claude runtime ordinary launches=$arms expected=$expected"
+      expected=2
+      [ "$publication" != published ] || expected=$(printf '2\n0')
+      [ "$(cat "$home/statuses")" = "$expected" ] || fail 'Claude runtime refusal lost exit 2 or repeated on next Stop'
       [ ! -s "$home/stdout-1" ] || fail 'Claude refusal was not stderr-only'
       assert_contains "$(cat "$home/stderr-1")" 'supervision-host: launch policy refused:' 'Claude runtime refusal delivered'
       assert_not_contains "$(cat "$home/stderr-1")" 'did not confirm a live watcher' 'Claude ordinary successor confirmed'
       if [ "$publication" = published ]; then
-        assert_contains "$(cat "$home/state/.claude-autoarm-epoch")" 'outcome=rewake' 'Claude published refusal retains recovery commit'
+        [ ! -s "$home/stdout-2" ] && [ ! -s "$home/stderr-2" ] || fail 'Claude runtime repeated delivered refusal on next Stop'
       else
         assert_contains "$(cat "$home/state/.claude-autoarm-epoch")" 'outcome=policy-refused' 'Claude failed publication uses marker-independent refusal commit'
       fi
     else
-      [ "$arms" -eq 1 ] || fail 'Cursor runtime refusal consumed its ordinary attempt'
-      [ "$(cat "$home/statuses")" = 0 ] || fail 'Cursor runtime restoration exit'
+      [ "$publication" != published ] || [ "$refusals" -eq 1 ] || fail 'Cursor runtime refusal not queued exactly once across Stops'
+      expected=1
+      [ "$publication" != published ] || expected=2
+      [ "$arms" -eq "$expected" ] || fail "Cursor runtime ordinary launches=$arms expected=$expected"
+      expected=0
+      [ "$publication" != published ] || expected=$(printf '0\n0')
+      [ "$(cat "$home/statuses")" = "$expected" ] || fail 'Cursor runtime restoration exit'
       if [ "$close" = wake ]; then
         assert_contains "$(cat "$home/stdout-1")" 'owned ordinary wake' 'Cursor restored ordinary wake delivery'
         assert_contains "$(cat "$home/stdout-1")" 'supervision-host: launch policy refused:' 'Cursor runtime refusal accompanies ordinary wake'
       else
         assert_contains "$(cat "$home/stdout-1")" 'supervision-host: launch policy refused:' 'Cursor healthy restoration delivers retained refusal'
         assert_not_contains "$(cat "$home/stdout-1")" 'TURN WOULD END BLIND' 'Cursor healthy restoration emits no repair nag'
+      fi
+      if [ "$publication" = published ]; then
+        assert_not_contains "$(cat "$home/stdout-2")$(cat "$home/stderr-2")" 'supervision-host: launch policy refused:' 'Cursor runtime refusal not redelivered'
       fi
     fi
     if [ "$publication" = failed ]; then
@@ -275,6 +317,160 @@ for stop_consumer in claude cursor; do
   test_shell_stop_policy "$stop_consumer" runtime lost
 done
 test_shell_stop_policy cursor runtime wake
+test_claude_real_arm_refusal() (
+  set -eu
+  policy=$1 publication=$2
+  case_dir="$TMP_ROOT/real-arm-$policy-$publication"
+  repo="$case_dir/repo"
+  export FM_HOME="$case_dir/home" STATE="$case_dir/home/state" FM_ROOT="$repo"
+  export FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$FM_HOME/config"
+  export FM_WAKE_QUEUE="$STATE/.wake-queue" FM_WAKE_QUEUE_LOCK="$STATE/.wake-queue.lock"
+  mkdir -p "$repo/bin" "$STATE" "$FM_CONFIG_OVERRIDE"
+  git init -q "$repo"
+  : > "$repo/AGENTS.md"
+  cp "$ROOT"/bin/*.sh "$ROOT"/bin/*.mjs "$repo/bin/"
+  printf 'claude sonnet\n' > "$FM_CONFIG_OVERRIDE/supervision-host"
+  printf 'owned task\n' > "$STATE/task.meta"
+  [ "$policy" != denied ] || printf 'omp-or-tc\n' > "$FM_CONFIG_OVERRIDE/session-launch-policy"
+  [ "$publication" != failed ] || mkdir "$STATE/.watcher-down"
+  mv "$repo/bin/fm-supervision-host.sh" "$repo/bin/fm-supervision-host-real.sh"
+  cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host\n' >> "$FM_HOME/host-launches"
+printf 'omp-or-tc\n' > "$FM_HOME/config/session-launch-policy"
+exec "$(dirname "$0")/fm-supervision-host-real.sh" "$@"
+SH
+  cat > "$repo/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$(dirname "$0")/fm-wake-lib.sh"
+printf '%s\t%s\t%s\n' "$$" "${FM_WATCH_HANDLING_SUCCESSOR:-0}" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/watcher-custody"
+if [ -d "$STATE/.watcher-down" ]; then
+  printf 'watcher: FAILED - recovery publication remains obstructed\n'
+  exit 1
+fi
+if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" != 1 ]; then
+  fm_recovery_marker_reopen_announced "$STATE/.watcher-down" || exit 1
+fi
+if ! fm_recovery_marker_arm_check "$STATE/.watcher-down"; then
+  printf 'watcher: FAILED - recovery marker cannot be inspected\n'
+  exit 1
+fi
+action=$FM_RECOVERY_MARKER_ACTION
+fm_lock_try_acquire "$STATE/.watch.lock" || exit 1
+printf '%s\n' "$$" > "$STATE/.watch.lock/pid"
+fm_pid_identity "$$" > "$STATE/.watch.lock/pid-identity"
+printf '%s\n' "$FM_HOME" > "$STATE/.watch.lock/fm-home"
+printf '%s\n' "$0" > "$STATE/.watch.lock/watcher-path"
+trap 'fm_lock_release "$STATE/.watch.lock"; exit 0' TERM INT
+: > "$STATE/.last-watcher-beat"
+if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" != 1 ] && [ "$action" = recover ]; then
+  sleep 1
+  printf 'check: rearm-resurface fixture ordinary recovery\n'
+  fm_recovery_transition "$STATE/.watcher-down" release-lock-existing "$STATE/.watch.lock"
+  exit 0
+fi
+for ((i=0; i<100; i++)); do
+  : > "$STATE/.last-watcher-beat"
+  sleep 0.2
+done
+fm_lock_release "$STATE/.watch.lock"
+SH
+  chmod +x "$repo/bin/fm-watch.sh" "$repo/bin/fm-supervision-host.sh"
+  successor_arm=
+  cleanup_real_arm() {
+    if [ -z "$successor_arm" ] && [ -f "$STATE/.watch.lock/pid" ]; then
+      cleanup_pid=$(cat "$STATE/.watch.lock/pid")
+      successor_arm=$(ps -p "$cleanup_pid" -o ppid= 2>/dev/null | tr -d ' ') || successor_arm=
+    fi
+    "$repo/bin/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
+    [ -z "$successor_arm" ] || kill -TERM "$successor_arm" 2>/dev/null || true
+  }
+  trap cleanup_real_arm EXIT
+  out=$(FM_CLAUDE_AUTOARM_ATTEMPTS=1 FM_ARM_CONFIRM_TIMEOUT=2 \
+    "$TMP_ROOT/primary/claude" -c '
+      printf "%s\n" "$$" > "$STATE/.lock"
+      rc=0
+      printf '\''{"session_id":"real-arm-policy","stop_hook_active":false}'\'' \
+        | "$FM_ROOT/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/stdout" 2> "$FM_HOME/stderr" || rc=$?
+      printf "%s\n" "$rc" > "$FM_HOME/status"
+    ' 2>&1) || fail "real-arm primary failed: $out"
+  [ "$(cat "$FM_HOME/status")" = 2 ] || fail 'real-arm refusal not delivered'
+  [ ! -s "$FM_HOME/stdout" ] || fail 'real-arm refusal was not stderr-only'
+  assert_contains "$(cat "$FM_HOME/stderr")" 'supervision-host: launch policy refused:' 'real-arm refusal banner'
+  if [ "$policy" = runtime ]; then
+    [ "$(cat "$FM_HOME/host-launches")" = host ] || fail 'real-arm runtime did not launch host exactly once'
+  else
+    [ ! -e "$FM_HOME/host-launches" ] || fail 'real-arm preflight launched host'
+  fi
+  foreground_arm=$(cut -f1 "$STATE/.watch-cycle-exits.log" | head -1)
+  foreground_arm=${foreground_arm#arm_pid=}
+  case "$foreground_arm" in ''|*[!0-9]*) fail 'real-arm foreground ledger lacks numeric arm PID' ;; esac
+  successor_pid=$(sed -n '2p' "$FM_HOME/watcher-custody" | cut -f1)
+  [ "$(sed -n '2p' "$FM_HOME/watcher-custody" | cut -f3)" = "$foreground_arm" ] || fail 'real-arm successor did not inherit actual closed predecessor'
+  successor_arm=$(ps -p "$successor_pid" -o ppid= 2>/dev/null | tr -d ' ') || successor_arm=
+  if [ "$publication" = published ]; then
+    [ "$(sed -n '2p' "$FM_HOME/watcher-custody" | cut -f2)" = 1 ] || fail 'real-arm successor child lacks handling ownership'
+    fm_watcher_healthy "$STATE" "$repo/bin/fm-watch.sh" 300 "$FM_HOME" || fail 'real-arm successor not healthy beyond exit 2'
+    assert_contains "$(cat "$STATE/.watch-cycle-exits.log")" "successor=started:$successor_pid" 'real-arm predecessor ledger links actual watcher'
+    assert_contains "$(cat "$STATE/.watch-cycle-exits.log")" 'reason=actionable-check' 'real-arm ordinary recovery close ledger'
+    assert_contains "$(cat "$FM_HOME/stderr")" 'check: rearm-resurface fixture ordinary recovery' 'real-arm ordinary output accompanies refusal'
+    assert_not_contains "$(cat "$FM_HOME/stderr")" 'did not confirm a live watcher' 'real-arm handling successor confirmed'
+    assert_contains "$(cat "$STATE/.watcher-down")" 'announced:downtime:' 'real-arm handling episode remains unacknowledged'
+    [ -s "$FM_WAKE_QUEUE" ] || fail 'real-arm successor consumed durable refusal'
+  else
+    assert_contains "$(cat "$FM_HOME/stderr")" 'could not record the hand-back' 'real-arm retains exact failed publication diagnostic'
+    assert_contains "$(cat "$FM_HOME/stderr")" 'did not confirm a live watcher' 'real-arm failed successor is reported'
+    assert_contains "$(cat "$STATE/.claude-autoarm-epoch")" 'outcome=policy-refused' 'real-arm markerless refusal committed'
+    [ -d "$STATE/.watcher-down" ] || fail 'real-arm failure discarded obstructed marker'
+    [ ! -e "$STATE/.watch.lock" ] || fail 'real-arm marker failure claimed healthy coverage'
+  fi
+  pass "Claude real arm policy=$policy publication=$publication predecessor-bound handling"
+)
+test_claude_real_arm_refusal denied published
+test_claude_real_arm_refusal runtime published
+test_claude_real_arm_refusal runtime failed
+test_host_task_refusal_receipts() (
+  set -eu
+  export FM_HOME="$TMP_ROOT/receipt-owners" STATE="$TMP_ROOT/receipt-owners/state"
+  export FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$FM_HOME/config"
+  export FM_WAKE_QUEUE="$STATE/.wake-queue" FM_WAKE_QUEUE_LOCK="$STATE/.wake-queue.lock"
+  mkdir -p "$STATE" "$FM_CONFIG_OVERRIDE"
+  fm_current_pid receipt_owner
+  printf '%s\n' "$receipt_owner" > "$STATE/.lock"
+  printf 'omp-or-tc\n' > "$FM_CONFIG_OVERRIDE/session-launch-policy"
+  printf 'claude sonnet\n' > "$FM_CONFIG_OVERRIDE/supervision-host"
+  fm_session_launch_policy_refusal_notify "$STATE" supervision-host task-generation \
+    'check: task launch refused' 'task policy refusal' "$FM_CONFIG_OVERRIDE/session-launch-policy"
+  [ -n "$FM_SESSION_LAUNCH_REFUSAL_WAKE" ] || fail 'task receipt was not newly notified'
+  fm_supervision_host_autoarm_enabled "$FM_CONFIG_OVERRIDE" claude "$STATE" && fail 'host policy unexpectedly admitted'
+  [ -n "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] || fail 'task ID collision swallowed host refusal'
+  task_receipt=$(cat "$STATE/.session-launch-refused-supervision-host")
+  host_receipt=$(cat "$STATE/.session-launch-refused-.supervision-host")
+  [ "$task_receipt" != "$host_receipt" ] || fail 'task and host share refusal receipt'
+  drain=$("$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "receipt drain failed: $drain"
+  ack=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/fm-wake-drain.sh //p')
+  [ -n "$ack" ] || fail 'receipt drain omitted public acknowledgement command'
+  read -r -a ack_args <<< "$ack"
+  "$ROOT/bin/fm-wake-drain.sh" "${ack_args[@]}" >/dev/null 2>&1 || fail 'receipt public acknowledgement failed'
+  for iteration in 1 2 3; do
+    fm_session_launch_policy_refusal_notify "$STATE" supervision-host task-generation \
+      'check: task launch refused' 'task policy refusal' "$FM_CONFIG_OVERRIDE/session-launch-policy"
+    [ -z "$FM_SESSION_LAUNCH_REFUSAL_WAKE" ] || fail 'unchanged task refusal renotified after acknowledgement'
+    fm_supervision_host_autoarm_enabled "$FM_CONFIG_OVERRIDE" claude "$STATE" && fail 'unchanged host policy unexpectedly admitted'
+    [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] || fail 'unchanged host refusal renotified after acknowledgement'
+  done
+  [ ! -s "$FM_WAKE_QUEUE" ] || fail 'unchanged alternating owners requeued acknowledged refusal'
+  [ "$(cat "$STATE/.session-launch-refused-supervision-host")" = "$task_receipt" ] || fail 'host overwrote task generation receipt'
+  rm "$STATE/.session-launch-refused-supervision-host"
+  [ "$(cat "$STATE/.session-launch-refused-.supervision-host")" = "$host_receipt" ] || fail 'task teardown removed host receipt'
+  fm_supervision_host_autoarm_enabled "$FM_CONFIG_OVERRIDE" claude "$STATE" && fail 'host policy admitted after task teardown'
+  [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] && [ ! -s "$FM_WAKE_QUEUE" ] || fail 'task teardown reset host notification'
+  pass 'host and task supervision-host retain independent acknowledged refusal receipts'
+)
+test_host_task_refusal_receipts
+
+
 
 fm_supervision_host_config "$FM_HOME/config" omp || fail 'configured host unexpectedly disabled'
 [ -z "$FM_SUPERVISION_ENGINE" ] || fail 'restricted engine remained available to attended routing'

@@ -130,7 +130,7 @@ fm_supervision_host_autoarm_enabled() {
   fi
   FM_SUPERVISION_HOST_REFUSAL="supervision-host: launch policy refused: $problem; restore ordinary primary supervision without retrying this host before configuration changes"
   generation=$(fm_supervision_host_main_key "$state") || return 1
-  fm_session_launch_policy_refusal_notify "$state" supervision-host "$generation" \
+  fm_session_launch_policy_refusal_notify "$state" .supervision-host "$generation" \
     "check: $FM_SUPERVISION_HOST_REFUSAL" "$problem" \
     "$config/session-launch-policy" "$config/supervision-host" || return 1
   [ -z "$FM_SESSION_LAUNCH_REFUSAL_WAKE" ] || FM_SUPERVISION_HOST_REFUSAL_WAKE=$FM_SUPERVISION_HOST_REFUSAL

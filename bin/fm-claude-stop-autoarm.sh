@@ -398,7 +398,6 @@ HOST_MODE=0
 HOST_RC=0
 HOST_REFUSAL=
 HOST_REFUSAL_WAKE=
-HOST_REFUSED=0
 ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
 # The opt-in is the file's presence (docs/configuration.md "Supervision host").
 fm_autoarm_still_owner "$STATE" "$MY_GEN" \
@@ -421,12 +420,6 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   fi
   attempt=$((attempt + 1))
   OUT=$(mktemp "$STATE/.claude-autoarm-output.XXXXXX") || OUT=
-  if [ -n "$HOST_REFUSAL_WAKE" ] && [ -n "$OUT" ]; then
-    printf '%s\n' "$HOST_REFUSAL_WAKE" > "$OUT"
-    HOST_REFUSED=1
-    ACTIONABLE=1
-    break
-  fi
   if [ "$HOST_MODE" -eq 1 ]; then
     HOST_RC=0
     FM_SUPERVISION_HOST_AUTOARM_GEN=$MY_GEN FM_SUPERVISION_HOST_OWNER_PID=$$ \
@@ -444,11 +437,25 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
     exit 0
   fi
 
-  ACTIONABLE=0
   if [ "$HOST_MODE" -eq 1 ] && [ -n "$OUT" ] \
     && grep -q '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null; then
-    HOST_REFUSED=1
+    if ! fm_autoarm_still_owner "$STATE" "$MY_GEN" \
+      || ! fm_session_lock_owned_by_self "$STATE"; then
+      rm -f "$OUT" 2>/dev/null || true
+      exit 0
+    fi
+    fm_supervision_host_autoarm_enabled "$CONFIG" claude "$STATE" || true
+    HOST_REFUSAL=$(grep '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null)
+    HOST_REFUSAL_WAKE=$HOST_REFUSAL
+    HOST_MODE=0
+    ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
+    attempt=$((attempt - 1))
+    rm -f "$OUT" 2>/dev/null || true
+    OUT=
+    continue
   fi
+  ACTIONABLE=0
+  [ -z "$HOST_REFUSAL_WAKE" ] || ACTIONABLE=1
   if [ -n "$OUT" ]; then
     grep -Eq "$ACTIONABLE_RE" "$OUT" 2>/dev/null && ACTIONABLE=1
   fi
@@ -532,12 +539,13 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     exit 0
   fi
   # The host owns its own successors and stops its cycle before handing back.
-  if [ "$HOST_MODE" -eq 0 ] || [ "$HOST_REFUSED" -eq 1 ]; then
+  if [ "$HOST_MODE" -eq 0 ]; then
     start_handling_successor "$CLOSED_ARM_PID" || true
   fi
   {
     printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'
-    if [ "$HOST_MODE" -eq 1 ] || [ "$HOST_REFUSED" -eq 1 ]; then
+    [ -z "$HOST_REFUSAL_WAKE" ] || printf '%s\n' "$HOST_REFUSAL_WAKE"
+    if [ "$HOST_MODE" -eq 1 ]; then
       [ -n "$OUT" ] && awk '/^supervision-host:/ { print; next } /^(signal:|stale:|check:|heartbeat)/ && shown++ < 8' "$OUT" 2>/dev/null
     else
       [ -n "$OUT" ] && grep -E '^(signal:|stale:|check:|heartbeat)' "$OUT" 2>/dev/null | head -8
@@ -549,7 +557,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     printf 'Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n'
   } >&2
   if autoarm_commit rewake \
-    || { [ "$HOST_REFUSED" -eq 1 ] && autoarm_commit policy-refused; }; then
+    || { [ -n "$HOST_REFUSAL_WAKE" ] && autoarm_commit policy-refused; }; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 2
   fi
