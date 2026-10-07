@@ -14,6 +14,91 @@ LOG="$TMP_ROOT/log"
 TASK="$TMP_ROOT/task"
 BRIEF="$TMP_ROOT/brief"
 mkdir -p "$HOME_DIR/config" "$CATALOG" "$LOG"
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+import http.server
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import threading
+
+root, temporary = map(Path, sys.argv[1:])
+lab = temporary / "curl-config"
+lab.mkdir()
+curl = shutil.which("curl")
+if curl is None:
+    raise SystemExit("curl is required for transport privacy regression")
+requests = []
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    status = 200
+
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers["Content-Length"]))
+        requests.append((self.headers.get("Authorization"), json.loads(body)))
+        self.send_response(self.status)
+        self.send_header("Content-Length", "2")
+        self.send_header("Retry-After", "1")
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+    def log_message(self, *args):
+        pass
+
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+(lab / "curl").write_text("""#!/usr/bin/env bash
+args=()
+for arg in "$@"; do
+  if [ "$arg" = https://api.typesafe.ai/v1/systemone ]; then
+    arg="http://127.0.0.1:$TRANSPORT_PORT/"
+  fi
+  args+=("$arg")
+done
+exec "$REAL_CURL" "${args[@]}"
+""")
+(lab / "curl").chmod(0o755)
+(lab / ".curlrc").write_text(f'trace-ascii = "{lab}/trace.log"\nretry = 3\n')
+environment = os.environ.copy()
+environment.update(
+    PATH=f"{lab}:{os.environ['PATH']}", CURL_HOME=str(lab), HOME=str(lab),
+    REAL_CURL=curl, TRANSPORT_PORT=str(server.server_port), NO_PROXY="127.0.0.1",
+    no_proxy="127.0.0.1", TYPESAFE_API_KEY="disposable-transport-key",
+)
+environment.pop("TYPESAFE_API_KEY_PRIVATE", None)
+try:
+    for stage, status, timed in [("rank", 200, False), ("recheck", 200, True), ("rank", 503, True)]:
+        Handler.status = status
+        catalog = {"id": "alpha", "description": "Public alpha description"}
+        if stage == "recheck":
+            catalog["excerpt"] = "Public alpha opening instructions"
+        request = {"state": {"task": "Public task", "catalog": [catalog]}}
+        before = len(requests)
+        response = lab / "response"
+        timing = lab / "timing"
+        command = '. "$1/bin/fm-typesafe-lib.sh"; fm_typesafe_post "$2" "$3" "$4"'
+        result = subprocess.run(
+            ["bash", "-c", command, "_", str(root), json.dumps(request),
+             str(response), str(timing) if timed else ""],
+            env=environment, capture_output=True, text=True, timeout=15,
+        )
+        assert result.returncode == 0 and result.stdout == str(status), result
+        assert requests[before:] == [("Bearer disposable-transport-key", request)], \
+            "transport must send the authorized body exactly once"
+        assert response.read_text() == "{}", "response body must remain available"
+        assert not (lab / "trace.log").exists(), "ambient curl tracing must not persist request or credential"
+        if timed:
+            assert float(timing.read_text()) >= 0, "dispatch transfer timing must remain available"
+finally:
+    server.shutdown()
+    server.server_close()
+    thread.join()
+PY
+pass "real TypeSafe transport ignores ambient tracing and retries while preserving bodies and timing"
+
 for id in alpha beta gamma delta safety; do
   mkdir -p "$CATALOG/$id"
   cat > "$CATALOG/$id/SKILL.md" <<MD

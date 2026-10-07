@@ -23,7 +23,7 @@ fm_typesafe_key() {
 
 fm_typesafe_post() {
   local request=$1 response=$2 timing=${3:-} result rc=0 http
-  result=$(printf '%s' "$request" | curl -sS --max-time 5 -o "$response" -w '%{http_code} %{time_total}' \
+  result=$(printf '%s' "$request" | curl -q -sS --max-time 5 -o "$response" -w '%{http_code} %{time_total}' \
     -X POST https://api.typesafe.ai/v1/systemone -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
     --data-binary @- 2>/dev/null) || rc=$?

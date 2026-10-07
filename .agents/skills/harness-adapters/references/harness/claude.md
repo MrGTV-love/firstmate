@@ -70,7 +70,7 @@ A `--secondmate` launch omits the statement because a secondmate operates under 
 
 ## Primary integration
 
-[`../../../../../docs/verification/supervision.md`](../../../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
+[`../../../docs/verification/supervision.md`](../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
 This differs from the worker Stop hook in `.claude/settings.local.json`, which records idle state and touches a task marker.
 
 Primary `.claude/settings.json` registers `../../../bin/fm-turnend-guard.sh --claude` and `../../../bin/fm-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
