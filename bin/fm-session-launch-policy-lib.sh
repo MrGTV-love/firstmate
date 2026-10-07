@@ -96,13 +96,27 @@ fm_session_launch_policy_refusal_notify() {
 }
 
 fm_session_launch_policy_check_child() {
-  local enabled child_enabled
+  local enabled child_enabled home=$2 source_bin file
   enabled=$(fm_session_launch_policy_enabled "$1") || return 1
   [ "$enabled" = 1 ] || return 0
-  child_enabled=$(fm_session_launch_policy_enabled "$2") || return 1
-  [ "$child_enabled" = 1 ] && return 0
-  printf 'error: secondmate config/session-launch-policy must be enabled at %s before launch\n' "$2" >&2
-  return 1
+  child_enabled=$(fm_session_launch_policy_enabled "$home/config") || return 1
+  if [ "$child_enabled" != 1 ]; then
+    printf 'error: secondmate config/session-launch-policy must be enabled at %s before launch\n' "$home/config" >&2
+    return 1
+  fi
+  source_bin=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || return 1
+  for file in fm-session-launch-policy-lib.sh fm-config-inherit-lib.sh \
+    fm-spawn.sh fm-control.sh fm-secondmate-liveness-lib.sh \
+    fm-session-end-relaunch-lib.sh fm-supervision-host.sh \
+    fm-supervision-engine-lib.sh fm-remote-secondmate-relaunch.sh \
+    fm-remote-secondmate-control.sh; do
+    if [ ! -f "$home/bin/$file" ] || [ ! -r "$home/bin/$file" ] \
+      || ! cmp -s "$source_bin/$file" "$home/bin/$file"; then
+      printf 'error: secondmate session-launch-policy tooling is not verified at %s; restore this policy owner from the primary without discarding the child checkout or work before retrying\n' "$home/bin/$file" >&2
+      return 1
+    fi
+  done
+  return 0
 }
 
 fm_session_launch_policy_converge_child() (
@@ -134,5 +148,5 @@ fm_session_launch_policy_converge_child() (
       propagate_inheritable_config "$config" "$home/config" ||
       printf 'warning: secondmate %s session-launch-policy inheritance failed for %s\n' "$id" "$home" >&2
   fi
-  fm_session_launch_policy_check_child "$config" "$home/config"
+  fm_session_launch_policy_check_child "$config" "$home"
 )

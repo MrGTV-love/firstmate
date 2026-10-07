@@ -394,6 +394,23 @@ SH
       printf '\''{"session_id":"real-arm-policy","stop_hook_active":false}'\'' \
         | "$FM_ROOT/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/stdout" 2> "$FM_HOME/stderr" || rc=$?
       printf "%s\n" "$rc" > "$FM_HOME/status"
+      if [ -d "$STATE/.watcher-down" ]; then
+        printf "session=real-arm-policy\ncount=2\nepoch=prior\n" > "$STATE/.turnend-claude-blocks"
+        cp "$STATE/.turnend-claude-blocks" "$FM_HOME/prior-budget"
+        printf "prior failure notice\n" > "$STATE/.claude-autoarm-failure-notified"
+        rc=0
+        printf '\''{"session_id":"real-arm-policy","stop_hook_active":true}'\'' \
+          | FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 "$FM_ROOT/bin/fm-turnend-guard.sh" --claude \
+            > "$FM_HOME/guard-stdout" 2> "$FM_HOME/guard-stderr" || rc=$?
+        printf "%s\n" "$rc" > "$FM_HOME/guard-status"
+        cp "$STATE/.turnend-claude-blocks" "$FM_HOME/fresh-budget"
+        touch -t 200001010000 "$STATE/.claude-autoarm-epoch"
+        rc=0
+        printf '\''{"session_id":"real-arm-policy","stop_hook_active":true}'\'' \
+          | FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 "$FM_ROOT/bin/fm-turnend-guard.sh" --claude \
+            > "$FM_HOME/stale-stdout" 2> "$FM_HOME/stale-stderr" || rc=$?
+        printf "%s\n" "$rc" > "$FM_HOME/stale-status"
+      fi
     ' 2>&1) || fail "real-arm primary failed: $out"
   [ "$(cat "$FM_HOME/status")" = 2 ] || fail 'real-arm refusal not delivered'
   [ ! -s "$FM_HOME/stdout" ] || fail 'real-arm refusal was not stderr-only'
@@ -424,12 +441,126 @@ SH
     assert_contains "$(cat "$STATE/.claude-autoarm-epoch")" 'outcome=policy-refused' 'real-arm markerless refusal committed'
     [ -d "$STATE/.watcher-down" ] || fail 'real-arm failure discarded obstructed marker'
     [ ! -e "$STATE/.watch.lock" ] || fail 'real-arm marker failure claimed healthy coverage'
+    [ "$(cat "$FM_HOME/guard-status")" = 0 ] || fail 'fresh completed refusal generated competing guard continuation'
+    [ ! -s "$FM_HOME/guard-stdout" ] && [ ! -s "$FM_HOME/guard-stderr" ] || fail 'fresh completed refusal emitted duplicate guard notice'
+    cmp -s "$FM_HOME/prior-budget" "$FM_HOME/fresh-budget" || fail 'fresh completed refusal consumed guard budget'
+    [ "$(cat "$STATE/.claude-autoarm-failure-notified")" = 'prior failure notice' ] || fail 'refusal falsely reset monitoring failure episode'
+    [ "$(cat "$FM_HOME/stale-status")" = 2 ] || fail 'stale refusal silently allowed blind Stop'
+    assert_contains "$(cat "$FM_HOME/stale-stderr")" 'TURN WOULD END BLIND' 'stale refusal still requires recovery'
   fi
   pass "Claude real arm policy=$policy publication=$publication predecessor-bound handling"
 )
 test_claude_real_arm_refusal denied published
 test_claude_real_arm_refusal runtime published
 test_claude_real_arm_refusal runtime failed
+test_runtime_refusal_receipt() (
+  set -eu
+  consumer=$1
+  case_dir="$TMP_ROOT/runtime-receipt-$consumer"
+  repo="$case_dir/repo"
+  export FM_HOME="$case_dir/home" STATE="$case_dir/home/state" FM_ROOT="$repo"
+  export FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$FM_HOME/config"
+  export FM_WAKE_QUEUE="$STATE/.wake-queue" FM_WAKE_QUEUE_LOCK="$STATE/.wake-queue.lock"
+  mkdir -p "$repo/bin" "$STATE" "$FM_CONFIG_OVERRIDE"
+  git init -q "$repo"
+  : > "$repo/AGENTS.md"
+  cp "$ROOT"/bin/*.sh "$ROOT"/bin/*.mjs "$repo/bin/"
+  printf 'claude sonnet\n' > "$FM_CONFIG_OVERRIDE/supervision-host"
+  printf 'omp-or-tc\n' > "$FM_CONFIG_OVERRIDE/session-launch-policy"
+  printf 'owned task\n' > "$STATE/task.meta"
+  mv "$repo/bin/fm-supervision-host.sh" "$repo/bin/fm-supervision-host-real.sh"
+  cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host\n' >> "$FM_HOME/host-launches"
+printf 'omp-or-tc\n' > "$FM_HOME/config/session-launch-policy"
+exec "$(dirname "$0")/fm-supervision-host-real.sh" "$@"
+SH
+  cat > "$repo/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${FIXTURE_MONITOR:-0}" = 1 ]; then
+  trap 'exit 0' TERM INT
+  while :; do sleep 1; done
+fi
+printf 'ordinary\n' >> "$FM_HOME/ordinary-launches"
+printf 'signal: ordinary checkpoint wake\n'
+SH
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+. "$(dirname "$0")/fm-wake-lib.sh"
+printf 'ordinary\n' >> "$FM_HOME/ordinary-launches"
+mkdir -p "$STATE/.watch.lock"
+printf '%s\n' "$FIXTURE_WATCH_PID" > "$STATE/.watch.lock/pid"
+fm_pid_identity "$FIXTURE_WATCH_PID" > "$STATE/.watch.lock/pid-identity"
+printf '%s\n' "$FM_HOME" > "$STATE/.watch.lock/fm-home"
+printf '%s\n' "$(dirname "$0")/fm-watch.sh" > "$STATE/.watch.lock/watcher-path"
+: > "$STATE/.last-watcher-beat"
+printf 'watcher: started pid=%s\n' "$FIXTURE_WATCH_PID"
+SH
+  chmod +x "$repo/bin/fm-supervision-host.sh" "$repo/bin/fm-watch.sh" "$repo/bin/fm-watch-arm.sh"
+  case "$consumer" in
+    claude) primary="$TMP_ROOT/primary/claude"; script=fm-claude-stop-autoarm.sh ;;
+    cursor) primary="$TMP_ROOT/primary/cursor-agent"; script=fm-turnend-guard-cursor.sh ;;
+    codex)
+      [ -e "$TMP_ROOT/primary/codex" ] || ln -s /bin/bash "$TMP_ROOT/primary/codex"
+      primary="$TMP_ROOT/primary/codex"; script=fm-watch-checkpoint.sh ;;
+  esac
+  status=0
+  out=$(FIXTURE_CONSUMER="$consumer" FIXTURE_SCRIPT="$script" \
+    FM_CLAUDE_AUTOARM_ATTEMPTS=1 FM_CURSOR_PARK_ATTEMPTS=1 FM_CURSOR_PARK_POLL=1 FM_ARM_CONFIRM_TIMEOUT=1 \
+    "$primary" -c '
+      owner=$$
+      [ "$FIXTURE_CONSUMER" != cursor ] || owner=$PPID
+      printf "%s\n" "$owner" > "$STATE/.lock"
+      FIXTURE_MONITOR=1 "$FM_ROOT/bin/fm-watch.sh" &
+      export FIXTURE_WATCH_PID=$!
+      trap '\''kill -TERM "$FIXTURE_WATCH_PID" 2>/dev/null || true; wait "$FIXTURE_WATCH_PID" 2>/dev/null || true'\'' EXIT
+      invoke() {
+        rc=0
+        if [ "$FIXTURE_CONSUMER" = codex ]; then
+          "$FM_ROOT/bin/$FIXTURE_SCRIPT" --seconds 2 > "$FM_HOME/stdout-$1" 2> "$FM_HOME/stderr-$1" || rc=$?
+        else
+          printf '\''{"session_id":"receipt-policy","stop_hook_active":false,"loop_count":0}'\'' \
+            | "$FM_ROOT/bin/$FIXTURE_SCRIPT" > "$FM_HOME/stdout-$1" 2> "$FM_HOME/stderr-$1" || rc=$?
+        fi
+        printf "%s\n" "$rc" > "$FM_HOME/status-$1"
+      }
+      invoke first
+      cp "$STATE/.session-launch-refused-.supervision-host" "$FM_HOME/prior-receipt"
+      "$FM_ROOT/bin/fm-wake-drain.sh" > "$FM_HOME/drained" 2>&1
+      ack=$(sed -n '\''s/^WAKE_ACK_REQUIRED: after handling completes run bin\/fm-wake-drain.sh //p'\'' "$FM_HOME/drained")
+      [ -n "$ack" ] || exit 91
+      read -r -a args <<< "$ack"
+      "$FM_ROOT/bin/fm-wake-drain.sh" "${args[@]}" > "$FM_HOME/acknowledged"
+      [ ! -s "$FM_WAKE_QUEUE" ] || exit 92
+      rm "$FM_HOME/config/session-launch-policy"
+      invoke replay
+      cmp -s "$FM_HOME/prior-receipt" "$STATE/.session-launch-refused-.supervision-host" || exit 93
+      [ ! -s "$FM_WAKE_QUEUE" ] || exit 94
+    ' 2>&1) || status=$?
+  expect_code 0 "$status" "$consumer same-receipt primary: $out"
+  expected=0
+  [ "$consumer" != claude ] || expected=2
+  [ "$(cat "$FM_HOME/status-first")" = "$expected" ] || fail "$consumer first refusal exit status"
+  assert_contains "$(cat "$FM_HOME/stdout-first" "$FM_HOME/stderr-first")" 'supervision-host: launch policy refused:' "$consumer first refusal delivered"
+  assert_contains "$(cat "$FM_HOME/drained")" 'supervision-host: launch policy refused:' "$consumer refusal drain owns acknowledgement"
+  [ "$(cat "$FM_HOME/host-launches")" = host ] || fail "$consumer did not reach exactly one runtime re-refusal"
+  [ "$(cat "$FM_HOME/status-replay")" = 0 ] || fail "$consumer acknowledged runtime refusal forced another continuation"
+  assert_not_contains "$(cat "$FM_HOME/stdout-replay" "$FM_HOME/stderr-replay")" 'launch policy refused:' "$consumer runtime translation overwrote existing receipt verdict"
+  expected=2
+  [ "$consumer" != claude ] || expected=3
+  [ "$(wc -l < "$FM_HOME/ordinary-launches" | tr -d ' ')" = "$expected" ] || fail "$consumer did not restore ordinary monitoring on both refusals"
+  if [ "$consumer" = codex ]; then
+    assert_contains "$(cat "$FM_HOME/stdout-replay")" 'signal: ordinary checkpoint wake' 'checkpoint preserves ordinary actionable close'
+  else
+    [ ! -s "$FM_HOME/stdout-replay" ] && [ ! -s "$FM_HOME/stderr-replay" ] || fail "$consumer ordinary healthy restoration emitted competing handoff"
+  fi
+  pass "$consumer notify/ack/remove-policy/runtime-same-A: receipt retained, refusal silent, ordinary monitoring restored"
+)
+for receipt_consumer in claude cursor codex; do
+  test_runtime_refusal_receipt "$receipt_consumer"
+done
+
 test_host_task_refusal_receipts() (
   set -eu
   export FM_HOME="$TMP_ROOT/receipt-owners" STATE="$TMP_ROOT/receipt-owners/state"
@@ -466,6 +597,12 @@ test_host_task_refusal_receipts() (
   [ "$(cat "$STATE/.session-launch-refused-.supervision-host")" = "$host_receipt" ] || fail 'task teardown removed host receipt'
   fm_supervision_host_autoarm_enabled "$FM_CONFIG_OVERRIDE" claude "$STATE" && fail 'host policy admitted after task teardown'
   [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] && [ ! -s "$FM_WAKE_QUEUE" ] || fail 'task teardown reset host notification'
+  rm "$STATE/.session-launch-refused-.supervision-host"
+  mkdir "$STATE/.session-launch-refused-.supervision-host"
+  fm_supervision_host_autoarm_enabled "$FM_CONFIG_OVERRIDE" claude "$STATE" 2> "$FM_HOME/publication-errors" \
+    && fail 'obstructed refusal receipt admitted host'
+  [ -n "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] || fail 'refusal receipt publication failure silently discarded diagnostic'
+  [ -d "$STATE/.session-launch-refused-.supervision-host" ] || fail 'refusal notification replaced obstructing directory'
   pass 'host and task supervision-host retain independent acknowledged refusal receipts'
 )
 test_host_task_refusal_receipts

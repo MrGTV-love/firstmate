@@ -17,6 +17,7 @@ cleanup() {
   done
 }
 RUN_TAG="$$-$RANDOM"
+CASE_SEQ=0
 trap cleanup EXIT
 
 make_case() {
@@ -24,7 +25,8 @@ make_case() {
   CASE="$TMP_ROOT/$name"
   HOME_DIR="$CASE/home"
   WT="$CASE/wt"
-  ID="launch-policy-$RUN_TAG-$name"
+  CASE_SEQ=$((CASE_SEQ + 1))
+  ID="launch-policy-$RUN_TAG-$CASE_SEQ"
   CHILD_HOME=
   CASE_TMPDIR=
   CASE_ROOT=
@@ -194,6 +196,7 @@ make_secondmate_case() {
   INHERIT_REPORT="$CASE/inherit-report"
   mkdir -p "$CHILD_HOME/bin" "$CHILD_HOME/config" "$CHILD_HOME/data" \
     "$CHILD_HOME/state" "$CHILD_HOME/projects" "$CASE_TMPDIR"
+  ln -s "$ROOT/bin/"* "$CHILD_HOME/bin/"
   printf '# Firstmate\n' > "$CHILD_HOME/AGENTS.md"
   printf '%s\n' "$ID" > "$CHILD_HOME/.fm-secondmate-home"
   printf '/config/\n/data/\n/state/\n/projects/\n' > "$CHILD_HOME/.gitignore"
@@ -681,14 +684,109 @@ for entry in fresh direct control auto; do
 done
 
 for entry in fresh direct control auto; do
+  for owner in fm-session-launch-policy-lib.sh fm-config-inherit-lib.sh \
+    fm-spawn.sh fm-control.sh fm-secondmate-liveness-lib.sh \
+    fm-session-end-relaunch-lib.sh fm-supervision-host.sh \
+    fm-supervision-engine-lib.sh fm-remote-secondmate-relaunch.sh \
+    fm-remote-secondmate-control.sh; do
+    make_secondmate_case "child-$entry-outdated-${owner%.sh}" omp "$entry"
+    restrict
+    EXPECT_CHILD_POLICY=1
+    set_child_policy_case skip-valid
+    SKIP_CHILD_SYNC=0
+    rm "$CHILD_HOME/bin/$owner"
+    cat > "$CHILD_HOME/bin/$owner" <<'SH'
+#!/usr/bin/env bash
+set -eu
+exec codex "$@"
+SH
+    chmod +x "$CHILD_HOME/bin/$owner"
+    cp "$CHILD_HOME/bin/$owner" "$CASE/tooling-prior"
+    if [ "$owner" = fm-spawn.sh ]; then
+      out=$(run_cli env FM_HOME="$CHILD_HOME" FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= \
+        FM_DATA_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PROJECTS_OVERRIDE= \
+        "$CHILD_HOME/bin/fm-spawn.sh" descendant --harness codex) \
+        || fail "outdated executable fixture did not reach its policy bypass: $out"
+      grep -Fx 'launch:codex' "$CASE/effects" >/dev/null || fail 'outdated child fixture did not launch forbidden codex'
+      grep -Fx 'launch:enabled' "$CASE/admission" >/dev/null || fail 'outdated child bypass did not run with an enabled policy'
+      : > "$CASE/effects"
+      : > "$CASE/admission"
+      rm "$CASE/child-launch"
+    fi
+    set_secondmate_endpoint "$entry" omp
+    rc=0
+    out=$(run_secondmate_entry "$entry") || rc=$?
+    [ "$rc" -ne 0 ] || fail "$entry accepted outdated child $owner with enabled policy: $out"
+    assert_contains "$out" 'session-launch-policy tooling is not verified' 'outdated child refusal identifies tooling boundary'
+    assert_contains "$out" "$CHILD_HOME/bin/$owner" 'outdated child refusal names the incapable policy owner'
+    cmp -s "$CASE/tooling-prior" "$CHILD_HOME/bin/$owner" || fail 'tooling admission rewrote preserved child code'
+    assert_secondmate_refused "$entry"
+    assert_inheritance_refusal skip-valid
+    pass "$entry refuses outdated $owner before replacement even with valid skipped inheritance"
+  done
+done
+
+for entry in fresh direct control auto; do
+  make_secondmate_case "child-$entry-missing-tooling" omp "$entry"
+  restrict
+  EXPECT_CHILD_POLICY=1
+  set_child_policy_case valid
+  rm "$CHILD_HOME/bin/fm-spawn.sh"
+  set_secondmate_endpoint "$entry" omp
+  rc=0
+  out=$(run_secondmate_entry "$entry") || rc=$?
+  [ "$rc" -ne 0 ] || fail "$entry accepted missing child launcher: $out"
+  assert_contains "$out" "$CHILD_HOME/bin/fm-spawn.sh" 'missing tooling refusal names the child launcher'
+  [ ! -e "$CHILD_HOME/bin/fm-spawn.sh" ] || fail 'tooling admission installed a launcher in the preserved checkout'
+  assert_secondmate_refused "$entry"
+  pass "$entry refuses missing child tooling without overwriting checkout or consuming recovery"
+done
+
+for entry in fresh direct control auto; do
+  make_secondmate_case "child-$entry-preserved-current-tooling" omp "$entry"
+  restrict
+  EXPECT_CHILD_POLICY=1
+  set_child_policy_case valid
+  SKIP_CHILD_SYNC=0
+  git -C "$CHILD_HOME" checkout -b "preserved-$entry" >/dev/null 2>&1
+  printf 'unique descendant commit\n' > "$CHILD_HOME/child-history"
+  git -C "$CHILD_HOME" add child-history
+  git -C "$CHILD_HOME" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    commit -qm 'Preserve unique descendant history'
+  git -C "$CHILD_HOME" rev-parse HEAD > "$CASE/head-prior"
+  set_secondmate_endpoint "$entry" omp
+  out=$(run_secondmate_entry "$entry") || fail "$entry refused capable preserved child: $out"
+  assert_secondmate_launched "$entry" omp enabled
+  [ "$(git -C "$CHILD_HOME" symbolic-ref --short HEAD)" = "preserved-$entry" ] || fail 'capability admission changed child branch'
+  [ "$(cat "$CHILD_HOME/child-history")" = 'unique descendant commit' ] || fail 'capability admission changed unique child history'
+  pass "$entry admits current policy owners while preserving dirty wrong-branch divergent child work"
+done
+
+make_secondmate_case child-own-tooling-policy omp direct
+restrict
+EXPECT_CHILD_POLICY=1
+set_child_policy_case valid
+rc=0
+out=$(run_cli env FM_HOME="$CHILD_HOME" FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= \
+  FM_DATA_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PROJECTS_OVERRIDE= \
+  "$CHILD_HOME/bin/fm-spawn.sh" descendant "$CHILD_HOME/projects/alpha" \
+  --harness codex --mode no-mistakes --yolo off) || rc=$?
+[ "$rc" -ne 0 ] || fail "capable child's own launcher admitted forbidden descendant codex: $out"
+assert_contains "$out" 'session-launch-policy' 'actual child-owned launcher enforces inherited policy'
+[ ! -s "$CASE/effects" ] || fail 'actual child-owned policy refusal reached a runtime or terminal'
+pass 'capable child-owned executable enforces policy with root and config overrides cleared'
+
+for entry in fresh direct control auto; do
   make_secondmate_case "child-$entry-legacy" codex "$entry"
   set_child_policy_case unwritable-absent
+  rm "$CHILD_HOME/bin/fm-spawn.sh" "$CHILD_HOME/bin/fm-session-launch-policy-lib.sh"
   set_secondmate_endpoint "$entry" codex
   out=$(run_secondmate_entry "$entry") || fail "$entry absent-parent compatibility failed: $out"
   assert_secondmate_launched "$entry" codex absent
+  [ ! -e "$CHILD_HOME/bin/fm-spawn.sh" ] || fail 'absent parent changed legacy child tooling'
   [ ! -e "$HOME_DIR/config/session-launch-policy" ] || fail 'legacy case unexpectedly enabled the parent policy'
   grep -Fx 'config-write' "$CASE/inherit-failures" >/dev/null || fail 'legacy best-effort write failure fixture never failed'
-  pass "$entry absent parent preserves codex secondmate launch despite unrelated config write failures"
+  pass "$entry absent parent preserves legacy codex secondmate launch despite missing policy tooling and config write failures"
 done
 
 assert_secondmate_auto_refusal() {

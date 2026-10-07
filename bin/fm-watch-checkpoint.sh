@@ -142,11 +142,13 @@ if [ "$HOST_MODE" -eq 1 ]; then
   RC=$?
   set -e
   if grep -q '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null; then
-    cat "$OUT"
-    [ ! -s "$ERR" ] || cat "$ERR" >&2
     fm_session_lock_owned_by_self "$STATE" || exit 1
     . "$SCRIPT_DIR/fm-wake-lib.sh"
     fm_supervision_host_autoarm_enabled "$CONFIG" codex "$STATE" || true
+    if [ -z "$FM_SUPERVISION_HOST_REFUSAL" ] || [ -n "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ]; then
+      cat "$OUT"
+      [ ! -s "$ERR" ] || cat "$ERR" >&2
+    fi
   else
     if grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT" 2>/dev/null \
       | grep -Ev '^supervision-host: cycle boundary' >/dev/null; then

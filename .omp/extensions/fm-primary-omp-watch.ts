@@ -1040,7 +1040,14 @@ export default function (pi: ExtensionAPI) {
       releaseChild();
       const classification = classifyClose(hostMode, stdout, stderr, code, signal);
       if (hostMode && hostLaunchRefused(classification.message)) {
-        refusedHostConfiguration = hostConfiguration;
+        const currentConfiguration = hostConfigurationKey();
+        const result = spawnSync(
+          "bash",
+          ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" omp && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
+            `${fmRoot}/bin/fm-supervision-engine-lib.sh`, config],
+          { cwd: fmRoot, encoding: "utf8", env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config } },
+        );
+        refusedHostConfiguration = result.status === 1 ? currentConfiguration : null;
       }
       const predecessor = String(armChild.pid ?? "");
       if (classification.kind === "actionable") {

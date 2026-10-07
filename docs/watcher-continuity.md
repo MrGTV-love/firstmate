@@ -45,9 +45,10 @@ Each adapter:
 A failed follow-up never cancels continuity restoration.
 
 OpenCode treats launch-policy-refused readiness as close-handler-owned, including on a scheduled retry after a non-actionable startup failure.
-At refusal close, OpenCode rechecks current policy and engine admission, suppressing only a still-denied configuration rather than the configuration captured before launch.
-The close restores currently permitted monitoring and delivers the actual refusal once after successor readiness; the retry callback does not emit a competing launch-failure prompt.
+At refusal close, OpenCode and omp recheck current policy and engine admission, suppressing only a still-denied configuration rather than the configuration captured before launch.
+The close restores currently permitted monitoring and delivers the actual refusal once after successor readiness; OpenCode's retry callback does not emit a competing launch-failure prompt.
 `tests/fm-supervision-session-launch-policy.test.sh` exercises scheduled retries, policy enablement between spawn and admission, and policy removal before refusal close with the real plugin and policy-refusal executable under a fake local runtime, without launching a vendor model session.
+`tests/fm-omp-harness.test.sh` covers a gated absent-policy selection, enabled-policy admission refusal, and policy removal before close, plus a still-denied close, unconsumed same-process replacement replay and consumption, and the next ordinary host wake.
 
 ### Pi session replacement
 
@@ -131,9 +132,9 @@ The host's successor and pass-through lifecycle is owned by [supervision-host.md
 
 Claude and Cursor resolve host launch admission before selecting their Stop-owned park.
 A denied host queues one refusal per main-session identity and policy/host configuration fingerprint, using the reserved `.supervision-host` launch-refusal receipt owner outside the task-ID namespace, and the Stop owner parks on the ordinary watcher instead.
-Acknowledgement does not permit another notification for unchanged configuration; policy repair is reconsidered at the next Stop.
-If configuration changes between admission and host activation, both Stop owners record the current-policy receipt and switch their park to the ordinary watcher while retaining the original refusal diagnostic.
-Claude waits for that ordinary arm to close before starting its handling successor with the closed arm's PID; refusal delivery does not depend on successful recovery-marker publication.
+Acknowledgement does not permit another notification for unchanged configuration, including when a policy is removed and restored to the same refused contents before host activation; policy repair is reconsidered at the next Stop.
+If configuration changes between admission and host activation, both Stop owners record the current-policy receipt and switch their park to the ordinary watcher. They retain the original runtime diagnostic for a new refusal or publication failure, but an existing receipt suppresses another refusal handoff.
+Claude waits for that ordinary arm to close before starting its handling successor with the closed arm's PID; refusal delivery does not depend on successful recovery-marker publication. A fresh completed `policy-refused` epoch makes its synchronous guard cooperate without spending another block or resetting the monitoring-failure episode. This is continuation ownership, not healthy monitoring: once the epoch is stale, a blind Stop is blocked again.
 
 ## Actionable wake ordering
 

@@ -3203,7 +3203,7 @@ if [ "$KIND" = secondmate ]; then
       propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
   fi
-  fm_session_launch_policy_check_child "$CONFIG" "$PROJ_ABS/config" || exit 1
+  fm_session_launch_policy_check_child "$CONFIG" "$PROJ_ABS" || exit 1
   if [ -f "$PROJ_ABS/data/charter.md" ]; then
     BRIEF="$PROJ_ABS/data/charter.md"
   else

@@ -87,7 +87,7 @@ The command is selected at render time; policy changes after rendering still rea
 The other owners read the file at every arm.
 
 Codex checks actual session-lock ownership before publishing a preflight refusal and runs the ordinary foreground watcher instead of the denied host.
-A host refusal after selection likewise retains the diagnostic and returns to ordinary foreground monitoring only while the primary still owns the session lock.
+A host refusal after selection likewise consults the persistent main-session refusal receipt before delivering its runtime diagnostic, and returns to ordinary foreground monitoring only while the primary still owns the session lock. New refusals and publication failures retain their diagnostics; restoring an already-acknowledged refused configuration before activation does not repeat its notice.
 The ordinary watcher and host retain their own ownership checks; refusal output alone is not a successful checkpoint.
 Without a session launch policy, existing opted-in host behavior is unchanged.
 

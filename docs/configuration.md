@@ -787,7 +787,10 @@ The shared template leaves this restriction off by default: absence preserves ex
 Enabling it in each captain home is the operator's responsibility.
 An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
-Local recovery converges this setting before stopping the old endpoint and refuses if the child restriction cannot be established, while unrelated inheritance remains best-effort.
+Local admission also requires the child's policy parser/configuration dependency and spawn, control, automatic-recovery, supervision-host/engine, and remote-replacement owners to match the authoritative launching code's bytes.
+This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
+Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
+Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt, while unrelated inheritance remains best-effort.
 
 This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
 Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.

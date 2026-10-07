@@ -794,6 +794,146 @@ EOF
   pass ".omp watch extension: a host close split across stream chunks reaches main as one whole follow-up"
 }
 
+test_watch_extension_revalidates_runtime_refusal() {
+  local close_policy=$1 repo home primary out status
+  repo="$TMP_ROOT/watch-refusal-$close_policy/repo"; home="$TMP_ROOT/watch-refusal-$close_policy/home"
+  install_omp_extension_fixture "$repo"
+  primary=$(make_named_shells "$TMP_ROOT/watch-refusal-$close_policy/primary")
+  mkdir -p "$home/state" "$home/config"
+  printf 'claude sonnet\n' > "$home/config/supervision-host"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$ROOT/bin/fm-session-launch-policy-lib.sh" \
+    "$ROOT/bin/fm-config-inherit-lib.sh" "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$repo/bin/"
+  cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
+trap 'exit 0' TERM INT
+if [ ! -e "$FM_HOME/state/admission-reached" ]; then
+  : > "$FM_HOME/state/admission-reached"
+  while [ ! -e "$FM_HOME/state/release-admission" ]; do sleep 0.02; done
+  "$FM_REFUSAL_ROOT/bin/fm-supervision-host.sh" "$@" > "$FM_HOME/state/refusal-output" 2>&1
+  status=$?
+  cat "$FM_HOME/state/refusal-output"
+  : > "$FM_HOME/state/refusal-reached"
+  while [ ! -e "$FM_HOME/state/release-refusal" ]; do sleep 0.02; done
+  exit "$status"
+fi
+: > "$FM_HOME/state/restoring-host"
+while [ ! -e "$FM_HOME/state/release-ready" ]; do sleep 0.02; done
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-%s\n' "$$" "$$"
+while :; do
+  if [ -e "$FM_HOME/state/release-monitor" ] && [ ! -e "$FM_HOME/state/ordinary-fired" ]; then
+    : > "$FM_HOME/state/ordinary-fired"
+    printf 'signal: permitted monitoring continues\n'
+    exit 0
+  fi
+  sleep 0.02
+done
+SH
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --handling-delivered ]; then
+  kill -0 "$4" 2>/dev/null || exit 1
+  printf 'confirmed=%s watcher=%s\n' "$2" "$4" >> "$FM_HOME/state/launches"
+  exit 0
+fi
+printf 'plain=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
+trap 'exit 0' TERM INT
+: > "$FM_HOME/state/restoring-plain"
+while [ ! -e "$FM_HOME/state/release-ready" ]; do sleep 0.02; done
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-%s\n' "$$" "$$"
+while :; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-supervision-host.sh" "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_REFUSAL_ROOT="$ROOT" FM_REFUSAL_CLOSE_POLICY="$close_policy" \
+    FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_OMP_ARM_READY_TIMEOUT_MS=10000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" "$primary/omp" -c \
+    'printf "%s\n" "$$" > "$FM_HOME/state/.lock"; "$1" --input-type=module; status=$?; :; exit "$status"' \
+    _ "$(command -v node)" 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+const policy = `${process.env.FM_HOME}/config/session-launch-policy`;
+const removed = process.env.FM_REFUSAL_CLOSE_POLICY === "removed";
+const handoff = `${state}/extensions/omp-primary-watch/session-replacement-actionable.json`;
+const handlers = new Map(); let tool = null; const sent = [];
+const rows = () => existsSync(`${state}/launches`) ? readFileSync(`${state}/launches`, "utf8").trim().split("\n") : [];
+const launches = () => rows().filter((row) => /^(?:host|plain)=/.test(row));
+const release = (name) => writeFileSync(`${state}/release-${name}`, "release\n");
+async function until(predicate, label) {
+  for (let i = 0; i < 500; i += 1) {
+    if (predicate()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`${label}: ${JSON.stringify({ rows: rows(), sent })}`);
+}
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(m) {
+    const pid = launches().at(-1)?.match(/^(?:host|plain)=([0-9]+)/)?.[1];
+    if (!pid || !rows().some((row) => row.startsWith("confirmed=") && row.endsWith(`watcher=${pid}`))) {
+      throw new Error(`wake delivered before successor readiness and handling confirmation: ${m}`);
+    }
+    sent.push(m);
+  },
+};
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+try {
+  await tool.execute();
+  await until(() => existsSync(`${state}/admission-reached`), "spawn did not reach admission gate");
+  if (existsSync(policy)) throw new Error("spawn-time policy must be absent");
+  writeFileSync(policy, "omp-or-tc\n");
+  release("admission");
+  await until(() => existsSync(`${state}/refusal-reached`), "real host did not reach runtime refusal");
+  const original = readFileSync(`${state}/refusal-output`, "utf8");
+  if (!original.includes("supervision-host: launch policy refused:") || !original.includes("session-launch-policy")) {
+    throw new Error(`real host did not refuse denied engine: ${original}`);
+  }
+  if (sent.length) throw new Error("historical refusal was delivered before close");
+  if (removed) unlinkSync(policy);
+  release("refusal");
+  await until(() => existsSync(`${state}/restoring-${removed ? "host" : "plain"}`), "close suppressed the wrong configuration");
+  if (launches().length !== 2 || sent.length) throw new Error("refusal did not wait for one currently permitted successor");
+  if (!/predecessor=[0-9]+$/.test(launches()[1])) throw new Error("refusal successor lost predecessor custody");
+  release("ready");
+  await until(() => sent.length === 1, "historical refusal was not delivered");
+  if (!sent[0].includes(original.trim()) || sent[0].includes("watcher: FAILED")) throw new Error(`refusal diagnostic changed: ${sent[0]}`);
+  await handlers.get("session_shutdown")({}, {});
+  if (JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 1) throw new Error("unconsumed refusal lost replacement handoff");
+  await handlers.get("session_start")({}, {});
+  await until(() => sent.length === 2, "same-process replacement did not replay pending refusal");
+  const expected = removed ? "host=" : "plain=";
+  if (launches().length !== 3 || !launches()[2].startsWith(expected)) throw new Error("replacement selected historical rather than current admission");
+  if (!sent[1].includes(original.trim())) throw new Error("replacement dropped historical refusal");
+  await handlers.get("before_agent_start")({ prompt: sent[1] }, {});
+  await handlers.get("session_shutdown")({}, {});
+  if (existsSync(handoff)) throw new Error("consumed refusal remained in replacement handoff");
+  if (!removed) unlinkSync(policy);
+  await handlers.get("session_start")({}, {});
+  await until(() => launches().length === 4, "permitted configuration did not reactivate after replacement");
+  if (!launches()[3].startsWith("host=") || sent.length !== 2) throw new Error("permitted configuration remained suppressed or refusal was duplicated");
+  release("monitor");
+  await until(() => sent.length === 3, "permitted host did not deliver ordinary monitoring wake");
+  if (!sent[2].includes("signal: permitted monitoring continues") || sent[2].includes("launch policy refused:")) {
+    throw new Error(`ordinary monitoring carried historical refusal: ${sent[2]}`);
+  }
+  if (launches().length !== 5 || !launches()[4].startsWith("host=")) throw new Error("ordinary close did not retain host continuity");
+  await handlers.get("before_agent_start")({ prompt: sent[2] }, {});
+} finally {
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp runtime refusal current admission ($close_policy): $out"
+  [ -z "$out" ] || fail "omp runtime refusal test printed output: $out"
+  pass ".omp watch extension: runtime refusal close policy=$close_policy preserves current admission, historical delivery, replacement, and ordinary monitoring"
+}
+
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
@@ -808,3 +948,5 @@ test_watch_extension_arms_and_delivers
 test_watch_extension_runs_the_supervision_host
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
+test_watch_extension_revalidates_runtime_refusal denied
+test_watch_extension_revalidates_runtime_refusal removed

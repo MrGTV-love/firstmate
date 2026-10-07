@@ -366,6 +366,9 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
     fm_supervision_host_autoarm_enabled "$CONFIG" cursor "$STATE" || true
     HOST_REFUSAL=$(grep '^supervision-host: launch policy refused:' "$ARM_OUT" 2>/dev/null)
     HOST_REFUSAL_WAKE=$HOST_REFUSAL
+    if [ -n "$FM_SUPERVISION_HOST_REFUSAL" ] && [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ]; then
+      HOST_REFUSAL_WAKE=
+    fi
     HOST_MODE=0
     ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
     attempt=$((attempt - 1))
