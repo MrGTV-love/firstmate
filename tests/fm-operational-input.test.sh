@@ -281,7 +281,39 @@ test_watcher_wakes_only_predicate() {
   pass "fm_operational_watcher_wakes_only: exact any-single emitted record identity, ignoring only whitespace and U+2063"
 }
 
+test_watcher_wake_unicode_whitespace() {
+  local tmp record_dir wake normalized space status
+  tmp=$(fm_test_tmproot fm-watcher-wake-unicode)
+  record_dir="$tmp/records"
+  mkdir -p "$record_dir"
+  fm_operational_input_encode watcher $'signal: /home/ship name/lane.status\n\nHandle the queued wake.' wake \
+    || fail "could not encode a Unicode whitespace fixture"
+  fm_operational_watcher_wakes_only "$wake" "$record_dir" \
+    && fail "a Unicode wake without a record must refuse"
+  for space in "${FM_COMPOSER_UNICODE_SPACES[@]}"; do
+    normalized=${wake// /"$space"}
+    printf '%s' "$normalized" > "$record_dir/unconsumed-1.wake"
+    LC_ALL=C fm_operational_watcher_wakes_only "$wake" "$record_dir" \
+      || fail "Unicode whitespace in the saved path must normalize under LC_ALL=C"
+    printf '%s' "$wake" > "$record_dir/unconsumed-1.wake"
+    LC_ALL=C fm_operational_watcher_wakes_only "$normalized" "$record_dir" \
+      || fail "Unicode whitespace in the composer must normalize under LC_ALL=C"
+    LC_ALL=C fm_operational_watcher_wakes_only "${normalized/lane.status/edited.status}" "$record_dir" \
+      && fail "Unicode whitespace normalization must not authorize an edited path"
+  done
+  fm_operational_watcher_wakes_only "${wake/lane.status/$'\xE2\x80\x8B'lane.status}" "$record_dir" \
+    && fail "a zero-width format character is not whitespace"
+  (
+    cat() { return 1; }
+    status=0
+    fm_operational_watcher_wakes_only "$wake" "$record_dir" || status=$?
+    [ "$status" -eq 2 ] || fail "an unreadable emitted record must retain its unavailable verdict"
+  ) || fail "record observation failure was collapsed into nonmatch"
+  pass "watcher identity: shared Unicode whitespace normalization under LC_ALL=C, edits refused, unreadable records distinct"
+}
+
 test_watcher_wakes_only_predicate
+test_watcher_wake_unicode_whitespace
 test_current_generic_matrix
 test_current_from_firstmate_carrier
 test_landed_untyped_prefix_is_explicitly_legacy

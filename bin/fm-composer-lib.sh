@@ -839,7 +839,7 @@ _fm_composer_titled_rule_row() {  # <trimmed-row>
 
 # Row-scan results are returned through FM_COMPOSER_SCAN_* globals (bash 3.2
 # has no nameref); they are internal to this owner.
-_fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
+_fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty>
   local pane=$1 cy=${2:-}
   local line indent left_stripped trimmed kind family side_family
   local top_inner top_spaces='' geometry_check=0 geometry_ambiguous=0
@@ -1728,7 +1728,7 @@ _fm_composer_claude_slash_choice() {  # <plain> <bare-row>
 }
 
 _fm_composer_select_cursorless() {
-  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0
+  local plain=$1 extract_wrap=${2:-0} generic=-1 next boundary raw trimmed glyph bare footer=0
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -1799,12 +1799,14 @@ _fm_composer_select_cursorless() {
     return 1
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
+    boundary=${plain//[!$'\n']/}
+    boundary=${#boundary}
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
-    while :; do
+    while [ "$next" -le "$boundary" ]; do
       raw=$(_fm_composer_screen_row "$next" "$plain")
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
-      [ -n "$trimmed" ] || break
+      [ -n "$trimmed" ] || [ "$extract_wrap" = 1 ] || break
       fm_composer_row_has_edge "$trimmed" && break
       _fm_composer_row_is_omp_status "$trimmed" && break
       _fm_composer_row_is_braille_furniture "$trimmed" && break
@@ -1857,8 +1859,8 @@ fm_composer_extract_selected_content() {  # <caps> <screen>
 $caps
 EOF
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
-  _fm_composer_scan_screen "$plain" '' 1
-  _fm_composer_select_cursorless "$plain" || return 1
+  _fm_composer_scan_screen "$plain" ''
+  _fm_composer_select_cursorless "$plain" 1 || return 1
   case "$FM_COMPOSER_SELECTED_KIND" in bare) strip_sides=0 ;; esac
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
@@ -2087,6 +2089,12 @@ fm_composer_submit_retry_core() {  # <send-key-fn> <state-fn> <target> <retries>
     esac
     i=$((i + 1))
     [ "$i" -lt "$retries" ] || { printf '%s' "$state"; return 0; }
+    sleep "$sleep_s"
+    state=$("$state_fn" "$target" "$expected_label")
+    case "$state" in
+      pending|pending-unproven) ;;
+      *) printf '%s' "$state"; return 0 ;;
+    esac
   done
 }
 

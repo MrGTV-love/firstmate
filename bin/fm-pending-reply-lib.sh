@@ -785,10 +785,7 @@ fm_pending_reply_fallback_idle_eligible() {  # <record-path>
 # SECONDMATE endpoint, without ever reading its conversation.
 #
 # Deliberately NOT the semantic busy-state contract (bin/fm-busy-lib.sh).
-# That contract covers ordinary task workers, whose turn lifecycle firstmate
-# wires at spawn; a secondmate has no such wiring because an idle secondmate
-# pane is healthy and it runs no supervised turn sequence of its own. This
-# observation exists only to notice a busy-then-idle transition around one
+# This observation exists only to notice a busy-then-idle transition around one
 # delivered request, so it is a delivery-confirmation signal in the same
 # category as the submit acknowledgement matcher in bin/fm-composer-lib.sh - never task
 # state, and never a source consumers can confuse with semantic state.

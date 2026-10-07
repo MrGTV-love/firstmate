@@ -986,7 +986,7 @@ secondmate_ring_to_drain() {  # <task> <window>
 secondmate_wake_stall_tick() {
   local now=$(( $(date +%s) )) threshold=$SECONDMATE_WAKE_STALL_SECS
   local meta task kind remote_host home queue row epoch seq row_key marker progress_marker ring_marker progress observed_at observed_key
-  local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w
+  local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w submit_rc
   # Endpoint metadata admits this queue-loop check; secondmate-liveness owns registered mates whose endpoint is missing or dead.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
@@ -1054,12 +1054,16 @@ EOF
       [ -f "$ring_marker" ] && [ ! -L "$ring_marker" ] || return 1
       [ "$(cat "$ring_marker" 2>/dev/null || true)" = "$row_key" ] && already_rung=1
     fi
-    if [ "$already_rung" -eq 0 ] && secondmate_submit_held_wake "$w"; then
+    submit_rc=1
+    if [ "$already_rung" -eq 0 ]; then
+      secondmate_submit_held_wake "$w" && submit_rc=0 || submit_rc=$?
+    fi
+    if [ "$submit_rc" -eq 0 ]; then
       fm_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
       fm_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1
       continue
     fi
-    if [ "$already_rung" -eq 0 ] && secondmate_idle_ring_safe "$w"; then
+    if [ "$already_rung" -eq 0 ] && [ "$submit_rc" -eq 1 ] && secondmate_idle_ring_safe "$w"; then
       if secondmate_ring_to_drain "$task" "$w"; then
         fm_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
         fm_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1

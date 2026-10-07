@@ -235,12 +235,9 @@
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
 #   own matcher. Indexed selections follow docs/configuration.md "Fleet model
-#   index". A crewmate or scout loads its per-task busy-state extension with -e
-#   from state/ (outside the worktree, so
-#   auto-discovery cannot load it a second time); a secondmate passes no -e at
-#   all and relies on omp auto-discovering the home's tracked .omp/extensions/
-#   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
-#   cwd-only with no trust dialog).
+#   index". Every task loads its per-task busy-state extension with -e from
+#   state/, outside cwd auto-discovery. Secondmates discover their home's
+#   tracked primary .omp/extensions/ separately.
 #   config/secondmate-harness may also carry an optional model and effort as extra
 #   whitespace-separated tokens ("<harness> [<model>] [<effort>]"). For a
 #   --secondmate spawn, those tokens apply only when this spawn also resolves its
@@ -2244,14 +2241,11 @@ launch_template() {
   # against the fresh-profile provider wizard, --auto-approve so no approval
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
-  # pinned to the worktree because omp's extension discovery is cwd-only. A
-  # secondmate loads its two primary extensions by that discovery alone:
-  # naming them with -e as well loads each twice (verified), doubling every
-  # session_stop continuation.
+  # pinned to the worktree because omp's extension discovery is cwd-only.
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
-      printf '%s' ' __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
       printf '%s' ' --config __OMPWORKERCFG__ __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
@@ -4701,7 +4695,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
-if [ "$KIND" != secondmate ]; then
+if [ "$KIND" != secondmate ] || [ "$HARNESS" = omp ]; then
   # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
   # adapter with a verified semantic source. The launch brief sent below IS a
   # submitted turn, so the seed record is busy/fm-spawn. The minted gen is
@@ -4921,10 +4915,9 @@ EOF
     # has no trust gate, yet its cwd-only extension auto-discovery would load a
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
-    guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
-      '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
-    cat >"$STATE/$ID.omp-ext.ts" <<EOF
-// Firstmate semantic busy-state events + turn-end notification for omp (Oh My
+    {
+      cat <<EOF
+// Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
 // Semantic state: "agent_start" -> busy when a low-level agent run begins;
 // "agent_end" -> idle only when event.willContinue is not true. omp has no
@@ -4934,28 +4927,52 @@ EOF
 // queued follow-ups, and a session_stop-forced continuation. ctx.isIdle() is
 // deliberately NOT consulted: at a natural TUI agent_end it still reads false
 // because session_stop is awaited before the session settles, so gating on it
-// would leave every completed turn recorded busy. "turn_end" fires at every
-// inner turn boundary and stays a wake NOTIFICATION touch for the watcher,
-// never current-state truth.
+// would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
+EOF
+      if [ "$KIND" != secondmate ]; then
+        guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
+          '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
+        cat <<EOF
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
+EOF
+      fi
+      cat <<EOF
+let busyEvents = Promise.resolve();
 const busyEvent = (state: string, event: string) =>
-  new Promise<void>((resolve) => {
+  busyEvents = busyEvents.then(() => new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
       "apply", "$STATE_REAL", "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "omp-ext", "--event", event,
     ], () => resolve());
-  });
+  }));
 export default function (pi: any) {
+EOF
+      if [ "$KIND" = secondmate ]; then
+        cat <<EOF
+  pi.on("session_start", () => busyEvent("unknown", "session-start"));
+  pi.on("session_shutdown", () => busyEvent("unknown", "session-shutdown"));
+EOF
+      else
+        cat <<EOF
   installGuardrail(pi, $guardrail_context);
+EOF
+      fi
+      cat <<EOF
+  pi.on("before_agent_start", () => busyEvent("busy", "before-agent-start"));
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
     return busyEvent("idle", "agent-end");
   });
-  pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
-}
 EOF
+      if [ "$KIND" != secondmate ]; then
+        cat <<EOF
+  pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
+EOF
+      fi
+      printf '}\n'
+    } >"$STATE/$ID.omp-ext.ts"
     ;;
   codex*)
     # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the
