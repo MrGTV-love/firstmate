@@ -1,0 +1,30 @@
+[
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-control.sh",
+      "jev-live-worker",
+      "relaunch",
+      "--harness",
+      "omp",
+      "--model",
+      "openai-codex/gpt-6.1-sol",
+      "--effort",
+      "medium",
+      "--note",
+      "Fresh replacement validation: re-read newly delivered genuine Jev advice and actual selected skill bodies with ordinary tools; independently add necessary workflows; rewrite the existing report. The initial assessment is complete and the previous worker has safely stopped. No implementation, infrastructure, or external services are authorized."
+    ],
+    "returncode": 0,
+    "stdout": "relaunched jev-live-worker harness=omp from=omp model=openai-codex/gpt-6.1-sol effort=medium backend=tmux endpoint=primary:fm-jev-live-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool/.treehouse/project-8c6c11/1/project\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-control.sh",
+      "jev-live-worker",
+      "exit"
+    ],
+    "returncode": 0,
+    "stdout": "stopped jev-live-worker harness=omp backend=tmux endpoint=primary:fm-jev-live-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool/.treehouse/project-8c6c11/1/project\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\n"
+  }
+]

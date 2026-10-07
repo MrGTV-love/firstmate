@@ -2,13 +2,14 @@ You are a crewmate: an autonomous worker agent managed by firstmate. Work on you
 
 # Task
 ## Captain's intent
-Review the disposable integer-limit collection helper and its operator documentation for correctness. Preserve required workflow triggers and agent judgment; use the available Jev suggestions as optional advice, not an exhaustive skill list.
+Assess a safe operational plan to provision a secondmate home, migrate a worker to omp, recover a stuck worker, and configure dispatch rules. This is a read-only workflow assessment: do not actually provision, launch, recover, or configure any infrastructure.
 
 ## Firstmate spec
-This is a read-only disposable product-validation task. Inspect helper.py and README.md in this assigned private fixture worktree. Read relevant advised skill bodies through ordinary read tools, and independently add needed workflows from the full code-root .agents/skills index. Do not modify source, memory files, credentials, settings, shared fleet state, or invoke any pipeline or Herdr operation. Report concrete input/output examples for zero, positive and negative bounds and any documentation contradiction. Write the required report and complete the normal isolated-home completion gate, then remain idle for a supervisor-controlled relaunch. This fixture's defects are intentional test data, not new author decisions.
+This is disposable live product validation. Do not invoke no-mistakes, Herdr, Treehouse, git mutation, package installation, fleet lifecycle, or external services. Read the actual ordinary skill bodies at each optional suggestion path in the additive Skill selection advice; independently choose and read any additional workflow needed. Keep all mandatory and safety triggers authoritative. Write a concise report at the specified report.md with the advice source/model, exact bodies read, an exact short quotation from each, independently added workflows, and a practical assessment answering the task. Do not write source code or project memory files. On each fresh launch or replacement, rewrite this report after re-reading the currently delivered advice and bodies, then stop.
 
 # Skill selection input
-Review a small integer-limit helper for correctness, boundary cases, consumer regression examples and operator documentation consistency. The deliverable is a read-only diagnostic report in a disposable local lab.
+
+Design a safe operational plan to provision a secondmate home, migrate a worker to omp, diagnose a stuck worker, and configure dispatch rules. Read-only assessment, no actual lifecycle.
 
 # Herdr lifecycle declaration - NOT ENABLED
 **HARD SAFETY GATE:** this scaffold cannot inspect the task text filled in above.
@@ -16,7 +17,7 @@ If the task will start, stop, delete, restart, profile, or otherwise drive Herdr
 Do not add Herdr lifecycle commands to this unguarded brief by hand.
 
 # Setup
-You are in a disposable git worktree of worker-probe, at a detached HEAD on a clean default branch.
+You are in a disposable git worktree of project, at a detached HEAD on a clean default branch.
 This is a SCOUT task: the deliverable is a written report, not a PR.
 The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
 The report is the only thing that survives, so anything worth keeping must be in it.
@@ -26,7 +27,7 @@ The report is the only thing that survives, so anything worth keeping must be in
 2. Stay inside this worktree; the only files you may write outside it are the report and the status file below.
 3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
 4. Report status by appending one line:
-   `echo "{state} [at=<epoch>]: {one short line}" >> '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.status' && { [ ! -e '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/bin/fm-fleet-ledger.sh' appended '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/config' '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.status' >/dev/null 2>&1 || true; }`
+   `echo "{state} [at=<epoch>]: {one short line}" >> '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.status' && { [ ! -e '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-fleet-ledger.sh' appended '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/config' '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.status' >/dev/null 2>&1 || true; }`
    States: working, needs-decision, blocked, paused, done, failed.
    Substitute `<epoch>` with the current Unix time in seconds - run `date +%s` and write the number it printed; a stamp that is not plain digits records no time at all.
    Each append wakes firstmate, so report sparingly: only phase changes a supervisor
@@ -73,14 +74,14 @@ The report is the only thing that survives, so anything worth keeping must be in
    `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
 
 # Firstmate instruction inbox
-Firstmate steers you through durable message files in '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.inbox'.
-When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure - list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.inbox'/*.msg, read and act on each message in numeric order, then acknowledge each handled message by moving it: `mv '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.inbox'/NNN.msg '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/state/jev-live-probe.inbox'/handled/`.
+Firstmate steers you through durable message files in '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox'.
+When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure - list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox'/*.msg, read and act on each message in numeric order, then acknowledge each handled message by moving it: `mv '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox'/NNN.msg '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox'/handled/`.
 The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or absent inbox needs no action.
 
 # Definition of done
-Write your findings to `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.worker-live/home/data/jev-live-probe/report.md`.
+Write your findings to `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/data/jev-live-worker/report.md`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.
-Before reporting done, read and follow `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49BAACZ1ZHY95W7KK1JRVBK/.agents/skills/captain-hold-lifecycle/SKILL.md` and pass its shared completion gate for the report and any visual review.
+Before reporting done, read and follow `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/captain-hold-lifecycle/SKILL.md` and pass its shared completion gate for the report and any visual review.
 When the report is complete, append `done [at=<epoch>]: {one-line conclusion}` to the status file and stop.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.

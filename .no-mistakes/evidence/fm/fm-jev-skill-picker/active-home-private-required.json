@@ -1,0 +1,10 @@
+{
+  "name": "active-home-private-required",
+  "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+  "returncode": 0,
+  "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.08999999999999997\n  required[2]{id,path}:\n    \"acme-private\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/home/.agents/skills/home-indexed/SKILL.md\"\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.96,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+  "stderr": "",
+  "elapsed_seconds": 0.97,
+  "recorded_request_attempts": 2,
+  "response_records": 2
+}

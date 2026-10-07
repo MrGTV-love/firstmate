@@ -1,16 +1,187 @@
 {
-  "head": "b3b2ffe0ce1300038eaee445c8b0347ed00f0f18",
-  "result": "All derived live advisory-selection scenarios passed on fresh head.",
-  "targeted_checks": [
-    "/bin/bash tests/fm-skill-suggest.test.sh",
-    "/bin/bash tests/fm-dispatch-resolve.test.sh"
+  "findings": [],
+  "summary": "The advisory skill-picker intent is demonstrated on the current worktree, including all four previously missing genuine-Jev scenarios. No actionable test findings remain.",
+  "tested": [
+    "`bin/fm-test-run.sh tests/fm-skill-suggest.test.sh tests/fm-dispatch-resolve.test.sh tests/fm-documentation-audiences.test.sh --json /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/targeted-regressions.json` \u2014 targeted executable regressions passed; the optional EPOCHREALTIME case reported unavailable on stock Bash.",
+    "`/bin/bash -c` sourcing the actual `bin/fm-skill-suggest.sh --task-file <disposable-task> --catalog <Git-tracked-disposable-catalog> [--required <id>]` \u2014 genuine Jev rank/recheck, no-fit, indexed-link privacy, local private requirements, CRLF/multiline metadata, fresh calls and ambient curl configuration. The approved single key was obtained only inside each live picker process through `fmx_env_get`; transparent curl recording retained JSON bodies/responses, never authorization headers.",
+    "Actual picker CLI adversarial runs with absent key, denied text, unreadable policy, inaccessible selected/home link targets, oversized task, malformed metadata and unavailable HTTPS proxy; retained CLI outputs and request-attempt receipts.",
+    "`omp -p --mode json --model openai-codex/gpt-6.1-sol --no-session --no-title --max-time 180 @<disposable-prompt>` \u2014 ordinary selected-body reads, independent api-design addition, representative API assessment and genuine no-fit arithmetic completion. Initial stdin setup was corrected to explicit EOF before these completed runs.",
+    "`bin/fm-lab-home.sh create <workspace-lab>` and `bin/fm-lab-home.sh tmux-dir <workspace-lab>`; keyless private `tmux -L fm-lab ... new-session -d -s primary -x 140 -y 45 ... omp` \u2014 real primary with nonzero terminal grid and isolated disposable project/pool.",
+    "From that actual primary: `bin/fm-spawn.sh jev-live-worker <disposable-project> --scout --backend tmux --harness omp --model openai-codex/gpt-6.1-sol --effort medium`; `bin/fm-control.sh jev-live-worker relaunch ... --note <progress>` \u2014 initial early relaunch was safely refused; corrected stopped-endpoint run passed and awaited a fresh report plus real turn-ended receipt.",
+    "`omp --export /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-launch-native-session.jsonl` and the replacement session equivalent; local evidence preview, Chromium rendering and advice/body-read screenshots.",
+    "Exact-task `bin/fm-control.sh jev-live-worker exit` and `bin/fm-teardown.sh jev-live-worker`; private-socket `tmux -L fm-lab kill-server`, `bin/fm-lab-home.sh teardown <workspace-lab>`, stopped preview server and removed only the newly created disposable workspace subtree."
   ],
-  "live_advice": "Real Jev 1.13.0 returned three independent optional suggestions after bounded three-entry recheck; unrelated task returned genuine no-fit.",
-  "privacy": "Both selected and active-home indexed readable child links remained locally resolvable, private fields absent from real ranking/recheck; named private task and incomplete permission discovery produced zero outbound requests. Literal/directive/inaccessible-policy guards and denied recheck opening withheld as required.",
-  "ordinary_agent_outcomes": "Four real omp actors (baseline/advice CSV audit and baseline/no-fit rainbow task) completed with successful read-tool receipts. Advice actor independently added precision skill absent from ranking; both audits identified duplicate I2, conditional 5.00 shortfall, unpaid I3 25.00, malformed I5, missing ID and unmatched I6; I4 exact split payments fully settled.",
-  "worker_integration": "Real fm-spawn launch and fm-control relaunch both generated fresh genuine advice, actual selected-body reads and correct diagnostic report; source intent unchanged, supported progress note additive.",
-  "visual": "Native omp HTML export viewed in real Chromium and captured ordinary-selection-transcript.png; worker native terminal/render and TUI captures retained.",
-  "recovered_setup": "Pass-through observer syntax and print-mode stdin fixed before proof; real Gemini quota 429 recovered using supported explicit GPT-6.1-Sol.",
-  "coverage_limits": "Ordinary task-file consumption and omp scout launch/relaunch exercised, not universal native interception or vendor-internal agents. Two small paired tasks and diagnostic report are local outcomes, not cookbook benchmark, context/cost reduction or broad noninferiority. Fleet completion attestation not exercised. No linters/static analysis/full suite/other pipeline phases run.",
-  "cleanup": "Direct fixture and actor sessions removed; worker home, private socket and disposable pool removed; evidence retained; no source/permanent test changes."
+  "testing_summary": "Targeted picker, dispatcher and documentation regressions passed. Fresh genuine Jev calls proved multiple/top-three recheck, no-fit, privacy and bounded fallback behavior; actual OMP tasks and isolated worker launch/relaunch proved ordinary body reads, independent additions and preserved intent. A premature relaunch was safely refused and passed after correcting idle synchronization. Retained wire records, native transcripts, rendered HTML and screenshots; all disposable runtime state was removed. No full suite, linters or other pipeline phases were run.",
+  "artifacts": [
+    {
+      "kind": "other",
+      "label": "Live scenario summary and exact verification steps",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-validation-summary.json"
+    },
+    {
+      "kind": "log",
+      "label": "Actual CLI advice and withholding outcomes",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-cli-results.json"
+    },
+    {
+      "kind": "other",
+      "label": "Actual Jev wire projections and bounded stages",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-wire-manifest.json"
+    },
+    {
+      "kind": "other",
+      "label": "Indexed readable private-link adversarial fixture proof",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/indexed-private-link-live-fixture.json"
+    },
+    {
+      "kind": "other",
+      "label": "Automatic launch and replacement wire projections",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-live-wire-manifest.json"
+    },
+    {
+      "kind": "other",
+      "label": "Native launch/relaunch integration and preservation result",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-integration-result.json"
+    },
+    {
+      "kind": "other",
+      "label": "Ordinary independent-selection and no-fit actor receipts",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/additional-agent-receipts.json"
+    },
+    {
+      "kind": "screenshot",
+      "label": "Genuine launch advice followed by ordinary body reads",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-launch-advice-rendered.png"
+    },
+    {
+      "kind": "screenshot",
+      "label": "Fresh replacement advice and ordinary body reads",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-relaunch-advice-rendered.png"
+    },
+    {
+      "kind": "rendered-html",
+      "label": "Production-rendered complete replacement session",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/omp-session-worker-relaunch-native-session.html"
+    },
+    {
+      "kind": "other",
+      "label": "Guarded task, private socket and fixture cleanup proof",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/lab-cleanup.json"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "Obtain genuine multiple-skill advice with a bounded top-three recheck",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-multiple.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-wire-manifest.json",
+      "reason": "Actual Jev ranking evaluated six optional skills independently; recheck received exactly three excerpts, each within 700 characters. Three suggestions were returned and required safety-review remained local."
+    },
+    {
+      "name": "Obtain genuine no-fit advice and complete the ordinary task",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-no-fit.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/no-fit-agent-final.md; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/additional-agent-receipts.json",
+      "reason": "Jev returned no optional fit after one request. Actual OMP completed the arithmetic task with 15 without loading optional skill bodies."
+    },
+    {
+      "name": "Read selected bodies normally and independently add an omitted necessary skill",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/ordinary-agent-body-read-receipt.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/additional-agent-receipts.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/independent-agent-final.md",
+      "reason": "Actual OMP read the required safety body and advised bodies through ordinary read tools; the independent-selection run additionally read api-design, absent from the Jev shortlist, and produced the API assessment."
+    },
+    {
+      "name": "Rank and recheck public siblings without disclosing indexed private child-directory links",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/indexed-private-link-live-fixture.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-private-siblings-final.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-wire-manifest.json",
+      "reason": "Both selected catalog and active-home fixtures retained Git-indexed lexical SKILL.md paths replaced by readable private directory links. Actual rank and recheck omitted the private ID, description marker and excerpt marker."
+    },
+    {
+      "name": "Resolve caller-required private linked skills locally in either discovery root",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/private-required-local.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/active-home-private-required.json",
+      "reason": "Each root separately resolved acme-private to its readable linked local body path while actual genuine ranking/recheck sent only public optional skills."
+    },
+    {
+      "name": "Name a private identity in task text and withhold remote advice",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/named-private-withheld.json",
+      "reason": "The real picker retained the recognized private requirement, returned off, and issued zero request attempts."
+    },
+    {
+      "name": "Try inaccessible linked skill targets and prevent incomplete discovery from sending task text",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/inaccessible-link-withheld.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/incomplete-active-home-withheld.json",
+      "reason": "Inaccessible selected-catalog directory and active-home final-file targets both produced fallback with zero request attempts while preserving accessible required safety-review."
+    },
+    {
+      "name": "Apply a never-send policy and fail closed when that policy is unreadable",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/denied-task-withheld.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unreadable-policy-withheld.json",
+      "reason": "Forbidden task text and an unreadable policy each returned off before any request attempt; requirements remained authoritative."
+    },
+    {
+      "name": "Run without a TypeSafe key and retain named workflows",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/missing-key-preserves-required.json",
+      "reason": "The real CLI returned off with the named input-validation identity and ordinary local path intact, without a request."
+    },
+    {
+      "name": "Lose the actual service route and recover ordinary selection",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unavailable-service-preserves-required.json",
+      "reason": "A refused local HTTPS proxy made real curl transport unavailable. The picker returned fallback, preserved required safety-review and did not retry advice."
+    },
+    {
+      "name": "Reject oversized input or unsupported metadata without losing requirements",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/oversized-input-preserves-required.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unsupported-metadata-preserves-required.json",
+      "reason": "A 4097-byte task and a catalog entry missing its supported description both fell back before requesting advice; required safety identity/path remained intact."
+    },
+    {
+      "name": "Process CRLF frontmatter and blank-separated multiline descriptions with genuine advice",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-crlf-multiline-metadata.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-wire-manifest.json",
+      "reason": "Actual rank/recheck retained the complete folded descriptions and local required identity and returned genuine suggestions."
+    },
+    {
+      "name": "Repeat unchanged intake and obtain fresh advice rather than cached results",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-fresh-call.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-multiple.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/live-wire-manifest.json",
+      "reason": "Identical input produced another actual ranking and recheck; no persistent advice cache was created."
+    },
+    {
+      "name": "Ignore ambient curl tracing configuration during genuine advice",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-ambient-curl-config.json",
+      "reason": "With a disposable .curlrc requesting trace-ascii and retries, genuine rank/recheck succeeded and no credential/task trace file materialized. Targeted real-curl regressions separately exercised the retryable HTTP-error and transfer-timing boundaries."
+    },
+    {
+      "name": "Automatically deliver genuine advice on an isolated supported worker launch",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-launch-launch-brief.md; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-launch-body-read-receipt.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-launch-report.md; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-live-wire-manifest.json",
+      "reason": "A real OMP primary launched a real OMP scout via fm-spawn on a 140x45 private tmux lab. Only minimal Skill selection input reached Jev; the source brief stayed unchanged, the delivered overlay contained live advice, and native tool receipts prove all three advised bodies were read."
+    },
+    {
+      "name": "Relaunch the supported worker with fresh advice while preserving intent and ordinary body reads",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-integration-result.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-control-relaunch.txt; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-relaunch-body-read-receipt.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-relaunch-report.md; /Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/worker-live-wire-manifest.json",
+      "reason": "The corrected idle-aware fm-control relaunch completed in the same endpoint/worktree with a fresh incarnation and fresh actual Jev requests. Native receipts prove all three newly advised bodies were re-read; original intent survived. A premature initial attempt was safely refused during UI redraw and restored the original instructions; setup was corrected before the successful run."
+    }
+  ],
+  "verdict": "go"
 }

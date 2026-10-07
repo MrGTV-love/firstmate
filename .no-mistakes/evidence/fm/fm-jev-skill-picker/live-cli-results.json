@@ -1,0 +1,182 @@
+[
+  {
+    "name": "genuine-multiple",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.06999999999999995\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.96,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.65,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "genuine-no-fit",
+    "task": "What is 7 plus 8? Give the sum only, with no coding, forms, APIs, schema changes, release documentation or other engineering work.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: none\n  reason: \"no optional fit; ordinary selection remains available\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 1\n  no_fit: 0.96\n  required[0]{id,path}:\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.61,
+    "recorded_request_attempts": 1,
+    "response_records": 1
+  },
+  {
+    "name": "genuine-private-siblings",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.06000000000000005\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.96,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.97,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.48,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "named-private-withheld",
+    "task": "Use acme-private for this task.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"task names a private local skill; use ordinary selection\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"acme-private\",null\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.45,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "private-required-local",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.07999999999999996\n  required[1]{id,path}:\n    \"acme-private\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/indexed-link/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.94,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "missing-key-preserves-required",
+    "task": "Use input-validation to inspect an input boundary.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"TypeSafe key unavailable\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.95,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "denied-task-withheld",
+    "task": "Handle PROHIBITED_TASK_MARKER with input validation.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.57,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "unreadable-policy-withheld",
+    "task": "Design HTTP signup API with validation.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: off\n  reason: \"text withheld by dispatch-never-send policy\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.44,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "inaccessible-link-withheld",
+    "task": "Use acme-private for this task.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.26,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "genuine-fresh-call",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.06000000000000005\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.29,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "oversized-input-preserves-required",
+    "task": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"task exceeds 4 KiB; supply minimal permitted text\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.09,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "genuine-ambient-curl-config",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.06999999999999995\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.96,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.05,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "unavailable-service-preserves-required",
+    "task": "Design a signup HTTP API with safe input validation.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"TypeSafe transport or HTTP failure\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.5,
+    "recorded_request_attempts": 1,
+    "response_records": 0
+  },
+  {
+    "name": "active-home-private-required",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.08999999999999997\n  required[2]{id,path}:\n    \"acme-private\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/home/.agents/skills/home-indexed/SKILL.md\"\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.96,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.97,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "incomplete-active-home-withheld",
+    "task": "Use undiscovered-private for work.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 0.28,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "genuine-crlf-multiline-metadata",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.08999999999999997\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/regression-tests/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/accessibility/SKILL.md\",0.97,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.44,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  },
+  {
+    "name": "unsupported-metadata-preserves-required",
+    "task": "Review a signup API boundary.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.88,
+    "recorded_request_attempts": 0,
+    "response_records": 0
+  },
+  {
+    "name": "genuine-private-siblings-final",
+    "task": "Design and implement an accessible HTTP signup form: validate untrusted input, specify API errors, add regression tests, and prepare release notes. Consider each relevant workflow independently; multiple workflows may be needed.",
+    "returncode": 0,
+    "stdout": "skill-advice:\n  status: suggested\n  reason: \"optional relevance only\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 2\n  no_fit: 0.06999999999999995\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md\"\n  suggestions[3]{id,path,fit,uncertain,evidence}:\n    \"input-validation\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"regression-tests\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md\",0.97,false,\"opening-instruction recheck\"\n    \"accessibility\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md\",0.96,false,\"opening-instruction recheck\"\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+    "stderr": "",
+    "elapsed_seconds": 1.06,
+    "recorded_request_attempts": 2,
+    "response_records": 2
+  }
+]

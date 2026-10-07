@@ -1,0 +1,10 @@
+{
+  "private_tmux_kill_exit": 0,
+  "lab_socket_teardown_exit": 0,
+  "private_socket_removed": true,
+  "completed_scratch_task_teardown_exit": 0,
+  "only_private_server_stopped": true,
+  "disposable_workspace_subtree_removed": true,
+  "evidence_preview_server_stopped": true,
+  "production_source_changes_by_test_phase": false
+}

@@ -1,0 +1,10 @@
+{
+  "name": "unsupported-metadata-preserves-required",
+  "task": "Review a signup API boundary.",
+  "returncode": 0,
+  "stdout": "skill-advice:\n  status: fallback\n  reason: \"unsupported skill metadata\"\n  uncertain: true\n  source: unavailable\n  model: jev-1.13.0\n  stages: 0\n  no_fit: null\n  required[1]{id,path}:\n    \"safety-review\",\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/crlf-catalog/safety-review/SKILL.md\"\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+  "stderr": "",
+  "elapsed_seconds": 1.88,
+  "recorded_request_attempts": 0,
+  "response_records": 0
+}

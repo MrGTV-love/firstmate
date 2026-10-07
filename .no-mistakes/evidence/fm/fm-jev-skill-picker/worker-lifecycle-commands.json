@@ -1,0 +1,52 @@
+[
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-spawn.sh",
+      "jev-live-worker",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/project",
+      "--scout",
+      "--backend",
+      "tmux",
+      "--harness",
+      "omp",
+      "--model",
+      "openai-codex/gpt-6.1-sol",
+      "--effort",
+      "medium"
+    ],
+    "returncode": 0,
+    "stdout": "spawned jev-live-worker harness=omp kind=scout window=primary:fm-jev-live-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool/.treehouse/project-8c6c11/1/project\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\n",
+    "seconds": 8.65
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-control.sh",
+      "jev-live-worker",
+      "relaunch",
+      "--harness",
+      "omp",
+      "--model",
+      "openai-codex/gpt-6.1-sol",
+      "--effort",
+      "medium",
+      "--note",
+      "Fresh replacement validation: re-read newly delivered live Jev advice and the actual ordinary selected skill bodies, then rewrite the same report. No source implementation, lifecycle, or external service work."
+    ],
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\nerror: task jev-live-worker's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'relaunch'\nerror: relaunch of jev-live-worker failed while stopping the old agent, which is still running; its original instructions were restored\n",
+    "seconds": 1.58
+  },
+  {
+    "command": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/bin/fm-control.sh",
+      "jev-live-worker",
+      "exit"
+    ],
+    "returncode": 0,
+    "stdout": "stopped jev-live-worker harness=omp backend=tmux endpoint=primary:fm-jev-live-worker worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool/.treehouse/project-8c6c11/1/project\n",
+    "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab\n",
+    "seconds": 4.95
+  }
+]

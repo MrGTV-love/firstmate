@@ -1,0 +1,466 @@
+[
+  {
+    "scenario": "genuine-multiple",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-multiple/request.4eljeM.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      },
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-multiple/request.jkadzw.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-multiple.json"
+  },
+  {
+    "scenario": "genuine-no-fit",
+    "recorded_request_attempts": 1,
+    "response_records": 1,
+    "stages": [
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-no-fit/request.iDnEt7.json",
+        "request_bytes": 3927,
+        "catalog_count": 7,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes",
+          "safety-review"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-no-fit.json"
+  },
+  {
+    "scenario": "genuine-private-siblings",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-private-siblings/request.MVMMtz.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      },
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-private-siblings/request.WUjPsF.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-private-siblings.json"
+  },
+  {
+    "scenario": "named-private-withheld",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/named-private-withheld.json"
+  },
+  {
+    "scenario": "private-required-local",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/private-required-local/request.JodwL1.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      },
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/private-required-local/request.U3hn4p.json",
+        "request_bytes": 4025,
+        "catalog_count": 7,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes",
+          "safety-review"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/private-required-local.json"
+  },
+  {
+    "scenario": "missing-key-preserves-required",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/missing-key-preserves-required.json"
+  },
+  {
+    "scenario": "denied-task-withheld",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/denied-task-withheld.json"
+  },
+  {
+    "scenario": "unreadable-policy-withheld",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unreadable-policy-withheld.json"
+  },
+  {
+    "scenario": "inaccessible-link-withheld",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/inaccessible-link-withheld.json"
+  },
+  {
+    "scenario": "genuine-fresh-call",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-fresh-call/request.2sLyhG.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      },
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-fresh-call/request.G16DqW.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-fresh-call.json"
+  },
+  {
+    "scenario": "oversized-input-preserves-required",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/oversized-input-preserves-required.json"
+  },
+  {
+    "scenario": "genuine-ambient-curl-config",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-ambient-curl-config/request.n2uvZC.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      },
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-ambient-curl-config/request.nXD6kM.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-ambient-curl-config.json"
+  },
+  {
+    "scenario": "unavailable-service-preserves-required",
+    "recorded_request_attempts": 1,
+    "response_records": 0,
+    "stages": [
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/unavailable-service-preserves-required/request.4hkddH.json",
+        "request_bytes": 3334,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unavailable-service-preserves-required.json"
+  },
+  {
+    "scenario": "active-home-private-required",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/active-home-private-required/request.qh0EAD.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      },
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/active-home-private-required/request.s14QIQ.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/active-home-private-required.json"
+  },
+  {
+    "scenario": "incomplete-active-home-withheld",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/incomplete-active-home-withheld.json"
+  },
+  {
+    "scenario": "genuine-crlf-multiline-metadata",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-crlf-multiline-metadata/request.7PeJ6Q.json",
+        "request_bytes": 3744,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      },
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-crlf-multiline-metadata/request.mMd5FO.json",
+        "request_bytes": 2599,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 114
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-crlf-multiline-metadata.json"
+  },
+  {
+    "scenario": "unsupported-metadata-preserves-required",
+    "recorded_request_attempts": 0,
+    "response_records": 0,
+    "stages": [],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/unsupported-metadata-preserves-required.json"
+  },
+  {
+    "scenario": "genuine-private-siblings-final",
+    "recorded_request_attempts": 2,
+    "response_records": 2,
+    "stages": [
+      {
+        "stage": "rank",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-private-siblings-final/request.7TcNPf.json",
+        "request_bytes": 3510,
+        "catalog_count": 6,
+        "catalog_ids": [
+          "accessibility",
+          "api-design",
+          "database-migrations",
+          "input-validation",
+          "regression-tests",
+          "release-notes"
+        ],
+        "catalog_fields": [
+          "description",
+          "id"
+        ],
+        "max_excerpt_chars": 0
+      },
+      {
+        "stage": "recheck",
+        "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/genuine-private-siblings-final/request.Mjx1Jl.json",
+        "request_bytes": 2812,
+        "catalog_count": 3,
+        "catalog_ids": [
+          "input-validation",
+          "regression-tests",
+          "accessibility"
+        ],
+        "catalog_fields": [
+          "description",
+          "excerpt",
+          "id"
+        ],
+        "max_excerpt_chars": 223
+      }
+    ],
+    "cli_result": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-private-siblings-final.json"
+  }
+]

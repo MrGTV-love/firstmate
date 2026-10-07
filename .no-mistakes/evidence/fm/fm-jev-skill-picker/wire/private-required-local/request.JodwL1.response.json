@@ -1,0 +1,1 @@
+{"model":"jev-1.13.0","answers":{"need":{"type":"noul","noul":0.92},"skill_input-validation":{"type":"noul","noul":0.97},"skill_regression-tests":{"type":"noul","noul":0.97},"skill_accessibility":{"type":"noul","noul":0.96}},"usage":{"input_tokens":755,"output_tokens":78}}

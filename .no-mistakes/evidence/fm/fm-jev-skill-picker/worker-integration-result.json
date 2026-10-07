@@ -1,0 +1,11 @@
+{
+  "result": "pass",
+  "initial_source_unchanged": true,
+  "captain_intent_preserved": true,
+  "same_endpoint": true,
+  "same_worktree": true,
+  "fresh_incarnation": true,
+  "launch_gen": "s1791339041.15347.32105",
+  "relaunch_gen": "s1791339242.76095.16846",
+  "setup_correction": "Initial attempt was too early during final checklist redraw; guarded control refused unknown composer and restored instructions. Previous worker safely exited; replacement now driven in retained dead endpoint and awaited actual turn-ended receipt."
+}

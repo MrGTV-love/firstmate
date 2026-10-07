@@ -95,23 +95,12 @@ Before reporting done, read and follow `/Users/charlesabrooker/.no-mistakes/work
 When the report is complete, append `done [at=<epoch>]: {one-line conclusion}` to the status file and stop.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
 
-## Progress note (2026-10-07T02:13:57Z)
-
-This task was relaunched. Continue from here; the local copy and every
-uncommitted change are exactly as the previous worker left them.
-
-First, check your instruction inbox: list /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox/*.msg, act on
-each message in numeric order, then mv each handled file into
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab/state/jev-live-worker.inbox/handled/. A steer sent before the relaunch survives there.
-
-Fresh replacement validation: re-read newly delivered genuine Jev advice and actual selected skill bodies with ordinary tools; independently add necessary workflows; rewrite the existing report. The initial assessment is complete and the previous worker has safely stopped. No implementation, infrastructure, or external services are authorized.
-
 # Skill selection advice
 
 Apply all existing mandatory explicit/named and safety triggers first, even if absent below.
 This additive advice does not replace the skill index, authorize actions, or suppress any workflow.
 Read relevant bodies through ordinary tools; reject unsuitable suggestions and add necessary skills.
 Optional suggestion: secondmate-provisioning - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/secondmate-provisioning/SKILL.md; fit=0.91, uncertain=false, evidence=opening-instruction recheck.
-Optional suggestion: operational-home-layout - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/operational-home-layout/SKILL.md; fit=0.69, uncertain=true, evidence=opening-instruction recheck.
-Optional suggestion: stuck-crewmate-recovery - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/stuck-crewmate-recovery/SKILL.md; fit=0.86, uncertain=false, evidence=opening-instruction recheck.
+Optional suggestion: operational-home-layout - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/operational-home-layout/SKILL.md; fit=0.7, uncertain=true, evidence=opening-instruction recheck.
+Optional suggestion: stuck-crewmate-recovery - read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.agents/skills/stuck-crewmate-recovery/SKILL.md; fit=0.84, uncertain=true, evidence=opening-instruction recheck.
 Advice source: live; model: jev-1.13.0.

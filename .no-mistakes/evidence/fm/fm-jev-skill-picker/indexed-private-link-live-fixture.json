@@ -1,0 +1,26 @@
+{
+  "fixtures": [
+    {
+      "catalog_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog",
+      "indexed_lexical_path": "indexed-link/SKILL.md",
+      "git_index_output": "indexed-link/SKILL.md",
+      "git_index_exit": 0,
+      "child_is_readable_directory_symlink": true,
+      "local_identity": "acme-private",
+      "private_description_marker": "PRIVATE_DESCRIPTION_MARKER",
+      "private_excerpt_marker": "PRIVATE_EXCERPT_MARKER"
+    },
+    {
+      "catalog_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/home/.agents/skills",
+      "indexed_lexical_path": "home-indexed/SKILL.md",
+      "git_index_output": "home-indexed/SKILL.md",
+      "git_index_exit": 0,
+      "child_is_readable_directory_symlink": true,
+      "local_identity": "acme-private",
+      "private_description_marker": "PRIVATE_DESCRIPTION_MARKER",
+      "private_excerpt_marker": "PRIVATE_EXCERPT_MARKER"
+    }
+  ],
+  "live_cli_receipt": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/genuine-private-siblings-final.json",
+  "wire_projection_omits_all_private_markers": true
+}

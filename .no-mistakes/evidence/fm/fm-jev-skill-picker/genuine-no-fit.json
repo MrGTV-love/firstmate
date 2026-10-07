@@ -1,0 +1,10 @@
+{
+  "name": "genuine-no-fit",
+  "task": "What is 7 plus 8? Give the sum only, with no coding, forms, APIs, schema changes, release documentation or other engineering work.",
+  "returncode": 0,
+  "stdout": "skill-advice:\n  status: none\n  reason: \"no optional fit; ordinary selection remains available\"\n  uncertain: false\n  source: live\n  model: jev-1.13.0\n  stages: 1\n  no_fit: 0.96\n  required[0]{id,path}:\n  suggestions[0]{id,path,fit,uncertain,evidence}:\nhelp[1]: Required triggers and agent judgment remain authoritative; read relevant bodies with ordinary tools\n",
+  "stderr": "",
+  "elapsed_seconds": 0.61,
+  "recorded_request_attempts": 1,
+  "response_records": 1
+}

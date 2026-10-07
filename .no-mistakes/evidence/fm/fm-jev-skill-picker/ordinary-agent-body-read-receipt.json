@@ -1,0 +1,23 @@
+{
+  "exit": 0,
+  "actual_read_tool_calls": [
+    {
+      "i": "Reading required safety advice",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/safety-review/SKILL.md"
+    },
+    {
+      "i": "Reading input validation advice",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/input-validation/SKILL.md"
+    },
+    {
+      "i": "Reading behavioral regression advice",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/regression-tests/SKILL.md"
+    },
+    {
+      "i": "Reading accessible error advice",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md"
+    }
+  ],
+  "independent_added_body": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/catalog/accessibility/SKILL.md",
+  "expected_sum_when_no_fit": "15"
+}

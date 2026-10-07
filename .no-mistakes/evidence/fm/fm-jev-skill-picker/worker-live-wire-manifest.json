@@ -1,0 +1,52 @@
+[
+  {
+    "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/worker-automatic/request.2IrUr6.json",
+    "stage": "rank",
+    "task": "\nDesign a safe operational plan to provision a secondmate home, migrate a worker to omp, diagnose a stuck worker, and configure dispatch rules. Read-only assessment, no actual lifecycle.\n\n",
+    "catalog_count": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "max_excerpt_chars": 0,
+    "request_bytes": 23144
+  },
+  {
+    "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/worker-automatic/request.BBUjsw.json",
+    "stage": "recheck",
+    "task": "\nDesign a safe operational plan to provision a secondmate home, migrate a worker to omp, diagnose a stuck worker, and configure dispatch rules. Read-only assessment, no actual lifecycle.\n\n",
+    "catalog_count": 3,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "max_excerpt_chars": 700,
+    "request_bytes": 5220
+  },
+  {
+    "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/worker-automatic/request.SDX5nS.json",
+    "stage": "recheck",
+    "task": "\nDesign a safe operational plan to provision a secondmate home, migrate a worker to omp, diagnose a stuck worker, and configure dispatch rules. Read-only assessment, no actual lifecycle.\n\n",
+    "catalog_count": 3,
+    "catalog_fields": [
+      "description",
+      "excerpt",
+      "id"
+    ],
+    "max_excerpt_chars": 700,
+    "request_bytes": 5220
+  },
+  {
+    "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A076ZYT1X4K1Z65KBR0AY2/wire/worker-automatic/request.msPxSm.json",
+    "stage": "rank",
+    "task": "\nDesign a safe operational plan to provision a secondmate home, migrate a worker to omp, diagnose a stuck worker, and configure dispatch rules. Read-only assessment, no actual lifecycle.\n\n",
+    "catalog_count": 28,
+    "catalog_fields": [
+      "description",
+      "id"
+    ],
+    "max_excerpt_chars": 0,
+    "request_bytes": 23144
+  }
+]

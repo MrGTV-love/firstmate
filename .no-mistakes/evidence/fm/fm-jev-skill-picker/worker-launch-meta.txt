@@ -1,0 +1,13 @@
+window=primary:fm-jev-live-worker
+endpoint_task_id=jev-live-worker
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool/.treehouse/project-8c6c11/1/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-jev-live-worker
+model=openai-codex/gpt-6.1-sol
+effort=medium
+busy_gen=g1791339041.41005.26015
+spawn_gen=s1791339041.15347.32105
+decisions_reviewed=1
+decision_keys=

@@ -1,0 +1,12 @@
+{
+  "root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2",
+  "lab": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/lab",
+  "private_socket": "/tmp/fml.RIINwT",
+  "project": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/project",
+  "pool": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A076ZYT1X4K1Z65KBR0AY2/.live-validation/gate-skill-picker/pool",
+  "pty_grid": [
+    140,
+    45
+  ],
+  "key_policy": "Only actual picker process loads approved single key using fmx_env_get; no key exported to primary, tmux server, helpers or workers. Transparent bash/curl launchers execute unchanged product and record no auth headers."
+}
