@@ -1,12 +1,10 @@
 <!--
-Drop-in guard for any Lavish board that carries a form. Paste this script into the board once.
-Without it, a form whose handler is missing or broken submits natively: the sandboxed artifact frame
-navigates to a URL with no Lavish load token, Lavish answers 409 "no longer current", a reload does
-not repair it, and the answer is gone with nothing said.
-With it, the native submit is cancelled, the form shows a visible error, and an error prompt is queued
-for the agent. A form whose handler ran and cancelled its own submit is left alone.
-bin/fm-procevent-lavish.sh check warns when a board has inline form handlers and no element carrying
-the data-fm-lavish-form-guard attribute below.
+Drop-in guard for a Lavish board that carries forms. Paste this script into the board once.
+An uncancelled submit can navigate the artifact frame and lose the entered answer.
+This guard cancels a submit that reaches its document listener without already being cancelled,
+shows a visible error, and attempts to queue a form-error prompt when the Lavish SDK is available.
+The visible notice remains if the SDK is absent or queuePrompt throws.
+See bin/fm-procevent-lavish.sh's header for the syntax check and live-script guard-marker warning.
 -->
 <script data-fm-lavish-form-guard>
 (function () {

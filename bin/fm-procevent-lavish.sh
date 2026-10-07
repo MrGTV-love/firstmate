@@ -41,21 +41,26 @@
 #            argument; later retries poll without that reply. That post is best
 #            effort: a crash while consuming drops that one round's reply
 #            instead of posting it twice. See the note at the consume site.
-# check      Compile, without running, every inline event handler and inline
-#            classic script in the board and exit 1 naming each one that does not
-#            parse. `arm` runs it first and refuses such a board. The defect it
-#            guards is a form whose inline onsubmit holds text pasted into a
-#            quoted JavaScript string (an apostrophe in a decision title ends
-#            the string): the handler fails to parse, the browser submits the
-#            form natively, the artifact frame lands on Lavish's 409 "no longer
-#            current" page, and no reload can repair it because the file itself
-#            is broken. Build handlers with addEventListener or read their text
-#            from data attributes, and run `check` before opening a board.
-#            It also warns, without failing, when a board has inline onsubmit
-#            handlers and lacks the guard in
-#            .agents/skills/bearings/assets/lavish-form-guard.html, which turns a
-#            form that fails to cancel its own submit into a visible error and an
-#            error prompt for the agent instead of a silent loss.
+# check      Compile, without running, inline event handlers and inline classic
+#            scripts; exit 1 naming each parse failure and its source line.
+#            Skip external, module, JSON and other non-classic scripts, and
+#            commented-out markup; HTML-like comments inside live JavaScript
+#            remain part of the script body. This is a syntax-only check, not
+#            proof that handlers run, cancel submission or queue answers.
+#            `node` must be on PATH unless extraction yields no entries.
+#            Direct `check` needs a readable file, not a final-component symlink;
+#            `arm` resolves symlinks and checks the physical file it will poll.
+#            docs/configuration.md owns the arm-time refusal contract.
+#            A malformed onsubmit can leave native form submission uncancelled,
+#            sending the artifact frame to Lavish's 409 "no longer current"
+#            page; reloading cannot repair malformed JavaScript in the file.
+#            Build handlers with addEventListener or read their text from data
+#            attributes instead of pasting text into quoted handler strings.
+#            Run `check` while building a board, before opening it.
+#            It warns, without failing, when inline onsubmit handlers exist but
+#            no live script carries data-fm-lavish-form-guard. Paste the guard in
+#            .agents/skills/bearings/assets/lavish-form-guard.html once into such
+#            a board; its local comment owns the guard's runtime guarantees.
 # terminal   Exit 0 when the captured result means this Lavish source will never
 #            produce another result, so the runner may retire it; any other exit
 #            keeps it armed. This is the generic adapter contract bin/fm-procevent.sh
@@ -86,10 +91,10 @@
 # positively proves nothing was said. Silence is only ever an absence this
 # adapter can see in the result, never an absence it assumes.
 #
-# This adapter is deliberately thin. It owns only what is specific to Lavish:
-# canonical source identity, the argv for the currently published poll command,
-# and how to read a completed result. Ownership, durable capture, publication,
-# and restart recovery all belong to bin/fm-procevent.sh.
+# This adapter owns Lavish-specific board checks, canonical source identity,
+# the argv for the currently published poll command, and completed-result
+# interpretation. Ownership, durable capture, publication, and restart recovery
+# all belong to bin/fm-procevent.sh.
 #
 # The published poll vocabulary includes feedback, ended, waiting, and
 # browser_disconnected. A waiting result from this no-timeout poll means a
@@ -213,19 +218,10 @@ cmd_source_id() {
   fi
 }
 
-# Compile, never run, every inline event handler and inline classic script the
-# board carries. A handler that fails to parse is not a no-op in a browser: the
-# form it sits on submits natively, which navigates the sandboxed artifact frame
-# to a URL with no load token, and Lavish answers that with a 409 "no longer
-# current" page. Reloading cannot repair it, and the answer never reaches the
-# poll. The syntax error is a property of the file, so it is caught here rather
-# than discovered by the captain. Handler bodies are compiled as the function
-# body a browser wraps them in; a type=module, JSON, or other non-classic script
-# is skipped because this check cannot parse it faithfully.
-#
-# 0 = nothing broken (including a board with nothing to compile), 1 = at least
-# one parse failure, printed one per line, anything else = the check could not
-# complete, which is never proof the board is sound.
+# Handler bodies are compiled as the function body a browser wraps them in.
+# The header owns check scope and limits; extraction must preserve live script
+# bodies while excluding commented-out markup from both compilation and guard
+# detection.
 board_extract_scripts() {  # <artifact> <out-json-file>
   perl -MJSON::PP -MEncode=decode,FB_DEFAULT -e '
     use strict; use warnings;
@@ -262,8 +258,9 @@ board_extract_scripts() {  # <artifact> <out-json-file>
       $v =~ s/&amp;/&/g;
       return $v;
     }
-    # Inline scripts first, then blank them (keeping their newlines) so script
-    # text can never be mistaken for markup by the tag scan below.
+    # Match comments and live scripts in one scan so inactive script tags never
+    # count as code or guards, without stripping comment-like JavaScript text.
+    # Blank their bodies, preserving newlines for subsequent handler locations.
     my $markup = $html;
     $markup =~ s{<!--.*?(?:-->|\z)|(<script\b([^>]*)>)(.*?)(</script\s*>)}{
       my ($open, $attrs, $body, $close, $start) = ($1, $2, $3, $4, $-[0]);
@@ -391,8 +388,7 @@ cmd_arm() {
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   poll_retry_delay >/dev/null
   id=$(cmd_source_id "$artifact") || exit 1
-  # A board whose page scripts do not parse loses every answer entered on it, so
-  # it is refused before anything is registered or listening.
+  # Check the listener's physical file before registration, including alias arms.
   real=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); defined($p) or exit 1; print "$p\n"' "$artifact" 2>/dev/null) \
     || die "cannot resolve the artifact path: $artifact"
   cmd_check "$real" >/dev/null || exit 1
