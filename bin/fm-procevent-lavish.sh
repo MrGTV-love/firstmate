@@ -729,9 +729,9 @@ cmd_poll() {
       *) die "cannot classify the poll response" ;;
     esac
   done
-  # A blocking poll killed by a signal before it printed anything delivered
-  # nothing, and Lavish keeps the feedback queued, so this is the runner's
-  # existing poll-again exit rather than a failed read awaiting reconciliation.
+  # An outputless signal termination uses the runner's existing poll-again exit
+  # rather than waiting for reconciliation. No local bytes does not prove the
+  # server retained feedback; the header's destructive-poll loss limit still applies.
   # A signal to this listener itself never reaches here: the traps above re-raise it.
   if [ "$rc" -gt 128 ] && [ ! -s "$response" ]; then
     return 75
