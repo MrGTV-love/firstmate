@@ -63,16 +63,25 @@ META="$FM_STATE_OVERRIDE/$TASK_ID.meta"
 run() { PATH="$REAL_PATH" "$HELPER" run "$SESSION" "$@"; }
 assert_live_profile() {
   run pane process-info --pane "$PANE" | jq -e --arg cwd "$WT" \
-    --arg config "$ROOT/.omp/fm-worker-overlay.yml" '
+    --arg session_config "$ROOT/.omp/fm-session-overlay.yml" \
+    --arg worker_config "$ROOT/.omp/fm-worker-overlay.yml" \
+    --arg kind "$(fm_meta_get "$META" kind)" '
     .result.process_info.foreground_processes
     | map(select(.argv | index("--model") != null)) | select(length == 1) | .[0]
     | select(.cwd == $cwd)
-    | .argv
+    | .argv as $argv
+    | [range(0; $argv | length) as $i
+        | select($argv[$i] == "--config") | $argv[$i + 1]] as $configs
+    | select(($configs | index($session_config)) != null
+        and ($kind == "secondmate" or ($configs | index($worker_config)) != null))
+    | $argv
     | select(index("--auto-approve") != null
-        and .[index("--config") + 1] == $config
         and .[index("--model") + 1] == "openai-codex/gpt-6.1-sol"
         and .[index("--thinking") + 1] == "low")
-    | true' >/dev/null || fail 'actual omp runtime lost cwd, managed config, approval posture or profile'
+    | true' >/dev/null || {
+      run pane process-info --pane "$PANE"
+      fail 'actual omp runtime lost cwd, managed config, approval posture or profile'
+    }
 }
 # Herdr's foreground view and the kernel ancestry snapshot are asynchronous;
 # a helper exiting between reads may yield unknown. Never retry a positively
@@ -194,7 +203,7 @@ PRESERVED=("$META" "$FM_STATE_OVERRIDE/$TASK_ID.busy-gen" "$FM_STATE_OVERRIDE/$T
 for DRAFT in 'preserve draft' '!git diff' '$ print(1)'; do
   run pane send-text "$PANE" "$DRAFT"
   sleep 0.3
-  [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE")" = "$DRAFT" ] \
+  [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE" "$(fm_backend_herdr_composer_identity "$SESSION:$PANE")")" = "$DRAFT" ] \
     || fail 'test draft was not captured before recovery'
   DRAFT_BEFORE=$(shasum -a 256 "${PRESERVED[@]}")
   for RECOVERY in direct sweep; do
@@ -209,7 +218,7 @@ for DRAFT in 'preserve draft' '!git diff' '$ print(1)'; do
     fi
     [ "$(fm_backend_composer_state herdr "$SESSION:$PANE" "fm-$TASK_ID")" = pending ] \
       || fail 'pending input was not preserved'
-    [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE")" = "$DRAFT" ] \
+    [ "$(fm_backend_herdr_composer_content "$SESSION:$PANE" "$(fm_backend_herdr_composer_identity "$SESSION:$PANE")")" = "$DRAFT" ] \
       || fail 'recovery altered the pending draft'
     [ "$(shasum -a 256 "${PRESERVED[@]}")" = "$DRAFT_BEFORE" ] \
       || fail 'pending refusal changed metadata, busy state, instructions or work'

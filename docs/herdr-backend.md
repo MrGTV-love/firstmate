@@ -604,7 +604,7 @@ That comparison ignores whitespace and U+2063, the invisible mark that starts op
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
-They skip it because their paste placeholders and composer shapes are not live-verified.
+Only Claude has this live-verified payload and paste-placeholder proof; recognizing another harness's composer does not establish payload ownership.
 
 ### Submit confirmation
 
@@ -664,12 +664,7 @@ A human-blocked permission dialog has no busy banner and still surfaces.
 
 Herdr has no direct cursor-row primitive.
 The adapter is a thin capture.
-It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier in `bin/fm-composer-lib.sh`, which owns every shape:
-
-- Bordered boxes.
-- Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
-- opencode's left bar.
-- The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.
+It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier, whose [shape catalogue](../bin/fm-composer-lib.sh) owns supported containers and their proof requirements.
 
 ### Pi composer states
 
