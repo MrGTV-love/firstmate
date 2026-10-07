@@ -382,6 +382,7 @@ EOF
   RECOVERY_OWNER=
   RECOVERY_PARENT=
   RECOVERY_CHILD=
+  # shellcheck disable=SC2154 # recovery_pid is assigned by the for loop inside the trap.
   trap '
     [ -z "$RECOVERY_PARENT" ] || kill -KILL -- "-$RECOVERY_PARENT" 2>/dev/null || true
     for recovery_pid in "$RECOVERY_CHILD" "$RECOVERY_PARENT" "$RECOVERY_OWNER" "$RECOVERY_RUNNER_PID"; do

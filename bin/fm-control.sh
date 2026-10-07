@@ -1250,6 +1250,7 @@ do_relaunch() {
       T=$FM_BACKEND_VALIDATED_TARGET
       BACKEND=$FM_BACKEND_VALIDATED_BACKEND
       if [ "$BACKEND" = herdr ] && ! declare -F fm_launch_proof_herdr >/dev/null 2>&1; then
+        # shellcheck source=bin/fm-launch-proof-lib.sh
         . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
         fm_backend_source herdr || die "could not load Herdr lifecycle control"
       fi

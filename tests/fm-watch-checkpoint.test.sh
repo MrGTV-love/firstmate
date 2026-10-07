@@ -67,7 +67,7 @@ SH
 }
 
 test_due_checks_precede_repeated_unmanaged_recovery() {
-  local home bin file status cycle drained notice expected_checks= expected_recoveries=
+  local home bin file status cycle drained notice expected_checks='' expected_recoveries=''
   local sequence generation
   local -a fixture_env
   home=$(make_home recovery-order)
