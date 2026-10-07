@@ -2618,6 +2618,7 @@ Ownership is machine-wide per canonical source, because separate homes can share
 - Once that stop has proved ownership and sent TERM, its own escalation to KILL checks only whether the proved group still has members; it does not re-read the leader's identity or group membership, which can change or become unreadable as TERM ends the leader.
 - This proof belongs only to that stop's own escalation and cannot authorize another caller that encounters an unproved group.
 - EXIT cleanup for a runner's TERM, INT, HUP, or ordinary exit keeps its identity-matched leader alive while draining remaining group members, and releases any retained claim only after those descendants are gone.
+  Uncertain group inspection or failed signalling keeps that leader alive for another shutdown attempt rather than abandoning its descendants.
   TERM-resistant descendants use that same proved KILL escalation; the killed runner leaves its claim for reconciliation after the whole generation is gone.
   Adapter-terminal self-retirement can release the claim earlier, under the same lock that removes the registration; the subsequent EXIT cleanup still drains descendants, so the retained-claim ordering is not a universal terminal-path guarantee.
 

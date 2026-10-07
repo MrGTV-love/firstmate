@@ -1071,26 +1071,27 @@ cmd_start() {
     trap '' INT TERM HUP
     extension_lifecycle_lock_release 2>/dev/null || true
     [ -z "$STAGED_OUTPUT" ] || rm -f -- "$STAGED_OUTPUT"
-    runner_group_children_gone "$CLAIM_PID" 0
-    case "$?" in
-      0) ;;
-      1)
-        runner_group_signal TERM "$CLAIM_PID" "$CLAIM_IDENTITY" || return 0
-        runner_group_children_gone "$CLAIM_PID" 2
-        case "$?" in
-          0) ;;
-          1)
-            # This escalation retains the live-leader proof from our TERM.
-            # KILL ends us too, leaving the claim for reconciliation only once
-            # the whole generation is gone; never release ahead of the kill.
-            runner_group_signal KILL "$CLAIM_PID" "$CLAIM_IDENTITY" proved
-            return 0
-            ;;
-          *) return 0 ;;
-        esac
-        ;;
-      *) return 0 ;;
-    esac
+    while :; do
+      runner_group_children_gone "$CLAIM_PID" 0
+      case "$?" in
+        0) break ;;
+        1)
+          if runner_group_signal TERM "$CLAIM_PID" "$CLAIM_IDENTITY"; then
+            runner_group_children_gone "$CLAIM_PID" 2
+            case "$?" in
+              0) break ;;
+              1)
+                # This escalation retains the live-leader proof from our TERM.
+                # KILL ends us too, leaving the claim for reconciliation only once
+                # the whole generation is gone; never release ahead of the kill.
+                runner_group_signal KILL "$CLAIM_PID" "$CLAIM_IDENTITY" proved && return 0
+                ;;
+            esac
+          fi
+          ;;
+      esac
+      sleep 0.1
+    done
     fm_procevent_source_lock_try_acquire "$CLAIM_ID" 2>/dev/null || return 0
     if fm_procevent_claim_load_locked "$CLAIM_ID" 2>/dev/null \
       && [ "$FM_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
