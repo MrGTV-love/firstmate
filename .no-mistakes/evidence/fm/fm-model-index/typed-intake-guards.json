@@ -1,0 +1,54 @@
+{
+  "network_isolation": "All HTTPS proxies point to loopback discard port 9; no external services used. Actual product preflight runs before API.",
+  "scenarios": [
+    {
+      "name": "empty present dispatch",
+      "command": [
+        "bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-intake-n0e_u2nu/brief.md"
+      ],
+      "dispatch": "",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-intake-n0e_u2nu/config/crew-dispatch.json (not JSON)\n",
+      "passed": true
+    },
+    {
+      "name": "concatenated dispatch with appended approval",
+      "command": [
+        "bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-intake-n0e_u2nu/brief.md"
+      ],
+      "dispatch": "{\"rules\": [], \"default\": {\"harness\": \"claude\", \"role\": \"fast\"}}\n{\"rules\": [], \"default\": {\"harness\": \"claude\", \"role\": \"fast\"}, \"approval\": \"required\"}",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "jq: error (at /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.NiVlNbyCgV:1): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.NiVlNbyCgV\nerror: model index/profile resolution failed\n",
+      "passed": true
+    },
+    {
+      "name": "nonobject dispatch",
+      "command": [
+        "bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-intake-n0e_u2nu/brief.md"
+      ],
+      "dispatch": "[]",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "jq: error (at /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.IxMZwhGbH6:0): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.IxMZwhGbH6\nerror: model index/profile resolution failed\n",
+      "passed": true
+    },
+    {
+      "name": "valid one-object dispatch without rules",
+      "command": [
+        "bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-intake-n0e_u2nu/brief.md"
+      ],
+      "dispatch": "{\"rules\": [], \"default\": {\"harness\": \"claude\", \"role\": \"fast\"}}",
+      "exit": 0,
+      "stdout": "dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n",
+      "stderr": "",
+      "passed": true
+    }
+  ],
+  "cleanup": "Disposable fixture removed in finally"
+}

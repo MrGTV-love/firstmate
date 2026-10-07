@@ -1,0 +1,1412 @@
+{
+  "assignment": "Manual live public model-selection CLI scenarios; no unit tests, suite, build, lint, formatter, source edits, operator Codex data, prompt, or session persistence.",
+  "recorded_at": "2026-10-07T07:41:14.274495+00:00",
+  "public_cli": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+  "public_cli_sha256": "f2b4d9b608330c02538352729eadc7a8cace175ea967bd60cd73945a83e1176e",
+  "artifact": "/Users/charlesabrooker/.no-mistakes/evidence/01M4A2J6ENDRSX124XXEZ5XC1T/model-selection-live.json",
+  "fixture_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+  "fixture_data": {
+    "initial_index": {
+      "version": 1,
+      "roles": {
+        "selection": {
+          "claude": {
+            "model": "current-primary-v1",
+            "stand_in": "current-stand-in-v1"
+          }
+        }
+      },
+      "retired": [
+        "retired-model"
+      ]
+    },
+    "one_edited_index": {
+      "version": 1,
+      "roles": {
+        "selection": {
+          "claude": {
+            "model": "current-primary-v2",
+            "stand_in": "current-stand-in-v2"
+          }
+        }
+      },
+      "retired": [
+        "retired-model"
+      ]
+    },
+    "unchanged_dispatch": {
+      "rules": [
+        {
+          "when": "primary",
+          "use": {
+            "harness": "claude",
+            "role": "selection",
+            "effort": "high"
+          }
+        },
+        {
+          "when": "alternate",
+          "use": [
+            {
+              "harness": "claude",
+              "role": "selection",
+              "stand_in": true,
+              "effort": "low"
+            }
+          ]
+        }
+      ],
+      "default": {
+        "harness": "claude",
+        "role": "selection"
+      }
+    },
+    "registry_fixtures": {
+      "retired-values-and-keys": {
+        "models": [
+          "retired-model",
+          "provider/retired-model[1m]",
+          "current-primary-v2"
+        ],
+        "retired-model": {
+          "description": "Contains retired-model in prose only"
+        }
+      },
+      "prose-only": {
+        "description": "This retired-model appears in prose and should not match.",
+        "notes": [
+          "Use retired-model only as historical prose",
+          "Not a current retired-model selection"
+        ]
+      },
+      "current-only": {
+        "model": "current-primary-v2",
+        "current-stand-in-v2": {
+          "model": "provider/current-primary-v2[1m]"
+        }
+      }
+    },
+    "native_proof_index": {
+      "version": 1,
+      "roles": {
+        "native-proof": {
+          "claude": {
+            "model": "default",
+            "stand_in": "fm-live-proof-absent-01M4A2J6ENDRSX124XXEZ5XC1T"
+          }
+        }
+      },
+      "retired": []
+    }
+  },
+  "dispatch_read_only_assertion": {
+    "before_sha256": "9f4608a73122bb3589f328ad24713fb7ada2175b8272ef1b320d8b474a11e271",
+    "after_sha256": "9f4608a73122bb3589f328ad24713fb7ada2175b8272ef1b320d8b474a11e271",
+    "passed": true
+  },
+  "registry_read_only_assertions": [
+    {
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-retired-values-and-keys.json",
+      "before_sha256": "77b3efca37d3f9313b80230a756d0d814f840c241057eaa6fcd578eb3ff0b34a",
+      "after_sha256": "77b3efca37d3f9313b80230a756d0d814f840c241057eaa6fcd578eb3ff0b34a",
+      "passed": true
+    },
+    {
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-prose-only.json",
+      "before_sha256": "a085f4346e7f5f9d5a22db55e1420bbfadb9e42d151fc774f0b47bc5d35e8e05",
+      "after_sha256": "a085f4346e7f5f9d5a22db55e1420bbfadb9e42d151fc774f0b47bc5d35e8e05",
+      "passed": true
+    },
+    {
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-current-only.json",
+      "before_sha256": "ab45784990858873752957e19b90cca66f66f259122d2d4fd343dd00fc304ed2",
+      "after_sha256": "ab45784990858873752957e19b90cca66f66f259122d2d4fd343dd00fc304ed2",
+      "passed": true
+    }
+  ],
+  "native_catalog_proof": {
+    "installed_binary": "/Users/charlesabrooker/.local/bin/claude",
+    "method": "Claude SDK initialize control request with no prompt, normal inherited login, --no-session-persistence, --setting-sources empty; live public checker performed its own native discovery with catalog export override unset.",
+    "listed_selectors": [
+      "default",
+      "opus",
+      "claude-fable-5-1[1m]",
+      "sonnet",
+      "haiku"
+    ],
+    "selected_id": "default",
+    "synthetic_absent_id": "fm-live-proof-absent-01M4A2J6ENDRSX124XXEZ5XC1T",
+    "absent_from_captured_native_ids": true
+  },
+  "scenarios": [
+    {
+      "scenario": "role-model-before-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:selection"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.036,
+      "result": {
+        "exit_code": 0,
+        "stdout": "current-primary-v1\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stdout contains expected text",
+          "expected": "current-primary-v1\n",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "stand-in-model-before-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "stand-in:selection"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.039,
+      "result": {
+        "exit_code": 0,
+        "stdout": "current-stand-in-v1\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stdout contains expected text",
+          "expected": "current-stand-in-v1\n",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "offline-profiles-before-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/crew-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.038,
+      "result": {
+        "exit_code": 0,
+        "stdout": "{\n  \"rules\": [\n    {\n      \"when\": \"primary\",\n      \"use\": {\n        \"harness\": \"claude\",\n        \"effort\": \"high\",\n        \"model\": \"current-primary-v1\"\n      }\n    },\n    {\n      \"when\": \"alternate\",\n      \"use\": [\n        {\n          \"harness\": \"claude\",\n          \"effort\": \"low\",\n          \"model\": \"current-stand-in-v1\"\n        }\n      ]\n    }\n  ],\n  \"default\": {\n    \"harness\": \"claude\",\n    \"model\": \"current-primary-v1\"\n  }\n}\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "role-model-after-one-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:selection"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.049,
+      "result": {
+        "exit_code": 0,
+        "stdout": "current-primary-v2\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "stand-in-model-after-one-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "stand-in:selection"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.034,
+      "result": {
+        "exit_code": 0,
+        "stdout": "current-stand-in-v2\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "offline-profiles-after-one-index-edit",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/crew-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.032,
+      "result": {
+        "exit_code": 0,
+        "stdout": "{\n  \"rules\": [\n    {\n      \"when\": \"primary\",\n      \"use\": {\n        \"harness\": \"claude\",\n        \"effort\": \"high\",\n        \"model\": \"current-primary-v2\"\n      }\n    },\n    {\n      \"when\": \"alternate\",\n      \"use\": [\n        {\n          \"harness\": \"claude\",\n          \"effort\": \"low\",\n          \"model\": \"current-stand-in-v2\"\n        }\n      ]\n    }\n  ],\n  \"default\": {\n    \"harness\": \"claude\",\n    \"model\": \"current-primary-v2\"\n  }\n}\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "readable-export-accepts-selected-id",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.068,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "readable-export-rejects-selected-absent-id",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.042,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: id 'current-primary-v2' absent or retired in claude catalog (role 'selection')\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "id 'current-primary-v2' absent or retired in claude catalog",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "retired-literal-check-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "retired-model"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.027,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: retired id 'retired-model' selected (claude)\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "retired id 'retired-model' selected (claude)",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "retired-literal-model-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "retired-model"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.03,
+      "result": {
+        "exit_code": 5,
+        "stdout": "",
+        "stderr": "model-index: warning: literal model 'retired-model' for claude is not an index entry; name its role so the next model release is one index edit\njq: error (at <stdin>:4): retired model: retired-model\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 5,
+          "actual": 5,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "retired model: retired-model",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "retired-literal-profile-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/retired-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.031,
+      "result": {
+        "exit_code": 5,
+        "stdout": "",
+        "stderr": "jq: error (at /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.GxTgRYeP2A/dispatch.json:6): retired model: retired-model\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 5,
+          "actual": 5,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "retired model: retired-model",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "catalog-alias-resolved-retirement-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.042,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: id 'current-primary-v2' absent or retired in claude catalog (role 'selection')\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "id 'current-primary-v2' absent or retired in claude catalog",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "unavailable-export-passes-with-unvalidated-notice",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/missing-catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.036,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current-primary-v2' (role 'selection') not validated\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "catalog unavailable",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "concatenated-export-passes-with-unvalidated-notice",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.035,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current-primary-v2' (role 'selection') not validated\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "catalog unavailable",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "empty-export-passes-with-unvalidated-notice",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.034,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current-primary-v2' (role 'selection') not validated\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "catalog unavailable",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-export-passes-with-unvalidated-notice",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "current-primary-v2"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.035,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current-primary-v2' (role 'selection') not validated\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "catalog unavailable",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "separate-registry-retired-values-and-keys",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-retired-values-and-keys.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.022,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: retired id 'provider/retired-model[1m]' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-retired-values-and-keys.json\nmodel-index: retired id 'retired-model' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-retired-values-and-keys.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "retired id 'retired-model'",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        },
+        {
+          "name": "registry remains byte-identical",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "separate-registry-prose-only",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-prose-only.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.022,
+      "result": {
+        "exit_code": 0,
+        "stdout": "model-index: registry checked; no retired identifiers\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        },
+        {
+          "name": "registry remains byte-identical",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "separate-registry-current-only",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/registry-current-only.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.023,
+      "result": {
+        "exit_code": 0,
+        "stdout": "model-index: registry checked; no retired identifiers\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        },
+        {
+          "name": "registry remains byte-identical",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "empty-index-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.019,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/config/model-index.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed index:",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "concatenated-index-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.018,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/config/model-index.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed index:",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-array-index-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.019,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/config/model-index.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed index:",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-null-index-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.02,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/config/model-index.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed index:",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-string-index-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.02,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/config/model-index.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed index:",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "empty-dispatch-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.026,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json:0): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed dispatch:",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "concatenated-dispatch-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.027,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json:2): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed dispatch:",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-array-dispatch-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.03,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json:1): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed dispatch:",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-null-dispatch-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.027,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json:1): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed dispatch:",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "nonobject-string-dispatch-rejected",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/catalogs",
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.024,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json:1): dispatch must contain exactly one JSON object\nmodel-index: malformed dispatch: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/invalid-dispatch.json\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "malformed dispatch:",
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "valid-index-only-profiles-no-arguments-success",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.024,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "native-claude-sdk-no-prompt-initialize",
+      "command": [
+        "/Users/charlesabrooker/.local/bin/claude",
+        "-p",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--no-session-persistence",
+        "--setting-sources",
+        ""
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": "{\"type\": \"control_request\", \"request_id\": \"model-index\", \"request\": {\"subtype\": \"initialize\"}}\n",
+      "duration_seconds": 1.011,
+      "result": {
+        "exit_code": 0,
+        "stdout": "{\"type\":\"control_response\",\"response\":{\"subtype\":\"success\",\"request_id\":\"model-index\",\"response\":{\"commands\":[{\"name\":\"deep-research\",\"description\":\"Deep research harness \u2014 fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"design\",\"description\":\"Grant or revoke Claude agent access to your Design projects\",\"argumentHint\":\"consent | revoke\",\"builtin\":true},{\"name\":\"design-sync\",\"description\":\"Push a React design system to claude.ai/design. This runs a converter that bundles the real component code (from Storybook or a bare package) and uploads it. Use when the user runs /design-sync or says \\\"sync my design system to Claude Design\\\".\",\"argumentHint\":\"[<project hint, e.g. \\\"Acme DS\\\">]\",\"builtin\":true},{\"name\":\"dataviz\",\"description\":\"Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium \u2014 an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, \u2026), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG \u2014 a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system \u2014 elegant, accessible, consistent in light and dark \u2014 using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` \u2014 swap that file's values for your brand's. Triggers on: \\\"chart\\\", \\\"graph\\\", \\\"plot\\\", \\\"data viz\\\", \\\"visualization\\\", \\\"dashboard\\\", \\\"analytics\\\", \\\"visualize data\\\", \\\"categorical colors\\\", \\\"sequential / diverging palette\\\", \\\"stat tile\\\", \\\"sparkline\\\", \\\"heatmap\\\", \\\"legend\\\", \\\"axis\\\", \\\"tooltip\\\", \\\"chart colors\\\", \\\"color by series\\\".\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"update-config\",\"description\":\"Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\\\"from now on when X\\\", \\\"each time X\\\", \\\"whenever X\\\", \\\"before/after X\\\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\\\"allow X\\\", \\\"add permission\\\", \\\"move permission to\\\"), env vars (\\\"set X=Y\\\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \\\"allow npm commands\\\", \\\"add bq permission to global settings\\\", \\\"move permission to user settings\\\", \\\"set DEBUG=true\\\", \\\"when claude stops show X\\\". For simple settings like theme/model, suggest the /config command.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"verify\",\"description\":\"Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior \u2014 drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) \u2014 there's nothing to observe.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"debug\",\"description\":\"Enable debug logging for this session and help diagnose issues\",\"argumentHint\":\"[issue description]\",\"builtin\":true},{\"name\":\"code-review\",\"description\":\"Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain; ultra: deep multi-agent review in the cloud); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default. For ultra on a GitHub.com PR target, --post asks to post the finished review\u2019s findings to the PR as a single comment from the user\u2019s GitHub account (not a review; the launch dialog still confirms in interactive sessions, while non-interactive mode posts on the flag alone) and --no-post hides that option.\",\"argumentHint\":\"[low|medium|high|xhigh|max|ultra] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]\",\"aliases\":[\"review\"],\"builtin\":true},{\"name\":\"simplify\",\"description\":\"Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only \u2014 it does not hunt for bugs; use /code-review for that.\",\"argumentHint\":\"[<target>]\",\"builtin\":true},{\"name\":\"batch\",\"description\":\"Research and plan a large-scale change, then execute it in parallel across 5\u201330 isolated worktree agents that each open a PR.\",\"argumentHint\":\"<instruction>\",\"builtin\":true},{\"name\":\"fewer-permission-prompts\",\"description\":\"Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"doctor\",\"description\":\"Health-check the user's Claude Code setup and fix issues: diagnose installation health \u2014 what the `claude doctor` terminal diagnostics cover \u2014 from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.\",\"argumentHint\":\"[prompt-audit [<path>]]\",\"aliases\":[\"checkup\"],\"builtin\":true},{\"name\":\"loop\",\"description\":\"Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.\",\"argumentHint\":\"[interval] [prompt]\",\"aliases\":[\"proactive\"],\"builtin\":true},{\"name\":\"schedule\",\"description\":\"Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.\",\"argumentHint\":\"\",\"aliases\":[\"routines\"],\"builtin\":true},{\"name\":\"claude-api\",\"description\":\"Reference for the Claude API / Anthropic SDK \u2014 model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\\nTRIGGER \u2014 read BEFORE opening the target file; don't skip because it \\\"looks like a one-liner\\\" \u2014 whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) \u2014 never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named \u2014 don't Read the file).\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"workflow-authoring\",\"description\":\"Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"run\",\"description\":\"Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"run-skill-generator\",\"description\":\"Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"plugin-authoring\",\"description\":\"Make a mod: a live pane, band, status line, toast or hook inside Claude Code (terminal or desktop Code tab), written as a plugin of function hooks that hot-reloads in this session. Load before writing or debugging a hooks module.\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"advisor\",\"description\":\"Let Claude consult a stronger model at key moments\",\"argumentHint\":\"[fable|opus|sonnet|off]\",\"builtin\":true},{\"name\":\"agents\",\"description\":\"(removed) Ask Claude to create/manage subagents, or edit .claude/agents/\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"auto-mode-setup\",\"description\":\"Teach auto mode about your environment, plus optional rule tweaks\",\"argumentHint\":\"[--request-id <uuid>] (--wizard posture=\u2026 scope=\u2026 depth=\u2026 --propose | --expect-sha256 <64-hex> --apply-file <path>)\",\"builtin\":true},{\"name\":\"autocompact\",\"description\":\"Configure the auto-compact window size\",\"argumentHint\":\"[auto|<tokens>]\",\"builtin\":true},{\"name\":\"clear\",\"description\":\"Start a new session with empty context; previous session stays on disk (resumable with /resume)\",\"argumentHint\":\"[name]\",\"aliases\":[\"reset\",\"new\"],\"builtin\":true},{\"name\":\"color\",\"description\":\"Set the prompt bar color for this session\",\"argumentHint\":\"[red|blue|green|yellow|purple|orange|pink|cyan|default]\",\"builtin\":true},{\"name\":\"compact\",\"description\":\"Free up context by summarizing the conversation so far\",\"argumentHint\":\"<optional custom summarization instructions>\",\"builtin\":true},{\"name\":\"config\",\"description\":\"Set a setting by key\",\"argumentHint\":\"key=value\",\"aliases\":[\"settings\"],\"builtin\":true},{\"name\":\"output-style\",\"description\":\"List output styles or switch to one\",\"argumentHint\":\"[style]\",\"builtin\":true},{\"name\":\"context\",\"description\":\"Show current context usage\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"effort\",\"description\":\"Set effort level for model usage\",\"argumentHint\":\"<low|medium|high|xhigh|max|auto|ultracode [on|off]>\",\"builtin\":true},{\"name\":\"fast\",\"description\":\"Toggle fast mode (Opus 5.5)\",\"argumentHint\":\"[on|off]\",\"builtin\":true},{\"name\":\"focus\",\"description\":\"Toggle focus view: just your prompt, summary, and response\",\"argumentHint\":\"[on|off]\",\"builtin\":true},{\"name\":\"heapdump\",\"description\":\"Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"init\",\"description\":\"Initialize a new CLAUDE.md file with codebase documentation\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"mcp\",\"description\":\"Manage MCP servers\",\"argumentHint\":\"[reconnect|enable|disable [<server>|all]]\",\"builtin\":true},{\"name\":\"import\",\"description\":\"Import config from another AI coding agent\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"model\",\"description\":\"Set the AI model for Claude Code\",\"argumentHint\":\"<model>\",\"builtin\":true},{\"name\":\"__remote-workflow\",\"description\":\"Run the workflow script delivered in this session environment (server-launched sessions only)\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"workflow-launch-exec\",\"description\":\"Execute a server-launched workflow handoff (workflow_launch event sessions only)\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"reload-plugins\",\"description\":\"Activate pending plugin changes in the current session\",\"argumentHint\":\"[--force]\",\"builtin\":true},{\"name\":\"reload-skills\",\"description\":\"Pick up skills added or changed on disk during this session\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"rename\",\"description\":\"Rename the current conversation\",\"argumentHint\":\"[name]\",\"aliases\":[\"name\"],\"builtin\":true},{\"name\":\"ultrareview\",\"description\":\"Start a cloud agent that finds and verifies bugs in your branch (~15-25 min, $5-$25 USD) \u00b7 Runs in a cloud session. See https://code.claude.com/docs/en/claude-code-on-the-web\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"security-review\",\"description\":\"Complete a security review of the pending changes on the current branch\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"usage-credits\",\"description\":\"Configure usage credits or request them from your admin when you hit a limit\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"extra-usage\",\"description\":\"Renamed to /usage-credits\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"usage\",\"description\":\"Show session cost, plan usage, and what's contributing to your limits\",\"argumentHint\":\"\",\"aliases\":[\"cost\",\"stats\"],\"builtin\":true},{\"name\":\"insights\",\"description\":\"Generate a report analyzing your Claude Code sessions\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"recap\",\"description\":\"Generate a one-line session recap now\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"skill-doctor\",\"description\":\"Show which loaded skills are unused and costing context\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"goal\",\"description\":\"Set a goal \u2014 keep working until the condition is met\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"design-consent\",\"description\":\"Grant Claude agent access to your Design projects\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"design-revoke\",\"description\":\"Revoke Claude agent access to your Design projects\",\"argumentHint\":\"\",\"builtin\":true},{\"name\":\"list-agents\",\"description\":\"List subagents, teammates, and other Claude sessions you can message\",\"argumentHint\":\"\",\"aliases\":[\"peers\"],\"builtin\":true},{\"name\":\"team-onboarding\",\"description\":\"Help teammates ramp on Claude Code with a guide from your usage\",\"argumentHint\":\"\",\"builtin\":true}],\"agents\":[{\"name\":\"claude\",\"description\":\"Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed.\"},{\"name\":\"Explore\",\"description\":\"Fast read-only search agent for locating code. Use it to find files by pattern (eg. \\\"src/components/**/*.tsx\\\"), grep for symbols or keywords (eg. \\\"API endpoints\\\"), or answer \\\"where is X defined / which files reference Y.\\\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis \u2014 it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \\\"quick\\\" for a single targeted lookup, \\\"medium\\\" for moderate exploration, or \\\"very thorough\\\" to search across multiple locations and naming conventions.\",\"model\":\"inherit\"},{\"name\":\"general-purpose\",\"description\":\"General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.\"},{\"name\":\"Plan\",\"description\":\"Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.\",\"model\":\"inherit\"},{\"name\":\"statusline-setup\",\"description\":\"Use this agent to configure the user's Claude Code status line setting.\",\"model\":\"sonnet\"}],\"output_style\":\"default\",\"available_output_styles\":[\"default\",\"Proactive\",\"Concise\",\"Explanatory\",\"Learning\"],\"user_output_styles_dir\":\"/Users/charlesabrooker/.claude/output-styles\",\"models\":[{\"value\":\"default\",\"resolvedModel\":\"claude-opus-5-5\",\"displayName\":\"Default (recommended)\",\"description\":\"Opus 5.5 \u00b7 Best for everyday, complex tasks\",\"supportsEffort\":true,\"supportedEffortLevels\":[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"],\"supportsAdaptiveThinking\":true,\"supportsFastMode\":true,\"supportsAutoMode\":true},{\"value\":\"opus\",\"resolvedModel\":\"claude-opus-5-5\",\"displayName\":\"Opus\",\"description\":\"Opus 5.5 \u00b7 Best for everyday, complex tasks\",\"supportsEffort\":true,\"supportedEffortLevels\":[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"],\"supportsAdaptiveThinking\":true,\"supportsFastMode\":true,\"supportsAutoMode\":true},{\"value\":\"claude-fable-5-1[1m]\",\"resolvedModel\":\"claude-fable-5-1\",\"displayName\":\"Fable\",\"description\":\"Fable 5.1 \u00b7 Most capable for your hardest and longest-running tasks\",\"supportsEffort\":true,\"supportedEffortLevels\":[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"],\"supportsAdaptiveThinking\":true,\"supportsAutoMode\":true},{\"value\":\"sonnet\",\"resolvedModel\":\"claude-sonnet-5-5\",\"displayName\":\"Sonnet\",\"description\":\"Sonnet 5.5 \u00b7 Efficient for routine tasks\",\"supportsEffort\":true,\"supportedEffortLevels\":[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"],\"supportsAdaptiveThinking\":true,\"supportsAutoMode\":true},{\"value\":\"haiku\",\"resolvedModel\":\"claude-haiku-4-5-20251001\",\"displayName\":\"Haiku\",\"description\":\"Haiku 4.5 \u00b7 Fastest for quick answers\"}],\"account\":{\"email\":\"charles@greentreetherapeutics.com\",\"organization\":\"charles@greentreetherapeutics.com's Organization\",\"subscriptionType\":\"Claude Max\",\"apiProvider\":\"firstParty\"},\"pid\":93144,\"current_permission_mode\":\"default\",\"feedback_mode\":{\"kind\":\"post\"},\"analytics_disabled\":false,\"remote_control_auto_enable\":false,\"remote_control_auto_connect_default\":false,\"remote_control_available\":true,\"remote_control_auto_on_by_default\":false,\"ide_rc_auto_enable_gate\":true,\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"session_state\":\"idle\",\"capabilities\":[\"ui_surface_v1\"]},\"pending_permission_requests\":[],\"pending_user_dialog_requests\":[]}}\n",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "native-catalog-accepts-harness-listed-selected-id",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "default"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 1.017,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "native-catalog-rejects-synthetic-absent-id",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "fm-live-proof-absent-01M4A2J6ENDRSX124XXEZ5XC1T"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.961,
+      "result": {
+        "exit_code": 2,
+        "stdout": "",
+        "stderr": "model-index: id 'fm-live-proof-absent-01M4A2J6ENDRSX124XXEZ5XC1T' absent or retired in claude catalog (role 'native-proof')\n"
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 2,
+          "actual": 2,
+          "passed": true
+        },
+        {
+          "name": "stderr contains expected text",
+          "expected": "id 'fm-live-proof-absent-01M4A2J6ENDRSX124XXEZ5XC1T' absent or retired in claude catalog",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "valid-index-only-no-dispatch-profiles-no-arguments-success",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh",
+        "profiles"
+      ],
+      "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture/index-only",
+        "FM_MODEL_CATALOG_DIR": null,
+        "fleet_overrides": "all inherited FM_* variables removed"
+      },
+      "stdin": null,
+      "duration_seconds": 0.044,
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "assertions": [
+        {
+          "name": "expected exit code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scenario output assertion",
+          "passed": true
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "summary": {
+    "scenario_count": 34,
+    "passed": 34,
+    "failed": [],
+    "dispatch_unchanged": true,
+    "all_registries_unchanged": true,
+    "blockers": []
+  },
+  "cleanup": {
+    "disposable_fixture_removed": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-selection-live-fixture",
+    "removal_command": ["rm", "-rf", ".model-selection-live-fixture"],
+    "removal_exit_code": 0,
+    "no_scripts_created": true,
+    "source_files_modified": false
+  }
+}

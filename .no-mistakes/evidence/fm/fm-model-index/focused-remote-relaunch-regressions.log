@@ -1,0 +1,17 @@
+bash tests/fm-remote-secondmate-relaunch.test.sh (mock SSH/terminal supplemental, NOT live remote fleet evidence)
+ok - a successful remote relaunch republishes the parent's harness, model, and effort
+ok - a remote relaunch records the identity the host confirmed
+ok - a refused remote relaunch leaves the parent's record untouched
+ok - a local secondmate is refused by the remote relaunch tool
+ok - a remote relaunch keeps an already-armed PR poll authenticating
+ok - catalog refusals retain reread intent and unchanged bootstrap notifies the survivor, retrying failed delivery
+ok - a preexisting remote reread marker survives catalog refusal until bootstrap delivers it
+ok - partial inheritance retains intent after unrelated writes and unchanged bootstrap notifies the survivor
+ok - missing route schema and missing harness confirmation both retain intent for unchanged bootstrap delivery
+ok - refused marker publication prevents inheritance and remote relaunch
+ok - supported destination catalogs relaunch roles, stand-ins, and indexed literals through real control and spawn
+ok - destination pair preflight refusal preserves both retained members, the working mate, and the parent route
+ok - after-stage source mutation leaves resolution, inheritance, destination validation, and spawn on the frozen pair
+ALL TESTS PASSED
+
+exit=0

@@ -1,0 +1,20 @@
+Selected executable regressions from tests/fm-control-relaunch.test.sh
+test_model_index_resolves_and_refuses_before_stop
+test_model_index_generation_survives_account_checks_and_replacement
+test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account
+test_default_secondmate_relaunch_survives_unsafe_routing_sources
+
+ok - fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop
+ok - relaunch freezes role, stand-in, and literal membership across authentication and replacement
+ok - unpinned indexed relaunch discloses unknown context before stopping without supervisor catalog evidence
+not ok - default secondmate relaunch must survive dangling routing source
+error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-control-vcsrcgxe/fm-control-relaunch.uWztxD/default-routing-dangling-12492/smhome
+error: the replacement agent for sm-default could not be launched on claude
+error: sm-default's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.gate-control-vcsrcgxe/fm-control-relaunch.uWztxD/default-routing-dangling-12492/smhome: expected exit 0, got 1
+
+exit=1
+
+Setup correction: isolated code-root under fixture allows sibling secondmate home while all writes remain in worktree; FM_ROOT_OVERRIDE used solely by existing hermetic regression. Re-ran only test_default_secondmate_relaunch_survives_unsafe_routing_sources.
+ok - default-model secondmate replacements keep warning-only routing inheritance
+
+exit=0
