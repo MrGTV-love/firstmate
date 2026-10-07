@@ -68,7 +68,7 @@ export function completeCoverage(adviser, ctx, secrets) {
       attestedBytes += bytes;
     }
     budget -= Buffer.byteLength(kept);
-    originalBudget -= Buffer.byteLength(first.text);
+    originalBudget = Math.max(0, originalBudget - Buffer.byteLength(first.text));
     recent.push({
       role: message.role, text: kept,
       ...(isTool ? { tool: message.toolName, error: message.isError } : {}),

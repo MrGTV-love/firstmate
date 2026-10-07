@@ -219,6 +219,25 @@ test("snapshot scrubs escaped and nested saved-key JSON fields before any Jev re
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+// Match the adviser's byte slicing, including UTF-8 replacement characters.
+function adviserClipMiddle(text, limit) {
+  const raw = Buffer.from(text);
+  if (raw.byteLength <= limit) return text;
+  if (limit <= 0) return "";
+  let omitted = raw.byteLength, head = 0, tail = 0;
+  const marker = () => `...[truncated ${omitted} bytes]...`;
+  for (let i = 0; i < 5; i++) {
+    const markerBytes = Buffer.byteLength(marker());
+    if (markerBytes >= limit) return raw.subarray(0, Math.max(0, limit - 3)).toString("utf8");
+    const keep = limit - markerBytes;
+    head = Math.ceil(keep / 2);
+    tail = Math.floor(keep / 2);
+    omitted = Math.max(0, raw.byteLength - head - tail);
+  }
+  return Buffer.concat([raw.subarray(0, head), Buffer.from(marker()),
+    raw.subarray(raw.byteLength - tail)]).toString("utf8");
+}
+
 function clippedView(messages, over = {}) {
   let remaining = 14000, recentTextTruncated = false;
   const recent = [];
@@ -230,15 +249,10 @@ function clippedView(messages, over = {}) {
     let retained = text;
     if (Buffer.byteLength(text) > limit) {
       recentTextTruncated = true;
-      let prefix = "", bytes = 0;
-      for (const char of text) {
-        const size = Buffer.byteLength(char);
-        if (bytes + size > (limit >= 3 ? limit - 3 : limit)) break;
-        prefix += char; bytes += size;
-      }
-      retained = prefix + (limit >= 3 ? "..." : "");
+      retained = m.role === "toolResult" ? adviserClipMiddle(text, limit)
+        : Buffer.from(text).subarray(0, Math.max(0, limit - 3)).toString("utf8");
     }
-    remaining -= Buffer.byteLength(retained);
+    remaining = Math.max(0, remaining - Buffer.byteLength(retained));
     recent.unshift({ role: m.role, text: retained,
       ...(m.role === "toolResult" ? { tool: m.toolName, error: m.isError } : {}) });
   }
@@ -345,6 +359,58 @@ test("original tail-budget clipping of a small successful read is attested befor
     assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
     assert.equal(f.compactions.length, 1);
     assert.ok(f.records.some(row => row.event === "native-persisted"));
+  }
+});
+
+test("UTF-8 tail-budget exhaustion judges recoverable reads but rejects clipped assistant text", async () => {
+  for (const assistantBytes of [36, 37]) {
+    for (const earlierText of ["", "x"]) {
+      const small = "\u{1f642}".repeat(100);
+      const large = "€".repeat(4000);
+      const messages = [
+        { role: "user", content: "Read everything." },
+        { role: "assistant", content: [{ type: "text", text: earlierText },
+          { type: "toolCall", id: "early", name: "read", arguments: { path: "source.txt" } }] },
+        { role: "toolResult", toolCallId: "early", toolName: "read", isError: false, content: small },
+        ...Array.from({ length: 27 }, (_, i) => reading(`unicode-${i}`, large)).flat(),
+        { role: "assistant", content: "h".repeat(assistantBytes - 18) },
+        { role: "assistant", content: "Final answer ready", stopReason: "stop" },
+      ];
+      const original = clippedView(messages);
+      const tools = original.state.recent.filter(entry => entry.role === "toolResult");
+      assert.equal(Buffer.byteLength(tools[1].text), 515, "byte slicing expands split UTF-8 sequences");
+      const remaining = 14000 - assistantBytes - 27 * 515;
+      assert.equal(remaining, assistantBytes === 36 ? 59 : 58);
+      assert.equal(Buffer.byteLength(tools[0].text), assistantBytes === 36 ? 59 : 64);
+      assert.equal(original.state.recent[0].text, "", "the original budget is exhausted");
+      const f = fixture();
+      let sent;
+      withHost(f, messages);
+      f.adviser.judge = (state, _key, signal) => {
+        sent = state;
+        const call = deferred(); f.evaluations.push({ ...call, signal }); return call.promise;
+      };
+      f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+      const work = f.fireTimer();
+      if (earlierText) {
+        await work;
+        assert.equal(f.evaluations.length, 0, "genuinely clipped assistant text cannot reach Jev");
+        assert.ok(f.records.some(row => row.event === "coverage-ineligible"));
+      } else {
+        assert.equal(f.evaluations.length, 1, `${assistantBytes} assistant bytes: Jev receives the checkpoint`);
+        f.evaluations[0].resolve({ finished: false, model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+        await work;
+        assert.equal(sent.recent.length, messages.length - 1);
+        assert.equal(sent.recent[0].text, "");
+        assert.equal(sent.recent.at(-1).text, "Final answer ready");
+        assert.equal(sent.coverage.recentTextTruncated, false);
+        assert.equal(sent.coverage.recentBulkAttested, 28);
+        const digest = createHash("sha256").update(small).digest("hex");
+        assert.ok(sent.recent[1].text.includes(`sha256 ${digest}`), "the full early read is attested");
+        assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
+      }
+      assert.equal(f.compactions.length, 0, "rejection or an unfinished judgment does not compact");
+    }
   }
 });
 
