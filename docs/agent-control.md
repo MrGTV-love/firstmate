@@ -51,6 +51,9 @@ muse is the one verified adapter that restores the cancelled prompt back into it
 The clear is refused before anything is sent when the recorded backend cannot deliver it.
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
+`exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it; it sends no Escape and chooses no option, so closing the dialog is left to the operator.
+A stopped agent whose pane still shows the dialog text is not refused.
+[`fm_composer_blocking_dialog`](../bin/fm-composer-lib.sh) owns the recognised set, which today is only Claude's background-task exit picker; [its verification record](verification/runtime-backends.md#claude-background-task-exit-picker) lists the dialogs that are not covered.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -75,6 +78,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
    Model resolution and selected-entry catalog preflight follow the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson) before the old agent stops.
+   Ship and scout replacements also pass the [worker tool exclusion checks](configuration.md#worker-tool-exclusions-configcrew-exclude-tools) at this step.
 2. **Check replacement admission, then checkpoint.**
    The control plane checks the launch owner's read-only backlog admission before appending a note or stopping the old agent, so a predictable held or dependency-blocked replacement refusal leaves that owner intact.
    [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns the shared rule; both control and direct replacement launch recheck it.

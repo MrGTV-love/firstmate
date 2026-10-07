@@ -154,10 +154,10 @@ Calm replaces Pi's stock working row with a small animated boat while Calm is on
 This path uses only public extension API and patches nothing: `ExtensionUIContext.setWorkingVisible(false)` hides the stock row, and `setWidget()` installs a temporary component factory above the editor.
 Pi's documented custom working-indicator frames are static and width-blind, so they cannot own responsive geometry; a widget component receives `render(width)` and can.
 
-`.pi/extensions/fm-calm.ts` remains the sole owner of the presentation choice and the only caller of `setWorkingVisible()`, while `.pi/extensions/lib/fm-calm-working-ship.ts` owns Pi's ANSI painting and the widget over the sprite geometry, bounce track, cadences, and freeze/resume state in `.claude/mods/firstmate-calm/lib/fm-calm-working-ship-sprite.ts`, the harness-neutral core the Claude Code mod also draws from (reached from the Pi tree through a tracked symlink, because Claude Code refuses a hooks-module import from outside the plugin folder).
+Within Firstmate Calm, `.pi/extensions/fm-calm.ts` remains the sole owner of its presentation choice and the only caller of `setWorkingVisible()`, while `.pi/extensions/lib/fm-calm-working-ship.ts` owns Pi's ANSI painting and the widget over the sprite geometry, bounce track, cadences, and freeze/resume state in `.claude/mods/firstmate-calm/lib/fm-calm-working-ship-sprite.ts`, the harness-neutral core the Claude Code mod also draws from (reached from the Pi tree through a tracked symlink, because Claude Code refuses a hooks-module import from outside the plugin folder).
 Visibility follows `agent_start` through `agent_settled` rather than turns or tool calls.
 Pi emits `agent_settled` from a `finally` block once a run will not continue automatically, so retries, automatic continuations, queued follow-ups, and compaction inside one run never remove the boat, while settle, abort, and failure all reach the same cleanup.
-Repeated `agent_start` events inside one run are idempotent, and Pi disposes the previous component before installing a replacement under the same key and when it clears extension widgets, so the frame timer cannot duplicate or outlive the widget.
+Repeated `agent_start` events inside one run are idempotent, and both Calm extensions use the shared `calm-working-ship` widget key, so Pi disposes the previous component before installing a replacement under that key and when it clears extension widgets, while Firstmate Calm's disposal signal prevents its cleanup from clearing a standalone Calm widget that replaced its own widget.
 Pi's above-editor widget container reserves one spacer row whether or not a widget is present, so removing the boat leaves no residual blank row.
 
 The sprite is two rows when the usable width admits the complete hull: an asymmetric three-cell `◿│◣` sail centered over a five-cell `╲▁▁▁╱` hull that sits inside the water row rather than adding a third row.
@@ -267,7 +267,7 @@ grok 0.2.106 (bde89716f679)
 
 | Harness | Conclusion | Evidence |
 | --- | --- | --- |
-| Claude Code 2.1.272 (superseding the 2.1.218 row, which found no transcript-row renderer in project hooks or the plugin CLI) | Feasible through the early-access Claude Code mods surface (function hooks), default-off behind `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and shipped as the `firstmate-calm` mod. | A `ui.render` hook draws per-component transcript rows and the working row, `$.ui.invalidate` redraws the transcript, and `$.ui.blit` animates a `Raster`; the [2026-09-15 record](#2026-09-15-claude-code-21272-mods-feasibility-and-the-shipped-mod) owns the spike-verified working animation, gapless hiding and retroactive redraw of tool, narration, and operational rows, the persisted per-home toggle, and the three bounded gaps: an early-access API that may change, main-screen scrollback keeping pre-toggle copies, and 256-color Raster paint. |
+| Claude Code 2.1.272 (superseding the 2.1.218 row, which found no transcript-row renderer in project hooks or the plugin CLI) | Feasible through the early-access Claude Code mods surface (function hooks), default-off behind `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS`, and initially shipped with the plugin name `firstmate-calm` (now `fm`; see [`calm.md`](calm.md#the-calm-mod)). | A `ui.render` hook draws per-component transcript rows and the working row, `$.ui.invalidate` redraws the transcript, and `$.ui.blit` animates a `Raster`; the [2026-09-15 record](#2026-09-15-claude-code-21272-mods-feasibility-and-the-shipped-mod) owns the spike-verified working animation, gapless hiding and retroactive redraw of tool, narration, and operational rows, the persisted per-home toggle, and the three bounded gaps: an early-access API that may change, main-screen scrollback keeping pre-toggle copies, and 256-color Raster paint. |
 | Codex CLI 0.144.6 | Not feasible through the inspected supported project surface. | The tracked hooks expose session, pre-tool, and stop handling, while the plugin and feature inventories expose no TUI tool-row renderer or transcript redraw control. |
 | OpenCode 1.17.18 | Not feasible without violating the preservation boundary. | Plugins expose events and tool execution hooks, not a built-in transcript-row renderer; same-name tool replacement changes execution rather than presentation alone. |
 | Pi (verified 0.81.1 through 0.82.0) | Partially feasible with two API-probed exported-class adapters. | Public APIs control working visibility, collapsed labels, known tool slots, custom entries, and expansion redraws; exported assistant and interactive-mode classes provide the collapsed-thinking and operational-user layout boundaries, gated on the exact method's presence rather than a version number, while generic user, tool, and status filtering remains unavailable. |
@@ -299,7 +299,8 @@ The same real-Pi reproduction then delivered the notification exactly once in a 
 
 ## Regression coverage
 
-`tests/fm-calm-pi-extension.test.sh` compares wrapped and stock renderers and verifies all seven built-ins plus `fm_watch_arm_pi`; `tests/fm-pi-branch-extension.test.sh` compares both supervision tools against the installed stock component through pending calls, argument updates, partial results, errors, expansion, Calm toggling, and updates received while hidden, and verifies `fm_branch_outcomes` stock HTML export fallback.
+`tests/fm-calm-pi-extension.test.sh` compares wrapped and stock renderers and verifies all seven built-ins plus `fm_watch_arm_pi`; its rendered HTML export check accepts either omission or default-hidden hook rows for legacy synthetic messages while rejecting visible leakage.
+`tests/fm-pi-branch-extension.test.sh` compares both supervision tools against the installed stock component through pending calls, argument updates, partial results, errors, expansion, Calm toggling, and updates received while hidden, and verifies `fm_branch_outcomes` stock HTML export fallback.
 Together they exercise redraw of already-rendered tool, thinking, current operational-user, and legacy synthetic rows, and cover every policy class.
 The focused `/export` and `/share` renderer assertions supply both Pi 0.99.0's `getToolDefinition` and Pi 1.0.2's `getToolRenderers` lookup interfaces using the registered tools, including the remapped-submit and non-submit paths.
 The supervision-tool HTML fixture verifies ordinary rendering before asserting export fallback, so a missing lookup interface cannot masquerade as delegation.
@@ -745,7 +746,7 @@ An escape-preserving capture of the boat from the spike, taken before the palett
 2. On the main-screen (non-fullscreen) layout a toggle redraws the live screen by clearing and reprinting the whole conversation, and the terminal's own scrollback keeps the previous rendering above it; the fullscreen layout has no such stale copy.
 3. The Raster paints RGB through a quantized palette, so the boat renders as 256-color escapes rather than Pi's standard 16-color ANSI codes.
 
-Three further observations, recorded so they are not read as failures: the `ctrl+o` detailed transcript view keeps its per-message timestamp and model headers where hidden assistant rows sat, because those headers are not a render component; the `/calm` toggle's answer is a transient toast under the prompt (`firstmate-calm: Calm on`) that expires within a few seconds and never becomes a transcript row; and the engine logs one benign debug-level warning at load, `options requested but its manifest declares no userConfig`, for every hooks module whose manifest declares no configuration fields, which an empty `userConfig` object does not silence.
+Three further observations, recorded so they are not read as failures: the `ctrl+o` detailed transcript view keeps its per-message timestamp and model headers where hidden assistant rows sat, because those headers are not a render component; on 2.1.272 the `/calm` toggle's answer was a transient toast under the prompt (`firstmate-calm: Calm on`) that expired within a few seconds and never became a transcript row; and the engine logs one benign debug-level warning at load, `options requested but its manifest declares no userConfig`, for every hooks module whose manifest declares no configuration fields, which an empty `userConfig` object does not silence.
 
 ### The shipped mod
 
@@ -923,3 +924,27 @@ ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.1
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=4835
 ```
 
+
+## 2026-09-28 Claude Code 2.1.284 supervision-note label and the fm plugin name
+
+The label in front of each supervision note is Claude Code's, not the mod's, so the plugin is named `fm` to keep it short.
+
+- The mod hands `$.ui.log` the glyph-first line, as the debug log shows: `[DEBUG] [firstmate-calm] $.ui.log: ⚓ [seq 1] fm-repro-a: REPRO_CAPTAIN open`.
+- Claude Code 2.1.284 turns every transcript `$.ui.log` line into a system-notice entry whose content is `<plugin name>: <text>`, after the `ui.log` hook chain has run; `UiLogOptions` offers only `to: "transcript" | "debug"`, no `ui.render` component draws that row, and no other `$` call appends a transcript row.
+- With the manifest named `fm`, the row draws as `⏺ fm: ⚓ [seq 1] fm-repro-a: REPRO_CAPTAIN open`, is stored as `"content":"fm: ⚓ [seq 1] ..."`, and the module loads as `hooks module fm@skills-dir loaded`; the folders keep their `firstmate-calm` names, which `claude plugin validate --strict` accepts.
+- `$.store` lives in one file per plugin id under Claude Code's configuration directory (`plugins/store/fm_skills-dir-<hash>.json`), so the rename starts an empty store and a session resumed across it replays its still-due notes once.
+
+```text
+$ claude --version
+2.1.284 (Claude Code)
+
+$ bash tests/fm-calm-claude-mod-plugin.test.sh
+ok - Claude Code 2.1.284 (Claude Code) validates the Calm mod strictly at its folder and its auto-load path, hooking exactly the working row, tool, user, and assistant drawings and /calm, and logging supervision notes
+ok - Claude Code 2.1.284 (Claude Code) runs the Calm mod's plugin test suites clean: persisted toggle, hidden rows, working notes, the clock-driven working ship, and supervision notes
+
+$ FM_CLAUDE_CALM_LIVE_E2E=1 bash tests/fm-calm-claude-mod-live-e2e.test.sh
+ok - Claude Code 2.1.284 (Claude Code) with the flag unset: no hooks module, no /calm, stock working row, stock tool rows, preference on ignored
+ok - Claude Code 2.1.284 (Claude Code) with the flag on: the mod auto-loads from .claude/skills, /calm exists, the sailboat replaces and moves in the working row, tool rows and the record-backed operational doorbell draw at zero height, /calm restores and re-hides them while persisting the shared preference
+ok - Claude Code 2.1.284 (Claude Code) resumes the transcript with Calm's hidden rows still hidden and the preference intact
+ok - Claude Code 2.1.284 (Claude Code) with Calm off shows the supervision notes: the session-start anchor for an unprocessed captain outcome, a sailboat for a new routine outcome, an anchor for a new captain outcome, and the latch-trip note, each behind the fm: label, skipping processed and silent outcomes, moving no store marker, never reaching the model, and on resume showing each anchor once
+```
