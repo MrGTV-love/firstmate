@@ -567,8 +567,8 @@ test_remote_role_restart_resolves_the_pair_selected_after_persist() {
     printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"after-model","stand_in":"after-stand-in"}}},"retired":[]}' \
       > "$dir/fake/later-index.json"
     case "$selector" in
-      role:routine) before=before-model; expected=after-model; stand_in=false ;;
-      stand-in:routine) before=before-stand-in; expected=after-stand-in; stand_in=true ;;
+      role:routine) before='before-model'; expected='after-model'; stand_in=false ;;
+      stand-in:routine) before='before-stand-in'; expected='after-stand-in'; stand_in=true ;;
     esac
     printf '{"default":{"harness":"codex","role":"routine","stand_in":%s}}\n' "$stand_in" \
       > "$dir/home/config/crew-dispatch.json"

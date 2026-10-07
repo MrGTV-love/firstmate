@@ -15,7 +15,8 @@
 # remote-secondmate suites fake it, rather than exercising a real host.
 set -u
 
-export TMPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TMPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export TMPDIR
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -460,7 +461,7 @@ assert_survivor_reread() {
       || fail "a refused send was recorded as delivered"
     assert_remote_marker
   fi
-  out=$(FM_FAKE_RELAUNCH_MODE= run_bootstrap); rc=$?
+  out=$(FM_FAKE_RELAUNCH_MODE='' run_bootstrap); rc=$?
   expect_code 0 "$rc" "bootstrap should deliver pending intent without further config changes: $out"
   assert_contains "$out" 'nudged remote fm-ios after convergence' \
     "bootstrap did not report delivery of the retained reread intent"
@@ -470,7 +471,7 @@ assert_survivor_reread() {
     "bootstrap delivered a different instruction instead of the remote config reread"
   [ "$(sort -u "$TMP/send-targets")" = ios ] || fail "bootstrap did not target only the surviving secondmate"
   assert_absent "$NUDGE_MARKER" "successful bootstrap delivery retained the remote marker"
-  out=$(FM_FAKE_RELAUNCH_MODE= run_bootstrap); rc=$?
+  out=$(FM_FAKE_RELAUNCH_MODE='' run_bootstrap); rc=$?
   expect_code 0 "$rc" "already-delivered bootstrap should remain successful: $out"
   [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$((records + 1))" ] \
     || fail "a cleared marker caused a redundant unchanged reread"
