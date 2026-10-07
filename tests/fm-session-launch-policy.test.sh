@@ -174,6 +174,8 @@ assert_preserved() {
   [ "$(cat "$WT/unpublished")" = 'unpublished work' ] || fail 'unpublished work changed'
   [ "$(cat "$HOME_DIR/state/$ID.validation")" = 'validation custody' ] || fail 'validation custody changed'
   [ ! -e "$HOME_DIR/state/$ID.control-relaunch" ] || fail 'refusal checkpointed a replacement'
+  [ ! -e "$HOME_DIR/state/.session-end-relaunch-$ID" ] || fail 'refusal consumed session-end recovery budget'
+  [ ! -e "$HOME_DIR/state/.session-end-handled-$ID" ] || fail 'refusal marked the session-end generation handled'
   [ ! -s "$CASE/effects" ] || fail "refusal caused side effects: $(cat "$CASE/effects")"
 }
 
@@ -420,31 +422,62 @@ for kind in ship scout batch; do
   pass "configured $kind default obeys launch policy"
 done
 
+session_end_scan() {
+  # shellcheck disable=SC2016
+  run_cli bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state" || exit $?; printf "%s\n" "$FM_SESSION_END_WAKE"' _ "$ROOT"
+}
+
 for harness in codex claude; do
-  make_case "recovery-$harness" omp
-  restrict
-  seed_task "$harness"
-  printf '%s\n' "$harness" > "$CASE/command"
-  rc=0
-  out=$(run_cli "$ROOT/bin/fm-control.sh" "$ID" relaunch --note 'continue preserved work') || rc=$?
-  [ "$rc" -ne 0 ] || fail 'restricted recorded runtime relaunched'
-  assert_contains "$out" 'session-launch-policy' 'control refusal identifies policy'
-  assert_preserved
-  [ "$(cat "$CASE/command")" = "$harness" ] || fail 'existing agent stopped'
-  printf 'zsh\n' > "$CASE/command"
-  rc=0
-  out=$(run_cli "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch) || rc=$?
-  [ "$rc" -ne 0 ] || fail 'direct recorded runtime relaunched'
-  assert_contains "$out" 'session-launch-policy' 'direct refusal identifies policy'
-  assert_preserved
-  "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source claude-hook --event launch-brief >/dev/null
+  for kind in ship scout; do
+    make_case "recovery-$harness-$kind" omp
+    restrict
+    seed_task "$harness" "$kind"
+    printf '%s\n' "$harness" > "$CASE/command"
+    rc=0
+    out=$(run_cli "$ROOT/bin/fm-control.sh" "$ID" relaunch --note 'continue preserved work') || rc=$?
+    [ "$rc" -ne 0 ] || fail 'restricted recorded runtime relaunched'
+    assert_contains "$out" 'session-launch-policy' 'control refusal identifies policy'
+    assert_preserved
+    [ "$(cat "$CASE/command")" = "$harness" ] || fail 'existing agent stopped'
+    printf 'zsh\n' > "$CASE/command"
+    rc=0
+    out=$(run_cli "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'direct recorded runtime relaunched'
+    assert_contains "$out" 'session-launch-policy' 'direct refusal identifies policy'
+    assert_preserved
+    "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source fm-recovery --event launch-brief >/dev/null
+    gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
+    "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source fm-recovery --event session-end >/dev/null
+    out=$(session_end_scan)
+    assert_contains "$out" 'session-launch-policy' 'automatic recovery reports policy refusal'
+    assert_preserved
+    pass "manual, direct, and automatic $harness $kind recovery preserve work and custody"
+  done
+done
+
+for kind in ship scout; do
+  make_case "recovery-malformed-$kind" omp
+  seed_task omp "$kind"
+  printf 'unknown\n' > "$HOME_DIR/config/session-launch-policy"
+  "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source omp-ext --event launch-brief >/dev/null
   gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
-  "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source claude-hook --event session-end >/dev/null
-  # shellcheck disable=SC2016 # Expand in the isolated child shell, not here.
-  out=$(run_cli bash -c '. "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$FM_HOME/state"; printf "%s\n" "$FM_SESSION_END_WAKE"' _ "$ROOT")
-  assert_contains "$out" 'session-launch-policy' 'automatic recovery reports policy refusal'
-  assert_preserved
-  pass "manual, direct, and automatic $harness recovery preserve work and custody"
+  "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source omp-ext --event session-end >/dev/null
+  for tick in 1 2; do
+    out=$(session_end_scan)
+    assert_contains "$out" 'session-launch-policy' 'malformed policy refuses automatic omp recovery'
+    assert_preserved
+  done
+  restrict
+  out=$(session_end_scan) || fail "$out"
+  assert_contains "$out" "$ID auto-relaunched after session-end" 'policy repair permits immediate recovery of the same generation'
+  grep -Fx 'launch:omp' "$CASE/effects" >/dev/null || fail 'repaired policy did not launch omp'
+  awk -F '\t' '$2 == "attempt" { attempts++ } $2 == "relaunched" { relaunched++ } END { exit !(attempts == 1 && relaunched == 1 && NR == 2) }' \
+    "$HOME_DIR/state/.session-end-relaunch-$ID" || fail 'policy refusal was counted as an attempt'
+  IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$HOME_DIR/state/.session-end-handled-$ID"
+  [ "$handled_gen" = "$gen" ] && [ "$handled_outcome" = relaunched ] || fail 'recovery did not handle the original generation'
+  [ "$(cat "$WT/unpublished")" = 'unpublished work' ] || fail 'recovery lost unpublished work'
+  [ "$(cat "$HOME_DIR/state/$ID.validation")" = 'validation custody' ] || fail 'recovery changed validation custody'
+  pass "malformed policy preserves $kind recovery budget and allows immediate recovery after repair"
 done
 
 make_case replacement omp

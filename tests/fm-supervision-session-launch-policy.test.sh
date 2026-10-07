@@ -45,7 +45,10 @@ pass "direct resumed engine refusal exit=$rc invocations=0 process-custody=uncha
 
 # The previous host is represented by an owned disposable sleeping process.
 # The new host runs under a Bash symlink with omp's structural process identity.
-/bin/sleep 120 &
+(
+  trap 'exit 0' TERM INT
+  while :; do /bin/sleep 1; done
+) &
 PREDECESSOR=$!
 identity=$(_fm_engine_identity "$PREDECESSOR")
 printf 'host\t%s\t%s\n' "$PREDECESSOR" "$identity" > "$STATE/.supervision-host"
@@ -116,6 +119,83 @@ rm "$TMP_ROOT/engine-pid"
 fm_supervision_engine_turn claude sonnet "$TMP_ROOT/prompt" "$TMP_ROOT/message" fixture new 5 "$TMP_ROOT/result" "$TMP_ROOT/errors" "$TMP_ROOT/engine-pid" || fail 'absent policy changed engine invocation'
 [ "$(cat "$FM_HOME/engine-effects")" = 'engine invoked' ] || fail 'absent policy never invoked engine fixture'
 pass 'absent policy preserves configured Claude engine and direct turn (fixture executable only)'
+
+test_away_launch_policy_guidance() {
+  local harness policy selection command home out status
+  for harness in claude cursor opencode omp grok codex; do
+    for policy in enabled malformed; do
+      for selection in default claude; do
+        home="$TMP_ROOT/away-$harness-$policy-$selection"
+        mkdir -p "$home/config" "$home/state" "$home/bin"
+        if [ "$selection" = default ]; then
+          : > "$home/config/supervision-host"
+        else
+          printf 'claude sonnet\n' > "$home/config/supervision-host"
+        fi
+        if [ "$policy" = enabled ]; then
+          printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
+        else
+          printf 'omp-or-tc extra\n' > "$home/config/session-launch-policy"
+        fi
+        printf '#!/usr/bin/env bash\nprintf "terminal invoked\\n" >> "$FM_HOME/terminal-effects"\nexit 1\n' > "$home/bin/tmux"
+        chmod +x "$home/bin/tmux"
+        status=0
+        out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_HARNESS="$harness" FM_AFK_MODE=away \
+          "$ROOT/bin/fm-afk-launch.sh" enter --words 'watch the fleet' 2>&1) || status=$?
+        expect_code 0 "$status" "$harness $policy $selection public away entry: $out"
+        assert_contains "$out" 'Supervision host: no engine runs the away session on this home (' "$harness missing-engine reason reaches main"
+        assert_contains "$out" 'so every away wake reaches this conversation' "$harness preserves main wake ownership"
+        assert_contains "$out" 'continue main-side supervision until a permitted native engine is verified' "$harness $policy keeps actionable main-side guidance"
+        assert_not_contains "$out" 'name a verified engine in config/supervision-host' "$harness $policy recommends no denied engine"
+        assert_not_contains "$out" 'for example "claude"' "$harness $policy does not recommend Claude"
+        if [ "$selection" = default ] && [ "$harness" != claude ]; then
+          assert_contains "$out" "the primary harness '$harness' has no verified supervision engine" "$harness retains missing default-engine reason"
+        else
+          assert_contains "$out" 'session-launch-policy' "$harness retains policy refusal reason"
+        fi
+        [ -f "$home/state/.afk-contract" ] || fail "$harness $policy entry lost away posture"
+        cp "$home/state/.afk-contract" "$home/prior-posture"
+        printf 'prior escalation\n' > "$home/state/.subsuper-escalations"
+        for command in start start-native; do
+          status=0
+          out=$(PATH="$home/bin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+            FM_TEST_HARNESS="$harness" FM_AFK_MODE=away FM_SUPERVISOR_TARGET=fixture:captain \
+            FM_SUPERVISOR_BACKEND=tmux "$ROOT/bin/fm-afk-launch.sh" "$command" 2>&1) || status=$?
+          expect_code 1 "$status" "$harness $policy $command must refuse the daemon: $out"
+          assert_not_contains "$out" 'runs the supervision host' "$harness refusal must not claim host activation"
+          cmp -s "$home/prior-posture" "$home/state/.afk-contract" || fail "$harness $policy $command changed away posture"
+          [ "$(cat "$home/state/.subsuper-escalations")" = 'prior escalation' ] || fail "$harness $policy $command cleared prior state"
+          [ ! -e "$home/state/.afk" ] || fail "$harness $policy $command allocated daemon flag"
+          [ ! -e "$home/state/.afk-daemon-terminal" ] || fail "$harness $policy $command allocated daemon terminal"
+          [ ! -e "$home/state/.supervise-daemon.lock" ] || fail "$harness $policy $command allocated daemon custody"
+          [ ! -e "$home/terminal-effects" ] || fail "$harness $policy $command invoked terminal backend"
+          [ ! -e "$home/engine-effects" ] || fail "$harness $policy $command invoked engine"
+        done
+      done
+    done
+    home="$TMP_ROOT/away-$harness-absent-policy"
+    mkdir -p "$home/config" "$home/state"
+    printf 'omp\n' > "$home/config/supervision-host"
+    status=0
+    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_HARNESS="$harness" FM_AFK_MODE=away \
+      "$ROOT/bin/fm-afk-launch.sh" enter --words 'watch the fleet' 2>&1) || status=$?
+    expect_code 0 "$status" "$harness absent-policy missing-engine entry: $out"
+    assert_contains "$out" "config/supervision-host names 'omp', which is not a verified supervision engine" "$harness retains explicit missing-engine reason"
+    assert_contains "$out" 'for example "claude"' "$harness absent policy recommends admissible Claude"
+    assert_not_contains "$out" 'continue main-side supervision until' "$harness absent policy offers an admissible engine"
+    printf 'claude sonnet\n' > "$home/config/supervision-host"
+    status=0
+    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_HARNESS="$harness" FM_AFK_MODE=away \
+      "$ROOT/bin/fm-afk-launch.sh" enter --words 'watch the fleet' 2>&1) || status=$?
+    expect_code 0 "$status" "$harness accepted-engine entry: $out"
+    assert_not_contains "$out" 'Supervision host:' "$harness accepted engine emits no missing-engine guidance"
+    [ -f "$home/state/.afk-contract" ] || fail "$harness accepted-engine entry lost away posture"
+    [ ! -e "$home/engine-effects" ] || fail "$harness accepted-engine entry activated engine"
+  done
+  pass 'public away entry: all host primaries preserve policy-admissible guidance and refuse denied daemon starts without losing posture'
+}
+
+test_away_launch_policy_guidance
 
 test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor>
   local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} selection=${5:-claude} case_dir repo home out status

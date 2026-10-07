@@ -335,7 +335,7 @@ fm_afk_launch_daemon_allowed() {
     mode=$(head -n 1 "$FM_AFK_LAUNCH_STATE/.afk" 2>/dev/null || true)
   fi
   [ "$mode" != quiet ] || return 0
-  fm_afk_launch_log "the away daemon is not launched on this $harness home, which runs the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)"
+  fm_afk_launch_log "the away daemon is not launched on this $harness home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)"
   return 1
 }
 
@@ -343,7 +343,7 @@ fm_afk_launch_daemon_allowed() {
 # launch-policy refusal (bin/fm-supervision-engine-lib.sh owns selection), so
 # main handles every away wake.
 fm_afk_launch_host_engine_note() {
-  local harness config
+  local harness config engine
   [ "${FM_AFK_MODE:-}" != quiet ] || return 0
   config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   [ -f "$config/supervision-host" ] || return 0
@@ -351,8 +351,15 @@ fm_afk_launch_host_engine_note() {
   fm_afk_launch_host_primary "$harness" || return 0
   fm_supervision_host_config "$config" "$harness" || return 0
   [ -z "$FM_SUPERVISION_ENGINE" ] || return 0
-  printf 'Supervision host: no engine runs the away session on this home (%s), so every away wake reaches this conversation; name a verified engine in config/supervision-host (for example "claude").\n' \
+  printf 'Supervision host: no engine runs the away session on this home (%s), so every away wake reaches this conversation; ' \
     "$FM_SUPERVISION_ENGINE_PROBLEM"
+  for engine in $FM_SUPERVISION_ENGINES_VERIFIED; do
+    if fm_session_launch_policy_check "$config" "$engine" >/dev/null 2>&1; then
+      printf 'name a verified engine in config/supervision-host (for example "%s").\n' "$engine"
+      return 0
+    fi
+  done
+  printf 'continue main-side supervision until a permitted native engine is verified.\n'
 }
 
 fm_afk_launch_catchup_pending() {
