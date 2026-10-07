@@ -6,7 +6,8 @@
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
-#                                         [--effort <level>] [--claude-debug]
+#                                         [--effort <level>] [--dispatch-rule <id>]
+#                                         [--claude-debug]
 #                                         [--reconcile-only]
 #                                         (--note <text> | --note-file <path>)
 # --claude-debug is relaunch-only and off by default.
@@ -277,9 +278,11 @@ fi
 NEW_HARNESS=
 NEW_MODEL=
 NEW_EFFORT=
+NEW_DISPATCH_RULE=
 HARNESS_SET=0
 MODEL_SET=0
 EFFORT_SET=0
+DISPATCH_RULE_SET=0
 NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
@@ -294,6 +297,7 @@ for control_arg in "$@"; do
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
+      dispatch-rule) NEW_DISPATCH_RULE=$control_arg; DISPATCH_RULE_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -311,6 +315,8 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
+    --dispatch-rule) control_want_value=dispatch-rule ;;
+    --dispatch-rule=*) NEW_DISPATCH_RULE=${control_arg#--dispatch-rule=}; DISPATCH_RULE_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -330,12 +336,13 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
-    || die "--harness, --model, --effort, --note, --claude-debug, and --reconcile-only apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$DISPATCH_RULE_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
+    || die "--harness, --model, --effort, --dispatch-rule, --note, --claude-debug, and --reconcile-only apply to 'relaunch' only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
+[ "$DISPATCH_RULE_SET" = 0 ] || [ -n "$NEW_DISPATCH_RULE" ] || die "--dispatch-rule requires a non-empty value"
 case "$NEW_EFFORT" in
   ''|default|low|medium|high|xhigh|max|ultra) ;;
   *) die "--effort must be one of default, low, medium, high, xhigh, max, ultra" ;;
@@ -997,11 +1004,16 @@ resolve_relaunch_profile() {
     TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
       "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
   fi
+  if [ "$DISPATCH_RULE_SET" = 1 ] && [ "$KIND" = secondmate ]; then
+    die "--dispatch-rule does not apply to a secondmate relaunch"
+  fi
   if [ "$KIND" != secondmate ]; then
     local dispatch_set dispatch_profile dispatch_result dispatch_fallback='[]' config_dir
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
     TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
-    if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
+    if [ "$DISPATCH_RULE_SET" = 1 ]; then
+      TARGET_DISPATCH_RULE=$NEW_DISPATCH_RULE
+    elif [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
       TARGET_DISPATCH_RULE=
     fi
     if [ -f "$config_dir/crew-dispatch.json" ]; then
@@ -1010,6 +1022,7 @@ resolve_relaunch_profile() {
       TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
       dispatch_fallback=$(jq -c .fallback <<<"$dispatch_set")
     else
+      [ "$DISPATCH_RULE_SET" = 0 ] || die "--dispatch-rule requires crew-dispatch.json"
       TARGET_DISPATCH_RULE=
     fi
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \

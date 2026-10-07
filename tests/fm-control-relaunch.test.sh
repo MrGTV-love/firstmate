@@ -669,6 +669,87 @@ SH
   pass "an ordinary non-OMP relaunch without crew-dispatch.json succeeds without required jq and preserves its durable profile"
 }
 
+enable_ambiguous_claude_dispatch() {
+  local dir=$1
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"primary work","use":{"harness":"claude","effort":"high"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]},{"when":"restricted work","use":{"harness":"claude","effort":"high"},"fallback":[]}]}' \
+    > "$dir/home/config/crew-dispatch.json"
+  cat > "$dir/fakebin/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"schemaVersion":6,"providers":[]}'
+SH
+  chmod +x "$dir/fakebin/quota-axi"
+}
+
+test_relaunch_dispatch_rule_selection() {
+  local dir id variant out rc before_meta before_brief argv expected_rule expected_error
+  local -a args
+  for variant in inherited harness model effort split equals rule-only invalid mismatch empty empty-split missing next-flag interrupt no-config secondmate; do
+    id="rl-rule-$variant"
+    dir=$(new_case "$id" "$id")
+    add_ship_task "$dir" "$id" claude
+    enable_ambiguous_claude_dispatch "$dir"
+    printf 'effort=high\ndispatch_rule=rule_1\n' >> "$dir/home/state/$id.meta"
+    args=("$id" relaunch --note "continue the selected profile")
+    expected_rule=rule_2
+    expected_error="error:"
+    case "$variant" in
+      inherited) expected_rule=rule_1 ;;
+      harness) args+=(--harness claude); expected_error="different fallback lists match this profile" ;;
+      model) args+=(--model default); expected_error="different fallback lists match this profile" ;;
+      effort) args+=(--effort high); expected_error="different fallback lists match this profile" ;;
+      split) args+=(--harness claude --model default --effort high --dispatch-rule rule_2) ;;
+      equals) args+=(--harness=claude --model=default --effort=high --dispatch-rule=rule_2) ;;
+      rule-only) args+=(--dispatch-rule rule_2) ;;
+      invalid) args+=(--dispatch-rule rule_missing); expected_error="dispatch rule does not contain the requested profile" ;;
+      mismatch) args+=(--dispatch-rule rule_1 --effort low); expected_error="dispatch rule does not contain the requested profile" ;;
+      empty) args+=(--dispatch-rule=) ;;
+      empty-split) args+=(--dispatch-rule "") ;;
+      missing) args+=(--dispatch-rule) ;;
+      next-flag) args+=(--dispatch-rule --effort high) ;;
+      interrupt) args=("$id" interrupt --dispatch-rule rule_2) ;;
+      no-config) rm "$dir/home/config/crew-dispatch.json"; args+=(--dispatch-rule rule_2) ;;
+      secondmate) printf 'kind=secondmate\n' >> "$dir/home/state/$id.meta"; args+=(--dispatch-rule rule_2) ;;
+    esac
+    before_meta=$(cat "$dir/home/state/$id.meta")
+    before_brief=$(cat "$dir/home/data/$id/brief.md")
+    out=$(run_control "$dir" "${args[@]}"); rc=$?
+    case "$variant" in
+      inherited|split|equals|rule-only)
+        expect_code 0 "$rc" "$variant dispatch relaunch should succeed: $out"
+        assert_equals "$expected_rule" "$(meta_field "$dir" "$id" dispatch_rule)" "$variant lost selected rule"
+        assert_equals claude "$(meta_field "$dir" "$id" harness)" "$variant changed harness"
+        assert_equals default "$(meta_field "$dir" "$id" model)" "$variant changed model"
+        assert_equals high "$(meta_field "$dir" "$id" effort)" "$variant lost effort"
+        assert_equals "fmses:fm-$id" "$(meta_field "$dir" "$id" window)" "$variant changed endpoint"
+        assert_equals "$dir/wt" "$(meta_field "$dir" "$id" worktree)" "$variant changed worktree"
+        assert_equals complete "$(journal_field "$dir" "$id" phase)" "$variant journal incomplete"
+        fm_fake_claude_recording "$dir/fakebin"
+        fm_eval_launch "$(cat "$dir/fake/launch")" "$dir/wt" "$dir/fakebin" \
+          -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+          -u CLAUDE_CODE_OAUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR \
+          HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
+          FM_FAKE_CLAUDE_ENV_LOG="$dir/worker.env" > "$dir/worker.out" 2>&1 \
+          || fail "$variant replacement command did not reach Claude"
+        [ -s "$dir/worker.env" ] || fail "$variant did not execute Claude"
+        argv=$(tr '\0' '\n' < "$dir/worker.env.args")
+        assert_contains "$argv" $'--effort\nhigh' "$variant actual Claude argv lost effort"
+        assert_not_contains "$argv" "--model" "$variant default model must use Claude's default"
+        ;;
+      *)
+        [ "$rc" -ne 0 ] || fail "$variant dispatch relaunch should refuse: $out"
+        assert_contains "$out" "$expected_error" "$variant refusal should explain the error"
+        assert_equals "$before_meta" "$(cat "$dir/home/state/$id.meta")" "$variant mutated metadata"
+        assert_equals "$before_brief" "$(cat "$dir/home/data/$id/brief.md")" "$variant mutated instructions"
+        [ ! -s "$dir/fake/literal" ] || fail "$variant sent lifecycle input before refusing"
+        [ ! -s "$dir/fake/keys" ] || fail "$variant sent replacement keys before refusing"
+        [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$variant started a transaction"
+        ;;
+    esac
+  done
+  pass "control validates explicit dispatch rules before mutation and preserves selected profiles through the actual replacement launch"
+}
+
 enable_exhausted_claude_dispatch() {
   local dir=$1
   mkdir -p "$dir/home/config"
@@ -4694,6 +4775,7 @@ test_ordinary_partial_failure_keeps_its_attempt_caps
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_no_dispatch_non_omp_relaunch_does_not_require_jq
+test_relaunch_dispatch_rule_selection
 test_claude_relaunch_preserves_unknown_adopted_auth_and_forwarded_credentials
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

@@ -1415,6 +1415,8 @@ Only proven primary exhaustion activates it; approval, confidence, unknown capac
 Spawn and recovery validate fallback fields even when typed resolution is off.
 The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
 Direct `fm-spawn.sh <id> --relaunch` restores a recorded rule together with its model and effort when neither a replacement rule nor a harness, model, or effort override is supplied.
+Control relaunch likewise inherits the recorded rule unless a harness, model, or effort override clears it; an explicit `--dispatch-rule` takes precedence even with profile overrides and must match the concrete replacement profile before instructions change or the worker stops.
+Control refuses an explicit rule without dispatch configuration or for a secondmate.
 Omitted model and effort fields match their persisted `default` metadata values during recovery.
 An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
 Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
