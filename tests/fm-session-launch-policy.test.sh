@@ -292,11 +292,12 @@ set_child_policy_case() {
 
 run_secondmate_entry() {
   local entry=$1
+  shift
   case "$entry" in
     fresh)
-      run_cli "$ROOT/bin/fm-spawn.sh" "$ID" "$CHILD_HOME" --secondmate ;;
+      run_cli "$ROOT/bin/fm-spawn.sh" "$ID" "$CHILD_HOME" --secondmate "$@" ;;
     direct)
-      run_cli "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch ;;
+      run_cli "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch "$@" ;;
     control)
       run_cli "$ROOT/bin/fm-control.sh" "$ID" relaunch --note 'continue descendant work' ;;
     auto)
@@ -815,6 +816,53 @@ for entry in fresh direct control auto; do
     fi
     pass "$entry checks effective child policy with absent primary: $scenario"
   done
+done
+
+for entry in fresh direct control auto; do
+  make_secondmate_case "child-$entry-absent-primary-guarded-codex" omp "$entry"
+  set_child_policy_case valid
+  printf '/config/*\n!/config/session-launch-policy\n/data/\n/state/\n/projects/\n' > "$CHILD_HOME/.gitignore"
+  EXPECT_CHILD_POLICY=1
+  printf 'codex\n' > "$HOME_DIR/config/secondmate-harness"
+  set_secondmate_endpoint "$entry" omp
+  rc=0
+  if [ "$entry" = direct ]; then
+    out=$(run_secondmate_entry "$entry" --harness codex) || rc=$?
+  else
+    out=$(run_secondmate_entry "$entry") || rc=$?
+  fi
+  [ "$rc" -ne 0 ] || fail "$entry accepted codex under the retained enabled child policy: $out"
+  assert_contains "$out" 'session-launch-policy' 'retained child refusal identifies policy'
+  assert_secondmate_refused "$entry"
+  [ ! -e "$HOME_DIR/config/session-launch-policy" ] || fail 'retained child fixture unexpectedly enabled the parent policy'
+  pass "$entry refuses codex under a write-guard-retained enabled child policy with current tooling"
+done
+
+for entry in fresh direct; do
+  make_secondmate_case "child-$entry-absent-primary-guarded-raw" omp "$entry"
+  set_child_policy_case valid
+  printf '/config/*\n!/config/session-launch-policy\n/data/\n/state/\n/projects/\n' > "$CHILD_HOME/.gitignore"
+  EXPECT_CHILD_POLICY=1
+  set_secondmate_endpoint "$entry" omp
+  rc=0
+  out=$(run_secondmate_entry "$entry" --harness 'omp --model anything') || rc=$?
+  [ "$rc" -ne 0 ] || fail "$entry accepted an opaque raw launch under the retained child policy: $out"
+  assert_contains "$out" 'session-launch-policy' 'retained child raw refusal identifies policy'
+  assert_secondmate_refused "$entry"
+  [ ! -e "$HOME_DIR/config/session-launch-policy" ] || fail 'raw child fixture unexpectedly enabled the parent policy'
+  pass "$entry refuses opaque raw launch under a write-guard-retained enabled child policy"
+done
+
+for entry in fresh direct control auto; do
+  make_secondmate_case "child-$entry-absent-primary-removed-codex" codex "$entry"
+  set_child_policy_case valid
+  set_secondmate_endpoint "$entry" codex
+  out=$(run_secondmate_entry "$entry") || fail "$entry refused codex after writable child policy removal: $out"
+  assert_secondmate_launched "$entry" codex absent
+  [ ! -e "$CHILD_HOME/config/session-launch-policy" ] && [ ! -L "$CHILD_HOME/config/session-launch-policy" ] \
+    || fail 'primary absence did not remove the writable enabled child policy'
+  [ ! -e "$HOME_DIR/config/session-launch-policy" ] || fail 'removed child fixture unexpectedly enabled the parent policy'
+  pass "$entry preserves codex compatibility after successful enabled child policy removal"
 done
 
 for entry in fresh direct control auto; do

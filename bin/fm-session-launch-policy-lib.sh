@@ -82,8 +82,13 @@ fm_session_launch_policy_refusal_notify() {
   return 0
 }
 
+fm_session_launch_policy_admit_child() {
+  fm_session_launch_policy_check_child "$1" "$2" || return 1
+  fm_session_launch_policy_check "$2/config" "$3" "${4:-0}"
+}
+
 fm_session_launch_policy_converge_child() (
-  local config=$1 home=$2 id=$3 enabled child_present lock dir
+  local config=$1 home=$2 id=$3 harness=$4 raw=${5:-0} enabled child_present lock dir
   enabled=$(fm_session_launch_policy_enabled "$config") || return 1
   if [ "$enabled" != 1 ]; then
     child_present=$(fm_config_source_present "$home/config/session-launch-policy") || return 1
@@ -114,5 +119,5 @@ fm_session_launch_policy_converge_child() (
       propagate_inheritable_config "$config" "$home/config" ||
       printf 'warning: secondmate %s session-launch-policy inheritance failed for %s\n' "$id" "$home" >&2
   fi
-  fm_session_launch_policy_check_child "$config" "$home"
+  fm_session_launch_policy_admit_child "$config" "$home" "$harness" "$raw"
 )

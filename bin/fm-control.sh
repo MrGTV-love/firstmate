@@ -1137,7 +1137,7 @@ do_relaunch() {
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
     [ -n "$secondmate_home" ] || secondmate_home=$WT
-    fm_session_launch_policy_converge_child "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$secondmate_home" "$ID" || return 1
+    fm_session_launch_policy_converge_child "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$secondmate_home" "$ID" "$TARGET_HARNESS" || return 1
   fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1

@@ -90,11 +90,10 @@ fm_sm_live_first_line() {
 }
 
 fm_sm_live_replacement_admit() {
-  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} enabled harness
-  enabled=$(fm_session_launch_policy_enabled "$config") || return 1
-  [ "$enabled" = 1 ] || return 0
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} harness
   harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || return 1
-  fm_session_launch_policy_check "$config" "$harness"
+  fm_session_launch_policy_check "$config" "$harness" || return 1
+  printf '%s\n' "$harness"
 }
 
 # One line per relaunch attempt and one per outcome, keyed by epoch, plus a
@@ -279,16 +278,16 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
-  local policy_error config home generation reason
+  local policy_error config home generation reason harness
   home=$(fm_meta_get "$meta" home)
   [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)
   [ -n "$home" ] || home=$(secondmate_registry_field "${FM_DATA_OVERRIDE:-$FM_HOME/data}/secondmates.md" "$id" home || true)
   if ! policy_error=$(
     {
       config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-      fm_sm_live_replacement_admit || exit 1
+      harness=$(fm_sm_live_replacement_admit) || exit 1
       if [ -z "$(fm_meta_get "$meta" remote_host)" ]; then
-        fm_session_launch_policy_converge_child "$config" "$home" "$id"
+        fm_session_launch_policy_converge_child "$config" "$home" "$id" "$harness"
       fi
     } 2>&1
   ); then
