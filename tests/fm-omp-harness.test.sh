@@ -19,8 +19,8 @@
 #      ancestor: it beats an inherited CLAUDECODE under omp and is inert when it
 #      leaks into a worker whose ancestry holds no omp.
 #   3. Every omp launch clears foreign markers, carries the tracked posture
-#      overlay, --auto-approve, --cwd, and one -e pointing at
-#      state/<id>.omp-ext.ts, with secondmate primary extensions auto-discovered.
+#      overlay, --auto-approve, --cwd, and (for a crewmate) one -e pointing at
+#      state/<id>.omp-ext.ts; a secondmate launch names no -e at all.
 #   4. A <provider>/<id> model is validated only when `omp models --json` lists
 #      that provider; an unlisted provider passes through with a notice.
 #   5. Busy state: agent_start is busy, agent_end with willContinue stays busy,
@@ -230,7 +230,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 }
 
 test_secondmate_launch_relies_on_discovery() {
-  local world repo home fakebin launchlog out status launch state ext
+  local world repo home fakebin launchlog out status launch state
   world="$TMP_ROOT/"'secondmate\n"paths'
   repo="$world/repo"
   fm_git_init_commit "$repo"
@@ -260,43 +260,16 @@ test_secondmate_launch_relies_on_discovery() {
   assert_grep "harness=omp" "$world/home/state/sm.meta" "secondmate meta missing harness=omp"
   launch=$(cat "$launchlog")
   state="$world/home/state"
-  ext="$state/sm.omp-ext.ts"
-  assert_contains "$launch" "-e '$ext'" "secondmate launch must load its distinct semantic busy adapter"
-  assert_not_contains "$launch" "-e '$home/.omp/extensions/" "secondmate primary extensions must not be explicitly loaded twice"
+  assert_not_contains "$launch" " -e " "secondmate primary extensions must load only through cwd discovery"
   assert_contains "$launch" "--config '$repo/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
   assert_not_contains "$launch" "fm-worker-overlay.yml" "secondmate launch must preserve the lane's memory settings"
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
-  assert_present "$ext" "secondmate spawn did not write its task-bound busy extension"
-  out=$(drive_omp_ext "$ext" handlers) || fail "secondmate handler registration failed: $out"
-  case " $out " in
-    *" tool_call "*|*" turn_end "*) fail "a secondmate registered worker guardrail or turn-end handlers: $out" ;;
-  esac
-  for handler in before_agent_start agent_start agent_end session_start session_shutdown; do
-    case " $out " in
-      *" $handler "*) ;;
-      *) fail "secondmate missing lifecycle handler $handler: $out" ;;
-    esac
-  done
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] || fail "secondmate spawn did not arm the parent's task contract"
-  drive_omp_ext "$ext" session-start || fail "secondmate session_start drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown omp-ext" ] || fail "a replacement session must invalidate settled evidence"
-  drive_omp_ext "$ext" before-start || fail "secondmate before_agent_start drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "a new secondmate turn must be busy before it runs"
-  drive_omp_ext "$ext" end-continuing || fail "secondmate continuing agent_end drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "a continuing secondmate run was falsely settled"
-  drive_omp_ext "$ext" end-final || fail "secondmate final agent_end drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "idle omp-ext" ] || fail "a settled secondmate must publish positive idle to its parent"
-  drive_omp_ext "$ext" end-and-restart || fail "secondmate restarted turn drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy omp-ext" ] || fail "an old settled write overrode a new secondmate turn"
-  drive_omp_ext "$ext" session-shutdown || fail "secondmate shutdown drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown omp-ext" ] || fail "secondmate shutdown retained stale settled evidence"
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" sm >/dev/null || fail "could not rearm the replacement secondmate"
-  drive_omp_ext "$ext" end-final || fail "stale secondmate end drive failed"
-  [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] || fail "an old secondmate extension overwrote its replacement generation"
-  [ ! -e "$state/sm.turn-ended" ] || fail "secondmate busy wiring wrote a parent turn notification"
-  [ ! -e "$home/state/sm.busy-state" ] || fail "secondmate busy wiring published under the child's own worker id"
-  pass "fm-spawn: omp secondmates publish parent-bound busy/settled evidence without duplicate primary loading"
+  assert_absent "$state/sm.omp-ext.ts" "secondmate spawn generated a per-task busy extension"
+  assert_absent "$state/sm.busy-state" "secondmate spawn armed a per-task busy-state record"
+  assert_absent "$state/sm.busy-gen" "secondmate spawn minted a per-task busy generation"
+  [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "secondmate metadata published a busy generation"
+  pass "fm-spawn: omp secondmates rely on primary extension discovery without generated busy wiring"
 }
 
 test_raw_secondmate_launch_has_no_busy_contract() {
@@ -337,81 +310,6 @@ test_raw_secondmate_launch_has_no_busy_contract() {
   [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
     || fail "raw secondmate without lifecycle evidence must classify unknown, not false busy"
   pass "fm-spawn: raw omp secondmates preserve their command without arming an unobservable busy contract"
-}
-
-test_raw_secondmate_replacement_retires_busy_contract() {
-  local world repo home fakebin launchlog out status launch state predecessor mode ext retired_ext
-  local gen retired_gen=
-  world="$TMP_ROOT/raw-secondmate-replacement"
-  repo="$world/repo"
-  fm_git_init_commit "$repo"
-  ln -s "$ROOT/bin" "$repo/bin"
-  ln -s "$ROOT/.omp" "$repo/.omp"
-  home="$world/sm"
-  mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf 'sm\n' > "$home/.fm-secondmate-home"
-  printf 'charter\n' > "$home/data/charter.md"
-  printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
-  git -C "$home" init -q -b main
-  fakebin=$(make_spawn_fakebin "$world/fake" claude)
-  make_fake_omp "$fakebin"
-  launchlog="$world/launch.log"
-  state="$world/home/state"
-  ext="$state/sm.omp-ext.ts"
-  for predecessor in busy idle; do
-    : > "$launchlog"
-    out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-      FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
-      FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$world/home/data" \
-      FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
-      "$ROOT/bin/fm-spawn.sh" sm "$home" omp --secondmate 2>&1)
-    status=$?
-    expect_code 0 "$status" "canonical omp secondmate before $predecessor replacement should succeed: $out"
-    assert_present "$ext" "canonical secondmate did not generate its busy adapter"
-    assert_contains "$(cat "$launchlog")" "-e '$ext'" "canonical secondmate did not load its busy adapter"
-    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "busy fm-spawn" ] \
-      || fail "canonical secondmate did not rearm its busy contract"
-    gen=$(fm_busy_current_gen "$state" sm) || fail "canonical secondmate has no busy generation"
-    [ "$gen" != "$retired_gen" ] || fail "canonical secondmate reused a retired busy generation"
-    [ "$(fm_meta_get "$state/sm.meta" busy_gen)" = "$gen" ] || fail "canonical secondmate metadata lost its armed generation"
-    retired_gen=$gen
-    retired_ext="$world/retired-$predecessor.ts"
-    cp "$ext" "$retired_ext"
-    mode=before-start
-    [ "$predecessor" != idle ] || mode=end-final
-    drive_omp_ext "$ext" "$mode" || fail "could not publish predecessor $predecessor evidence"
-    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "$predecessor omp-ext" ] \
-      || fail "canonical predecessor did not publish trusted $predecessor evidence"
-    : > "$launchlog"
-    out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-      FM_ROOT_OVERRIDE="$repo" FM_HOME="$world/home" \
-      FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$world/home/data" \
-      FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
-      "$ROOT/bin/fm-spawn.sh" sm "$home" 'omp --auto-approve' --secondmate 2>&1)
-    status=$?
-    expect_code 0 "$status" "raw omp secondmate should replace its $predecessor predecessor: $out"
-    launch=$(cat "$launchlog")
-    assert_contains "$launch" "omp --auto-approve" "replacement lost its ordinary raw omp command"
-    assert_not_contains "$launch" "-e '$ext'" "raw replacement loaded its predecessor's generated extension"
-    [ "$(fm_meta_get "$state/sm.meta" harness)" = omp ] || fail "raw replacement metadata lost its omp harness"
-    [ -z "$(fm_meta_get "$state/sm.meta" busy_gen)" ] || fail "raw replacement metadata retained predecessor busy authority"
-    assert_absent "$state/sm.busy-gen" "raw replacement retained its $predecessor predecessor's busy generation"
-    assert_absent "$state/sm.busy-state" "raw replacement retained its $predecessor predecessor's busy record"
-    assert_absent "$ext" "raw replacement retained its predecessor's generated extension"
-    [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
-      || fail "raw replacement reused predecessor $predecessor authority"
-    for mode in before-start end-final; do
-      drive_omp_ext "$retired_ext" "$mode" || fail "could not drive the retired secondmate's $mode callback"
-      assert_absent "$state/sm.busy-gen" "retired callback rearmed raw replacement authority"
-      assert_absent "$state/sm.busy-state" "retired callback recreated raw replacement authority"
-      [ "$(fm_busy_classify tmux fake:w omp sm "$state")" = "unknown missing" ] \
-        || fail "retired callback changed the raw replacement's unknown state"
-    done
-  done
-  pass "fm-spawn: raw omp replacements retire busy and idle predecessor authority; canonical spawns still rearm"
 }
 
 test_secondmate_config_pinned_model_is_validated() {
@@ -497,8 +395,6 @@ switch (process.env.MODE) {
   case "handlers": console.log(Object.keys(handlers).sort().join(" ")); break;
   case "agent-start": await handlers["agent_start"]({ type: "agent_start" }, ctx); break;
   case "before-start": await handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx); break;
-  case "session-start": await handlers["session_start"]({ type: "session_start" }, ctx); break;
-  case "session-shutdown": await handlers["session_shutdown"]({ type: "session_shutdown" }, ctx); break;
   case "end-and-restart": {
     const ending = handlers["agent_end"]({ type: "agent_end" }, ctx);
     const starting = handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx);
@@ -530,9 +426,6 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  case " $out " in
-    *" session_start "*|*" session_shutdown "*) fail "a worker registered secondmate session handlers: $out" ;;
-  esac
   for handler in before_agent_start agent_start agent_end tool_call turn_end; do
     case " $out " in
       *" $handler "*) ;;
@@ -553,6 +446,11 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
+
+  out=$(drive_omp_ext "$ext" before-start) || fail "before_agent_start drive failed: $out"
+  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] || fail "before_agent_start must mark a new worker turn busy"
+  out=$(drive_omp_ext "$ext" end-and-restart) || fail "restarted worker turn drive failed: $out"
+  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] || fail "an old settled write overrode a new worker turn"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -1084,7 +982,7 @@ SH
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, readFileSync, readdirSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = []; const turns = [];
 const transcript = [{ role: "assistant" }];
@@ -1093,8 +991,6 @@ const pi = {
   registerCommand() {},
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
-    const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
-    if (!readdirSync(dir).some((name) => name.endsWith(".wake") && readFileSync(`${dir}/${name}`, "utf8") === m)) throw new Error("wake identity missing at synchronous send");
     sent.push({ m, o });
     if (process.env.SCENARIO === "sync-consumed") handlers.get("before_agent_start")({ prompt: m }, ctx);
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
@@ -1128,21 +1024,21 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+  writeFileSync(`${process.env.FM_HOME}/state/.e2e-fired`, "");
 }
 await handlers.get("session_start")({ type: "session_start" }, ctx);
 if (!["nonpending", "failed-send"].includes(process.env.SCENARIO)) await tool.execute();
 if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
-  const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
-  const records = () => readdirSync(dir).filter((name) => name.endsWith(".wake"));
   await sleep(50);
   if (sent.length !== 1 || !sent[0].m.includes("could not load a replacement-session actionable wake")) throw new Error("expected nonpending load-failure wake");
-  if (process.env.SCENARIO === "failed-send") {
-    if (records().length !== 0) throw new Error("failed send retained its record");
-  } else {
-    if (records().length !== 1) throw new Error("nonpending wake was not recorded");
-    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: sent[0].m }] } }, ctx);
-    if (records().length !== 0) throw new Error("nonpending consumption retained its record");
+  const wake = sent[0].m;
+  if (process.env.SCENARIO !== "failed-send") {
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
   }
+  composer.text = wake;
+  await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+  await sleep(2500);
+  if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== wake) throw new Error("failed or consumed nonpending wake was recovered");
   await handlers.get("session_shutdown")({}, ctx);
   process.exit(0);
 }
@@ -1151,14 +1047,14 @@ if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.leng
 const wake = sent[0].m;
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("regular delivery must remain queued as a follow-up");
 const bare = wake.replace(/⁣/g, "");
-const recordDir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
-const records = () => readdirSync(recordDir).filter((name) => /^unconsumed-\d+-\d+-\d+\.wake$/.test(name));
 if (process.env.SCENARIO === "sync-consumed") {
-  if (records().length !== 0) throw new Error("synchronous consumption retained its record");
+  composer.text = wake;
+  await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+  await sleep(2500);
+  if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== wake) throw new Error("synchronously consumed wake was recovered");
   await handlers.get("session_shutdown")({}, ctx);
   process.exit(0);
 }
-if (records().length !== 1 || readFileSync(`${recordDir}/${records()[0]}`, "utf8") !== wake) throw new Error("emitted wake must have one exact durable identity");
 const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(2500); };
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
@@ -1174,20 +1070,29 @@ switch (process.env.SCENARIO) {
     if (sent.length !== 2 || !same(sent[1])) throw new Error("idle custom-tail wake was not sent through prompt flow");
     if (turns.length !== 1 || turns[0].prompt !== wake || turns[0].tail !== tail) throw new Error("idle recovery did not start handling after the advisor tail");
     if (composer.text !== draft) throw new Error("custom-tail recovery changed operator draft bytes");
-    if (records().length !== 0) throw new Error("started custom-tail turn retained its wake identity");
     idle = true;
     await settle();
     if (sent.length !== 2 || turns.length !== 1 || composer.text !== draft) throw new Error("consumed custom-tail wake was recovered again");
     break;
   }
-  case "normalized-consumed":
-  case "consumed": {
-    const prompt = process.env.SCENARIO === "normalized-consumed" ? bare.replace(/\s/g, "").replace(/(.{17})/g, "$1\n \t") : wake;
+  case "normalized-consumed": {
+    const prompt = bare.replace(/\s/g, "").replace(/(.{17})/g, "$1\n \t");
     await handlers.get("before_agent_start")({ type: "before_agent_start", prompt }, ctx);
-    if (records().length !== 0) throw new Error("consumption did not remove the wake identity");
+    composer.text = wake;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error("normalized text consumed an exact wake identity");
+    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    composer.text = wake;
+    await settle();
+    if (sent.length !== 2 || composer.text !== wake) throw new Error("exact wake consumption was not retained");
+    break;
+  }
+  case "consumed": {
+    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    composer.text = wake;
     await settle();
     if (sent.length !== 1) throw new Error(`a consumed wake was sent again: ${sent.length}`);
-    if (composer.sets.length !== 0) throw new Error("a consumed wake changed the composer");
+    if (composer.sets.length !== 0 || composer.text !== wake) throw new Error("a consumed wake changed the composer");
     break;
   }
   case "draft": {
@@ -1230,10 +1135,6 @@ switch (process.env.SCENARIO) {
     break;
   }
   case "alone": {
-    // The wake text the real producer sends, kept for the shell side to check
-    // against the parent's wake-only predicate.
-    writeFileSync(`${process.env.FM_HOME}/wake.txt`, wake);
-    writeFileSync(`${process.env.FM_HOME}/wake-normalized.txt`, bare.replace(/\s/g, ""));
     // A composer that drops the invisible mark still holds the same wake.
     composer.text = bare;
     await settle();
@@ -1269,7 +1170,6 @@ switch (process.env.SCENARIO) {
     throw new Error(`unknown scenario ${process.env.SCENARIO}`);
 }
 await handlers.get("session_shutdown")({}, ctx);
-if (!["consumed", "normalized-consumed", "draft", "custom-tail"].includes(process.env.SCENARIO) && records().length !== 1) throw new Error("shutdown removed an unconsumed wake identity");
 process.exit(0);
 EOF
   local status=$?
@@ -1285,8 +1185,6 @@ test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
     [ -z "$out" ] || fail "omp watch restore scenario $scenario printed output: $out"
   done
-  bash -c '. "$1/bin/fm-operational-input.sh"; text=$(cat "$2"); fm_operational_watcher_wakes_only "$text" "$3" && fm_operational_watcher_wakes_only "$(cat "$4")" "$3" && ! fm_operational_watcher_wakes_only "$text edited" "$3" && ! fm_operational_watcher_wakes_only "$text$text" "$3"' _ "$ROOT" "$TMP_ROOT/watch-restore-alone/home/wake.txt" "$TMP_ROOT/watch-restore-alone/home/state/extensions/omp-primary-watch" "$TMP_ROOT/watch-restore-alone/home/wake-normalized.txt" \
-    || fail "the real emitted record must match only a single normalized wake"
   pass ".omp watch extension: a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
 }
 
@@ -1397,7 +1295,6 @@ test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_raw_secondmate_launch_has_no_busy_contract
-test_raw_secondmate_replacement_retires_busy_contract
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_generated_extension_preserves_hostile_paths

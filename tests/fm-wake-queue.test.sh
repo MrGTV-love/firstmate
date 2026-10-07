@@ -965,15 +965,11 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
   pass "busy panes defer without a ring and unknown panes keep the parent alarm"
 }
 
-# A harness can put a queued watcher wake back into the composer unsubmitted
-# (omp does when a run is interrupted), which leaves the mate idle with its queue
-# frozen and a pending composer the idle ring refuses to type into.
 install_secondmate_composer_herdr() {  # <fakebin>
   local fakebin=$1
   cat > "$fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
 case "${1:-} ${2:-}" in
   'status --json')
     printf '{"client":{"version":"0.9.1","protocol":22},"server":{"running":true}}\n'
@@ -987,52 +983,9 @@ case "${1:-} ${2:-}" in
   'agent get')
     printf '{"result":{"agent":{"agent":"omp","agent_status":"idle"}}}\n'
     ;;
-  'pane read')
-    case "$*" in
-      *'--source visible --format ansi'*)
-        [ ! -e "${FM_FAKE_HERDR_SCREEN:?}.unavailable" ] || exit 1
-        cat "$FM_FAKE_HERDR_SCREEN"
-        ;;
-      *) cat "${FM_FAKE_PLAIN_SCREEN:-$FM_FAKE_HERDR_SCREEN}" ;;
-    esac
-    ;;
-  'pane send-text')
-    printf 'TYPED:%s\n' "${4:-}" >> "${FM_FAKE_HERDR_SENT:?}"
-    ;;
-  'pane send-keys')
-    while [ "$#" -gt 0 ]; do
-      case "$1" in
-        enter|Enter)
-          printf '[ENTER]\n' >> "${FM_FAKE_HERDR_SENT:-/dev/null}"
-          if [ -n "${FM_FAKE_EDIT_AFTER_WAKE_ENTER:-}" ] \
-            && [ "$(wc -l < "${FM_FAKE_HERDR_SENT:?}" | tr -d '[:space:]')" = "$FM_FAKE_EDIT_AFTER_WAKE_ENTER" ]; then
-            cat "${FM_FAKE_EDITED_COMPOSER:?}" > "${FM_FAKE_HERDR_SCREEN:?}"
-          elif [ "${FM_FAKE_AFTER_ENTER_CAPTURE_FAIL:-0}" = 1 ]; then
-            : > "${FM_FAKE_HERDR_SCREEN:?}.unavailable"
-          elif [ "${FM_FAKE_AFTER_ENTER_EXTRACT_FAIL:-0}" = 1 ]; then
-            printf '$ no readable composer\n' > "${FM_FAKE_HERDR_SCREEN:?}"
-          elif [ "${FM_FAKE_HOLD_WAKE_ENTER:-0}" = 1 ]; then
-            if [ -n "${FM_FAKE_AFTER_ENTER_BUSY_CLASS:-}" ]; then
-              "${FM_FAKE_BUSY_EVENT:?}" apply "${FM_FAKE_BUSY_STATE_DIR:?}" mate \
-                "$FM_FAKE_AFTER_ENTER_BUSY_CLASS" --current-gen --source omp-ext --event agent-start >/dev/null || exit 1
-            fi
-          elif [ "${FM_FAKE_LOSE_FIRST_WAKE_ENTER:-0}" = 1 ] \
-            && [ "$(cat "${FM_FAKE_HERDR_SENT:?}")" = '[ENTER]' ]; then
-            :
-          else
-            if [ "${FM_FAKE_CLEAR_WAKE_SHAPE:-box}" = bare ]; then
-              printf '❯ \033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m\nπ · model · ◫ 7.5%%/272K\n' > "${FM_FAKE_HERDR_SCREEN:?}"
-            else
-              printf '╭── π > ◒ GPT-6-Astra ──╮\n╰─ \033[38;2;0;180;255m⇧⇥\033[0m \033[3m\033[38;2;107;114;128mto change thinking effort\033[0m ─╯\n' > "${FM_FAKE_HERDR_SCREEN:?}"
-            fi
-            if [ -n "${FM_FAKE_CHILD_WAKE_QUEUE:-}" ]; then
-              : > "$FM_FAKE_CHILD_WAKE_QUEUE"
-            fi
-          fi
-          ;;
-      esac
-      shift
-    done
+  'pane read') cat "${FM_FAKE_HERDR_SCREEN:?}" ;;
+  'pane send-text'|'pane send-keys')
+    printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
     ;;
   *) exit 0 ;;
 esac
@@ -1061,472 +1014,71 @@ render_secondmate_composer() {
   fi
 }
 
-setup_secondmate_composer_case() {  # <case> <composer-text>  (sets dir state sub fakebin)
-  local composer=$2 emitted_wake real_sleep
-  dir=$(make_case "$1")
-  state="$dir/state"
-  sub="$dir/secondmate"
-  fakebin="$dir/fakebin"
-  mkdir -p "$sub/state/extensions/omp-primary-watch"
-  printf 'mate\n' > "$sub/.fm-secondmate-home"
-  printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
-    "$sub" > "$state/mate.meta"
-  printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  emitted_wake=$(secondmate_wake_text)
-  printf '%s' "$emitted_wake" > "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake"
-  install_secondmate_composer_herdr "$fakebin"
-  install_secondmate_stall_date "$fakebin"
-  real_sleep=$(command -v sleep) || fail "sleep is unavailable for the composer fixture"
-  printf '%s\n' "$real_sleep" > "$dir/real-sleep"
-  cat > "$fakebin/sleep" <<'SH'
-#!/usr/bin/env bash
-if [ "$#" -eq 1 ] && [ "$1" = 0.5 ]; then
-  printf '%s\n' "$1" >> "${FM_FAKE_SUBMIT_SLEEP_LOG:?}"
-  exec "${FM_FAKE_REAL_SLEEP:?}" 0.05
-fi
-exec "${FM_FAKE_REAL_SLEEP:?}" "$@"
-SH
-  chmod +x "$fakebin/sleep"
-  render_secondmate_composer "${3:-box}" "$composer" > "$dir/screen"
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
-    || fail "could not arm the mate's busy contract"
-  "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
-    --source omp-ext --event agent-end >/dev/null \
-    || fail "could not mark the mate idle"
-}
-
-stall_composer_leg() {  # <leg> <now> <mode> [arg...]  (uses dir state sub fakebin)
-  local leg=$1 now=$2 mode=$3
-  shift 3
-  printf '%s\n' "$now" > "$dir/now"
-  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
-    FM_FAKE_HERDR_LOG="$dir/backend-log" \
-    FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
-    FM_FAKE_REAL_SLEEP="$(cat "$dir/real-sleep")" FM_FAKE_SUBMIT_SLEEP_LOG="$dir/submit-sleeps" \
-    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "$leg" "$mode" "$@"
-}
-
-test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted() {
-  local dir state sub fakebin wake shape scenario
+test_secondmate_pending_omp_screens_alarm_without_input() {
+  local dir state sub fakebin wake shape scenario composer before
   wake=$(secondmate_wake_text)
   for shape in box bare; do
-    for scenario in plain transcript; do
-      setup_secondmate_composer_case "secondmate-unsubmitted-wake-$shape-$scenario" "$wake" "$shape"
-      if [ "$scenario" = transcript ]; then
-        {
-          printf 'Previous assistant response completed.\n'
-          render_secondmate_composer "$shape" "$wake"
-          if [ "$shape" = box ]; then
-            printf '\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
-          fi
-          printf '\n\n'
-        } > "$dir/screen"
-      fi
-      LC_ALL=C stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-      [ ! -s "$state/.wake-queue" ] || fail "the first observation of a frozen row produced an alert"
-      [ ! -e "$dir/sent" ] || fail "the pane was touched before the stall interval"
-
-      FM_FAKE_CLEAR_WAKE_SHAPE="$shape" LC_ALL=C stall_composer_leg submit 1002 ring mate 100-7
-      [ "$(cat "$dir/sent")" = '[ENTER]' ] \
-        || fail "an omp $shape wake must get one bare Enter and no typed text: $(cat "$dir/sent" 2>/dev/null)"
-      [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
-        || fail "an omp $shape wake must use the fixed first confirmation wait"
-      grep -Fx 'pane read w1:p1 --source visible --format ansi --session firstmate' "$dir/backend-log" >/dev/null \
-        || fail "the $shape recovery did not capture the Herdr ANSI viewport"
-      ! grep -F 'secondmate wake-loop stalled' "$dir/watch-submit.out" >/dev/null \
-        || fail "a recovered omp $shape wake still alarmed the parent: $(cat "$dir/watch-submit.out")"
-      [ ! -s "$state/.wake-queue" ] || fail "the recovery published a parent stall notification"
-      [ ! -s "$sub/state/.wake-queue" ] || fail "the submitted wake did not let the child drain its queue"
-      [ ! -e "$state/mate.inbox" ] || fail "the recovery typed a drain steer instead of submitting the recorded wake"
-      [ -e "$state/.secondmate-wake-ring-mate" ] || fail "the recovered $shape $scenario wake did not record a ring"
-    done
-  done
-  pass "positively idle omp box and bare composers submit recorded wakes with ordinary transcript prefixes, context footers and trailing blanks under LC_ALL=C"
-}
-
-test_secondmate_composer_draft_next_to_a_wake_is_never_submitted() {
-  local dir state sub fakebin wake before shape draft composer direction case_index=0
-  wake=$(secondmate_wake_text)
-  for shape in box bare; do
-    for direction in before after; do
-      for draft in 'my unsent draft' '| my unsent draft' '│ my unsent draft' 'π · my unsent draft' '⠁⠂' '❯ my unsent draft'; do
-        case_index=$((case_index + 1))
-        if [ "$direction" = before ]; then
-          composer="$draft"$'\n\n'"$wake"
-        else
-          composer="$wake"$'\n\n'"$draft"
-        fi
-        setup_secondmate_composer_case "secondmate-wake-with-draft-$case_index" "$composer" "$shape"
-        before=$(cat "$dir/screen")
-        stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-        stall_composer_leg stall 1002 alert
-        grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-          || fail "a $shape composer holding a draft $direction the wake must keep the parent alarm: $(cat "$dir/watch-stall.out")"
-        [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
-        [ "$(cat "$dir/screen")" = "$before" ] \
-          || fail "the composer text changed: $(cat "$dir/screen")"
-        [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
-          || fail "draft refusal changed the foreign wake queue"
-        [ ! -e "$state/mate.inbox" ] || fail "draft refusal wrote a drain steer"
-        [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "draft refusal recorded a recovery ring"
-      done
-    done
-  done
-  pass "box and bare composers holding operator drafts before or after wakes remain untouched and alarm"
-}
-
-# Draft-only composers are likewise untouched.
-test_secondmate_composer_holding_only_a_draft_is_never_submitted() {
-  local dir state sub fakebin shape
-  for shape in box bare; do
-    setup_secondmate_composer_case "secondmate-draft-only-$shape" "my unsent draft" "$shape"
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    stall_composer_leg stall 1002 alert
-    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-      || fail "a $shape composer holding only a draft must keep the parent alarm: $(cat "$dir/watch-stall.out")"
-    [ ! -e "$dir/sent" ] || fail "an operator draft was submitted or typed over: $(cat "$dir/sent")"
-  done
-  pass "box and bare composers holding only operator drafts are never submitted"
-}
-
-test_secondmate_idle_with_unreadable_composer_is_never_rung() {
-  local dir state sub fakebin scenario
-  for scenario in unknown blank unavailable; do
-    setup_secondmate_composer_case "secondmate-idle-composer-$scenario" ''
-    case "$scenario" in
-      unknown) printf 'no identified composer\n' > "$dir/screen" ;;
-      blank) : > "$dir/screen" ;;
-      unavailable) : > "$dir/screen.unavailable" ;;
-    esac
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    stall_composer_leg stall 1002 alert
-    [ ! -e "$dir/sent" ] || fail "$scenario composer received input"
-    [ ! -e "$state/mate.inbox" ] || fail "$scenario composer received a drain steer"
-    [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$scenario composer recorded a ring"
-    [ -s "$sub/state/.wake-queue" ] || fail "$scenario composer changed the foreign queue"
-  done
-  pass "idle records never authorize a drain ring without an affirmatively empty composer"
-}
-
-test_secondmate_modified_or_missing_wake_record_is_never_submitted() {
-  local dir state sub fakebin wake composer case_name before
-  wake=$(secondmate_wake_text)
-  for case_name in reason inserted-line missing-record multiple-wakes; do
-    case "$case_name" in
-      reason) composer=${wake/lane.status/edited.status} ;;
-      inserted-line) composer=${wake/Watcher continuity/$'\nmy inserted instruction\nWatcher continuity'} ;;
-      missing-record) composer=$wake ;;
-      multiple-wakes) composer="$wake"$'\n\n'"$wake" ;;
-    esac
-    setup_secondmate_composer_case "secondmate-unmatched-$case_name" "$composer"
-    if [ "$case_name" = missing-record ]; then
-      rm -f "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake"
-    fi
-    before=$(cat "$dir/screen")
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    stall_composer_leg stall 1002 alert
-    [ ! -e "$dir/sent" ] || fail "$case_name restored text was submitted or typed over: $(cat "$dir/sent")"
-    [ "$(cat "$dir/screen")" = "$before" ] || fail "$case_name composer changed"
-    [ -s "$sub/state/.wake-queue" ] || fail "$case_name foreign queue was drained"
-    [ ! -e "$state/mate.inbox" ] || fail "$case_name recovery typed a drain steer"
-  done
-  pass "edited reasons, inserted instructions, missing records, and multiple wakes never authorize restored-wake submission"
-}
-
-test_secondmate_restored_wake_requires_semantic_idle() {
-  local dir state sub fakebin wake class shape scenario before
-  wake=$(secondmate_wake_text)
-  for scenario in box-busy box-unknown bare-busy bare-unknown; do
-    shape=${scenario%-*}
-    class=${scenario##*-}
-    setup_secondmate_composer_case "secondmate-restored-wake-$scenario" "$wake" "$shape"
-    before=$(cat "$dir/screen")
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    if [ "$class" = busy ]; then
-      "$ROOT/bin/fm-busy-event.sh" apply "$state" mate busy --current-gen \
-        --source omp-ext --event agent-start >/dev/null \
-        || fail "could not begin the restored-wake mate's new turn"
-    else
-      rm -f "$state/mate.busy-state" "$state/mate.busy-gen"
-    fi
-    if [ "$class" = busy ]; then
-      FM_BUSY_TURN_MAX_SECS=1 stall_composer_leg stall 1002 alert
-    else
-      stall_composer_leg stall 1002 alert
-    fi
-    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-      || fail "a semantically $class $shape restored wake did not retain the parent alarm"
-    [ ! -e "$dir/sent" ] || fail "a semantically $class $shape mate had its restored wake submitted: $(cat "$dir/sent")"
-    [ "$(cat "$dir/screen")" = "$before" ] || fail "a semantically $class $shape mate's composer changed"
-    [ -s "$sub/state/.wake-queue" ] || fail "a semantically $class $shape mate's wake queue drained"
-    [ ! -e "$state/mate.inbox" ] || fail "a semantically $class $shape mate received a drain steer"
-  done
-  pass "busy and unknown semantic verdicts refuse exact recorded box and bare restored wakes"
-}
-
-test_secondmate_restored_wake_rechecks_semantic_idle_before_retry() {
-  local dir state sub fakebin wake class before
-  wake=$(secondmate_wake_text)
-  for class in busy unknown; do
-    setup_secondmate_composer_case "secondmate-restored-wake-retry-$class" "$wake"
-    before=$(cat "$dir/screen")
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    FM_FAKE_HOLD_WAKE_ENTER=1 FM_FAKE_AFTER_ENTER_BUSY_CLASS="$class" \
-      FM_FAKE_BUSY_EVENT="$ROOT/bin/fm-busy-event.sh" FM_FAKE_BUSY_STATE_DIR="$state" \
-      stall_composer_leg stall 1002 alert
-    [ "$(cat "$dir/sent")" = '[ENTER]' ] \
-      || fail "an idle-to-$class transition must prevent the retry: $(cat "$dir/sent" 2>/dev/null)"
-    [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
-      || fail "an idle-to-$class transition must wait once before refusing the retry"
-    [ "$(cat "$dir/screen")" = "$before" ] || fail "an idle-to-$class transition changed the held composer"
-    [ -s "$sub/state/.wake-queue" ] || fail "an idle-to-$class transition drained the foreign queue"
-    [ ! -e "$state/mate.inbox" ] || fail "an idle-to-$class transition typed a drain steer"
-  done
-  pass "a lost Enter is never retried after semantic idle changes to busy or unknown"
-}
-
-test_secondmate_restored_wake_unavailable_after_enter_keeps_parent_alarm() {
-  local dir state sub fakebin wake failure shape scenario
-  wake=$(secondmate_wake_text)
-  for scenario in box-capture box-extract bare-capture bare-extract; do
-    shape=${scenario%-*}
-    failure=${scenario##*-}
-    setup_secondmate_composer_case "secondmate-restored-wake-unavailable-$scenario" "$wake" "$shape"
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    if [ "$failure" = capture ]; then
-      FM_FAKE_AFTER_ENTER_CAPTURE_FAIL=1 stall_composer_leg stall 1002 alert
-    else
-      FM_FAKE_AFTER_ENTER_EXTRACT_FAIL=1 stall_composer_leg stall 1002 alert
-    fi
-    [ "$(cat "$dir/sent")" = '[ENTER]' ] \
-      || fail "$shape $failure failure after Enter retried or typed over an unreadable composer: $(cat "$dir/sent")"
-    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-      || fail "$shape $failure failure after Enter hid the parent alarm"
-    [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "an unconfirmed $shape $failure was marked recovered"
-    [ -s "$sub/state/.wake-queue" ] || fail "an unconfirmed $shape $failure drained the child's queue"
-    [ ! -e "$state/mate.inbox" ] || fail "an unconfirmed $shape $failure fell through to another drain steer"
-  done
-  pass "box and bare capture and extraction failures after Enter keep the parent alarm without retrying or typing a second steer"
-}
-
-test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm() {
-  local dir state sub fakebin wake shape confirmation content edited expected
-  wake=$(secondmate_wake_text)
-  for shape in box bare; do
-    for confirmation in 1 2; do
-      for content in edited mixed hint; do
-        setup_secondmate_composer_case "secondmate-wake-edit-$shape-$confirmation-$content" "$wake" "$shape"
-        case "$content" in
-          edited) edited=${wake/lane.status/operator-edited.status} ;;
-          mixed) edited="$wake operator draft" ;;
-          hint) edited='⇧⇥ to change thinking effort' ;;
-        esac
-        render_secondmate_composer "$shape" "$edited" > "$dir/edited-screen"
-        stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-        FM_FAKE_EDIT_AFTER_WAKE_ENTER="$confirmation" FM_FAKE_EDITED_COMPOSER="$dir/edited-screen" \
-          FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg stall 1002 alert
-        expected='[ENTER]'
-        [ "$confirmation" -eq 1 ] || expected=$(printf '[ENTER]\n[ENTER]')
-        [ "$(cat "$dir/sent")" = "$expected" ] \
-          || fail "$shape $content at confirmation $confirmation caused an extra Enter or typed text"
-        expected=0.5
-        [ "$confirmation" -eq 1 ] || expected=$(printf '0.5\n0.5')
-        [ "$(cat "$dir/submit-sleeps")" = "$expected" ] \
-          || fail "$shape $content at confirmation $confirmation changed the fixed confirmation waits"
-        cmp -s "$dir/screen" "$dir/edited-screen" \
-          || fail "$shape $content at confirmation $confirmation changed the operator's composer"
-        grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-          || fail "$shape $content at confirmation $confirmation hid the parent alarm"
-        [ ! -e "$state/.secondmate-wake-ring-mate" ] \
-          || fail "$shape $content at confirmation $confirmation was marked recovered"
-        [ -s "$sub/state/.wake-queue" ] \
-          || fail "$shape $content at confirmation $confirmation drained the child's queue"
-        [ ! -e "$state/mate.inbox" ] \
-          || fail "$shape $content at confirmation $confirmation typed a drain steer"
-      done
-    done
-  done
-  pass "operator edits after either swallowed Enter remain unconfirmed without submitting edited or mixed box and bare composers"
-}
-
-test_secondmate_restored_wake_unsupported_capture_keeps_parent_alarm() {
-  local dir state sub fakebin wake scenario before backend target captured
-  wake=$(secondmate_wake_text)
-  for scenario in tmux-truncated zellij-truncated herdr-ansi-failure herdr-missing-footer; do
-    setup_secondmate_composer_case "secondmate-wake-capture-refusal-$scenario" "$wake" bare
-    render_secondmate_composer bare "$wake" > "$dir/plain-screen"
-    {
-      printf '❯ my unsent draft\n'
-      render_secondmate_composer bare "$wake"
-    } > "$dir/screen"
-    if [ "$scenario" = herdr-missing-footer ]; then
-      printf '❯ %s\n' "${wake//$'\xe2\x81\xa3'/}" > "$dir/screen"
-    fi
-    before=$(cat "$dir/screen")
-    if [ "$scenario" = zellij-truncated ]; then
-      printf 'window=firstmate:1\nkind=secondmate\nharness=omp\nbackend=zellij\nhome=%s\n' \
+    for scenario in copied-wake draft mixed duplicate edited below-draft hint empty unreadable; do
+      dir=$(make_case "secondmate-pending-$shape-$scenario")
+      state="$dir/state"
+      sub="$dir/secondmate"
+      fakebin="$dir/fakebin"
+      mkdir -p "$sub/state"
+      printf 'mate\n' > "$sub/.fm-secondmate-home"
+      printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
         "$sub" > "$state/mate.meta"
-      cat > "$fakebin/zellij" <<'SH'
-#!/usr/bin/env bash
-set -u
-printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
-case "$*" in
-  *list-sessions*) printf 'firstmate\n' ;;
-  *list-panes*) printf '[{"id":1,"tab_id":1,"is_plugin":false}]\n' ;;
-  *list-tabs*) printf '[{"tab_id":1,"name":"fm-mate"}]\n' ;;
-  *dump-screen*) cat "${FM_FAKE_PLAIN_SCREEN:?}" ;;
-  *write-chars*|*send-keys*)
-    printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
-    ;;
-esac
-SH
-      chmod +x "$fakebin/zellij"
-    elif [ "$scenario" = tmux-truncated ]; then
-      printf 'window=firstmate:fm-mate\nkind=secondmate\nharness=omp\nbackend=tmux\nhome=%s\n' \
-        "$sub" > "$state/mate.meta"
-      cat > "$fakebin/tmux" <<'SH'
-#!/usr/bin/env bash
-set -u
-printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
-case "${1:-}" in
-  list-windows) printf 'fm-mate\n' ;;
-  capture-pane) cat "${FM_FAKE_PLAIN_SCREEN:?}" ;;
-  display-message)
-    case "$*" in
-      *pane_current_command*) printf 'omp\n' ;;
-      *pane_tty*) exit 1 ;;
-      *cursor_y*) awk 'END { print NR - 1 }' "${FM_FAKE_PLAIN_SCREEN:?}" ;;
-      *) printf '0\n' ;;
-    esac
-    ;;
-  send-keys) printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}" ;;
-esac
-SH
-      chmod +x "$fakebin/tmux"
-    elif [ "$scenario" = herdr-ansi-failure ]; then
-      : > "$dir/screen.unavailable"
-    fi
-    backend=${scenario%%-*}
-    case "$backend" in
-      tmux) target=firstmate:fm-mate ;;
-      zellij) target=firstmate:1 ;;
-      herdr) target=firstmate:w1:p1 ;;
-    esac
-    captured=$(
-      export PATH="$fakebin:$PATH" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state"
-      export FM_FAKE_HERDR_LOG="$dir/backend-log" FM_FAKE_HERDR_SCREEN="$dir/screen"
-      export FM_FAKE_PLAIN_SCREEN="$dir/plain-screen"
-      . "$ROOT/bin/fm-backend.sh"
-      fm_backend_capture "$backend" "$target" 200 fm-mate
-    ) || fail "$scenario fixture did not expose its readable plain capture"
-    [ "$captured" = "$(cat "$dir/plain-screen")" ] \
-      || fail "$scenario fixture did not expose the matching wake without the earlier draft"
-    FM_FAKE_PLAIN_SCREEN="$dir/plain-screen" stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    FM_FAKE_PLAIN_SCREEN="$dir/plain-screen" stall_composer_leg stall 1002 alert
-    [ ! -e "$dir/sent" ] || fail "$scenario received input despite unproven viewport ownership"
-    [ "$(cat "$dir/screen")" = "$before" ] || fail "$scenario changed the visible draft"
-    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-      || fail "$scenario hid the parent alarm"
-    [ -s "$state/.wake-queue" ] || fail "$scenario lost the parent alarm queue"
-    [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
-      || fail "$scenario changed the foreign queue"
-    [ -e "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake" ] \
-      || fail "$scenario consumed the recorded wake"
-    [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$scenario recorded a successful ring"
-    [ ! -e "$state/mate.inbox" ] || fail "$scenario wrote a drain steer"
-  done
-  pass "truncated captures, failed Herdr ANSI captures with readable plain fallback, and bare composers without a terminal footer retain alarms without input"
-}
-
-test_secondmate_restored_wake_below_visible_draft_is_never_submitted() {
-  local dir state sub fakebin wake shape confirmation expected initial_shape row
-  wake=$(secondmate_wake_text)
-  for shape in bare box pasted-box-after-draft box-draft-before-box box-draft-before-bare; do
-    for confirmation in 0 1 2; do
-      initial_shape=${shape/pasted-box-after-draft/box}
-      setup_secondmate_composer_case "secondmate-wake-below-draft-$shape-$confirmation" "$wake" "${initial_shape##*-}"
+      printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
+      case "$scenario" in
+        copied-wake|below-draft) composer=$wake ;;
+        draft) composer='my unsent draft' ;;
+        mixed) composer="$wake"$'\n\nmy unsent draft' ;;
+        duplicate) composer="$wake"$'\n\n'"$wake" ;;
+        edited) composer=${wake/lane.status/operator-edited.status} ;;
+        hint) composer='⇧⇥ to change thinking effort' ;;
+        empty|unreadable) composer= ;;
+      esac
       {
-        case "$shape" in
-          bare)
-            printf '❯ my unsent draft\n────────\n────────\n'
-            render_secondmate_composer bare "$wake"
-            ;;
-          box)
-            printf '❯ my unsent draft\n'
-            for row in {1..25}; do printf '\n'; done
-            render_secondmate_composer box "$wake"
-            printf '\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
-            ;;
-          pasted-box-after-draft)
-            printf '❯ my unsent draft\n\n'
-            render_secondmate_composer box "$wake"
-            printf '\n| \n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
-            ;;
-          box-draft-before-box|box-draft-before-bare)
-            render_secondmate_composer box 'my unsent draft'
-            render_secondmate_composer "${shape##*-}" "$wake"
-            printf '\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
-            ;;
-        esac
-      } > "$dir/edited-screen"
-      if [ "$confirmation" -eq 0 ]; then
-        cat "$dir/edited-screen" > "$dir/screen"
-      fi
-      stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-      if [ "$confirmation" -eq 0 ]; then
-        stall_composer_leg stall 1002 alert
-        [ ! -e "$dir/sent" ] \
-          || fail "$shape wake below a visible draft received initial input"
-        [ ! -e "$dir/submit-sleeps" ] \
-          || fail "$shape wake below a visible draft began submission confirmation"
-      else
-        FM_FAKE_EDIT_AFTER_WAKE_ENTER="$confirmation" FM_FAKE_EDITED_COMPOSER="$dir/edited-screen" \
-          FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg stall 1002 alert
-        expected='[ENTER]'
-        [ "$confirmation" -eq 1 ] || expected=$(printf '[ENTER]\n[ENTER]')
-        [ "$(cat "$dir/sent")" = "$expected" ] \
-          || fail "$shape wake below a visible draft at confirmation $confirmation received extra input"
-        expected=0.5
-        [ "$confirmation" -eq 1 ] || expected=$(printf '0.5\n0.5')
-        [ "$(cat "$dir/submit-sleeps")" = "$expected" ] \
-          || fail "$shape wake below a visible draft at confirmation $confirmation changed the fixed confirmation waits"
-      fi
-      cmp -s "$dir/screen" "$dir/edited-screen" \
-        || fail "$shape wake below a visible draft at confirmation $confirmation changed the composer"
-      [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
-        || fail "$shape wake below a visible draft at confirmation $confirmation changed the foreign queue"
+        if [ "$scenario" = below-draft ]; then
+          render_secondmate_composer box 'my unsent draft'
+          printf '\n\n'
+        fi
+        render_secondmate_composer "$shape" "$composer"
+      } > "$dir/screen"
+      [ "$scenario" != unreadable ] || printf 'no identified composer\n' > "$dir/screen"
+      before=$(cat "$dir/screen")
+      install_secondmate_composer_herdr "$fakebin"
+      install_secondmate_stall_date "$fakebin"
+      "$ROOT/bin/fm-busy-event.sh" arm "$state" mate >/dev/null \
+        || fail "could not arm the mate's busy contract"
+      "$ROOT/bin/fm-busy-event.sh" apply "$state" mate idle --current-gen \
+        --source omp-ext --event agent-end >/dev/null \
+        || fail "could not mark the mate idle"
+      printf '1000\n' > "$dir/now"
+      PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+        FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
+        FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+        FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        secondmate_stall_watch_leg "$dir" first progress mate "$(printf '1000\t100-7')"
+      [ ! -s "$state/.wake-queue" ] || fail "$shape $scenario alerted before the stall interval"
+      [ ! -e "$dir/sent" ] || fail "$shape $scenario received input before the stall interval"
+      printf '1002\n' > "$dir/now"
+      PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
+        FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
+        FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+        FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+        secondmate_stall_watch_leg "$dir" stall alert
       grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
-        || fail "$shape wake below a visible draft at confirmation $confirmation hid the parent alarm"
-      [ -s "$state/.wake-queue" ] \
-        || fail "$shape wake below a visible draft at confirmation $confirmation lost the parent alarm queue"
-      [ ! -e "$state/.secondmate-wake-ring-mate" ] \
-        || fail "$shape wake below a visible draft at confirmation $confirmation recorded a successful ring"
-      [ ! -e "$state/mate.inbox" ] \
-        || fail "$shape wake below a visible draft at confirmation $confirmation wrote a drain steer"
+        || fail "$shape $scenario did not retain the parent alarm"
+      [ ! -e "$dir/sent" ] || fail "$shape $scenario received automatic input: $(cat "$dir/sent")"
+      [ "$(cat "$dir/screen")" = "$before" ] || fail "$shape $scenario composer changed"
+      [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+        || fail "$shape $scenario foreign queue changed"
+      [ -s "$state/.wake-queue" ] || fail "$shape $scenario lost the durable parent alarm"
+      [ ! -e "$state/mate.inbox" ] || fail "$shape $scenario received a drain steer"
+      [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$shape $scenario recorded a ring"
     done
   done
-  pass "recorded bare and pasted box wakes alongside visible drafts remain untouched initially and after either Enter confirmation"
-}
-
-test_secondmate_restored_wake_lost_enter_retries_while_idle() {
-  local dir state sub fakebin wake shape
-  wake=$(secondmate_wake_text)
-  for shape in box bare; do
-    setup_secondmate_composer_case "secondmate-restored-wake-idle-retry-$shape" "$wake" "$shape"
-    stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
-    FM_FAKE_CLEAR_WAKE_SHAPE="$shape" FM_FAKE_LOSE_FIRST_WAKE_ENTER=1 stall_composer_leg submit 1002 ring mate 100-7
-    [ "$(cat "$dir/sent")" = "$(printf '[ENTER]\n[ENTER]')" ] \
-      || fail "a lost Enter while still idle must get exactly one bare retry: $(cat "$dir/sent" 2>/dev/null)"
-    [ "$(cat "$dir/submit-sleeps")" = "$(printf '0.5\n0.5')" ] \
-      || fail "the first Enter and its idle retry must each use the fixed confirmation wait"
-    [ ! -s "$sub/state/.wake-queue" ] || fail "the submitted retry did not drain the foreign queue"
-    [ ! -s "$state/.wake-queue" ] || fail "a successful idle retry alarmed the parent"
-    [ ! -e "$state/mate.inbox" ] || fail "an idle retry typed a drain steer"
-  done
-  pass "an exact recorded restored wake gets one confirmed Enter retry only while semantically idle"
+  pass "omp copied wakes, operator drafts, ambiguous screens and empty composers alarm without automatic input"
 }
 
 # After a proven-idle ring, the same leftover row is a genuine stall if the
@@ -3974,18 +3526,7 @@ test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
 test_secondmate_proven_idle_ring_lets_the_child_drain
 test_secondmate_busy_and_unknown_panes_are_not_rung
 test_secondmate_genuine_stall_after_idle_ring_still_alarms
-test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted
-test_secondmate_composer_draft_next_to_a_wake_is_never_submitted
-test_secondmate_composer_holding_only_a_draft_is_never_submitted
-test_secondmate_idle_with_unreadable_composer_is_never_rung
-test_secondmate_modified_or_missing_wake_record_is_never_submitted
-test_secondmate_restored_wake_requires_semantic_idle
-test_secondmate_restored_wake_rechecks_semantic_idle_before_retry
-test_secondmate_restored_wake_lost_enter_retries_while_idle
-test_secondmate_restored_wake_unavailable_after_enter_keeps_parent_alarm
-test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm
-test_secondmate_restored_wake_below_visible_draft_is_never_submitted
-test_secondmate_restored_wake_unsupported_capture_keeps_parent_alarm
+test_secondmate_pending_omp_screens_alarm_without_input
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

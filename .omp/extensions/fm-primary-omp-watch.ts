@@ -64,8 +64,7 @@
 // extension waits briefly for the normal drain, then, when the agent is idle
 // and the composer holds that exact wake, removes only the wake text and sends
 // it again (three attempts per wake). Operator text in the composer is left
-// exactly as typed. bin/fm-watch.sh's stalled-loop check is the parent's
-// backstop for a composer this extension cannot read.
+// exactly as typed.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
@@ -594,24 +593,11 @@ export default function (pi: ExtensionAPI) {
       `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     );
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
-    const record = `${handoffDir}/unconsumed-${token}.wake`;
-    const temporary = `${record}.tmp-${process.pid}-${++nextHandoffId}`;
-    mkdirSync(handoffDir, { recursive: true });
-    try {
-      writeFileSync(temporary, content, { mode: 0o600 });
-      renameSync(temporary, record);
-    } catch (error) {
-      try { unlinkSync(temporary); } catch {}
-      throw error;
-    }
     owner.unconsumedWakes.set(token, { content, pending });
     try {
       await pi.sendUserMessage(content, { deliverAs: "followUp" });
     } catch (error) {
       owner.unconsumedWakes.delete(token);
-      try { unlinkSync(record); } catch (cleanupError) {
-        if (nodeErrorCode(cleanupError) !== "ENOENT") throw cleanupError;
-      }
       throw error;
     }
     // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
@@ -624,17 +610,8 @@ export default function (pi: ExtensionAPI) {
   // omp consumed a main follow-up: an idle main at before_agent_start, a
   // streaming main at the user message_start that joins the running run.
   function consumeWake(owner: SessionGeneration, text: string): void {
-    const identity = text.replace(/[\u2063\s]/g, "");
     for (const [token, wake] of owner.unconsumedWakes) {
-      if (wake.content.replace(/[\u2063\s]/g, "") !== identity) continue;
-      try {
-        unlinkSync(`${handoffDir}/unconsumed-${token}.wake`);
-      } catch (error) {
-        if (nodeErrorCode(error) !== "ENOENT") {
-          surfaceCleanupFailure(owner, error);
-          return;
-        }
-      }
+      if (wake.content !== text) continue;
       owner.unconsumedWakes.delete(token);
       if (!wake.pending) return;
       wake.pending.delivered = true;
@@ -683,10 +660,7 @@ export default function (pi: ExtensionAPI) {
         pi.sendUserMessage(wake.content);
         return;
       }
-    } catch {
-      // A stale or unavailable context: the parent's stalled-loop check still
-      // recovers a wake left in the composer.
-    }
+    } catch {}
   }
 
   function scheduleRestoredWakeCheck(owner: SessionGeneration): void {
