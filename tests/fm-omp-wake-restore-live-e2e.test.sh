@@ -101,6 +101,9 @@ chmod +x "$FAKEBIN/herdr"
 "$LAB_HELPER" provision "$SESSION" || fail "could not provision the isolated Herdr lab"
 export PATH="$FAKEBIN:$ORIGINAL_PATH"
 
+# The adapter does not provide the metadata dispatcher used by start_omp.
+# shellcheck source=bin/fm-backend.sh
+. "$ROOT/bin/fm-backend.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/backends/herdr.sh"
 set +e
@@ -154,7 +157,9 @@ wait_for() {  # <seconds> <command...>
 live_busy_class() {
   [ "$1" = "$TARGET" ] || { printf unknown; return; }
   [ "$(fm_backend_herdr_agent_state "$TARGET")" = alive ] || { printf unknown; return; }
-  fm_backend_herdr_rendered_busy_state "$TARGET" omp
+  # A box spinner is not a standalone rendered busy footer; use Herdr's
+  # process-validated native state so a running sleep remains positively busy.
+  fm_backend_herdr_busy_state "$TARGET"
 }
 is_idle() { [ "$(live_busy_class "$TARGET")" = idle ]; }
 is_busy() { [ "$(live_busy_class "$TARGET")" = busy ]; }

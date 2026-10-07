@@ -635,7 +635,8 @@ Their pre-Enter typed-payload proof has not been live-verified; composer classif
 
 On an idle or done native baseline, submit confirmation proceeds in this order:
 
-1. Wait for `working` or `blocked` across a bounded polling window. Native transition alone confirms only positively identified Claude, Codex, Pi, or agy; omp and missing or other identities still require composer clearance, because resumed work on another turn cannot prove this Enter delivered retained text.
+1. Wait for `working` or `blocked` across a bounded polling window.
+   Native transition alone confirms only positively identified Claude, Codex, Pi, or agy; omp and missing or other identities still require composer clearance, because resumed work on another turn cannot prove this Enter delivered retained text.
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery; pending and unproven pending text receive a fresh composer read before another Enter is allowed.
    If the initial or refreshed composer reads unknown, positively identified Claude, Codex, Pi, and agy receive another native confirmation window against the same idle baseline, without sending another Enter.
@@ -664,7 +665,7 @@ For a positively identified Cursor pane, the verified busy footer is read once b
 It is the same semantic signal the native path uses and the same one the tmux submit core reads.
 
 A pane already mid-turn cannot borrow a rendered-footer transition as proof of this delivery.
-After retries, retained proven pending text plus native `working` establishes queued delivery only for positively identified OpenCode. omp's retained payload cannot use the earlier rendered-footer transition either.
+[Submit confirmation](#submit-confirmation) owns the separate identity-gated queued-Enter exception.
 
 The composer verdict itself is deliberately unchanged.
 A right-aligned status token on the composer row stays content for every other caller, including the away-mode pre-injection guard.
@@ -695,7 +696,7 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 - Bordered boxes.
 - omp's rounded box, with its status in the top border and its last input row folded into the bottom border.
   The status opens with omp's identity glyph while idle and with a spinner frame plus the elapsed time while a turn runs, so a working lane's composer reads `empty` or `pending` like an idle one.
-  The parent never submits held composer text, even when a viewport appears to contain only a restored wake. The omp watch extension recovers only its exact emitted wake through the real editor and omp's message API at a fixed two-second interval, bounded to three attempts per wake, preserving operator draft bytes; unrecovered text keeps the ordinary stalled-loop alarm.
+  [Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
 - opencode's left bar.
 - The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.

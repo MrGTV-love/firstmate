@@ -127,9 +127,9 @@ fm_control_harness_supports_kind() {  # <harness> <kind>
 # rovo cancels on a single Escape too, printing "Agent cancelled" (verified,
 # 202609.1.2). agy cancels on a single Escape, printing the Interrupted row
 # with an idle composer and no repollution (verified live, agy 1.2.0 through
-# Herdr). omp (Oh My Pi) shares Pi's single Escape, empty composer
-# afterwards, and /quit exit (verified omp 18.1.2 in a PTY, re-verified 18.1.11
-# through Herdr).
+# Herdr). omp (Oh My Pi) shares Pi's single Escape and /quit exit.
+# Its queued follow-ups can return to the composer; the recovery contract is
+# owned by docs/watcher-continuity.md "omp restored-wake recovery".
 fm_control_interrupt_key() {  # <harness>
   case "${1-}" in
     claude|codex|opencode|pi|pi-signed|omp|kimi|cursor|gemini|muse|rovo|agy|devin) printf 'Escape' ;;
@@ -191,17 +191,19 @@ fm_control_interrupt_hazard_signal() {  # <harness>
   esac
 }
 
-# The key that must follow the interrupt key to leave the composer empty, or
-# nothing when the adapter needs none. muse is the one verified adapter that
-# RESTORES the cancelled prompt into its composer as real bright text, so an
-# interrupt is not complete until Ctrl+U has cleared it; leaving it there would
+# The adapter-owned post-interrupt clear key, or nothing when none is configured.
+# muse restores the cancelled prompt as real bright text, so its interrupt
+# sequence includes Ctrl+U; leaving it there would
 # make the next submitted line - a steer, or this plane's own exit command -
 # concatenate onto it. cursor was checked for exactly that behaviour and does
 # NOT repollute: after a single Escape its composer shows only the `Add a
 # follow-up` placeholder, so it needs no clear key. gemini was checked the
 # same way and also does not repollute: after a single Escape it prints
 # `Request cancelled.` and its composer shows only the `Type your message
-# or @path/to/file` placeholder. Prints the key or nothing;
+# or @path/to/file` placeholder. omp sends no clear key even though queued
+# follow-ups can return to the composer; watcher recovery is owned by
+# docs/watcher-continuity.md "omp restored-wake recovery".
+# Prints the key or nothing;
 # a harness with no verified mechanics returns nonzero, matching the tables
 # above.
 fm_control_interrupt_clear_key() {  # <harness>

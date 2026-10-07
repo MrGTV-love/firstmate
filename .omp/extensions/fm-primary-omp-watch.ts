@@ -57,14 +57,9 @@
 // event finishes the pending record, and a still-unconsumed record rides the
 // replacement handoff.
 //
-// Restored wakes (stated once here):
-// omp puts a queued user follow-up back into the composer when a run is
-// interrupted or dequeued, so a wake queued behind a running turn can sit there
-// unsubmitted: omp accepted it and no turn consumes it. After agent_end the
-// extension waits briefly for the normal drain, then, when the agent is idle
-// and the composer holds that exact wake, removes only the wake text and sends
-// it again (three attempts per wake). Operator text in the composer is left
-// exactly as typed.
+// Restored-wake recovery is documented in docs/watcher-continuity.md.
+// Recovery must use the real editor and resend only this extension's unchanged
+// emitted wake, never submit the whole composer or alter operator draft bytes.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";

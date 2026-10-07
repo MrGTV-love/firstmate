@@ -84,13 +84,14 @@ The submit acknowledgement and away-mode supervisor-pane busy guard below still 
 The supervisor guard selects only the detected primary harness's signature rather than a global union of vendor patterns.
 
 `bin/fm-tmux-lib.sh` owns exact type-and-submit mechanics.
-It types a message once and retries Enter only until the composer clears. Before any retry after pending or unproven pending, it refreshes the composer verdict; a fresh empty or unreadable composer receives no further Enter.
+It types a message once and retries Enter only until the composer clears.
+Before any retry after pending or unproven pending, it refreshes the composer verdict; a fresh empty or unreadable composer receives no further Enter.
 Only a proven empty composer is a positive delivery acknowledgement.
 Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
-The parent never submits held composer text on tmux or any other backend. The omp watch extension alone recovers its exact emitted wake through the real editor and omp's message API, preserving operator draft bytes; unrecovered text retains the ordinary stalled-loop alarm.
+[Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.
 
 OpenCode 1.18.4 has one busy-queue exception.
 While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.
