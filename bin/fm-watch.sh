@@ -1063,9 +1063,10 @@ EOF
 # bin/fm-secondmate-liveness-lib.sh (which owns the state contract, the remote
 # probe rules, the kill ordering, and the guarded relaunch). On a bounded
 # cadence each registered mate's recorded endpoint is probed once; only a
-# recovery-grade `dead` or `missing` verdict relaunches, every relaunch
-# (success or failure) becomes exactly one durable `check` wake row, and every
-# other verdict lands only in the triage log. The tick finishes every mate
+# recovery-grade `dead` or `missing` verdict permits relaunch, and every relaunch
+# (success or failure) becomes exactly one durable `check` wake row. Policy
+# refusals follow the shared library's notification contract; other skipped
+# verdicts land only in the triage log. The tick finishes every mate
 # before it wakes once on the first outcome, so one dead mate never delays
 # another's recovery; the drain surfaces every queued row. A mate that keeps
 # dying is parked after SECONDMATE_LIVENESS_MAX_ATTEMPTS ledgered attempts
