@@ -136,22 +136,22 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
 The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
-That matching live pin proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
-See the accepted residual risk below - the live spawn pin binds the launch incarnation, not the current omp conversation.
+That matching live pin proves the launch incarnation, including interpreter-based harnesses and older records without a launch-proof field.
+For omp, the existing worker extension or local-secondmate watcher must also record the current session file and live PID for that task.
 Argv and text embedded in other environment values never supply incarnation evidence.
 An omp process without that matching pin is unmanaged, including Herdr-native `omp --resume`.
-Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for the pin.
-An in-process switch of a native-restored omp to a personal conversation remains unmanaged even when its PID, argv, environment, and original session file are unchanged.
+Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for extension-recorded current-session proof.
+An in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
 Every other recorded harness remains unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
 Neither unmanaged nor unknown proof authorizes lifecycle action.
-Every Herdr replacement must have matching managed-launch proof before transaction completion.
+Every Herdr replacement must have matching managed-launch proof, including current-session proof for omp, before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
-The live spawn pin is an incarnation binding, not proof of the current omp conversation.
-**Accepted residual risk:** `/resume` inside an FM-spawned worker retains its live pin and remains undetected pending `fm-omp-current-session-proof`.
+The omp task record binds its initial session file once per launch generation and updates the active file and PID synchronously on session activation or switch.
+The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
 - The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
-No extension-recorded current-session proof is implemented by this control plane.
+Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
 

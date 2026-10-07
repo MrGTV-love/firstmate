@@ -4840,6 +4840,7 @@ EOF
 // never current-state truth.
 import { execFile } from "node:child_process";
 import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
+import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -4849,6 +4850,7 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   installGuardrail(pi, $guardrail_context);
+  installTaskSessionProof(pi, "$STATE_REAL", "$ID");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;

@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Launch proof: live kernel environment pins and conservative foreground identity.
 set -eu
+export TMPDIR="$PWD"
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-TMP=$(mktemp -d)
+TMP=$(mktemp -d "$ROOT/.fm-launch-proof.XXXXXX")
 PID=
-cleanup() { [ -z "$PID" ] || kill "$PID" 2>/dev/null || true; rm -rf "$TMP"; }
+cleanup() { [ -z "$PID" ] || kill "$PID" 2>/dev/null || true; rm -rf "$TMP"; fm_test_cleanup; }
 trap cleanup EXIT
 export FM_HOME="$TMP/home"
 mkdir -p "$FM_HOME/state"
+export HOME="$TMP/operator-home"
+mkdir -p "$HOME"
 . "$ROOT/bin/fm-backend.sh"
 . "$ROOT/bin/fm-control-lib.sh"
 . "$ROOT/bin/fm-launch-proof-lib.sh"
@@ -28,6 +31,66 @@ stop_probe() {
   kill "$PID"
   wait "$PID" 2>/dev/null || true
   PID=
+}
+
+test_launch_proof_pinned_personal_switch() {
+  local meta="$FM_HOME/state/pinned.meta" task="$TMP/task.jsonl" personal="$TMP/personal.jsonl"
+  local SWITCH_INFO before_env before_task before_info actual
+  start_probe expected
+  printf 'task session\n' > "$task"
+  printf 'personal session\n' > "$personal"
+  printf 'window=lab:w1:p1\nharness=omp\nworktree=%s\nspawn_gen=expected\nlaunch_proof=env-v1\n' "$TMP" > "$meta"
+  SWITCH_INFO=$(jq -nc --argjson pid "$PID" --arg cwd "$TMP" --arg task "$task" '
+    {result:{type:"pane_process_info",process_info:{pane_id:"w1:p1",
+      foreground_processes:[{argv:["omp",("--resume="+$task)],pid:$pid,cwd:$cwd}]}}}')
+  fm_backend_herdr_cli() {
+    case "$*" in
+      'lab pane process-info --pane w1:p1') printf '%s' "$SWITCH_INFO" ;;
+      'lab agent get --pane w1:p1') jq -nc --arg ref "$ACTIVE_SESSION_REF" '{result:{agent:{session_ref:$ref}}}' ;;
+      *) fail 'pinned switch must inspect only its recorded endpoint' ;;
+    esac
+  }
+  ACTIVE_SESSION_REF=$task
+  jq -nc --arg gen expected --argjson pid "$PID" --arg task "$task" \
+    '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$task}' \
+    > "$FM_HOME/state/pinned.omp-session.json"
+  [ "$(fm_launch_proof_herdr "$meta")" = managed ] || fail 'matching pinned task and current session must be managed'
+  before_env=$(fm_remote_herdr_process_env "$PID")
+  before_task=$(shasum -a 256 "$task")
+  before_info=$SWITCH_INFO
+  ACTIVE_SESSION_REF=$personal
+  jq --arg personal "$personal" '.current_session_file=$personal' "$FM_HOME/state/pinned.omp-session.json" \
+    > "$FM_HOME/state/pinned.omp-session.json.next"
+  mv "$FM_HOME/state/pinned.omp-session.json.next" "$FM_HOME/state/pinned.omp-session.json"
+  actual=$(fm_launch_proof_herdr "$meta")
+  [ "$actual" = unmanaged ] || fail "same live PID retains its real kernel pin after personal switch: expected unmanaged, got $actual"
+  [ "$SWITCH_INFO" = "$before_info" ] && [ "$(fm_remote_herdr_process_env "$PID")" = "$before_env" ] \
+    && [ "$(shasum -a 256 "$task")" = "$before_task" ] \
+    || fail 'switch changed launch PID, argv, kernel environment or historical task session'
+  proof_record() {
+    jq -nc --arg gen "${1:-expected}" --argjson pid "${2:-$PID}" \
+      --arg task "$task" --arg current "${3:-$task}" \
+      '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$current}' \
+      > "$FM_HOME/state/pinned.omp-session.json"
+  }
+  ACTIVE_SESSION_REF=$task
+  proof_record other
+  [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'stale sidecar generation must not authenticate a live matching pin'
+  proof_record expected 2000000000
+  [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'proof from another PID must not authenticate the selected process'
+  proof_record expected "$PID" ''
+  jq '.current_session_file=null' "$FM_HOME/state/pinned.omp-session.json" > "$TMP/invalidated"
+  mv "$TMP/invalidated" "$FM_HOME/state/pinned.omp-session.json"
+  [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'shutdown-invalidated current session must not authenticate a retained pin'
+  printf 'malformed\n' > "$FM_HOME/state/pinned.omp-session.json"
+  [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'malformed sidecar must not authenticate a matching pin'
+  rm "$FM_HOME/state/pinned.omp-session.json"
+  [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'missing current-session proof must not authenticate a matching pin'
+  ln -s "$task" "$TMP/task-link.jsonl"
+  proof_record expected "$PID" "$TMP/task-link.jsonl"
+  [ "$(fm_launch_proof_herdr "$meta")" = managed ] || fail 'resolved current and task session paths must identify the same file'
+  stop_probe
+  pass 'serialized current-session proof rejects a same-PID pinned personal switch'
 }
 
 test_launch_proof_recorded_native_identity() {
@@ -65,6 +128,14 @@ test_launch_proof_recorded_native_identity() {
   proof_meta() {
     printf 'window=lab:w1:p1\nharness=%s\nworktree=%s\nspawn_gen=%s\n' "$1" "$WORKTREE" "${3:-expected}" > "$META"
     [ -z "${2:-}" ] || printf 'launch_proof=%s\n' "$2" >> "$META"
+    if [ "$1" = omp ]; then
+      : > "$WORKTREE/task-proof.jsonl"
+      jq -nc --arg gen "${3:-expected}" --argjson pid "$PID" --arg task "$WORKTREE/task-proof.jsonl" \
+        '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$task}' \
+        > "$FM_HOME/state/t.omp-session.json"
+    else
+      rm -f "$FM_HOME/state/t.omp-session.json"
+    fi
   }
   INFO=
   ACTIVE_SESSION_REF=
@@ -191,3 +262,4 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
   exit 0
 fi
 test_launch_proof_recorded_native_identity
+test_launch_proof_pinned_personal_switch

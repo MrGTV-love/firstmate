@@ -2,7 +2,7 @@
 # Proof that a recorded Herdr agent came through Firstmate's launch boundary.
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
-# This is an incarnation binding, not current-session proof or an auth credential.
+# For omp, a matching pin also requires extension-recorded current-session proof.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action.
 # No endpoint discovery: callers supply this home's validated exact endpoint.
@@ -31,7 +31,7 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
 
 fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
   local meta=$1 target session pane info foreground pid proof gen verdict
-  local candidates ids='' name argv0 parents group
+  local candidates ids='' name argv0 parents group record task_file current_file
   target=$(fm_meta_get "$meta" window)
   session=${target%%:*}; pane=${target#*:}
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane" 2>/dev/null) \
@@ -84,6 +84,23 @@ fm_launch_proof_herdr() { # <meta> -> managed|unmanaged|unknown
     | select(type == "number" and . > 1) | floor' 2>/dev/null) \
     || { printf unknown; return; }
   verdict=$(fm_launch_proof_pid "$pid" "$gen")
+  if [ "$verdict" = managed ] && [ "$(fm_meta_get "$meta" harness)" = omp ]; then
+    # Launch argv and the environment survive /resume. Only the extension's
+    # current activation for this live PID may authorize the task conversation.
+    record=$(jq -ec --arg gen "$gen" --argjson pid "$pid" '
+      select(.version == 1 and .spawn_gen == $gen and .pid == $pid)
+      | select(all(.task_session_file, .current_session_file;
+          type == "string" and startswith("/") and (explode | all(. >= 32))))' \
+      "${meta%.meta}.omp-session.json" 2>/dev/null) \
+      || { printf unmanaged; return; }
+    task_file=$(printf '%s' "$record" | jq -r '.task_session_file')
+    current_file=$(printf '%s' "$record" | jq -r '.current_session_file')
+    if [ ! -f "$task_file" ] || [ ! -f "$current_file" ] \
+      || [ ! "$task_file" -ef "$current_file" ]; then
+      printf unmanaged
+      return
+    fi
+  fi
   case "$verdict" in
     managed|unknown) printf '%s' "$verdict" ;;
     unmanaged)

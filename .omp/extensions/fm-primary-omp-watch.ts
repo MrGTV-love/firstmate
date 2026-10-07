@@ -68,6 +68,7 @@ import { Type } from "typebox";
 // resolves bin/fm-operational-input.sh relative to its own location, which is
 // the same repository root this file lives in.
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
+import { installTaskSessionProof, resolveLocalSecondmateTask } from "./lib/fm-task-session.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -538,6 +539,8 @@ process.once("exit", cleanupOnProcessExit);
 export default function (pi: ExtensionAPI) {
   let generation = createGeneration();
   activateGeneration(generation);
+  const parentTask = resolveLocalSecondmateTask(fmRoot, fmHome, state);
+  if (parentTask) installTaskSessionProof(pi, parentTask.state, parentTask.id);
 
   async function sendWake(
     owner: SessionGeneration,

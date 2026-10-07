@@ -19,6 +19,7 @@
 #      agent exited.
 set -u
 unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_ROOT_OVERRIDE
+export TMPDIR="$PWD"
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -2522,6 +2523,16 @@ case "${1:-} ${2:-}" in
           [[ "$payload" =~ $pin_pattern ]] || exit 1
           printf 'PATH=/test\nFM_SPAWN_GEN=%s\n' "${BASH_REMATCH[1]}" > "$D/herdr-managed-env-$pid"
         fi
+        if [ -f "$D/recovery-case-id" ]; then
+          id=$(cat "$D/recovery-case-id")
+          pid=$(cat "$D/recovery-pid")
+          pin_pattern='export FM_SPAWN_GEN=[^[:alnum:]]*([[:alnum:].]+)'
+          [[ "$payload" =~ $pin_pattern ]] || exit 1
+          task=$(cat "$D/recovery-session-ref")
+          jq -nc --arg gen "${BASH_REMATCH[1]}" --argjson pid "$pid" --arg task "$task" \
+            '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$task}' \
+            > "$FM_HOME/state/$id.omp-session.json"
+        fi
         printf '%s\n' "$payload" > "$D/launched-command"
         : > "$D/herdr-live-${3:-}"
         : > "$D/herdr-agent-live" ;;
@@ -3855,6 +3866,14 @@ write_recovery_native_launch() { # <case-dir> <owning-home> <id> <kind>
   write_recovery_native_session "$dir/wt/recorded-session.jsonl" "$dir/wt" "$message"
 }
 
+write_recovery_session_proof() { # <case-dir> <id> [current-session-file]
+  local dir=$1 id=$2
+  jq -nc --arg gen old --argjson pid "$(cat "$dir/fake/recovery-pid")" \
+    --arg task "$dir/wt/recorded-session.jsonl" --arg current "${3:-$dir/wt/recorded-session.jsonl}" \
+    '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$current}' \
+    > "$dir/home/state/$id.omp-session.json"
+}
+
 prepare_herdr_recovery() {  # <case-dir> <id> <kind>
   local dir=$1 id=$2 kind=$3
   rm -f "$dir/fake/herdr-stopped"
@@ -3885,15 +3904,16 @@ SH
   fi
   write_recovery_native_launch "$dir" "$dir/home" "$id" "$kind"
   write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal task unrelated to Firstmate"
+  write_recovery_session_proof "$dir" "$id"
 }
 
 test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
   local dir id kind proof action scenario out rc gen busy draft before head_before work_before suffix
   local CONTROL="$ROOT/bin/fm-control.sh" preserved=() case_index=0
-  for kind in ship scout secondmate; do
-  for proof in env-v1 legacy; do
-    for action in exit busy-exit relaunch interrupt spawn; do
-      for scenario in different-cwd same-cwd-personal historical-startup in-process-personal mismatched unreadable missing-registration; do
+  for kind in ${2:-ship scout secondmate}; do
+  for proof in ${3:-env-v1 legacy}; do
+    for action in ${4:-exit busy-exit relaunch interrupt spawn}; do
+      for scenario in ${1:-different-cwd same-cwd-personal historical-startup in-process-personal pinned-personal mismatched unreadable missing-registration}; do
         case_index=$((case_index + 1))
         recovery_case_or_skip "ownership-$kind-$proof-$action-$scenario" "owner-$case_index" \
           || fail "live lifecycle ownership regression requires jq"
@@ -3906,9 +3926,13 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref"
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
             ;;
-          in-process-personal)
+          in-process-personal|pinned-personal)
             printf '["omp","--resume=%s"]' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-process-argv"
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
+            if [ "$scenario" = pinned-personal ]; then
+              printf old > "$dir/fake/recovery-spawn-gen"
+              write_recovery_session_proof "$dir" "$id" "$dir/wt/personal-session.jsonl"
+            fi
             ;;
           mismatched) printf other > "$dir/fake/recovery-spawn-gen" ;;
           unreadable) : > "$dir/fake/recovery-env-unreadable" ;;
@@ -3929,7 +3953,9 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
           "$dir/home/data/$id/brief.md" "$dir/fake/recovery-pending" "$dir/wt/unlanded.txt"
           "$dir/wt/recorded-session.jsonl" "$dir/wt/personal-session.jsonl")
         preserved+=("$dir/fake/recovery-pid" "$dir/fake/recovery-spawn-gen" "$dir/fake/recovery-session-ref")
-        [ "$scenario" != in-process-personal ] || preserved+=("$dir/fake/recovery-process-argv" "$dir/fake/recovery-registration-ref")
+        preserved+=("$dir/home/state/$id.omp-session.json")
+        case "$scenario" in in-process-personal|pinned-personal)
+          preserved+=("$dir/fake/recovery-process-argv" "$dir/fake/recovery-registration-ref") ;; esac
         [ "$kind" != secondmate ] || preserved+=("$dir/wt/AGENTS.md" "$dir/wt/data/charter.md")
         before=$(shasum -a 256 "${preserved[@]}")
         head_before=$(git -C "$dir/wt" rev-parse HEAD)
@@ -3965,7 +3991,7 @@ test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation() {
     done
   done
   done
-  pass "all lifecycle verbs refuse unpinned native startup and personal session switches without input or task mutation"
+  pass "all lifecycle verbs refuse native startup and pinned personal session switches without input or task mutation"
 }
 
 test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration() {
@@ -4006,9 +4032,9 @@ test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration() {
 test_live_herdr_lifecycle_accepts_managed_launches() {
   local dir id proof launch action out rc gen busy before head_before log meta_before brief_before status_before
   local CONTROL="$ROOT/bin/fm-control.sh"
-  for proof in env-v1 legacy; do
-    for launch in managed missing-registration; do
-      for action in interrupt exit busy-exit relaunch; do
+  for proof in ${1:-env-v1 legacy}; do
+    for launch in ${2:-managed missing-registration}; do
+      for action in ${3:-interrupt exit busy-exit relaunch}; do
         recovery_case_or_skip "owned-$proof-$launch-$action" "owned-$proof-$launch-$action" \
           || fail "positive lifecycle ownership regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
@@ -4106,9 +4132,9 @@ test_reboot_recovery_inspects_without_native_attribution() {
   local dir id proof mode scenario out rc expected before head_before log failures=0 gen suffix
   local personal personal_id personal_before personal_log CONTROL="$ROOT/bin/fm-control.sh"
   local preserved=()
-  for proof in env-v1 legacy; do
+  for proof in ${2:-env-v1 legacy}; do
     for mode in direct sweep; do
-      for scenario in different-cwd different-resume in-process-personal header-only historical-startup managed managed-claude unknown-harness mismatched unreadable missing-registration; do
+      for scenario in ${1:-different-cwd different-resume in-process-personal pinned-personal header-only historical-startup managed managed-claude unknown-harness mismatched unreadable missing-registration}; do
         recovery_case_or_skip "native-$proof-$mode-$scenario" "native-$proof-$mode-$scenario" \
           || fail "native identity regression requires jq"
         dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
@@ -4122,9 +4148,13 @@ test_reboot_recovery_inspects_without_native_attribution() {
           missing-registration) : > "$dir/fake/recovery-registration-missing" ;;
           different-cwd) printf '%s' "$dir/proj" > "$dir/fake/recovery-process-cwd" ;;
           different-resume) printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-process-ref" ;;
-          in-process-personal)
+          in-process-personal|pinned-personal)
             printf '%s' "$dir/wt/personal-session.jsonl" > "$dir/fake/recovery-registration-ref"
             printf '["omp","--resume=%s"]' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-process-argv"
+            if [ "$scenario" = pinned-personal ]; then
+              printf old > "$dir/fake/recovery-spawn-gen"
+              write_recovery_session_proof "$dir" "$id" "$dir/wt/personal-session.jsonl"
+            fi
             ;;
           header-only)
             jq -nc --arg cwd "$dir/wt" '{type:"session",version:3,id:"personal",cwd:$cwd}' > "$dir/wt/personal-session.jsonl"
@@ -4158,7 +4188,9 @@ test_reboot_recovery_inspects_without_native_attribution() {
           "$dir/home/data/$id/brief.md" "$dir/fake/recovery-pending" "$dir/wt/unlanded.txt")
         preserved+=("$dir/fake/recovery-pid" "$dir/fake/recovery-spawn-gen" "$dir/fake/recovery-session-ref"
           "$dir/wt/recorded-session.jsonl" "$dir/wt/personal-session.jsonl")
-        [ "$scenario" != in-process-personal ] || preserved+=("$dir/fake/recovery-process-argv" "$dir/fake/recovery-registration-ref")
+        preserved+=("$dir/home/state/$id.omp-session.json")
+        case "$scenario" in in-process-personal|pinned-personal)
+          preserved+=("$dir/fake/recovery-process-argv" "$dir/fake/recovery-registration-ref") ;; esac
         before=$(shasum -a 256 "${preserved[@]}")
         head_before=$(git -C "$dir/wt" rev-parse HEAD)
         rc=0
@@ -4543,6 +4575,17 @@ SH
   pass 'bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch'
 }
 
+
+test_pinned_personal_session_refuses_lifecycle_boundaries() {
+  test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation \
+    pinned-personal "ship secondmate" env-v1 "interrupt exit busy-exit relaunch"
+  test_reboot_recovery_inspects_without_native_attribution pinned-personal env-v1
+}
+
+test_proven_task_lifecycle_remains_available() {
+  FM_CONTROL_SETTLE_WAIT=.05 FM_CONTROL_ARM_WAIT=.05 \
+    test_live_herdr_lifecycle_accepts_managed_launches env-v1 managed "interrupt exit relaunch"
+}
 
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"

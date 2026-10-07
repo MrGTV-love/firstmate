@@ -464,6 +464,9 @@ test_ownership_proof_is_omp_keyed() {
 install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
+  mkdir -p "$repo/.omp/extensions/lib"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$repo/.omp/extensions/lib/"
+  cp "$ROOT/bin/fm-parent-channel-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$repo/bin/"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" "$repo/.pi/extensions/lib/"
   cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/"
@@ -808,6 +811,86 @@ EOF
   pass ".omp watch extension: a host close split across stream chunks reaches main as one whole follow-up"
 }
 
+test_task_session_proof_tracks_active_session() {
+  local case_dir="$TMP_ROOT/task-session-proof" status
+  mkdir -p "$case_dir"
+  FM_PROOF_CASE="$case_dir" EXT="$ROOT/.omp/extensions/lib/fm-task-session.ts" node --input-type=module <<'EOF'
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+const state = process.env.FM_PROOF_CASE;
+const task = `${state}/task.jsonl`, personal = `${state}/personal.jsonl`;
+writeFileSync(task, "{}\n"); writeFileSync(personal, "{}\n");
+writeFileSync(`${state}/demo.meta`, "spawn_gen=proof-gen\n");
+process.env.FM_SPAWN_GEN = "proof-gen";
+const handlers = new Map(), warnings = [];
+const pi = { on(event, handler) { handlers.set(event, handler); } };
+installTaskSessionProof(pi, state, "demo");
+let file = task;
+const ctx = { sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+const start = () => handlers.get("session_start")({}, ctx);
+const stop = () => handlers.get("session_shutdown")({}, ctx);
+const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
+const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
+const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
+stop();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = task; start();
+beforeSwitch();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = personal; afterSwitch();
+assert.equal(record().current_session_file, realpathSync(personal));
+assert.equal(record().task_session_file, realpathSync(task));
+// Reloading the extension in the personal session must not rebind the task.
+installTaskSessionProof(pi, state, "demo"); start();
+assert.equal(record().task_session_file, realpathSync(task));
+handlers.get("session_before_branch")({}, ctx);
+assert.equal(record().current_session_file, "");
+file = task; handlers.get("session_branch")({ previousSessionFile: personal }, ctx);
+assert.equal(record().current_session_file, record().task_session_file);
+const originalWarn = console.warn; console.warn = () => {};
+try {
+  beforeSwitch();
+  file = `${state}/absent.jsonl`;
+  assert.throws(afterSwitch);
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.ok(warnings.length);
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=other-gen\n");
+  file = task; assert.throws(start);
+  assert.equal(record().current_session_file, "");
+  writeFileSync(`${state}/wrong.meta`, "spawn_gen=other-gen\n");
+  installTaskSessionProof(pi, state, "wrong");
+  assert.throws(start);
+  assert.equal(existsSync(`${state}/wrong.omp-session.json`), false);
+  writeFileSync(`${state}/corrupt.meta`, "spawn_gen=proof-gen\n");
+  writeFileSync(`${state}/corrupt.omp-session.json`, "{bad");
+  installTaskSessionProof(pi, state, "corrupt");
+  assert.throws(start);
+  assert.equal(readFileSync(`${state}/corrupt.omp-session.json`, "utf8"), "{bad");
+  delete process.env.FM_SPAWN_GEN;
+  installTaskSessionProof(pi, state, "absent");
+  start();
+  assert.equal(existsSync(`${state}/absent.omp-session.json`), false);
+} finally { console.warn = originalWarn; }
+EOF
+  status=$?
+  expect_code 0 "$status" "omp task-session proof follows activation and fails closed"
+  pass ".omp task-session proof: task binding survives shutdown, personal resume, reload, and return"
+}
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
+  "$FM_TEST_ONLY"
+  exit $?
+fi
+
+test_task_session_proof_tracks_active_session
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
