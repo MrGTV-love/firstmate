@@ -46,6 +46,13 @@ fm_procevent_registry_dir() {
 fm_procevent_inbox_dir()    { printf '%s\n' "$1/procevent-inbox"; }
 fm_procevent_capture_reservation_dir() { printf '%s\n' "$1/procevent-capture-reservations"; }
 
+FM_PROCEVENT_LIB_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+adapter_script() {
+  local root=${FM_ROOT:-${FM_ROOT_OVERRIDE:-$FM_PROCEVENT_LIB_ROOT}}
+  printf '%s/bin/fm-procevent-%s.sh\n' "$root" "$1"
+}
+
 # A source id names a private file and a bounded wake slug, so it is held to the
 # same path-safe shape as a task id. Adapters derive it from canonical source
 # identity, never from a caller-supplied display string.
@@ -1112,6 +1119,7 @@ fm_procevent_capture() {
   local state=$1 id=$2 adapter=$3 src=$4 extension_id=${5-} extension_version=${6-}
   local capability_version=${7-} package_digest=${8-} binding_digest=${9-} task_owner=${5-}
   local inbox seq dest tmp adapter_dest adapter_tmp owner_dest='' owner_tmp='' extension_dest='' extension_tmp=''
+  local script handled_dest='' handled_tmp=''
   [ "$#" -eq 4 ] || [ "$#" -eq 5 ] || [ "$#" -eq 9 ] || return 1
   fm_procevent_source_id_valid "$id" || return 1
   fm_procevent_adapter_valid "$adapter" || return 1
@@ -1143,7 +1151,8 @@ fm_procevent_capture() {
     (umask 077; mkdir -p "$inbox") || return 1
   fi
   seq=1
-  while [ -e "$inbox/$id.$seq.result" ]; do seq=$((seq + 1)); done
+  while [ -e "$inbox/$id.$seq.result" ] || [ -e "$inbox/$id.$seq.handled" ] \
+    || [ -L "$inbox/$id.$seq.handled" ]; do seq=$((seq + 1)); done
   dest="$inbox/$id.$seq.result"
   adapter_dest="$inbox/$id.$seq.adapter"
   if [ "$#" -eq 5 ]; then
@@ -1205,8 +1214,22 @@ fm_procevent_capture() {
     rm -f -- "$tmp" "$adapter_dest" "$owner_dest" "$extension_tmp"
     return 1
   fi
+  if [ "$#" -ne 9 ]; then
+    script=$(adapter_script "$adapter")
+    if [ -f "$script" ] && [ ! -L "$script" ] \
+      && { [ "$#" -ne 5 ] || ! "$script" terminal "$tmp" >/dev/null 2>&1; } \
+      && "$script" silent "$tmp" >/dev/null 2>&1; then
+      handled_dest="$inbox/$id.$seq.handled"
+      if ! handled_tmp=$(umask 077; mktemp "$inbox/.handled.XXXXXX") \
+        || ! chmod 0600 "$handled_tmp" \
+        || ! ln "$handled_tmp" "$handled_dest" 2>/dev/null; then
+        handled_dest=''
+      fi
+      rm -f -- "$handled_tmp"
+    fi
+  fi
   if ! mv -f -- "$tmp" "$dest"; then
-    rm -f -- "$tmp" "$adapter_dest" "$owner_dest"
+    rm -f -- "$tmp" "$adapter_dest" "$owner_dest" "$handled_dest"
     [ -z "$extension_dest" ] || rm -f -- "$extension_dest"
     return 1
   fi

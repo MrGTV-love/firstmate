@@ -1123,10 +1123,6 @@ PATH="$EMPTY_BIN:$PATH" FM_HOME="$HEMPTY" \
 quiet_out=$(PATH="$EMPTY_BIN:$PATH" pe "$HEMPTY" start "$quiet_id" 2>&1)
 assert_not_contains "$quiet_out" "not-autohandled" \
   "a durably silenced result was reported as still unacknowledged"
-# The handled marker is written at exactly the point the wake would otherwise
-# have been appended, so waiting on it - rather than on a fixed sleep - is what
-# makes "no wake" a real observation instead of a race the test won by being
-# early.
 QUIET_HANDLED="$HEMPTY/state/procevent-inbox/$quiet_id.1.handled"
 for _ in $(seq 1 100); do
   [ -f "$QUIET_HANDLED" ] && break

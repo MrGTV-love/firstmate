@@ -288,8 +288,6 @@ if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   state_root_bind || die "process-event state root is not a private directory"
 fi
 
-adapter_script() { printf '%s/bin/fm-procevent-%s.sh\n' "$FM_ROOT" "$1"; }
-
 extension_lifecycle_lock_acquire() {
   state_root_bind create || return 1
   (umask 077; mkdir -p "$REG") || return 1
