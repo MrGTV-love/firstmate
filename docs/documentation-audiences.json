@@ -229,6 +229,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/hyper-jev/FIRSTMATE.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/hyper-jev/SOURCE.md",
       "audience": "agent-runtime"
     },

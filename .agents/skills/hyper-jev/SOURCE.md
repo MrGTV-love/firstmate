@@ -1,3 +1,4 @@
+For firstmate usage rules that override conflicting upstream guidance, read [FIRSTMATE.md](FIRSTMATE.md).
 # Source
 
 This skill is vendored byte-for-byte from an upstream repository.
