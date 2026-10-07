@@ -183,9 +183,7 @@ test_matrix_claude_bare_nbsp_row() {
   assert_screen "claude idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
   typed=$'────────────────────────\n❯ fix the login bug\n────────────────────────'
   assert_screen "claude typed on tmux" pending "$CAPS_TMUX" "$typed" 1 probe-absent
-  # Plain capture cannot tell typed text from claude's rotating suggestion:
-  # the styled=0 degradation defers instead of fabricating pending.
-  assert_screen "claude typed on plain backends" unknown "$CAPS_PLAIN" "$typed"
+  assert_screen "claude typed on plain backends" pending "$CAPS_PLAIN" "$typed"
   pass "matrix: claude's ❯+NBSP row reads empty on every profile in both locales (#1988)"
 }
 
@@ -217,6 +215,347 @@ test_matrix_claude_arrow_statusline_footer() {
   residue=$'transcript line\n────────────────────────\n❯ <65;77;27M\n────────────────────────'"$footer"
   assert_screen "stray mouse report in the composer" pending "$CAPS_STYLED" "$residue" '' "$claude_idle"
   pass "matrix: claude's arrow statusline is footer furniture, not a composer holding text"
+}
+
+test_matrix_claude_titled_top_border() {
+  # Real claude 2.x draws the session title (a --name, a /rename, a hook-supplied
+  # or generated title) INSIDE the composer's top rule: `──── <title> ─`. That row
+  # is no longer a solid rule, so the cursorless profiles lost the pair, saw the
+  # lower plain rule as an unproven separator, and refused `unknown` on a visibly
+  # empty composer - every steer to the worker was undeliverable and its
+  # relaunch refused (task fm-claude-titled-composer-unknown, captured live
+  # 2026-10-06 on herdr).
+  local titled plain_rule empty typed claude_idle pi_idle screen
+  claude_idle=$(printf 'claude\tidle'); pi_idle=$(printf 'pi\tidle')
+  titled='──────────────────────── Firstmate operational input waiting read Users ─'
+  plain_rule='────────────────────────────────────────────────────────────────────────'
+  empty=$'transcript line\n'"$titled"$'\n❯'"$NBSP"$'\n'"$plain_rule"$'\n  Sonnet 5.5 ░░░░░░░░░░ 9%\n  ⏵⏵ bypass permissions on'
+  assert_screen "claude titled idle on tmux" empty "$CAPS_TMUX" "$empty" 2 probe-absent
+  assert_screen "claude titled idle on herdr" empty "$CAPS_STYLED" "$empty" '' "$claude_idle"
+  assert_screen "claude titled idle on zellij" empty "$CAPS_STYLED_NOID" "$empty"
+  assert_screen "claude titled idle on cmux/orca" empty "$CAPS_PLAIN" "$empty"
+  typed=$'transcript line\n'"$titled"$'\n❯ fix the login bug\n'"$plain_rule"$'\n  Sonnet 5.5 ░░░░░░░░░░ 9%'
+  assert_screen "claude titled typed on tmux" pending "$CAPS_TMUX" "$typed" 2 probe-absent
+  assert_screen "claude titled typed on herdr" pending "$CAPS_STYLED" "$typed" '' "$claude_idle"
+  assert_screen "claude titled typed on zellij" pending "$CAPS_STYLED_NOID" "$typed"
+  assert_screen "claude titled typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  # The same plain-border shapes keep their verdicts beside the titled ones.
+  screen=$'transcript line\n'"$plain_rule"$'\n❯'"$NBSP"$'\n'"$plain_rule"
+  assert_screen "claude plain idle on herdr" empty "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  pass "matrix: claude's titled top border reads empty when idle and pending when typed on every profile"
+}
+
+assert_selected_content() {
+  local label=$1 want=$2 out
+  shift 2
+  out=$(fm_composer_extract_selected_content "$@") \
+    || fail "$label: selected content extraction failed"
+  [ "$out" = "$want" ] || fail "$label: expected '$want', got '$out'"
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$@") \
+    || fail "$label under LC_ALL=C: selected content extraction failed"
+  [ "$out" = "$want" ] || fail "$label under LC_ALL=C: expected '$want', got '$out'"
+}
+
+assert_multiline_rule_pair() {
+  local label=$1 screen=$2 want=$3 first=$4 last=$5 claude_idle cursor
+  claude_idle=$(printf 'claude\tidle')
+  assert_screen "$label on idle Herdr Claude" pending "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  assert_selected_content "$label on styled capture" "$want" "$CAPS_STYLED" "$screen"
+  assert_screen "$label requests lazy Herdr identity" need-identity "$CAPS_STYLED" "$screen"
+  assert_screen "$label after absent Herdr identity probe" pending "$CAPS_STYLED" "$screen" '' probe-absent
+  assert_screen "$label on Zellij without identity" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_selected_content "$label on Zellij without identity" "$want" "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "$label on plain capture" pending "$CAPS_PLAIN" "$screen"
+  assert_selected_content "$label on plain capture" "$want" "$CAPS_PLAIN" "$screen"
+  assert_selected_content "$label on tmux capture" "$want" "$CAPS_TMUX" "$screen"
+  cursor=$first
+  while [ "$cursor" -le "$last" ]; do
+    assert_screen "$label on tmux row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    cursor=$((cursor + 1))
+  done
+}
+
+test_rule_pair_equal_indentation() {
+  local top bottom screen caps draft want verdict claude_idle
+  bottom='────────────────'
+  claude_idle=$(printf 'claude\tidle')
+  for top in '──────── Session ─' "$bottom"; do
+    for draft in '' 'keep this unsent text'; do
+      want=$draft
+      verdict=empty
+      [ -z "$draft" ] || verdict=pending
+      screen=$'transcript line\n  '"$top"$'\n  ❯ '"$draft"$'\n  '"$bottom"
+      assert_screen "$top equally indented $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" 2 probe-absent
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top equally indented $verdict cursorless" "$verdict" "$caps" "$screen" '' "$claude_idle"
+        assert_selected_content "$top equally indented $verdict extraction" "$want" "$caps" "$screen"
+      done
+      assert_selected_content "$top equally indented $verdict tmux extraction" "$want" "$CAPS_TMUX" "$screen"
+    done
+    # A less-indented closing rule is also a mismatch, not a proven pair.
+    screen=$'transcript line\n  '"$top"$'\n  ❯ keep this unsent text\n'"$bottom"
+    assert_screen "$top outdented closer on cursor" unknown "$CAPS_TMUX" "$screen" 2 probe-absent
+    assert_screen "$top outdented closer cursorless" unknown "$CAPS_STYLED_NOID" "$screen"
+    if fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen"; then
+      fail "$top outdented closer must refuse extraction"
+    fi
+  done
+  pass "equally indented plain and titled rule pairs classify and extract while mismatched closers refuse"
+}
+
+test_rule_pair_ambiguity_is_candidate_scoped() {
+  local history top bottom draft screen caps cursor verdict want
+  bottom='────────────────'
+  for history in \
+    $' ──────── Old example ─\n ❯ old example\n────────────────' \
+    $'──────── Old example ─\n❯ old example\n ────────────────' \
+    $'──────── Old example ─\n❯ old example\n────────────────\n❯ old continuation\n────────────────' \
+    $'──────── Old example ─\n❯ old example\n ──────── pasted title ─\n ❯\n────────────────' \
+    $'╭───╮\n│ ❯ │\n╰────╯'; do
+    cursor=$(printf '%s\n' "$history" | wc -l)
+    cursor=$((cursor + 2))
+    for top in '──────── Live session ─' "$bottom"; do
+      for draft in '' 'live draft'; do
+        verdict=empty
+        [ -z "$draft" ] || verdict=pending
+        want=$draft
+        screen="$history"$'\n\n'"$top"$'\n❯ '"$draft"$'\n'"$bottom"
+        assert_screen "historical ambiguity before $top $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "historical ambiguity before $top $verdict cursorless" "$verdict" "$caps" "$screen" '' probe-absent
+          assert_selected_content "historical ambiguity before $top $verdict extraction" "$want" "$caps" "$screen"
+        done
+        assert_selected_content "historical ambiguity before $top $verdict tmux extraction" "$want" "$CAPS_TMUX" "$screen"
+      done
+    done
+    screen="$history"$'\n\n❯ live draft'
+    assert_screen "historical ambiguity before live bare composer" pending "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "historical ambiguity before live bare composer on cursor" pending "$CAPS_TMUX" "$screen" "$((cursor - 1))" probe-absent
+    assert_selected_content "historical ambiguity before live bare composer extraction" 'live draft' "$CAPS_STYLED_NOID" "$screen"
+    screen="$history"$'\n\n╭──────────────────╮\n│ ❯ live draft     │\n╰──────────────────╯'
+    assert_screen "historical ambiguity before live boxed composer" pending "$CAPS_STYLED_NOID" "$screen"
+    assert_screen "historical ambiguity before live boxed composer on cursor" pending "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    assert_selected_content "historical ambiguity before live boxed composer extraction" 'live draft' "$CAPS_STYLED_NOID" "$screen"
+  done
+  for top in '──────── Live session ─' "$bottom"; do
+    screen="$top"$'\n❯ keep this unsent text\n '"$bottom"
+    assert_screen "selected $top indented closer on cursor" unknown "$CAPS_TMUX" "$screen" 1 probe-absent
+    for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "selected $top indented closer cursorless" unknown "$caps" "$screen" '' probe-absent
+      if fm_composer_extract_selected_content "$caps" "$screen"; then
+        fail "selected $top indented closer must refuse extraction"
+      fi
+    done
+  done
+  pass "historical ambiguity does not poison live rule pairs and selected ambiguity still refuses"
+}
+
+test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer() {
+  local history outside prefix draft screen cursor verdict caps
+  for history in $' ──────── Old example ─\n ❯ old example\n────────────────' ''; do
+    for outside in \
+      $'  ❯ /exit                       Exit the CLI\n    /context                    Visualize current context usage as a colored grid' \
+      $'────────────────\n❯ old example\n────────────────\n\n❯ outside example'; do
+      prefix=$outside
+      [ -z "$history" ] || prefix="$history"$'\n\n'"$outside"
+      cursor=$(printf '%s\n' "$prefix" | wc -l)
+      cursor=$((cursor + 1))
+      for draft in '/exit' ''; do
+        verdict=empty
+        [ -z "$draft" ] || verdict=pending
+        screen="$prefix"$'\n──────── Live session ─\n❯'"$NBSP $draft"$'\n────────────────\n  ⏵⏵ bypass permissions on'
+        assert_screen "outside glyph before titled $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+        assert_selected_content "outside glyph before titled $verdict tmux extraction" "$draft" "$CAPS_TMUX" "$screen"
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+          assert_screen "outside glyph before titled $verdict cursorless" "$verdict" "$caps" "$screen" '' probe-absent
+          assert_selected_content "outside glyph before titled $verdict extraction" "$draft" "$caps" "$screen"
+        done
+      done
+    done
+  done
+  pass "glyphs outside a closed pair do not poison a live titled composer or its extracted draft"
+}
+
+test_multiline_rule_pair_retains_all_interior_rows() {
+  local top bottom screen earlier later
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top concrete multiline draft" "$screen" 'keep this unsent text ❯' 2 3
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n\n ordinary continuation\n ❯\n\n final continuation\n'"$bottom"
+    assert_multiline_rule_pair "$top blank and ordinary continuations" "$screen" 'keep this unsent text ordinary continuation ❯ final continuation' 2 7
+    screen=$'transcript line\n'"$top"$'\n❯\n\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top empty proof with a later glyph" "$screen" '❯' 2 4
+    screen=$'transcript line\n'"$top"$'\n\n❯ keep this unsent text\n\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top leading blank before proof" "$screen" 'keep this unsent text ❯' 2 5
+    earlier=$'────────────────\n❯ old draft\n────────────────\n\n'"$screen"
+    assert_screen "$top real earlier composer does not replace multiline draft" pending "$CAPS_STYLED_NOID" "$earlier"
+    assert_selected_content "$top real earlier composer does not replace multiline draft" 'keep this unsent text ❯' "$CAPS_STYLED_NOID" "$earlier"
+    later="$screen"$'\n\n────────────────\n❯\n────────────────'
+    assert_screen "$top later real empty composer wins" empty "$CAPS_STYLED_NOID" "$later"
+    assert_selected_content "$top later real empty composer wins" '' "$CAPS_STYLED_NOID" "$later"
+    later="$screen"$'\n\n────────────────\n❯ newer draft\n────────────────'
+    assert_screen "$top later real pending composer wins" pending "$CAPS_STYLED_NOID" "$later"
+    assert_selected_content "$top later real pending composer wins" 'newer draft' "$CAPS_STYLED_NOID" "$later"
+  done
+  pass "multiline rule pairs retain every interior row and strip only the proving prompt glyph"
+}
+
+test_rule_pair_continuations_never_prove_empty() {
+  local top bottom pasted screen caps cursor literal want pi_idle
+  bottom='────────────────'
+  pi_idle=$(printf 'pi\tidle')
+  for top in '──────── Session ─' "$bottom"; do
+    for pasted in ' ──────── pasted title ─' ' ────────────────' '──────── pasted title ─' "$bottom"; do
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top ambiguous pasted rule $pasted" unknown "$caps" "$screen" '' probe-absent
+        if fm_composer_extract_selected_content "$caps" "$screen"; then
+          fail "$top ambiguous pasted rule must refuse extraction"
+        fi
+        if LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"; then
+          fail "$top ambiguous pasted rule must refuse extraction under LC_ALL=C"
+        fi
+      done
+      for cursor in 2 3 4; do
+        assert_screen "$top ambiguous pasted rule on cursor row $cursor" unknown "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+      done
+    done
+    for literal in '││' '┃┃' '║║' '||' '│draft│' '┃draft┃' '║draft║' '|draft|' '│' '┃' '║' '|'; do
+      screen=$'transcript line\n'"$top"$'\n❯\n '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top literal continuation $literal" "$screen" "$literal" 2 3
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n '"$literal"$'\n ❯\n'"$bottom"
+      want="keep this unsent text $literal ❯"
+      assert_multiline_rule_pair "$top literal continuation and later glyph $literal" "$screen" "$want" 2 4
+    done
+  done
+  for literal in '││' '┃┃' '║║' '||' '│draft│' '┃draft┃' '║draft║' '|draft|'; do
+    screen="$bottom"$'\n '"$literal"$'\n'"$bottom"
+    assert_screen "Pi literal rule-pair content $literal" pending "$CAPS_STYLED" "$screen" '' "$pi_idle"
+    assert_screen "Pi literal rule-pair content $literal on cursor" pending "$CAPS_TMUX" "$screen" 1 "$pi_idle"
+    assert_selected_content "Pi literal rule-pair extraction $literal" "$literal" "$CAPS_STYLED" "$screen"
+  done
+  pass "rule-like continuations refuse proof and literal side characters remain draft content"
+}
+
+test_rule_pair_pasted_containers_remain_literal() {
+  local top bottom pasted screen want later cursor caps
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ╭───╮\n │ │\n ╰───╯\n'"$bottom"
+    assert_multiline_rule_pair "$top indented pasted rounded box" "$screen" 'keep this unsent text ╭───╮ │ │ ╰───╯' 2 5
+    for pasted in \
+      $'╭────────╮\n│ ❯     │\n╰────────╯' \
+      $'┌────────┐\n│ ❯     │\n└────────┘' \
+      $'┏━━━━━━━━┓\n┃ ❯     ┃\n┗━━━━━━━━┛' \
+      $'╔════════╗\n║ ❯     ║\n╚════════╝' \
+      $'+--------+\n| >      |\n+--------+'; do
+      case "$pasted" in
+        ╭*) want='╭────────╮ │ ❯ │ ╰────────╯' ;;
+        ┌*) want='┌────────┐ │ ❯ │ └────────┘' ;;
+        ┏*) want='┏━━━━━━━━┓ ┃ ❯ ┃ ┗━━━━━━━━┛' ;;
+        ╔*) want='╔════════╗ ║ ❯ ║ ╚════════╝' ;;
+        +*) want='+--------+ | > | +--------+' ;;
+      esac
+      screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top pasted box $pasted" "$screen" "$want" 2 5
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
+      assert_multiline_rule_pair "$top pasted box with later glyph $pasted" "$screen" "keep this unsent text $want ❯" 2 6
+      later="$screen"$'\n\n────────────────\n❯\n────────────────'
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top newer empty pair below pasted box" empty "$caps" "$later"
+        assert_selected_content "$top newer empty pair below pasted box" '' "$caps" "$later"
+      done
+      for cursor in 2 3 4 5 6; do
+        assert_screen "$top cursor stays in earlier pasted-box pair on row $cursor" pending "$CAPS_TMUX" "$later" "$cursor" probe-absent
+      done
+    done
+    pasted="$(omp_box_top)"$'\n╰─ nested draft ─╯'
+    want="$(omp_box_top) ╰─ nested draft ─╯"
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested omp folded box" "$screen" "$want" 2 4
+    pasted="$(omp_box_top)"$'\n│ nested draft │\n'"$(omp_box_last '')"
+    want="$(omp_box_top) │ nested draft │ ╰─ ─╯"
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested omp multiline box" "$screen" "$want" 2 5
+    pasted=$'┃\n┃  Ask anything...\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high\n╹▀▀▀▀▀▀▀▀'
+    want='┃ ┃ Ask anything... ┃ ┃ Build · GPT-5.5 Fast OpenAI · high ╹▀▀▀▀▀▀▀▀'
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested opencode leftbar" "$screen" "$want" 2 7
+    for later in \
+      $'────────────────\n❯ newer draft\n────────────────' \
+      $'╭────────────────────────╮\n│ ❯ newer draft          │\n╰────────────────────────╯'; do
+      later="$screen"$'\n\n'"$later"
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top lower genuine candidate wins" pending "$caps" "$later"
+        assert_selected_content "$top lower genuine candidate wins" 'newer draft' "$caps" "$later"
+      done
+      assert_screen "$top newer genuine candidate on prompt row" pending "$CAPS_TMUX" "$later" 11 probe-absent
+      case "$later" in
+        *"$bottom")
+          assert_screen "$top cursor on newer pair closing border" unknown "$CAPS_TMUX" "$later" 12 probe-absent
+          ;;
+        *)
+          assert_screen "$top cursor on newer box folded border" pending "$CAPS_TMUX" "$later" 12 probe-absent
+          ;;
+      esac
+    done
+  done
+  pass "rule pairs retain pasted boxes and leftbars while newer genuine candidates win"
+}
+
+test_rule_pair_braille_is_literal_content() {
+  local top bottom literal screen caps
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    for literal in '⠋' '⠧' '⠀' '⣿⠿'; do
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only singleton $literal" "$screen" "$literal" 2 2
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only prompt followed by blank $literal" "$screen" "$literal" 2 3
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n\n ordinary continuation\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only prompt with continuation $literal" "$screen" "$literal ordinary continuation" 2 4
+      screen=$'transcript line\n'"$top"$'\n❯\n '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only continuation $literal" "$screen" "$literal" 2 3
+    done
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$bottom"
+    for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "$top empty singleton" empty "$caps" "$screen"
+      assert_selected_content "$top empty singleton" '' "$caps" "$screen"
+    done
+    assert_screen "$top empty singleton on cursor" empty "$CAPS_TMUX" "$screen" 2 probe-absent
+    assert_selected_content "$top empty singleton on tmux capture" '' "$CAPS_TMUX" "$screen"
+  done
+  pass "rule pairs preserve Braille prompt content and empty singletons stay empty"
+}
+
+test_claude_titled_top_border_needs_glyph_proof_and_exact_shape() {
+  # A titled rule only OPENS a composer pair, and the pair needs the agent glyph
+  # row inside it. Anything short of that exact shape keeps the refusal.
+  local titled plain_rule screen claude_idle pi_idle
+  claude_idle=$(printf 'claude\tidle'); pi_idle=$(printf 'pi\tidle')
+  titled='──────────────────────── Some session title ─'
+  plain_rule='────────────────────────────────────────────────────────────────────────'
+  # No glyph row between the titled rule and the closing rule: not a composer,
+  # whatever the agent identity claims.
+  screen=$'transcript line\n'"$titled"$'\n\n'"$plain_rule"
+  assert_screen "titled rule around a blank row (no identity)" unknown "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "titled rule around a blank row (idle pi identity)" unknown "$CAPS_STYLED" "$screen" '' "$pi_idle"
+  assert_screen "titled rule around a blank row (idle claude identity)" unknown "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  assert_screen "titled rule around a blank row on tmux" unknown "$CAPS_TMUX" "$screen" 2 probe-absent
+  # Shapes that are not a titled rule stay ordinary rows: a short opening run,
+  # no closing rule glyph, a title without surrounding spaces, an edge glyph
+  # inside the title, and a heading rule carrying only spaces.
+  for titled in \
+    '─────── Some session title ─' \
+    '──────────────────────── Some session title' \
+    '────────────────────────Some session title─' \
+    '──────────────────────── Some │ title ─' \
+    '──────────────────────── ─'; do
+    screen=$'transcript line\n'"$titled"$'\n❯'"$NBSP"$'\n'"$plain_rule"
+    assert_screen "not a titled rule: $titled" unknown "$CAPS_STYLED_NOID" "$screen"
+  done
+  pass "matrix: a titled rule opens a composer pair only with an exact shape and an agent glyph row inside"
 }
 
 test_composer_footer_demotion_needs_a_proven_pair() {
@@ -852,7 +1191,9 @@ test_pi_nested_omp_box_preserves_enclosing_draft() {
         "$screen"$'\n╭── π > model > path ─╮\n╰─  ─╯'
       row=2
       [ -z "$prefix" ] || row=3
-      assert_screen "later Pi pair cannot restore an earlier nested omp proof" unknown "$CAPS_TMUX" \
+      # The cursor's own pair is the composer: its owned draft reads pending,
+      # and a later empty pair can neither restore emptiness nor veto it.
+      assert_screen "later Pi pair cannot restore an earlier nested omp proof" pending "$CAPS_TMUX" \
         "$screen"$'\n\n────────' "$row" $'pi\tidle'
       assert_screen "later empty Pi pair remains the cursorless composer" empty "$CAPS_STYLED" \
         "$screen"$'\n\n────────' '' $'pi\tidle'
@@ -1661,7 +2002,7 @@ test_claude_selected_slash_menu_extracts_only_the_composer() {
     [ "$out" = /exit ] || fail "selected /exit popup under LC_ALL=C must extract exactly /exit, got '$out'"
   done
   assert_screen "selected /exit popup on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "selected /exit popup on plain backends retains degradation" unknown "$CAPS_PLAIN" "$screen"
+  assert_screen "selected /exit popup on plain backends" pending "$CAPS_PLAIN" "$screen"
   # A selected completion is not the typed command: preserve a nonempty prefix,
   # also when both the composer and popup are indented by the pane renderer.
   prefix=$'  ────────────────────────\n  ❯ /ex\n  ────────────────────────\n    ❯ /exit                       Exit the CLI\n      /extra                      Another matching command'
@@ -1672,7 +2013,7 @@ test_claude_selected_slash_menu_extracts_only_the_composer() {
     [ "$out" = /ex ] || fail "selected completion under LC_ALL=C must preserve /ex, got '$out'"
   done
   assert_screen "nonempty slash prefix on styled backends" pending "$CAPS_STYLED_NOID" "$prefix"
-  assert_screen "nonempty slash prefix on plain backends" unknown "$CAPS_PLAIN" "$prefix"
+  assert_screen "nonempty slash prefix on plain backends" pending "$CAPS_PLAIN" "$prefix"
   pass "Claude selected slash-menu rows do not replace the actual command or prefix"
 }
 
@@ -1724,6 +2065,15 @@ test_idle_placeholder_case_mode_is_explicit
 test_real_text_is_pending
 test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
+test_matrix_claude_titled_top_border
+test_rule_pair_equal_indentation
+test_rule_pair_ambiguity_is_candidate_scoped
+test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer
+test_multiline_rule_pair_retains_all_interior_rows
+test_rule_pair_continuations_never_prove_empty
+test_rule_pair_pasted_containers_remain_literal
+test_rule_pair_braille_is_literal_content
+test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent
 test_composer_footer_zone_refuses_rather_than_allows

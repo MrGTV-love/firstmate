@@ -4992,4 +4992,234 @@ PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$undisp_art" >/dev/null 2>&1 || true
 pass "arm does not launch beside a stale claim whose process group is alive"
 
+# --- lost-answer regression: a board whose page scripts do not parse ---------
+# The captain's report: he picked options on a decision board and pressed Queue
+# answer, saw a "no longer current" notice, and a reload did not help; none of
+# his answers reached the process-event result. The cause was one form whose
+# inline onsubmit held a decision title pasted into a quoted JavaScript string.
+# An apostrophe ended the string, the handler failed to parse, the browser
+# submitted the form natively, and the sandboxed artifact frame landed on
+# Lavish's 409 page. The file stays broken across reloads, so every retry fails.
+# The adapter now refuses to arm such a board and names the form, and a drop-in
+# guard turns any form that fails to cancel its own submit into a visible error.
+BOARD_DIR="$TMP_ROOT/boards"; mkdir -p "$BOARD_DIR"
+cat > "$BOARD_DIR/broken.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<form data-lavish-question="d5-branch-pointer" onsubmit="event.preventDefault(); const c=new FormData(event.currentTarget).get('d5-branch-pointer'); if(c) window.lavish.queuePrompt('Decision: '+c, {tag:'choice', text:'1. Repair lane d5&#x27;s broken branch pointer: '+c, data:{question:'d5-branch-pointer', answer:c}});">
+<input type="radio" name="d5-branch-pointer" value="Repair it"><button type="submit">Queue answer</button></form>
+HTML
+cat > "$BOARD_DIR/fixed.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<form data-lavish-question="d5-branch-pointer" onsubmit="event.preventDefault(); const c=new FormData(event.currentTarget).get('d5-branch-pointer'); if(c) window.lavish.queuePrompt('Decision: '+c, {tag:'choice', text:&quot;1. Repair lane d5's broken branch pointer: &quot;+c, data:{question:'d5-branch-pointer', answer:c}});">
+<input type="radio" name="d5-branch-pointer" value="Repair it"><button type="submit">Queue answer</button></form>
+HTML
+cat > "$BOARD_DIR/plain.html" <<'HTML'
+<!doctype html><h1>nothing to compile</h1><p>It's fine.</p>
+HTML
+cat > "$BOARD_DIR/badscript.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<script>
+const ok = 1;
+const broken = ;
+</script>
+HTML
+cat > "$BOARD_DIR/skipped.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<script type="application/json">{"title": "d5's \" not javascript"</script>
+<script type="module">import broken from ;;; </script>
+<script src="external.js"></script>
+HTML
+cat > "$BOARD_DIR/commented.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<!-- <form onsubmit="const x = ;"> a commented-out form is not a live handler -->
+<!-- <script>const broken = ;</script> -->
+<!-- <script data-fm-lavish-form-guard>const guard = true;</script> -->
+<script>const example = "<!-- <script data-fm-lavish-form-guard> -->";</script>
+<form onsubmit="event.preventDefault()"><button>ok</button></form>
+HTML
+cat > "$BOARD_DIR/script-comments.html" <<'HTML'
+<!doctype html><h1>board</h1>
+<script>
+const open = "<!--";
+const broken = ;
+const close = "-->";
+</script>
+HTML
+
+if ! command -v node >/dev/null 2>&1; then
+  printf 'skip: node not found; the board script check needs it\n'
+else
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/plain.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "a board with nothing to compile failed the check: $out"
+  assert_contains "$out" "check: ok handlers=0 scripts=0" "a board with no scripts passes without needing a compiler"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/broken.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 1 ] || fail "the apostrophe-in-handler board did not fail the check (rc=$rc): $out"
+  assert_contains "$out" "question d5-branch-pointer onsubmit (line 2)" "the failure names the form, the handler, and its line"
+  assert_contains "$out" "would be lost" "the failure says what it costs"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/fixed.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "the correctly quoted board failed the check: $out"
+  assert_contains "$out" "check: ok handlers=1 scripts=0" "the same title quoted safely passes"
+  assert_contains "$out" "warning:" "a board with inline form handlers and no guard is warned about"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/badscript.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 1 ] || fail "an inline script that does not parse passed the check: $out"
+  assert_contains "$out" "inline script (line 2)" "an inline script failure names its line"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/skipped.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "JSON, module, or external scripts were compiled as classic scripts: $out"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/commented.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "commented-out markup was treated as live: $out"
+  assert_contains "$out" "handlers=1 scripts=1" "only the live handler and script are counted"
+  assert_contains "$out" "warning:" "a commented-out guard does not silence the missing-guard warning"
+
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/script-comments.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 1 ] || fail "HTML comment markers inside live JavaScript hid a syntax error: $out"
+  assert_contains "$out" "inline script (line 2)" "live script bodies retain HTML-like comment text"
+
+  # The drop-in guard satisfies the warning without any other change.
+  { cat "$BOARD_DIR/fixed.html"; cat "$ROOT/.agents/skills/bearings/assets/lavish-form-guard.html"; } > "$BOARD_DIR/guarded.html"
+  out=$("$ROOT/bin/fm-procevent-lavish.sh" check "$BOARD_DIR/guarded.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "the guarded board failed the check: $out"
+  assert_not_contains "$out" "warning:" "the guard silences the missing-guard warning"
+  pass "check refuses page scripts that do not parse and names the form"
+
+  # arm refuses the broken board before anything is registered or listening.
+  HBOARD="$TMP_ROOT/hboard"; new_home "$HBOARD"
+  fm_test_track_procevent_home "$HBOARD"
+  BOARD_BIN=$(fm_fakebin "$TMP_ROOT/lavish-board-stub")
+  BOARD_POLLS="$TMP_ROOT/board-polls"; : > "$BOARD_POLLS"; export BOARD_POLLS
+  BOARD_RELEASE="$TMP_ROOT/board-release"; export BOARD_RELEASE
+  cat > "$BOARD_BIN/lavish-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'poll\n' >> "$BOARD_POLLS"
+while [ ! -e "$BOARD_RELEASE" ]; do
+  [ "$SECONDS" -lt 20 ] || exit 75
+  sleep 0.05
+done
+printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","board answer","","message",""\n'
+SH
+  chmod +x "$BOARD_BIN/lavish-axi"
+  lavish_session "$BOARD_DIR/broken.html"
+  broken_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOARD_DIR/broken.html")
+  out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/broken.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -ne 0 ] || fail "arm armed a board whose form handler does not parse: $out"
+  assert_contains "$out" "question d5-branch-pointer" "arm's refusal names the broken form"
+  assert_not_contains "$out" "armed: $broken_id" "arm did not report the broken board armed"
+  assert_absent "$HBOARD/state/procevent/$broken_id.source" "arm registered nothing for the broken board"
+  sleep 0.5
+  [ ! -s "$BOARD_POLLS" ] || fail "arm started a listener for a board whose form handler does not parse"
+
+  lavish_session "$BOARD_DIR/guarded.html"
+  guarded_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOARD_DIR/guarded.html")
+  out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "arm refused a board whose scripts all parse: $out"
+  assert_contains "$out" "armed: $guarded_id" "arm still arms a sound board with handlers"
+  PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/guarded.html" >/dev/null 2>&1 || true
+  pass "arm refuses a board whose form handler does not parse and still arms a sound one"
+
+  lavish_session "$BOARD_DIR/commented.html"
+  commented_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$BOARD_DIR/commented.html")
+  out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/commented.html" 2>&1) && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || fail "arm refused a sound board containing inactive scripts: $out"
+  assert_contains "$out" "armed: $commented_id" "arm ignores a commented-out broken script"
+  assert_contains "$out" "warning:" "arm warns when the guard is only commented out"
+  PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/commented.html" >/dev/null 2>&1 || true
+
+  ln -s "$BOARD_DIR/guarded.html" "$BOARD_DIR/guarded-alias.html"
+  for board_owner in firstmate task; do
+    board_owner_args=()
+    if [ "$board_owner" = task ]; then
+      new_task_endpoint "$HBOARD" board-worker
+      board_owner_args=(--for board-worker)
+    fi
+    board_poll_count=$(wc -l < "$BOARD_POLLS" | tr -d ' ')
+    out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" ${board_owner_args[@]+"${board_owner_args[@]}"} 2>&1) && rc=0 || rc=$?
+    [ "$rc" -eq 0 ] || fail "$board_owner arm refused a sound board through a symlink: $out"
+    assert_contains "$out" "armed: $guarded_id" "symlink arming retains the canonical source identity"
+    assert_contains "$out" "artifact: $BOARD_DIR/guarded.html" "symlink arming reports the checked physical file"
+    wait_for_lines "$BOARD_POLLS" "$((board_poll_count + 1))" || fail "symlink arming did not start a listener"
+    out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" ${board_owner_args[@]+"${board_owner_args[@]}"} 2>&1) && rc=0 || rc=$?
+    if [ "$board_owner" = firstmate ]; then
+      [ "$rc" -eq 0 ] || fail "firstmate re-arm refused the symlink: $out"
+      assert_contains "$out" "still-listening: $guarded_id" "symlink re-arm retains the existing listener"
+      [ "$(wc -l < "$BOARD_POLLS" | tr -d ' ')" -eq "$((board_poll_count + 1))" ] || fail "symlink re-arm started a second listener"
+    else
+      [ "$rc" -ne 0 ] || fail "task symlink re-arm discarded a listener with no captured round"
+      assert_contains "$out" "no captured round" "task symlink re-arm reaches the ownership boundary"
+      [ "$(wc -l < "$BOARD_POLLS" | tr -d ' ')" -eq "$((board_poll_count + 1))" ] || fail "refused task re-arm started another listener"
+      touch "$BOARD_RELEASE"
+      wait_capture "$HBOARD" "$guarded_id" || fail "the symlink-armed task never captured its round"
+      rm -f "$BOARD_RELEASE"
+      out=$(PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" arm "$BOARD_DIR/guarded-alias.html" --for board-worker 2>&1) && rc=0 || rc=$?
+      [ "$rc" -eq 0 ] || fail "task re-arm refused the symlink after capturing a round: $out"
+      assert_contains "$out" "armed: $guarded_id" "task symlink re-arm starts the next round"
+      [ -f "$HBOARD/state/procevent-inbox/$guarded_id.1.handled" ] || fail "task symlink re-arm did not acknowledge its captured round"
+      wait_for_lines "$BOARD_POLLS" "$((board_poll_count + 2))" || fail "task symlink re-arm did not start its next listener"
+    fi
+    PATH="$BOARD_BIN:$PATH" FM_HOME="$HBOARD" "$ROOT/bin/fm-procevent-lavish.sh" retire "$BOARD_DIR/guarded-alias.html" >/dev/null 2>&1 || fail "could not retire the symlink-armed board"
+  done
+  pass "sound boards arm and re-arm through symlinks for both owners"
+
+  # The guard's behavior, run for real against a stand-in document: a native
+  # submit nobody cancelled is cancelled, shown, and reported to the agent; a
+  # submit its own handler already cancelled is left alone.
+  GUARD_JS="$TMP_ROOT/form-guard.js"
+  sed -n '/<script data-fm-lavish-form-guard>/,/<\/script>/p' \
+    "$ROOT/.agents/skills/bearings/assets/lavish-form-guard.html" | sed '1d;$d' > "$GUARD_JS"
+  [ -s "$GUARD_JS" ] || fail "could not extract the guard script from its asset"
+  cat > "$TMP_ROOT/form-guard-run.js" <<'JS'
+const fs = require("fs"), vm = require("vm");
+const source = fs.readFileSync(process.argv[2], "utf8");
+function element() {
+  return { children: [], style: {}, attrs: {}, textContent: "",
+    setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    appendChild(c) { this.children.push(c); } };
+}
+function load(lavish) {
+  const state = { listener: null, queued: [] };
+  const document = { createElement: element, body: element(),
+    addEventListener(type, fn) { if (type === "submit") state.listener = fn; } };
+  const window = lavish ? { lavish: { queuePrompt(prompt, options) { state.queued.push({ prompt, options }); } } } : {};
+  vm.runInNewContext(source, { document, window });
+  state.submit = (defaultPrevented) => {
+    const form = element(); form.attrs["data-lavish-question"] = "q1";
+    const event = { defaultPrevented, target: form, cancelled: false, preventDefault() { this.cancelled = true; } };
+    state.listener(event);
+    return { form, event };
+  };
+  return state;
+}
+const a = load(true);
+const broken = a.submit(false);
+const handled = a.submit(true);
+const b = load(false);
+const noSdk = b.submit(false);
+console.log(JSON.stringify({
+  brokenCancelled: broken.event.cancelled,
+  brokenNotice: broken.form.children.length === 1 && /NOT recorded/.test(broken.form.children[0].textContent),
+  brokenNoticeIsAlert: broken.form.children[0].attrs.role === "alert",
+  queuedCount: a.queued.length,
+  queuedTag: a.queued[0] && a.queued[0].options.tag,
+  queuedQuestion: a.queued[0] && a.queued[0].options.data.question,
+  handledCancelledByGuard: handled.event.cancelled,
+  handledChildren: handled.form.children.length,
+  noSdkStillNotices: noSdk.event.cancelled && noSdk.form.children.length === 1,
+}));
+JS
+  guard_out=$(node "$TMP_ROOT/form-guard-run.js" "$GUARD_JS" 2>&1) || fail "the guard script failed to run: $guard_out"
+  assert_contains "$guard_out" '"brokenCancelled":true' "the guard cancels a native submit nobody cancelled"
+  assert_contains "$guard_out" '"brokenNotice":true' "the guard shows a visible notice on the form"
+  assert_contains "$guard_out" '"brokenNoticeIsAlert":true' "the notice is announced as an alert"
+  assert_contains "$guard_out" '"queuedCount":1' "exactly one error prompt reaches the agent, and none for the handled submit"
+  assert_contains "$guard_out" '"queuedTag":"form-error"' "the error prompt is tagged so it is never mistaken for a choice"
+  assert_contains "$guard_out" '"queuedQuestion":"q1"' "the error prompt names the form"
+  assert_contains "$guard_out" '"handledCancelledByGuard":false' "a submit its own handler cancelled is left alone"
+  assert_contains "$guard_out" '"handledChildren":0' "a handled submit gets no notice"
+  assert_contains "$guard_out" '"noSdkStillNotices":true' "the notice still shows when the Lavish SDK is missing"
+  pass "the form guard turns an uncancelled submit into a visible error and an agent prompt"
+fi
+
 printf '\nall procevent tests passed\n'

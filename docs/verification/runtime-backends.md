@@ -1121,6 +1121,64 @@ ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch 
 
 With the classifier change reverted, the same run stopped at `an idle empty box composer read 'unknown', not empty`.
 
+### 2026-10-06 claude titled top border through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against Claude Code 2.1.292 in an isolated Herdr 0.9.1 lab session, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+Claude draws the session's name inside the prompt box's top rule once the session has one: `claude --name <name>`, `/rename`, a hook-supplied session title, or the title it generates from the first prompt.
+The observed idle composer, with the title right-aligned in the top rule and a plain closing rule:
+
+```text
+──────────────────────────────────────────── Firstmate operational input waiting read Users charlesabrooker treehouse ─
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
+The operator safety contract is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact titled-rule predicates and rule-pair content handling are owned by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh).
+The focused regressions in [`tests/fm-composer-lib.test.sh`](../../tests/fm-composer-lib.test.sh) cover:
+
+- `test_matrix_claude_titled_top_border` and `test_claude_titled_top_border_needs_glyph_proof_and_exact_shape`: idle, typed, and refused titled-border shapes.
+- `test_multiline_rule_pair_retains_all_interior_rows`: blank and ordinary continuation rows, including a pasted `❯` after `❯ keep this unsent text`.
+- `test_rule_pair_continuations_never_prove_empty`: ambiguous rule continuations and literal side characters in titled, plain, and identity-backed Pi pairs.
+- `test_rule_pair_ambiguity_is_candidate_scoped`: historical indent mismatches, adjacent rule pairs, and pasted titled rules do not poison a newer live composer; ambiguity in the selected pair still refuses classification and extraction.
+- `test_rule_pair_pasted_containers_remain_literal`: complete pasted box families, folded and multiline omp boxes, left bars, and newer genuine composers.
+- `test_rule_pair_braille_is_literal_content`: singleton and multiline Braille drafts and empty single-line pairs.
+
+The recorded focused test and direct classifier/extractor smoke passed, including cursor and cursorless profiles in both locales; the concrete multiline draft extracted as `keep this unsent text ❯`.
+These portable results do not establish live coverage for multiline, pasted-container, or Braille drafts.
+The live guard includes multiline content and exit-refusal checks, but the recorded live output below predates those checks.
+
+On 2026-10-07, the focused composer suite passed with every draft-preservation regression intact.
+A direct classifier smoke changed the reported historical-example/live-composer capture from `unknown` before the fix to `empty` after it.
+An executable guard-preparation smoke used real Git fixtures and trust registration with a disposable lab transport and model-free launch probe.
+It verified isolated trust, unchanged symlinked operator files, file-backed and simulated default/custom Keychain authentication, explicit and empty OAuth overrides, legacy configuration, and secure-storage overrides.
+This smoke stopped after the initial launch; it did not rerun real Herdr, Claude, doorbell, or lifecycle behavior.
+
+The saved live historical-example capture with Claude's slash menu above the titled opener reproduced `unknown` classification and refused `/exit` extraction.
+After excluding glyph carry from a candidate implicitly reopened by a recorded closing separator, replaying that capture produced `pending` and extracted exactly `/exit` across cursor and cursorless profiles in UTF-8 and `LC_ALL=C`.
+`test_titled_rule_pair_ignores_outside_glyph_after_recorded_closer` covers the outside-menu boundary with empty and nonempty live composers; the existing selected-envelope ambiguity and draft-preservation cases remain in the focused composer regression file.
+This replay exercises the production classifier and extractor on actual terminal output; it is not a new live-worker lifecycle run.
+The focused `tests/fm-composer-lib.test.sh` run passed, including the new boundary regression and all existing draft-preservation and selected-ambiguity checks.
+
+The live guard that refreshes this entry launches the installed claude idle with a session name in a guarded Herdr lab and drives the public lifecycle commands.
+For prerequisites, token-spending opt-ins, subscription-only relaunch, and configuration isolation, see the [guard's header](../../tests/fm-claude-titled-composer-live-e2e.test.sh).
+
+```sh
+FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 tests/fm-claude-titled-composer-live-e2e.test.sh
+```
+
+Observed output (the run with the doorbell proof and the run with the relaunch proof were separate invocations):
+
+```text
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 draws the session title in the prompt box's top border in isolated session fm-lab-claude-titled-li-74828-13064
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-send doorbell reaches the titled-border worker, which acts on the record and acknowledges it
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-control exit stops the idle titled-border worker and preserves its endpoint
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-control relaunch replaces the titled-border worker with a live agent in the same endpoint
+```
+
+With the classifier change reverted, the same run stopped at `an idle empty titled-border composer read 'unknown', not empty`.
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
@@ -1486,6 +1544,7 @@ The pre-Enter payload proof then judged the typed command unsent, pressed Ctrl+U
 The fix captures the FULL VISIBLE VIEWPORT for every herdr adapter composer read (`pane read --source visible [--format ansi]`, `fm_backend_herdr_composer_state` and `fm_backend_herdr_composer_content`): the composer is by definition inside the viewport, and the viewport is the one bound that always contains it.
 The shared inbox pending-line confirmation read (`bin/fm-task-inbox-lib.sh`) stays a bounded tail on every backend, herdr included; its payloads are task lines, not slash commands, so the popup shape does not arise there.
 The popup rows sit below the composer's closing rule, which bounds the extracted input; the selector also distinguishes an indented selected slash-menu glyph from the nonempty command inside the proven composer.
+Current rule-pair safety limits are owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety), and exact slash-menu demotion predicates by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh); `test_claude_selected_slash_menu_extracts_only_the_composer` in [`tests/fm-composer-lib.test.sh`](../../tests/fm-composer-lib.test.sh) covers classification and extraction in both locales.
 Verified live in the lab: with the popup up the state read answers `pending` (previously `empty`) and the payload proof returns `/exit` (previously empty), the submit presses Enter, and the Claude process exits, leaving the shell prompt.
 Growing the window only adds rows above the composer, so the bottom-most-shape selection, the footer zone, and every previously passing verdict are unchanged.
 

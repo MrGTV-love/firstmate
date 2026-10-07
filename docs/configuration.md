@@ -2144,6 +2144,12 @@ A long-polling external process is registered as a *source* through its adapter,
 
 `bin/fm-procevent-lavish.sh` is the first built-in adapter and wraps only the currently published `lavish-axi poll` interface.
 
+**Check the Lavish board before arming**
+
+Every Lavish arm or re-arm checks the canonical physical artifact for syntax errors in its inline event handlers and inline classic scripts before registering or acknowledging a round.
+A parse failure or an incomplete check refuses the arm without replacing the existing registration or starting a listener.
+Passing this syntax-only check does not prove that handlers run, cancel native submission, or deliver answers; the [adapter header and help](../bin/fm-procevent-lavish.sh) own the standalone check, its exclusions, and form-guard guidance.
+
 **Open the Lavish artifact first**
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; each poll attempt derives its host and port from that session and refuses missing or invalid session evidence before consuming a staged worker reply.

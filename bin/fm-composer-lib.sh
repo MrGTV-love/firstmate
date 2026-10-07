@@ -24,10 +24,11 @@
 #   styled=1    the capture preserves ANSI styling, so ghost/placeholder text
 #               is detectable and can be stripped (tmux -e, herdr --format
 #               ansi, zellij dump-screen --ansi). With styled=0 (cmux, orca)
-#               ghost text is unreadable, so a bare glyph row or left-bar row
-#               carrying trailing non-idle text degrades to `unknown` rather
-#               than `pending`: the text may be the harness's own idle
-#               suggestion, and a false `pending` blocks every safe caller.
+#               ghost text is unreadable, so an unpaired bare glyph row or
+#               left-bar row carrying trailing non-idle text degrades to
+#               `unknown` rather than `pending`: the text may be the harness's
+#               own idle suggestion. Proven rule-pair interiors instead use
+#               _fm_composer_rule_pair_row_content.
 #   cursor=1    a cursor row is supplied (tmux #{cursor_y} only). The cursor
 #               anchors shape selection: the shape containing the cursor is the
 #               composer. Without it, the bottom-most shape wins.
@@ -98,7 +99,11 @@
 #                A separated pair that closes over a bare AGENT-GLYPH row is a
 #                different, self-proving thing: real claude 2.x draws exactly
 #                that (`─` rule, `❯`+NBSP, `─` rule), so the glyph inside the
-#                pair carries the shape and no identity is needed.
+#                pair carries the shape and no identity is needed. Once the
+#                session has a name, claude writes it into the top rule
+#                (`──── <title> ─`); that TITLED rule opens the pair the same
+#                way, but only with the glyph row inside it, and never closes
+#                one (see _fm_composer_titled_rule_row).
 #
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
@@ -113,9 +118,8 @@
 # ENVELOPE that CLOSED over an agent prompt glyph is a proven composer
 # container, so a BARE candidate among the contiguous non-blank rows below its
 # closing row is that composer's own footer furniture and not a composer. The
-# proven envelope is selected instead; when its proving glyph row is itself
-# borderless, that row is the bare candidate it stood for, and the envelope's
-# staleness probe resumes past the zone.
+# proven envelope is selected instead, retaining its interior; footer-aware
+# staleness checks resume past the zone.
 #
 # THE ASYMMETRY that bounds it: `empty` is the one verdict that authorizes
 # fm-send to type into a pane, so this rule may move a verdict only toward
@@ -810,6 +814,46 @@ _fm_composer_omp_band_header() {  # <trimmed-row>
   [[ "$1" =~ ^π\ \>\ .+\ \>\ 📁\ .+\ \>\ ⑂\ .+\ ▶(─)*[0-9]+(\.[0-9]+)?%┃(─)*[0-9]+(\.[0-9]+)?[KMGT]?(─)*$ ]]
 }
 
+# _fm_composer_titled_rule_row: 0 when the trimmed row is a `─` rule that
+# carries a TITLE, the shape claude 2.x draws as its composer's top border once
+# the session has a name (`--name`, `/rename`, a hook-supplied or generated
+# session title): `──────── <title> ─`. The rule must open with a solid run of
+# at least 8 `─`, close with a `─` run, and hold its title set apart by spaces
+# with no structural edge glyph inside. A row that is not exactly that shape
+# stays an ordinary row; accepting an opener alone does not prove a composer.
+_fm_composer_titled_rule_row() {  # <trimmed-row>
+  local row=$1 inner lead=0
+  # Literal prefix/suffix removal only: `${v#?}` and bracket classes cut single
+  # BYTES under LC_ALL=C, so a multibyte title character could be mistaken for
+  # part of the rule.
+  inner=$row
+  while :; do
+    case "$inner" in
+      ─*) inner=${inner#─}; lead=$((lead + 1)) ;;
+      *) break ;;
+    esac
+  done
+  [ "$lead" -ge 8 ] || return 1
+  case "$inner" in
+    *─) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    case "$inner" in
+      *─) inner=${inner%─} ;;
+      *) break ;;
+    esac
+  done
+  case "$inner" in
+    ' '*[![:space:]]*' ') ;;
+    *) return 1 ;;
+  esac
+  case "$inner" in
+    *│*|*┃*|*║*|*╭*|*╮*|*┌*|*┐*|*╔*|*╗*|*┏*|*┓*|*╰*|*╯*|*└*|*┘*|*╚*|*╝*|*┗*|*┛*|*═*|*━*) return 1 ;;
+  esac
+  return 0
+}
+
 # Row-scan results are returned through FM_COMPOSER_SCAN_* globals (bash 3.2
 # has no nameref); they are internal to this owner.
 _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
@@ -835,21 +879,22 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_LEFTBAR_END=-1
   FM_COMPOSER_SCAN_PI_PAIR_FOUND=0
   FM_COMPOSER_SCAN_PI_PAIR_VALID=0
+  FM_COMPOSER_SCAN_PI_PAIR_AMBIG=0
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
   FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
-  # The glyph PROOF of each envelope: the first row strictly inside it whose
-  # content leads with an agent prompt glyph once its side borders are
-  # stripped, and that glyph. This is what tells a composer container from a
-  # decorative banner; it is recorded here, on the one pass that already walks
-  # and trims every row, so the footer zone never re-reads the screen.
+  # The glyph PROOF of each envelope distinguishes a composer container from
+  # a decorative banner. Box and left-bar proofs remove container sides;
+  # rule-pair proofs inspect trimmed interior rows without stripping literal
+  # side characters. Record the first proving row and glyph on this scan so
+  # the footer zone never re-reads the screen.
   FM_COMPOSER_SCAN_BOX_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_BOX_GLYPH=
   FM_COMPOSER_SCAN_PI_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_PI_GLYPH=
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
-  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max
+  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0 pi_open_indent='' pi_ambiguous=0
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   FM_COMPOSER_SCAN_BOX_OMP=0
@@ -1059,9 +1104,9 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       kind=
       family=
     fi
-    # This row's glyph proof, computed once for every envelope that contains
-    # it: the same side-border strip _fm_composer_row_content performs, then
-    # the agent-glyph test. A border row never carries a proof.
+    # Box and left-bar glyph proof after removing container sides. Rule pairs
+    # use their own unstripped interior-row proof below, so pasted side borders
+    # cannot manufacture a prompt glyph. A box border row carries no proof.
     row_glyph=''
     row_glyph_row=-1
     if [ -z "$kind" ]; then
@@ -1083,11 +1128,30 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # closes the preceding candidate and immediately opens the next, so an
     # earlier transcript rule can never outrank the live bottom composer pair.
     if _fm_composer_pi_separator_row "$trimmed"; then
+      if [ "$indent" != "$pi_open_indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
+        pi_ambiguous=1
+      fi
+      if [ "$pi_glyph_row" -ge 0 ] \
+         && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
+         && [ "$pi_glyph" = "$FM_COMPOSER_SCAN_PI_GLYPH" ] \
+         && [ "$pi_open" -eq "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        pi_ambiguous=1
+        FM_COMPOSER_SCAN_PI_PAIR_AMBIG=1
+      fi
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
-      if [ "$pi_open" -ge 0 ]; then
+      # A pair opened by a TITLED rule (claude draws its session title in the
+      # composer's top border) is proven only by the agent glyph row inside it:
+      # the title makes the opener look like transcript text, so without that
+      # glyph the pair is not recorded and the rule below stays unproven.
+      if [ "$pi_open" -ge 0 ] \
+         && { [ "$pi_open_titled" = 0 ] || [ "$pi_glyph_row" -ge 0 ]; } \
+         && { [ -z "$cy" ] \
+              || [ "$FM_COMPOSER_SCAN_PI_OPEN" -ge "$cy" ] \
+              || [ "$FM_COMPOSER_SCAN_PI_CLOSE" -le "$cy" ]; }; then
         FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row
+        FM_COMPOSER_SCAN_PI_PAIR_AMBIG=$pi_ambiguous
         if [ "$pi_lines" -le "$pi_max" ]; then
           FM_COMPOSER_SCAN_PI_PAIR_VALID=1
         else
@@ -1107,15 +1171,33 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         fi
       fi
       pi_open=$row
+      pi_open_indent=$indent
+      pi_open_titled=0
+      pi_ambiguous=0
+      pi_lines=0
+      pi_glyph_row=-1
+      pi_glyph=''
+    elif _fm_composer_titled_rule_row "$trimmed"; then
+      pi_ambiguous=0
+      # Carry draft ambiguity, not glyphs after a recorded pair's closer.
+      if [ "$pi_glyph_row" -ge 0 ] && [ "$pi_open" -ne "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        pi_ambiguous=1
+      fi
+      # A titled rule only OPENS a pair; it never closes one, so a titled
+      # transcript row can never end a composer region.
+      FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
+      pi_open=$row
+      pi_open_indent=$indent
+      pi_open_titled=1
       pi_lines=0
       pi_glyph_row=-1
       pi_glyph=''
     else
       if [ "$pi_open" -ge 0 ]; then
         pi_lines=$((pi_lines + 1))
-        if [ "$pi_glyph_row" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
-          pi_glyph_row=$row_glyph_row
-          pi_glyph=$row_glyph
+        if [ "$pi_glyph_row" -lt 0 ] && fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+          pi_glyph_row=$row
+          pi_glyph=$glyph
         fi
       fi
     fi
@@ -1491,8 +1573,30 @@ _fm_composer_row_content() {  # <raw-row> <styled> [omp-shape] [literal] -> cont
   printf '%s' "$stripped"
 }
 
-# _fm_composer_classify_rows: shared multi-row box verdict: pending beats empty,
-# unreadable input is unknown, and ambiguous geometry cannot prove emptiness.
+# A proven rule pair owns its whole interior, so nested container edges and
+# Codex Braille animation patterns are literal draft content here. Apart from
+# whitespace normalization, only the capture's ghost policy and the single
+# proving prompt glyph are removed. Native Pi classification passes
+# prompt_row=-1 because its glyph-like text is user input.
+_fm_composer_rule_pair_row_content() {
+  local raw=$1 styled=$2 row=$3 prompt_row=${4:-$FM_COMPOSER_SCAN_PI_GLYPH_ROW} content glyph
+  if [ "$styled" = 1 ]; then
+    content=$(printf '%s\n' "$raw" | fm_composer_strip_ghost)
+  else
+    content=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+  fi
+  fm_composer_normalize_trim_var content
+  if [ "$row" -eq "$prompt_row" ] \
+     && fm_composer_leading_agent_glyph_var glyph "$content"; then
+    content=${content#*"$glyph"}
+  fi
+  printf '%s' "$content"
+}
+
+# _fm_composer_classify_rows: shared multi-row container verdict for the box
+# and separated shapes: pending beats empty, an unreadable row is unknown, and
+# geometry ambiguity turns pending into pending-unproven and empty into
+# unknown (an ambiguous container is not positive proof).
 # Omp box input is literal after floor stripping, not an idle-placeholder match.
 _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <last-row> [omp-box]
   local screen=$1 styled=$2 ambiguous=$3 first=$4 last=$5 literal=${6:-0}
@@ -1543,8 +1647,8 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
 _fm_composer_classify_bare_row() {  # <screen> <styled> <row>
   local screen=$1 styled=$2 row=$3 raw content plain state
   raw=$(_fm_composer_screen_row "$row" "$screen")
-  content=$(_fm_composer_row_content "$raw" "$styled")
-  plain=$(_fm_composer_row_content "$raw" 0)
+  content=$(_fm_composer_row_content "$raw" "$styled" 0 1)
+  plain=$(_fm_composer_row_content "$raw" 0 0 1)
   _fm_composer_bare_row_strip_furniture_var content
   _fm_composer_bare_row_strip_furniture_var plain
   state=$(fm_composer_classify_content 0 "$content" \
@@ -1659,8 +1763,8 @@ _fm_composer_row_is_pi_status() {  # <trimmed-row>
 
 # _fm_composer_row_is_braille_furniture: 0 when the row is non-blank and its
 # non-whitespace content is entirely braille cells (fm_composer_strip_braille
-# above) - an animation row that never counts as typed content and bounds a
-# bare composer's wrap region. A blank row is not furniture (the blank-row
+# above). Treat it as animation furniture at bare-wrap and footer boundaries,
+# not inside a proven rule pair. A blank row is not furniture (the blank-row
 # rules own it), and a row mixing braille with anything else is not either.
 _fm_composer_row_is_braille_furniture() {  # <row>
   local row=$1 rest
@@ -1741,7 +1845,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
 # suggestion happened to wrap; any surviving text is pending when styling can
 # prove it real and unknown otherwise (the same styled=0 degradation as the
 # glyph row itself).
-_fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row>
+_fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0
   row=$g
   while [ "$row" -le "$cy" ]; do
@@ -1952,11 +2056,10 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_OMPBOX_TOP + 1))
     FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
   fi
-  # A bare candidate standing in a proven envelope's footer zone is that
-  # harness's own furniture, never a composer. The envelope it sits under is
-  # what the screen actually shows, so when that envelope's proving glyph row
-  # is itself borderless, the bare candidate moves UP to it; otherwise the
-  # envelope (box, left bar) stays selected on its own.
+  # A bare candidate in a proven envelope's footer zone is harness furniture,
+  # not a composer. Move its ranking anchor to the borderless proving row, or
+  # remove it when the envelope has container sides. The rule-pair selection
+  # below retains the entire enclosing interior, not just that anchor row.
   bare=$FM_COMPOSER_SCAN_BARE_ROW
   if [ "$footer" = 1 ]; then
     trimmed=$(_fm_composer_screen_row "$FM_COMPOSER_FOOTER_GLYPH" "$plain")
@@ -1983,7 +2086,9 @@ _fm_composer_select_cursorless() {
   fi
   if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
      && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
-     && [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; then
+     && { [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
+          || [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; }; then
+    [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 0 ] || return 1
     generic=$FM_COMPOSER_SCAN_PI_CLOSE
     FM_COMPOSER_SELECTED_KIND=pi
     FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
@@ -2082,7 +2187,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0 literal=0 is_last omp_plain
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 omp=0 literal=0 is_last omp_plain pair_prompt_row
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -2093,11 +2198,19 @@ EOF
   _fm_composer_scan_screen "$plain" '' 1
   _fm_composer_select_cursorless "$plain" || return 1
   [ "$FM_COMPOSER_SELECTED_KIND" != box ] || omp=$FM_COMPOSER_SCAN_BOX_OMP
-  case "$FM_COMPOSER_SELECTED_KIND" in bare|pi) literal=1 ;; esac
+  case "$FM_COMPOSER_SELECTED_KIND" in bare) literal=1 ;; esac
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    if [ "$omp" = 2 ] && [ "$row" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
+    if [ "$FM_COMPOSER_SELECTED_KIND" = pi ]; then
+      pair_prompt_row=$FM_COMPOSER_SCAN_PI_GLYPH_ROW
+      if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+         && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+         && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        pair_prompt_row=-1
+      fi
+      content=$(_fm_composer_rule_pair_row_content "$raw" "$styled" "$row" "$pair_prompt_row")
+    elif [ "$omp" = 2 ] && [ "$row" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
       content=$(_fm_composer_row_content "$raw" "$styled" 0 1)
     else
       content=$(_fm_composer_row_content "$raw" "$styled" "$omp" "$literal")
@@ -2119,7 +2232,8 @@ EOF
         fi
         ;;
       bare)
-        if [ "$row" -eq "$FM_COMPOSER_SELECTED_FIRST" ] \
+        prompt_row=$FM_COMPOSER_SELECTED_FIRST
+        if [ "$row" -eq "$prompt_row" ] \
            && fm_composer_leading_agent_glyph_var glyph "$content"; then
           content=${content#*"$glyph"}
         fi
@@ -2213,6 +2327,19 @@ EOF
       fi
       return 0
     fi
+    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$FM_COMPOSER_SCAN_PI_PAIR_AMBIG" = 1 ] \
+       && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+       && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+      printf 'unknown'; return 0
+    fi
+    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
+       && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+       && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+      _fm_composer_pair_glyph_verdict "$screen" "$styled" "$has_identity" "$identity"
+      return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
       if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] && [ "$FM_COMPOSER_SCAN_BOX_AMBIG" = 1 ]; then
         printf 'unknown'; return 0
@@ -2257,13 +2384,7 @@ EOF
       fi
     fi
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$FM_COMPOSER_SCAN_BARE_ROW" ]; then
-      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-         && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-         && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" "$cy"
-      else
-        _fm_composer_classify_bare_row "$screen" "$styled" "$cy"
-      fi
+      _fm_composer_classify_bare_row "$screen" "$styled" "$cy"
       return 0
     fi
     # _fm_composer_wrap_region_ok owns the continuation proof; cursor position
@@ -2295,16 +2416,25 @@ EOF
     printf 'unknown'
     return 0
   fi
-  # No cursor: the bottom-most shape wins, with the pi-separator staleness
-  # rules layered on (a live pi composer pair below the generic candidate
-  # proves that candidate stale).
+  # Cursorless envelope precedence and ambiguity refusal have one owner:
+  # _fm_composer_select_cursorless, shared with content extraction.
   if ! _fm_composer_select_cursorless "$plain"; then
     printf 'unknown'
     return 0
   fi
   case "$FM_COMPOSER_SELECTED_KIND" in
     pi)
-      _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
+         && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
+         && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        # An ambiguous native draft enclosed by the pair is Pi containment, so
+        # only a proven Pi identity may read it.
+        _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      elif [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ]; then
+        _fm_composer_pair_glyph_verdict "$screen" "$styled" "$has_identity" "$identity"
+      else
+        _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      fi
       ;;
     box)
       _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SELECTED_AMBIG" \
@@ -2382,11 +2512,11 @@ fm_composer_queued_enter_verdict() {  # <composer-state> <busy|idle|unknown>
 }
 
 _fm_composer_classify_pi_rows() {  # <screen> <styled>
-  local screen=$1 styled=$2 row raw content
+  local screen=$1 styled=$2 prompt_row=${3:--1} row raw content
   row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
   while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled" 0 1)
+    content=$(_fm_composer_rule_pair_row_content "$raw" "$styled" "$row" "$prompt_row")
     fm_composer_normalize_trim_var content
     if [ -n "$content" ]; then
       printf 'pending'
@@ -2397,22 +2527,43 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
   printf 'empty'
 }
 
-_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> <bare-row> [last-row]
-  local screen=$1 styled=$2 has_identity=$3 identity=$4 row=$5 last=${6:-$5} agent
-  if [ "$has_identity" = 1 ] && [ -z "$identity" ]; then
-    printf 'need-identity'
-    return 0
+# _fm_composer_pair_glyph_verdict: verdict for a rule pair whose interior holds
+# the proving agent-glyph row. Owned native-omp rows under that glyph cannot be
+# told from furniture without styling, so an unstyled capture never proves
+# them input unless the backend identity is exactly Pi.
+_fm_composer_pair_glyph_verdict() {  # <screen> <styled> <has-identity> <identity>
+  local state
+  state=$(_fm_composer_classify_bare_pi_overlap "$1" "$2" "$3" "$4")
+  if [ "$2" != 1 ] && [ "$state" = pending ] \
+     && [ "${4%%$'\t'*}" != pi ] \
+     && [ "$FM_COMPOSER_SCAN_BARE_LITERAL_ROWS" != '|' ]; then
+    state=unknown
   fi
-  agent=${identity%%$'\t'*}
-  if [ "$has_identity" = 1 ] && [ "$agent" = pi ]; then
-    _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
-  else
+  printf '%s' "$state"
+}
+
+_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> [bare-row] [last-row]
+  local screen=$1 styled=$2 has_identity=$3 identity=$4 row=${5:-} last=${6:-${5:-}} agent
+  if [ "$has_identity" = 1 ]; then
+    if [ -z "$identity" ]; then
+      printf 'need-identity'
+      return 0
+    fi
+    agent=${identity%%$'\t'*}
+    if [ "$agent" = pi ]; then
+      _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      return 0
+    fi
+  fi
+  if [ -n "$row" ]; then
     if [ "$last" -gt "$row" ]; then
       _fm_composer_classify_bare_wrap "$screen" "$styled" "$row" "$last"
     else
       _fm_composer_classify_bare_row "$screen" "$styled" "$row"
     fi
+    return 0
   fi
+  _fm_composer_classify_pi_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_PI_GLYPH_ROW"
 }
 
 # The pi separated-shape verdict: identity + structure conjunction (herdr's

@@ -28,6 +28,7 @@ Firstmate registers a source, keeps working, and is woken when that process comp
 
 Use the adapter, not the generic runner, for a real source.
 Before either Lavish arm form below, open the artifact with `lavish-axi` so its saved session can route the listener; the [operating contract](../../../docs/configuration.md#process-to-event-sources-stateprocevent) owns the prerequisite and refusal boundary.
+For board authoring, follow the [adapter header's check and form-guard guidance](../../../bin/fm-procevent-lavish.sh); the operating contract above owns the arm-time refusal boundary.
 For a Lavish review artifact firstmate owns:
 
 ```sh
