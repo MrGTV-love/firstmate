@@ -168,7 +168,8 @@ fm_dispatch_capacity() {
       printf '%s\n' "$quota" | jq -ce --arg model "$model" "$FM_QUOTA_ROW_JQ"'
         (quota_row(.; "claude"; "") |
           [.quotaSemantics.effectiveAvailability[]? | select(
-            .scope == "all_models" or .scope == "all_products" or .scope == ("model:" + $model))]) as $rows |
+            .scope == "all_models" or .scope == "all_products" or
+            .scope == ("model:" + $model) or .scope == ("product:" + $model))]) as $rows |
         {status: (if any($rows[]; .runway.status == "exhausted_now" or
                        (.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) then "exhausted"
                   elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining > 0) then "usable"

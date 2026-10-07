@@ -1398,6 +1398,7 @@ Native Claude's default-account quota is not a TeamClaude proxy ledger or proof 
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
 For fresh tmux workers, bounded probes run through the already-owned initialized pane after worktree entry, using the same pane-expanded launch allowlist and explicit forwarded stores and account-pin credential shedding as launch; shell initialization and directory-entry exports therefore participate in the evidence, and `--allow-api-key` grants permission without establishing headroom.
 Native Claude default-store quota is bound only when the destination's absolute `HOME` is established as matching the measuring process's `HOME`; a different, absent, removed, empty, or relative destination `HOME` keeps capacity unknown.
+Bound native Claude capacity includes global quota and exact `model:<selected model>` and `product:<selected model>` bounds; exhaustion of any applicable bound takes precedence over positive headroom.
 An adopted pane retains its existing shell environment, which current tmux session/global settings cannot establish, so its native Claude and OMP quota remain unknown.
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
 

@@ -398,7 +398,8 @@ SH
 fm_dispatch_endpoint_query() {
   local harness=$1 config=$2 session=$3 cwd=$4 executable=$5
   shift 5
-  [ "$harness" = omp ] && [ -z "$session" ] && [ -d "$cwd" ] || return 125
+  { [ "$harness" = omp ] || [ "$harness" = claude ]; } && [ -z "$session" ] && [ -d "$cwd" ] || return 125
+  [ "$harness" != claude ] || executable=true
   env -i HOME="$HOME" PATH="$PATH" FM_HOME="$TMP_ROOT" \
     bash --noprofile --norc -c '
       cd "$1" || exit 125
@@ -408,6 +409,54 @@ fm_dispatch_endpoint_query() {
       exec "$@"
     ' _ "$cwd" "$executable" "$@"
 }
+claude_primary='{"harness":"claude","model":"sonnet","effort":"high"}'
+claude_fallback='[{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]'
+for schema in 5 6; do
+  for bound in model:sonnet product:sonnet product:opus; do
+    for state in percent_exhausted runway_exhausted global_exhausted healthy; do
+      jq -n --argjson schema "$schema" --arg bound "$bound" --arg state "$state" '
+        {schemaVersion:$schema,providers:[{
+          provider:"claude",
+          quotaSemantics:{
+            status:(if $state == "runway_exhausted" then "partial" else "known" end),
+            effectiveAvailability:[
+              {scope:"all_models",status:"known",
+               effectivePercentRemaining:(if $state == "global_exhausted" then 0 else 70 end),
+               runway:{status:"through_reset"}},
+              ({scope:$bound} +
+               if $state == "runway_exhausted" then
+                 {status:"unknown",runway:{status:"exhausted_now"}}
+               else
+                 {status:"known",
+                  effectivePercentRemaining:(if $state == "percent_exhausted" then 0 else 70 end),
+                  runway:{status:"through_reset"}}
+               end)
+            ]
+          }
+        }]} |
+        if $schema == 6 then .providers[0].accountKey="default" else . end
+      ' > "$QUOTA_FIXTURE"
+      fm_quota_json_valid < "$QUOTA_FIXTURE" || fail "Claude bounds must use a supported quota snapshot"
+      expected=usable
+      if [ "$state" = global_exhausted ] ||
+        { [ "$bound" != product:opus ] && [ "$state" != healthy ]; }; then
+        expected=exhausted
+      fi
+      out=$(fm_dispatch_capacity claude sonnet "$TMP_ROOT/config" '' "$TMP_ROOT") ||
+        fail "bound Claude capacity must complete"
+      assert_equals "$expected" "$(jq -r .status <<<"$out")" "schema $schema $bound $state must classify all applicable bounds"
+      out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$claude_primary" "$claude_fallback" '' '' "$TMP_ROOT") ||
+        fail "bound Claude selection must complete"
+      expected_profile="$claude_primary"
+      if [ "$expected" = exhausted ]; then
+        expected_profile=$(jq -c '.[0]' <<<"$claude_fallback")
+      fi
+      assert_equals "$expected_profile" "$(jq -c .profile <<<"$out")" "schema $schema $bound $state must retain healthy Claude or select its permitted stand-in"
+    done
+  done
+done
+pass "native Claude model and product bounds constrain fallback selection under both quota schemas"
+
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
 allowed='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]'
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
