@@ -20,9 +20,9 @@ An arm owner is the component in each primary harness that starts watcher cycles
 
 ## Scope today
 
-The host is opt-in per home through `config/supervision-host`; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the file, and the [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) governs activation.
+The host is opt-in per home through `config/supervision-host`; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the file.
 Without the file every home behaves exactly as it does without the host.
-When activation is permitted, it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
+Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
 
 ### Behavior by posture and harness
 
@@ -31,7 +31,7 @@ When activation is permitted, it runs beside a Claude, Cursor, OpenCode, omp, Gr
 - Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
 - Away (the record exists), the host hands each close to the engine.
   Main stays parked unless the host hands the wake back.
-- `/afk` launches no away daemon on an opted-in home of those harnesses even if host activation is refused; the [away procedure](../.agents/skills/afk/SKILL.md#entering-afk-words) owns entry and main-side handling.
+- `/afk` launches no away daemon on an opted-in home of those harnesses, because the host is the away session there.
 - `/quiet` enters nothing where the attended host runs, and elsewhere launches the daemon; see [Quiet mode](#quiet-mode).
   While the daemon's flag `state/.afk` exists, the host stands aside exactly as the plain arm does.
 - Pi keeps its in-process branch whether or not the file exists, and no Pi engine is built.
@@ -47,7 +47,7 @@ Until they land, their current behavior stays as described in their own owners.
 | Component | Owner | Role |
 |---|---|---|
 | The loop | `bin/fm-supervision-host.sh` | Its header owns the per-close order, the park boundary, ownership checks, predecessor cleanup, state files, and tunables. |
-| The arm owners | Each primary's existing arm owner | Selects the host for an opted-in home and delivers a handed-back wake to main; see [Arm owners](#arm-owners). |
+| The arm owners | Each primary's existing arm owner | Runs the host for an opted-in home and delivers a handed-back wake to main; see [Arm owners](#arm-owners). |
 | The engine | `bin/fm-supervision-engine-lib.sh` | Owns the opt-in parse, the verified-engine list, and one bounded engine turn, including the reap of engine tool processes that outlive it. |
 | Row eligibility and the offer rule | `bin/fm-branch-dispatch.mjs` | The command entry to `.pi/extensions/lib/fm-branch-dispatch.ts`, so the host and the Pi extension compute branch-claimable rows, their task scope, and whether the branch may take a close (`branchOfferForWake`) from one owner; it also renders the wake message with the same away-posture tail, or the dialog mirror at its head. |
 | The grant and the drain | `bin/fm-wake-grant.sh` | Publishes the branch's rows bound to the host's own process; [watcher-continuity.md](watcher-continuity.md#per-actor-acknowledgement) owns the per-actor drain and acknowledgement the engine runs. |
@@ -60,13 +60,9 @@ Until they land, their current behavior stays as described in their own owners.
 
 ### Arm owners
 
-When host activation is permitted for an opted-in home, each primary's existing arm owner runs the host in place of its watcher command.
+For an opted-in home, each primary's existing arm owner runs the host in place of its watcher command.
 The arm owner delivers a handed-back wake through the wake path that harness already trusts.
 The host's header owns the output contract they read.
-
-OpenCode's watch-arm coordinator owns restoration after a launch-policy refusal.
-Its `refused` readiness status, like `armed`, `wake`, and `failed`, makes the turn-end plugin defer rather than run the generic guard or emit a competing blind-turn prompt.
-The watch-arm plugin delivers the refusal separately through its actionable wake path after restoring ordinary monitoring.
 
 | Primary | Arm owner | A handed-back wake reaches main as |
 |---|---|---|
@@ -81,15 +77,9 @@ Hook, plugin, extension, and checkpoint owners pass their harness as the primary
 Grok's model-owned call relies on primary detection.
 The host pins dispatched work to the primary's crew harness rather than the engine's.
 
-Grok's rendered initial, repair, and ordinary-wake commands select the ordinary watcher when an enabled or malformed session launch policy refuses the host, and retain the refusal diagnostic.
-Rendering is read-only: it publishes no refusal wake or receipt and acquires no session lock.
-The command is selected at render time; policy changes after rendering still reach the host's own activation check, so main must follow a refusal's ordinary-supervision direction rather than repeat the rendered host command.
+Grok's arm command is fixed when the session-start block renders.
+So adding or removing the file on a Grok home takes effect at the next session start.
 The other owners read the file at every arm.
-
-Codex checks actual session-lock ownership before publishing a preflight refusal and runs the ordinary foreground watcher instead of the denied host.
-A host refusal after selection likewise consults the persistent main-session refusal receipt before delivering its runtime diagnostic, and returns to ordinary foreground monitoring only while the primary still owns the session lock. New refusals and publication failures retain their diagnostics; restoring an already-acknowledged refused configuration before activation does not repeat its notice.
-The ordinary watcher and host retain their own ownership checks; refusal output alone is not a successful checkpoint.
-Without a session launch policy, existing opted-in host behavior is unchanged.
 
 ### The report surface
 
@@ -270,8 +260,8 @@ So it never stops the owner's host or watcher or releases its leases.
 
 ### A host that dies without a close
 
-The host's owner retries a host that died without a close, not one that returned a launch-policy refusal.
-Grok's model and Codex's checkpoint see a missing close as a failed cycle and start the next one.
+The host's owner retries it.
+Grok's model and Codex's checkpoint see it as a failed cycle and start the next one.
 Before it arms, the next host does two things:
 
 - It stops, by recorded identity, whatever its predecessor left running, including the engine descendants a killed turn recorded.
@@ -317,8 +307,6 @@ The checkpoint passes it as the boundary and reports the boundary as its ordinar
 |---|---|
 | Attended | `FM_CODEX_WATCH_CHECKPOINT` (default 180 seconds). |
 | Away record exists | Raised to `FM_CODEX_WATCH_CHECKPOINT_AWAY` (default 3,600) if longer, then capped at 27,000 seconds so a parked main is not woken every few minutes. |
-
-These raised host bounds do not apply after a launch-policy refusal: ordinary monitoring uses the requested foreground checkpoint bound.
 
 Because that bound is not a harness timeout, the checkpoint also sets `FM_SUPERVISION_HOST_PARK_LIMIT`.
 That setting lets an engine turn that starts before the boundary finish after it.
@@ -400,8 +388,9 @@ Such a process is never recorded and survives the turn, the same residual `bin/f
 The default model is `sonnet`, which handled every measured wake correctly at a fraction of a larger model's cost.
 `config/supervision-host` can name another.
 
-[Configuration's engine-selection contract](configuration.md#engine-selection) owns the selection defaults, explicit engine pin, and activation restrictions.
-`/afk` reports when the file selects no engine.
+The Claude engine runs beside any of the six primaries, but only a Claude primary selects it by default.
+A Cursor, OpenCode, omp, Grok, or Codex home names it (`claude`, optionally with a model) in `config/supervision-host`.
+`/afk` there says so when the file selects no engine.
 
 ## Verification
 

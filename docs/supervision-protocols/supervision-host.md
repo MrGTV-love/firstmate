@@ -1,5 +1,4 @@
-Supervision host: configured for this home (`config/supervision-host`; [`supervision-host.md`](../supervision-host.md) owns the design, and the [session launch policy](../configuration.md#session-launch-policy-configsession-launch-policy) governs activation).
-The wake-handling additions below assume an active host; the primary supervision rules above remain in force when activation is refused.
+Supervision host: on for this home (`config/supervision-host`; [`supervision-host.md`](../supervision-host.md) owns the design).
 {claude} The Stop hook runs the supervision host in the arm's place, and everything above still holds with these additions:
 {cursor} The `stop` hook park runs the supervision host in the arm's place, and everything above still holds with these additions:
 {opencode} The OpenCode TUI plugin runs the supervision host in the arm's place, and everything above still holds with these additions:

@@ -155,8 +155,6 @@ esac
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 # shellcheck source=bin/fm-hook-host-lib.sh
 . "$SCRIPT_DIR/fm-hook-host-lib.sh"
-# shellcheck source=bin/fm-supervision-engine-lib.sh
-. "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
 
 # The watcher's progress beats do not change the terminal wait's POLL-second
 # allowance. fm_poll_derived_grace (bin/fm-wake-lib.sh) is the single owner of
@@ -261,9 +259,8 @@ MY_GEN=$FM_AUTOARM_MY_GEN
 # even an already-printed banner is never delivered by a losing generation.
 autoarm_commit() {  # <outcome> [marker-file]
   local outcome=$1 marker=${2:-} session_pid recovery
-  fm_session_lock_owned_by_self "$STATE" || return 2
-  [ ! -e "$STATE/.afk" ] || return 2
   if [ "$outcome" = rewake ]; then
+    fm_session_lock_owned_by_self "$STATE" || return 2
     session_pid=$(sed -n '1p' "$STATE/.lock" 2>/dev/null || true)
     fm_recovery_marker_snapshot "$STATE/.watcher-down" || return 2
     case "$FM_RECOVERY_MARKER_TOKEN" in
@@ -396,18 +393,11 @@ ACTIONABLE=0
 HEALTHY=0
 HOST_MODE=0
 HOST_RC=0
-HOST_REFUSAL=
-HOST_REFUSAL_WAKE=
 ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
 # The opt-in is the file's presence (docs/configuration.md "Supervision host").
-fm_autoarm_still_owner "$STATE" "$MY_GEN" \
-  && fm_session_lock_owned_by_self "$STATE" && [ ! -e "$STATE/.afk" ] || exit 0
-if fm_supervision_host_autoarm_enabled "$CONFIG" claude "$STATE"; then
+if [ -f "$CONFIG/supervision-host" ]; then
   HOST_MODE=1
   ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)'
-else
-  HOST_REFUSAL=$FM_SUPERVISION_HOST_REFUSAL
-  HOST_REFUSAL_WAKE=$FM_SUPERVISION_HOST_REFUSAL_WAKE
 fi
 attempt=0
 while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
@@ -437,28 +427,7 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
     exit 0
   fi
 
-  if [ "$HOST_MODE" -eq 1 ] && [ -n "$OUT" ] \
-    && grep -q '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null; then
-    if ! fm_autoarm_still_owner "$STATE" "$MY_GEN" \
-      || ! fm_session_lock_owned_by_self "$STATE"; then
-      rm -f "$OUT" 2>/dev/null || true
-      exit 0
-    fi
-    fm_supervision_host_autoarm_enabled "$CONFIG" claude "$STATE" || true
-    HOST_REFUSAL=$(grep '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null)
-    HOST_REFUSAL_WAKE=$HOST_REFUSAL
-    if [ -n "$FM_SUPERVISION_HOST_REFUSAL" ] && [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ]; then
-      HOST_REFUSAL_WAKE=
-    fi
-    HOST_MODE=0
-    ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:))'
-    attempt=$((attempt - 1))
-    rm -f "$OUT" 2>/dev/null || true
-    OUT=
-    continue
-  fi
   ACTIONABLE=0
-  [ -z "$HOST_REFUSAL_WAKE" ] || ACTIONABLE=1
   if [ -n "$OUT" ]; then
     grep -Eq "$ACTIONABLE_RE" "$OUT" 2>/dev/null && ACTIONABLE=1
   fi
@@ -536,8 +505,7 @@ fi
 if [ "$ACTIONABLE" -eq 1 ]; then
   # Cheap early-out before composing the banner; the real commit decision is
   # the owned terminal write below.
-  if ! fm_autoarm_still_owner "$STATE" "$MY_GEN" \
-    || ! fm_session_lock_owned_by_self "$STATE" || [ -e "$STATE/.afk" ]; then
+  if ! fm_autoarm_still_owner "$STATE" "$MY_GEN"; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0
   fi
@@ -547,7 +515,6 @@ if [ "$ACTIONABLE" -eq 1 ]; then
   fi
   {
     printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'
-    [ -z "$HOST_REFUSAL_WAKE" ] || printf '%s\n' "$HOST_REFUSAL_WAKE"
     if [ "$HOST_MODE" -eq 1 ]; then
       [ -n "$OUT" ] && awk '/^supervision-host:/ { print; next } /^(signal:|stale:|check:|heartbeat)/ && shown++ < 8' "$OUT" 2>/dev/null
     else
@@ -559,8 +526,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$SUCCESSOR_FAILURE" ] || printf '%s\n' "$SUCCESSOR_FAILURE"
     printf 'Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n'
   } >&2
-  if autoarm_commit rewake \
-    || { [ -n "$HOST_REFUSAL_WAKE" ] && autoarm_commit policy-refused; }; then
+  if autoarm_commit rewake; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 2
   fi
@@ -580,7 +546,6 @@ if [ ! -e "$FAILURE_NOTICE" ]; then
   fi
   {
     printf 'firstmate watcher auto-arm FAILED - the Stop-owned automatic supervision mechanism is broken after %s bounded attempts, and no live watcher with a fresh beacon was verified.\n' "$attempt"
-    [ -z "$HOST_REFUSAL" ] || printf '%s\n' "$HOST_REFUSAL"
     [ -n "$OUT" ] && grep -E '^(watcher:|signal:|stale:|check:|heartbeat|supervision-host)' "$OUT" 2>/dev/null | head -8
     [ "$HOST_MODE" -eq 0 ] || printf 'The supervision host (config/supervision-host) ran these cycles; its last one exited %s without a wake.\n' "$HOST_RC"
     printf 'Do not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.\n'

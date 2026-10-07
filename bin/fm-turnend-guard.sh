@@ -375,10 +375,6 @@ autoarm_owns_recovery() {
   fi
   outcome=$(sed -n '1s/^.*outcome=\([a-z][a-z-]*\) .*$/\1/p' "$STATE/.claude-autoarm-epoch" 2>/dev/null || true)
   case "$outcome" in
-    policy-refused)
-      age=$(fm_path_age "$STATE/.claude-autoarm-epoch")
-      [ "$age" -ge "$EPOCH_FRESH" ] || return 0
-      ;;
     rewake)
       age=$(fm_path_age "$STATE/.claude-autoarm-epoch")
       if [ "$age" -lt "$EPOCH_FRESH" ]; then

@@ -28,8 +28,11 @@ test_supervision_host_protocol_only_on_an_opted_in_claude_home() {
   assert_not_contains "$plain" "Supervision host" "a claude home without config/supervision-host rendered the host protocol"
   : > "$config/supervision-host"
   hosted=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness claude)
-  assert_contains "$hosted" "- Supervision host:" "an opted-in claude home did not render the host state line"
-  [ "$(printf '%s\n' "$hosted" | grep -vF -e '- Supervision host:' | head -n "$(printf '%s\n' "$plain" | wc -l)")" = "$plain" ] \
+  assert_contains "$hosted" "- Supervision host: on;" "an opted-in claude home did not render the host state line"
+  assert_contains "$hosted" "Mode: Claude Stop-hook-owned supervision." "the host protocol replaced the claude protocol instead of adding to it"
+  assert_contains "$hosted" "supervision-host: cycle boundary" "the host protocol did not tell main how to handle a park boundary"
+  assert_contains "$hosted" "never run the return from it" "the host protocol did not say a handed-back wake is not the captain's return"
+  [ "$(printf '%s\n' "$hosted" | grep -vF -e '- Supervision host: on;' | head -n "$(printf '%s\n' "$plain" | wc -l)")" = "$plain" ] \
     || fail "the host protocol changed the claude block it should only append to"
   other=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness pi)
   assert_not_contains "$other" "Supervision host" "a pi primary rendered the host protocol"
@@ -40,7 +43,7 @@ test_supervision_host_protocol_only_on_an_opted_in_claude_home() {
 # own terms; Grok's model-owned arm command becomes the host; a home without
 # the file renders exactly what it did before, with no tag or placeholder.
 test_supervision_host_protocol_on_every_arm_owner() {
-  local home config harness plain hosted daemon_command other_daemon_command
+  local home config harness plain hosted body
   home="$TMP_ROOT/host-owners-home"
   config="$TMP_ROOT/host-owners-config"
   mkdir -p "$home/state" "$config"
@@ -51,25 +54,18 @@ test_supervision_host_protocol_on_every_arm_owner() {
     assert_not_contains "$plain" "__FM_" "$harness: a placeholder leaked into the rendered block"
     : > "$config/supervision-host"
     hosted=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness "$harness")
-    assert_contains "$hosted" "- Supervision host:" \
-      "$harness: an opted-in home did not render the host state line"
-    printf '%s\n' "$hosted" | grep -E '^\{[a-z,]+\} ' >/dev/null \
-      && fail "$harness: a harness tag leaked into the rendered block"
-    assert_not_contains "$hosted" "__FM_" "$harness: a placeholder leaked into the rendered block"
-    # These are command contracts in the emitted prompt, not prose about
-    # whether a configured host was successfully activated.
-    case "$harness" in
-      claude|grok)
-        daemon_command="\`bin/fm-afk-launch.sh start-native\`"
-        other_daemon_command="\`bin/fm-afk-launch.sh start\`"
-        ;;
-      *)
-        daemon_command="\`bin/fm-afk-launch.sh start\`"
-        other_daemon_command="\`bin/fm-afk-launch.sh start-native\`"
-        ;;
-    esac
-    assert_contains "$hosted" "$daemon_command" "$harness: the host protocol omitted its daemon command"
-    assert_not_contains "$hosted" "$other_daemon_command" "$harness: the host protocol included another harness's daemon command"
+    assert_contains "$hosted" "- Supervision host: on; it takes away-posture wakes and, where the dialog mirror is verified, eligible attended wakes itself, and hands the rest to you (protocol at the end of this block)." \
+      "$harness: an opted-in home did not render the host state line naming both postures it takes"
+    body=$(printf '%s\n' "$hosted" | sed -n '/^Supervision host: on for this home/,$p')
+    [ -n "$body" ] || fail "$harness: the host protocol is missing"
+    printf '%s\n' "$body" | grep -E '^\{[a-z,]+\} ' >/dev/null && fail "$harness: a harness tag leaked into the rendered protocol: $body"
+    [ "$(printf '%s\n' "$body" | grep -c 'runs the supervision host')" -eq 1 ] \
+      || fail "$harness: the protocol must name exactly one arm owner: $body"
+    [ "$(printf '%s\n' "$body" | grep -c '^ *Only a wake the host hands back reaches you')" -eq 1 ] \
+      || fail "$harness: the protocol must name exactly one wake path: $body"
+    [ "$(printf '%s\n' "$body" | grep -c '^3\. ')" -eq 1 ] || fail "$harness: the protocol must say once how the park boundary arrives: $body"
+    [ "$(printf '%s\n' "$body" | grep -c '^6\. ./afk. writes only the record here')" -eq 1 ] \
+      || fail "$harness: the protocol must say once what /afk does here: $body"
   done
   rm -f "$config/supervision-host"
   plain=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness grok)
@@ -84,35 +80,6 @@ test_supervision_host_protocol_on_every_arm_owner() {
   assert_contains "$hosted" 'FM_CODEX_WATCH_CHECKPOINT_AWAY' "codex must learn that an away checkpoint holds longer"
   assert_contains "$hosted" 'checkpoint: no actionable wake within' "codex must learn how the park boundary arrives"
   pass "renderer gives each non-Pi arm owner the host protocol in its own terms, and grok arms the host"
-}
-
-test_denied_grok_host_renders_only_ordinary_monitoring() {
-  local home policy out repair ordinary
-  home="$TMP_ROOT/grok-denied-home"
-  mkdir -p "$home/state" "$home/config"
-  printf 'claude\n' > "$home/config/supervision-host"
-  for policy in omp-or-tc malformed; do
-    printf '%s\n' "$policy" > "$home/config/session-launch-policy"
-    out=$(FM_HOME="$home" "$RENDER" --harness grok)
-    assert_contains "$out" "supervision-host: launch policy refused:" "denied rendering lost its diagnostic"
-    assert_contains "$out" 'exec bin/fm-watch-arm.sh`' "denied initial rendering did not select the ordinary watcher"
-    assert_not_contains "$out" "bin/fm-supervision-host.sh park" "denied rendering still selected the host"
-    ordinary=$(printf '%s\n' "$out" | grep -F -- '- Ordinary wake:')
-    assert_contains "$ordinary" "bin/fm-watch-arm.sh" "denied ordinary wake would retry the host"
-    repair=$(FM_HOME="$home" "$RENDER" --harness grok --repair-line)
-    assert_contains "$repair" "supervision-host: launch policy refused:" "denied repair lost its diagnostic"
-    assert_contains "$repair" "bin/fm-watch-arm.sh" "denied repair would not restore ordinary monitoring"
-    assert_not_contains "$repair" "bin/fm-supervision-host.sh park" "denied repair would retry the host"
-    FM_HOME="$home" "$RENDER" --harness grok --read-only 1 >/dev/null
-    assert_absent "$home/state/.lock" "renderer fabricated a session lock"
-    assert_absent "$home/state/.wake-queue" "renderer published a refusal wake"
-    assert_absent "$home/state/.session-launch-refused-.supervision-host" "renderer wrote a refusal receipt"
-  done
-  rm "$home/config/session-launch-policy"
-  out=$(FM_HOME="$home" "$RENDER" --harness grok)
-  assert_contains "$out" 'exec bin/fm-supervision-host.sh park`' "absent policy no longer permits the host"
-  assert_not_contains "$out" "launch policy refused:" "absent policy rendered a refusal"
-  pass "Grok renders read-only refusal diagnostics and ordinary initial, repair, and wake commands"
 }
 
 test_unknown_fallback() {
@@ -318,7 +285,6 @@ test_pi_snippet_uses_effective_extension_path() {
 
 test_supervision_host_protocol_only_on_an_opted_in_claude_home
 test_supervision_host_protocol_on_every_arm_owner
-test_denied_grok_host_renders_only_ordinary_monitoring
 test_selected_harness_block_only
 test_unknown_fallback
 test_conditional_stanzas

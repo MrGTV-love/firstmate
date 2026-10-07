@@ -104,28 +104,12 @@ case "$HARNESS" in
 esac
 [ -f "$SNIPPET" ] || SNIPPET="$DOC_DIR/unknown.md"
 HOST_SNIPPET=
-HOST_REFUSAL=
 grok_arm='bin/fm-watch-arm.sh'
 case "$HARNESS" in
   claude|cursor|opencode|omp|grok|codex)
     if [ -f "$CONFIG/supervision-host" ]; then
-      . "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
-      if policy_enabled=$(fm_session_launch_policy_enabled "$CONFIG" 2>&1); then
-        if [ "$policy_enabled" = 1 ]; then
-          fm_supervision_host_config "$CONFIG" "$HARNESS"
-          if [ -z "$FM_SUPERVISION_ENGINE" ]; then
-            HOST_REFUSAL="no permitted supervision engine: $FM_SUPERVISION_ENGINE_PROBLEM"
-          fi
-        fi
-      else
-        HOST_REFUSAL=$policy_enabled
-      fi
-      if [ -z "$HOST_REFUSAL" ]; then
-        HOST_SNIPPET="$DOC_DIR/supervision-host.md"
-        grok_arm='bin/fm-supervision-host.sh park'
-      else
-        HOST_REFUSAL="supervision-host: launch policy refused: $HOST_REFUSAL; restore ordinary primary supervision without retrying this host before configuration changes"
-      fi
+      HOST_SNIPPET="$DOC_DIR/supervision-host.md"
+      grok_arm='bin/fm-supervision-host.sh park'
     fi
     ;;
 esac
@@ -250,8 +234,6 @@ ordinary_wake_line() {
   esac
 }
 
-[ -z "$HOST_REFUSAL" ] || printf '%s\n' "$HOST_REFUSAL"
-
 if [ "$REPAIR_LINE" -eq 1 ]; then
   repair_line
   exit 0
@@ -282,7 +264,7 @@ else
   printf '%s\n' '- X mode: inactive; use the default watcher cadence.'
 fi
 if [ -n "$HOST_SNIPPET" ]; then
-  printf '%s\n' '- Supervision host: configured; when activation succeeds, it takes away-posture wakes and, where the dialog mirror is verified, eligible attended wakes itself, and hands the rest to you (protocol at the end of this block).'
+  printf '%s\n' '- Supervision host: on; it takes away-posture wakes and, where the dialog mirror is verified, eligible attended wakes itself, and hands the rest to you (protocol at the end of this block).'
 fi
 ordinary_wake_line
 printf '\n'

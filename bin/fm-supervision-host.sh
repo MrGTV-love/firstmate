@@ -32,11 +32,6 @@
 # and an FM_WATCH_PREDECESSOR_ARM_PID the owner passes reaches that first
 # cycle only, for owners that start their own successor after every close
 # (OpenCode, omp).
-# A launch-policy refusal returns 1 with an actionable "supervision-host:"
-# close and attempts to publish a recovery episode; publication failure is
-# reported in the close, and neither outcome implies ownership transferred.
-# Both closes are terminal for the unchanged configuration: omp and OpenCode
-# restore the ordinary watcher arm; other owners deliver the refusal to main.
 #
 # THE LOOP. It owns watcher cycles through bin/fm-watch-arm.sh. The posture is
 # the away-posture record state/.afk-contract, read at every close and again
@@ -134,8 +129,6 @@
 # engine descendants its turn recorded, removes that turn's files, and
 # releases the branch actor's leases; it releases them again after every
 # engine turn.
-# Session launch policy refusal happens before activation and its cleanup trap,
-# so a forbidden engine leaves the predecessor's processes and custody intact.
 #
 # STATE (all under state/, owned here): .supervision-host (this host's pid and
 # the processes it runs), .supervision-host-engine (the engine conversation:
@@ -596,19 +589,6 @@ stand_down() {  # <why>
   exit 0
 }
 
-# Unlike ownership stand-down, a policy refusal leaves continuity with main.
-# Publish its recovery episode before activation: Claude's Stop consumer needs
-# that generation to commit the actionable close rather than suppressing it.
-refuse_launch_policy() {  # <why>
-  log_line "policy-refusal	$1"
-  if ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime; then
-    emit "supervision-host: launch policy refused: $1; could not record the hand-back; restore ordinary primary supervision without retrying this host before configuration changes"
-    exit 1
-  fi
-  emit "supervision-host: launch policy refused: $1; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes"
-  exit 1
-}
-
 # Start the successor cycle and wait until it proves a live watcher. Sets
 # SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when the arm attached).
 start_successor() {  # <predecessor-arm-pid>
@@ -995,16 +975,6 @@ attended_acceptor() {  # <first-reason-line>
 # host, processes, arms, and leases alone.
 if ! host_still_owner; then
   stand_down "this session does not own supervision"
-fi
-# An opted-in session policy must be resolved before activation can stop or
-# retire a predecessor. Absent-policy host behavior remains unchanged.
-policy_enabled=$(fm_session_launch_policy_enabled "$CONFIG" 2>&1) \
-  || refuse_launch_policy "$policy_enabled"
-if [ "$policy_enabled" = 1 ]; then
-  fm_supervision_host_config "$CONFIG" "$PRIMARY" \
-    || refuse_launch_policy "config/session-launch-policy requires a configured permitted supervision engine"
-  [ -n "$FM_SUPERVISION_ENGINE" ] \
-    || refuse_launch_policy "no permitted supervision engine: $FM_SUPERVISION_ENGINE_PROBLEM"
 fi
 trap cleanup EXIT
 trap 'exit 129' HUP

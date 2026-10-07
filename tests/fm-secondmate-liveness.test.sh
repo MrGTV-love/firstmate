@@ -485,6 +485,7 @@ test_sweep_launch_policy_allows_configured_omp_replacement() {
   local w fb tmuxfb log out
   w=$(new_world sweep-policy-allowed)
   add_sm_home "$w" sm1 firstmate:fm-sm1 codex
+  ln -s "$ROOT/bin/"* "$w/sm1/bin/"
   printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
   printf 'omp openai-codex/gpt-6.1-sol high\n' > "$w/home/config/secondmate-harness"
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")

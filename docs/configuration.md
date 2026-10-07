@@ -300,11 +300,11 @@ Both choices are local to each Firstmate home and are not part of secondmate inh
 
 ## Supervision host (config/supervision-host)
 
-The optional local, gitignored `config/supervision-host` selects a supervision host for this home.
+The optional local, gitignored `config/supervision-host` enables a supervision host for this home.
 The host runs the supervision branch's contract on a headless engine session beside a non-Pi primary.
 [docs/supervision-host.md](supervision-host.md) defines its design, current scope, and verified engines.
 A Claude, Cursor, OpenCode, omp, Grok, or Codex primary can run the host.
-With the file present, the primary's arm owner selects the host in place of the watcher arm, subject to the [session launch policy](#session-launch-policy-configsession-launch-policy).
+With the file present, the primary's arm owner runs the host in place of the watcher arm.
 The host handles wakes on the engine while `state/.afk-contract` exists, and also while attended on a Claude or Cursor primary, whose dialog mirror is verified ([supervision-host.md](supervision-host.md#postures)).
 On that home, `/afk` launches no away daemon; see [Quiet mode](supervision-host.md#quiet-mode) for `/quiet`'s attended statement and fallback.
 The file also gates the primary's dialog-mirror hooks (`bin/fm-host-mirror.sh`), which record on a Claude or Cursor primary ([supervision-host.md](supervision-host.md#the-dialog-mirror)).
@@ -319,14 +319,14 @@ The file may be empty, or hold one line `<engine> [<model>]`:
 - empty or `default` selects the primary harness's own engine at that engine's default model (`sonnet` for the Claude engine);
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
-When host activation is permitted, a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file because only Claude has a verified engine of its own.
+Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
 
 ### Failures and when changes apply
 
-Without an enabled [session launch policy](#session-launch-policy-configsession-launch-policy), an unverified engine, a primary without a verified engine, or a malformed line leaves the host without an engine.
+An unverified engine, a primary without a verified engine, or a malformed line leaves the host without an engine.
 It takes no wake, so every wake reaches main as it would without the host.
 Each away-posture wake includes a line naming the problem.
-An active host reads the file at every wake, so an engine-selection change applies at the next one without a restart.
+The file is read at every wake, so a change applies at the next one without a restart.
 
 It is local to each home and not part of secondmate inherited configuration.
 While the file exists, main's lease-checked commands also take the per-task lease lock, so a claim by the host's engine cannot race a mutation main already started (`bin/fm-lease-lib.sh`).
@@ -787,7 +787,7 @@ The shared template leaves this restriction off by default: absence preserves ex
 Enabling it in each captain home is the operator's responsibility.
 An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
-Local admission also requires the child's policy parser/configuration dependency and spawn, control, automatic-recovery, supervision-host/engine, and remote-replacement owners to match the authoritative launching code's bytes.
+Local admission also requires the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
 This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
 Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
 Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt, while unrelated inheritance remains best-effort.
@@ -807,17 +807,13 @@ Automatic secondmate recovery and host-local remote launch check the selected re
 Automatic session-end and secondmate recovery notify once per task or secondmate generation and refusal fingerprint, derived from the raw policy-source contents and admission diagnostic.
 Acknowledging the queued notification does not make an unchanged refusal recur, and toggling the policy away and back does not re-notify an already-seen fingerprint within that generation.
 This notification deduplication does not skip policy admission checks: repairs remain immediately eligible for reconsideration, while recovery-attempt and handled-generation accounting remain untouched by a refusal.
-The supervision host also refuses a disallowed engine before activation can stop its predecessor or retire its custody, and direct or resumed engine turns repeat the same check.
-Its policy refusal is a terminal actionable close, not an ownership stand-down: Claude's Stop hook and Cursor's park deliver it, while omp and OpenCode restore ordinary watcher monitoring without retrying the denied host.
-Pending refusal replay follows the [omp session replacement contract](watcher-continuity.md#omp-session-replacement).
-Currently its only verified engine starts standalone Claude, so this opt-in prevents host activation even under an omp primary; use ordinary primary supervision until a permitted native engine is verified.
-Away entry recommends only policy-admissible verified engines; when none is permitted, it directs the operator to continue main-side supervision rather than configure standalone Claude.
 A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
 Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.
 Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.
 
-[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh) and [`tests/fm-supervision-session-launch-policy.test.sh`](../tests/fm-supervision-session-launch-policy.test.sh).
+[`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh).
 This setting governs Firstmate-owned launches only, not separately configured validation tools or the operator's own primary session.
+The Pi supervision branch is an in-process part of the exempt operator primary session, not a Firstmate-invoked worker, and is also exempt.
 
 ### Installed hooks and launch details
 

@@ -34,11 +34,6 @@
 # Test seam: FM_SUPERVISION_ENGINE_CLAUDE_BIN names the claude executable
 # (default: claude on PATH), so a hermetic test can run a stub engine through
 # the real argument construction.
-# The session launch policy is checked both when selecting an engine and on
-# every direct or resumed turn, before allocating process custody.
-
-# shellcheck source=bin/fm-session-launch-policy-lib.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-session-launch-policy-lib.sh"
 
 FM_SUPERVISION_ENGINES_VERIFIED='claude'
 
@@ -68,7 +63,7 @@ fm_supervision_engine_default_model() {  # <engine>
 # sentence naming why this home has no engine.
 # shellcheck disable=SC2034 # Output globals, read by the sourcing caller.
 fm_supervision_host_config() {
-  local config=$1 primary=${2:-} line engine model extra policy_error
+  local config=$1 primary=${2:-} line engine model extra
   FM_SUPERVISION_ENGINE=''
   FM_SUPERVISION_ENGINE_MODEL=''
   FM_SUPERVISION_ENGINE_PROBLEM=''
@@ -98,10 +93,6 @@ EOF
       fi
       ;;
   esac
-  if ! policy_error=$(fm_session_launch_policy_check "$config" "$engine" 2>&1); then
-    FM_SUPERVISION_ENGINE_PROBLEM=${policy_error%%$'\n'*}
-    return 0
-  fi
   case "$model" in
     '') model=$(fm_supervision_engine_default_model "$engine") || model= ;;
     *[!A-Za-z0-9._:/@-]*)
@@ -112,30 +103,6 @@ EOF
   FM_SUPERVISION_ENGINE=$engine
   FM_SUPERVISION_ENGINE_MODEL=$model
   return 0
-}
-
-# shellcheck disable=SC2034
-fm_supervision_host_autoarm_enabled() {
-  local config=$1 primary=$2 state=$3 enabled problem generation
-  FM_SUPERVISION_HOST_REFUSAL=
-  FM_SUPERVISION_HOST_REFUSAL_WAKE=
-  fm_supervision_host_enabled "$config" || return 1
-  if enabled=$(fm_session_launch_policy_enabled "$config" 2>&1); then
-    [ "$enabled" = 1 ] || return 0
-    fm_supervision_host_config "$config" "$primary"
-    [ -z "$FM_SUPERVISION_ENGINE" ] || return 0
-    problem="no permitted supervision engine: $FM_SUPERVISION_ENGINE_PROBLEM"
-  else
-    problem=$enabled
-  fi
-  FM_SUPERVISION_HOST_REFUSAL="supervision-host: launch policy refused: $problem; restore ordinary primary supervision without retrying this host before configuration changes"
-  FM_SUPERVISION_HOST_REFUSAL_WAKE=$FM_SUPERVISION_HOST_REFUSAL
-  generation=$(fm_supervision_host_main_key "$state") || return 1
-  fm_session_launch_policy_refusal_notify "$state" .supervision-host "$generation" \
-    "check: $FM_SUPERVISION_HOST_REFUSAL" "$problem" \
-    "$config/session-launch-policy" "$config/supervision-host" || return 1
-  [ -n "$FM_SESSION_LAUNCH_REFUSAL_WAKE" ] || FM_SUPERVISION_HOST_REFUSAL_WAKE=
-  return 1
 }
 
 # fm_supervision_host_attended_ready <config-dir> <primary-harness>
@@ -328,7 +295,6 @@ fm_supervision_engine_turn() {
   local engine=$1 model=$2 prompt=$3 message=$4 session=$5 mode=$6 timeout=$7 result=$8 errors=$9
   local pid_file=${10:-} bin grace ledger watched rc home_phys root_phys state_phys identity recorded
   local -a args
-  fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$engine" 2>"$errors" || return 127
   bin=$(fm_supervision_engine_bin "$engine" 2>"$errors") || return 127
   case "$timeout" in ''|0*|*[!0-9]*) timeout=1200 ;; esac
   grace=${FM_SUPERVISION_ENGINE_GRACE:-30}

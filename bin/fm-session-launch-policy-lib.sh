@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Session launch policy shared by spawning, recovery, and supervision engines.
+# Session launch policy shared by spawning and recovery.
 # docs/configuration.md "Session launch policy" owns the opt-in schema.
 # Absent configuration preserves existing behavior; a restriction never maps
 # a recorded harness or model to another profile. Opaque raw commands refuse.
@@ -107,8 +107,7 @@ fm_session_launch_policy_check_child() {
   source_bin=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || return 1
   for file in fm-session-launch-policy-lib.sh fm-config-inherit-lib.sh \
     fm-spawn.sh fm-control.sh fm-secondmate-liveness-lib.sh \
-    fm-session-end-relaunch-lib.sh fm-supervision-host.sh \
-    fm-supervision-engine-lib.sh fm-remote-secondmate-relaunch.sh \
+    fm-session-end-relaunch-lib.sh fm-remote-secondmate-relaunch.sh \
     fm-remote-secondmate-control.sh; do
     if [ ! -f "$home/bin/$file" ] || [ ! -r "$home/bin/$file" ] \
       || ! cmp -s "$source_bin/$file" "$home/bin/$file"; then

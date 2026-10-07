@@ -24,18 +24,16 @@
 //   - The arming tool is fm_watch_arm_omp and its human fallback
 //     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
 //   - Supervision host: a home opted in with config/supervision-host
-//     (docs/configuration.md "Supervision host" owns the opt-in) selects
-//     bin/fm-supervision-host.sh park --restart in the arm's place, subject to
-//     the session launch policy. A permitted host takes away-posture wakes itself
-//     and closes when main is needed; its header owns the output read here.
-//     A "supervision-host:" line is
+//     (docs/configuration.md "Supervision host" owns the opt-in) spawns
+//     bin/fm-supervision-host.sh park --restart in the arm's place, which
+//     takes away-posture wakes itself and closes only when main is needed; its
+//     header owns the output read here. A "supervision-host:" line is
 //     actionable like a wake line, and the message delivered at the host's
 //     close carries every such line in order while wake lines keep an
 //     eight-line cap. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
-//     longer readiness budget for the host's own startup. A launch refusal restores
-//     the ordinary arm until the host configuration changes. Without the file
+//     longer readiness budget for the host's own startup. Without the file
 //     nothing below changes.
 //
 // Session-generation ownership (stated once here):
@@ -203,7 +201,6 @@ const armRetired = new WeakSet<ChildProcess>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
 const armHostMode = new WeakMap<ChildProcess, boolean>();
-let refusedHostConfiguration: string | null = null;
 
 function positiveInteger(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -257,20 +254,6 @@ function actionableLine(output: string): string {
 function completedActionableLine(output: string): string {
   const newline = output.lastIndexOf("\n");
   return newline < 0 ? "" : actionableLine(output.slice(0, newline + 1));
-}
-
-function hostConfigurationKey(): string {
-  return JSON.stringify(["supervision-host", "session-launch-policy"].map((name) => {
-    try {
-      return { content: readFileSync(`${config}/${name}`, "utf8") };
-    } catch (error) {
-      return { error: nodeErrorCode(error) || "unreadable" };
-    }
-  }));
-}
-
-function hostLaunchRefused(message: string): boolean {
-  return /^supervision-host: launch policy refused:/m.test(message);
 }
 
 // The host-mode wake message: every "supervision-host:" line in order, wake
@@ -954,20 +937,7 @@ export default function (pi: ExtensionAPI) {
       };
     }
     const id = ++owner.seq;
-    const hostConfiguration = hostConfigurationKey();
-    if (refusedHostConfiguration !== hostConfiguration &&
-      owner.pendingActionables.some((item) => hostLaunchRefused(item.message))) {
-      const result = spawnSync(
-        "bash",
-        ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" omp && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
-          `${fmRoot}/bin/fm-supervision-engine-lib.sh`, config],
-        { cwd: fmRoot, encoding: "utf8", env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config } },
-      );
-      if (result.status === 1) {
-        refusedHostConfiguration = hostConfiguration;
-      }
-    }
-    const hostMode = existsSync(`${config}/supervision-host`) && refusedHostConfiguration !== hostConfiguration;
+    const hostMode = existsSync(`${config}/supervision-host`);
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       FM_HOME: fmHome,
@@ -1039,16 +1009,6 @@ export default function (pi: ExtensionAPI) {
       settleReadiness(false);
       releaseChild();
       const classification = classifyClose(hostMode, stdout, stderr, code, signal);
-      if (hostMode && hostLaunchRefused(classification.message)) {
-        const currentConfiguration = hostConfigurationKey();
-        const result = spawnSync(
-          "bash",
-          ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" omp && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
-            `${fmRoot}/bin/fm-supervision-engine-lib.sh`, config],
-          { cwd: fmRoot, encoding: "utf8", env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config } },
-        );
-        refusedHostConfiguration = result.status === 1 ? currentConfiguration : null;
-      }
       const predecessor = String(armChild.pid ?? "");
       if (classification.kind === "actionable") {
         const pending = armPendingActionable.get(armChild) ?? createPendingActionable(classification.message, predecessor);

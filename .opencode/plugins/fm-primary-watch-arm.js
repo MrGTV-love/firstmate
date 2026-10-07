@@ -3,18 +3,16 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.js";
 
-// Supervision host: with config/supervision-host this plugin tries
-// bin/fm-supervision-host.sh park --restart in the arm's place, subject to the
-// session launch policy (docs/configuration.md owns the opt-in and policy).
-// docs/supervision-host.md owns activation and posture behavior; the host's
-// header owns the output read here. A policy refusal restores the ordinary
-// watcher arm for the unchanged configuration.
-// A "supervision-host:" line is actionable like a wake line, and the delivered
-// message carries every such line in order while wake lines keep an eight-line
-// cap. An active host prints the first cycle's status line as soon as it is
-// verified, so readiness and the handling handoff work as they do for the arm,
-// with a longer readiness budget for the host's own startup.
-// Without the file nothing below changes.
+// Supervision host: a home opted in with config/supervision-host
+// (docs/configuration.md "Supervision host" owns the opt-in) spawns
+// bin/fm-supervision-host.sh park --restart in the arm's place, which takes
+// away-posture wakes itself and closes only when main is needed; its header
+// owns the output read here. A "supervision-host:" line is actionable like a
+// wake line, and the delivered message carries every such line in order while
+// wake lines keep an eight-line cap. The host prints the first cycle's status
+// line as soon as it is verified, so readiness and the handling handoff work
+// as they do for the arm, with a longer readiness budget for the host's own
+// startup. Without the file nothing below changes.
 const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
 // 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
 // bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
@@ -39,8 +37,6 @@ let armClose = new WeakMap();
 let armReadiness = new WeakMap();
 let armRecovery = new WeakMap();
 let armHostMode = new WeakMap();
-let refusedHostConfiguration = null;
-const armHostRefusal = new WeakMap();
 
 function positiveInteger(name, fallback) {
   const value = Number(process.env[name]);
@@ -149,20 +145,6 @@ async function sessionOwnsLock(paths) {
   return false;
 }
 
-function hostConfigurationKey(paths) {
-  return JSON.stringify(["supervision-host", "session-launch-policy"].map((name) => {
-    try {
-      return { content: readFileSync(`${paths.config}/${name}`, "utf8") };
-    } catch (error) {
-      return { error: String(error?.code ?? "unreadable") };
-    }
-  }));
-}
-
-function hostLaunchRefused(message) {
-  return /^supervision-host: launch policy refused:/m.test(message);
-}
-
 // The host-mode wake message: every "supervision-host:" line in order, wake
 // lines capped at eight, and the away note while the posture record exists.
 function hostWakeMessage(paths, combined) {
@@ -222,11 +204,6 @@ function classifyArmClose(paths, hostMode, stdout, stderr, code, signal) {
 
 function observeArmOutput(hostMode, stdout, stderr, settleReadiness) {
   const combined = `${stdout}\n${stderr}`;
-  if (hostMode && hostLaunchRefused(combined)) {
-    setArmStatus("refused");
-    settleReadiness("refused");
-    return;
-  }
   if (combined.split(/\r?\n/).some((line) => WAKE_LINE.test(line) || (hostMode && HOST_LINE.test(line)))) {
     setArmStatus("wake");
     settleReadiness("wake");
@@ -353,29 +330,23 @@ function restorationFailure(status) {
 
 async function restoreAfterActionableClose(paths, sessionID, client, predecessorArmPid) {
   let failure = "";
-  let refusal = "";
   for (let attempt = 0; attempt <= REARM_RETRY_LIMIT; attempt += 1) {
-    let { status, armChild } = await ensureArm(paths, sessionID, client, predecessorArmPid, true);
-    if (status === "refused") {
-      await armClose.get(armChild);
-      refusal = armHostRefusal.get(armChild) ?? "";
-      ({ status, armChild } = await ensureArm(paths, sessionID, client, String(armChild.pid ?? ""), true));
-    }
-    if (status === "armed") return { failure: refusal, recovery: armRecovery.get(armChild) };
+    const { status, armChild } = await ensureArm(paths, sessionID, client, predecessorArmPid, true);
+    if (status === "armed") return { failure: "", recovery: armRecovery.get(armChild) };
     // An actionable line belongs to this arm's close handler.
     // Do not retire it before that handler can start the successor cycle.
-    if (status === "wake") return { failure: refusal, recovery: armRecovery.get(armChild) };
+    if (status === "wake") return { failure: "", recovery: armRecovery.get(armChild) };
     failure = restorationFailure(status);
     if (!(await retireArm(armChild))) {
       setArmStatus("failed");
-      return { failure: `${refusal ? `${refusal}\n\n` : ""}${failure}\nwatcher: FAILED - OpenCode could not restore watcher continuity because the unready successor arm did not exit within ${ARM_RETIRE_TIMEOUT_MS}ms` };
+      return { failure: `${failure}\nwatcher: FAILED - OpenCode could not restore watcher continuity because the unready successor arm did not exit within ${ARM_RETIRE_TIMEOUT_MS}ms` };
     }
     if (status === "read-only" || status === "not-primary" || status === "skipped") break;
     if (attempt === REARM_RETRY_LIMIT) break;
     await waitForRetry(attempt + 1);
   }
   setArmStatus("failed");
-  return { failure: `${refusal ? `${refusal}\n\n` : ""}${failure}\nwatcher: FAILED - OpenCode could not restore watcher continuity after ${REARM_RETRY_LIMIT} retries` };
+  return { failure: `${failure}\nwatcher: FAILED - OpenCode could not restore watcher continuity after ${REARM_RETRY_LIMIT} retries` };
 }
 
 async function scheduleRetry(paths, sessionID, client, reason, predecessorArmPid) {
@@ -395,7 +366,7 @@ async function scheduleRetry(paths, sessionID, client, reason, predecessorArmPid
   const timer = setTimeout(() => {
     if (retryTimer === timer) retryTimer = null;
     void ensureArm(paths, sessionID, client, predecessorArmPid).then((status) => {
-      if (["armed", "starting", "wake", "refused"].includes(status)) return;
+      if (["armed", "starting", "wake"].includes(status)) return;
       surfaceFailure(paths, client, sessionID, `watcher: FAILED - OpenCode could not launch a continuity retry (${status})`);
     });
   }, retryDelay(retryFailures));
@@ -405,8 +376,7 @@ async function scheduleRetry(paths, sessionID, client, reason, predecessorArmPid
 
 function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
   setArmStatus("starting");
-  const hostConfiguration = hostConfigurationKey(paths);
-  const hostMode = existsSync(`${paths.config}/supervision-host`) && refusedHostConfiguration !== hostConfiguration;
+  const hostMode = existsSync(`${paths.config}/supervision-host`);
   const env = {
     ...process.env,
     FM_HOME: paths.home,
@@ -462,22 +432,10 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
   armChild.on("close", (code, signal) => {
     if (settled) return;
     settled = true;
+    resolveClosed();
     releaseChild();
     const classification = classifyArmClose(paths, hostMode, stdout, stderr, code, signal);
-    const refused = hostMode && hostLaunchRefused(classification.message);
-    if (refused) {
-      const currentConfiguration = hostConfigurationKey(paths);
-      const result = spawnSync(
-        "bash",
-        ["-c", '. "$1"; policy_enabled=$(fm_session_launch_policy_enabled "$2" 2>/dev/null) || exit 1; [ "$policy_enabled" = 1 ] || exit 0; fm_supervision_host_config "$2" opencode && [ -n "$FM_SUPERVISION_ENGINE" ]', "_",
-          `${paths.root}/bin/fm-supervision-engine-lib.sh`, paths.config],
-        { cwd: paths.root, encoding: "utf8", env: { ...process.env, FM_HOME: paths.home, FM_CONFIG_OVERRIDE: paths.config } },
-      );
-      refusedHostConfiguration = result.status === 1 ? currentConfiguration : null;
-      armHostRefusal.set(armChild, classification.message);
-    }
-    resolveClosed();
-    settleReadiness(refused ? "refused" : classification.kind === "actionable" ? "wake" : "failed");
+    settleReadiness(classification.kind === "actionable" ? "wake" : "failed");
     const predecessor = String(armChild.pid ?? "");
     if (classification.kind === "actionable") {
       if (restorationInFlight) return;

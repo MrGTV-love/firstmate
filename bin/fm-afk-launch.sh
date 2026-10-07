@@ -20,9 +20,9 @@
 # `start` refuses on those harnesses. The same holds for away mode (not quiet
 # mode) on a claude, cursor, opencode, omp, grok, or codex primary whose home
 # opted into the supervision host (config/supervision-host), where the host
-# runs the away session when activation is permitted; `enter` adds one line when
-# the host has no engine, because every away wake then reaches main.
-# Every other harness still runs the daemon, so `start` and `start-native` require the record
+# runs the away session; `enter` there adds one line when the host has no
+# engine, because every away wake then reaches main. Every other harness still
+# runs the daemon for now, so `start` and `start-native` require the record
 # `enter` wrote before they launch the daemon.
 # QUIET MODE on a home that opted into the supervision host needs nothing
 # where the attended host runs (docs/supervision-host.md "Quiet mode"): its
@@ -237,8 +237,8 @@ fm_afk_launch_primary_harness() {
   "$FM_AFK_LAUNCH_DIR/fm-harness.sh" 2>/dev/null || printf unknown
 }
 
-# The primary harnesses whose arm owner selects the supervision host when the
-# home opts in (docs/supervision-host.md owns activation).
+# The primary harnesses whose arm owner runs the supervision host when the
+# home opted in (docs/supervision-host.md).
 fm_afk_launch_host_primary() {  # <harness>
   case "$1" in
     claude|cursor|opencode|omp|grok|codex) return 0 ;;
@@ -316,7 +316,7 @@ fm_afk_launch_quiet_check() {
 # The away daemon is no longer launched on Pi, nor for away mode on a primary
 # whose home opted into the supervision host (config/supervision-host,
 # docs/supervision-host.md): the posture record is the whole entry there and
-# main handles wakes when host activation is refused. Quiet mode runs the
+# the ordinary supervision session runs in both postures. Quiet mode runs the
 # daemon on that home only where a quiet `enter` found the attended host
 # unready (the header's QUIET MODE), so a quiet entry or a refresh of a running
 # quiet daemon is allowed.
@@ -335,15 +335,15 @@ fm_afk_launch_daemon_allowed() {
     mode=$(head -n 1 "$FM_AFK_LAUNCH_STATE/.afk" 2>/dev/null || true)
   fi
   [ "$mode" != quiet ] || return 0
-  fm_afk_launch_log "the away daemon is not launched on this $harness home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)"
+  fm_afk_launch_log "the away daemon is not launched on this $harness home, which runs the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)"
   return 1
 }
 
-# One entry line when the configured host has no usable engine, including a
-# launch-policy refusal (bin/fm-supervision-engine-lib.sh owns selection), so
-# main handles every away wake.
+# One line for the entry when this home runs the supervision host but the host
+# has no engine (bin/fm-supervision-engine-lib.sh owns the opt-in parse), so
+# the away posture would hand every wake to main.
 fm_afk_launch_host_engine_note() {
-  local harness config engine
+  local harness config
   [ "${FM_AFK_MODE:-}" != quiet ] || return 0
   config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   [ -f "$config/supervision-host" ] || return 0
@@ -351,15 +351,8 @@ fm_afk_launch_host_engine_note() {
   fm_afk_launch_host_primary "$harness" || return 0
   fm_supervision_host_config "$config" "$harness" || return 0
   [ -z "$FM_SUPERVISION_ENGINE" ] || return 0
-  printf 'Supervision host: no engine runs the away session on this home (%s), so every away wake reaches this conversation; ' \
+  printf 'Supervision host: no engine runs the away session on this home (%s), so every away wake reaches this conversation; name a verified engine in config/supervision-host (for example "claude").\n' \
     "$FM_SUPERVISION_ENGINE_PROBLEM"
-  for engine in $FM_SUPERVISION_ENGINES_VERIFIED; do
-    if fm_session_launch_policy_check "$config" "$engine" >/dev/null 2>&1; then
-      printf 'name a verified engine in config/supervision-host (for example "%s").\n' "$engine"
-      return 0
-    fi
-  done
-  printf 'continue main-side supervision until a permitted native engine is verified.\n'
 }
 
 fm_afk_launch_catchup_pending() {

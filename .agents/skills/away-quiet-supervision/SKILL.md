@@ -15,8 +15,7 @@ The `/afk` and `/quiet` skills each own their daemon procedure, which is otherwi
   A record carrying quiet mode (`bin/fm-afk-contract.sh mode`) is quiet mode's instead: the captain is present, it holds nothing for a return, and requested actions proceed under ordinary attended authority.
 - While `state/.afk` exists, the daemon owns supervision; do not arm a separate watcher.
   The daemon is never launched on Pi, where the ordinary supervision session continues under the record with main parked: the branch takes every safe actionable wake it can, and only a declined wake (including a broken branch or unsafe scan) or a watcher failure wakes main.
-  Away mode on a non-Pi home with an active [supervision host](../../../docs/supervision-host.md) works the same way with the host as the branch; a wake it hands back arrives through that harness's own wake path and is never the captain's return.
-  If the configured host is unavailable or activation is refused, handle away wakes on main instead; the host owner above governs activation and refusal handling, and `/afk` still refuses the away daemon on that configured home.
+  Away mode on a non-Pi home with `config/supervision-host` works the same way with the supervision host as the branch; a wake it hands back arrives through that harness's own wake path and is never the captain's return.
 - A marked message while away or quiet mode is active is internal escalation and does not exit that mode.
 - A message beginning `/afk` refreshes away mode; a message beginning `/quiet` refreshes quiet mode.
 - Any other unmarked message means the captain returned in away mode (load `/afk`, run the return owner, and do not process that message as ordinary work until its durable catch-up gate clears), or, in quiet mode, is simply answered as ordinary work with the flag and daemon left untouched until an explicit `/quiet off`.

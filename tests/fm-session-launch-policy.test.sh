@@ -686,8 +686,7 @@ done
 for entry in fresh direct control auto; do
   for owner in fm-session-launch-policy-lib.sh fm-config-inherit-lib.sh \
     fm-spawn.sh fm-control.sh fm-secondmate-liveness-lib.sh \
-    fm-session-end-relaunch-lib.sh fm-supervision-host.sh \
-    fm-supervision-engine-lib.sh fm-remote-secondmate-relaunch.sh \
+    fm-session-end-relaunch-lib.sh fm-remote-secondmate-relaunch.sh \
     fm-remote-secondmate-control.sh; do
     make_secondmate_case "child-$entry-outdated-${owner%.sh}" omp "$entry"
     restrict
