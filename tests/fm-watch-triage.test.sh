@@ -4746,11 +4746,7 @@ term_watcher_with_held_marker_lock() {  # <dir> [release-ticks]
         wait "$writer"
         rm -f "$contended"
       fi
-      i=0
-      while [ "$i" -lt "$release_ticks" ]; do
-        sleep 0.1
-        i=$((i + 1))
-      done
+      sleep "$((release_ticks / 10)).$((release_ticks % 10))"
     else
       : > "$held"
       i=0
@@ -5828,34 +5824,37 @@ pe_case() {  # <dir> <command>...
    FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_HOME="$dir" "$ROOT/bin/fm-procevent.sh" "$@")
 }
 
-# Capture one real process-event result into <dir>'s home, then retire the
-# source so the fixture holds exactly the reported end state: one durably
-# captured, unhandled, queued result and no remaining poll work.
+# Capture one real final-feedback result into <dir>'s home. Terminal retirement
+# leaves exactly one durably captured, unhandled, queued result and no poller;
+# a waiting payload would instead opt into Lavish's unhandled relisten loop.
 seed_captured_procevent_result() {  # <dir>
   local dir=$1 i=0
   pe_case "$dir" register lavish delivery-src -- \
-    /bin/sh -c 'printf "session:\n  file: /a.html\n  status: waiting\n"' >/dev/null || return 1
+    /usr/bin/printf 'session:\n  file: /a.html\n  status: feedback\n  session_ended: true\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","delivery fixture","","message",""\n' >/dev/null || return 1
   pe_case "$dir" reconcile >/dev/null || return 1
   while [ "$i" -lt 100 ]; do
     [ -s "$dir/state/.wake-queue" ] && break
     sleep 0.1
     i=$((i + 1))
   done
-  # The runner publishes that wake BEFORE it releases its claim and exits, so a
-  # retire that lands in that gap reads the exiting runner's ownership as
-  # uncertain and refuses with "cannot confirm runner identity" - the pipeline
-  # saw exactly that under load. Wait, bounded, for the release the publish
-  # promises, so retire meets a source nothing owns instead of racing the
-  # runner's last milliseconds. The bound keeps a runner that never releases a
-  # real failure at retire rather than a hang here.
+  # Publication precedes terminal retirement and claim release. Keep the wait
+  # bounded so the fixture never starts a watcher while its runner still owns
+  # the source, and a retirement that fails cannot silently leave poll work.
   i=0
   while [ "$i" -lt 100 ]; do
     [ -e "$dir/claims/delivery-src.claim" ] || break
     sleep 0.1
     i=$((i + 1))
   done
-  pe_case "$dir" retire delivery-src >/dev/null || return 1
-  [ -s "$dir/state/.wake-queue" ]
+  set -- "$dir/state/procevent-inbox"/delivery-src.*.result
+  [ "$#" -eq 1 ] \
+    && [ "$1" = "$dir/state/procevent-inbox/delivery-src.1.result" ] \
+    && [ -f "$1" ] && [ ! -L "$1" ] \
+    && [ ! -e "$dir/state/procevent/delivery-src.source" ] \
+    && [ ! -L "$dir/state/procevent/delivery-src.source" ] \
+    && [ ! -e "$dir/claims/delivery-src.claim" ] \
+    && [ ! -L "$dir/claims/delivery-src.claim" ] \
+    && [ -s "$dir/state/.wake-queue" ]
 }
 
 # Keep FM_HOME for per-cycle reconcile and give the inherited poll hook the
@@ -5939,6 +5938,83 @@ test_procevent_unacknowledged_result_redrains_until_handled() {
   after=$(awk 'END { print NR + 0 }' "$state/.wake-queue" 2>/dev/null || echo 0)
   [ "$after" = "$before" ] || fail "a handled result was announced again ($before -> $after queued records)"
   pass "an unacknowledged process-event result re-drains until handling is acknowledged"
+}
+
+# Recovery first noticed during a poll must use the same close transition as
+# startup recovery. Hold the real delivery recorder after its reason was printed
+# but before EXIT cleanup, so the drain's acknowledgement wins that race.
+test_recovery_discovered_during_poll_preserves_acknowledgement() {
+  local dir state out drain_out drain_err ready release pid sequence generation token
+  local FM_TEST_RECOVERY_REAL_CUT
+  dir=$(make_case recovery-poll-ack); state="$dir/state"; out="$dir/watch.out"
+  drain_out="$dir/drain.out"; drain_err="$dir/drain.err"
+  ready="$dir/output-ready"; release="$dir/output-release"
+  FM_TEST_RECOVERY_REAL_CUT=$(command -v cut)
+  export FM_TEST_RECOVERY_REAL_CUT
+  cat > "$dir/fakebin/cut" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = -c1-4096 ] && [ -n "${FM_TEST_RECOVERY_OUTPUT_READY:-}" ]; then
+  printf '1\n' > "$FM_TEST_RECOVERY_OUTPUT_READY" || exit 1
+  i=0
+  while [ ! -e "$FM_TEST_RECOVERY_OUTPUT_RELEASE" ]; do
+    [ "$i" -lt 1500 ] || exit 1
+    sleep 0.02
+    i=$((i + 1))
+  done
+fi
+exec "$FM_TEST_RECOVERY_REAL_CUT" "$@"
+SH
+  chmod +x "$dir/fakebin/cut"
+  (
+    pid=
+    trap 'touch "$release"; if [ -n "$pid" ]; then reap "$pid"; fi' EXIT
+    FM_TEST_RECOVERY_OUTPUT_READY="$ready" FM_TEST_RECOVERY_OUTPUT_RELEASE="$release" \
+      procevent_watch_bg "$dir" "$out"
+    pid=$!
+    if ! wait_poll_cycle "$state" "$pid"; then
+      fail "the empty-queue watcher did not reach its ordinary poll loop: $(cat "$out")"
+    fi
+    [ ! -s "$out" ] || fail "the empty-queue watcher printed a wake before late publication: $(cat "$out")"
+    append_wake "$state" check late-recovery "check: late recovery fixture" \
+      || fail "could not publish the late recovery fixture"
+    wait_numeric_file "$ready" 100 \
+      || fail "the polling watcher never reached the post-output delivery boundary: $(cat "$out")"
+    grep -Fx 'check: rearm-resurface' "$out" >/dev/null \
+      || fail "the late durable row was not surfaced through recovery: $(cat "$out")"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2> "$drain_err" \
+      || fail "the late recovery row could not be presented before cleanup"
+    grep -F "check: late recovery fixture" "$drain_out" >/dev/null \
+      || fail "the recovery drain lost the late durable row"
+    sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$drain_err")
+    generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$drain_err")
+    [ -n "$sequence" ] && [ -n "$generation" ] \
+      || fail "late recovery presentation omitted its acknowledgement boundary"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" --recovery-generation "$generation" \
+      || fail "late recovery could not be acknowledged before watcher cleanup"
+    token=$(cat "$state/.watcher-down")
+    [ "$token" = "acked:handling:$generation" ] \
+      || fail "the paused watcher did not hold an acknowledged recovery episode: $token"
+    [ ! -s "$state/.wake-queue" ] || fail "late recovery acknowledgement left a durable row"
+    touch "$release"
+    if ! wait_for_exit "$pid" 100; then
+      pid=
+      fail "the acknowledged recovery watcher did not finish cleanup"
+    fi
+    pid=
+    [ "$(cat "$state/.watcher-down")" = "$token" ] \
+      || fail "poll-discovered recovery cleanup republished an acknowledged episode"
+    : > "$out"
+    procevent_watch_bg "$dir" "$out"
+    pid=$!
+    if ! wait_poll_cycle "$state" "$pid"; then
+      fail "the successor woke after poll-discovered recovery was acknowledged: $(cat "$out")"
+    fi
+    [ ! -s "$out" ] || fail "the acknowledged recovery successor printed a wake: $(cat "$out")"
+    [ ! -s "$state/.wake-queue" ] || fail "the acknowledged recovery successor queued a duplicate wake"
+    reap "$pid"
+    pid=
+    pass "poll-discovered recovery preserves acknowledgement completed before cleanup and leaves its successor quiet"
+  ) || fail "poll-discovered recovery acknowledgement regression failed"
 }
 
 test_procevent_marker_keys_are_injective() {
@@ -6737,6 +6813,7 @@ test_terminal_first_sight_drops_a_finished_write_deferral_chain
 test_triage_log_size_cap_accepts_spaced_wc_counts
 test_procevent_captured_result_surfaces_proactively
 test_procevent_unacknowledged_result_redrains_until_handled
+test_recovery_discovered_during_poll_preserves_acknowledgement
 test_procevent_marker_keys_are_injective
 test_procevent_headlines_classify_queue_keys
 test_procevent_launch_failed_episodes_are_each_delivered

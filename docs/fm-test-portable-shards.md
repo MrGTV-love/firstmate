@@ -68,6 +68,9 @@ Thirteen further hints come from the complete green [run 37404365422](https://gi
 The `tests/fm-supervision-host.test.sh` hint is refreshed to its slow-mode CI maximum of 877426 ms from main [run 37774962436](https://github.com/MrGTV-love/firstmate/actions/runs/37774962436), compared with 562966 ms in main [run 37772520915](https://github.com/MrGTV-love/firstmate/actions/runs/37772520915), 853538 ms in main [run 37764027766](https://github.com/MrGTV-love/firstmate/actions/runs/37764027766), 549 s in this PR's [run 37774432736](https://github.com/MrGTV-love/firstmate/actions/runs/37774432736), and 859832 ms in this PR's [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
 The new `tests/fm-skill-pick.test.sh` hint is its completed 120549 ms CI measurement from [run 37778222434](https://github.com/MrGTV-love/firstmate/actions/runs/37778222434).
 An unfinished or failed invocation is not a healthy duration sample.
+On 2026-10-07, 32 previously missing hints were added from successful completed per-script records in the portable-serial timing artifacts of [run 37619080376](https://github.com/MrGTV-love/firstmate/actions/runs/37619080376).
+That run was not green: its successful records supplement the retained baseline, while failed and unfinished invocations supply no hints.
+Capability skips measure only the portable gate path, not the opt-in live scenario.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
 Shard selection checks the complete assignment generator before consuming its output; a generation failure refuses the lane instead of returning a successful partial list.
@@ -78,7 +81,8 @@ That is not hypothetical: by 2026-09-01 the lane had grown from 116 to 139 scrip
 Refresh the hints whenever the serial lane gains scripts, rather than waiting for that bound to trip.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
-The longest indivisible script sets a floor for the layout, regardless of how evenly the remaining work is packed.
+The nine serial runners pack the current hints into derived lane memberships; refresh those hints rather than treating an older modeled shard sum as a current measurement.
+The longest individual script remains an indivisible lower bound on this packing.
 This is a packing estimate, not measured new-workflow execution or an end-to-end latency guarantee.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.

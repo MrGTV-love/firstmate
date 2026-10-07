@@ -24,7 +24,7 @@ DRIVER="$TMP_ROOT/consumer.mjs"
 cat > "$DRIVER" <<'JS'
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [mode, artifact, home, config, state, transport, code, posture] = process.argv.slice(2);
@@ -46,8 +46,52 @@ if (mode.startsWith('tracked')) {
 let invoke;
 if (mode.endsWith('claude')) {
   const settings = JSON.parse(readFileSync(artifact, 'utf8'));
-  assert.equal(settings.hooks.PostToolUse, undefined);
-  assert.equal(settings.hooks.PostToolUseFailure, undefined);
+  const postHooks = ['PostToolUse', 'PostToolUseFailure'].flatMap(event =>
+    (settings.hooks[event] || []).flatMap(group => group.hooks));
+  if (postHooks.length) {
+    const inbox = resolve(state, 'procevent-inbox');
+    const registry = resolve(state, 'procevent');
+    mkdirSync(inbox, { recursive: true });
+    mkdirSync(registry, { recursive: true });
+    const capture = resolve(inbox, 'lavish-consumer.1');
+    const fixture = new Map([
+      [resolve(state, '.lock'), `${process.pid}\n`],
+      [resolve(registry, '.owner-lease'), '0\n'],
+      [resolve(registry, 'lavish-consumer.source'), 'adapter=lavish\nargc=1\nargv:\n/bin/true\n'],
+      [`${capture}.result`, 'session:\n  status: feedback\n'],
+      [`${capture}.adapter`, 'lavish\n'],
+    ]);
+    const previous = new Map([...fixture.keys()].map(path =>
+      [path, existsSync(path) ? readFileSync(path) : null]));
+    try {
+      for (const [path, content] of fixture) writeFileSync(path, content);
+      for (const agent_id of ['helper-1', '', null]) {
+        for (const hook of postHooks) {
+          // Keep a live Claude-shaped owner above the shipped command's exec.
+          const result = spawnSync('/bin/bash', ['-c',
+            'exec -a claude /bin/bash -c \'printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/.lock"; /bin/sh -c "$1"; status=$?; exit "$status"\' _ "$1"',
+            '_', hook.command], {
+            env: { ...process.env, CLAUDE_PROJECT_DIR: home, FM_HOME: home,
+              FM_ROOT_OVERRIDE: home, FM_STATE_OVERRIDE: state },
+            input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'cat README.md' }, agent_id }),
+            encoding: 'utf8',
+          });
+          assert.equal(result.status, 0, 'helper post-tool consumer must remain advisory');
+          assert.equal(result.stdout, '', 'helper must not receive primary capture context');
+          assert.equal(result.stderr, '');
+          for (const [path, content] of fixture) {
+            if (path !== resolve(state, '.lock')) assert.equal(readFileSync(path, 'utf8'), content);
+          }
+          assert.equal(existsSync(`${capture}.handled`), false, 'helper must not acknowledge primary capture');
+        }
+      }
+    } finally {
+      for (const [path, content] of previous) {
+        if (content === null) rmSync(path);
+        else writeFileSync(path, content);
+      }
+    }
+  }
   const hooks = settings.hooks.PreToolUse.filter(entry => entry.matcher === '^(Bash|Read)$');
   assert.equal(hooks.length, 1);
   assert.equal(hooks[0].hooks.length, 1);
