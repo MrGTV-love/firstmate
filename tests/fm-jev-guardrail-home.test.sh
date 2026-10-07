@@ -188,6 +188,9 @@ for harness in claude omp; do
   emit_spawn "$id" "$CASE/project" --mode no-mistakes --yolo off
   if [ "$harness" = claude ]; then
     artifact="$CASE/wt/.claude/settings.local.json"
+    jq -e '.hooks.Stop[0].hooks[1] | .timeout == 25 and (.command | contains("fm-jev-belay-hook.sh") and contains("FM_HOME="))' "$artifact" >/dev/null \
+      || fail "claude worker settings lost the jev-belay Stop hook"
+    ! grep -q 'synthetic-owner-key' "$artifact" || fail "claude worker settings hold the key"
   else
     artifact="$STATE_DIR/$id.omp-ext.ts"
   fi

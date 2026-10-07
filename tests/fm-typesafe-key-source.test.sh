@@ -21,6 +21,7 @@ printf 'TYPESAFE_API_KEY=primary-key\n' > "$PRIMARY/.env"
 
 # resolve <home> [env-key]: prints the resolved key, or "absent".
 resolve_key() {
+  # shellcheck disable=SC2016 # the child shell script is intentionally single-quoted.
   env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE ${2:+TYPESAFE_API_KEY=$2} bash -c '
     . "$1/bin/fm-typesafe-lib.sh"
     if fm_typesafe_key "$2"; then printf %s "$TYPESAFE_API_KEY_PRIVATE"; else printf absent; fi
@@ -76,3 +77,55 @@ hook_status() {  # <home>
 grep -q 'Bearer primary-key' "$TMP_ROOT/transport" || fail "guardrail did not send the primary key"
 [ "$(hook_status "$REMOTE")" = missing_key ] || fail "guardrail in a remote-bound home must stay off"
 pass "the Jev guardrail resolves the primary key and stays off without one"
+
+# The jev-belay Stop-hook wrapper delivers the key to one process only.
+BELAY_ROOT="$PRIMARY/data/vendor/jev-belay"
+mkdir -p "$BELAY_ROOT"
+cat > "$BELAY_ROOT/belay.mjs" <<'JS'
+import { readFileSync, writeFileSync } from 'node:fs';
+const seen = {
+  key: process.env.TYPESAFE_API_KEY ?? null,
+  base: process.env.JEV_BASE_URL ?? null,
+  model: process.env.JEV_MODEL ?? null,
+  alt: process.env.JEV_API_KEY ?? null,
+  option: process.env.CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY ?? null,
+  argvHasKey: process.argv.some(arg => arg.includes('primary-key')),
+  stdin: readFileSync(0, 'utf8'),
+};
+writeFileSync(process.env.FM_TEST_BELAY_SEEN, JSON.stringify(seen));
+process.exit(Number(process.env.FM_TEST_BELAY_EXIT || 0));
+JS
+SEEN="$TMP_ROOT/belay-seen.json"
+run_belay() {  # <home> [KEY=VALUE...]; stdin payload fixed
+  local home=$1
+  shift
+  rm -f "$SEEN"
+  printf 'payload' | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE FM_HOME="$home" \
+    FM_JEV_BELAY_BLOB="$(git hash-object "$BELAY_ROOT/belay.mjs" 2>/dev/null || true)" FM_TEST_BELAY_SEEN="$SEEN" "$@" \
+    bash "$ROOT/bin/fm-jev-belay-hook.sh"
+}
+
+run_belay "$LANE" JEV_BASE_URL=https://evil.invalid JEV_MODEL=other JEV_API_KEY=alt \
+  CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY=option || fail "wrapper failed for a lane home with the primary key"
+[ "$(jq -r .key "$SEEN")" = primary-key ] || fail "belay did not receive the primary key"
+[ "$(jq -r .stdin "$SEEN")" = payload ] || fail "belay did not receive the Stop payload"
+[ "$(jq -c '[.base,.model,.alt,.option,.argvHasKey]' "$SEEN")" = '[null,null,null,null,false]' ] \
+  || fail "belay saw a redirecting variable or the key on argv"
+pass "the wrapper hands the primary key to belay only, with redirecting variables cleared"
+
+run_belay "$LANE" FM_TEST_BELAY_EXIT=2 && fail "belay exit status must pass through"
+[ -f "$SEEN" ] || fail "belay did not run for the exit-status case"
+pass "belay's own exit status reaches Claude"
+
+printf 'tampered\n' >> "$BELAY_ROOT/belay.mjs"
+run_belay "$LANE" FM_JEV_BELAY_BLOB=0000000000000000000000000000000000000000 || fail "pin mismatch must exit 0"
+[ ! -e "$SEEN" ] || fail "a belay.mjs that does not match the pin must not run"
+mv "$BELAY_ROOT" "$BELAY_ROOT.off"
+run_belay "$LANE" || fail "missing clone must exit 0"
+[ ! -e "$SEEN" ] || fail "missing clone must not run belay"
+mv "$BELAY_ROOT.off" "$BELAY_ROOT"
+mv "$PRIMARY/.env" "$PRIMARY/.env.off"
+run_belay "$LANE" || fail "missing key must exit 0"
+[ ! -e "$SEEN" ] || fail "belay must not run without a key"
+mv "$PRIMARY/.env.off" "$PRIMARY/.env"
+pass "pin mismatch, missing clone and missing key exit 0 without running belay"

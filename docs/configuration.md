@@ -1589,6 +1589,24 @@ Evaluation calls are not proof that a native hook loaded or that fleet sample vo
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
 
+## Jev belay Stop hook
+
+Firstmate-launched Claude ship and scout workers run the published [jev-belay](https://github.com/valentynkit/jev-belay) Stop hook, which blocks a turn that reports work as done when nothing verified it.
+`bin/fm-spawn.sh` adds `bin/fm-jev-belay-hook.sh` to the Stop group of the worker's gitignored `.claude/settings.local.json`; no plugin is installed and no setting outside the worker's copy changes, so the captain's own Claude sessions are untouched.
+Secondmate sessions and other harnesses do not run it.
+
+The published hook reads the TypeSafe key only from its own process environment, and Firstmate keeps the key out of worker environments.
+The wrapper therefore resolves the key at call time with `fm_typesafe_key` (the environment, the home `.env`, then the primary home `.env`) and sets it for the one `node` process it execs.
+The key is never in Claude's environment, in a file, in the Keychain, in plugin options, or on argv.
+`JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are cleared first, so nothing ambient can redirect the key or change the model pin.
+Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
+
+`belay.mjs` comes from a pinned, gitignored clone at `<primary home>/data/vendor/jev-belay`, taken at commit `ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+Install it once from the primary home with `git clone https://github.com/valentynkit/jev-belay data/vendor/jev-belay && git -C data/vendor/jev-belay checkout ef719db7eaadc56aa4def86c4da4ffff5bcbca35`.
+The wrapper runs the file only when its git blob id matches the pin in `bin/fm-jev-belay-hook.sh`, so a changed file never receives the key.
+A missing clone, key, or `node`, or a pin mismatch, makes the hook exit 0 silently and never delays a stop.
+To move to a newer upstream version, review it, update the pinned commit in this section and the blob id in the wrapper together, and refresh the clone.
+
 ## Advisory skill selection
 
 `bin/fm-skill-suggest.sh` uses Jev to suggest which optional skill bodies to inspect first, without replacing the full skill index, required trigger rules, or agent judgment.
