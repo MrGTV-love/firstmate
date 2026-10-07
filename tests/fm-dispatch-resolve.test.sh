@@ -39,14 +39,22 @@ case "$1" in
   has-session) exit 0 ;;
   show-environment)
     [ "${FM_AUTH_UNREADABLE:-0}" = 0 ] || exit 1
-    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
     name=${!#}
     file=$FM_AUTH_DESTINATION
     [ "$2" != -g ] || file=$FM_AUTH_DESTINATION.global
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then
+      [ "$2" != -g ] || printf 'HOME=%s\nPATH=%s\n' "$FM_AUTH_HOME" "$PATH"
+      [ ! -f "$file" ] || cat "$file"
+      exit 0
+    fi
     if [ -f "$file" ]; then
       while IFS= read -r entry; do
         case "$entry" in "$name"=*|-"$name") printf '%s\n' "$entry"; exit 0 ;; esac
       done < "$file"
+    fi
+    if [ "$2" = -g ] && [ "$name" = PATH ]; then
+      printf 'PATH=%s\n' "$PATH"
+      exit 0
     fi
     if [ "$2" = -g ] && [ "$name" = HOME ]; then
       printf 'HOME=%s\n' "$FM_AUTH_HOME"
@@ -198,6 +206,9 @@ SH
 chmod +x "$FAKEBIN/quota-axi"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
+if [ -f "${0%/*}/omp-controls" ]; then
+  . "${0%/*}/omp-controls"
+fi
 case "$1" in
   usage)
     [ "${OMP_USAGE_FAIL:-0}" = 0 ] || exit 7
@@ -212,12 +223,21 @@ case "$1" in
         observed="-$OMP_AUTH_SELECTOR"
       fi
       if [ "$observed" != "$OMP_AUTH_EXPECTED" ]; then
-        jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE"
+        "$OMP_FIXTURE_JQ" '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE"
         exit 0
       fi
     fi
     cat "${OMP_USAGE_FIXTURE:?}" ;;
-  models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
+  models)
+    if [ -f "${0%/*}/catalog-key" ]; then
+      if [ "${OPENROUTER_API_KEY-unset}" = destination ]; then
+        printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"}]}'
+      else
+        printf '%s\n' '{"models":[{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}'
+      fi
+    else
+      printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}'
+    fi ;;
   *) exit 2 ;;
 esac
 SH
@@ -248,8 +268,14 @@ reset_log() {
 # run <exit-var> <out-var> <err-var> [args...]: the tool with fakebin first on
 # PATH and an isolated FM_HOME; TYPESAFE_API_KEY comes from the caller's env.
 run() {
-  local __exit=$1 __out=$2 __err=$3 _out _code
+  local __exit=$1 __out=$2 __err=$3 _out _code control
   shift 3
+  {
+    printf 'OMP_FIXTURE_JQ=%q\n' "$(command -v jq)"
+    for control in OMP_USAGE_FIXTURE OMP_AUTH_SELECTOR OMP_AUTH_EXPECTED OMP_USAGE_FAIL OMP_USAGE_EMPTY OMP_USAGE_INVALID; do
+      printf '%s=%q\n' "$control" "${!control-}"
+    done
+  } > "$FAKEBIN/omp-controls"
   _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "${RESOLVER_BASH:-bash}" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
   _code=$?
   printf -v "$__exit" '%s' "$_code"
@@ -1627,6 +1653,29 @@ reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
 assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
+: > "$FAKEBIN/catalog-key"
+cp "$RULES" "$TMP_ROOT/catalog-rules.json"
+jq '.rules[3].fallback += [{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]' \
+  "$RULES" > "$TMP_ROOT/catalog-ordered.json"
+cp "$TMP_ROOT/catalog-ordered.json" "$RULES"
+for policy in inherited retained filtered removed empty; do
+  printf 'OPENROUTER_API_KEY=destination\n' > "$FM_AUTH_DESTINATION.global"
+  case "$policy" in
+    inherited) ;;
+    retained) printf 'OPENROUTER_API_KEY\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+    filtered) : > "$HOME_DIR/config/launch-env-allowlist" ;;
+    removed) printf -- '-OPENROUTER_API_KEY\n' > "$FM_AUTH_DESTINATION" ;;
+    empty) printf 'OPENROUTER_API_KEY=\n' > "$FM_AUTH_DESTINATION" ;;
+  esac
+  reset_log
+  OPENROUTER_API_KEY=caller TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+  case "$policy" in inherited|retained) expected=openrouter/z-ai/glm-5.3-flash ;; *) expected=openrouter/deepseek/deepseek-v4-flash ;; esac
+  assert_contains "$out" "--model '$expected'" "$policy resolver support must use destination-only provider credentials"
+  rm -f "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global" "$HOME_DIR/config/launch-env-allowlist"
+done
+cp "$TMP_ROOT/catalog-rules.json" "$RULES"
+rm "$FAKEBIN/catalog-key"
+pass "OMP resolver fallback catalog is destination-scoped including provider credentials"
 cp "$RULES" "$TMP_ROOT/exhausted-primary-rules.json"
 jq '.rules[3].use = [
   {harness:"omp",model:"openai-codex/gpt-6-luna",provider:"codex"},

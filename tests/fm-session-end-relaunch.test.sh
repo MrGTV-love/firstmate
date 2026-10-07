@@ -253,8 +253,8 @@ test_cap_holds_and_wakes_once() {
   pass "the daily cap holds and wakes once"
 }
 
-test_quota_recovery_retries_after_recent_relaunch_and_failure() {
-  local dir state gen identity seq
+test_quota_recovery_contains_same_generation_failures() {
+  local dir state gen identity attempts
   dir=$(make_lane quota-retry omp)
   state="$dir/state"
   scan_lane "$dir" || fail "initial session-end relaunch failed"
@@ -262,43 +262,128 @@ test_quota_recovery_retries_after_recent_relaunch_and_failure() {
     || fail "the quota fixture did not first relaunch after session-end"
   gen=$(cat "$state/lane.busy-gen")
   "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
-    --source omp-ext --event quota-exhausted >/dev/null \
-    || fail "quota exhaustion was not recorded"
+    --source omp-ext --event quota-exhausted >/dev/null || fail "quota exhaustion was not recorded"
+  identity=$(fm_session_end_identity "$state" lane) || fail "quota identity was lost"
   FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_RC=1 scan_lane "$dir" \
     || fail "failed quota-recovery scan failed"
-  [ "$FM_SESSION_END_ACTION" = failed ] \
-    || fail "recent session-end history suppressed the first quota attempt: $FM_SESSION_END_ACTION"
-  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
-    || fail "quota recovery did not invoke control after a recent relaunch"
+  [ "$FM_SESSION_END_ACTION" = failed ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "recent session-end history suppressed the first quota attempt"
   grep -F 'auto-relaunch failed after quota exhaustion' <<<"$FM_SESSION_END_WAKE" >/dev/null \
-    || fail "the failed quota attempt did not report quota exhaustion: ${FM_SESSION_END_WAKE:-<empty>}"
-  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "quota retry scan failed"
-  [ "$FM_SESSION_END_ACTION" = relaunch ] \
-    || fail "a previous failed quota attempt suppressed recovery: ${FM_SESSION_END_WAKE:-<empty>}"
-  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
-    || fail "quota retry did not invoke control exactly once"
-  [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-lane" | wc -l | tr -d ' ')" = 3 ] \
-    || fail "the original relaunch, failed quota attempt, and successful retry were not ledgered"
-  printf '%s\tattempt\n' $(( $(date +%s) - 90000 )) > "$state/.session-end-relaunch-lane"
-  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "handled quota scan failed"
-  [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] && [ ! -s "$dir/tmux.log" ] \
-    || fail "a successful quota recovery duplicated after its attempt history expired"
-  identity=$(fm_session_end_identity "$state" lane) || fail "quota identity was lost"
-  seq=${identity#* }
+    || fail "the failed quota attempt did not report quota exhaustion"
+  [ "$(cat "$state/.session-end-handled-lane")" = "$(printf '%s\t%s\tquota-failed' "${identity%% *}" "${identity#* }")" ] \
+    || fail "the failed origin was not handled"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "contained quota scan failed"
+  [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+    || fail "the failed quota origin invoked control or woke again"
   "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
-    --source omp-ext --event quota-exhausted >/dev/null \
-    || fail "a later quota exhaustion was not recorded"
-  [ "$(fm_session_end_identity "$state" lane)" != "$gen $seq" ] \
-    || fail "a later quota event did not advance its identity"
-  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "later quota recovery scan failed"
-  [ "$FM_SESSION_END_ACTION" = relaunch ] \
-    || fail "successful handling of an older sequence suppressed a new quota event"
-  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
-    || fail "the new quota event did not invoke control exactly once"
-  identity=$(fm_session_end_identity "$state" lane) || fail "the new quota identity was lost"
-  [ "$(cat "$state/.session-end-handled-lane")" = "$(printf '%s\t%s\trelaunched' "${identity%% *}" "${identity#* }")" ] \
-    || fail "the new quota identity was not marked successfully handled"
-  pass "quota recovery ignores recent relaunches and failed attempts but deduplicates successful identities"
+    --source omp-ext --event quota-exhausted >/dev/null || fail "later quota event was not recorded"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "advanced-sequence scan failed"
+  [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+    || fail "advancing the quota sequence reset the automatic allowance"
+  attempts=$(awk -F '\t' '$2 == "attempt" {n++} END {print n}' "$state/.session-end-relaunch-lane")
+  [ "$attempts" = 2 ] || fail "the ordinary and first quota attempts were not the only attempts"
+  [ "$(FM_WAKE_QUEUE="$state/.wake-queue" fm_wake_queued_keys check | wc -l | tr -d ' ')" = 2 ] \
+    || fail "quota containment duplicated its wake"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" lane --state busy --source fm-spawn --event launch-brief >/dev/null
+  gen=$(cat "$state/lane.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null || fail "fresh generation quota was not recorded"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "fresh-origin scan failed"
+  [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "a fresh generation did not get its first authoritative recovery attempt"
+  pass "quota recovery ignores ordinary caps but contains a failed origin across advanced sequences"
+}
+
+test_ordinary_failure_does_not_consume_quota_attempt() {
+  local dir state gen
+  dir=$(make_lane ordinary-failed-quota omp)
+  state="$dir/state"
+  gen=$(cat "$state/lane.busy-gen")
+  FM_SESSION_END_CONTROL_RC=1 scan_lane "$dir" || fail "ordinary failure scan failed"
+  [ "$FM_SESSION_END_ACTION" = failed ] || fail "ordinary failure was not recorded"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null || fail "quota event was not recorded"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "first quota scan failed"
+  [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
+    || fail "ordinary failure handling consumed the first quota attempt"
+  pass "ordinary failed recovery does not consume the first quota attempt"
+}
+
+test_failed_quota_origin_stays_contained_after_session_end() {
+  local dir state gen identity before
+  dir=$(make_lane failed-quota-session-end omp)
+  state="$dir/state"
+  gen=$(cat "$state/lane.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event quota-exhausted >/dev/null || fail "quota event was not recorded"
+  FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_RC=1 scan_lane "$dir" \
+    || fail "failed quota scan failed"
+  identity=$(cat "$state/.session-end-handled-lane")
+  before=$(cat "$state/.wake-queue")
+  printf '%s\tattempt\n' "$(( $(date +%s) - 90000 ))" > "$state/.session-end-relaunch-lane"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+    --source omp-ext --event session-end >/dev/null || fail "later session-end was not recorded"
+  scan_lane "$dir" || fail "contained session-end scan failed"
+  [ ! -s "$dir/control.log" ] && [ -z "$FM_SESSION_END_WAKE" ] \
+    || fail "session-end bypassed quota-origin containment"
+  [ "$(cat "$state/.session-end-handled-lane")" = "$identity" ] \
+    && [ "$(cat "$state/.wake-queue")" = "$before" ] \
+    || fail "session-end overwrote the quota failure or duplicated its wake"
+  pass "failed quota origins stay contained when the exhausted incarnation later ends"
+}
+
+test_interrupted_quota_attempt_escalates_without_retry() {
+  local dir state mode gen seq identity before
+  for mode in quota session-end journal; do
+    dir="$TMP_ROOT/interrupted-quota-$mode"
+    if [ "$mode" = journal ]; then
+      add_partial_quota_lane "$dir" lane
+      gen=$(fm_meta_get "$dir/state/lane.control-relaunch" quota_gen)
+      seq=$(fm_meta_get "$dir/state/lane.control-relaunch" quota_seq)
+    else
+      add_lane "$dir" lane omp
+      gen=$(cat "$dir/state/lane.busy-gen")
+      "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" \
+        --source omp-ext --event quota-exhausted >/dev/null || fail "quota event fixture failed"
+      identity=$(fm_session_end_identity "$dir/state" lane) || fail "quota identity fixture failed"
+      seq=${identity#* }
+    fi
+    state="$dir/state"
+    printf '%s\t%s\tquota-attempted\n' "$gen" "$seq" > "$state/.session-end-handled-lane"
+    printf '%s\tattempt\n' "$(date +%s)" > "$state/.session-end-relaunch-lane"
+    if [ "$mode" = quota ]; then
+      printf 'phase=launching\n' > "$state/lane.control-relaunch"
+      FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "active transaction scan failed"
+      [ ! -s "$dir/control.log" ] && [ -z "$FM_SESSION_END_WAKE" ] \
+        || fail "an active quota transaction escalated or duplicated"
+      rm "$state/lane.control-relaunch"
+      "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+        --source omp-ext --event quota-exhausted >/dev/null || fail "advanced quota fixture failed"
+      FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "interrupted quota scan failed"
+    else
+      if [ "$mode" = session-end ]; then
+        "$ROOT/bin/fm-busy-event.sh" apply "$state" lane idle --gen "$gen" \
+          --source omp-ext --event session-end >/dev/null || fail "session-end fixture failed"
+      fi
+      scan_lane "$dir" || fail "$mode interrupted scan failed"
+    fi
+    [ "$FM_SESSION_END_ACTION" = failed ] && [ ! -s "$dir/control.log" ] \
+      || fail "$mode interrupted allowance invoked control again"
+    grep -F 'interrupted automatic attempt' <<<"$FM_SESSION_END_WAKE" >/dev/null \
+      || fail "$mode interrupted attempt was silently suppressed"
+    [ "$(cat "$state/.session-end-handled-lane")" = "$(printf '%s\t%s\tquota-failed' "$gen" "$seq")" ] \
+      || fail "$mode interrupted attempt did not preserve its original quota identity"
+    before=$(cat "$state/.wake-queue")
+    FM_FAKE_TMUX_CURRENT_COMMAND=omp scan_lane "$dir" || fail "$mode contained scan failed"
+    [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
+      && [ "$(cat "$state/.wake-queue")" = "$before" ] \
+      || fail "$mode interrupted attempt repeated its control call or failure wake"
+    if [ "$mode" = journal ]; then
+      [ ! -e "$state/lane.busy-gen" ] && [ ! -e "$state/lane.busy-state" ] \
+        || fail "interrupted journal containment resurrected busy state"
+    fi
+  done
+  pass "interrupted automatic quota attempts escalate once through current, ended, and journal-backed origins"
 }
 
 test_quota_recovery_ignores_daily_cap_and_capped_handling() {
@@ -354,8 +439,8 @@ test_failed_quota_recovery_does_not_starve_later_tasks() {
     || fail "a failed Sol recovery starved Luna or allowed a second success: $(cat "$dir/control.log")"
   [ "$FM_SESSION_END_WAKE" = "check: a-sol auto-relaunch failed after quota exhaustion: no supported equal route for a-sol" ] \
     || fail "the scan did not preserve the first failure wake: ${FM_SESSION_END_WAKE:-<empty>}"
-  [ "$(cat "$state/.session-end-handled-a-sol")" = "$(printf '%s\t%s\tfailed' "${first_identity%% *}" "${first_identity#* }")" ] \
-    || fail "failed Sol did not retain its retryable identity"
+  [ "$(cat "$state/.session-end-handled-a-sol")" = "$(printf '%s\t%s\tquota-failed' "${first_identity%% *}" "${first_identity#* }")" ] \
+    || fail "failed Sol did not retain its handled identity"
   [ "$(cat "$state/.session-end-handled-b-luna")" = "$(printf '%s\t%s\trelaunched' "${luna_identity%% *}" "${luna_identity#* }")" ] \
     || fail "successful Luna was not marked handled for its generation and sequence"
   [ ! -e "$state/.session-end-relaunch-c-luna" ] \
@@ -368,18 +453,18 @@ test_failed_quota_recovery_does_not_starve_later_tasks() {
   for scan in 3 4 5; do
     FM_FAKE_TMUX_CURRENT_COMMAND=omp FM_SESSION_END_CONTROL_FAIL_ID=a-sol scan_lane "$dir" \
       || fail "multi-task quota scan $scan failed"
-    [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
-      || fail "scan $scan capped Sol retries or duplicated a successful generation: $(cat "$dir/control.log")"
+    [ ! -s "$dir/control.log" ] && [ -z "$FM_SESSION_END_WAKE" ] \
+      || fail "scan $scan repeated an already handled quota origin"
   done
-  [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-a-sol" | wc -l | tr -d ' ')" = 4 ] \
-    || fail "the failed quota task did not remain retryable beyond the daily attempt cap"
+  [ "$(awk -F '\t' '$2 == "attempt"' "$state/.session-end-relaunch-a-sol" | wc -l | tr -d ' ')" = 1 ] \
+    || fail "the failed quota task repeated its automatic attempt"
   for id in b-luna c-luna; do
     [ "$(awk -F '\t' '$2 == "relaunched"' "$state/.session-end-relaunch-$id" | wc -l | tr -d ' ')" = 1 ] \
       || fail "$id's successful quota generation was not deduplicated"
   done
   [ "$(FM_WAKE_QUEUE="$state/.wake-queue" fm_wake_queued_keys check | wc -l | tr -d ' ')" = 3 ] \
     || fail "the durable queue lost a later success or duplicated Sol's failure wake"
-  pass "failed quota recovery advances to later tasks, retries without caps, and deduplicates successful generations"
+  pass "failed quota recovery advances to later tasks and handles each origin once"
 }
 
 test_failed_recovery_shares_the_scan_time_bound() {
@@ -450,29 +535,28 @@ SH
       || fail "bounded quota scan $scan failed"
     [ "$FM_SESSION_END_TIMEOUT" = 6 ] && [ "$FM_SESSION_END_LAUNCH_WAIT" = 3 ] \
       || fail "scan $scan changed the grace-derived execution bound"
-    grep -Fx 'FM_CONTROL_LAUNCH_WAIT=3' "$dir/control-env.log" >/dev/null \
-      || fail "scan $scan did not preserve the half-budget command wait"
+    if [ "$scan" -le 2 ]; then
+      grep -Fx 'FM_CONTROL_LAUNCH_WAIT=3' "$dir/control-env.log" >/dev/null \
+        || fail "scan $scan did not preserve the half-budget command wait"
+    fi
     if [ "$scan" = 2 ]; then
       [ "$(cut -d' ' -f1 "$dir/control.log")" = b-luna ] \
         || fail "the slow failed task starved the usable later route: $(cat "$dir/control.log")"
-      [ "$FM_SESSION_END_ACTION" = relaunch ] \
-        || fail "the later quota task did not recover"
+      [ "$FM_SESSION_END_ACTION" = relaunch ] || fail "the later quota task did not recover"
+    elif [ "$scan" = 1 ]; then
+      [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] || fail "the first scan exceeded its budget"
+      [ ! -e "$state/.session-end-relaunch-b-luna" ] || fail "the exhausted first scan attempted a second lane"
+      [ "$(cat "$dir/clock")" = 100006 ] || fail "the failure did not consume the shared deadline"
     else
-      [ "$(cut -d' ' -f1 "$dir/control.log")" = a-sol ] \
-        || fail "scan $scan exceeded its budget, capped retries, or duplicated recovery"
-      if [ "$scan" = 1 ]; then
-        [ ! -e "$state/.session-end-relaunch-b-luna" ] \
-          || fail "the exhausted first scan attempted a second lane"
-        [ "$(cat "$dir/clock")" = 100006 ] \
-          || fail "the failed attempt did not consume the shared scan deadline"
-      fi
+      [ ! -s "$dir/control.log" ] && [ -z "$FM_SESSION_END_WAKE" ] \
+        || fail "a handled quota origin retried or woke again"
     fi
   done
   attempts=$(awk -F '\t' '$2 == "attempt" {n++} END {print n}' "$state/.session-end-relaunch-a-sol")
-  [ "$attempts" = 4 ] || fail "slow quota retries were capped after $attempts attempts"
+  [ "$attempts" = 1 ] || fail "slow quota failure repeated after $attempts attempts"
   [ "$(awk -F '\t' '$2 == "relaunched" {n++} END {print n}' "$state/.session-end-relaunch-b-luna")" = 1 ] \
     || fail "the recovered later task was not deduplicated"
-  pass "deadline-consuming quota failures yield first position on the next bounded scan without retry caps"
+  pass "deadline-consuming quota failures yield to the next lane without repeating their automatic attempt"
 }
 
 test_deliberate_exit_and_waits_are_skipped() {
@@ -707,8 +791,8 @@ add_partial_quota_lane() {
     || fail "quota retirement fixture failed"
 }
 
-test_partial_quota_retries_are_uncapped_and_deduplicated() {
-  local dir="$TMP_ROOT/partial-quota-retries" id=a-journal gen seq scan now
+test_partial_quota_retries_are_contained_and_deduplicated() {
+  local dir="$TMP_ROOT/partial-quota-retries" id=a-journal gen seq now
   add_partial_quota_lane "$dir" "$id"
   gen=$(fm_meta_get "$dir/state/$id.control-relaunch" quota_gen)
   seq=$(fm_meta_get "$dir/state/$id.control-relaunch" quota_seq)
@@ -716,31 +800,23 @@ test_partial_quota_retries_are_uncapped_and_deduplicated() {
   now=$(date +%s)
   printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' "$now" "$((now - 2000))" "$((now - 4000))" \
     > "$dir/state/.session-end-relaunch-$id"
-  for scan in 1 2 3 4; do
-    FM_SESSION_END_CONTROL_FAIL_ID="$id" FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
-      || fail "partial quota failure scan $scan failed"
-    [ "$(cut -d' ' -f1 "$dir/control.log")" = "$(if [ "$scan" = 1 ]; then printf 'b-session-end'; else printf '%s' "$id"; fi)" ] \
-      || fail "a partial quota retry was capped, starved the later lane, or repeated a success"
-    [ ! -e "$dir/state/$id.busy-gen" ] && [ ! -e "$dir/state/$id.busy-state" ] \
-      || fail "journal eligibility resurrected busy state"
-  done
+  scan_lane "$dir" || fail "ordinary lane scan failed"
+  [ "$(cut -d' ' -f1 "$dir/control.log")" = b-session-end ] || fail "the untouched ordinary lane lost priority"
+  FM_SESSION_END_CONTROL_FAIL_ID="$id" FM_SESSION_END_CONTROL_ENV_LOG="$dir/control-env.log" scan_lane "$dir" \
+    || fail "first partial quota scan failed"
+  [ "$(cut -d' ' -f1 "$dir/control.log")" = "$id" ] || fail "ordinary history suppressed the first journal attempt"
   grep -Fx "FM_CONTROL_QUOTA_GEN=$gen" "$dir/control-env.log" >/dev/null \
-    || fail "the stable quota generation was not passed to control"
-  grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
-    || fail "the stable quota sequence was not passed to control"
-  scan_lane "$dir" || fail "partial quota success scan failed"
-  [ "$FM_SESSION_END_ACTION" = relaunch ] \
-    || fail "partial quota recovery did not remain eligible after repeated failures"
-  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
-    && [ "$(cut -d' ' -f1 "$dir/control.log")" = "$id" ] \
-    || fail "partial quota recovery did not invoke control exactly once for its task"
-  [ "$(cat "$dir/state/.session-end-handled-$id")" = "$(printf '%s\t%s\trelaunched' "$gen" "$seq")" ] \
-    || fail "partial quota recovery did not mark its stable journal identity successfully handled"
+    && grep -Fx "FM_CONTROL_QUOTA_SEQ=$seq" "$dir/control-env.log" >/dev/null \
+    || fail "the stable quota origin was not passed to control"
+  [ "$(cat "$dir/state/.session-end-handled-$id")" = "$(printf '%s\t%s\tquota-failed' "$gen" "$seq")" ] \
+    || fail "partial quota failure did not handle its origin"
   printf '%s\tattempt\n' "$((now - 90000))" > "$dir/state/.session-end-relaunch-$id"
-  scan_lane "$dir" || fail "handled partial quota scan failed"
+  scan_lane "$dir" || fail "contained partial quota scan failed"
   [ -z "$FM_SESSION_END_WAKE" ] && [ ! -s "$dir/control.log" ] \
-    || fail "the successfully handled journal identity duplicated after its ledger expired"
-  pass "journal-backed quota failures stay uncapped, advance to later lanes, and deduplicate their stable identity"
+    || fail "the failed journal origin repeated after its attempt history expired"
+  [ ! -e "$dir/state/$id.busy-gen" ] && [ ! -e "$dir/state/$id.busy-state" ] \
+    || fail "journal containment resurrected busy state"
+  pass "journal-backed quota failures receive one automatic attempt without resurrecting busy state"
 }
 
 test_delayed_quota_stop_recovery_requires_current_death() {
@@ -789,6 +865,11 @@ test_delayed_quota_stop_recovery_requires_current_death() {
         || fail "$rollback delayed-death scan failed"
       if [ "$guard" != none ]; then
         [ ! -s "$dir/control.log" ] || fail "$rollback bypassed $guard after delayed death"
+        continue
+      fi
+      if [ "$mode" = retained ] && [ "$command" = omp ]; then
+        [ ! -s "$dir/control.log" ] && [ -z "$FM_SESSION_END_WAKE" ] \
+          || fail "$rollback repeated the handled origin after delayed death"
         continue
       fi
       [ "$FM_SESSION_END_ACTION" = relaunch ] && [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] \
@@ -1023,12 +1104,15 @@ test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
 test_relaunch_bound_stays_inside_the_watcher_grace
 test_cap_holds_and_wakes_once
-test_quota_recovery_retries_after_recent_relaunch_and_failure
+test_quota_recovery_contains_same_generation_failures
+test_ordinary_failure_does_not_consume_quota_attempt
+test_failed_quota_origin_stays_contained_after_session_end
+test_interrupted_quota_attempt_escalates_without_retry
 test_quota_recovery_ignores_daily_cap_and_capped_handling
 test_failed_quota_recovery_does_not_starve_later_tasks
 test_failed_recovery_shares_the_scan_time_bound
 test_deadline_consuming_quota_failure_advances_next_scan
-test_partial_quota_retries_are_uncapped_and_deduplicated
+test_partial_quota_retries_are_contained_and_deduplicated
 test_delayed_quota_stop_recovery_requires_current_death
 test_live_published_quota_uses_new_event_identity
 test_partial_quota_journal_guards_fail_closed

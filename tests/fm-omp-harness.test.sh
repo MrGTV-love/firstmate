@@ -122,30 +122,79 @@ test_lock_identity_and_liveness_classification() {
 make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
 #!/usr/bin/env bash
+record_scope() {
+  printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
+    "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY-unset}" "CUSTOM_MODEL_TOKEN=${CUSTOM_MODEL_TOKEN-unset}" > "$1"
+}
 case "$1" in
   models)
+    if [ -d "${0%/*}/scope-fixtures" ]; then
+      count=0
+      [ ! -f "${0%/*}/models.count" ] || IFS= read -r count < "${0%/*}/models.count"
+      count=$((count + 1))
+      printf '%s\n' "$count" > "${0%/*}/models.count"
+      record_scope "${0%/*}/models.$count.env"
+      if [ -f "${0%/*}/scope-fixtures/catalog-auth" ]; then
+        if [ "${OPENROUTER_API_KEY-unset}|${CUSTOM_MODEL_TOKEN-unset}" = 'destination|destination' ]; then
+          cat "${0%/*}/scope-fixtures/destination-models.json"
+        else
+          cat "${0%/*}/scope-fixtures/caller-models.json"
+        fi
+        exit 0
+      fi
+    fi
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
   usage)
     if [ -d "${0%/*}/scope-fixtures" ]; then
-      printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
-        "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" > "${0%/*}/usage.env"
+      record_scope "${0%/*}/usage.env"
       case "${PI_CODING_AGENT_DIR-}|${OMP_PROFILE-${PI_PROFILE-}}" in
         *exhausted-dir*|*'|exhausted') cat "${0%/*}/scope-fixtures/exhausted.json" ;;
         *) cat "${0%/*}/scope-fixtures/healthy.json" ;;
       esac
-    elif [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
+    elif [ -f "${0%/*}/usage.json" ]; then cat "${0%/*}/usage.json"; else printf '{}\n'; fi
     ;;
   *)
     if [ -d "${0%/*}/scope-fixtures" ]; then
-      printf '%s\n' "HOME=${HOME-}" "PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR-}" \
-        "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" > "${0%/*}/worker.env"
+      record_scope "${0%/*}/worker.env"
     fi
     ;;
 esac
 exit 0
 SH
   chmod +x "$1/omp"
+  cp "$1/tmux" "$1/tmux-fixture"
+  cat > "$1/tmux" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = show-environment ]; then
+  [ "${FM_FAKE_TMUX_UNREADABLE:-0}" != 1 ] || exit 1
+  prefix=FM_FAKE_TMUX_ENV_
+  [ "$2" != -g ] || prefix=FM_FAKE_TMUX_GLOBAL_ENV_
+  if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then
+    [ "$2" != -g ] || printf 'HOME=%s\nPATH=%s\n' "$HOME" "$PATH"
+    while IFS='=' read -r knob value; do
+      case "$knob" in
+        "$prefix"*)
+          name=${knob#"$prefix"}
+          if [ "$value" = - ]; then printf -- '-%s\n' "$name"; else printf '%s=%s\n' "$name" "$value"; fi
+          ;;
+      esac
+    done < <(/usr/bin/env)
+    exit 0
+  fi
+  name=${!#}
+  knob=$prefix$name
+  if [ "$2" = -g ] && [ -z "${!knob+x}" ]; then
+    case "$name" in
+      HOME) printf 'HOME=%s\n' "$HOME"; exit 0 ;;
+      PATH) printf 'PATH=%s\n' "$PATH"; exit 0 ;;
+    esac
+  fi
+fi
+exec "${0%/*}/tmux-fixture" "$@"
+SH
+  chmod +x "$1/tmux"
 }
 
 make_spawn_case() {  # <name> <harness> <id>
@@ -173,6 +222,7 @@ EOF
 run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
+  [ -z "${OMP_USAGE_FIXTURE:-}" ] || cp "$OMP_USAGE_FIXTURE" "$fakebin/usage.json"
   FM_FAKE_LAUNCH_LOG="$launchlog" fm_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
 }
 
@@ -239,7 +289,7 @@ JSON
 }
 
 test_spawn_capacity_matches_destination_auth_and_allowlist() {
-  local rec id scenario out status destination_root caller_root caller_profile destination_profile expected_model expected_root expected_profile launch
+  local rec id scenario out status destination_root caller_root caller_profile destination_profile expected_model expected_root expected_profile launch catalog_env
   local -a pane_env
   for scenario in destination-healthy destination-exhausted filtered empty-profile; do
     id="omp-scope-$scenario"
@@ -294,13 +344,111 @@ JSON
     assert_grep "OMP_PROFILE=$expected_profile" "$FAKEBIN_DIR/usage.env" "$scenario usage must preserve profile presence and allowlist filtering"
     launch=$(cat "$LAUNCH_LOG")
     pane_env=(-u PI_CONFIG_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME
+      -u OPENROUTER_API_KEY -u CUSTOM_MODEL_TOKEN
       HOME="$CASE_DIR/destination-home" PI_CODING_AGENT_DIR="$destination_root"
       OMP_PROFILE="$destination_profile" PI_PROFILE=exhausted)
     fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
       > "$CASE_DIR/worker.out" 2>&1 || fail "$scenario generated OMP command could not be consumed"
     cmp -s "$FAKEBIN_DIR/usage.env" "$FAKEBIN_DIR/worker.env" || fail "$scenario usage scope differs from the generated worker's effective authentication"
+    for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
+      cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "$scenario catalog scope differs from the generated worker's effective authentication"
+    done
   done
   pass "OMP fresh capacity follows destination authentication, profile precedence, and the launch allowlist rather than caller credentials"
+}
+
+test_spawn_catalog_matches_destination_provider_auth() {
+  local rec id scenario out status model expected_model launch catalog_env expected_auth expected_custom destination_custom unreadable
+  local -a pane_env
+  for scenario in destination-only caller-only unsupported filtered removed empty explicit-destination explicit-caller unreadable; do
+    id="omp-catalog-$scenario"
+    rec=$(make_spawn_case "catalog-$scenario" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config" "$FAKEBIN_DIR/scope-fixtures" "$CASE_DIR/destination-home"
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
+    jq '.reports[].metadata.meterStates.chat={allowed:true,limitReached:false}' \
+      "$FAKEBIN_DIR/scope-fixtures/exhausted.json" > "$FAKEBIN_DIR/scope-fixtures/healthy.json"
+    : > "$FAKEBIN_DIR/scope-fixtures/catalog-auth"
+    printf '%s\n' '{"models":[{"provider":"openai-codex","selector":"openai-codex/gpt-6-luna"},{"provider":"openrouter","selector":"openrouter/z-ai/glm-5.3-flash"},{"provider":"openrouter","selector":"openrouter/destination-model"}]}' \
+      > "$FAKEBIN_DIR/scope-fixtures/destination-models.json"
+    printf '%s\n' '{"models":[{"provider":"openai-codex","selector":"openai-codex/gpt-6-luna"},{"provider":"openrouter","selector":"openrouter/deepseek/deepseek-v4-flash"},{"provider":"openrouter","selector":"openrouter/caller-model"}]}' \
+      > "$FAKEBIN_DIR/scope-fixtures/caller-models.json"
+    printf '%s\n' '{"rules":[{"use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"},{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]}]}' \
+      > "$HOME_DIR/config/crew-dispatch.json"
+    printf '%s\n' PATH PI_CODING_AGENT_DIR OPENROUTER_API_KEY CUSTOM_MODEL_TOKEN > "$HOME_DIR/config/launch-env-allowlist"
+    model=openai-codex/gpt-6-luna
+    expected_model=openrouter/z-ai/glm-5.3-flash
+    expected_auth=destination
+    expected_custom=destination
+    destination_custom=destination
+    unreadable=0
+    case "$scenario" in
+      caller-only)
+        cp "$FAKEBIN_DIR/scope-fixtures/destination-models.json" "$CASE_DIR/catalog.json"
+        cp "$FAKEBIN_DIR/scope-fixtures/caller-models.json" "$FAKEBIN_DIR/scope-fixtures/destination-models.json"
+        cp "$CASE_DIR/catalog.json" "$FAKEBIN_DIR/scope-fixtures/caller-models.json"
+        expected_model=openrouter/deepseek/deepseek-v4-flash
+        ;;
+      unsupported)
+        printf '%s\n' '{"models":[{"provider":"openai-codex","selector":"openai-codex/gpt-6-luna"}]}' \
+          > "$FAKEBIN_DIR/scope-fixtures/destination-models.json"
+        ;;
+      filtered)
+        printf '%s\n' PATH PI_CODING_AGENT_DIR OPENROUTER_API_KEY > "$HOME_DIR/config/launch-env-allowlist"
+        expected_custom=unset
+        expected_model=openrouter/deepseek/deepseek-v4-flash
+        ;;
+      removed) expected_custom=unset; destination_custom=-; expected_model=openrouter/deepseek/deepseek-v4-flash ;;
+      empty) expected_custom=; destination_custom=; expected_model=openrouter/deepseek/deepseek-v4-flash ;;
+      explicit-destination) model=openrouter/destination-model; expected_model=$model ;;
+      explicit-caller) model=openrouter/caller-model; expected_model=$model ;;
+      unreadable) model=openrouter/caller-model; expected_model=$model; unreadable=1 ;;
+    esac
+    out=$(OPENROUTER_API_KEY=caller CUSTOM_MODEL_TOKEN=caller \
+      FM_FAKE_TMUX_ENV_HOME="$CASE_DIR/destination-home" \
+      FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR="$CASE_DIR/exhausted-dir" \
+      FM_FAKE_TMUX_GLOBAL_ENV_OPENROUTER_API_KEY=destination \
+      FM_FAKE_TMUX_GLOBAL_ENV_CUSTOM_MODEL_TOKEN=destination \
+      FM_FAKE_TMUX_ENV_CUSTOM_MODEL_TOKEN="$destination_custom" \
+      FM_FAKE_TMUX_UNREADABLE="$unreadable" \
+      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness omp --model "$model" --effort high)
+    status=$?
+    if [ "$scenario" = unsupported ]; then
+      expect_code 1 "$status" "exhausted destination without any supported fallback must refuse: $out"
+      assert_contains "$out" 'no supported permitted fallback' "caller catalog must not supply destination fallback support"
+      assert_absent "$HOME_DIR/state/$id.meta" "unsupported fallback refusal must publish no record"
+      [ ! -s "$LAUNCH_LOG" ] || fail "unsupported fallback refusal must create no launch"
+      continue
+    fi
+    if [ "$scenario" = explicit-caller ]; then
+      expect_code 1 "$status" "caller-only model under a destination-listed provider must refuse: $out"
+      assert_contains "$out" "omp model '$model' is not listed" "explicit caller-only refusal must use destination evidence"
+      assert_absent "$HOME_DIR/state/$id.meta" "caller-only refusal must publish no record"
+      [ ! -s "$LAUNCH_LOG" ] || fail "caller-only refusal must create no launch"
+      continue
+    fi
+    expect_code 0 "$status" "$scenario catalog must select and validate in destination scope: $out"
+    assert_grep "model=$expected_model" "$HOME_DIR/state/$id.meta" "$scenario must record the destination-supported model"
+    if [ "$scenario" = unreadable ]; then
+      assert_absent "$FAKEBIN_DIR/models.count" "unknown scope must not query caller catalog"
+      continue
+    fi
+    launch=$(cat "$LAUNCH_LOG")
+    pane_env=(-u OMP_PROFILE -u PI_PROFILE -u CUSTOM_MODEL_TOKEN
+      HOME="$CASE_DIR/destination-home" PI_CODING_AGENT_DIR="$CASE_DIR/exhausted-dir"
+      OPENROUTER_API_KEY=destination)
+    [ "$scenario" = removed ] || pane_env+=("CUSTOM_MODEL_TOKEN=$destination_custom")
+    fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
+      > "$CASE_DIR/worker.out" 2>&1 || fail "$scenario generated OMP command could not be consumed"
+    assert_grep "OPENROUTER_API_KEY=$expected_auth" "$FAKEBIN_DIR/worker.env" "destination provider auth must survive launch policy"
+    assert_grep "CUSTOM_MODEL_TOKEN=$expected_custom" "$FAKEBIN_DIR/worker.env" "arbitrary model interpolation auth must follow launch policy"
+    for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
+      cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "$scenario catalog scope differs from executed worker scope"
+    done
+  done
+  pass "OMP fallback discovery and post-selection validation share destination provider auth and arbitrary model interpolation scope"
 }
 
 test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
@@ -1406,6 +1554,7 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
+test_spawn_catalog_matches_destination_provider_auth
 test_spawn_capacity_matches_destination_auth_and_allowlist
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery

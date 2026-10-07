@@ -232,7 +232,7 @@
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written.
 #   Crewmates and scouts also receive eager native account rotation.
 #   A non-index-entry literal <provider>/<id> is validated against
-#   `omp models --json` only when that provider appears in the listing; a
+#   destination-scoped `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
@@ -2104,12 +2104,12 @@ pi_supports_tui_mode() {
 # IS listed must be listed too, a provider the listing does not know passes
 # through with a notice, a bare fuzzy pattern is omp's own matcher's job, and an
 # unreadable listing establishes nothing (harness-adapters model-and-effort.md).
-omp_model_validate() { # <omp-bin> <model>
-  local bin=$1 model=$2 provider listing providers
+omp_model_validate() { # <omp-bin> <model> <config-dir> [tmux-session]
+  local bin=$1 model=$2 config=$3 session=${4:-} provider listing providers
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$model" in */*) ;; *) return 0 ;; esac
   command -v jq >/dev/null 2>&1 || return 0
-  listing=$(OMP_SKIP_SETUP=1 "$bin" models --json 2>/dev/null) || return 0
+  listing=$(fm_dispatch_omp_query "$config" "$session" "$bin" models --json) || return 0
   providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || return 0
   [ -n "$providers" ] || return 0
   provider=${model%%/*}
@@ -2529,14 +2529,15 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
 else
   MODEL_INDEXED=0
 fi
+dispatch_tmux_session=
+if [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_REBIND" -eq 0 ]; then
+  dispatch_tmux_session=$RELAUNCH_TARGET
+fi
+
 # Preserve the chosen rule through launch and recovery. Only declared stand-ins
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
-  dispatch_tmux_session=
-  if [ "$BACKEND" = tmux ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_REBIND" -eq 0 ]; then
-    dispatch_tmux_session=$RELAUNCH_TARGET
-  fi
   if [ -f "$CONFIG/crew-dispatch.json" ]; then
     dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
     DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
@@ -2666,7 +2667,7 @@ if [ "$EFFORT" = ultra ]; then
   }
 fi
 if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
-  omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
+  omp_model_validate "$OMP_BIN" "$MODEL" "$CONFIG" "$dispatch_tmux_session" || exit 1
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
@@ -5727,12 +5728,7 @@ fi
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH_ENV_PREFIX='/usr/bin/env -i'
   # The resolved literal below wins over any retained ambient switch.
-  for env_name in HOME PATH USER LOGNAME SHELL TERM COLORTERM LANG LC_ALL LC_CTYPE \
-    TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
-    HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
-    CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
-    FM_TASK_ID COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS LAVISH_AXI_HOST \
-    $LAUNCH_ENV_NAMES; do
+  for env_name in $FM_LAUNCH_ENV_FLOOR $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
     # the pane shell and never become source text or spawn-process snapshots.
     # shellcheck disable=SC2016

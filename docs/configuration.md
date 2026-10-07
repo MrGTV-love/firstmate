@@ -1399,7 +1399,8 @@ An adopted pane retains its existing shell environment, which current tmux sessi
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
 
 Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
-An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication scope as capacity, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
+A Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
@@ -1413,16 +1414,21 @@ Direct `fm-spawn.sh <id> --relaunch` restores a recorded rule together with its 
 Omitted model and effort fields match their persisted `default` metadata values during recovery.
 An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
 Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
-OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
-An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+OMP workers keep native account rotation enabled and preserve destination-owned native model-fallback settings.
+In-worker model switching belongs to OMP's `retry.fallbackChains`, including the configured chain `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`; Firstmate neither installs nor changes that chain.
+Firstmate does not promise live terminal fallback: its shared selector applies declared stand-ins at fresh spawn and at relaunch only where authoritative destination capacity proves exhaustion.
+An idle terminal quota error invokes recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+When adopted-target selection returns unknown capacity, automatic quota control refuses before changing instructions or stopping the worker and raises the quota-exhausted recovery check so the supervisor can arrange a fresh spawn with selection.
 Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, the absence of an open captain call, and the absence of a pending authoritative close (`state/<id>.backlog-close`, including a dangling symlink) before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
-Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
-A failure before stopping the original worker remains retryable through its still-current quota event, even when checkpoint or note publication left a failed transaction journal.
-After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
+Automatic quota recovery spends one attempt per quota-origin generation before invoking control; advancing the event sequence or emitting a later session-end from that incarnation does not reset a failed or interrupted allowance, and ordinary session-end attempt history does not consume it.
+The quota-exhausted recovery check is queued once, duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
+The limit applies both to a still-current quota event and to its journal-backed partial recovery; a matching control transaction journal establishes the original event identity only when the current endpoint is proven dead.
+Retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
+Deliberate manual relaunch remains available, and a fresh worker generation is evaluated independently.
 A failed recovery without a replacement does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks and break timestamp ties by attempt count and task name.
 Each scan stops after one successful relaunch or a transaction-bound confirmed or published-alive replacement, retaining any control failure report.
 Launch and successful replacement report the selected route on command output, and automatic quota recovery includes the served profile in its supervisor notification, without appending a task-status declaration; control reports and completes its transaction using the replacement's published harness, model, and effort rather than preflight choices.
-The quota-recovery instruction preserves work context without assuming a model switch; unknown capacity may retain the original route.
+The quota-recovery instruction preserves work context without claiming a model switch or established pool exhaustion.
 No account pin, saved reset, or global reviewer configuration is changed.
 
 

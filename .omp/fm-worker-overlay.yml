@@ -14,4 +14,3 @@ retry:
   usageReservePct: 0
   usageReservePolicy: auto
   waitForUsageReset: false
-  modelFallback: false

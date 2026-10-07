@@ -15,6 +15,12 @@ export FM_BACKEND=tmux
 export FM_FAKE_TMUX_HOME="$HOME"
 cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
+OMP_USAGE_FIXTURE="${0%/*}/../usage.json"
+OMP_AUTH_EXHAUSTED_FIXTURE="${0%/*}/../auth-exhausted.json"
+if [ -f "${0%/*}/auth-selector" ]; then
+  IFS= read -r OMP_AUTH_SELECTOR < "${0%/*}/auth-selector"
+  IFS= read -r OMP_AUTH_EXHAUSTED_VALUE < "${0%/*}/auth-value"
+fi
 case "$1" in
   usage)
     if [ -n "${OMP_AUTH_SELECTOR:-}" ]; then
@@ -26,7 +32,16 @@ case "$1" in
       fi
     fi
     cat "$OMP_USAGE_FIXTURE" ;;
-  models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
+  models)
+    if [ -f "${0%/*}/catalog-key" ]; then
+      if [ "${OPENROUTER_API_KEY-unset}" = destination ]; then
+        printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"}]}'
+      else
+        printf '%s\n' '{"models":[{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}'
+      fi
+    else
+      printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}'
+    fi ;;
   *) exit 2 ;;
 esac
 SH
@@ -42,18 +57,28 @@ case "$1" in
   has-session) exit 0 ;;
   show-environment)
     [ "${FM_FAKE_TMUX_UNREADABLE:-0}" != 1 ] || exit 1
-    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then exit 0; fi
     if [ "$2" = -t ]; then
       file="$FM_HOME/tmux-session-env"
       [ "$3" != recorded ] || file="$FM_HOME/tmux-recorded-env"
     else
       file="$FM_HOME/tmux-global-env"
     fi
+    if { [ "$2" = -g ] && [ "$#" = 2 ]; } || { [ "$2" = -t ] && [ "$#" = 3 ]; }; then
+      if [ "$2" = -g ]; then
+        printf 'HOME=%s\nPATH=%s\n' "$FM_FAKE_TMUX_HOME" "$PATH"
+      fi
+      [ ! -f "$file" ] || cat "$file"
+      exit 0
+    fi
     name=${!#}
     if [ -f "$file" ]; then
       while IFS= read -r entry; do
         case "$entry" in "$name="*|"-$name") printf '%s\n' "$entry"; exit 0 ;; esac
       done < "$file"
+    fi
+    if [ "$2" = -g ] && [ "$name" = PATH ]; then
+      printf 'PATH=%s\n' "$PATH"
+      exit 0
     fi
     if [ "$2" = -g ] && [ "$name" = HOME ] && [ -n "${FM_FAKE_TMUX_HOME:-}" ]; then
       printf 'HOME=%s\n' "$FM_FAKE_TMUX_HOME"
@@ -371,6 +396,8 @@ write_pool 98
 for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME OMP_AUTH_BROKER_URL OMP_AUTH_BROKER_TOKEN; do
   export OMP_AUTH_SELECTOR="$selector" OMP_AUTH_EXHAUSTED_VALUE="$TMP_ROOT/exhausted-scope"
   case "$selector" in OMP_PROFILE|PI_PROFILE) export OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile ;; esac
+  printf '%s\n' "$OMP_AUTH_SELECTOR" > "$FAKEBIN/auth-selector"
+  printf '%s\n' "$OMP_AUTH_EXHAUSTED_VALUE" > "$FAKEBIN/auth-value"
   out=$(env "$selector=$OMP_AUTH_EXHAUSTED_VALUE" "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
   assert_equals usable "$(jq -r .status <<<"$out")" "caller-only $selector must not select the worker's authentication"
   printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-global-env"
@@ -390,6 +417,8 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
 export OMP_AUTH_SELECTOR=OMP_PROFILE OMP_AUTH_EXHAUSTED_VALUE=exhausted-profile
+printf '%s\n' "$OMP_AUTH_SELECTOR" > "$FAKEBIN/auth-selector"
+printf '%s\n' "$OMP_AUTH_EXHAUSTED_VALUE" > "$FAKEBIN/auth-value"
 printf 'PI_PROFILE=exhausted-profile\n' > "$TMP_ROOT/tmux-global-env"
 printf 'OMP_PROFILE=\n' > "$TMP_ROOT/tmux-session-env"
 out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
@@ -399,6 +428,7 @@ out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config")
 assert_equals exhausted "$(jq -r .status <<<"$out")" "removed OMP_PROFILE must allow destination PI_PROFILE selection"
 rm "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env"
 unset OMP_AUTH_SELECTOR OMP_AUTH_EXHAUSTED_VALUE OMP_AUTH_EXHAUSTED_FIXTURE
+rm "$FAKEBIN/auth-selector" "$FAKEBIN/auth-value"
 for scope in adopted unreadable daemon; do
   case "$scope" in
     adopted) out=$(fm_dispatch_capacity omp openai-codex/gpt-6.1-sol "$TMP_ROOT/config" recorded:fm-existing.0) ;;
@@ -409,6 +439,41 @@ for scope in adopted unreadable daemon; do
   assert_contains "$(jq -r .reason <<<"$out")" 'authentication scope' "unknown capacity must disclose its binding limitation"
 done
 pass "OMP pooled measurements bind destination selectors, profile emptiness, and launch filtering"
+
+write_pool 0
+: > "$FAKEBIN/catalog-key"
+ordered='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"},{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]'
+for policy in inherited retained filtered removed empty; do
+  printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
+  case "$policy" in
+    inherited) ;;
+    retained) printf 'OPENROUTER_API_KEY\n' > "$TMP_ROOT/config/launch-env-allowlist" ;;
+    filtered) : > "$TMP_ROOT/config/launch-env-allowlist" ;;
+    removed) printf -- '-OPENROUTER_API_KEY\n' > "$TMP_ROOT/tmux-session-env" ;;
+    empty) printf 'OPENROUTER_API_KEY=\n' > "$TMP_ROOT/tmux-session-env" ;;
+  esac
+  out=$(OPENROUTER_API_KEY=caller fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  case "$policy" in inherited|retained) expected=openrouter/z-ai/glm-5.3-flash ;; *) expected=openrouter/deepseek/deepseek-v4-flash ;; esac
+  assert_equals "$expected" "$(jq -r .profile.model <<<"$out")" "$policy catalog must retain only destination provider auth"
+  rm -f "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
+done
+for scope in adopted unreadable daemon relative; do
+  case "$scope" in
+    adopted) session=recorded:fm-existing.0 ;;
+    *) session= ;;
+  esac
+  if [ "$scope" = relative ]; then printf 'XDG_DATA_HOME=relative-root\n' > "$TMP_ROOT/tmux-global-env"; fi
+  if OPENROUTER_API_KEY=destination \
+    BACKEND=$([ "$scope" != daemon ] && printf tmux || printf herdr) \
+    FM_FAKE_TMUX_UNREADABLE=$([ "$scope" != unreadable ] && printf 0 || printf 1) \
+    fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '{"status":"exhausted"}' "$session" \
+      > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "$scope catalog acquisition must not authorize fallback from caller credentials"
+  fi
+  rm -f "$TMP_ROOT/tmux-global-env"
+done
+rm "$FAKEBIN/catalog-key"
+pass "OMP fallback catalogs retain destination provider auth without borrowing caller credentials"
 
 for container in scalar array; do
   for use in '{"harness":"claude"}' '{"harness":"claude","model":"","effort":""}' '{"harness":"claude","model":"default","effort":"default"}'; do

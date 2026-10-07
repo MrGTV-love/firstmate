@@ -3,6 +3,8 @@
 # Sourced by routing, spawn, and recovery; docs/configuration.md owns the matrix
 # schema. Never reads stored tokens, changes account pins, redeems saved resets, or
 # ranks accounts by a fabricated spendPriority. OMP owns credential rotation.
+# fm_dispatch_omp_query <config-dir> <tmux-session|empty> <executable> <args...>
+# prints destination-scoped OMP output; unestablished scope exits 125.
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> [config-dir] [tmux-session] prints evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
@@ -24,39 +26,78 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-backend.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-backend.sh"
 
-fm_dispatch_omp_usage() {
-  local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  local session=${2:-} backend=${BACKEND:-} name names= present entry value usage
-  local unknown='{"reason":"destination OMP authentication scope is not established"}'
-  local selectors='HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME OMP_AUTH_BROKER_URL OMP_AUTH_BROKER_TOKEN'
-  local assignments=() unset_args=()
-  case "$session" in *:*) printf '%s\n' "$unknown"; return ;; esac
-  if [ -z "$backend" ]; then
-    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || { printf '%s\n' "$unknown"; return; }
-  fi
-  [ "$backend" = tmux ] || { printf '%s\n' "$unknown"; return; }
-  fm_worker_account_tmux_env '' "$session" readable || { printf '%s\n' "$unknown"; return; }
-  present=$(fm_config_source_present "$config/launch-env-allowlist") || { printf '%s\n' "$unknown"; return; }
-  if [ "$present" = 1 ]; then
-    names=$(fm_config_launch_env_names "$config") || { printf '%s\n' "$unknown"; return; }
-  fi
-  for name in $selectors; do
-    unset_args+=(-u "$name")
-    if [ "$name" != HOME ] && [ "$present" = 1 ]; then
-      case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac
+fm_dispatch_omp_query_scoped() {
+  local config=$1 session=$2 backend=$3 executable=$4
+  shift 4
+  local global_env session_env= name names= present entry value
+  local assignments=() discovered=()
+  case "$session" in *:*) return 125 ;; esac
+  [ "$backend" = tmux ] || return 125
+  if [ -z "$session" ]; then
+    if [ -n "${TMUX:-}" ]; then
+      session=$(tmux display-message -p '#S' 2>/dev/null) || return 125
+      [ -n "$session" ] || return 125
+    elif tmux has-session -t firstmate 2>/dev/null; then
+      session=firstmate
     fi
-    entry=$(fm_worker_account_tmux_env "$name" "$session" assignment) || { printf '%s\n' "$unknown"; return; }
+  fi
+  global_env=$(tmux show-environment -g 2>/dev/null) || return 125
+  if [ -n "$session" ]; then
+    session_env=$(tmux show-environment -t "$session" 2>/dev/null) || return 125
+  fi
+  present=$(fm_config_source_present "$config/launch-env-allowlist") || return 125
+  if [ "$present" = 1 ]; then
+    names=$(fm_config_launch_env_names "$config") || return 125
+  fi
+  while IFS= read -r entry; do
+    name=${entry%%=*}
+    name=${name#-}
+    case "$name" in ''|[0-9]*|*[!a-zA-Z0-9_]*) continue ;; esac
+    case " ${discovered[*]-} " in *" $name "*) continue ;; esac
+    discovered+=("$name")
+    if [ "$present" = 1 ]; then
+      case " $FM_LAUNCH_ENV_FLOOR " in
+        *" $name "*) ;;
+        *) case $'\n'"$names"$'\n' in *$'\n'"$name"$'\n'*) ;; *) continue ;; esac ;;
+      esac
+    fi
+    entry=$(fm_worker_account_tmux_env "$name" "$session" assignment) || return 125
     [ -n "$entry" ] || continue
     value=${entry#*=}
     case "$name" in
       HOME|PI_CODING_AGENT_DIR|XDG_DATA_HOME|XDG_STATE_HOME|XDG_CACHE_HOME)
-        case "$value" in ''|/*) ;; *) printf '%s\n' "$unknown"; return ;; esac
+        case "$value" in ''|/*) ;; *) return 125 ;; esac
         ;;
     esac
     assignments+=("$entry")
-  done
-  usage=$(fm_run_timed 20 env "${unset_args[@]}" "${assignments[@]+"${assignments[@]}"}" omp usage --provider openai-codex --json 2>/dev/null </dev/null) || usage='{}'
-  [ -n "$usage" ] || usage='{}'
+  done <<<"$global_env
+$session_env"
+  /usr/bin/env -i "${assignments[@]+"${assignments[@]}"}" OMP_SKIP_SETUP=1 "$executable" "$@"
+}
+
+fm_dispatch_omp_query() {
+  local config=$1 session=$2 executable=$3 backend=${BACKEND:-} shell_bin
+  shift 3
+  executable=$(command -v "$executable") || return 127
+  case "$executable" in /*) ;; *) return 127 ;; esac
+  shell_bin=$(command -v bash) || return 127
+  if [ -z "$backend" ]; then
+    backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 125
+  fi
+  fm_run_timed 20 "$shell_bin" -c '. "$1"; shift; fm_dispatch_omp_query_scoped "$@"' _ \
+    "$FM_DISPATCH_CAPACITY_DIR/fm-dispatch-capacity-lib.sh" "$config" "$session" "$backend" "$executable" "$@" \
+    2>/dev/null </dev/null
+}
+
+fm_dispatch_omp_usage() {
+  local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
+  local session=${2:-} usage rc=0
+  usage=$(fm_dispatch_omp_query "$config" "$session" omp usage --provider openai-codex --json) || rc=$?
+  if [ "$rc" -eq 125 ]; then
+    printf '%s\n' '{"reason":"destination OMP authentication scope is not established"}'
+    return
+  fi
+  [ "$rc" -eq 0 ] && [ -n "$usage" ] || usage='{}'
   printf '%s\n' "$usage"
 }
 
@@ -262,12 +303,12 @@ fm_dispatch_fallbacks() {
 }
 
 fm_dispatch_fallback_supported() {
-  local config=$1 profile=$2 harness model catalog launcher
+  local config=$1 profile=$2 session=${3:-} harness model catalog launcher
   harness=$(jq -r .harness <<<"$profile")
   model=$(jq -r .model <<<"$profile")
   case "$harness" in
     omp)
-      catalog=$(fm_run_timed 20 omp models --json 2>/dev/null </dev/null) || return 1
+      catalog=$(fm_dispatch_omp_query "$config" "$session" omp models --json) || return 1
       jq -e --arg m "$model" 'any(.models[]?; .selector == $m)' <<<"$catalog" >/dev/null
       ;;
     claude)
@@ -298,7 +339,7 @@ fm_dispatch_select() {
   fi
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
-    fm_dispatch_fallback_supported "$config" "$candidate" || continue
+    fm_dispatch_fallback_supported "$config" "$candidate" "$session" || continue
     evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \

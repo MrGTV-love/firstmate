@@ -186,9 +186,9 @@ The worktree and the task's records are unaffected either way.
 - A launch failure **after** the agent is stopped keeps the prior durable record, keeps the progress note so a later recovery still has it, marks the journal `failed:launching`, and reports plainly that no agent is running and where the work is preserved.
 - If the launch owner already published the new record but no running agent can be confirmed, the new record is kept: the task is recorded on the new harness with no agent confirmed, which is exactly what recovery reconciles.
   Rewriting it back to the old harness would be a second, worse inaccuracy.
-- Automatic quota recovery carries its original event identity across journal transitions and rollback, separately from the current incarnation and publication transaction; the session-end library validates those bindings for [retryable partial recovery](configuration.md#pooled-omp-capacity-and-declared-stand-ins).
+- Automatic quota recovery carries its original event identity across journal transitions and rollback, separately from the current incarnation and publication transaction; the session-end library validates those bindings subject to the [one-attempt containment contract](configuration.md#pooled-omp-capacity-and-declared-stand-ins).
   Every accepted journal phase requires the current endpoint to be proven dead, including a published replacement and a failed stop that restored instructions while the old worker was alive or its state was uncertain.
-  Such delayed stop failures become retryable only after current death, with the same prior-record identity checks and explicit-exit cancellation for both the quota origin and current incarnation.
+  Current death establishes journal eligibility, not permission to repeat a spent automatic attempt; prior-record identity checks and explicit-exit cancellation still apply to both the quota origin and current incarnation.
   A live published replacement's new quota event instead uses its own current event identity, never the old journal identity.
 - The [automatic quota-recovery guard contract](configuration.md#pooled-omp-capacity-and-declared-stand-ins) owns locked recovery eligibility, including the pending-authoritative-close guard.
 

@@ -944,6 +944,7 @@ resolve_relaunch_profile() {
   PRIOR_EFFORT=$(fm_meta_get "$META" effort)
   [ -n "$PRIOR_MODEL" ] || PRIOR_MODEL=default
   [ -n "$PRIOR_EFFORT" ] || PRIOR_EFFORT=default
+  TARGET_DISPATCH_CAPACITY=
   TARGET_API_KEY_ALLOW=0
   [ "$(fm_meta_get "$META" api_key)" = allow ] && TARGET_API_KEY_ALLOW=1
   if [ "$HARNESS_SET" = 0 ] \
@@ -1037,12 +1038,13 @@ resolve_relaunch_profile() {
       TARGET_DISPATCH_RULE=
     fi
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
-       || [ "$dispatch_fallback" != '[]' ]; then
+       || [ "$dispatch_fallback" != '[]' ] || [ -n "${FM_CONTROL_QUOTA_GEN:-}" ]; then
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
         "$dispatch_profile" "$dispatch_fallback" "" "$T") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
+      TARGET_DISPATCH_CAPACITY=$(jq -r .capacity.status <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
       TARGET_EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
@@ -1264,6 +1266,9 @@ do_relaunch() {
     FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" >/dev/null 2>&1 || quota_hold_rc=$?
     [ "$quota_hold_rc" -eq 1 ] \
       || die "quota recovery requires a proven absence of an open captain hold for $ID"
+    if [ "$TARGET_DISPATCH_CAPACITY" = unknown ]; then
+      die "quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for $ID (adopted authentication scope)"
+    fi
     RELAUNCH_QUOTA_GEN=$FM_CONTROL_QUOTA_GEN
     RELAUNCH_QUOTA_SEQ=$FM_CONTROL_QUOTA_SEQ
     RELAUNCH_FROM_BUSY_GEN=$(fm_meta_get "$META" busy_gen)

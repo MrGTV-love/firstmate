@@ -38,8 +38,10 @@ The optional claude-bridge extension runs a nested executable literally named `c
 
 [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns session posture, worker-only memory scope, and the invariant that the captain's own configuration is never written.
 OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`; native rotation also applies to review processes launched with extensions disabled.
-Workers enable usage-aware account selection without a generic percentage reserve or reset wait, while `retry.modelFallback=false` prevents ambient native model fallback.
-A terminal quota-exhausted event drives recovery through Firstmate's shared selector, preserving the selected matrix rule's ordered fallbacks and strongest-class constraints.
+Workers enable usage-aware account selection without a generic percentage reserve or reset wait and preserve destination-owned native model-fallback settings.
+OMP's native `retry.fallbackChains` supplies in-worker switching, including `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`; Firstmate does not install or change that chain.
+Firstmate does not promise live terminal fallback: declared matrix stand-ins apply at fresh spawn and relaunch only with authoritative destination pool evidence.
+An adopted target with unknown capacity gets one automatic quota-recovery attempt, then a quota-exhausted check for supervisor-owned fresh spawn, not a successful same-model restart loop; the exact recovery contract belongs to `docs/configuration.md`.
 Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's single Codex account; the schema and supported cross-harness stand-ins belong to `docs/configuration.md`.
 
 ## Extension loading

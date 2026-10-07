@@ -27,8 +27,8 @@
 # Ordinary session-end caps count attempt rows in state/.session-end-relaunch-<id>:
 # at most one attempt per task in 30 minutes, and at most 3 per task in a day.
 # Past either cap the tick does not relaunch and wakes once for that
-# session-end generation. Omp quota recovery bypasses these caps and failed
-# or capped handling; a successfully handled generation/sequence is not retried.
+# session-end generation. Omp quota recovery bypasses these caps, but a failed
+# quota origin generation is not attempted again, including journal recovery.
 # Relaunch calls share the watcher's stale grace minus FM_SESSION_END_MARGIN
 # seconds, and the watcher beacon is touched just before each call, so a live
 # watcher blocked in a relaunch never reads as down. fm-control's launch wait
@@ -317,6 +317,11 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   if [ -f "$handled" ] && [ ! -L "$handled" ]; then
     IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$handled" || true
   fi
+  if [ "$handled_gen" = "$gen" ]; then
+    case "$handled_outcome" in
+      quota-failed) return 0 ;;
+    esac
+  fi
   if [ "$handled_gen" = "$gen" ] && [ "$handled_seq" = "$seq" ]; then
     if [ "$handled_outcome" = relaunched ] \
        && { [ "$quota_event" = 1 ] || [ "$recent" -ge 1 ]; }; then
@@ -385,6 +390,16 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_SESSION_END_REASON=$FM_SESSION_LAUNCH_REFUSAL_WAKE
     return 0
   fi
+  if [ "$handled_gen" = "$gen" ] && [ "$handled_outcome" = quota-attempted ]; then
+    reason="check: $id auto-relaunch failed after quota exhaustion: interrupted automatic attempt; use a fresh spawn with known capacity or a manual relaunch profile"
+    key="session-end-relaunch-failed-$id-$gen-$handled_seq"
+    fm_session_end_queue_wake "$key" "$reason" || return 1
+    fm_session_end_ledger_add "$state" "$id" failed || return 1
+    printf '%s\t%s\tquota-failed\n' "$gen" "$handled_seq" > "$handled" || return 1
+    FM_SESSION_END_ACTION=failed
+    FM_SESSION_END_REASON=$reason
+    return 0
+  fi
   if [ -n "$which" ]; then
     if [ "$which" = min ]; then
       reason="check: $id auto-relaunch paused after 1 attempt in ${FM_SESSION_END_MIN_SECS}s; session-end still recorded"
@@ -406,6 +421,9 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     [ "$launch_wait" -ge 1 ] || return 0
   fi
   fm_session_end_ledger_add "$state" "$id" attempt || return 1
+  if [ "$quota_event" = 1 ]; then
+    printf '%s\t%s\tquota-attempted\n' "$gen" "$seq" > "$handled" || return 1
+  fi
   bin=$(fm_session_end_control_bin)
   rc=0
   prior_tx=$(fm_meta_get "$journal" relaunch_tx)
@@ -414,7 +432,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
     FM_CONTROL_LAUNCH_WAIT="$launch_wait" \
     FM_CONTROL_QUOTA_GEN="$(if [ "$quota_event" = 1 ]; then printf '%s' "$gen"; fi)" \
     FM_CONTROL_QUOTA_SEQ="$(if [ "$quota_event" = 1 ]; then printf '%s' "$seq"; fi)" \
-    "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
+    "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native recovery ended. Continue from the preserved local copy and instructions.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     FM_SESSION_END_REPLACEMENT_BOUND=1
     FM_SESSION_END_ACTION=relaunch
@@ -440,7 +458,8 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id> [<deadline-epoch>]
   reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
-  printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1
+  printf '%s\t%s\t%s\n' "$gen" "$seq" \
+    "$(if [ "$quota_event" = 1 ]; then printf quota-failed; else printf failed; fi)" > "$handled" || return 1
   FM_SESSION_END_REASON=$reason
   return 0
 }
