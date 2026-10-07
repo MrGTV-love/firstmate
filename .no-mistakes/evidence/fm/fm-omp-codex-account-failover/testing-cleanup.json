@@ -1,0 +1,13 @@
+{
+  "actions": [
+    "Removed owned disposable .no-mistakes/live-test-disposable",
+    "Removed owned disposable .t",
+    "Removed owned disposable .no-mistakes/recovery-live-smoke",
+    "Removed inactive owned socket .s",
+    "Removed inactive owned socket .ls"
+  ],
+  "parent_private_tmux_server_stopped": true,
+  "targeted_initial_exit": 1,
+  "targeted_redrive_exit": 0,
+  "source_or_permanent_test_changes": false
+}

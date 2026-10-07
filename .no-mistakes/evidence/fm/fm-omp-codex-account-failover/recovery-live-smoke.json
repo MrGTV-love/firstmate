@@ -1,0 +1,531 @@
+{
+  "scope": "Disposable seeded task/busy records, actual native omp idle RPC worker; no model request, no primary, no mocks, production watcher/control/wake paths.",
+  "calls": [
+    {
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-lab-home.sh",
+        "create",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/lab"
+      ],
+      "returncode": 0,
+      "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/lab\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "new-session",
+        "-d",
+        "-s",
+        "quota-smoke",
+        "-n",
+        "fm-quota-live",
+        "-x",
+        "120",
+        "-y",
+        "40",
+        "-c",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/work",
+        "exec /usr/bin/env -i PATH=/opt/homebrew/bin:/Users/charlesabrooker/.bun/bin:/usr/bin:/bin HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/home PI_CODING_AGENT_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/agent XDG_CONFIG_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/config XDG_CACHE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/cache XDG_DATA_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/data XDG_STATE_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/state TMPDIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/tmp OMP_SKIP_SETUP=1 NO_MISTAKES_GATE=live-quota-recovery /Users/charlesabrooker/.bun/bin/omp --mode rpc --no-ui --no-session --no-tools --no-lsp --no-pty --no-skills --no-rules --no-extensions --no-title --thinking off --model openai-codex/quota-primary --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "alive",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "68117 omp\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-control.sh",
+        "quota-live",
+        "relaunch",
+        "--note",
+        "Disposable quota smoke refusal"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/lab\nerror: quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for quota-live (adopted authentication scope)\n"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "alive",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "68117 omp\n",
+      "stderr": ""
+    },
+    {
+      "label": "watcher_initial_quota",
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-watch.sh"
+      ],
+      "returncode": 0,
+      "terminated_after_bound": false,
+      "bound_seconds": 25,
+      "stdout": "check: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "alive",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "68117 omp\n",
+      "stderr": ""
+    },
+    {
+      "label": "watcher_advanced_quota_sequence",
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-watch.sh"
+      ],
+      "returncode": 0,
+      "terminated_after_bound": false,
+      "bound_seconds": 6,
+      "stdout": "check: rearm-resurface\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "alive",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "68117 omp\n",
+      "stderr": ""
+    },
+    {
+      "label": "watcher_later_ordinary_event",
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-watch.sh"
+      ],
+      "returncode": 0,
+      "terminated_after_bound": false,
+      "bound_seconds": 6,
+      "stdout": "check: rearm-resurface\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "alive",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "68117 omp\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "respawn-pane",
+        "-k",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "exec /bin/bash --noprofile --norc"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "dead",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "92543 bash\n",
+      "stderr": ""
+    },
+    {
+      "label": "watcher_interrupted_marker_dead_endpoint",
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-watch.sh"
+      ],
+      "returncode": 0,
+      "terminated_after_bound": false,
+      "bound_seconds": 12,
+      "stdout": "check: quota-live auto-relaunch failed after quota exhaustion: interrupted automatic attempt; use a fresh spawn with known capacity or a manual relaunch profile\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "dead",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "92543 bash\n",
+      "stderr": ""
+    },
+    {
+      "label": "watcher_interrupted_repeat",
+      "argv": [
+        "/bin/bash",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/bin/fm-watch.sh"
+      ],
+      "returncode": 0,
+      "terminated_after_bound": false,
+      "bound_seconds": 6,
+      "stdout": "check: rearm-resurface\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-c",
+        ". \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"",
+        "_",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P",
+        "quota-smoke:fm-quota-live"
+      ],
+      "returncode": 0,
+      "stdout": "dead",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "display-message",
+        "-p",
+        "-t",
+        "quota-smoke:fm-quota-live",
+        "#{pane_pid} #{pane_current_command}"
+      ],
+      "returncode": 0,
+      "stdout": "92543 bash\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/tmux",
+        "-S",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs",
+        "kill-server"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "observations": [
+    {
+      "label": "native_before",
+      "native_pane": "68117 omp",
+      "backend_agent_state": "alive",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "",
+      "handled": "",
+      "queue": ""
+    },
+    {
+      "label": "after_direct_control",
+      "native_pane": "68117 omp",
+      "backend_agent_state": "alive",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "",
+      "handled": "",
+      "queue": ""
+    },
+    {
+      "label": "after_watcher_first",
+      "native_pane": "68117 omp",
+      "backend_agent_state": "alive",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-failed\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    },
+    {
+      "label": "after_advanced_quota",
+      "native_pane": "68117 omp",
+      "backend_agent_state": "alive",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-failed\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    },
+    {
+      "label": "after_ordinary_event",
+      "native_pane": "68117 omp",
+      "backend_agent_state": "alive",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-failed\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    },
+    {
+      "label": "seeded_interrupted_attempt_later_ordinary_event_dead_native_endpoint",
+      "native_pane": "92543 bash",
+      "backend_agent_state": "dead",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-attempted\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    },
+    {
+      "label": "after_interrupted_reconciliation",
+      "native_pane": "92543 bash",
+      "backend_agent_state": "dead",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n1791363093\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-failed\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    },
+    {
+      "label": "after_interrupted_repeat",
+      "native_pane": "92543 bash",
+      "backend_agent_state": "dead",
+      "meta_hash": "432c1cc61d5c19f8822a842f36676c729d7013575098ca914fb884f73615e362",
+      "brief_hash": "26f1a2ddfb3cbc81118560e6a32042e523725b9debf288d97db03954ea005713",
+      "journal_exists": false,
+      "ledger": "1791363088\tattempt\n1791363088\tfailed\n1791363093\tfailed\n",
+      "handled": "quota-live-generation\t1\tquota-failed\n",
+      "queue": "1791363088\t1\tcheck\tsession-end-relaunch-failed-quota-live-quota-live-generation-1\tcheck: quota-live auto-relaunch failed after quota exhaustion: error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)\n"
+    }
+  ],
+  "checks": {
+    "direct_adopted_auth_refusal": true,
+    "direct_precheckpoint_unchanged": true,
+    "one_attempt_origin_generation": true,
+    "one_durable_quota_wake": true,
+    "actual_native_process_unchanged": true,
+    "interrupted_marker_survives_ordinary_event_and_dead_endpoint": true
+  },
+  "blockers": [
+    "Watcher child fm-control sets FM_STATE_OVERRIDE; gate lab allowance disallows overrides, so automatic attempt is refused by production gate guard before adopted-auth preflight. Direct control had no overrides."
+  ],
+  "environment": {
+    "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/wrapper:/opt/homebrew/bin:/Users/charlesabrooker/.bun/bin:/usr/bin:/bin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/home",
+    "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/agent",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/config",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/cache",
+    "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/data",
+    "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/state",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/tmp",
+    "OMP_SKIP_SETUP": "1",
+    "NO_MISTAKES_GATE": "live-quota-recovery",
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/lab",
+    "FM_POLL": "1",
+    "FM_HEARTBEAT": "3600",
+    "FM_CHECK_INTERVAL": "3600",
+    "FM_HOME_SUMMARY_INTERVAL": "3600"
+  },
+  "native_launch": {
+    "argv": [
+      "/Users/charlesabrooker/.bun/bin/omp",
+      "--mode",
+      "rpc",
+      "--no-ui",
+      "--no-session",
+      "--no-tools",
+      "--no-lsp",
+      "--no-pty",
+      "--no-skills",
+      "--no-rules",
+      "--no-extensions",
+      "--no-title",
+      "--thinking",
+      "off",
+      "--model",
+      "openai-codex/quota-primary",
+      "--config",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.omp/fm-worker-overlay.yml"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/Users/charlesabrooker/.bun/bin:/usr/bin:/bin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/home",
+      "PI_CODING_AGENT_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/agent",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/cache",
+      "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/data",
+      "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/xdg/state",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.no-mistakes/recovery-live-smoke/quota/tmp",
+      "OMP_SKIP_SETUP": "1",
+      "NO_MISTAKES_GATE": "live-quota-recovery"
+    },
+    "requests_submitted": 0,
+    "native_provider": "Explicit disposable custom openai-codex route at 127.0.0.1:1; no listener or paid request; idle RPC only."
+  },
+  "interrupted_fixture": "Seeded quota-attempted marker at origin seq 1 while current busy record was ordinary agent_end seq 3; native worker intentionally stopped by own tmux respawn to retain real dead shell endpoint. No claim an actual fm-control was interrupted. The origin wake key was already queued from the first refusal, so reconciliation deduplicated against that existing row; the new interrupted diagnosis was observed in actual watcher stdout, not a newly appended interrupted-text row.",
+  "runnable_driver": "import os, pathlib, subprocess, time, json, shlex, shutil, hashlib, signal\nROOT=pathlib.Path('/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P')\nBASE=ROOT/'.no-mistakes/recovery-live-smoke/quota'\nEVIDENCE=pathlib.Path('/Users/charlesabrooker/.no-mistakes/evidence/01M49AAWM08X3K86CZWW2AQZ0P/recovery-live-smoke.json')\nSOCKET=ROOT/'.rs'; TMUX='/opt/homebrew/bin/tmux'; OMP='/Users/charlesabrooker/.bun/bin/omp'\nresults={'scope':'Disposable seeded task/busy records, actual native omp idle RPC worker; no model request, no primary, no mocks, production watcher/control/wake paths.','calls':[], 'observations':[], 'checks':{}, 'blockers':[]}\nprocesses=[]\ndef run(argv,env=None,timeout=20):\n    r=subprocess.run([str(x) for x in argv],cwd=str(BASE/'work') if (BASE/'work').exists() else str(ROOT),env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)\n    results['calls'].append({'argv':[str(x) for x in argv], 'returncode':r.returncode,'stdout':r.stdout,'stderr':r.stderr})\n    return r\n\ndef digest(p): return hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None\n\ndef snap(label,env,target):\n    state=BASE/'lab/state'\n    r=run(['/bin/bash','-c','. \"$1/bin/fm-backend.sh\"; fm_backend_agent_state tmux \"$2\"','_',str(ROOT),target],env)\n    pid=run([TMUX,'-S',SOCKET,'display-message','-p','-t',target,'#{pane_pid} #{pane_current_command}'],env).stdout.strip()\n    obs={'label':label,'native_pane':pid,'backend_agent_state':r.stdout.strip(),'meta_hash':digest(state/'quota-live.meta'),'brief_hash':digest(BASE/'lab/data/quota-live/brief.md'),'journal_exists':(state/'quota-live.control-relaunch').exists(),'ledger':(state/'.session-end-relaunch-quota-live').read_text() if (state/'.session-end-relaunch-quota-live').exists() else '', 'handled':(state/'.session-end-handled-quota-live').read_text() if (state/'.session-end-handled-quota-live').exists() else '', 'queue':(state/'.wake-queue').read_text() if (state/'.wake-queue').exists() else ''}\n    results['observations'].append(obs); return obs\n\ndef watcher(label,env,bound=8):\n    log=BASE/(label+'.stdout'); err=BASE/(label+'.stderr')\n    with log.open('w') as out,err.open('w') as e:\n        p=subprocess.Popen(['/bin/bash',str(ROOT/'bin/fm-watch.sh')],cwd=BASE/'work',env=env,stdout=out,stderr=e,start_new_session=True); processes.append(p)\n        terminated=False\n        try: p.wait(timeout=bound)\n        except subprocess.TimeoutExpired:\n            terminated=True; os.killpg(p.pid,signal.SIGTERM); p.wait(timeout=10)\n    results['calls'].append({'label':label,'argv':['/bin/bash',str(ROOT/'bin/fm-watch.sh')],'returncode':p.returncode,'terminated_after_bound':terminated,'bound_seconds':bound,'stdout':log.read_text(),'stderr':err.read_text()})\n    return results['calls'][-1]\n\ntry:\n    if BASE.exists() or SOCKET.exists(): raise RuntimeError('Own fixture/socket already exists; refusing collision')\n    BASE.mkdir(parents=True)\n    for rel in ['home','agent','xdg/config','xdg/cache','xdg/data','xdg/state','tmp','work','wrapper']:(BASE/rel).mkdir(parents=True,exist_ok=True)\n    clean={'PATH':'/opt/homebrew/bin:/Users/charlesabrooker/.bun/bin:/usr/bin:/bin','HOME':str(BASE/'home'),'PI_CODING_AGENT_DIR':str(BASE/'agent'),'XDG_CONFIG_HOME':str(BASE/'xdg/config'),'XDG_CACHE_HOME':str(BASE/'xdg/cache'),'XDG_DATA_HOME':str(BASE/'xdg/data'),'XDG_STATE_HOME':str(BASE/'xdg/state'),'TMPDIR':str(BASE/'tmp'),'OMP_SKIP_SETUP':'1','NO_MISTAKES_GATE':'live-quota-recovery'}\n    r=run(['/bin/bash',ROOT/'bin/fm-lab-home.sh','create',BASE/'lab'],clean)\n    if r.returncode: raise RuntimeError('Production lab creation failed')\n    (BASE/'agent/models.yml').write_text('providers:\\n  openai-codex:\\n    baseUrl: http://127.0.0.1:1/v1\\n    api: openai-completions\\n    apiKey: disposable-local-key\\n    auth: apiKey\\n    models:\\n      - id: quota-primary\\n        name: Local quota idle worker\\n        reasoning: false\\n        input: [text]\\n        contextWindow: 128000\\n        maxTokens: 256\\n        cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}\\n')\n    wrapper=BASE/'wrapper/tmux'; wrapper.write_text('#!/bin/sh\\nexec '+shlex.quote(TMUX)+' -S '+shlex.quote(str(SOCKET))+' \"$@\"\\n'); wrapper.chmod(0o700)\n    env={**clean,'PATH':str(BASE/'wrapper')+':'+clean['PATH'],'FM_HOME':str(BASE/'lab'),'FM_POLL':'1','FM_HEARTBEAT':'3600','FM_CHECK_INTERVAL':'3600','FM_HOME_SUMMARY_INTERVAL':'3600'}\n    results['environment']=env\n    nativeargv=[OMP,'--mode','rpc','--no-ui','--no-session','--no-tools','--no-lsp','--no-pty','--no-skills','--no-rules','--no-extensions','--no-title','--thinking','off','--model','openai-codex/quota-primary','--config',str(ROOT/'.omp/fm-worker-overlay.yml')]\n    command='exec /usr/bin/env -i '+' '.join(shlex.quote(k+'='+v) for k,v in clean.items())+' '+shlex.join(nativeargv)\n    results['native_launch']={'argv':nativeargv,'env':clean,'requests_submitted':0,'native_provider':'Explicit disposable custom openai-codex route at 127.0.0.1:1; no listener or paid request; idle RPC only.'}\n    r=run([TMUX,'-S',SOCKET,'new-session','-d','-s','quota-smoke','-n','fm-quota-live','-x','120','-y','40','-c',BASE/'work',command],clean)\n    if r.returncode: raise RuntimeError('Real tmux creation failed')\n    time.sleep(4)\n    target='quota-smoke:fm-quota-live'; state=BASE/'lab/state'; task='quota-live'; gen='quota-live-generation'\n    (BASE/'lab/data'/task).mkdir()\n    (BASE/'lab/data'/task/'brief.md').write_text('Disposable native idle worker, never submit a model request.\\n')\n    (state/(task+'.meta')).write_text('kind=ship\\nbackend=tmux\\nwindow='+target+'\\nworktree='+str(BASE/'work')+'\\nproject='+str(BASE/'work')+'\\nharness=omp\\nmodel=openai-codex/quota-primary\\neffort=default\\n')\n    (state/(task+'.status')).write_text('[2026-10-07 00:00] progress: disposable recovery smoke\\n')\n    (state/(task+'.busy-gen')).write_text(gen+'\\n')\n    def busy(seq,event,kind='idle'):(state/(task+'.busy-state')).write_text('v1 gen='+gen+' seq='+str(seq)+' state='+kind+' source=omp-ext event='+event+' ts='+str(int(time.time()))+'\\n')\n    busy(1,'quota-exhausted'); (state/'home-summary.json').write_text('{}\\n')\n    for name in ['.last-check','.last-heartbeat']:(state/name).touch()\n    first=snap('native_before',env,target)\n    if first['backend_agent_state']!='alive':\n        results['blockers'].append('Real native endpoint does not classify alive; cannot license watcher automatic recovery.')\n        results['native_screen']=run([TMUX,'-S',SOCKET,'capture-pane','-p','-t',target],env).stdout\n        raise RuntimeError('Native endpoint not alive')\n    directenv={**env,'FM_CONTROL_QUOTA_GEN':gen,'FM_CONTROL_QUOTA_SEQ':'1'}\n    direct=run(['/bin/bash',ROOT/'bin/fm-control.sh',task,'relaunch','--note','Disposable quota smoke refusal'],directenv)\n    afterdirect=snap('after_direct_control',env,target)\n    results['checks']['direct_adopted_auth_refusal']=direct.returncode!=0 and 'automatic recovery capacity is unknown' in direct.stderr\n    results['checks']['direct_precheckpoint_unchanged']=first['native_pane']==afterdirect['native_pane'] and first['meta_hash']==afterdirect['meta_hash'] and first['brief_hash']==afterdirect['brief_hash'] and not afterdirect['journal_exists'] and afterdirect['backend_agent_state']=='alive'\n    w1=watcher('watcher_initial_quota',env,25); after1=snap('after_watcher_first',env,target)\n    busy(2,'quota-exhausted'); w2=watcher('watcher_advanced_quota_sequence',env,6); after2=snap('after_advanced_quota',env,target)\n    busy(3,'agent_end'); w3=watcher('watcher_later_ordinary_event',env,6); after3=snap('after_ordinary_event',env,target)\n    results['checks']['one_attempt_origin_generation']=after1['ledger'].count('\\tattempt\\n')==1 and after2['ledger']==after1['ledger'] and after3['ledger']==after1['ledger']\n    results['checks']['one_durable_quota_wake']=after1['queue'].count('auto-relaunch failed after quota exhaustion:')==1 and after2['queue'].count('auto-relaunch failed after quota exhaustion:')==1 and after3['queue'].count('auto-relaunch failed after quota exhaustion:')==1\n    results['checks']['actual_native_process_unchanged']=all(o['native_pane']==first['native_pane'] and o['backend_agent_state']=='alive' and o['meta_hash']==first['meta_hash'] and o['brief_hash']==first['brief_hash'] and not o['journal_exists'] for o in [afterdirect,after1,after2,after3])\n    if 'no-mistakes gate' in after1['queue'].lower() or 'gate agent' in after1['queue'].lower(): results['blockers'].append('Watcher child fm-control sets FM_STATE_OVERRIDE; gate lab allowance disallows overrides, so automatic attempt is refused by production gate guard before adopted-auth preflight. Direct control had no overrides.')\n    # Interrupt fixture deliberately seeded, not an actually interrupted fm-control run.\n    (state/'.session-end-handled-quota-live').write_text(gen+'\\t1\\tquota-attempted\\n')\n    run([TMUX,'-S',SOCKET,'respawn-pane','-k','-t',target,'exec /bin/bash --noprofile --norc'],env)\n    time.sleep(1)\n    dead=snap('seeded_interrupted_attempt_later_ordinary_event_dead_native_endpoint',env,target)\n    wi=watcher('watcher_interrupted_marker_dead_endpoint',env,12); afteri=snap('after_interrupted_reconciliation',env,target)\n    wir=watcher('watcher_interrupted_repeat',env,6); afterir=snap('after_interrupted_repeat',env,target)\n    results['checks']['interrupted_marker_survives_ordinary_event_and_dead_endpoint']=dead['backend_agent_state']=='dead' and 'interrupted automatic attempt' in wi['stdout'] and afteri['handled']==gen+'\\t1\\tquota-failed\\n' and afteri['ledger']==afterir['ledger']\n    results['interrupted_fixture']='Seeded quota-attempted marker at origin seq 1 while current busy record was ordinary agent_end seq 3; native worker intentionally stopped by own tmux respawn to retain real dead shell endpoint. No claim an actual fm-control was interrupted.'\nexcept Exception as e:\n    results['error']=str(e)\nfinally:\n    for p in processes:\n        if p.poll() is None:\n            try:os.killpg(p.pid,signal.SIGTERM);p.wait(timeout=10)\n            except Exception:pass\n    if SOCKET.exists():\n        try:run([TMUX,'-S',SOCKET,'kill-server'],{ 'PATH':'/usr/bin:/bin','HOME':str(BASE/'home')})\n        except Exception as e:results['cleanup_error']=str(e)\n    results['runnable_driver']=pathlib.Path(__file__).read_text()\n    if BASE.exists():shutil.rmtree(BASE)\n    results['cleanup']={'fixture_removed':not BASE.exists(),'socket_removed':not SOCKET.exists(),'watcher_processes_exited':all(p.poll() is not None for p in processes)}\n    EVIDENCE.parent.mkdir(parents=True,exist_ok=True);EVIDENCE.write_text(json.dumps(results,indent=2)+'\\n')\n    print(json.dumps({k:v for k,v in results.items() if k in ['checks','blockers','error','cleanup']},indent=2))\n",
+  "cleanup": {
+    "fixture_removed": true,
+    "socket_removed": true,
+    "watcher_processes_exited": true,
+    "native_and_dead_shell_exited": true,
+    "socket_cleanup_note": "kill-server left an inactive Unix socket pathname; verified no live server then unlinked only own ROOT/.rs pathname."
+  },
+  "cleanup_observation": {
+    "tmux_has_session_returncode": 1,
+    "stderr": "no server running on /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49AAWM08X3K86CZWW2AQZ0P/.rs\n",
+    "ps_owned_pids_returncode": 1,
+    "stdout": ""
+  }
+}

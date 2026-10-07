@@ -1,0 +1,136 @@
+[
+  {
+    "name": "Second account remains usable",
+    "expected": "usable",
+    "observed": {
+      "status": "usable",
+      "accounts": [
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 1
+        },
+        {
+          "status": "usable",
+          "remaining": 98,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Both exhausted despite saved reset",
+    "expected": "exhausted",
+    "observed": {
+      "status": "exhausted",
+      "accounts": [
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 1
+        },
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Unmeasured sibling prevents exhaustion",
+    "expected": "unknown",
+    "observed": {
+      "status": "unknown",
+      "accounts": [
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Stale sibling prevents exhaustion",
+    "expected": "unknown",
+    "observed": {
+      "status": "unknown",
+      "accounts": [
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 0
+        },
+        {
+          "status": "unknown",
+          "remaining": 0,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Negative shared flag does not exhaust healthy scoped window",
+    "expected": "usable",
+    "observed": {
+      "status": "usable",
+      "accounts": [
+        {
+          "status": "usable",
+          "remaining": 80,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Uppercase Spark uses exhausted Spark tier",
+    "expected": "exhausted",
+    "observed": {
+      "status": "exhausted",
+      "accounts": [
+        {
+          "status": "exhausted",
+          "remaining": 0,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  },
+  {
+    "name": "Uppercase paid SOL rejects free entitlement",
+    "expected": "exhausted",
+    "observed": {
+      "status": "exhausted",
+      "accounts": [
+        {
+          "status": "ineligible",
+          "remaining": 80,
+          "savedResets": 0
+        }
+      ]
+    },
+    "exit": 0,
+    "live": false,
+    "method": "production Bash fm_omp_codex_capacity supplied freshly constructed usage JSON"
+  }
+]
