@@ -26,6 +26,9 @@ install_runner() {  # <case-dir>
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-status-record-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
+    "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-utc-lib.sh" "$dir/bin/"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/"

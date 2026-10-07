@@ -108,9 +108,27 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 
 `bin/fm-lint.sh` owns two canonical CI partitions, each running full source-aware ShellCheck analysis, workflow validation, and backend-purity checks.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope and per-root execution contract.
-Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots and unchanged analysis flags.
+Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, shared-cache invalidation, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, reduced checks, or paid runner provisioning is part of this layout.
+
+The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
+Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.
+`tests/fm-test-run.test.sh` verifies changed status and UTC owners through the runner's authoritative consuming-family map.
+
+A same-host Darwin cold comparison on 2026-10-04 (UTC), using ShellCheck 0.11.0 with `/usr/bin/time -l "$SHELLCHECK" --norc --external-sources -- <root>`, recorded the following direct analyzer high-water RSS in bytes, wall seconds, and starting 1-minute load.
+The before source was the pre-partition implementation; the after source was the ownership-corrected working copy, not a committed-head or CI validation.
+Both roots exited 0 before and after, without success-cache reuse.
+
+| Root | Before RSS bytes | After RSS bytes | Before wall seconds | After wall seconds | Before load | After load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tests/fm-pending-reply.test.sh` | 1,555,906,560 | 923,418,624 | 63.47 | 127.55 | 26.43 | 57.77 |
+| `bin/fm-watch.sh` | 1,342,930,944 | 1,507,655,680 | 138.85 | 215.09 | 30.96 | 47.61 |
+
+Pending-reply's observed peak was lower, but watcher's was higher and both wall times increased under higher host load; these measurements do not establish a general cold-memory or latency improvement.
+Seeded joint checks retained SC2119 across the pending import seams, watcher UTC import, and resolve caller; owner-only and hidden-source counterfactuals did not retain that call-dependent finding.
+Cache reuse remains a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
+macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
 
 The performance objective is a complete green run under fifteen minutes including start delay: roughly twelve minutes of longest-path execution, at most two minutes of runner delay, and less than one minute of other overhead.
 The candidate uses fourteen long-lived Linux jobs (nine serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.

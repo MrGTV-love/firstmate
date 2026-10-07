@@ -75,7 +75,7 @@ The tmux reader is a thin adapter over the [fleet-wide classifier and its shape 
 Real text in an identified shape is pending, while only positively proven emptiness reads empty.
 A blank or otherwise unidentified cursor row is `unknown` and every consumer defers, except that a foreground process proven to be Cursor is re-read cursorlessly because Cursor parks its terminal cursor below its footer.
 That identity-gated exception preserves the strict container-proof rule for every other pane, so a modal dialog, a dead shell between stale rules, or a mid-redraw pane is never an injection target.
-A bare shell prompt is `unknown`, so away-mode escalation is never injected into a dead shell.
+The shared supported shapes, prompt-glyph limits, and plain-capture safety boundary are owned by [Composer and injection safety](herdr-backend.md#composer-and-injection-safety).
 
 Busy state is not read from rendered text on this backend.
 A task's busy, idle, unknown, or dead verdict comes from the semantic busy-state contract owned by `bin/fm-busy-lib.sh`; [architecture](architecture.md#busy-state-is-semantic-per-adapter) owns its boundaries.

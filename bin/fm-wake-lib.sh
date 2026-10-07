@@ -18,13 +18,10 @@ FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 _FM_UNAME=$(uname 2>/dev/null || echo unknown)
 mkdir -p "$STATE"
 
-# Most wake-library consumers need only queue and lock primitives, including
-# deliberately minimal recovery fixtures and remote installations.
-# Load the classifier only when a status presentation helper is actually used.
-_fm_wake_require_classify() {
+_fm_wake_require_status() {
   command -v status_observed_signature >/dev/null 2>&1 && return 0
-  # shellcheck source=bin/fm-classify-lib.sh
-  . "$FM_WAKE_LIB_DIR/fm-classify-lib.sh"
+  # shellcheck source=bin/fm-status-wake-lib.sh
+  . "$FM_WAKE_LIB_DIR/fm-status-wake-lib.sh"
 }
 
 # Load the bounded-execution owner only for callers that use the presentation
@@ -123,11 +120,7 @@ fm_path_age() {
 }
 
 # fm_poll_derived_grace [poll-seconds]
-# Default guard-grace derivation: max(300, poll + 60). A watcher touches its
-# liveness beacon once per poll cycle, so a fixed 300s grace stops correctly
-# bounding staleness once the poll cadence reaches or exceeds it; growing the
-# default with the cadence while keeping the historical 300s floor for the
-# common short-poll case fixes that without a caller-specific constant.
+# Default guard-grace derivation: max(300, poll + 60).
 # Defaults to $FM_POLL (fm-watch.sh's own poll env var) when no argument is
 # given, so a caller with no independent notion of the poll cadence still
 # derives the same default fm-watch.sh itself would use.
@@ -2310,7 +2303,7 @@ fm_wake_rows_queued() {  # <seq>...
 # The watcher's per-file signal scan (bin/fm-watch.sh scan_signals) detects a
 # status or turn-ended change by comparing a file signature against a persisted
 # state/.seen-* marker.
-# fm-classify-lib.sh's header owns the status marker contract, including its
+# fm-status-wake-lib.sh's header owns the status marker contract, including its
 # independent reported signature and classified position.
 # These helpers own wake-facing marker routing, the legacy turn-ended signature,
 # drain-time staleness checks, and guarded bookkeeping writes.
@@ -2318,7 +2311,7 @@ fm_wake_rows_queued() {  # <seq>...
 fm_wake_signal_sig() {  # <file> -> reported-state signature
   case "$1" in
     *.status)
-      _fm_wake_require_classify || return 1
+      _fm_wake_require_status || return 1
       status_observed_signature "$1"
       ;;
     *)
@@ -2343,7 +2336,7 @@ fm_wake_signal_seen_size() {  # <state> <file>
   marker=$(fm_wake_signal_seen_path "$1" "$2")
   case "$2" in
     *.status)
-      _fm_wake_require_classify || { printf '0'; return 0; }
+      _fm_wake_require_status || { printf '0'; return 0; }
       status_presentation_marker_offset "$marker" "$2"
       ;;
     *)
@@ -2370,7 +2363,7 @@ fm_wake_signal_reported_current() {  # <state> <file>
   marker=$(fm_wake_signal_seen_path "$1" "$2")
   case "$2" in
     *.status)
-      _fm_wake_require_classify || return 1
+      _fm_wake_require_status || return 1
       status_presentation_marker_reported_matches "$marker" "$sig"
       ;;
     *) [ "$(cat "$marker" 2>/dev/null)" = "$sig" ] ;;
@@ -2390,7 +2383,7 @@ fm_wake_signal_seen_current() {  # <state> <file>
   local classified size
   fm_wake_signal_reported_current "$1" "$2" && return 0
   case "$2" in *.status) ;; *) return 1 ;; esac
-  _fm_wake_require_classify || return 1
+  _fm_wake_require_status || return 1
   classified=$(fm_wake_signal_seen_size "$1" "$2")
   size=$(_fm_status_file_size "$2") || return 1
   size=${size//[[:space:]]/}
@@ -2400,12 +2393,12 @@ fm_wake_signal_seen_current() {  # <state> <file>
 }
 
 fm_wake_status_reported_commit() {  # <state> <status-file> <reported-signature>
-  _fm_wake_require_classify || return 1
+  _fm_wake_require_status || return 1
   status_presentation_marker_report "$(fm_wake_signal_seen_path "$1" "$2")" "$3"
 }
 
 fm_wake_status_seen_commit() {  # <state> <status-file> <captured-end> <captured-identity>
-  _fm_wake_require_classify || return 1
+  _fm_wake_require_status || return 1
   status_presentation_marker_commit "$(fm_wake_signal_seen_path "$1" "$2")" "$2" "$3" "$4"
 }
 
@@ -2413,7 +2406,7 @@ fm_wake_status_seen_commit() {  # <state> <status-file> <captured-end> <captured
 # This is the public setup primitive for consumers that adopt an existing log.
 fm_wake_status_mark_current() {  # <state> <status-file>
   local size ident
-  _fm_wake_require_classify || return 1
+  _fm_wake_require_status || return 1
   size=$(_fm_status_file_size "$2") || return 1
   ident=$(_fm_open_decisions_file_ident "$2") || return 1
   fm_wake_status_seen_commit "$1" "$2" "$size" "$ident"
@@ -2425,7 +2418,7 @@ fm_wake_status_mark_current() {  # <state> <status-file>
 # pending-reply escalation close, captain-held transfers). Such a close must
 # not wake the session that wrote it, so this appends one command's lines
 # together, records the exact appended byte range in the home-owned append
-# ledger (bin/fm-classify-lib.sh), and then advances the watcher's seen marker
+# ledger (bin/fm-status-wake-lib.sh), and then advances the watcher's seen marker
 # across the appended bytes and no byte this home has not already read. The
 # advance is provenance-gated and fails toward waking:
 #   - the marker advances only when this home already read every pre-append
@@ -2452,7 +2445,7 @@ fm_wake_status_mark_current() {  # <state> <status-file>
 # size past the owned ranges and wakes as before: task identity alone can never
 # suppress new content.
 # Each line is stamped with its emission time on the way in (status_stamp_line,
-# bin/fm-classify-lib.sh), so the appended bytes are the stamped ones, not the
+# bin/fm-status-record-lib.sh), so the appended bytes are the stamped ones, not the
 # caller's: a caller that caps a line first must reserve status_stamp_width,
 # and one that suppresses a repeat must ask status_event_recorded rather than
 # compare exact bytes.
@@ -2463,7 +2456,7 @@ fm_wake_status_append_self_announced() {  # <state> <status-file> <line>...
   local classified folded lag span_rc=0
   local LC_ALL=C stamped=()
   shift 2
-  _fm_wake_require_classify || return 1
+  _fm_wake_require_status || return 1
   for line in "$@"; do
     stamped+=("$(status_stamp_line "$line")")
   done

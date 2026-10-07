@@ -67,7 +67,7 @@
 #   grace_secs=             bounded grace before recovery is eligible
 #
 # Escalation lifecycle: an escalation is not just a message, it OPENS a durable
-# keyed decision in the parent status log, and bin/fm-classify-lib.sh's fold is
+# keyed decision in the parent status log, and bin/fm-status-decision-lib.sh's fold is
 # the one owner of what closes it. So this library owns both ends of that
 # decision: fm_pending_reply_maybe_escalate opens it under a per-request key, and
 # fm_pending_reply_close_escalation closes it once the record resolves. Resolving
@@ -76,7 +76,7 @@
 # That per-request key lives in a namespace the fold reserves to this library, so
 # no other writer into the same status stream - a local mate appending directly,
 # or a remote mate's mirrored line - can take the key over or clear it; see the
-# reserved-key rule in bin/fm-classify-lib.sh.
+# reserved-key rule in bin/fm-status-decision-lib.sh.
 # The operator-facing close of that same keyed decision is still
 # fm-send --resolve-key (bin/fm-send.sh header): it must speak the close note
 # owned below (fm_pending_reply_resolved_note), because a bare answered: note is
@@ -105,27 +105,33 @@
 #                                 (tests); receives task_id and full message as args
 #   FM_PENDING_REPLY_NOW          optional fixed epoch for deterministic tests
 
-# This directive does double duty: it also binds _FM_PENDING_REPLY_LIB_DIR as
-# the bin/ source prefix so the deliberately undirected lazy sources below
-# still resolve for ShellCheck instead of warning SC1091.
-# shellcheck source=bin/fm-marker-lib.sh
 _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || _FM_PENDING_REPLY_LIB_DIR="."
 # shellcheck source=bin/fm-marker-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-marker-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-backend.sh"
-# Deliberately undirected: this library consumes no symbols from
-# bin/fm-tmux-lib.sh, so following it under ShellCheck's external-source
-# traversal would expand that graph for zero cross-file checks.
+# shellcheck source=bin/fm-tmux-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-tmux-lib.sh"
-# Deliberately undirected: bin/fm-classify-lib.sh is already expanded inside
-# bin/fm-wake-lib.sh's single directed expansion below; a second directive
-# here would re-expand the same transitive graph.
-. "$_FM_PENDING_REPLY_LIB_DIR/fm-classify-lib.sh"
+# shellcheck source=bin/fm-status-io-lib.sh
+. "$_FM_PENDING_REPLY_LIB_DIR/fm-status-io-lib.sh"
+# shellcheck source=bin/fm-status-decision-lib.sh
+. "$_FM_PENDING_REPLY_LIB_DIR/fm-status-decision-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'
 FM_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'
 FM_PENDING_REPLY_GRACE_DEFAULT=120
+
+# Keep each import at its caller's dynamic scope and run its initialization on
+# every invocation, while joint analysis follows one real source statement.
+_fm_pending_reply_source_wake() {
+  # shellcheck source=bin/fm-wake-lib.sh
+  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+}
+
+_fm_pending_reply_source_parent_channel() {
+  # shellcheck source=bin/fm-parent-channel-lib.sh
+  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+}
 
 fm_pending_reply_now() {
   if [ -n "${FM_PENDING_REPLY_NOW:-}" ]; then
@@ -416,7 +422,7 @@ fm_pending_reply_confirm_delivery() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_confirm_delivery_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -497,7 +503,7 @@ fm_pending_reply_reconcile_delivery() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_reconcile_delivery_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -528,7 +534,7 @@ fm_pending_reply_reset_known_undelivered() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_reset_known_undelivered_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -648,8 +654,7 @@ fm_pending_reply_try_resolve() {  # <state-dir> <corr_id> [status-file-override]
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # shellcheck source=bin/fm-wake-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_try_resolve_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1053,7 +1058,7 @@ fm_pending_reply_escalation_key() {  # <corr_id>
 }
 
 # Close-note body the reserved-key fold accepts as this library's resolution.
-# The fold's guard (bin/fm-classify-lib.sh _fm_decision_key_transition_allowed)
+# The fold's guard (bin/fm-status-decision-lib.sh _fm_decision_key_transition_allowed)
 # requires the note to begin with this namespace's vocabulary token; this is
 # that token plus the stable task/id/via fields both the record close and the
 # operator --resolve-key path write. Optional <extra> is appended after a space.
@@ -1126,7 +1131,7 @@ fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
 # Close the durable status decision a previous escalation opened for <corr_id>.
 # Idempotent, and safe to retry until it succeeds: it appends the closing line
 # only while that exact keyed decision is still open in
-# bin/fm-classify-lib.sh's fold. Records that never escalated are left untouched.
+# bin/fm-status-decision-lib.sh's fold. Records that never escalated are left untouched.
 fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
   # Serialized per correlation so a resolution and an escalation cannot interleave.
   # bin/fm-wake-lib.sh owns the lock primitives but assigns its own globals when
@@ -1139,10 +1144,7 @@ fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # Deliberately undirected: bin/fm-wake-lib.sh is expanded once at the
-  # fm_pending_reply_try_resolve site; each directed site would re-expand its
-  # whole transitive graph under ShellCheck's external-source traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_close_escalation_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1207,10 +1209,7 @@ fm_pending_reply_maybe_escalate() {  # <state-dir> <corr_id>
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  # Deliberately undirected: bin/fm-wake-lib.sh is expanded once at the
-  # fm_pending_reply_try_resolve site; each directed site would re-expand its
-  # whole transitive graph under ShellCheck's external-source traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  _fm_pending_reply_source_wake "$@"
   fm_lock_acquire_wait "$lock" || return 1
   _fm_pending_reply_maybe_escalate_locked "$@" || rc=$?
   fm_lock_release "$lock"
@@ -1304,8 +1303,7 @@ fm_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
     return 0
   fi
   sightings=$(fm_pending_reply_get "$rec" wrong_home_sightings)
-  # shellcheck source=bin/fm-parent-channel-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+  _fm_pending_reply_source_parent_channel "$@"
   if fm_parent_channel_destination "$sm_home" "$sm_home/state" >/dev/null 2>&1 \
     && [ "$FM_PARENT_CHANNEL_ROUTE" = remote ]; then
     remote_parent_channel=1
@@ -1364,11 +1362,7 @@ fm_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <se
   [ "$stranded" != "$parent_status" ] || return 1
   line=$(fm_pending_reply_find_resolve_line "$stranded" "$corr")
   [ -n "$line" ] || return 1
-  # Deliberately undirected: bin/fm-parent-channel-lib.sh is expanded once at
-  # the fm_pending_reply_detect_wrong_home site; each directed site would
-  # re-expand its whole transitive graph under ShellCheck's external-source
-  # traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/fm-parent-channel-lib.sh"
+  _fm_pending_reply_source_parent_channel "$@"
   fm_parent_channel_append_once "$parent_status" "$line"
 }
 
@@ -1450,25 +1444,39 @@ fm_pending_reply_tick_one() {  # <state-dir> <corr_id> <busy_state> [secondmate-
 # state, and optional secondmate-home wrong-home path checks.
 fm_pending_reply_tick() {  # <state-dir>
   local state=$1 dir rec corr task_id phase delivered meta backend target label busy sm_home harness remote_host
+  local record_line escalated closed
   local observation observation_task found i
   local -a observation_tasks=() observation_values=()
   dir=$(fm_pending_reply_dir "$state")
   [ -d "$dir" ] || return 0
   for rec in "$dir"/*; do
     [ -f "$rec" ] || continue
-    case "$(basename "$rec")" in
+    case "${rec##*/}" in
       .*) continue ;;
     esac
-    corr=$(fm_pending_reply_get "$rec" corr_id)
-    [ -n "$corr" ] || corr=$(basename "$rec")
-    task_id=$(fm_pending_reply_get "$rec" task_id)
-    phase=$(fm_pending_reply_get "$rec" phase)
+    # Records are replaced atomically. Read one snapshot with builtins instead
+    # of spawning a field-reader pipeline for every retained completed reply.
+    corr='' task_id='' phase='' escalated='' closed=''
+    while IFS= read -r record_line || [ -n "$record_line" ]; do
+      case "$record_line" in
+        corr_id=*) corr=${record_line#*=} ;;
+        task_id=*) task_id=${record_line#*=} ;;
+        phase=*) phase=${record_line#*=} ;;
+        escalated_epoch=*) escalated=${record_line#*=} ;;
+        escalation_closed_epoch=*) closed=${record_line#*=} ;;
+      esac
+    done < "$rec" || continue
     if [ "$phase" = resolved ]; then
-      # Cheap no-op unless an escalation for this record is still open; this is
-      # the retry that makes the close converge after a transient write failure.
-      fm_pending_reply_close_escalation "$state" "$corr" || true
+      # Completed no-ops need no lock. An owed close still re-reads the current
+      # record under the existing correlation lock, including after a failed
+      # publication; this snapshot never authorizes a status append.
+      if [ -n "$escalated" ] && [ -z "$closed" ]; then
+        [ -n "$corr" ] || corr=${rec##*/}
+        fm_pending_reply_close_escalation "$state" "$corr" || true
+      fi
       continue
     fi
+    [ -n "$corr" ] || corr=${rec##*/}
     fm_pending_reply_reconcile_delivery "$state" "$corr" || true
     phase=$(fm_pending_reply_get "$rec" phase)
     delivered=$(fm_pending_reply_get "$rec" delivered_epoch)

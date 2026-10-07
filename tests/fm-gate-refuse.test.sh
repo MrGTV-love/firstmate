@@ -187,7 +187,7 @@ test_helper_lab_home_admits() {
 
 test_lab_home_private_tmux_socket_survives_deep_paths() {
   local root=$TMP/deep lab socket_dir ready socket_path depth=0
-  local real_tmux
+  local real_tmux probe_out probe_rc
   real_tmux=$(command -v tmux) || fail "tmux is required for the lab socket behavioral test"
   while [ "${#root}" -le 150 ]; do
     root="$root/long-directory-segment"
@@ -233,11 +233,12 @@ test_lab_home_private_tmux_socket_survives_deep_paths() {
   env TMUX_TMPDIR="$socket_dir" "$real_tmux" -L fm-lab kill-server \
     || fail "could not stop the isolated lab tmux server"
   mkdir -p "$TMP/failing-tmux-bin"
-  printf '#!/bin/sh\necho "tmux: probe failed" >&2\nexit 1\n' > "$TMP/failing-tmux-bin/tmux"
+  printf '#!/bin/sh\necho "tmux: probe failed" >&2\nexit 7\n' > "$TMP/failing-tmux-bin/tmux"
   chmod +x "$TMP/failing-tmux-bin/tmux"
-  if PATH="$TMP/failing-tmux-bin:$PATH" "$LABHOME" teardown "$lab" >/dev/null 2>&1; then
-    fail "lab teardown removed the directory when its tmux probe failed"
-  fi
+  probe_out=$(PATH="$TMP/failing-tmux-bin:$PATH" "$LABHOME" teardown "$lab" 2>&1); probe_rc=$?
+  expect_code 1 "$probe_rc" "lab teardown must refuse a failed tmux probe"
+  assert_contains "$probe_out" "tmux: probe failed" "lab teardown must report the failed probe's stderr"
+  assert_contains "$probe_out" "tmux probe exit=7" "lab teardown must report the probe's exit code, not just its own refusal"
   [ -d "$socket_dir" ] || fail "failed-probe teardown removed the socket directory"
   "$LABHOME" teardown "$lab" || fail "lab tmux directory teardown failed"
   [ ! -e "$socket_dir" ] || fail "lab teardown left the private tmux directory behind"

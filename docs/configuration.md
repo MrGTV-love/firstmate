@@ -104,7 +104,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
 
-- The producing PR and Relay helpers own the fields they append, [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh) owns status-event vocabulary, optional emission-time syntax, and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
+- The producing PR and Relay helpers own the fields they append, [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh) owns status-event vocabulary, [`bin/fm-status-record-lib.sh`](../bin/fm-status-record-lib.sh) owns optional emission-time syntax and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
 - The [`bin/fm-fleet-snapshot.sh` header](../bin/fm-fleet-snapshot.sh) owns the snapshot's event-time and age fields, including secondmate parent-event projections.
 
@@ -746,7 +746,7 @@ Enabled primary-session turn-end guard integrations are tracked as repo-level ho
 Kimi remains outside the primary turn-end guard integrations; [`docs/turnend-guard.md`](turnend-guard.md#compatibility-limits) owns its separate captain-approved crew wake hook.
 Primary-session watcher wake protocols are rendered at session start by [`bin/fm-supervision-instructions.sh`](../bin/fm-supervision-instructions.sh) from [`docs/supervision-protocols/`](supervision-protocols/).
 
-Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses its own two tracked `.omp/extensions/` files with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
+Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses two tracked supervision extensions under `.omp/extensions/` with a blocking `session_stop` turn-end hook, and OpenCode uses its TUI plugin.
 
 ### Choose the worker harness
 
@@ -1353,6 +1353,69 @@ Firstmate passes its profile line unless it states a reason to override, such as
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
+
+## Jev command screening (shadow only)
+
+`bin/fm-jev-guardrail.mjs` measures risky operations on Claude's native `PreToolUse` and omp's native `tool_call` surfaces without returning a permission decision, changing input, or replacing any deterministic guard.
+The tracked project registrations screen native `Bash`/`Read` on Claude and `bash`/`read` on omp in primary and secondmate sessions; tracked callers skip `FM_TASK_ID` task contexts, and the Claude registration also skips Grok compatibility hooks.
+`fm-spawn.sh` installs the generated task caller for new Claude and omp fleet workers, including Firstmate task worktrees, so the tracked copy does not screen a task twice.
+Existing sessions need a normal authorized relaunch to load a new caller; installing files does not prove activation.
+Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERRIDE` to the owning Firstmate home so environment filtering cannot redirect its key, never-send policy or ledger; tracked secondmate callers retain their own-home launch context.
+The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
+Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
+
+The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
+It does not grant account, billing, egress, command, or secret-access authority.
+No key means `missing_key`, not a synthetic judgment.
+Timeouts, HTTP errors, transport errors and malformed answers record their concrete unavailable result while leaving the existing command decision unchanged.
+
+Selection reuses Firstmate's read-only shell parser, with shadow-only parsing extensions kept inside the Jev hook; deterministic guard policies and their parser behavior remain unchanged.
+Deletes, deploy/apply/publish operations, force pushes, destructive git and secret-access candidates call Jev; ordinary reader arguments without sensitive-looking tokens and printed command examples do not.
+For delete/deploy operations, production scope takes precedence over a secret-shaped target.
+Literal execution prefixes in shell control syntax retain their operations with syntax uncertainty; remaining unsupported risky literals become opaque risk, never a reassuring exclusion.
+Native `Read`/`read` paths select secret-shaped targets without opening the file.
+Selection policy cohort 8 conservatively checks every argument token of `cat`, `head`, `tail`, `less`, `more`, `ls`, `find`, `jq`, `grep`, `rg`, `sed`, `awk`, `base64` and `xxd` for sensitive-looking evidence: `.env`, `.ssh`/`.aws`/`.gnupg`, `.pem`/`.key`, `id_*`, keychain, credentials/secrets, `~/.config/vernant` and `auth.json`.
+This is token evidence, not a claim that a file is read: patterns, programs and attached or separate option values intentionally qualify, including `rg --max-columns 120 '.env' README.md` and `rg -C 2 --context-separator .env needle README.md`.
+The `secret_read` operation enum therefore also denotes a sensitive-token candidate; native `Read`/`read` remains path-specific.
+Wrapper-only `env` dumps are secret-access candidates; `env X=1 cat README.md`, informational options and command lookups remain excluded.
+Wrapper parsing preserves ordered `env -S` child arguments and literal env quoting/escapes, including trailing argv and `env -P` search paths; unsupported or environment-dependent split strings remain uncertain without expanding variables.
+`command -v`/`command -V` look up a candidate without executing it; only descendants of that query are inert, while substitutions and redirections retain their own effects.
+Shell payload selection distinguishes command, script and stdin invocation, preserves known fd-0 input through literal descriptor duplication and aliases, and screens unquoted-heredoc substitutions independently of whether the shell consumes that input.
+SSH remote argv is selected after its options and destination; explicit production destinations retain production delete/deploy scope.
+Supported Git and cloud commands normalize subcommands, relevant option equivalents and option termination before deriving operations and flags; executable operands after `--` remain eligible, including mixed and comma-separated kubectl secret resources, while object names such as `pods secrets` do not imply Secret access.
+Curl and wget selection includes supported secret-shaped file-backed upload, header, credential, config, cookie and file-URL inputs, including multipart file lists and qualifiers; curl bundles advance only through known no-value flags and stop at value-taking or unresolved options.
+Ordinary file reads, literal form data, timestamp-only `-z` values and output-only paths remain excluded.
+`printenv` dumps and named token/secret/password/credential/API-key lookups are candidates, while ordinary lookups such as `printenv PATH` and help/version requests remain excluded; neither names nor values enter Jev state.
+Operation-list overflow is reported as explicit opaque risk with uncertainty, never as a silently truncated apparently routine prefix.
+This is a bounded screen, not a complete shell interpreter or an authorization system; dynamically constructed commands and opaque scripts may escape classification.
+
+Only closed structural operation/scope enums and booleans enter Jev state.
+Arbitrary arguments, paths, URLs, command text, customer content, environment values, file bodies and tool-result bodies are never sent or logged.
+The existing `config/dispatch-never-send` list additionally withholds matching native inputs locally; unreadable or non-regular lists withhold rather than send.
+The key is removed from child environments and passed to `curl` through its stdin header pipe (`-H @-`), not argv or a reopened `/dev/fd` path.
+Only the closed structural JSON request body is passed in `--data-binary` argv; this transport works with Node's socket-backed stdio on Linux as well as macOS.
+
+The private `state/jev-guardrail.jsonl` ledger records selection outcomes, every HTTP attempt before it starts, and verdict/confidence, monotonic latency, returned token usage and estimated cost when available.
+An interrupted attempt or unavailable usage remains unknown, not zero.
+Records require a private regular file and a complete UTF-8 row write; if attempt accounting cannot be fully written, no model request starts.
+The current integration screens pre-tool inputs only; it does not register completion hooks or correlate native success, failure or denial outcomes.
+The script header and `--help` own invocation mechanics.
+
+`metrics` reports descriptive counts, p95 selected-command overhead and all-attempt known/unknown spend.
+Labelled counts, risky recall and routine would-block rates appear only in separate `historical_september30` and `synthetic` objects, never as pooled or duplicated top-level quality fields.
+The top-level `unclassified_labelled` count reports old labelled records without a recognized dataset; those labels cannot contribute to either dataset's quality.
+`evaluate` consumes labelled native inputs without executing their commands; every new case requires `dataset: "historical_september30"` or `dataset: "synthetic"`, and provenance and independent labels remain the evaluator's responsibility.
+If any case result or required attempt cannot be fully persisted, evaluation stops with an explicit error and nonzero exit instead of printing success metrics.
+Existing bytes remain intact without retries or ledger repair; a partial row can prevent `metrics` from parsing the ledger.
+Only authentic September 30 command/decision receipts may be labelled `historical_september30`; proposal examples, later synthetic observations and reconstructed commands belong to neither historical evidence nor its counts.
+The supplied reports do not provide those receipts; [the retained-source limitation](verification/runtime-backends.md#jev-shadow-native-tool-hooks) records the precise gap.
+The shipped `tests/fixtures/jev-guardrail-new-cases.json` contains only explicitly marked synthetic rows, with no placeholder historical cases.
+Until real receipts are available, the historical labelled count remains zero and historical quality rates remain `null`, even when synthetic quality is measurable.
+Historical labels and attempt records retain their original meaning; cohort 8 does not relabel prior evaluations or turn synthetic examples into historical receipts.
+Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
+The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
+This implementation cannot enable blocking or reset that date.
 
 ## Toolchain
 
@@ -2081,11 +2144,13 @@ This section is the single owner of the runner's operating contract.
 
 Discovery is never a timer.
 Each registered source has its own child process blocking on that source.
-On every cycle, the watcher's `reconcile`:
+Once per cycle, unless that watcher process's previous run is still going, the watcher starts a background `reconcile` that:
 
 - Republishes every captured result without a durable handled acknowledgement, regardless of earlier publication.
 - Restarts a source whose owner is gone.
 - Stops this home's runner if its registration disappeared unexpectedly.
+
+This single-flight limit is per watcher process, not home-wide: a successor watcher can overlap a reconcile started by its predecessor.
 
 In supported steady state, a home with no registered source runs nothing, generates no state, and keeps its ordinary cadence.
 
@@ -2297,42 +2362,46 @@ The generation's first launch is immediate, later launches share its monotonic p
 
 **Confirm detached launches**
 
-`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) bounds how long `reconcile` waits for the runners it just started to prove they are running: never less than the configured value, and at most one second more, because the wait is measured on a whole-second clock.
+`FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS` (default 3, range 1..600) sets how long `reconcile` allows the runners it just started to prove they are running: a fully unconfirmed window nominally lasts from the configured value through one second more, because the deadline uses a whole-second clock.
+Confirmation can end the wait early, while scheduling delays can extend elapsed wall-clock time.
 
-- Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports every unconfirmed launch as `failed=` and a non-zero exit instead.
+- Starting a runner is detached and its errors are not visible to the caller, so `reconcile` reports a start only after the source is observed owned or its launch-pacing stamp has advanced or appeared, and reports an unconfirmed launch as `failed=` with a non-zero exit only if that registration still exists and remains launchable when the failure is committed.
 - Both signals are durable evidence a runner claimed: ownership is the only evidence a runner still blocked on its source ever shows, and the stamp - written after the claim and before the source command runs, and removed only by registration replacement - covers a runner that claimed, ran and exited between two polls.
-- A healthy launch therefore confirms on the first poll and the window only bounds a launch that has not yet proved itself - one that died before claiming, or one merely too slow to claim inside the window; confirmation cannot tell those apart, and a launch that proves itself on a later cycle closes its failure episode without a retraction wake.
-- All of a cycle's launches share one window, so a home full of sources that cannot start costs the same bounded wait as one.
+- A healthy launch can therefore confirm on the first poll; an unconfirmed launch may have died before claiming or merely be too slow to claim inside the window, and confirmation cannot tell those apart.
+- All of a reconcile pass's launches share one confirmation window rather than paying a separate window for each source.
+- A retired or replaced registration, or an unconfirmed launch whose claim has become uncertain, stranded or retirement-pending, is counted as `uncertain=` instead of publishing an obsolete launch failure.
 
 **Keep confirmation below the watcher interval**
 
 Keep this window well below `FM_POLL`.
-`bin/fm-watch.sh` runs `reconcile` once per supervision cycle, so a source that cannot start makes every cycle wait up to the confirm window before the rest of that cycle runs.
+See **Reconcile sources** in [Process-to-event sources](#process-to-event-sources-stateprocevent) for the watcher's background scheduling and per-process single-flight rule.
+The watcher's own cycle and liveness beacon do not wait for launch confirmation.
 
-Raising the confirm window lengthens every supervision cycle and delays wake delivery by up to that much.
+Raising the confirm window past `FM_POLL` can make a reconcile pass overlap later supervision cycles, which then skip opportunities to restart sources and republish captured results.
+Results already queued are still delivered on every cycle.
 
 **Report launch failures**
 
 A source that can never start is reported as `failed=` with a non-zero exit on every `reconcile`, rather than counted as `started` and retried silently as though it were healthy, so a wedged source stays visible instead of presenting as armed.
 The `failed=` count reaches only the command's caller because `bin/fm-watch.sh` discards `reconcile` output and exit status.
 For that reason, `reconcile` also publishes a durable `check` wake once per failure episode, with key `procevent:<id>:launch-failed:<registration-identity>-<episode-nonce>`.
-Later cycles stay silent for that episode until a launch confirms.
+Later cycles stay silent for that episode until successful claim acquisition or a source-locked observation of a live owner, including another home's, ends it for the current registration without a retraction wake.
+Failure commits recheck the registration identity, claim and launch stamp under the source lock, which also serializes episode markers, live-owner recovery, wake append and failed-append rollback.
 A later fresh failure gets a fresh key, because the watcher never re-surfaces a key it has already surfaced.
 
-- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source every cycle exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
+- The announcement changes nothing about the launch: `reconcile` keeps relaunching the source on each eligible reconcile pass exactly as before, and nothing is retried differently, throttled, or recovered from that signal.
 - The wake reports only the observed failure: the launch did not prove that it took the claim within the window.
 - If the failure persists, inspect the source command and adapter binary named in the registration.
   The wake names both, along with the attached `bin/fm-procevent.sh start <source-id>` command that reproduces the refusal on stderr.
   The detached launch discards that output.
-- A later cycle that finds the source owned ends the episode automatically.
-  A runner that was merely slow to claim needs no operator action.
+- A runner that was merely slow to claim needs no operator action, and a delayed stamp-only confirmation of an earlier successful launch cannot erase a newer failure episode.
 - A source stranded on a claim nothing may automatically displace is announced the same way, once per stranded claim generation, as described above.
 - `bin/fm-watch.sh` surfaces both under their own headlines - `process-event source stranded` and `process-event source failed to start` - rather than as a captured result.
 
 **Reject unusable settings**
 
 A value this command cannot use is refused by name before anything is launched, the same way `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` and `FM_PROCEVENT_MAX_OUTPUT_BYTES` are refused, so a mistyped window can never present as a fleet of sources that cannot start.
-`bin/fm-watch.sh` validates the same value when it arms and refuses to arm on an unusable one, naming the variable and the range: under a running watcher that refusal would otherwise repeat on every cycle into a discarded stdout and leave the whole home disarmed while presenting as supervised, whereas a watcher that will not arm is loud through the liveness guard.
+`bin/fm-watch.sh` validates the same value when it arms and refuses to arm on an unusable one, naming the variable and the range: under a running watcher that refusal would otherwise repeat on each eligible background reconcile pass into discarded output and leave the whole home disarmed while presenting as supervised, whereas a watcher that will not arm is loud through the liveness guard.
 
 **Limit captured output**
 
@@ -2431,7 +2500,7 @@ FM_INACTIVE_RECONCILE_BUDGET_SECS=10  # 1..30-second scan deadline; wedged-scan 
 FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls, custom checks, or Relay dispatch)
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
-FM_CHECK_TIMEOUT=30     # seconds allowed per slow check script
+FM_CHECK_TIMEOUT=30     # decimal whole seconds allowed after each slow check launches, excluding output setup; leading zeros do not change the duration
 FM_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5..25, cut to fit FM_CHECK_TIMEOUT
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
@@ -2492,7 +2561,7 @@ FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
 FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'   # captain-relevant status regex; nonterminal progress verbs remain excluded even when their prose matches
-FM_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/fm-classify-lib.sh owns its meaning and legacy external-wait label; excluded from FM_CAPTAIN_RE and distinct from blocked
+FM_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/fm-status-event-lib.sh owns its meaning and legacy external-wait label; excluded from FM_CAPTAIN_RE and distinct from blocked
 FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates, unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the FM_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence, while a live idle declared wait still surfaces once before that cadence bounds repeats; at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age without a completed turn or explicit native-harness progress (bin/fm-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the FM_PAUSE_RESURFACE_SECS recheck below instead
 FM_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its FM_STALE_ESCALATE_SECS escalation, and a live busy pane past FM_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture

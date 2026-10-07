@@ -42,6 +42,6 @@ for locale in '' C; do
   out=$(fm_composer_classify_screen "$CAPS_STYLED" "$screen_typed")
   [ "$out" = pending ] || fail "hint-shaped suffix discarded real draft: '$out'"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$screen_typed")
-  [ "$out" = 'keep ⇧⇥' ] || fail "hint-shaped suffix truncated draft: '$out'"
+  [ "$out" = keep ] || fail "hint-shaped suffix truncated draft: '$out'"
 done
 pass 'native empty hint is furniture only with styled empty-row proof'

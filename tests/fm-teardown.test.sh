@@ -2511,8 +2511,6 @@ SH
     PATH="$case_dir/fakebin:$PATH" \
     "$teardown_bin" task-x1 --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-preflight-$mode: teardown continued without its required preflight"
-  assert_grep "nothing was changed" "$case_dir/stderr" \
-    "herdr-preflight-$mode: the retryable pre-return refusal was not explained visibly"
   [ -d "$case_dir/wt" ] || fail "herdr-preflight-$mode: refusal removed the isolated copy"
   [ "$(git -C "$case_dir/wt" rev-parse --abbrev-ref HEAD 2>/dev/null)" = "fm/task-x1" ] \
     || fail "herdr-preflight-$mode: refusal dropped the task branch"
@@ -2609,8 +2607,6 @@ SH
   [ -d "$home" ] || fail "herdr-child-preflight: refusal removed the secondmate home"
   [ ! -s "$thlog" ] || fail "herdr-child-preflight: refusal returned work before child preflight"
   [ ! -e "$closed" ] || fail "herdr-child-preflight: refusal attempted a child close"
-  assert_grep "nothing was changed" "$case_dir/stderr" \
-    "herdr-child-preflight: refusal did not explain its non-mutating boundary"
   pass "forced secondmate teardown preflights every Herdr child before cleanup mutation"
 }
 

@@ -33,10 +33,18 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-marker-lib.sh
-. "$ROOT/bin/fm-marker-lib.sh"
-# shellcheck source=bin/fm-pending-reply-lib.sh
-. "$ROOT/bin/fm-pending-reply-lib.sh"
+_fm_pending_test_source_marker() {
+  # shellcheck source=bin/fm-marker-lib.sh
+  . "$ROOT/bin/fm-marker-lib.sh"
+}
+
+_fm_pending_test_source_library() {
+  # shellcheck source=bin/fm-pending-reply-lib.sh
+  . "$ROOT/bin/fm-pending-reply-lib.sh"
+}
+
+_fm_pending_test_source_marker "$@"
+_fm_pending_test_source_library "$@"
 
 SEND="$ROOT/bin/fm-send.sh"
 REPORT="$ROOT/bin/fm-secondmate-report.sh"
@@ -154,7 +162,7 @@ test_normal_correlated_reply_resolves_once() {
 }
 
 test_completed_turn_no_report_triggers_one_recovery() {
-  local home state corr hook_log rec
+  local home state corr hook_log rec recovery_count
   home=$(setup_parent one-recovery)
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-hook.log"
@@ -184,8 +192,8 @@ test_completed_turn_no_report_triggers_one_recovery() {
   if fm_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
     fail "second recovery must refuse"
   fi
-  lines=$(wc -l < "$hook_log" | tr -d ' ')
-  [ "$lines" = 1 ] || fail "expected exactly one recovery send, got $lines"
+  recovery_count=$(wc -l < "$hook_log" | tr -d ' ')
+  [ "$recovery_count" = 1 ] || fail "expected exactly one recovery send, got $recovery_count"
   rec=$(fm_pending_reply_path "$state" "$corr")
   case "$(cat "$hook_log")" in
     *"corr=$corr"*) : ;;
@@ -622,7 +630,7 @@ test_delivery_confirmation_fallback_reconciles() {
     [ -f "$marker" ] || fail "delivery confirmation fallback marker should persist"
     [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
       || fail "failed primary commit should leave delivered_epoch empty"
-    . "$ROOT/bin/fm-pending-reply-lib.sh"
+    _fm_pending_test_source_library
     fm_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "watcher should reconcile the delivery marker"
     [ "$(fm_pending_reply_get "$rec" delivered_epoch)" = 5750 ] \
@@ -784,15 +792,17 @@ test_restart_preserves_expectation_and_parent_destination() {
   rec=$(fm_pending_reply_path "$state" "$corr")
   parent_status=$(fm_pending_reply_get "$rec" parent_status)
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
-  # Simulate process restart: re-source library and re-read the same record.
-  # shellcheck source=bin/fm-pending-reply-lib.sh
-  . "$ROOT/bin/fm-pending-reply-lib.sh"
-  [ -f "$rec" ] || fail "record must survive restart"
-  [ "$(fm_pending_reply_get "$rec" parent_status)" = "$parent_status" ] \
-    || fail "parent_status must be stable across restart"
-  [ "$(fm_pending_reply_get "$rec" parent_home)" = "$parent_home" ] \
-    || fail "parent_home must be stable across restart"
-  [ "$(phase_of "$state" "$corr")" = awaiting_report ] || fail "phase preserved"
+  # A real fresh process must recover these fields without inherited functions.
+  bash -c '
+    . "$1/bin/fm-pending-reply-lib.sh"
+    [ -f "$2" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_status)" = "$3" ] &&
+      [ "$(fm_pending_reply_get "$2" parent_home)" = "$4" ] &&
+      [ "$(fm_pending_reply_get "$2" phase)" = awaiting_report ]
+  ' _ "$ROOT" "$rec" "$parent_status" "$parent_home" \
+    || fail "fresh process must retain expectation and exact parent destination"
+  # Preserve the marker reinitialization performed by the old in-process reload.
+  _fm_pending_test_source_marker
   # Compaction-safe: destination is absolute path fields, not chat memory.
   case "$parent_status" in
     /*.status) : ;;
@@ -1014,6 +1024,115 @@ test_kimi_capture_fallback_uses_recorded_harness() (
     || fail "working Kimi secondmate entered recovery"
   pass "pending replies scope Kimi capture fallback by recorded harness"
 )
+
+test_completed_reply_locks_do_not_delay_open_replies() {
+  (
+    local home state mode corr rec pending pending_rec before lock holder release ready rc deadline
+    home=$(setup_parent completed-locks)
+    state="$home/state"
+    # These fixture overrides are intentionally scoped to the isolated subshell.
+    # shellcheck disable=SC2030,SC2031
+    export FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_PENDING_REPLY_NOW=10050
+    # shellcheck source=bin/fm-wake-lib.sh
+    . "$ROOT/bin/fm-wake-lib.sh"
+    # shellcheck source=bin/fm-timeout-lib.sh
+    . "$ROOT/bin/fm-timeout-lib.sh"
+    for mode in never-escalated already-closed; do
+      corr=$(fm_pending_reply_create "$home" "$state" archived "$mode retained answer")
+      rec=$(fm_pending_reply_path "$state" "$corr")
+      fm_pending_reply_set "$rec" phase resolved || fail "archive fixture should resolve"
+      if [ "$mode" = already-closed ]; then
+        fm_pending_reply_set "$rec" escalated_epoch 10000 || fail "archive escalation fixture failed"
+        # Last-value precedence and an unterminated final field remain readable.
+        printf 'escalation_closed_epoch=\nescalation_closed_epoch=10001' >> "$rec"
+      fi
+      before=$(cat "$rec")
+      pending=$(fm_pending_reply_create "$home" "$state" live "reply behind completed archive")
+      fm_pending_reply_mark_delivered "$state" "$pending" || fail "open reply should be delivered"
+      pending_rec=$(fm_pending_reply_path "$state" "$pending")
+      printf 'done [corr=%s]: live answer\n' "$pending" > "$state/live.status"
+      lock="$state/.pending-reply-$corr.lock"
+      release="$home/release-$mode"
+      ready="$home/ready-$mode"
+      mkfifo "$release" || fail "lock release barrier failed"
+      exec 3<> "$release"
+      (
+        fm_lock_acquire_wait "$lock" || exit 1
+        trap 'fm_lock_release "$lock"' EXIT
+        : > "$ready"
+        IFS= read -r _ < "$release"
+      ) &
+      holder=$!
+      trap 'printf "release\n" >&3; wait "$holder" 2>/dev/null || true; exec 3>&-' EXIT
+      deadline=$((SECONDS + 30))
+      while [ ! -e "$ready" ] && kill -0 "$holder" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do
+        sleep 0.1
+      done
+      [ -e "$ready" ] || fail "real archive lock holder did not become ready"
+      rc=0
+      # Positional parameters expand in the child Bash, not this test shell.
+      # shellcheck disable=SC2016
+      fm_run_timed 30 env FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+        bash -c '. "$1"; fm_pending_reply_tick "$2"' _ \
+        "$ROOT/bin/fm-pending-reply-lib.sh" "$state" > "$home/tick.out" 2> "$home/tick.err" || rc=$?
+      printf 'release\n' >&3
+      wait "$holder" || fail "archive lock holder failed"
+      exec 3>&-
+      trap - EXIT
+      expect_code 0 "$rc" "completed $mode lock delayed a pending answer"
+      [ "$(phase_of "$state" "$pending")" = resolved ] || fail "live answer behind archive did not resolve"
+      [ "$(cat "$rec")" = "$before" ] || fail "tick changed a completed retained answer"
+      [ -f "$pending_rec" ] || fail "tick discarded the newly resolved reply"
+    done
+  ) || fail "completed reply lock regression failed"
+  pass "completed reply locks do not delay delivery of pending answers"
+}
+
+test_tick_retries_owed_close_without_disturbing_other_replies() {
+  (
+    local home state corr rec pending pending_rec before first second open
+    home=$(setup_parent owed-close-tick)
+    state="$home/state"
+    # These fixture overrides are intentionally scoped to the isolated subshell.
+    # shellcheck disable=SC2030,SC2031
+    export FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_PENDING_REPLY_NOW=10060
+    corr=$(fm_pending_reply_create "$home" "$state" hibit "owed close after interrupted resolution")
+    fm_pending_reply_mark_delivered "$state" "$corr" || fail "owed reply should be delivered"
+    rec=$(fm_pending_reply_path "$state" "$corr")
+    fm_pending_reply_set "$rec" escalated_epoch 10000 || fail "owed escalation fixture failed"
+    fm_pending_reply_set "$rec" phase resolved || fail "owed reply should be durably resolved"
+    fm_pending_reply_set "$rec" resolved_via status || fail "owed resolution fixture failed"
+    printf 'blocked [key=pending-reply-%s]: pending-reply-missed: task=hibit pending-reply-id=%s request=owed close after interrupted resolution\n' \
+      "$corr" "$corr" > "$state/hibit.status"
+    printf 'blocked [key=release]: unrelated operator decision\n' >> "$state/hibit.status"
+    pending=$(fm_pending_reply_create "$home" "$state" waiting "not delivered and still unresolved")
+    pending_rec=$(fm_pending_reply_path "$state" "$pending")
+    before=$(cat "$pending_rec")
+    bash -c '. "$1"; fm_pending_reply_tick "$2"' _ "$ROOT/bin/fm-pending-reply-lib.sh" "$state" &
+    # The background PID is consumed within this isolated test subshell.
+    # shellcheck disable=SC2031
+    first=$!
+    bash -c '. "$1"; fm_pending_reply_tick "$2"' _ "$ROOT/bin/fm-pending-reply-lib.sh" "$state" &
+    # The background PID is consumed within this isolated test subshell.
+    # shellcheck disable=SC2031
+    second=$!
+    wait "$first" || fail "first complete tick failed"
+    wait "$second" || fail "second complete tick failed"
+    [ "$(grep -Fc "pending-reply-resolved: task=hibit pending-reply-id=$corr" "$state/hibit.status")" -eq 1 ] \
+      || fail "concurrent complete ticks did not close the owed escalation exactly once"
+    [ -n "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] || fail "owed close was not durably recorded"
+    open=$(status_open_decisions "$state/hibit.status")
+    assert_contains "$open" $'release\tblocked\tunrelated operator decision' \
+      "owed close consumed an unrelated decision"
+    assert_not_contains "$open" "pending-reply-$corr" "owed escalation remained open"
+    [ "$(cat "$pending_rec")" = "$before" ] || fail "complete tick changed an undelivered unresolved request"
+    [ -f "$rec" ] || fail "complete tick discarded its resolved answer"
+    fm_pending_reply_tick "$state" || fail "complete follow-up tick failed"
+    [ "$(grep -Fc "pending-reply-resolved: task=hibit pending-reply-id=$corr" "$state/hibit.status")" -eq 1 ] \
+      || fail "completed owed close was duplicated on the next tick"
+  ) || fail "owed close complete-tick regression failed"
+  pass "complete ticks retry owed closes once and retain unrelated unresolved requests"
+}
 
 test_tick_skips_terminal_and_reuses_target_observation() {
   (
@@ -1628,6 +1747,8 @@ test_helper_report_resolves
 test_busy_idle_observation_via_backend_abstraction
 test_unknown_backend_state_uses_capture_fallback
 test_kimi_capture_fallback_uses_recorded_harness
+test_completed_reply_locks_do_not_delay_open_replies
+test_tick_retries_owed_close_without_disturbing_other_replies
 test_tick_skips_terminal_and_reuses_target_observation
 test_correlations_reuse_only_for_matching_open_task
 test_tick_end_to_end_missed_then_escalate

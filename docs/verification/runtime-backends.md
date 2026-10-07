@@ -463,11 +463,39 @@ Herdr runs both flat and projected layouts in generated lab sessions through `bi
 Both terminal shells and the fake get's interactive child use lab-private history files.
 
 The cross-home contention case starts a flat acquisition and a projected acquisition for different projects in the same generated Herdr session.
-After the flat acquisition refuses at its unchanged isolation deadline, the projected acquisition retains the session presentation lock for ten actual seconds, beyond the former cleanup timeout.
-The refused spawn remained blocked in endpoint cleanup until the projected spawn released the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
-Allowing the projected acquisition to launch releases the lock; the refused attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
+After both acquisitions release presentation custody, the fixture holds the session lock for ten actual seconds while the flat acquisition refuses at its unchanged isolation deadline.
+The refused spawn stays blocked in endpoint cleanup until the fixture releases the lock, exercising the [Herdr close-locking contract](../herdr-backend.md#ordinary-removal-and-cleanup-locking).
+Once custody is released and the projected acquisition is allowed to launch, the flat attempt's exact pane, get process, and lease disappear, while the projected acquisition, earlier successful acquisition, and sentinel survive.
 The companion `tests/fm-backend-herdr.test.sh` checks unresolved-lock refusal without any pane-close mutation.
-Projected abort cleanup confirms its exact acquisition pane is gone before releasing the presentation lock and retires that pane's generic cleanup target, avoiding a second close outside the original transaction.
+Projected spawn aborts instead follow the bounded contract in `bin/fm-spawn.sh`'s header.
+
+Focused projected-refusal verification on 2026-10-06 used the checksum-verified official CI Herdr 0.7.4 binary (protocol 16), generated checkout-local fixture homes, and the unchanged named-lab/default-fleet tripwire.
+With that binary on `PATH`, the selected executable scenarios were:
+
+```sh
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+FM_TEST_ACQUISITION_CASES=contention bash tests/fm-spawn-acquisition-cleanup.test.sh herdr off
+bash tests/fm-spawn-acquisition-cleanup.test.sh herdr on
+```
+
+The public CLI acquired a generated dirty copy while the fixture held real session custody beyond all 50 existing abort acquisition probes.
+Before the correction it printed the custody refusal but remained waiting in generic cleanup, failing the bounded caller-exit assertion.
+After the correction it exited nonzero while the fixture still owned custody, leaving the exact journal, pane and get lease intact without publishing task metadata.
+Sibling metadata (including its spawn generation), journal, pane, process lease, parent, sentinel and exact workspace/tab focus stayed unchanged both before and after custody was released.
+The fixture then explicitly closed its retained endpoint and required structured `dead` plus actual process-lease cessation.
+
+```text
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+```
+
+The flat contention scenario also passed with both acquisition leases held during contention and cleanup releasing only the refused flat attempt after the projected launch.
+The projected-layout entrypoint also passed its ordinary successful acquisition and all four refusal/lease-cleanup paths (105.45 seconds total).
+The selector limits local execution; the default CI entrypoint still executes all acquisition cases in both layouts, including both contention paths.
 
 Acquisition output excerpts, with the five basic Herdr rows printed once per layout:
 
@@ -510,6 +538,99 @@ ok - teamclaude 1.1.21-affinity.0: the launcher hands claude HTTPS_PROXY and a r
 
 The guard runs by default wherever TeamClaude is installed and its proxy answers, skips naming the absent tool or stopped proxy otherwise, and fails instead when `FM_TEAMCLAUDE_LAUNCH_LIVE=1` or `FM_LIVE=1` requested it.
 Rerun it after any TeamClaude upgrade.
+
+## Reconciliation-only owner recovery
+
+Verified on 2026-10-02 on Darwin 25.5.0 arm64 with omp 18.4.10, tmux 3.5a, and Herdr 0.9.1 protocol 22, using real `openai-codex/gpt-6.1-sol` model turns at low effort in a private tmux server and a helper-owned named Herdr lab.
+The [control-plane contract](../agent-control.md#recovering-an-exited-instruction-owner) owns the distinction between instruction recovery and continuation.
+The isolated fixtures drove these public commands against task records with both a genuine unresolved dependency and a captain hold:
+
+```bash
+bash "$ROOT/bin/fm-control.sh" "$id" relaunch --note 'fresh context'
+bash "$ROOT/bin/fm-control.sh" "$id" exit
+bash "$ROOT/bin/fm-control.sh" "$id" relaunch --reconcile-only --note 'Reconcile unread instruction 005 only. The dependency and captain hold remain unresolved.'
+```
+
+On both backends, ordinary replacement refused while leaving the original real omp owner alive; after public exit, reconciliation-only replacement restored the instruction owner in the same endpoint and local copy.
+Each real model read and acknowledged unread instruction 005, wrote a factual receipt, explicitly declined the historical request to create a file and commit it, and waited without implementing or validating.
+The fixture compared the retained commit, dirty file bytes, untracked file bytes, acknowledged instruction bytes, and whole backlog bytes; all were preserved.
+The named Herdr helper completed cleanup without its default-session tripwire firing.
+
+The portable public-interface regressions in `tests/fm-control-relaunch.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, inherited recovery after a genuine prerequisite completes, explicit owner-authorized clearance, both continuation/replacement lock orderings, and away-branch replacement admission.
+Their session-authority fixtures, stubbed backends, and 14-harness admission matrix are structural evidence, not live-harness liveness or model-compliance proof.
+The recovery-grade boundary remains tmux and Herdr; zellij, Orca, and cmux retain their existing refusal, and no native recovery surface was added for them.
+Secondmates retain their separate recovery owner rather than acquiring this ship/scout recovery option.
+The existing control, backlog-atomicity, and brief suites supply the unchanged capability, dispatch, and instruction-contract coverage.
+
+Verified on 2026-10-06 with stock Bash 3.2.57, tasks-axi 0.2.6, and pinned ShellCheck 0.11.0:
+
+```sh
+bash bin/fm-lint.sh bin/fm-control.sh tests/fm-control-relaunch.test.sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-control-relaunch.test.sh
+```
+
+The focused lint roots passed full source-aware extended analysis. The session-lock import resolves to its tracked library, and the parent-shell background PID captures retain their readiness, wait, and cleanup behavior.
+
+Observed focused results:
+
+```text
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
+```
+
+## Jev shadow native tool hooks
+
+The current behavior and privacy boundary are owned by [Jev command screening](../configuration.md#jev-command-screening-shadow-only).
+The retained observations below describe the prior implementation at its recorded heads, not a fresh run or proof of the current pre-tool-only integration or selection policy cohort 8.
+For cohort 8, the configuration owner's `secret_read` candidate semantics must not be mistaken for proof of actual secret-file reads.
+Native hook observations used omp 18.6.1 on 2026-10-05 and Claude Code 2.1.291 through TeamClaude 1.1.21-affinity.0 on 2026-10-06.
+Both hosts executed the same five synthetic cases: ordinary file read, bounded local missing-file delete, allowed synthetic secret-shaped file read, independently denied synthetic secret-shaped file read, and missing synthetic secret-shaped file read.
+External native-stream comparisons against matched controls that omitted only the shadow hook found the same success, denial and path-not-found outcomes with shadow enabled, a missing Jev key, or explicitly injected timeout/malformed transport responses.
+
+| Prior native observation | omp | Claude |
+| --- | --- | --- |
+| Ordinary read | Excluded; no request | Excluded; no request |
+| Genuine Jev starts / returned judgments | 4 / 4 | 4 / 3, plus one genuine timeout with unknown usage/cost |
+| Bounded local delete verdict | Routine | Routine |
+| Allowed and independently denied synthetic secret-read verdicts | Risky | Risky |
+| Native selected-command p95 screen time | 221.722ms | 2029.214ms |
+| Missing-key attempts | 0 | 0 |
+| Injected fault handling | One timeout, three malformed responses | One timeout, three malformed responses |
+
+The timeout is retained rather than retried into a pass, and neither host's synthetic sample establishes fleet recall, seven-day/300-command volume, total task cost savings or blocking readiness.
+The Claude sample misses the separately owned 500ms promotion bar.
+Only closed structural operations reach Jev; native ledgers contain no fixture bodies, command text, paths or key sentinels.
+The prior implementation observed native `PostToolUse`/`PostToolUseFailure` and omp `tool_result` events; those completion registrations and outcome-correlation metrics are not part of the current integration.
+The unchanged native outcomes above come from the external stream comparisons, not a current ledger success/failure claim.
+Other harnesses have no guardrail caller in this slice, and these observations do not claim their coverage.
+
+The executable offline refresh is `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh tests/fm-jev-guardrail-home.test.sh tests/fm-arm-pretool-check.test.sh tests/fm-cd-pretool-check.test.sh`; it proves selector, privacy, advisory-output, unavailable-usage, generated owning-home boundaries and shared-parser deterministic guard behavior, not native host activation or outcome correlation.
+The prior native metrics commands were `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-omp-20261005/main006-shadow/jev-guardrail.jsonl` and `node bin/fm-jev-guardrail.mjs metrics --log .no-mistakes/jev-guardrail/native-claude-20261006/main008-shadow/jev-guardrail.jsonl`.
+Those private fixture ledgers and exact native invocations remain prior recorded-head delivery evidence, not shipped fixtures, cohort 8 evidence or a claim that offline tests refresh native proof after a host upgrade.
+
+The prior October 6 offline refresh passed all four focused suites: `FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=115213`; that result predates cohort 8 and is not verification of its sensitive-token contract.
+The selector/evaluation suite passed 18 boundary groups, including ordered env argv, command queries, control syntax, effective shell stdin, heredoc expansion, SSH scope, Git/cloud option equivalents and secret operands.
+The deterministic arm and cd suites preserved their allow/deny contracts across all five transport entry forms.
+The owning-home suite passed six generated/tracked Claude and omp scenarios through filtered and hostile ambient environments, checking owner-key transport, withholding, private ledgers and advisory behavior.
+Transport responses were local fixtures; no paid provider or native host activation was exercised.
+The current offline reader matrix covers sensitive patterns and option values, routine reader tokens, wrapped/nested selection and command-query exclusions through both Claude and omp hook payloads with fake transport only; supplied command strings are not executed.
+The October 6 cohort 8 focused offline refresh, `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh`, passed: `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=56463`.
+That run exercised the correcting implementation through both hook input protocols, not native host activation or provider judgment.
+The October 6 isolated actual-curl transport refresh, `bash bin/fm-test-run.sh tests/fm-jev-guardrail.test.sh` with worktree-local `TMPDIR`, passed: `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=63674`.
+An isolated HOME with synthetic `trace-ascii` and `retry = 3` settings produced a credential-bearing trace and four loopback HTTP 503 requests in the unprotected control; the shared guardrail transport produced no trace and exactly one physical request per recorded attempt through both hook payload formats and evaluation.
+The local receiver also exercised successful, HTTP-error, timeout, malformed-response and missing-key paths, preserving closed request/log privacy and known/unknown usage accounting.
+Only synthetic credentials and loopback requests were used; this proves local transport behavior, not an observed real-key disclosure, native host activation or a real Jev judgment.
+
+**September 30 historical dataset source is unavailable.**
+The supplied `/Users/charlesabrooker/firstmate/data/fm-jev-implementation-review/report.md` (October 1, F8 and the guardrail promotion row) records a planned screen and promotion contract, with no hook measurement; its cited `/Users/charlesabrooker/firstmate/data/fm-jev-value-scout/report.md` (September 29, worker destructive-risk proposal) describes prospective fixture replay, not dated blocked/allowed command receipts.
+The companion `data/fm-jev-value-scout/notes.md` inventories retained research material, but does not supply September 30 command/decision pairs either.
+The review's cited E7, `/Users/charlesabrooker/firstmate/data/backlog.md` (`fm-jev-guardrail-hook`), requires labelled September 30 blocked/allowed cases but supplies no command/decision receipts; its separate `fm-jev-guardrail-promote` entry retains the original owner, date and criteria.
+The missing source is the authentic September 30 blocked and allowed command inputs paired with their independently recorded decisions and dated provenance.
+Proposal narrative, subsequent native synthetic observations and reconstructed examples cannot replace that source.
+The [configuration owner](../configuration.md#jev-command-screening-shadow-only) defines evaluation dataset rules, legacy-label handling and the separate promotion boundary.
 
 ## Claude workspace trust
 
@@ -853,6 +974,27 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 
 `zellij action dump-screen --pane-id <id> --ansi` was verified at zellij 0.44.0 to preserve ANSI styling (real Claude Code rendered inside a zellij pane dumped `ESC[m` `❯` U+00A0 for its idle composer row), which is the capability the zellij composer classifier reads.
 
+### 2026-10-02 omp 18.4.10 borderless effort hint
+
+The same live owner-recovery run above captured omp's otherwise empty borderless composer as a `❯` row followed by a right-side `⇧⇥ to change thinking effort` hint and the omp status row.
+The shortcut keys were `SGR 38;2;0;180;255`, followed by a normal-colour space and a muted explanation in `SGR 38;2;107;114;128`.
+The shared ghost extractor correctly kept the bright keys while dropping the explanation, so the first divergent stage was the remnant classification, not capture or ghost stripping.
+[`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh)'s shared row-content boundary owns the styled-hint proof used by both classification and selected-content extraction.
+The behavioral regressions in `tests/fm-composer-lib.test.sh` cover empty and draft-bearing extraction, wrapped drafts, human shortcut-like input, unrelated ghost text, and hint disappearance; `tests/fm-backend-zellij.test.sh` exercises public submission with the hint retained, disappeared, or beside wrapped payload text.
+Real typed copies remained `pending` and public exit refused without clearing them on both tmux and Herdr; busy drafts also read `pending`, and a real slash popup refused as `unknown` on tmux and `pending` on Herdr.
+The Herdr busy capture showed a native `Steering · 1` queue while the real model remained working; the queued reconciliation instruction did not change the owner's restricted authority.
+
+The affected omp arm of `tests/fm-composer-matrix-live-e2e.test.sh` was exercised against the real installed binary in a helper-owned private tmux server:
+
+```text
+ok - omp (omp/18.4.10): real idle composer classifies empty
+ok - omp (omp/18.4.10): the same idle pane read cursorless is not pending (verdict: empty)
+ok - omp (omp/18.4.10): typed effort-hint copy remains protected as pending
+```
+
+The portable `tests/fm-composer-lib.test.sh` and `tests/fm-composer-ghost.test.sh` runs passed, including bright hint-like drafts, multiline input, busy/queued input, popup refusal, plain boxed drafts, and both locale profiles.
+The existing full matrix command above refreshes installed-harness evidence; this focused refresh does not claim new native results for its other harnesses.
+
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 
 Verified on 2026-09-20 on macOS arm64 (Darwin 25.6.0) against Claude Code 2.1.236 running as Firstmate workers in Herdr 0.8.0 panes, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
@@ -939,6 +1081,45 @@ tests/fm-composer-codex-idle-live-e2e.test.sh
 
 The verification machine runs its fleet on Herdr and has no tmux installed, so on 2026-09-15 that guard reported `skip: live: tmux absent` there, and the Herdr capture above is this entry's live evidence.
 The guard also notes whether the starfield and the placeholder were actually drawn during its read, because codex need not animate them under every model or mode; a refresh on a tmux host should record that note beside the verdict rather than assume the starfield was exercised.
+
+### 2026-10-06 omp box composer through Herdr
+
+Verified on 2026-10-06 on macOS arm64 against omp 18.6.3 in an isolated Herdr 0.9.1 lab session, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the session composer pin; the remaining user configuration selected `box` in this verification.
+omp live-reloads every `--config` overlay file it was started with: an idle worker launched with the overlay pinning `borderless` drew a bare `❯` row, and removing the `shape` line from that file in place made the same worker redraw as the box shape within seconds, with no restart.
+The observed empty single-line composer had its status in the top border and its last input row folded into the bottom border:
+
+```text
+╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 firstmate/firstmate > ⑂ fm/fm-model-index > … 🆔 01a111e1 ──╮
+╰─                                                                                     ─╯
+```
+
+Typed text appears in the folded row (`╰─ hello world typed text ─╯`), wrapped text takes `│ … │` rows above it, and the empty row shows a right-aligned `⇧⇥ to change thinking effort` hint whose key glyphs are bright and whose words are dim italic (luminance 113, below the default ghost ceiling of 128).
+The current classification and plain-hint safety boundary is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact container predicates are owned by `bin/fm-composer-lib.sh`.
+`test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
+
+The live guard that refreshes this entry launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
+Its default-on checks spend no tokens wherever omp, herdr, and jq are installed; the relaunch proof submits a real worker brief and remains opt-in:
+
+```sh
+FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
+```
+
+Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
+Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
+The relaunch proof first requires a live agent with a proven empty box composer, failing if that readiness wait expires, then checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
+
+Observed output:
+
+```text
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-26478-21255
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control exit stops the idle box-shaped worker and preserves its endpoint
+ok - live omp box composer: omp (omp/18.6.3) on herdr 0.9.1 fm-control relaunch replaces the box-shaped worker with a live agent in the same endpoint
+```
+
+With the classifier change reverted, the same run stopped at `an idle empty box composer read 'unknown', not empty`.
 
 ## Steering-inbox doorbell
 
@@ -1497,7 +1678,7 @@ ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session
 ```
 
 The projected spawn in that run used the historical empty opt-in file, so a home that had already enabled the projection keeps it without any migration step.
-One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention is a deliberate hard refusal rather than a flat fallback, which default-on now makes reachable from any Herdr home.
+The current concurrent-recovery and abort-cleanup evidence is owned by [Cross-home recovery custody](#cross-home-recovery-custody).
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
 The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
@@ -1508,6 +1689,134 @@ HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
 ```
 
 Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pane childless idle shell was closed after restoration while the exact non-target focus and default fleet session remained unchanged, and a repeat run was a no-op.
+
+### Cross-home recovery custody
+
+Verified on 2026-10-06 on macOS aarch64 with Herdr 0.9.1 and Bash 3.2.57, using the guarded named-session helpers and a checkout-local runner `TMPDIR`:
+
+```sh
+bash bin/fm-test-run.sh --fail-on-gate-skip 'not found' --json .fm-review-verification/timing.json tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+```
+
+Selected observed output:
+
+```text
+ok - offline executable inventory and reaper remove only generated owned processes before Herdr provisioning
+# herdr 0.9.1 recovery custody lab
+ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
+ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
+ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned conclude, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside held actual owned reap, with task/meta custody, session release and exact sibling focus
+ok - recovery and fresh/reclaimed abort cleanup complete beside a held forced-secondmate recursive child return, preserving descendant task/meta custody and exact sibling focus
+ok - owned conclude refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - conclude pre-mutation refusal survives actual startup; admitted deferred close replays only its exact generation
+ok - owned reap refuses exact replaced generation before endpoint, journal, worktree or record mutation
+ok - reap pre-mutation refusal survives actual startup; admitted deferred retain replays only its exact generation
+FM_TEST_END 2026-10-06T17:15:17Z tests/fm-backend-herdr-recovery-lock-e2e.test.sh exit=0 duration_ms=505266 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=505707
+```
+
+Before provisioning Herdr, the fixture proves submitted and literal allocation interception, exact generated-copy return interception, and refusal of unmatched commands and foreign paths.
+It executes the production cwd inventory and reaper against generated native processes through a PID- and birth-identity-scoped `lsof` boundary, removes only the owned process, and requires an unrelated process to survive.
+No shared Treehouse allocation or return is invoked.
+Generated homes, copies, process fixtures, and evidence stay in the checkout, and task IDs include the unique lab-session identity to isolate the production commands' incidental temporary namespaces.
+The regression invokes the original public spawn and teardown executables without transforming them.
+
+The original allocation and return contention scenarios remain covered.
+Both homes replace only their exact old husks in their original workspaces, advance distinct generations, retain projection tokens and home bindings, publish matching journal and metadata endpoints, and preserve the exact focused workspace and tab.
+A duplicate invocation refuses while its original process retains task custody.
+Reclaimed and fresh failed-setup cleanup require structured `dead` for their exact panes; arbitrary inspection failures cannot satisfy removal assertions.
+
+The owned-cleanup cases separately hold conclusion during branch/head attribution after a controlled `no-mistakes axi status` that takes at least one second inside the unchanged command deadline, and hold the actual reaper's cwd inventory.
+Conclusion uses generated run output and an executable Git timing boundary, then requires the exact owned `axi abort --run` and terminal readback; no real no-mistakes pipeline is controlled.
+While each phase remains held, full cross-home recovery and fresh/reclaimed abort cleanup complete.
+Task/control and metadata lock owners remain live, independent acquisition proves session custody is released, intercepted presentation mutations have the exact expected lock owners, and sibling metadata, journals, panes, and focus remain unchanged.
+After release, native signaling reaps the owned processes without touching the unrelated sentinel, and teardown removes its exact pane and record.
+
+Forced secondmate cleanup descends through a generated nested home and holds its Herdr grandchild's intercepted, registered Git-worktree return after the exact pane is confirmed dead.
+Full unrelated recovery and both abort forms complete while the parent retains descendant task-set, control, and metadata locks but no session custody.
+After release, all three exact endpoints and the generated homes are removed, with exactly one owned grandchild return.
+The removal fixture uses a generated code-root directory pointing to the original binaries, separate from removable worktree/home siblings, because the production guard refuses descendant deletion inside its code root.
+
+Wrong endpoint and replaced-generation refusals carry an applicable markdown backlog in both ordinary close and captain-held retain modes.
+Actual bootstrap reconciliation preserves their records, journals, exact pane presence, and isolated copy HEAD, with no copy return or pending-close marker.
+After admission succeeds, a controlled backlog-transition interruption leaves the existing deferred marker, and actual bootstrap replay consumes it to close only the ordinary row or retain the captain-held row and deliverable.
+The guarded lab teardown and default-fleet tripwire also complete successfully.
+
+#### CI regression follow-up
+
+Verified on 2026-10-06 on macOS aarch64:
+
+```sh
+bash bin/fm-lint.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh tests/fm-teardown.test.sh
+FM_HOME="$PWD/.ci-verification/home" bash bin/fm-test-run.sh --json .ci-verification/teardown-timing.json tests/fm-teardown.test.sh
+```
+
+The generated `FM_HOME` was separate from the fixtures, and the teardown suite used its standard temporary directory outside the code root so the production home-removal safety guard remained in force.
+Full extended analysis passed with pinned ShellCheck 0.11.0.
+The teardown suite completed with `exit=0`, `failed=0`, and `gate_skip=false` (434180 ms), including all four flat-task prerequisite refusals and forced-secondmate child admission refusal.
+Those cases assert preserved copies, branches, records, and endpoints rather than the obsolete diagnostic phrase “nothing was changed”; the shared admission helpers also run after owned-process cleanup, when that phrase would be misleading.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
+
+A checkout-local throwaway smoke separately executed the recovery fixture's production inventory/reaper boundary, including its command-scoped `ID` and `BACKEND` inputs: the generated owned process was removed and the unrelated process remained alive.
+No Herdr session was provisioned in this CI follow-up; the native named-lab evidence above is unchanged.
+
+The subsequent required-prerequisite CI correction was verified on 2026-10-06.
+Provider reads (`gh pr view`, `gh pr checks --json`, and the existing job log) succeeded without credential or configuration changes.
+Run `37512668073`, Herdr job `112437553561`, belongs to head `0aa309b273a5a3821687943679053fb5dad58acb`; its green result is not recovery-regression proof: the exact script reported `tasks-axi not found`, `exit=0`, and `gate_skip=true`.
+
+The Herdr job now installs tasks-axi using the existing npm convention before running the family.
+The existing `--fail-on-gate-skip` option accumulates repeated tokens, so this lane rejects both missing Herdr and missing tasks-axi at the shared serial/parallel result boundary.
+A throwaway executable smoke parsed the workflow and ran its actual npm installation command with a checkout-local prefix/cache; the installed CLI reported `0.2.6`.
+With tasks-axi deliberately absent from PATH, the original recovery entrypoint under the workflow's parsed required-skip options failed before provisioning (`exit=1`, `failed=1`, `skipped_gate=0`).
+An ordinary executable fixture under those same options passed with `gate_skip=false`.
+Shell syntax checks, pinned ShellCheck 0.11.0 full extended analysis of the changed shell files, and actionlint of the workflow passed.
+
+Current `origin/main` (`12609b8641addef89bf4ab980ad490644395daf5`) was merged without rewriting the task history.
+The merge retains the exact acquisition abort target and the approved release of presentation custody before allocation.
+Main's acquisition-contention fixture now proves that release, then uses the existing ownership-sensitive lock API to hold fixture-owned contention; it releases the lock before resuming allocation and before failure cleanup.
+The guarded acquisition entrypoint (`tests/fm-spawn-acquisition-herdr-e2e.test.sh`) passed through `fm-test-run.sh` with `exit=0`, `failed=0`, and `gate_skip=false` (306609 ms).
+Both flat and projected acquisition cases ran; the flat case also exercised fixture-held contention, preservation of both live leases, and exact cleanup of only the refused acquisition after the projected launch.
+The complete runner and workflow contract suites also passed through `fm-test-run.sh` (`total=2`, `failed=0`, `skipped_gate=0`): runner 693622 ms, workflow 12439 ms.
+The runner suite exercised singleton and repeated required-skip flags, both option forms and token ordering, ordinary skip accounting, serial/parallel result handling, and aggregate failure propagation.
+The recovery regression's scenarios and the Herdr family's 20-minute step timeout are unchanged.
+The outer executor must publish through the active pipeline, perform native current-base revalidation, and inspect the resulting real CI log for this exact recovery script completing with `exit=0` and `gate_skip=false` on a green mergeable head.
+No new-head CI execution or Linux timing measurement is claimed by these local checks.
+
+The next required Herdr run (`37521752809`, job `112468697923`) did execute this regression (`gate_skip=false`), but failed after held conclusion with “released cleanup presentation mutations lost exact session-lock ownership”.
+The fixture audited explicit `pane close` calls but omitted the focus-safe shell-death route, which sends HUP to the verified lone idle shell instead.
+The audit now observes both routes, including same-shell KILL escalation, without counting ordinary worktree-process reaping as a presentation mutation or changing production close behavior.
+An executable signal smoke proved live-owner recording for HUP and escalation, ordinary TERM exclusion, and refusal of an unlocked HUP while its generated target remained alive.
+
+Base `3db901238a6b389ea0ea33e336b98bcbb43d10c7` was integrated in merge commit `7d44ebf2`, preserving the recorded no-history-rewrite decision.
+Its non-authoritative backlog staging and pre-signal process audit coexist with split custody: staging and owned cleanup precede exact Herdr reacquisition; legacy stamping and authoritative publication follow it; refusal retires the stage through the existing trap.
+The offline inventory fixture now supplies the generated project/state context and existing backlog audit library required by that updated reaper.
+
+Verified on 2026-10-06 on macOS aarch64 using the checkout-local official Herdr 0.7.4 pin (protocol 16):
+
+```sh
+bin/fm-install-herdr.sh "$PWD/.ci-herdr-bin"
+env PATH="$PWD/.ci-herdr-bin:$PATH" bin/fm-test-run.sh \
+  --fail-on-gate-skip 'herdr not found' \
+  --fail-on-gate-skip 'tasks-axi not found' \
+  --json "$PWD/.ci-recovery-timing.json" \
+  tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+bin/fm-lint.sh bin/fm-teardown.sh tests/fm-teardown.test.sh tests/fm-backend-herdr-recovery-lock-e2e.test.sh
+actionlint .github/workflows/ci.yml
+```
+
+The exact recovery script completed with `exit=0`, `duration_ms=1793668`, and `gate_skip=false`; the runner reported `total=1`, `failed=0`, and `skipped_gate=0`.
+All allocation, return, deliberately held conclusion/reaping, forced-secondmate recursion, fresh/reclaimed abort, replaced-generation refusal, close/retain bootstrap replay, structured-dead, inventory-isolation, sibling-custody and exact-focus scenarios passed.
+Guarded lab cleanup preserved the default-fleet tripwire, and no shared pool operation was invoked.
+Canonical pinned ShellCheck 0.11.0 full extended analysis and actionlint passed.
+This is local macOS evidence, not a new-head Linux CI timing measurement; the required family timeout and all existing scenarios remain unchanged.
+
+The merged teardown suite also passed through the public runner with a separate generated `FM_HOME` and the suite's ordinary temporary root outside the code root:
+`env FM_HOME="$PWD/.ci-verification-home" bin/fm-test-run.sh --json "$PWD/.ci-teardown-timing.json" tests/fm-teardown.test.sh`.
+It completed with `exit=0`, `duration_ms=2617651`, and `gate_skip=false` (`failed=0`, `skipped_gate=0`), including staged-marker replay/refusal, legacy stamp rollback, descendant custody, durable pre-signal audit and process-birth identity coverage.
+An earlier invocation placing this suite's removable homes under checkout-local `TMPDIR` correctly reached the code-root removal refusal before the expected child-source refusal; no guard or assertion was changed to accommodate that placement.
+The suite's existing Darwin-specific index-lock mtime fault injection was not exercised.
 
 ### Workspace-removal focus safety
 
@@ -1651,7 +1960,9 @@ tests/fm-teardown.test.sh
 tests/fm-backend-herdr.test.sh
 ```
 
-Observed guarantees: a contended presentation lock refused the teardown before the isolated copy was returned, with the task branch, every durable record, and the endpoint intact and no pane close attempted; the retry after the contention cleared returned the copy, closed the pane under the lock, and removed the records; an unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit; and every presence-gate mode accepted only a structured not-found as gone.
+Observed guarantees: admission contention retained the task branch, isolated copy, every durable record, and endpoint without attempting a pane close; cleanup completed after contention cleared.
+An unknown structured-presence result after an attempted projected close retained the journal and every record with a nonzero exit, and every presence-gate mode accepted only structured not-found as gone.
+[Cross-home recovery custody](#cross-home-recovery-custody) owns the current evidence for split cleanup custody and refusal followed by session-start replay.
 
 The same fixtures verified three further boundaries on 2026-07-29: missing or malformed endpoint identity and an unparseable pane presence refused record removal with everything retained; the SIGKILL escalation re-read the exact pane's process information and refused to signal when a different shell pid owned the pane, falling back to the plain close with the original process untouched; and a reposition whose removal then failed on every path restored the exact original workspace order through a second verified move and reported the close as failed.
 

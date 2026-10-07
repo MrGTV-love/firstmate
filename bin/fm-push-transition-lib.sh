@@ -120,7 +120,7 @@ _hb_surfaced_path() {
 # classified, or 0 when it has no usable position. A position rather than an
 # event line lets the backstop catch an event the per-wake path missed,
 # and comparing the last line cannot see an event a later routine append moved
-# past - exactly the masking fm-classify-lib.sh's span read exists to stop. An
+# past - exactly the masking fm-status-wake-lib.sh's span read exists to stop. An
 # absent or malformed marker (including one an older watcher wrote as a status
 # line) reads 0, so the log is re-classified and the backstop errs toward
 # surfacing rather than swallowing.

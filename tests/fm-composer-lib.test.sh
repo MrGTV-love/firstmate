@@ -486,11 +486,178 @@ test_matrix_omp_status_row_bounds_bare_composer() {
   pass "matrix: omp's status row bounds the bare composer's wrap region"
 }
 
+test_matrix_omp_effort_hint_remnant() {
+  # omp 18.4.10 draws cyan shortcut keys and a muted explanation on the
+  # otherwise empty row. The keys survive the shared ghost extractor.
+  local hint row screen typed plain out draft
+  hint="${ESC}[38;2;0;180;255m⇧⇥${ESC}[38;2;229;229;231m ${ESC}[38;2;107;114;128mto change thinking effort"
+  row="❯ ${ESC}[38;2;229;229;231m                                                   $hint"
+  screen=$'transcript\n\n'"$row"$'\n π · ◔ GPT-6.1-Sol · ◫ 7.5%/272K'
+  assert_screen "omp styled effort hint on tmux" empty "$CAPS_TMUX" "$screen" 2
+  assert_screen "omp styled effort hint cursorless" empty "$CAPS_STYLED_NOID" "$screen"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen")
+  [ -z "$out" ] || fail "styled effort hint must extract no draft, got '$out'"
+  plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
+  assert_screen "omp unstyled hint has no emptiness proof" unknown "$CAPS_PLAIN" "$plain"
+  out=$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$plain")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "unstyled effort hint must remain extracted content, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" \
+    $'╭────────────────────────╮\n│ ❯ '"$hint"$'\033[0m │\n╰────────────────────────╯')
+  [ "$out" = '⇧⇥' ] || fail "boxed effort-like content must not gain bare-hint stripping, got '$out'"
+  [ "$(classify 1 '❯ ⇧⇥ to change thinking effort' "$FM_COMPOSER_IDLE_RE_DEFAULT" \
+    sensitive '❯ ⇧⇥ to change thinking effort' 1 0)" = pending ] \
+    || fail "the effort hint must never become a plain boxed placeholder"
+  typed="❯ ${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[39m"
+  assert_screen "typed complete hint stays pending" pending "$CAPS_TMUX" "$typed" 0
+  assert_screen "typed shortcut-only stays pending" pending "$CAPS_TMUX" '❯ ⇧⇥' 0
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$typed")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "human full hint must survive extraction, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ ⇧⇥')
+  [ "$out" = '⇧⇥' ] || fail "human shortcut keys must survive extraction, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ shift+tab to change thinking effort')
+  [ "$out" = 'shift+tab to change thinking effort' ] || fail "generic shortcut text must survive extraction, got '$out'"
+  draft="❯ ${ESC}[38;2;229;229;231mdo not discard this draft      $hint"
+  assert_screen "draft before rendered hint cursorless" pending "$CAPS_STYLED_NOID" "$draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = 'do not discard this draft' ] || fail "only effort furniture must be removed beside a draft, got '$out'"
+  draft="$draft"$'\n'"${ESC}[38;2;229;229;231mkeep this second line"
+  assert_screen "wrapped draft with hint cursorless" pending "$CAPS_STYLED_NOID" "$draft"
+  assert_screen "wrapped draft with hint cursor anchored" pending "$CAPS_TMUX" "$draft" 1
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = 'do not discard this draft keep this second line' ] || fail "wrapped draft extraction must omit only the effort hint, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯ do not discard this draft')
+  [ "$out" = 'do not discard this draft' ] || fail "hint disappearance must not change the extracted draft, got '$out'"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" '❯')
+  [ -z "$out" ] || fail "hint disappearance must preserve empty extraction, got '$out'"
+  draft="❯ ${ESC}[2mghost${ESC}[0m ⇧⇥ to change thinking effort"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$draft")
+  [ "$out" = '⇧⇥ to change thinking effort' ] || fail "unrelated ghost text must not prove a bright human hint is furniture, got '$out'"
+  assert_screen "draft before rendered hint stays pending" pending "$CAPS_TMUX" \
+    "❯ ${ESC}[38;2;229;229;231mdo not discard this draft      $hint" 0
+  assert_screen "multiline draft before hint stays pending" pending "$CAPS_TMUX" \
+    "$row"$'\nkeep this second line' 1
+  assert_screen "queued text resembling the hint stays pending" pending "$CAPS_STYLED_NOID" \
+    $'Working…\n❯ ⇧⇥ to change thinking effort\n ⠧ 11s · ◔ GPT-6.1-Sol'
+  assert_screen "busy activity below hint is not erased" pending "$CAPS_STYLED_NOID" \
+    "$row"$'\nWorking on request...'
+  assert_screen "slash popup remains unreadable" unknown "$CAPS_TMUX" \
+    $'❯ /\n❯ ✦  skill:            37 skills\n  ❯ exit              Exit the application │' 0
+  pass "omp effort hint needs styling proof; drafts, activity, and popups keep refusing"
+}
+
 # codex_cell <grey> <glyph>: one codex 0.154 starfield cell exactly as the
 # harness draws it - a truecolor grey foreground, the composer's grey
 # background, the braille glyph, then a reset.
 codex_cell() {
   printf '%s[38;2;%s;%s;%sm%s[48;2;57;57;57m%s%s[0m' "$ESC" "$1" "$1" "$1" "$ESC" "$2" "$ESC"
+}
+
+# omp's `box` composer shape: the status line rides the TOP border and the
+# editor's last row is folded into the bottom border (`╰─ text ─╯`). This is the
+# screen 11 idle omp workers drew after live-reloading an overlay file that no
+# longer pinned `borderless` (task fm-omp-composer-unknown-blocks-control);
+# every verdict read `unknown`, which stopped fm-control exit and relaunch.
+# The captured screen is the task's own capture; the rest are real omp 18.6.3
+# captures through Herdr (typed text, wrapped rows, the empty-row hint).
+omp_box_top() {
+  printf '%s' '╭── π > ◒ GPT-6.1-Sol 🙈 > 🌳 firstmate/firstmate > ⑂ fm/fm-model-index > S1.95 + 👁 1.11 ▶─────────────38%─────────╎──┃────272K─◀ ⚙ 1 < Implement fleet model index < 🆔 01a111e1 ──╮'
+}
+
+omp_box_last() {  # <editor text>
+  printf '╰─ %-176s ─╯' "$1"
+}
+
+test_matrix_omp_box_composer() {
+  local top captured typed multi hint styled_hint styled_typed multi_hint
+  top=$(omp_box_top)
+  captured=$'⚠ Operation aborted
+
+ TODO
+  ├─ II. Validate · 0/1
+  │  └─ ☐ Drive no-mistakes through every gate to CI readiness
+  ├─ III. Deliver · 0/1
+  └─────
+
+  F5 to retry
+
+'"$top"$'
+╰─                                                                                                                                                                                 ─╯'
+  # The captured idle worker: an empty editor reads empty on every profile.
+  assert_screen "omp box idle on herdr" empty "$CAPS_STYLED" "$captured" '' probe-absent
+  assert_screen "omp box idle on zellij" empty "$CAPS_STYLED_NOID" "$captured"
+  assert_screen "omp box idle on cmux/orca" empty "$CAPS_PLAIN" "$captured"
+  # Typed text is pending (the plain profile cannot be fooled either: a bordered
+  # row reads pending without ghost proof).
+  typed=$'transcript\n\n'"$top"$'\n'"$(omp_box_last 'hello world typed text')"
+  assert_screen "omp box typed on herdr" pending "$CAPS_STYLED" "$typed" '' probe-absent
+  assert_screen "omp box typed on plain backends" pending "$CAPS_PLAIN" "$typed"
+  multi=$'transcript\n\n'"$top"$'\n│  first line'"$(printf '%*s' 160 '')"$'│\n'"$(omp_box_last '')"
+  assert_screen "omp box draft in an upper row" pending "$CAPS_STYLED" "$multi" '' probe-absent
+  # omp's box draws no prompt glyph, so a typed glyph is text, never an empty
+  # composer (the shared bordered rule would have read `>` as empty).
+  assert_screen "omp box typed >" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '>')" '' probe-absent
+  assert_screen "omp box typed ❯" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '❯')" '' probe-absent
+  assert_screen "omp box typed dash" pending "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$(omp_box_last '─')" '' probe-absent
+  hint=$'transcript\n\n'"$top"$'\n╰─'"$(printf '%*s' 60 '')"$'⇧⇥ to change thinking effort ─╯'
+  assert_screen "omp box unstyled hint stays ambiguous" unknown "$CAPS_PLAIN" "$hint"
+  assert_screen "omp box unstyled hint with cursor" unknown \
+    $'styled=0\ncursor=1\nidentity=1' "$hint" 3 probe-absent
+  styled_hint=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m$(printf '%*s' 60 '')${ESC}[0m${ESC}[38;2;0;180;255m⇧⇥${ESC}[0m${ESC}[38;2;229;229;231m ${ESC}[0m${ESC}[3m${ESC}[38;2;107;114;128mto change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
+  assert_screen "omp box styled hint" empty "$CAPS_STYLED" "$styled_hint" '' probe-absent
+  styled_typed=$'transcript\n\n'"$top"$'\n'"${ESC}[0m${ESC}[38;2;0;180;255m╰─ ${ESC}[0m${ESC}[38;2;229;229;231m⇧⇥ to change thinking effort${ESC}[0m${ESC}[38;2;0;180;255m ─╯"
+  assert_screen "omp box whole hint typed bright" pending "$CAPS_STYLED" "$styled_typed" '' probe-absent
+  assert_screen "omp box hint loses proof without styling" unknown "$CAPS_PLAIN" "$styled_hint"
+  assert_screen "omp box styled hint with cursor" empty "$CAPS_TMUX" "$styled_hint" 3 probe-absent
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$hint")" = '⇧⇥ to change thinking effort' ] \
+    || fail "omp box plain extraction must preserve ambiguous hint-like text"
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled_typed")" = '⇧⇥ to change thinking effort' ] \
+    || fail "omp box styled extraction must preserve a bright typed hint"
+  multi_hint=$'transcript\n\n'"$top"$'\n│ first line │\n'"$(omp_box_last '⇧⇥ to change thinking effort')"
+  assert_screen "omp box draft precedes ambiguous last row" pending "$CAPS_PLAIN" "$multi_hint"
+  [ "$(fm_composer_extract_selected_content "$CAPS_PLAIN" "$multi_hint")" = 'first line ⇧⇥ to change thinking effort' ] \
+    || fail "omp box extraction must preserve both the upper draft and ambiguous last row"
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled_hint")" = '' ] \
+    || fail "omp box extraction must drop the empty-row hint"
+  [ "$(fm_composer_extract_selected_content "$CAPS_STYLED" "$typed")" = 'hello world typed text' ] \
+    || fail "omp box extraction must return the typed text without its borders"
+  # Cursor mode (tmux): the cursor sits on the folded last row.
+  assert_screen "omp box idle on tmux" empty "$CAPS_TMUX" "$captured" 11 probe-absent
+  assert_screen "omp box typed on tmux" pending "$CAPS_TMUX" "$typed" 3 probe-absent
+  pass "matrix: omp's box composer (status in the top border, folded last row) reads empty, pending, and never a typed glyph as empty"
+}
+
+test_omp_box_requires_omp_identity_and_complete_shape() {
+  local top empty_last
+  top=$(omp_box_top)
+  empty_last=$(omp_box_last '')
+  # Only omp's own status identity proves the container; an arbitrary titled
+  # rounded border, a busy spinner status, or the ascii preset's `pi` stays
+  # an unprovable shape and reads unknown, never empty.
+  assert_screen "titled non-omp border" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── some other title ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "omp busy spinner status" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── ⠧ 11s > ◒ GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  assert_screen "omp ascii-preset status" unknown "$CAPS_STYLED" \
+    $'transcript\n\n╭── pi - GPT-6.1-Sol ──╮\n'"$empty_last" '' probe-absent
+  # A bare rule closing the box is not the folded last row.
+  assert_screen "bare rule bottom" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n╰'"$(printf '─%.0s' $(seq 1 60))"$'╯' '' probe-absent
+  # A broken interior (blank row, shifted indent) is not a proven box.
+  assert_screen "blank row inside the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n\n'"$empty_last" '' probe-absent
+  assert_screen "shifted side-border indent" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n │'"$(printf '%*s' 60 '')"$'│\n'"$empty_last" '' probe-absent
+  # Anything live below the box makes it stale, and a newer shape outranks it.
+  assert_screen "activity below the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last"$'\nsome later activity' '' probe-absent
+  assert_screen "dead shell below the box" unknown "$CAPS_STYLED" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last"$'\n$ ls -la' '' probe-absent
+  assert_screen "cursor outside the box" unknown "$CAPS_TMUX" \
+    $'transcript\n\n'"$top"$'\n'"$empty_last" 0 probe-absent
+  pass "matrix: an omp box needs omp's status identity and a complete shape; every other variant reads unknown"
 }
 
 test_matrix_codex_idle_starfield_furniture() {
@@ -1502,6 +1669,9 @@ test_matrix_muse_truecolor_glyph_survives_signal_loss
 test_matrix_cursor_reverse_video_placeholder_remnant
 test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
+test_matrix_omp_effort_hint_remnant
+test_matrix_omp_box_composer
+test_omp_box_requires_omp_identity_and_complete_shape
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_pi_literal_omp_floor_with_blank_continuation

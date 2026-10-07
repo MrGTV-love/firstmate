@@ -213,7 +213,7 @@ if [ -d "$POST_CREATE_ABORT_CONTROL" ] && [ "${1:-}" = get ]; then
 fi
 # Treehouse's pool allocator is outside the Herdr concurrency contract under
 # test. Serialize its calls so simultaneous recovery spawns cannot race for
-# one pool slot before reaching the Herdr session lock exercised below.
+# one pool slot during allocation.
 while ! mkdir "$TREEHOUSE_LOCK_DIR" 2>/dev/null; do
   sleep 0.01
 done

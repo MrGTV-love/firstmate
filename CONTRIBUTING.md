@@ -62,14 +62,14 @@ Coordinate any workflow rollback with its required-check names so a retired chec
   A local `config/backlog-backend=manual` opt-out forces firstmate's routine backlog updates to hand-editing and stays gitignored; validated secondmate handoffs still delegate through `tasks-axi mv`.
   A local `config/backend` file explicitly overrides runtime auto-detection for new task endpoints and stays gitignored; spawn-supported values are `tmux`, `herdr` (which has its own required CI lane), and `zellij`, `orca`, and `cmux`, which remain experimental with no dedicated real-backend CI lane, while `codex-app` is documented only in `docs/codex-app-backend.md`.
   It does not make `data/` tracked.
-- Helper scripts in `bin/` are plain bash.
+- Shell helper scripts in `bin/` are plain bash.
   Each starts with a usage header comment; keep it accurate when you change behavior.
   Test scripts and helpers in `tests/` are plain bash too.
   Teardown real-process regressions use the suite-local fixture helpers in `tests/fm-teardown.test.sh`; preserve their identity-checked cleanup, replacement-readiness synchronization, audit-collection exit/live-failure controls, and exempt-retry close-replay checks when extending those cases.
   `bin/fm-lint.sh` must pass: it is the single owner of the lint definition (the shellcheck file set, config, pinned shellcheck version, pinned actionlint workflow lint, and the backend-purity check rejecting direct Beads CLI calls in core `bin/` scripts).
-  CI uses its full canonical partitions; the no-mistakes pre-push gate uses its context-selected default.
+  CI checks its full canonical partitions without cache reuse; the no-mistakes pre-push gate uses the context-selected default.
   `docs/fm-test-portable-shards.md` owns partition verification and performance evidence.
-  Its header and `--help` output own the exact local lint modes, file-set selection, and analysis flags.
+  Its header and `--help` output own the exact local lint modes, dependency selection, cache behavior, and analysis flags.
   A malformed `.github/workflows/*.yml`, including a self-broken `ci.yml`, fails that local lint path before merge because a broken workflow cannot report its own breakage.
   It pins one exact shellcheck version and one exact actionlint version and refuses to run under any other.
   Print the shellcheck pin with `bin/fm-lint.sh --required-version` and the actionlint pin with `bin/fm-lint-workflows.sh --required-version`.
@@ -99,7 +99,7 @@ The pipeline publishes that evidence itself, so never hand-commit `.no-mistakes/
 Check and test the toolbelt before pushing:
 
 ```sh
-while IFS= read -r script; do /bin/bash -n "$script" || exit; done < <(bin/fm-lint.sh --list-files)   # syntax-check the shell surface fm-lint.sh will cover (changed files locally, full set in CI/on main)
+while IFS= read -r script; do /bin/bash -n "$script" || exit; done < <(bin/fm-lint.sh --list-files)   # syntax-check fm-lint.sh's context-selected shell surface
 bin/fm-lint.sh   # lint that shell surface plus GitHub workflows via pinned actionlint; the single owner CI and the no-mistakes gate both run
 bin/fm-test-run.sh tests/<subject>.test.sh   # one script (primary local focus path, timed)
 bin/fm-test-run.sh tests/<a>.test.sh tests/<b>.test.sh   # several subjects at once: bounded automatic concurrency

@@ -21,7 +21,7 @@ set -u
 
 # shellcheck source=tests/wake-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/wake-helpers.sh"
-# shellcheck source=/dev/null
+# shellcheck source=bin/fm-classify-lib.sh
 . "$ROOT/bin/fm-classify-lib.sh"
 
 DRAIN="$ROOT/bin/fm-wake-drain.sh"

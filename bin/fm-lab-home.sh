@@ -18,6 +18,8 @@
 # tmux-dir is the single owner of the short private socket directory: callers
 # use TMUX_TMPDIR=<printed-dir> and call teardown from their cleanup trap after
 # killing only the server addressed through that directory.
+# A refused teardown reports the tmux probe's exit status and stderr while
+# retaining the socket directory and its durable ownership record.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,9 +94,14 @@ case "${1:-}" in
     # private TMUX_TMPDIR could have hosted before removing the directory.
     for socket in "$socket_dir/tmux-$(id -u)"/*; do
       [ -e "$socket" ] || [ -L "$socket" ] || continue
-      if probe=$(tmux -S "$socket" list-sessions 2>&1 >/dev/null) \
-        || [ "${probe#*no server running}" = "$probe" ]; then
-        fm_lab_home_error "refusing teardown: cannot confirm the lab tmux server has stopped"
+      if probe=$(tmux -S "$socket" list-sessions 2>&1 >/dev/null); then
+        probe_status=0
+      else
+        probe_status=$?
+      fi
+      if [ "$probe_status" -eq 0 ] || [ "${probe#*no server running}" = "$probe" ]; then
+        fm_lab_home_error "refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=$probe_status)"
+        [ -z "$probe" ] || printf '%s\n' "$probe" >&2
         exit 1
       fi
     done

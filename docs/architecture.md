@@ -8,7 +8,7 @@ firstmate's supervisor contract and routing index for conditional procedures is 
 
 ## Event-driven supervision
 
-The declared-wait vocabulary, including the legacy "external wait" label, is owned by [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh); worker declaration instructions are owned by [`bin/fm-brief.sh`](../bin/fm-brief.sh).
+The declared-wait vocabulary, including the legacy "external wait" label, is owned by [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh); worker declaration instructions are owned by [`bin/fm-brief.sh`](../bin/fm-brief.sh).
 
 A zero-token bash watcher (`bin/fm-watch.sh`) sleeps on the fleet, classifies detected wakes in bash, and wakes the first mate only when something is actionable.
 Actionable wakes include captain-relevant status signals, no-verb signals without positive evidence that their crew is still executing, authenticated check output such as PR merge polling or a Relay mention, stale panes whose crew is not provably working whether their status log looks terminal or non-terminal, provably-working stale panes that persist past `FM_STALE_ESCALATE_SECS` with no wait their own worker declared, no writes to their own task worktree, and - in a home that armed `config/wedge-defer-parked-gate` - no validation gate of their own awaiting an unanswered supervisor decision, declared external waits and attended captain-held transfers that remain declared past `FM_PAUSE_RESURFACE_SECS`, and heartbeat backstop hits.
@@ -114,7 +114,7 @@ Each `fm-wake-drain.sh` presentation runs the same liveness guard as the supervi
 Routine watcher polling, supervision no-ops, elapsed waiting time, and absorbed benign wakes stay silent.
 A declared external wait or an attended verified captain-held transfer trades that silence for one bounded recheck per pause window, naming the dependency or decision owner; while the away-posture record exists, captain-held work waits without rechecks and remains visible in the return brief.
 Crew status files are append-only wake-event logs, not current-state fields.
-Because of that, a per-wake read of only the latest line can bury an earlier still-open `needs-decision`/`blocked` under later unrelated appends; `fm-wake-drain.sh` prints a separate, fleet-wide OPEN DECISIONS section on every presentation (including the empty-queue path session-start relies on), built through `fm-classify-lib.sh`'s cursor-backed incremental scan using the authoritative `status_open_decisions` fold semantics so the buried decision keeps surfacing until that fold closes it while each presentation folds only new status-log appends.
+Because of that, a per-wake read of only the latest line can bury an earlier still-open `needs-decision`/`blocked` under later unrelated appends; `fm-wake-drain.sh` prints a separate, fleet-wide OPEN DECISIONS section on every presentation (including the empty-queue path session-start relies on), built through `fm-classify-lib.sh`'s cursor-backed incremental scan using `fm-status-decision-lib.sh`'s authoritative `status_open_decisions` fold semantics so the buried decision keeps surfacing until that fold closes it while each presentation folds only new status-log appends.
 The drain coordinates that fold and its annotations through a locked fleet-wide snapshot whose `.status-presentation-cursor` manifest records each status file's identity plus independent annotation and outcome-backstop byte offsets.
 [`pi-supervision-branch.md`](pi-supervision-branch.md#lost-wake-outcome-backstop) owns the bounded lost-wake backstop that uses the latter offset.
 A queued signal annotation prints every status line still unread at that cursor, while the fleet-wide UNREAD STATUS section prints `note:` lines and reserved-key pending-reply resolutions once even on an empty-queue drain because those verbs never enter the OPEN DECISIONS fold.
@@ -170,7 +170,7 @@ Live GitHub enrichment exists only behind the bearings `--include-prs` opt-in.
 Optional Relay integrates with the watcher only after explicit opt-in; [configuration.md](configuration.md#relay-env) owns its generated-artifact and dispatch mechanics.
 
 At session start, `bin/fm-session-start.sh` emits exactly one primary-harness supervision block rendered by `bin/fm-supervision-instructions.sh` from `docs/supervision-protocols/`.
-That block owns the live wait shape for the running primary harness: Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses its own two tracked `.omp/extensions/` files, and OpenCode uses its TUI plugin.
+That block owns the live wait shape for the running primary harness; [configuration.md](configuration.md#verification-and-primary-supervision) summarizes the per-harness supervision integrations.
 `bin/fm-watch-arm.sh` remains the verified arm wrapper for protocols that call it; it forks the watcher as a tracked child, verifies it is genuinely alive with a fresh liveness beacon, and prints an honest `started`, `attached`, or nonzero `FAILED` status.
 [`watcher-continuity.md`](watcher-continuity.md#arm-layer-cycle-contract) owns the arm layer's successor, terminal-delivery, re-arm recovery, and typed clean-close failure contract.
 The arm layer records one bounded lifecycle row per observed cycle in `state/.watch-cycle-exits.log`; `state/.watch-triage.log` remains exclusively the absorbed-wake debug log.
@@ -232,8 +232,7 @@ Its local-only typed plane - harness-native invocations and explicit backend tar
 
 Text for a worker to read and commands that drive a worker's process are separate planes.
 `fm-send.sh` is the data plane and always routing-marks a `kind=secondmate` target, which is right for a message and wrong for a lifecycle command, because a marked exit command arrives as chat the agent reasons about instead of executing.
-`bin/fm-control.sh` is the control plane: an allowlisted `interrupt`, `exit`, and transactional `relaunch` addressed to an exact task id, with per-harness mechanics owned by `bin/fm-control-lib.sh`, a verified postcondition per verb, and no arbitrary-text or raw-key entry point.
-[`docs/agent-control.md`](agent-control.md) owns the verb contract, the capability matrix, the relaunch transaction, and the fail-closed boundaries.
+[`docs/agent-control.md`](agent-control.md) owns `bin/fm-control.sh`'s control-plane verb contract, capability matrix, relaunch transaction, continuation authorization, and fail-closed boundaries.
 
 ## Busy state is semantic, per adapter
 

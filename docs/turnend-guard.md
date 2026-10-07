@@ -206,9 +206,9 @@ With `state/.afk` absent the daemon lock proves nothing and the strict watcher p
 
 ### Guard grace and the poll cadence
 
-`bin/fm-watch.sh` touches `state/.last-watcher-beat` once per cycle, immediately before its terminal wait (`event_wait_or_sleep`) as well as at the top of the next cycle.
-A healthy watcher's beacon can therefore legitimately age up to `FM_POLL` seconds between touches.
-The session-end relaunch tick also touches it immediately before its one blocking `bin/fm-control.sh relaunch` call, which is bounded below the watcher's stale grace, so a live watcher mid-relaunch never reads as down; `bin/fm-session-end-relaunch-lib.sh` owns that bound.
+`bin/fm-watch.sh` owns beacon publication; [`watcher-continuity.md`](watcher-continuity.md#grace-beacon-and-stop-signals) describes its progress checkpoints and bounded-check waits.
+Its terminal poll wait can still age a healthy beacon by `FM_POLL` seconds.
+`bin/fm-session-end-relaunch-lib.sh` also refreshes it before its deadline-bounded relaunch call.
 
 A fixed 300-second grace default stops correctly bounding staleness once a home's `FM_POLL` reaches or exceeds it.
 A perfectly healthy watcher mid-wait would then read stale at the edge of every full poll cycle by definition.
@@ -272,7 +272,7 @@ The registrations in detail:
   The continuation's stop carries `stop_hook_active: true`, which bounds it to one per turn, and omp's own cap of eight consecutive continuations is the second backstop.
   `session_stop` never fires for an interrupted turn or a task session, so those boundaries are deliberately unguarded.
 - Cursor registers a `stop` hook in `.cursor/hooks.json` and delegates the whole turn boundary to `bin/fm-turnend-guard-cursor.sh`, the park described below.
-  Cursor also loads `<project>/.claude/settings.json`, so every tracked Claude-shaped entrypoint whose event Cursor covers stands down on a Cursor-delivered payload through `bin/fm-hook-host-lib.sh`.
+  Cursor also loads `<project>/.claude/settings.json`, so the tracked Claude-shaped supervision entrypoints whose events Cursor covers stand down on a Cursor-delivered payload through `bin/fm-hook-host-lib.sh`.
   That predicate reads the delivered payload's own `cursor_version`, never the environment.
   Cursor exports `CURSOR_INVOKED_AS`, `CURSOR_PROJECT_DIR`, and `CURSOR_VERSION` into every child process, so an environment guard would also disable the hooks of a Claude session started by hand from a Cursor pane, which is the hazard the `GROK_SESSION_ID` exclusion below records.
   The guarded supervision entrypoints are session start, the two Bash command protections, and the turn-end guard and auto-arm.
@@ -555,6 +555,8 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - Pi logical-run latching.
 - Missing-`jq` behavior.
 - All five primary registrations.
+- Tracked Claude shell and JavaScript hook execution in primary and task checkouts, including modern and legacy Grok exclusion.
+- Helper-tool exclusion and both authoritative Bash protections alongside advisory Bash/Read screening.
 - Grok native and legacy selection.
 - Typed field precedence.
 - Malformed input.
