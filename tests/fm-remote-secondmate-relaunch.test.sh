@@ -15,13 +15,17 @@
 # remote-secondmate suites fake it, rather than exercising a real host.
 set -u
 
+export TMPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$ROOT/bin/fm-pr-lib.sh"
+. "$ROOT/bin/fm-secondmate-nudge-lib.sh"
 
 command -v perl >/dev/null 2>&1 || { echo "skip: perl not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
+command -v git >/dev/null 2>&1 || { echo "skip: git not found"; exit 0; }
 unset FM_MODEL_CATALOG_DIR
 
 TMP=$(TMPDIR="$ROOT" fm_test_tmproot fm-remote-secondmate-relaunch)
@@ -31,6 +35,7 @@ mkdir -p "$HOME_DIR/data" "$HOME_DIR/state" "$HOME_DIR/config"
 DEST_HOME="$TMP/destination"
 mkdir -p "$DEST_HOME/config" "$DEST_HOME/state" "$DEST_HOME/data" "$TMP/tmp" "$TMP/user-home"
 export TMPDIR="$TMP/tmp"
+NUDGE_MARKER="$HOME_DIR/state/.secondmate-nudge-pending/ios.pending"
 
 printf -- '- ios - iOS delivery (host: remote-mac; root: /srv/fm; home: /srv/fm-home; scope: iOS; projects: alpha; added 2026-08-01)\n' \
   > "$HOME_DIR/data/secondmates.md"
@@ -73,7 +78,18 @@ while IFS= read -r -d '' arg; do args+=("$arg"); done < <(
 cmd=${args[0]}
 action=${args[1]}
 printf '%s %s\n' "$cmd" "$action" >> "$FM_FAKE_SSH_LOG"
+if [ "$cmd" = fm-remote-doctor.sh ]; then
+  [ "${#args[@]}" -eq 1 ] || exit 95
+  exit 0
+fi
 if [ "$cmd" = fm-remote-inherit.sh ]; then
+  [ -f "$FM_FAKE_SOURCE_HOME/state/.secondmate-nudge-pending/ios.pending" ] \
+    || { printf 'inheritance reached SSH without reread intent\n' >&2; exit 96; }
+  if [ "${FM_FAKE_RELAUNCH_MODE:-}" = partial-inherit ] \
+    && [ "$action" = absent ] && [ "${args[2]}" = data/captain-shared.md ]; then
+    printf 'error: fixture refused final inheritance item\n' >&2
+    exit 1
+  fi
   if [ "$action" = check ] && [ "${FM_FAKE_RELAUNCH_MODE:-}" = mutate-source ] \
     && [ ! -e "$FM_FAKE_SOURCE_HOME/mutated" ]; then
     cp "$FM_FAKE_LATER/model-index.json" "$FM_FAKE_SOURCE_HOME/config/model-index.json"
@@ -84,6 +100,33 @@ if [ "$cmd" = fm-remote-inherit.sh ]; then
     exec "$FM_FAKE_ROOT/bin/fm-remote-inherit.sh" "${args[@]:1}"
 fi
 id=${args[2]}
+case "$action" in
+  state)
+    [ "$(cat "$FM_FAKE_SOURCE_HOME/../native/command")" = pi ] || exit 97
+    printf 'alive\n'
+    exit 0
+    ;;
+  sync)
+    head=$(git -C "$FM_FAKE_DEST_HOME" rev-parse HEAD) || exit 99
+    [ "${args[3]}" = "$head" ] || exit 99
+    printf 'current: %s\n' "$head"
+    exit 0
+    ;;
+  route)
+    printf 'backend=herdr\n'
+    exit 0
+    ;;
+  send)
+    printf '%s\n' "$id" >> "$FM_FAKE_SOURCE_HOME/../send-targets"
+    if [ "${FM_FAKE_RELAUNCH_MODE:-}" = send-fail ]; then
+      printf 'error: fixture inbox write refused\n' >&2
+      exit 1
+    fi
+    [ "$(cat "$FM_FAKE_SOURCE_HOME/../native/command")" = pi ] || exit 98
+    printf '%s\n' "${args[3]}" >> "$FM_FAKE_SOURCE_HOME/../notifications"
+    exit 0
+    ;;
+esac
 harness=${args[3]}
 model=${args[4]}
 effort=${args[5]}
@@ -123,25 +166,59 @@ case "$FM_FAKE_RELAUNCH_MODE" in
 esac
 printf 'relaunched %s harness=%s from=pi model=%s effort=%s backend=herdr endpoint=fm-remote:w1:p1 worktree=/srv/fm-home\n' \
   "$id" "$harness" "$model" "$effort"
-printf 'schema=fm-remote-secondmate-control.v1\n'
+if [ "${FM_FAKE_RELAUNCH_MODE:-}" != missing-schema ]; then
+  printf 'schema=fm-remote-secondmate-control.v1\n'
+fi
 printf 'backend=herdr\n'
 printf 'target=fm-remote:w1:p1\n'
 printf 'herdr_session=fm-remote\n'
-printf 'harness=%s\n' "$harness"
+if [ "${FM_FAKE_RELAUNCH_MODE:-}" != missing-harness ]; then
+  printf 'harness=%s\n' "$harness"
+fi
 printf 'model=%s\n' "$model"
 printf 'effort=%s\n' "$effort"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
-run_relaunch() {  # <args...>
-  env -u FM_MODEL_CATALOG_DIR -u FM_CONFIG_OVERRIDE -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE \
-    PATH="$FAKEBIN:$PATH" HOME="$TMP/user-home" \
-    FM_HOME="$HOME_DIR" FM_SSH_BIN="$FAKEBIN/fake-ssh" \
+fixture_env() {
+  env -i PATH="$FAKEBIN:$PATH" HOME="$TMP/user-home" TMPDIR="$TMP/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 \
+    FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    FM_DATA_OVERRIDE="$HOME_DIR/data" FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" \
+    FM_SSH_BIN="$FAKEBIN/fake-ssh" FM_SEND_SETTLE=0 \
+    FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness' \
+    FM_PROCEVENT_CLAIM_ROOT="$TMP/claims" \
     FM_FAKE_ROOT="$ROOT" FM_FAKE_SOURCE_HOME="$HOME_DIR" \
     FM_FAKE_DEST_HOME="$DEST_HOME" FM_FAKE_SSH_LOG="$TMP/ssh.log" \
     FM_FAKE_LATER="$TMP/later" \
-    FM_FAKE_RELAUNCH_MODE="${FM_FAKE_RELAUNCH_MODE:-}" \
-    "$ROOT/bin/fm-remote-secondmate-relaunch.sh" "$@" 2>&1
+    FM_FAKE_RELAUNCH_MODE="${FM_FAKE_RELAUNCH_MODE:-}" "$@" 2>&1
+}
+
+run_relaunch() {
+  fixture_env "$ROOT/bin/fm-remote-secondmate-relaunch.sh" "$@"
+}
+
+run_bootstrap() {
+  fixture_env FM_ROOT_OVERRIDE="$TMP/primary" \
+    FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=0 \
+    FM_BOOTSTRAP_VERBOSE_FACTS=1 "$ROOT/bin/fm-bootstrap.sh"
+}
+
+seed_remote_marker() {
+  fm_secondmate_nudge_write "$HOME_DIR/state" ios /srv/fm-home "" remote \
+    "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1 || fail "could not seed the remote reread marker"
+}
+
+assert_remote_marker() {
+  assert_present "$NUDGE_MARKER" "unconfirmed replacement lost remote reread intent"
+  assert_grep 'id=ios' "$NUDGE_MARKER" "reread marker lost its task identity"
+  assert_grep 'selector=fm-ios' "$NUDGE_MARKER" "reread marker lost its selector"
+  assert_grep 'home=/srv/fm-home' "$NUDGE_MARKER" "reread marker changed the remote home"
+  assert_grep 'remote=1' "$NUDGE_MARKER" "reread marker lost its remote placement"
+  assert_grep "message=$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" "$NUDGE_MARKER" \
+    "reread marker did not retain the inherited-config message"
 }
 
 # --- a successful relaunch republishes the parent's own route record --------
@@ -247,12 +324,19 @@ printf '%s\n' '{"default":{"harness":"pi","role":"later"}}' > "$TMP/later/crew-d
 printf '%s\n' "$DEST_HOME/worker-account" openai > "$DEST_HOME/config/pi-account"
 cp "$DEST_HOME/config/pi-account" "$TMP/pi-account-before"
 printf 'tmux\n' > "$DEST_HOME/config/backend"
+cp "$ROOT"/bin/fm-remote-*.sh "$DEST_HOME/bin/"
 printf 'ios\n' > "$DEST_HOME/.fm-secondmate-home"
 printf 'fixture instructions\n' > "$DEST_HOME/AGENTS.md"
 printf 'fixture charter\n' > "$DEST_HOME/data/charter.md"
 git -C "$DEST_HOME" init -q -b main
-git -C "$DEST_HOME" add AGENTS.md
+git -C "$DEST_HOME" add AGENTS.md bin
 git -C "$DEST_HOME" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture
+git clone -q "$DEST_HOME" "$TMP/primary"
+cat > "$FAKEBIN/gh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = auth ] && [ "${2:-}" = status ]
+SH
+chmod +x "$FAKEBIN/gh"
 cat > "$FAKEBIN/pi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = auth ] && [ "${2:-}" = check ]; then
@@ -319,6 +403,8 @@ chmod +x "$FAKEBIN/pi" "$FAKEBIN/tmux"
 
 reset_native() {
   reset_meta
+  rm -f "$NUDGE_MARKER" "$HOME_DIR/state/local1.meta" \
+    "$HOME_DIR/config/crew-harness" "$DEST_HOME/config/crew-harness"
   cp "$TMP/new/model-index.json" "$HOME_DIR/config/model-index.json"
   cp "$TMP/new/crew-dispatch.json" "$HOME_DIR/config/crew-dispatch.json"
   cp "$TMP/old/model-index.json" "$DEST_HOME/config/model-index.json"
@@ -332,6 +418,8 @@ reset_native() {
   : > "$TMP/native/literal"
   : > "$TMP/native/runtime.log"
   : > "$TMP/ssh.log"
+  : > "$TMP/notifications"
+  : > "$TMP/send-targets"
   : > "$HOME_DIR/native-catalog.log"
   rm -f "$TMP/native/launch" "$HOME_DIR/mutated"
   rm -f "$DEST_HOME/state/parent-route/ios.control-relaunch"*
@@ -339,6 +427,72 @@ reset_native() {
   cp "$HOME_DIR/state/ios.meta" "$TMP/parent-before"
   cp "$DEST_HOME/state/parent-route/ios.meta" "$TMP/destination-before"
   FM_FAKE_RELAUNCH_MODE=native
+}
+
+assert_survivor_reread() {
+  local retry=${1:-} member out rc records head attempts
+  head=$(git -C "$DEST_HOME" rev-parse HEAD)
+  [ "$head" = "$(git -C "$TMP/primary" rev-parse HEAD)" ] \
+    || fail "bootstrap fixture is not already at the primary tracked-file commit"
+  cp "$DEST_HOME/AGENTS.md" "$TMP/agents-before-bootstrap"
+  cp "$HOME_DIR/state/ios.meta" "$TMP/route-before-bootstrap"
+  cp "$DEST_HOME/state/parent-route/ios.meta" "$TMP/worker-before-bootstrap"
+  cp "$TMP/native/literal" "$TMP/literal-before-bootstrap"
+  for member in model-index.json crew-dispatch.json; do
+    cmp -s "$HOME_DIR/config/$member" "$DEST_HOME/config/$member" \
+      || fail "bootstrap retry precondition: routing pair is not already inherited"
+    cp "$DEST_HOME/config/$member" "$TMP/bootstrap-$member"
+  done
+  if [ -f "$HOME_DIR/config/crew-harness" ]; then
+    cmp -s "$HOME_DIR/config/crew-harness" "$DEST_HOME/config/crew-harness" \
+      || fail "bootstrap retry precondition: unrelated config is not already inherited"
+  else
+    assert_absent "$DEST_HOME/config/crew-harness" "bootstrap retry precondition: unexpected unrelated config"
+  fi
+  records=$(wc -l < "$TMP/notifications" | tr -d ' ')
+  if [ "$retry" = retry-send ]; then
+    attempts=$(wc -l < "$TMP/send-targets" | tr -d ' ')
+    out=$(FM_FAKE_RELAUNCH_MODE=send-fail run_bootstrap); rc=$?
+    expect_code 0 "$rc" "bootstrap should report a failed reread diagnostically: $out"
+    [ "$(wc -l < "$TMP/send-targets" | tr -d ' ')" -eq "$((attempts + 1))" ] \
+      || fail "bootstrap did not attempt the failed remote send"
+    [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$records" ] \
+      || fail "a refused send was recorded as delivered"
+    assert_remote_marker
+  fi
+  out=$(FM_FAKE_RELAUNCH_MODE= run_bootstrap); rc=$?
+  expect_code 0 "$rc" "bootstrap should deliver pending intent without further config changes: $out"
+  assert_contains "$out" 'nudged remote fm-ios after convergence' \
+    "bootstrap did not report delivery of the retained reread intent"
+  [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$((records + 1))" ] \
+    || fail "unchanged bootstrap did not notify the surviving worker exactly once"
+  assert_grep "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" "$TMP/notifications" \
+    "bootstrap delivered a different instruction instead of the remote config reread"
+  [ "$(sort -u "$TMP/send-targets")" = ios ] || fail "bootstrap did not target only the surviving secondmate"
+  assert_absent "$NUDGE_MARKER" "successful bootstrap delivery retained the remote marker"
+  out=$(FM_FAKE_RELAUNCH_MODE= run_bootstrap); rc=$?
+  expect_code 0 "$rc" "already-delivered bootstrap should remain successful: $out"
+  [ "$(wc -l < "$TMP/notifications" | tr -d ' ')" -eq "$((records + 1))" ] \
+    || fail "a cleared marker caused a redundant unchanged reread"
+  [ "$(git -C "$DEST_HOME" rev-parse HEAD)" = "$head" ] \
+    || fail "bootstrap retry changed the tracked-file commit"
+  cmp -s "$TMP/agents-before-bootstrap" "$DEST_HOME/AGENTS.md" \
+    || fail "bootstrap retry changed tracked instructions"
+  cmp -s "$TMP/route-before-bootstrap" "$HOME_DIR/state/ios.meta" \
+    || fail "bootstrap retry changed parent routing"
+  cmp -s "$TMP/worker-before-bootstrap" "$DEST_HOME/state/parent-route/ios.meta" \
+    || fail "bootstrap retry changed survivor metadata"
+  cmp -s "$TMP/literal-before-bootstrap" "$TMP/native/literal" \
+    || fail "bootstrap retry stopped or respawned the surviving worker"
+  [ "$(cat "$TMP/native/command")" = pi ] || fail "bootstrap did not preserve the surviving worker"
+  for member in model-index.json crew-dispatch.json; do
+    cmp -s "$TMP/bootstrap-$member" "$DEST_HOME/config/$member" \
+      || fail "bootstrap retry changed the already-inherited routing pair"
+  done
+  if [ -f "$HOME_DIR/config/crew-harness" ]; then
+    cmp -s "$HOME_DIR/config/crew-harness" "$DEST_HOME/config/crew-harness" \
+      || fail "bootstrap retry changed unrelated inherited config"
+  fi
 }
 
 assert_native_untouched() {
@@ -356,6 +510,7 @@ assert_native_untouched() {
 
 for REQUEST in role:restart stand-in:restart openai/new; do
   reset_native
+  assert_absent "$NUDGE_MARKER" "catalog refusal fixture unexpectedly has pending intent"
   OUT=$(run_relaunch ios pi "$REQUEST" medium); RC=$?
   [ "$RC" -ne 0 ] || fail "catalog missing the new indexed selector accepted $REQUEST: $OUT"
   SELECTED=openai/new
@@ -369,11 +524,110 @@ for REQUEST in role:restart stand-in:restart openai/new; do
     cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
       || fail "the pre-stop gate did not see the selected parent pair"
   done
+  assert_remote_marker
+  if [ "$REQUEST" = role:restart ]; then
+    assert_survivor_reread retry-send
+  else
+    assert_survivor_reread
+  fi
 done
-pass "new roles, stand-ins, and indexed literals refuse through the real destination catalog before stopping"
+pass "catalog refusals retain reread intent and unchanged bootstrap notifies the survivor, retrying failed delivery"
+
+reset_native
+seed_remote_marker
+cp "$NUDGE_MARKER" "$TMP/existing-marker"
+OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+[ "$RC" -ne 0 ] || fail "a preexisting marker made an unsupported restart acceptable: $OUT"
+assert_contains "$OUT" "id 'openai/new' absent or retired in pi catalog" \
+  "preexisting intent bypassed the real catalog refusal"
+assert_native_untouched
+assert_remote_marker
+cmp -s "$TMP/existing-marker" "$NUDGE_MARKER" \
+  || fail "catalog refusal changed the existing remote reread intent"
+assert_survivor_reread
+pass "a preexisting remote reread marker survives catalog refusal until bootstrap delivers it"
+
+reset_native
+assert_absent "$NUDGE_MARKER" "partial-transfer fixture unexpectedly has pending intent"
+printf 'pi\n' > "$HOME_DIR/config/crew-harness"
+printf 'codex\n' > "$DEST_HOME/config/crew-harness"
+FM_FAKE_RELAUNCH_MODE=partial-inherit
+OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+[ "$RC" -ne 0 ] || fail "partial remote inheritance unexpectedly succeeded: $OUT"
+assert_contains "$OUT" 'fixture refused final inheritance item' \
+  "partial inheritance did not reach the final failing boundary"
+assert_contains "$OUT" 'remote inheritance refused' \
+  "partial inheritance lost its relaunch refusal diagnostic"
+assert_contains "$OUT" 'pushed: config/crew-harness' \
+  "partial inheritance failed before its unrelated write"
+cmp -s "$HOME_DIR/config/crew-harness" "$DEST_HOME/config/crew-harness" \
+  || fail "partial inheritance did not publish the unrelated config"
+for MEMBER in model-index.json crew-dispatch.json; do
+  cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+    || fail "partial inheritance did not publish its routing pair"
+done
+assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$TMP/ssh.log" \
+  "partial inheritance failure reached the remote relaunch"
+assert_native_untouched
+assert_remote_marker
+assert_survivor_reread
+pass "partial inheritance retains intent after unrelated writes and unchanged bootstrap notifies the survivor"
+
+for CONFIRMATION in missing-schema missing-harness; do
+  reset_native
+  assert_absent "$NUDGE_MARKER" "missing-confirmation fixture unexpectedly has pending intent"
+  FM_FAKE_RELAUNCH_MODE=$CONFIRMATION
+  OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+  [ "$RC" -ne 0 ] || fail "an incomplete host confirmation was accepted: $OUT"
+  case "$CONFIRMATION" in
+    missing-schema)
+      assert_contains "$OUT" 'reported no route confirmation to record' \
+        "missing route schema bypassed the wrapper's confirmation gate"
+      ;;
+    missing-harness)
+      assert_contains "$OUT" 'route confirmation carried no harness to record' \
+        "missing confirmed harness bypassed the wrapper's identity gate"
+      ;;
+  esac
+  assert_grep 'fm-remote-secondmate-control.sh relaunch' "$TMP/ssh.log" \
+    "the incomplete confirmation fixture did not reach the relaunch boundary"
+  assert_native_untouched
+  assert_remote_marker
+  for MEMBER in model-index.json crew-dispatch.json; do
+    cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+      || fail "unconfirmed relaunch did not deliver the routing pair"
+  done
+  assert_survivor_reread
+done
+pass "missing route schema and missing harness confirmation both retain intent for unchanged bootstrap delivery"
+
+reset_native
+rmdir "$HOME_DIR/state/.secondmate-nudge-pending" \
+  || fail "marker-publication refusal fixture did not start with an empty marker directory"
+mkdir "$TMP/blocked-marker-target"
+printf 'retained\n' > "$TMP/blocked-marker-target/sentinel"
+ln -s "$TMP/blocked-marker-target" "$HOME_DIR/state/.secondmate-nudge-pending"
+OUT=$(run_relaunch ios pi role:restart medium); RC=$?
+[ "$RC" -ne 0 ] || fail "unsafe marker publication unexpectedly permitted remote transfer: $OUT"
+assert_contains "$OUT" 'cannot record the remote reread marker' \
+  "marker publication refusal lost its diagnostic"
+[ ! -s "$TMP/ssh.log" ] || fail "marker publication refusal reached a remote command"
+assert_native_untouched
+for MEMBER in model-index.json crew-dispatch.json; do
+  cmp -s "$TMP/old/$MEMBER" "$DEST_HOME/config/$MEMBER" \
+    || fail "marker publication refusal changed destination routing"
+done
+[ "$(cat "$TMP/blocked-marker-target/sentinel")" = retained ] \
+  || fail "marker publication wrote through its guarded directory"
+assert_absent "$TMP/blocked-marker-target/ios.pending" \
+  "marker publication wrote through its directory symlink"
+rm "$HOME_DIR/state/.secondmate-nudge-pending"
+mkdir "$HOME_DIR/state/.secondmate-nudge-pending"
+pass "refused marker publication prevents inheritance and remote relaunch"
 
 for REQUEST in role:restart stand-in:restart openai/new; do
   reset_native
+  seed_remote_marker
   printf 'openai new 128K 32K yes no\nopenai new-standby 128K 32K yes no\n' \
     > "$DEST_HOME/worker-account/listed"
   OUT=$(run_relaunch ios pi "$REQUEST" medium); RC=$?
@@ -400,6 +654,8 @@ for REQUEST in role:restart stand-in:restart openai/new; do
   done
   cmp -s "$TMP/pi-account-before" "$DEST_HOME/config/pi-account" \
     || fail "the supported restart changed the destination account"
+  assert_absent "$NUDGE_MARKER" "confirmed replacement retained obsolete reread intent"
+  [ ! -s "$TMP/notifications" ] || fail "confirmed replacement unnecessarily nudged the prior worker"
 done
 pass "supported destination catalogs relaunch roles, stand-ins, and indexed literals through real control and spawn"
 
@@ -414,12 +670,14 @@ for MEMBER in model-index.json crew-dispatch.json; do
   assert_no_grep 'fm-remote-secondmate-control.sh relaunch' "$TMP/ssh.log" \
     "a pair preflight refusal reached remote relaunch"
   assert_native_untouched
+  assert_remote_marker
   [ -L "$DEST_HOME/config/$MEMBER" ] || fail "pair preflight replaced the guarded member"
   for RETAINED in model-index.json crew-dispatch.json; do
     cmp -s "$TMP/old/$RETAINED" "$DEST_HOME/config/$RETAINED" \
       || fail "pair preflight changed the retained destination pair"
   done
-  [ "$(FM_HOME="$DEST_HOME" "$ROOT/bin/fm-model-index.sh" profiles \
+  [ "$(fixture_env FM_HOME="$DEST_HOME" FM_CONFIG_OVERRIDE="$DEST_HOME/config" \
+    FM_STATE_OVERRIDE="$DEST_HOME/state" "$ROOT/bin/fm-model-index.sh" profiles \
     "$DEST_HOME/config/crew-dispatch.json" | jq -r '.default.model')" = openai/old ] \
     || fail "pair preflight left a retained pair that no longer resolves"
   rm "$DEST_HOME/config/$MEMBER"
@@ -440,7 +698,8 @@ for MEMBER in model-index.json crew-dispatch.json; do
   cmp -s "$TMP/new/$MEMBER" "$DEST_HOME/config/$MEMBER" \
     || fail "the sender delivered the later source instead of its frozen pair"
 done
-[ "$(FM_HOME="$DEST_HOME" "$ROOT/bin/fm-model-index.sh" profiles \
+[ "$(fixture_env FM_HOME="$DEST_HOME" FM_CONFIG_OVERRIDE="$DEST_HOME/config" \
+  FM_STATE_OVERRIDE="$DEST_HOME/state" "$ROOT/bin/fm-model-index.sh" profiles \
   "$DEST_HOME/config/crew-dispatch.json" | jq -r '.default.model')" = openai/new ] \
   || fail "the delivered frozen pair does not resolve the staged model"
 assert_grep 'model=openai/new' "$HOME_DIR/state/ios.meta" \
@@ -451,6 +710,7 @@ assert_contains "$(cat "$TMP/native/launch")" 'openai/new' \
   "the replacement launch did not consume the frozen selection"
 assert_not_contains "$(cat "$TMP/native/launch")" 'openai/later' \
   "the replacement launch consumed the later selection"
+assert_absent "$NUDGE_MARKER" "confirmed frozen-pair replacement retained remote reread intent"
 pass "after-stage source mutation leaves resolution, inheritance, destination validation, and spawn on the frozen pair"
 
 echo "ALL TESTS PASSED"

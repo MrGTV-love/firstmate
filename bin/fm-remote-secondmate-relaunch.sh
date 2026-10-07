@@ -69,6 +69,11 @@ case "$MODEL" in
 esac
 GENERATION=$(fm_remote_inherit_generation_next "$STATE" "$ID") \
   || die "cannot publish the remote inheritance generation"
+REMOTE_MARKER=$(fm_secondmate_nudge_marker_path "$STATE" "$ID") \
+  || die "cannot resolve the remote reread marker"
+fm_secondmate_nudge_write "$STATE" "$ID" "$(fm_meta_get "$META" home)" "" remote \
+  "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1 \
+  || die "cannot record the remote reread marker"
 if INHERIT_OUT=$(FM_CONFIG_INHERIT_PAIR_DIR="$PAIR_DIR" FM_CONFIG_INHERIT_LIVE=1 \
   "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$ID" "$GENERATION" 2>&1); then
   :
@@ -130,3 +135,4 @@ done < "$META"
 chmod 0600 "$META_TMP"
 mv -f -- "$META_TMP" "$META"
 fm_lock_release "$META_LOCK"
+rm -f -- "$REMOTE_MARKER"

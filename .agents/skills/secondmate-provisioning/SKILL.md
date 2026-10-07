@@ -148,7 +148,7 @@ A newly launched or relaunched secondmate already reads its files at launch, so 
 Quarantined pre-relaunch generations are retained in bounded private history, and cleanup skips creating an empty quarantine generation.
 Successfully delivered generations are retained only within a bounded per-home state history, while pending generations remain until delivery succeeds or a launch supersedes them.
 A remote home receives the same allowlisted bytes through `fm-remote-inherit.sh` and gets one marked re-read instruction after changed transfers, including unrelated successfully published changes when a routing-pair guard refuses; pending sends still retry despite that guard.
-The parent records that nudge before delivery, retains it after a failed send, and retries the exact same route during locked bootstrap convergence.
+The parent records that nudge before live transfer, retains it until a successful send or confirmed replacement, and retries the exact same route during locked bootstrap convergence after failed inheritance, refused relaunch, unconfirmed replacement, or failed delivery.
 It does not receive a pointer to a primary-local generation path that cannot exist on that host.
 Inherited harness and runtime-backend defaults must not harden `fm-spawn` to reject a deliberate runtime choice that differs from those defaults.
 The [worker launch environment contract](../../../docs/configuration.md#worker-launch-environment-configlaunch-env-allowlist) separately governs explicit environment grants.
