@@ -181,6 +181,9 @@ case "$COMMAND" in
     commit_generation
     if [ -f "$DEST" ] && cmp -s "$TMP" "$DEST"; then
       [ "$REL" != data/captain-shared.md ] || chmod 444 "$DEST"
+      if [ "$REL" = config/session-launch-policy ]; then
+        fm_session_launch_policy_check_child "$HOME_REAL/config" "$HOME_REAL" || exit 1
+      fi
       printf 'unchanged: %s\n' "$REL"
       exit 0
     fi
@@ -189,6 +192,9 @@ case "$COMMAND" in
     mv -f -- "$TMP" "$DEST" || die "cannot publish inherited material"
     TMP=
     [ "$REL" != data/captain-shared.md ] || chmod 444 "$DEST"
+    if [ "$REL" = config/session-launch-policy ]; then
+      fm_session_launch_policy_check_child "$HOME_REAL/config" "$HOME_REAL" || exit 1
+    fi
     printf 'pushed: %s\n' "$REL"
     ;;
   absent)

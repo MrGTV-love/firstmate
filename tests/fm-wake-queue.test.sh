@@ -3156,6 +3156,37 @@ test_secondmate_liveness_tick_relaunches_dead_endpoint_once() {
   pass "watch liveness: a dead secondmate is relaunched once, ledgered, and quiet afterwards"
 }
 
+test_secondmate_liveness_tick_launch_policy_preserves_recovery_records() {
+  local dir state pid mode rc
+  for mode in dead missing; do
+    dir=$(make_secondmate_liveness_case "liveness-policy-$mode")
+    state="$dir/state"
+    printf 'omp-or-tc\n' > "$dir/config/session-launch-policy"
+    printf 'codex explicit-model high\n' > "$dir/config/secondmate-harness"
+    printf '1\tattempt\n1\tfailed\n' > "$state/.secondmate-relaunch-sm1"
+    cp "$state/.secondmate-relaunch-sm1" "$dir/ledger-before"
+    cp "$state/sm1.meta" "$dir/meta-before"
+    if [ "$mode" = missing ]; then
+      run_liveness_leg "$dir" policy FM_FAKE_WINDOW_GONE=1
+    else
+      run_liveness_leg "$dir" policy FM_FAKE_TMUX_CURRENT_COMMAND=zsh
+    fi
+    pid=$LIVENESS_PID
+    rc=0
+    wait_for_exit "$pid" 300 || rc=$?
+    expect_code 0 "$rc" "watcher did not deliver the forbidden recovery wake successfully"
+    assert_contains "$(cat "$dir/watch-policy.out")" "check: secondmate sm1 auto-relaunch refused:" \
+      "watcher lost the actionable recovery policy refusal"
+    assert_contains "$(cat "$dir/watch-policy.out")" "config/session-launch-policy" \
+      "watcher lost the recovery policy refusal"
+    [ ! -s "$dir/tmux.log" ] || fail "watcher refusal removed or launched an endpoint"
+    cmp -s "$dir/meta-before" "$state/sm1.meta" || fail "watcher refusal rewrote endpoint metadata"
+    cmp -s "$dir/ledger-before" "$state/.secondmate-relaunch-sm1" || fail "watcher refusal consumed a recovery attempt"
+    [ ! -e "$state/.secondmate-relaunch-bound-sm1" ] || fail "watcher refusal parked the secondmate"
+  done
+  pass "watch liveness: policy refuses before endpoint removal and attempt ledger mutation"
+}
+
 test_secondmate_liveness_tick_relaunches_missing_endpoint() {
   local dir state pid out
   dir=$(make_secondmate_liveness_case liveness-missing)
@@ -3562,6 +3593,7 @@ test_interruption_before_and_after_raw_commit
 test_wake_queue_prune_task
 test_drain_rotates_orphaned_scratch
 test_secondmate_liveness_tick_relaunches_dead_endpoint_once
+test_secondmate_liveness_tick_launch_policy_preserves_recovery_records
 test_secondmate_liveness_tick_relaunches_missing_endpoint
 test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched

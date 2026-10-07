@@ -77,6 +77,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    `--claude-debug` is off by default, refused unless the resolved replacement harness is claude, and passed through to the launch; the [`bin/fm-spawn.sh`](../bin/fm-spawn.sh) header owns what it turns on, including the diagnostics file that names the signal of the next stop.
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
+   The resolved replacement is also subject to the home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) before checkpointing.
    Model resolution and selected-entry catalog preflight follow the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson) before the old agent stops.
    Ship and scout replacements also pass the [worker tool exclusion checks](configuration.md#worker-tool-exclusions-configcrew-exclude-tools) at this step.
 2. **Check replacement admission, then checkpoint.**

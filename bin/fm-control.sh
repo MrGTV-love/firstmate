@@ -93,6 +93,8 @@
 #              The same pre-stop refusal applies to this home's worker tool
 #              exclusions (bin/fm-exclude-tools-lib.sh): a malformed list, or a
 #              replacement runtime that cannot hide the listed tools.
+#              config/session-launch-policy is checked against the resolved
+#              replacement before checkpointing or stopping the current agent.
 #              --note is required for a ship or scout, whose replacement
 #              inherits the local copy but none of the conversation; a
 #              secondmate reconciles its own home's records at startup, so its
@@ -200,8 +202,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
-# shellcheck source=bin/fm-config-inherit-lib.sh
-. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-session-launch-policy-lib.sh
+. "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
@@ -1026,6 +1028,7 @@ resolve_relaunch_profile() {
   else
     TARGET_HARNESS=$PRIOR_HARNESS
   fi
+  fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TARGET_HARNESS" || return 1
   # The launch owner refuses an adapter that cannot run this task's kind, but it
   # is only reached after the old agent has been stopped. Asking the same
   # capability table here keeps that refusal on the pre-stop side of the
@@ -1194,7 +1197,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line
+  local exit_result state note_line secondmate_home
   local -a spawn_args
 
   require_state_verified_backend relaunch
@@ -1253,6 +1256,11 @@ do_relaunch() {
     esac
   fi
   safe_checkpoint
+  if [ "$KIND" = secondmate ]; then
+    secondmate_home=$(fm_meta_get "$META" home)
+    [ -n "$secondmate_home" ] || secondmate_home=$WT
+    fm_session_launch_policy_converge_child "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$secondmate_home" "$ID" "$TARGET_HARNESS" || return 1
+  fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
   journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"

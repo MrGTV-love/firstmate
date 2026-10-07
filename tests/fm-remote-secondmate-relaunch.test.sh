@@ -64,6 +64,7 @@ reset_meta() {
 
 cat > "$FAKEBIN/fake-ssh" <<'SH'
 #!/usr/bin/env bash
+printf 'transport\n' >> "$FM_RELAUNCH_TRANSPORT_LOG"
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
@@ -189,6 +190,7 @@ fixture_env() {
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
     FM_DATA_OVERRIDE="$HOME_DIR/data" FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" \
     FM_SSH_BIN="$FAKEBIN/fake-ssh" FM_SEND_SETTLE=0 \
+    FM_RELAUNCH_TRANSPORT_LOG="$TMP/transport.log" \
     FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness' \
     FM_PROCEVENT_CLAIM_ROOT="$TMP/claims" \
     FM_FAKE_ROOT="$ROOT" FM_FAKE_SOURCE_HOME="$HOME_DIR" \
@@ -270,6 +272,21 @@ assert_contains "$OUT" "unverified remote secondmate harness" \
 cmp -s "$TMP/ios-before-refusal.meta" "$HOME_DIR/state/ios.meta" \
   || fail "a refused relaunch must not touch the parent's record"
 pass "a refused remote relaunch leaves the parent's record untouched"
+
+reset_meta
+cp "$HOME_DIR/state/ios.meta" "$TMP/ios-before-policy.meta"
+printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
+printf 'omp openai-codex/gpt-6.1-sol high\n' > "$HOME_DIR/config/secondmate-harness"
+: > "$TMP/transport.log"
+OUT=$(run_relaunch ios codex explicit-model high); RC=$?
+[ "$RC" -ne 0 ] || fail "parent policy accepted an explicit forbidden replacement"
+assert_contains "$OUT" "session-launch-policy" "parent refusal did not identify launch policy"
+[ ! -s "$TMP/transport.log" ] || fail "parent refusal crossed the transport boundary"
+cmp -s "$TMP/ios-before-policy.meta" "$HOME_DIR/state/ios.meta" \
+  || fail "parent policy refusal changed route metadata"
+pass "initiating-home policy refuses the requested harness before transport"
+
+rm "$HOME_DIR/config/session-launch-policy" "$HOME_DIR/config/secondmate-harness"
 
 # --- a local (non-remote) secondmate is refused, not silently mishandled ----
 fm_write_meta "$HOME_DIR/state/local1.meta" \

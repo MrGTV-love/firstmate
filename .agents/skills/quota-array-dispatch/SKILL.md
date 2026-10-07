@@ -65,6 +65,8 @@ It cannot override a hard-gate failure, and it is never hidden inside a new comp
 
 ### 1. Eligibility
 
+Apply the [session launch policy](../../../docs/configuration.md#session-launch-policy-configsession-launch-policy) before evaluating catalog and credential eligibility.
+
 Outside those documented mappings, deterministic shell must not infer a provider family or credential store from a harness, model, or source name.
 You establish the remaining relations yourself, in the open, from the candidate's own authoritative catalog (`harness-adapters` owns the per-harness discovery surface) plus the one intake snapshot.
 
@@ -83,9 +85,9 @@ A Pi-hosted family may authenticate through the vendor's own store with no `pi:`
 Uncertainty and ineligibility are different findings:
 
 - No model-level window, no matching auth source, an unmeasurable or `unknown` scope, or a surface quota-axi does not model at all is disclosed uncertainty.
-  Keep the candidate eligible, state the unknown, and prefer known viable evidence when otherwise comparable.
+  These unknowns alone do not make the candidate ineligible; state the unknown and prefer known viable evidence when otherwise comparable.
 - An expired credential is a short-lived session token the owning vendor renews on next use, not a sign-out.
-- Only concrete contradictory evidence blocks: an authoritative catalog proving the model unsupported, or proof that the credential the candidate actually selects is unusable.
+- For catalog and authentication eligibility, only concrete contradictory evidence blocks: an authoritative catalog proving the model unsupported, or proof that the credential the candidate actually selects is unusable.
 - Reserve login wording for that proven-unusable case, and name the harness, model, surface, and evidence.
 
 When a credential's local classification is the only thing standing between a candidate and a block, get ground truth before blocking.

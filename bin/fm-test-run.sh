@@ -140,11 +140,14 @@
 # a split above that target. Neither figure is an execution timeout or proof of
 # observed headroom: refresh growing files from CI measurements.
 # --changed is conservative: it over-selects related families rather than
-# under-selecting, and never expands to the complete suite unless --all. The one
+# under-selecting, and never expands to the complete suite unless --all. One
 # place it is deliberately narrow is a bin/ path with no curated family: a test
 # that names it is selected as that SCRIPT, because the reference is per-script
 # evidence. Consumer bin/ scripts still resolve through the curated map, so
 # recorded family-level coupling still expands to the whole family.
+# The vendored-skill arm for .agents/skills/hyper-jev/ is another exception: it
+# selects no suite except for SKILL.md, which retains its earlier family-selection
+# rule.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
 # tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
@@ -389,6 +392,7 @@ family_for_basename() {
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
     fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
@@ -894,6 +898,9 @@ tests/fm-watch-triage.test.sh 1074843
 tests/fm-watcher-lock.test.sh 72022
 tests/fm-worker-account-live-e2e.test.sh 3179
 tests/fm-worker-account.test.sh 37445
+tests/fm-session-launch-policy-inherit.test.sh 16144
+tests/fm-session-launch-policy-receipt.test.sh 2166
+tests/fm-session-launch-policy.test.sh 229671
 EOF
 }
 
@@ -1723,6 +1730,10 @@ families_for_changed_path() {
       ;;
     .agents/skills/*/SKILL.md)
       printf '%s\n' pure-contract-unit
+      ;;
+    .agents/skills/hyper-jev/*)
+      # Vendored upstream skill files (see SOURCE.md there) have no firstmate
+      # test consumer, so they select no suite instead of refusing as unmapped.
       ;;
     .github/workflows/ci.yml|.no-mistakes.yaml)
       printf '%s\n' pure-contract-unit

@@ -391,6 +391,16 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" add .agents/skills/harness-adapters/SKILL.md
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm harness-adapter-router-change
 
+  mkdir -p "$repo/.agents/skills/hyper-jev/cookbook" "$repo/.agents/skills/hyper-jev/templates/starter/src/core"
+  : >"$repo/.agents/skills/hyper-jev/LICENSE"
+  : >"$repo/.agents/skills/hyper-jev/cookbook/README.md"
+  : >"$repo/.agents/skills/hyper-jev/templates/starter/src/core/client.ts"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "vendored skill files were refused as unmapped changed sources"
+  assert_not_contains "$listed" "tests/fm-ask-user-authority.test.sh" "vendored skill files select no suite"
+  git -C "$repo" add .agents/skills/hyper-jev
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-skill-change
+
   printf '\n' >>"$repo/bin/fm-procevent-quota.sh"
   printf '\n' >>"$repo/bin/fm-quota-choose.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
