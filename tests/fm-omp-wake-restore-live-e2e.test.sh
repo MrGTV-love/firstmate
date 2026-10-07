@@ -167,6 +167,12 @@ is_busy() { [ "$(live_busy_class "$TARGET")" = busy ]; }
 queue_drained() { [ "$(queue_rows)" -eq 0 ]; }
 composer_is() { [ "$(composer)" = "$1" ]; }
 
+busy_composer_is() {
+  is_busy || fail "$SUBJECT: the lane was not busy before the $1 composer probe"
+  composer_is "$1" || return 1
+  is_busy || fail "$SUBJECT: the lane was not busy after the $1 composer probe"
+}
+
 # start_omp <label>
 start_omp() {
   local label=$1
@@ -200,6 +206,7 @@ busy_turn() {
   send_key Enter
   wait_for 60 is_busy || { screen >&2; fail "the lane never showed a running turn"; }
   sleep 5
+  is_busy || fail "$SUBJECT: the lane stopped running before the busy turn was ready"
 }
 
 # queue_wake: write a status line so the watcher wakes main while the turn runs,
@@ -276,11 +283,14 @@ wait_for 20 composer_is empty || fail "$SUBJECT: could not clear the draft"
 
 # The descendant omp child must not take over the markers.
 wait_for 120 is_idle || fail "the lane did not settle before the child probe"
-send_text "Run this exact bash command and then reply CHILD_DONE: env FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL"
+rm -f "$LAB/child-omp.ok" "$LAB/child-omp.out"
+send_text "Run this exact bash command and then reply CHILD_DONE: env FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL > '$LAB/child-omp.out' 2>&1 && printf 'child-omp-ok\n' > '$LAB/child-omp.ok'"
 sleep 1
 send_key Enter
-wait_for 60 is_busy || fail "the lane never ran the child omp command"
-wait_for 180 is_idle || fail "the lane did not finish the child omp command"
+wait_for 60 is_busy || fail "the lane never showed a running turn for the child probe"
+wait_for 180 is_idle || fail "the lane did not settle after the child probe"
+[ "$(cat "$LAB/child-omp.ok" 2>/dev/null)" = child-omp-ok ] \
+  || { cat "$LAB/child-omp.out" >&2 2>/dev/null; fail "$SUBJECT: the descendant omp command did not produce successful execution evidence"; }
 lock_pid=$(sed -n 1p "$PROJECT/state/.lock")
 for marker in .omp-turnend-extension-loaded .omp-watch-extension-loaded; do
   [ "$(sed -n 2p "$PROJECT/state/$marker")" = "$lock_pid" ] \
@@ -336,20 +346,21 @@ pass "live omp parent recovery: $SUBJECT submitted the restored wake with one ba
 # ---------------------------------------------------------------------------
 wait_for 120 is_idle || fail "the lane did not settle before the busy composer checks"
 busy_turn
-[ "$(composer)" = empty ] || fail "$SUBJECT: a working lane's empty box composer read '$(composer)', not empty"
+busy_composer_is empty || fail "$SUBJECT: a working lane's empty box composer read '$(composer)', not empty"
 send_text 'unsent line typed while busy'
 sleep 1
-[ "$(composer)" = pending ] || { screen >&2; fail "$SUBJECT: a line typed into a working lane's composer read '$(composer)', not pending"; }
+busy_composer_is pending || { screen >&2; fail "$SUBJECT: a line typed into a working lane's composer read '$(composer)', not pending"; }
 send_key C-u
-wait_for 20 composer_is empty || fail "$SUBJECT: could not clear the busy draft"
+wait_for 20 busy_composer_is empty || fail "$SUBJECT: could not clear the busy draft"
 pass "live omp busy composer: $SUBJECT reads empty and pending while a turn runs"
 
 doorbell=": Firstmate operational input waiting: read '$LAB/none.msg' and handle its contents as Firstmate operational input."
+is_busy || fail "$SUBJECT: the lane was not busy immediately before the adapter submission"
 verdict=$(fm_backend_herdr_send_text_submit "$TARGET" "$doorbell" 3 0.4 0.3)
 case "$verdict" in
   empty|unknown) ;;
   *) fail "$SUBJECT: the adapter's submit into a working lane reported '$verdict'" ;;
 esac
-wait_for 20 composer_is empty \
+wait_for 20 busy_composer_is empty \
   || { screen >&2; fail "$SUBJECT: an injected doorbell stayed in a working lane's composer (read '$(composer)')"; }
 pass "live omp busy composer: $SUBJECT took an injected doorbell mid-turn and left the composer empty"
