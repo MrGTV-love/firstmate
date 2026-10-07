@@ -2,10 +2,8 @@
 # Brief heading reader.
 # Usage: . bin/fm-brief-heading-lib.sh
 #
-# This file is the single owner of how a brief's sections are read: the
-# `# Task` subsections bin/fm-brief.sh scaffolds feed the no-mistakes
-# `--intent` contract in bin/fm-dod-lib.sh, spawn and promotion validation,
-# and the task text bin/fm-dispatch-resolve.sh sends to the router.
+# This file is the single owner of brief-section parsing for intent,
+# validation, dispatch resolution, and advisory skill selection.
 # Every consumer shares parsing semantics; resolver-only privacy preprocessing
 # is owned by docs/configuration.md "Never-send list".
 

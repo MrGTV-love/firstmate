@@ -88,7 +88,14 @@ def resolve_local_target(root: Path, source: Path, raw: str) -> Path | None:
     decoded = unquote(split.path)
     if decoded.startswith("/"):
         fail(f"absolute local link in {source.relative_to(root)}: {raw}")
-    target = (source.parent / decoded).resolve(strict=False)
+    base = source.parent
+    for parent in source.parents:
+        if parent == root:
+            break
+        if (parent / "SKILL.md").is_file() and source.relative_to(parent).parts[0] == "references":
+            base = parent
+            break
+    target = (base / decoded).resolve(strict=False)
     try:
         target.relative_to(root.resolve())
     except ValueError:

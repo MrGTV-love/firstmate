@@ -1194,7 +1194,7 @@ Secondmate homes inherit this file from the primary, so a secondmate's own crewm
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
-It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the Relay accessor in `bin/fm-env-lib.sh` reads the line.
+It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
 
 Off means one `dispatch-resolve: off` line on stderr, nothing on stdout, exit 0, and no network call, so firstmate dispatches exactly as it does without the tool.
 This section is the single owner of the tool's operator contract; the script header owns its exact flags and output lines, and "Crew dispatch profiles" above owns the declared rule and profile fields it applies.
@@ -1222,9 +1222,9 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 **Never-send list (config/dispatch-never-send)**
 
-The optional local, gitignored `config/dispatch-never-send` keeps named values and marked brief regions out of Jev resolver requests.
+The optional local, gitignored `config/dispatch-never-send` keeps values you name from leaving the machine in dispatch-resolution or advisory skill-selection requests, and keeps marked brief regions out of Jev resolver requests.
 It has no default entries, and an absent file sends unmarked briefs exactly as before.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver applies the same privacy policy.
+Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so both tools there withhold the same values.
 
 Each non-blank line not beginning with `#` remains one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1239,6 +1239,8 @@ Example Client Ltd
 # Remove explicitly marked regions from briefs
 # dispatch-never-send marked-sections
 ```
+
+The following marked-region rules apply only to dispatch resolution; advisory skill selection neither removes nor validates these markers.
 
 Brief authors wrap project- or customer-sensitive text in these exact standalone marker lines:
 
@@ -1261,9 +1263,9 @@ A brief without such text is sent as before.
 This option protects only the marked occurrences in the brief, not copies elsewhere or dispatch-rule text; use literals when those must also be withheld.
 Do not send real Vernant/customer text until authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training.
 
-Before the request is sent, every remaining string in it is checked for literal matches: the project name, the sanitized task text, each rule's `when`, and the fixed question text.
+Before each request is sent, every remaining string in it is checked for literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; advisory skill selection checks every request string through `bin/fm-typesafe-lib.sh`.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
-A list that is present but not a readable regular file, an invalid directive, or a marker problem also stops the request the same way rather than sending unchecked text.
+A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
 The offline behavior coverage in `tests/fm-dispatch-resolve.test.sh` captures outgoing request bodies using only synthetic data.
 
@@ -1348,8 +1350,8 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 **Key handling and fixed settings**
 
-- The resolver and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver sends the key to `curl` only as a header read from a file descriptor, never on argv, and nothing prints, logs, or writes it.
+- The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
+- The resolver and skill picker send the key to `curl` only as a header read from a file descriptor, never on argv, and neither prints, logs, or writes it.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
@@ -1416,6 +1418,50 @@ Historical labels and attempt records retain their original meaning; cohort 8 do
 Evaluation calls are not proof that a native hook loaded or that fleet sample volume was reached.
 The separate `fm-jev-guardrail-promote` task owns the existing October 14, 09:00 America/Chicago decision and its recorded quality, seven-day/300-command volume, latency and no-secret criteria.
 This implementation cannot enable blocking or reset that date.
+
+## Advisory skill selection
+
+`bin/fm-skill-suggest.sh` uses Jev to suggest which optional skill bodies to inspect first, without replacing the full skill index, required trigger rules, or agent judgment.
+The existing TypeSafe key opt-in and dispatch-never-send literal policy also apply here through the shared `bin/fm-typesafe-lib.sh` boundary; see [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) for setup and directive validation.
+The tool's header and help own exact flags, size limits, probability policy, deadlines, and output.
+
+Provide a minimal permitted task summary, not a transcript, secret, customer excerpt, or pasted source report.
+An explicitly supplied task file is the ordinary tool input for primary, secondmate, or worker agents at intake and when intent materially changes.
+For worker launch integration, the supervisor puts that same minimal summary and any explicitly named skill IDs in `# Skill selection input`, outside `# Task`, before spawning.
+`fm-spawn.sh` appends advice to its existing worker launch overlay when that section exists, including on relaunch; it never rewrites source intent or a secondmate charter.
+The private launch overlay retains the advice and is regenerated on relaunch.
+Absent input preserves ordinary selection and does not send the whole brief instead.
+
+All existing mandatory explicit/named and safety triggers run first and cannot be suppressed by this advisory result.
+Caller-supplied required IDs and locally resolvable named IDs are reported separately from optional suggestions and survive invalid or unavailable catalogs, with unresolved paths left for ordinary skill-index lookup; conditional safety triggers remain governed by their existing index and role instructions, not by a learned relevance score.
+Agents read selected bodies through ordinary tools and may reject suggestions, add necessary skills, or proceed without optional skills when none fits.
+LF and CRLF skill files resolve the same IDs, paths, descriptions, and opening excerpts.
+Supported name scalars ignore surrounding syntax spaces and tabs without altering quoted contents.
+
+Stage one evaluates each public optional skill in the selected catalog independently using its stable ID and full description, plus a no-fit need signal.
+Blank-separated paragraphs in supported block descriptions are retained in both stages; unsupported scalar continuations restore ordinary selection rather than sending a shortened description.
+Ambiguous shortlists receive a second evaluation using bounded opening excerpts, allowing multiple suggestions or rejection of all candidates.
+Paths remain local; the judge does not receive the catalog's full instruction bodies.
+TypeSafe key consent covers only Git-tracked catalog entries whose child skill directories and `SKILL.md` files are not symlinks; git-excluded, untracked, and other private local skills never enter remote ranking or excerpt requests, including their IDs and descriptions.
+Local discovery and required-trigger handling include private skills from both the selected catalog and the active Firstmate home, even when that home differs from the code root; if the task summary names one, the request is withheld rather than rewriting that summary.
+Incomplete local identity discovery, including inaccessible catalog ancestors, catalogs or skill children that cannot be enumerated or searched, unreadable skill bodies, and present catalog, child, or body symlinks whose targets cannot be inspected, withholds requests while preserving caller-required IDs and other recognized named requirements.
+Git-tracked, non-symlink home entries are classified as public independently of the selected remote catalog; home-only entries do not enlarge that catalog.
+Byte-identical public copies across the selected catalog and a distinct active home resolve to the selected catalog's path, while differing or private copies remain ambiguous.
+Catalogs without verifiable Git tracking remain local.
+Missing keys, timeouts, withheld content, unsupported metadata, and malformed answers restore ordinary selection without a mock answer.
+When requests are permitted, each invocation evaluates the current task and public catalog with fresh, bounded requests; results are not cached or reused across invocations.
+
+Coverage is role- and input-specific:
+
+- Primary and secondmate agents have the ordinary task/turn tool path; there is no automatic every-turn native interception or transcript capture.
+- Firstmate-launched ship and scout workers receive additive advice through the supported launch-brief input, including Pi and omp's existing positional brief input; later advice can use the existing steering path.
+- No-mistakes vendor-managed reviewers, fixers, and other internal agents are not instrumented by this integration; no closed-source injection surface is assumed.
+- Other native harnesses retain their existing input mechanics and skill loaders; availability of the shared wrapper alone is not proof of a live suggestion or body load on each harness.
+
+[`tests/fm-skill-suggest.test.sh`](../tests/fm-skill-suggest.test.sh) exercises the advisory selection and recovery boundaries through the public tool.
+The TypeSafe [skill-suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion) is external design context, not validated performance evidence for this caller; published rates and earlier evaluation conclusions do not establish local recall, fewer failed tasks, reduced agent context, or completed-task cost savings.
+This integration retains the index, so any local context saving is limited to avoiding unnecessary optional body loads and is not guaranteed.
+
 
 ## Toolchain
 
@@ -2533,7 +2579,7 @@ FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainl
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $FM_HOME/.env
 FMX_DRY_RUN=            # truthy previews Relay replies and dismissals to state/x-outbox/ without posting or requiring a token
 FMX_X_REPLY_MAX_CHARS=280   # X reply per-message split budget; values below 50 clamp to 50
-TYPESAFE_API_KEY=       # typed dispatch resolution opt-in, from the environment or .env; absent means bin/fm-dispatch-resolve.sh is off (docs/configuration.md "Typed dispatch resolution")
+TYPESAFE_API_KEY=       # TypeSafe opt-in; see "Typed dispatch resolution" and "Advisory skill selection" above
 FMX_DISCORD_REPLY_MAX_CHARS=1900   # Discord reply per-message split budget; values below 50 clamp to 50, values above 2000 reset to 1900
 FMX_X_THREAD_MAX=25     # maximum messages in one auto-split reply thread
 FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion follow-ups (7 days)
