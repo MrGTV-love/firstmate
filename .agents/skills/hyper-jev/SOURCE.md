@@ -11,4 +11,4 @@ This skill is vendored byte-for-byte from an upstream repository.
 
 `SKILL.md`, `cookbook/`, and `templates/` are unmodified copies of the upstream files.
 `LICENSE` is the upstream repository's root MIT license text.
-`SOURCE.md` is the only file added by firstmate besides `LICENSE`.
+Besides `SOURCE.md`, firstmate adds `LICENSE` and `FIRSTMATE.md`.
