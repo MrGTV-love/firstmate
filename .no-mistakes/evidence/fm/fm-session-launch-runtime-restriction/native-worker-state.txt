@@ -1,0 +1,17 @@
+Task metadata:
+window=firstmate:fm-native-worker
+endpoint_task_id=native-worker
+kind=ship
+harness=omp
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.validation-runtime/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.validation-runtime/project
+mode=local-only
+yolo=off
+model=openai-codex/gpt-6.1-sol
+effort=low
+
+Validation custody:
+native worker custody
+
+Unpublished work:
+owned unpublished work

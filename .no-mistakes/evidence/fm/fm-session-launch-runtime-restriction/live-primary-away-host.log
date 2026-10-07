@@ -1,0 +1,40 @@
+Real primary harness: omp
+lock acquired: harness pid 15519
+Real lock owner: 15519
+--- away enter: enabled policy ---
+Away posture recorded at 2026-10-07T01:24:59Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-07T01:24:59Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    watch only the owned lab fleet
+Supervision host: no engine runs the away session on this home (error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper), so every away wake reaches this conversation; continue main-side supervision until a permitted native engine is verified.
+fm-afk-launch: the away daemon is not launched on this omp home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)
+away start exit=1
+fm-afk-launch: the away daemon is not launched on this omp home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)
+away start-native exit=1
+--- away enter: malformed policy ---
+fm-afk-contract: replaced the earlier away posture; its record is archived at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.validation-runtime/native-home/state/afk-contracts/1791336299-superseded-1791336301.afk-contract
+Away posture recorded at 2026-10-07T01:25:01Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-07T01:24:59Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    watch only the owned lab fleet
+Supervision host: no engine runs the away session on this home (error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)), so every away wake reaches this conversation; continue main-side supervision until a permitted native engine is verified.
+fm-afk-launch: the away daemon is not launched on this omp home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)
+away start exit=1
+fm-afk-launch: the away daemon is not launched on this omp home, which is configured to select the supervision host (config/supervision-host); the away-posture record is the posture here (run bin/fm-afk-launch.sh enter and stop)
+away start-native exit=1
+supervision-host: launch policy refused: no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper; predecessor custody is unchanged; restore ordinary primary supervision without retrying this host before configuration changes
+host restart exit=1
+host refusal: predecessor alive; host ownership, turn, and engine conversation unchanged
+error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded
+direct resumed engine exit=127
+direct engine refusal: result and process custody unchanged
+PRIMARY_POLICY_PROBE_COMPLETE

@@ -1,0 +1,2 @@
+1791336303	policy-refusal	no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper
+1791336640	policy-refusal	no permitted supervision engine: error: config/session-launch-policy=omp-or-tc refuses launch 'claude'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper

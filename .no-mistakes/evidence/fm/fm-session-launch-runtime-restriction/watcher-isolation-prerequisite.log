@@ -1,0 +1,3 @@
+$ FM_HOME=<owned marked lab> FM_ROOT_OVERRIDE=<gate source> FM_CONFIG_OVERRIDE=<lab config> bin/fm-watch-arm.sh --restart
+exit=1
+watcher: FAILED - refusing to arm from a disposable validation checkout: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/bin

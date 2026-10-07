@@ -1,0 +1,54 @@
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF -e FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.validation-runtime/native-home 'env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE omp --model openai-codex/gpt-6.1-sol --thinking low --no-session --no-title --auto-approve --no-lsp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF/.omp/fm-session-overlay.yml'
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary -l 'Execute exactly `bash .validation-runtime/primary-probe.sh` using bash from this worktree. The probe now acquires its own disposable lab lock through the real fm-lock.sh interface. Then read `.validation-runtime/native-home/primary-probe.log` and report its last line. No other commands, no source/credential edits, and no additional sessions or pipeline control are authorized.'
+exit=0
+
+$ tmux -L fm-lab send-keys -t primary Enter
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -S -250 -t primary
+exit=0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.6.3
+
+                         Tip: Drop the word `ultrathink` in your message for harder multi-step
+                                     reasoning — watch it glow rainbow as you type
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Execute exactly bash .validation-runtime/primary-probe.sh using bash from this worktree. The probe now acquires its
+ own disposable lab lock through the real fm-lock.sh interface. Then read
+ .validation-runtime/native-home/primary-probe.log and report its last line. No other commands, no source/credential
+ edits, and no additional sessions or pipeline control are authorized.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bash .validation-runtime/primary-probe.sh                                                                          │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                                                          │
+│ ⟦Wall: 3.87s | Timeout: 300s⟧                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Running authorized primary probe
+
+❯
+ ⠋ 8s · ◔ GPT-6.1-Sol 👁 · 🌳 32d18ed9638d/01M49WV9E5D3VX0R8RJYQFM4XF · ⑂ detached *1 ?1 · ◫ 7.0%/272K ⟲ · S0.04
+
+
+
+
+
+
+
+
+$ tmux -L fm-lab kill-server
+exit=0

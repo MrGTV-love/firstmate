@@ -1,0 +1,24 @@
+ok - restricted fresh codex launch refuses before resources
+ok - restricted fresh claude launch refuses before resources
+ok - restricted fresh pi launch refuses before resources
+ok - restricted fresh env codex launch refuses before resources
+ok - restricted fresh omp --model anything launch refuses before resources
+ok - configured ship default obeys launch policy
+ok - configured scout default obeys launch policy
+ok - configured batch default obeys launch policy
+ok - manual, direct, and automatic codex ship recovery preserve work and custody
+ok - manual, direct, and automatic codex scout recovery preserve work and custody
+ok - manual, direct, and automatic claude ship recovery preserve work and custody
+ok - manual, direct, and automatic claude scout recovery preserve work and custody
+ok - malformed policy preserves ship recovery budget and allows immediate recovery after repair
+ok - malformed policy preserves scout recovery budget and allows immediate recovery after repair
+ok - explicit omp replacement allows the openai-codex provider
+ok - fresh omp launch works with Codex provider
+ok - fresh secondmate obeys restriction
+ok - secondmate recovery checks configured replacement before stopping
+ok - malformed or dangling opt-in never disables restriction
+ok - unlanded tc run prerequisite refuses plain Claude without a fallback
+ok - inherited policy enforces future descendant launches
+ok - absent policy preserves codex launch (fixture executable only)
+ok - absent policy preserves claude launch (fixture executable only)
+not ok - publication fixture was not reached

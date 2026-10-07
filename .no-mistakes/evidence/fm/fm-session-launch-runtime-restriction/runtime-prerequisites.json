@@ -1,0 +1,7 @@
+{
+  "tc": null,
+  "teamclaude": null,
+  "opencode": null,
+  "native_tc_adapter": "Product refusal explicitly requires a verified native tc launcher; no plain Claude/proxy substitution is authorized.",
+  "absent_policy_real_codex_claude": "Not launched: explicit user prohibition remains in force."
+}
