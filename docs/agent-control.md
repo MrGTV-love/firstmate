@@ -134,6 +134,7 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
 The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
 That matching live pin proves a managed launch for every recorded harness, including interpreter-based harnesses and older records without a launch-proof field.
+See the accepted residual risk below - the live spawn pin binds the launch incarnation, not the current omp conversation.
 Argv and text embedded in other environment values never supply incarnation evidence.
 An omp process without that matching pin is unmanaged, including Herdr-native `omp --resume`.
 Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for the pin.
