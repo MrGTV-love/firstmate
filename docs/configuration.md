@@ -788,10 +788,12 @@ The shared template leaves this restriction off by default: absence preserves ex
 Enabling it in each captain home is the operator's responsibility.
 An unreadable or malformed present file refuses new worker and secondmate sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
-Local admission also requires the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
+Local admission and live inheritance also require the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
+The remote inheritance receiver verifies destination-home owners against its separate authoritative code root before reporting a policy put as pushed or unchanged; equal policy bytes do not bypass verification.
 This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
+An unsupported policy reports an error rather than usable convergence. Its copied configuration may remain in place, while unrelated inheritance remains best-effort and primary policy absence still clears the restriction without requiring compatible owners.
 Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
-Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt, while unrelated inheritance remains best-effort.
+Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt.
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
 For worker and secondmate launches, this opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
@@ -809,6 +811,7 @@ Automatic secondmate recovery and host-local remote launch check the selected re
 Automatic session-end and secondmate recovery notify once per task or secondmate generation and refusal fingerprint, derived from the raw policy-source contents and admission diagnostic.
 Acknowledging the queued notification does not make an unchanged refusal recur, and toggling the policy away and back does not re-notify an already-seen fingerprint within that generation.
 This notification deduplication does not skip policy admission checks: repairs remain immediately eligible for reconsideration, while recovery-attempt and handled-generation accounting remain untouched by a refusal.
+Automatic refusal receipts publish the complete generation and notified-fingerprint set atomically under the notification queue lock, using only transient staging and no additional durable marker files.
 A disallowed recorded ship or scout runtime is refused rather than silently reusing it or translating its model onto omp.
 Select an explicit allowed dispatch profile and use the replacement flags documented by [`fm-control.sh --help`](../bin/fm-control.sh); the refusal also prints that supported recovery path.
 Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.

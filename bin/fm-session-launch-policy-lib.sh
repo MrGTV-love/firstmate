@@ -12,25 +12,6 @@
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-config-inherit-lib.sh"
 
-fm_session_launch_policy_enabled() {  # <config-dir>; prints 0 or 1
-  local file="$1/session-launch-policy" present value
-  present=$(fm_config_source_present "$file") || return 1
-  if [ "$present" = 0 ]; then
-    printf '0\n'
-    return 0
-  fi
-  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
-    printf 'error: config/session-launch-policy must be a readable regular file containing omp-or-tc\n' >&2
-    return 1
-  fi
-  value=$(jq -Rrs '. == "omp-or-tc" or . == "omp-or-tc\n"' "$file") || return 1
-  if [ "$value" != true ]; then
-    printf 'error: config/session-launch-policy must contain exactly omp-or-tc (with an optional trailing newline)\n' >&2
-    return 1
-  fi
-  printf '1\n'
-}
-
 fm_session_launch_policy_check() {  # <config-dir> <harness> [raw=0|1]
   local enabled harness=$2 raw=${3:-0}
   enabled=$(fm_session_launch_policy_enabled "$1") || return 1
@@ -68,7 +49,8 @@ fm_session_launch_policy_refusal_notify() {
   key="session-launch-refused-$id-$generation-${fingerprint// /-}"
   notified=$(
     fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
-    trap 'fm_lock_release "$FM_WAKE_QUEUE_LOCK"' EXIT
+    receipt=
+    trap '[ -z "$receipt" ] || rm -f -- "$receipt"; fm_lock_release "$FM_WAKE_QUEUE_LOCK"' EXIT
     marker="$state/.session-launch-refused-$id"
     marker_generation=
     if [ -e "$marker" ] || [ -L "$marker" ]; then
@@ -84,37 +66,19 @@ fm_session_launch_policy_refusal_notify() {
       fm_wake_append_locked check "$key" "$reason" || exit 1
       new=1
     fi
-    if [ "$marker_generation" != "$generation" ]; then
-      printf '%s\n' "$generation" > "$marker" || exit 1
+    receipt=$(umask 077; mktemp "$marker.tmp.XXXXXX") || exit 1
+    if [ "$marker_generation" = "$generation" ]; then
+      cat "$marker" > "$receipt" || exit 1
+    else
+      printf '%s\n' "$generation" > "$receipt" || exit 1
     fi
-    printf '%s\n' "$key" >> "$marker" || exit 1
+    printf '%s\n' "$key" >> "$receipt" || exit 1
+    _fm_atomic_replace "$receipt" "$marker" || exit 1
+    receipt=
     [ "$new" = 0 ] || printf '%s' "$reason"
   ) || return 1
   # shellcheck disable=SC2034 # Output is read by the sourcing recovery owners.
   FM_SESSION_LAUNCH_REFUSAL_WAKE=$notified
-  return 0
-}
-
-fm_session_launch_policy_check_child() {
-  local enabled child_enabled home=$2 source_bin file
-  enabled=$(fm_session_launch_policy_enabled "$1") || return 1
-  [ "$enabled" = 1 ] || return 0
-  child_enabled=$(fm_session_launch_policy_enabled "$home/config") || return 1
-  if [ "$child_enabled" != 1 ]; then
-    printf 'error: secondmate config/session-launch-policy must be enabled at %s before launch\n' "$home/config" >&2
-    return 1
-  fi
-  source_bin=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || return 1
-  for file in fm-session-launch-policy-lib.sh fm-config-inherit-lib.sh \
-    fm-spawn.sh fm-control.sh fm-secondmate-liveness-lib.sh \
-    fm-session-end-relaunch-lib.sh fm-remote-secondmate-relaunch.sh \
-    fm-remote-secondmate-control.sh; do
-    if [ ! -f "$home/bin/$file" ] || [ ! -r "$home/bin/$file" ] \
-      || ! cmp -s "$source_bin/$file" "$home/bin/$file"; then
-      printf 'error: secondmate session-launch-policy tooling is not verified at %s; restore this policy owner from the primary without discarding the child checkout or work before retrying\n' "$home/bin/$file" >&2
-      return 1
-    fi
-  done
   return 0
 }
 

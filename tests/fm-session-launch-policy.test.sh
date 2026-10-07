@@ -657,7 +657,8 @@ pass 'unlanded tc run prerequisite refuses plain Claude without a fallback'
 
 make_case inheritance codex
 restrict
-mkdir -p "$WT/config"
+mkdir -p "$WT/config" "$WT/bin"
+ln -s "$ROOT/bin/"* "$WT/bin/"
 printf '/config/\n' > "$WT/.gitignore"
 # shellcheck disable=SC2016 # Expand in the isolated child shell, not here.
 run_cli bash -c '. "$1/bin/fm-config-inherit-lib.sh"; propagate_inheritable_config "$FM_HOME/config" "$2/config"' _ "$ROOT" "$WT"
