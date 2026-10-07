@@ -78,7 +78,9 @@ HOLDER_PID=$!
 wait_for nonempty "$TMP_ROOT/lock-ready" || fail 'could not hold unrelated exact source lock'
 for round in 1 2; do
   printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","backlog round %s","","message",""\n' "$round" > "$ARTIFACT.expected$round"
-  cp "$ARTIFACT.expected$round" "$ARTIFACT.answer$round"
+  cp "$ARTIFACT.expected$round" "$ARTIFACT.answer$round.tmp" \
+    && mv -f -- "$ARTIFACT.answer$round.tmp" "$ARTIFACT.answer$round" \
+    || fail "round $round answer publication failed"
   result="$FM_HOME/state/procevent-inbox/$SOURCE_ID.$round.result"
   wait_for nonempty "$result" || fail "round $round was not captured while unrelated source stayed locked"
   cmp -s "$ARTIFACT.expected$round" "$result" || fail "round $round native bytes changed"

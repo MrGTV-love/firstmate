@@ -2422,9 +2422,9 @@ The runner's existing owner lease and source launch pacing remain in force.
 **Deliver captured feedback during a Claude turn**
 
 The tracked Claude `PostToolUse` hook calls `bin/fm-procevent-posttool-check.sh` after each tool completion.
-Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled.
+Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled; payloads carrying `agent_id` never refresh the lease or receive a notice.
 It names the capture's source and sequence and directs the primary to drain and handle it immediately, before continuing its previous work.
-If capture succeeded but wake publication did not, the notice supplies the exact durable result path for direct reading after the empty drain and the matching acknowledgement command.
+If capture succeeded but wake publication did not, the notice supplies the exact durable result path for direct reading after the empty drain and the matching acknowledgement command, with all three commands bound to absolute shipped script paths and the inspected home, state, and root so they remain usable from another working directory.
 The hook reads no result payload, performs no network call, starts no listener or watcher, and never acknowledges feedback itself.
 It inspects local directory entries and reads each candidate adapter sidecar at most 16 bytes; an empty or fully handled inbox is silent.
 Active primary tool completions also refresh the existing owner lease between Claude's Stop-owned watcher cycles.
