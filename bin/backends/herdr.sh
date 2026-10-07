@@ -3555,7 +3555,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
       case "$verdict" in
         busy)
           case "${identity%%$'\t'*}" in
-            claude|codex|pi)
+            claude|codex|pi|agy)
               printf 'empty'; return 0 ;;
           esac
           ;;
@@ -3567,7 +3567,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         pending|pending-unproven) ;;
         unknown)
           case "${identity%%$'\t'*}" in
-            claude|codex|pi)
+            claude|codex|pi|agy)
               [ "$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
                 "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")" != busy ] \
                 || { printf 'empty'; return 0; }
@@ -3615,7 +3615,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         pending|pending-unproven) ;;
         unknown)
           case "${identity%%$'\t'*}" in
-            claude|codex|pi)
+            claude|codex|pi|agy)
               [ "$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
                 "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")" != busy ] \
                 || { printf 'empty'; return 0; }
