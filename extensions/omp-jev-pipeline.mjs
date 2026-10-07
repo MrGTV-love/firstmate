@@ -3,11 +3,107 @@
 // See docs/configuration.md for opt-in configuration, endpoint safety, metrics
 // and the timing-only bake-off contract.
 import { appendFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const HEALTH_MS = 60000;
 const RETRY_MS = 60000;
 const IDLE_WAIT_MS = 2000;
 const INPUT_PRICE_PER_MILLION = 0.042;
+// The adviser snapshot keeps at most this many bytes of one recent tool result and
+// 14000 bytes of recent text; anything larger is clipped and marked incomplete.
+const TOOL_RESULT_BYTES = 512;
+const TAIL_BYTES = 14000;
+const ASSISTANT_BYTES = 8000;
+// Only file-content retrieval can be attested: the body is data the assistant asked
+// for and cannot carry a failure signal that "finished" depends on. Shell output,
+// errors and every other tool must still arrive verbatim.
+const ATTESTED_TOOLS = new Set(["read"]);
+
+const textOf = message => typeof message.content === "string" ? message.content :
+  message.content.filter(part => part.type === "text").map(part => part.text).join("\n");
+
+// The adviser snapshot clips each recent tool result to 512 bytes and then reports
+// the whole view as incomplete, so a turn that read a large file can never be judged.
+// This returns a view whose completeness is proven instead of assumed: the bulk body
+// of a successful file read is replaced by a record of its exact size, line count and
+// SHA-256 over the full sanitized text, so the recent window holds every message with
+// nothing clipped. Any other reason for incomplete coverage (clipped assistant or user
+// text, an errored or non-read tool result too large to send verbatim, redaction,
+// images, unknown context, no recoverable transcript, or an unexpected package shape)
+// returns the original view untouched and therefore still ineligible.
+export function completeCoverage(adviser, ctx, secrets) {
+  const base = adviser.snapshot(ctx, secrets, "omp");
+  if (base.autoCoverage) return base;
+  const coverage = base.state?.coverage;
+  if (!coverage || coverage.recentTextTruncated !== true || coverage.omittedUserMessages !== 0 ||
+      coverage.hasImages || coverage.redacted || coverage.unknownContext ||
+      coverage.transcriptRecoverable !== true) return base;
+  const { buildSessionContext, redact, scrubKnownSecrets, RECENT_TAIL_MESSAGES } = adviser;
+  if (typeof buildSessionContext !== "function" || typeof redact !== "function" ||
+      typeof scrubKnownSecrets !== "function" || !Number.isInteger(RECENT_TAIL_MESSAGES)) return base;
+  const messages = buildSessionContext(ctx.sessionManager.getBranch()).messages;
+  const recent = [], bulk = [];
+  let budget = TAIL_BYTES, attestedBytes = 0;
+  for (let i = messages.length - 1; i >= messages.length - RECENT_TAIL_MESSAGES && i >= 0; i--) {
+    const message = messages[i];
+    if (message.role !== "assistant" && message.role !== "toolResult") continue;
+    const cleaned = redact(textOf(message));
+    const scrubbed = scrubKnownSecrets(cleaned.text, secrets);
+    if (cleaned.redacted || scrubbed.redacted) return base;
+    const text = scrubbed.text;
+    const bytes = Buffer.byteLength(text);
+    const isTool = message.role === "toolResult";
+    let kept = text, summarized = false;
+    if (bytes > Math.min(budget, isTool ? TOOL_RESULT_BYTES : ASSISTANT_BYTES)) {
+      if (!isTool || message.isError || !ATTESTED_TOOLS.has(message.toolName)) return base;
+      const lines = text === "" ? 0 : text.split("\n").length;
+      kept = `[${message.toolName} result fully received, body not sent: ${bytes} bytes, ` +
+        `${lines} lines, sha256 ${createHash("sha256").update(text).digest("hex")}]`;
+      if (Buffer.byteLength(kept) > budget) return base;
+      summarized = true;
+      attestedBytes += bytes;
+    }
+    budget -= Buffer.byteLength(kept);
+    recent.push({
+      role: message.role, text: kept,
+      ...(isTool ? { tool: message.toolName, error: message.isError } : {}),
+    });
+    bulk.push(summarized);
+  }
+  recent.reverse();
+  bulk.reverse();
+  const attested = bulk.filter(Boolean).length;
+  // Defensive: the rebuilt window must match the package's own, entry for entry,
+  // except where a bulk body was attested.
+  const original = base.state.recent;
+  if (!attested || recent.length !== original.length) return base;
+  for (let i = 0; i < recent.length; i++) {
+    const kept = recent[i], first = original[i];
+    if (kept.role !== first.role || kept.tool !== first.tool || (!bulk[i] && kept.text !== first.text)) return base;
+  }
+  return {
+    ...base, autoCoverage: true,
+    state: { ...base.state, recent, coverage: { ...coverage, recentTextTruncated: false,
+      recentBulkAttested: attested } },
+    attested, attestedBytes,
+  };
+}
+
+// Categorical, text-free reasons a view cannot authorize a Jev request.
+function coverageReasons(view) {
+  const coverage = view.state?.coverage ?? {};
+  const reasons = [];
+  if (view.conversationTokens <= 20000) reasons.push("small-conversation");
+  if (!view.autoCoverage) {
+    if (coverage.omittedUserMessages) reasons.push("user-text-clipped");
+    if (coverage.recentTextTruncated) reasons.push("recent-text-clipped");
+    if (coverage.hasImages) reasons.push("images");
+    if (coverage.redacted) reasons.push("redacted");
+    if (coverage.unknownContext) reasons.push("unknown-context");
+    if (coverage.transcriptRecoverable === false) reasons.push("transcript-unrecoverable");
+  }
+  return reasons;
+}
 
 function identity(ctx) {
   return JSON.stringify([
@@ -83,10 +179,10 @@ export function installPipeline(api, adviser, options) {
     const last = adviser.lastResponse(ctx.sessionManager.getBranch());
     if (last?.message.stopReason !== "stop") { record("nonterminal-answer"); return; }
     let view;
-    try { view = adviser.snapshot(ctx, [selected.key, selected.config.typesafeApiKey], "omp"); }
+    try { view = completeCoverage(adviser, ctx, [selected.key, selected.config.typesafeApiKey]); }
     catch { record("snapshot-unavailable"); return; }
     if (view.conversationTokens <= 20000 || !view.autoCoverage) {
-      record("coverage-ineligible");
+      record("coverage-ineligible", { reasons: coverageReasons(view) });
       return;
     }
     const controller = new AbortController();
@@ -100,7 +196,7 @@ export function installPipeline(api, adviser, options) {
     requestTimer = guard;
     requestContext = ctx;
     const started = now();
-    record("judge-start");
+    record("judge-start", { attestedResults: view.attested ?? 0, attestedBytes: view.attestedBytes ?? 0 });
     try {
       const result = await adviser.judge(view.state, selected.key, controller.signal,
         undefined, 2000, selected.profile, selected.endpoint);
