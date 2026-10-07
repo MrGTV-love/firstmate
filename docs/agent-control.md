@@ -190,7 +190,7 @@ The worktree and the task's records are unaffected either way.
   Every accepted journal phase requires the current endpoint to be proven dead, including a published replacement and a failed stop that restored instructions while the old worker was alive or its state was uncertain.
   Such delayed stop failures become retryable only after current death, with the same prior-record identity checks and explicit-exit cancellation for both the quota origin and current incarnation.
   A live published replacement's new quota event instead uses its own current event identity, never the old journal identity.
-- Control rechecks cancellation, terminal status, declared waits, and captain holds under the lifecycle lock before automatic quota recovery mutates task state or stops the worker; deliberate manual relaunch is unaffected.
+- The [automatic quota-recovery guard contract](configuration.md#pooled-omp-capacity-and-declared-stand-ins) owns locked recovery eligibility, including the pending-authoritative-close guard.
 
 ## Fail-closed boundaries
 

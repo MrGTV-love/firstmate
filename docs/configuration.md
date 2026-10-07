@@ -1387,7 +1387,7 @@ Native serving verdicts and successful-response rate-limit warnings remain usabl
 Chat and Spark consume independent windows and meter verdicts; paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
 When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
-The merged report's timestamp cannot establish current Spark capacity.
+For merged reports, report-wide `fetchedAt` cannot make elapsed chat or Spark windows current or establish current Spark capacity.
 The pool has no synthesized `spendPriority` or completion runway: manual intake and typed resolution can dispatch a sole eligible native-usable OMP route when every alternative is proven exhausted or blocked and no explicit floor remains unverifiable, disclosing both economics as `unknown`; unknown or unmeasured pools do not qualify, and percentages cannot economically rank competing unranked routes.
 An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
@@ -1413,7 +1413,7 @@ Direct `fm-spawn.sh <id> --relaunch` restores a recorded rule together with its 
 Omitted model and effort fields match their persisted `default` metadata values during recovery, without granting permission for a different explicit profile.
 OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
 An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
-Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, and the absence of an open captain call before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
+Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, the absence of an open captain call, and the absence of a pending authoritative close (`state/<id>.backlog-close`, including a dangling symlink) before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
 Quota recovery has no recent or daily attempt cap and retries unsuccessful recovery; duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
 A failure before stopping the original worker remains retryable through its still-current quota event, even when checkpoint or note publication left a failed transaction journal.
 After a failed stop or replacement launch, a matching control transaction journal retains the original quota-event identity for another attempt only when the current endpoint is proven dead; retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.

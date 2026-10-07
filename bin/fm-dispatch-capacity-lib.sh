@@ -111,7 +111,7 @@ fm_omp_codex_capacity() {
       (if $merged and $tier == "spark" then null else .fetchedAt end) as $fetched |
       (if $merged and $tier == "spark" then [] else (.limits // [] | map(select(scoped))) end) as $scoped |
       ($scoped | map(select((.window.resetsAt | type) == "number" and
-        ($fetched | type) == "number" and $fetched < .window.resetsAt and
+        ($merged or (($fetched | type) == "number" and $fetched < .window.resetsAt)) and
         .window.resetsAt <= ($now * 1000)))) as $expired |
       ($scoped - $expired) as $limits |
       (if $merged or ($expired | length) > 0 then {}

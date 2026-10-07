@@ -254,6 +254,51 @@ out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/healthy-s
 assert_equals usable "$(jq -r .status <<<"$out")" "a measured usable sibling keeps a conflicting account from parking the pool"
 pass "merged native reports preserve uncertainty for conflicting window provenance"
 
+for source in ratelimit-headers usage-endpoint; do
+  for expired_window in primary secondary; do
+    for fetched in at-reset after-reset; do
+      for current in absent positive exhausted zero warning; do
+        jq -n --argjson at "$(date +%s)" --arg source "$source" --arg window "$expired_window" \
+          --arg fetched "$fetched" --arg current "$current" '
+          {reports:[{provider:"openai-codex",
+            fetchedAt:(($at - (if $fetched=="at-reset" then 10 else 0 end))*1000),
+            metadata:{source:$source,headersUpdatedAt:($at*1000),
+              meterStates:{chat:{allowed:false,limitReached:true}}},
+            limits:([{id:("openai-codex:"+$window),status:"exhausted",
+              window:{resetsAt:(($at-10)*1000)},amount:{unit:"percent",remaining:0}}] +
+              if $current=="absent" then [] else
+                [{id:("openai-codex:"+(if $window=="primary" then "secondary" else "primary" end)),
+                  status:(if $current=="exhausted" then "exhausted" elif $current=="warning" then "warning" else "ok" end),
+                  window:{resetsAt:(($at+1000)*1000)},
+                  amount:{unit:"percent",remaining:(if $current=="positive" then 80 else 0 end)}}] end)}]}' \
+          > "$TMP_ROOT/merged-reset.json"
+        if [ "$expired_window" = secondary ]; then
+          jq '(.reports[].limits[]) |= (del(.id) | .scope={tier:"chat"})' \
+            "$TMP_ROOT/merged-reset.json" > "$TMP_ROOT/scoped-merged-reset.json"
+          mv "$TMP_ROOT/scoped-merged-reset.json" "$TMP_ROOT/merged-reset.json"
+        fi
+        if [ "$current" = exhausted ] || [ "$current" = zero ]; then expected=exhausted; else expected=unknown; fi
+        out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/merged-reset.json")")
+        assert_equals "$expected" "$(jq -r .status <<<"$out")" "merged $source $fetched cannot re-date elapsed $expired_window with $current sibling"
+        if [ "$current" = absent ]; then
+          assert_equals null "$(jq -r '.accounts[0].remaining' <<<"$out")" "elapsed merged bounds must not contribute remaining quota"
+        elif [ "$current" = positive ]; then
+          assert_equals 80 "$(jq -r '.accounts[0].remaining' <<<"$out")" "current positive evidence excludes elapsed merged exhaustion"
+          out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 \
+            '{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}' '[]' "$out")
+          assert_equals false "$(jq -r .switched <<<"$out")" "reset-crossed merged uncertainty cannot authorize fallback"
+        fi
+      done
+    done
+  done
+done
+jq '.reports += [(.reports[0] | .metadata={} |
+  .limits=[{id:"openai-codex:primary",amount:{unit:"percent",remaining:80}}])]' \
+  "$TMP_ROOT/merged-reset.json" > "$TMP_ROOT/reset-healthy-sibling.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/reset-healthy-sibling.json")")
+assert_equals usable "$(jq -r .status <<<"$out")" "a measured healthy account keeps reset-crossed uncertainty from parking the pool"
+pass "merged timestamps cannot re-date elapsed bounds or infer replenishment"
+
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
 allowed='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]'
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"

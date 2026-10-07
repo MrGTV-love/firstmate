@@ -1251,6 +1251,8 @@ do_relaunch() {
     if fm_session_end_exit_cancelled "$STATE" "$ID" "$FM_CONTROL_QUOTA_GEN" "$quota_current_gen"; then
       die "quota recovery cancelled by explicit exit for $ID"
     fi
+    [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
+      || die "quota recovery refused for pending authoritative close of $ID"
     quota_last=$(last_status_line "$STATE/$ID.status" 2>/dev/null || true)
     quota_verb=$(status_line_verb "$quota_last" 2>/dev/null || true)
     case "$quota_verb" in

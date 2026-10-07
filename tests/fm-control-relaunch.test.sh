@@ -4303,6 +4303,12 @@ case "$FM_FAKE_QUOTA_RACE" in
   done|failed)
     printf '%s: task became terminal after quota selection\n' "$FM_FAKE_QUOTA_RACE" > "$FM_HOME/state/$1.status"
     ;;
+  pending-close)
+    printf 'pending authoritative close after quota selection\n' > "$FM_HOME/state/$1.backlog-close"
+    ;;
+  dangling-close)
+    ln -s "$1.backlog-close-missing" "$FM_HOME/state/$1.backlog-close"
+    ;;
   unproven-hold)
     mkdir "$FM_HOME/data/backlog.md"
     ;;
@@ -4454,7 +4460,7 @@ test_quota_hold_and_status_are_rechecked_after_scan_selection() {
     pass "skipped: operator hold selection race requires compatible tasks-axi"
   fi
   for publication in live unpublished published; do
-    for hold in operator-hold captain-held paused inherited-pause done failed unproven-hold; do
+    for hold in operator-hold captain-held paused inherited-pause done failed pending-close dangling-close unproven-hold; do
       [ "$hold" != operator-hold ] || [ "$has_tasks" = 1 ] || continue
       id="rl-quota-hold-$publication-$hold"
       dir=$(new_case quota-hold-race "$id")
@@ -4475,6 +4481,8 @@ test_quota_hold_and_status_are_rechecked_after_scan_selection() {
           printf zsh > "$dir/fake/command"
           ;;
       esac
+      [ ! -e "$dir/home/state/$id.backlog-close" ] && [ ! -L "$dir/home/state/$id.backlog-close" ] \
+        || fail "pending close must not exist before quota selection"
       if [ "$hold" = operator-hold ]; then
         seed_backlog "$dir" "$id" in_flight
       fi
@@ -4504,6 +4512,18 @@ test_quota_hold_and_status_are_rechecked_after_scan_selection() {
           ;;
         done|failed)
           assert_contains "$(cat "$dir/fake/race-relaunch-out")" "terminal task" "terminal status must still prevent automatic recovery"
+          ;;
+        pending-close|dangling-close)
+          assert_equals "error: quota recovery refused for pending authoritative close of $id" "$(cat "$dir/fake/race-relaunch-out")" "pending authoritative close must prevent automatic recovery"
+          if [ "$hold" = pending-close ]; then
+            [ -f "$dir/home/state/$id.backlog-close" ] && [ ! -L "$dir/home/state/$id.backlog-close" ] \
+              || fail "refused quota recovery must preserve a regular pending-close marker"
+            assert_equals 'pending authoritative close after quota selection' "$(cat "$dir/home/state/$id.backlog-close")" "refused quota recovery must preserve the pending-close marker"
+          else
+            [ -L "$dir/home/state/$id.backlog-close" ] && [ ! -e "$dir/home/state/$id.backlog-close" ] \
+              || fail "refused quota recovery must preserve a dangling pending-close symlink"
+            assert_equals "$id.backlog-close-missing" "$(readlink "$dir/home/state/$id.backlog-close")" "refused quota recovery must preserve the pending-close symlink target"
+          fi
           ;;
       esac
       assert_equals "$(cat "$dir/fake/race-before-literal")" "$(cat "$dir/fake/literal")" "held quota recovery must not type or launch"
@@ -4535,7 +4555,7 @@ test_quota_hold_and_status_are_rechecked_after_scan_selection() {
       fi
     done
   done
-  pass "quota control rechecks captain holds, unreadable holds, inherited pauses and terminal status after live and journal selection without lifecycle mutations"
+  pass "quota control rechecks captain holds, unreadable holds, inherited pauses, terminal status and pending closes after live and journal selection without lifecycle mutations"
 }
 
 test_quota_scan_stops_after_failed_published_or_confirmed_replacement() {
