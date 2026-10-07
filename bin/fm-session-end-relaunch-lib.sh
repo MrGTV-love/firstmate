@@ -72,6 +72,7 @@ if ! declare -F fm_run_timed >/dev/null 2>&1; then
   . "$_FM_SESSION_END_DIR/fm-timeout-lib.sh"
 fi
 if ! declare -F fm_session_launch_policy_check >/dev/null 2>&1; then
+  # shellcheck source=bin/fm-session-launch-policy-lib.sh
   . "$_FM_SESSION_END_DIR/fm-session-launch-policy-lib.sh"
 fi
 

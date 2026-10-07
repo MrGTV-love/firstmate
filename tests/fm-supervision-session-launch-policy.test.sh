@@ -137,7 +137,11 @@ test_away_launch_policy_guidance() {
         else
           printf 'omp-or-tc extra\n' > "$home/config/session-launch-policy"
         fi
-        printf '#!/usr/bin/env bash\nprintf "terminal invoked\\n" >> "$FM_HOME/terminal-effects"\nexit 1\n' > "$home/bin/tmux"
+        cat > "$home/bin/tmux" <<'SH'
+#!/usr/bin/env bash
+printf "terminal invoked\n" >> "$FM_HOME/terminal-effects"
+exit 1
+SH
         chmod +x "$home/bin/tmux"
         status=0
         out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_TEST_HARNESS="$harness" FM_AFK_MODE=away \

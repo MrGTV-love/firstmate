@@ -468,7 +468,7 @@ for kind in ship scout; do
   "$ROOT/bin/fm-busy-event.sh" arm "$HOME_DIR/state" "$ID" --state idle --source omp-ext --event launch-brief >/dev/null
   gen=$(cat "$HOME_DIR/state/$ID.busy-gen")
   "$ROOT/bin/fm-busy-event.sh" apply "$HOME_DIR/state" "$ID" idle --gen "$gen" --source omp-ext --event session-end >/dev/null
-  for tick in 1 2; do
+  for _tick in 1 2; do
     out=$(session_end_scan)
     assert_contains "$out" 'session-launch-policy' 'malformed policy refuses automatic omp recovery'
     assert_preserved
@@ -479,7 +479,7 @@ for kind in ship scout; do
   grep -Fx 'launch:omp' "$CASE/effects" >/dev/null || fail 'repaired policy did not launch omp'
   awk -F '\t' '$2 == "attempt" { attempts++ } $2 == "relaunched" { relaunched++ } END { exit !(attempts == 1 && relaunched == 1 && NR == 2) }' \
     "$HOME_DIR/state/.session-end-relaunch-$ID" || fail 'policy refusal was counted as an attempt'
-  IFS=$'\t' read -r handled_gen handled_seq handled_outcome < "$HOME_DIR/state/.session-end-handled-$ID"
+  IFS=$'\t' read -r handled_gen _handled_seq handled_outcome < "$HOME_DIR/state/.session-end-handled-$ID"
   [ "$handled_gen" = "$gen" ] && [ "$handled_outcome" = relaunched ] || fail 'recovery did not handle the original generation'
   [ "$(cat "$WT/unpublished")" = 'unpublished work' ] || fail 'recovery lost unpublished work'
   [ "$(cat "$HOME_DIR/state/$ID.validation")" = 'validation custody' ] || fail 'recovery changed validation custody'
