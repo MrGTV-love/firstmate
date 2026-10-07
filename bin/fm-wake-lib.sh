@@ -1221,17 +1221,46 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
   trap - TERM INT
 }
 
+# Snapshot the public owner identity and liveness around the final deadline
+# attempt. Dead PID cleanup is not turnover; a live owner disappearing or a
+# public link replacement is. Only a stable identity can name a live blocker.
+_fm_lock_deadline_snapshot() {  # <lockdir> <identity-variable> <live-pid-variable>
+  local lockdir=$1 snapshot_kind snapshot_owner= snapshot_pid snapshot_live_pid=
+  if [ -L "$lockdir" ]; then
+    snapshot_kind=link
+    snapshot_owner=$(fm_lock_link_owner "$lockdir" 2>/dev/null || true)
+  elif [ -d "$lockdir" ]; then
+    snapshot_kind=directory
+  elif [ -e "$lockdir" ]; then
+    snapshot_kind=unsupported
+  else
+    snapshot_kind=absent
+  fi
+  snapshot_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
+  case "$snapshot_pid" in
+    ''|*[!0-9]*|0) ;;
+    *)
+      if [ "$snapshot_pid" -gt 0 ] 2>/dev/null && fm_pid_alive "$snapshot_pid"; then
+        snapshot_live_pid=$snapshot_pid
+      fi
+      ;;
+  esac
+  printf -v "$2" '%s' "$snapshot_kind:$snapshot_owner:$snapshot_live_pid"
+  printf -v "$3" '%s' "$snapshot_live_pid"
+}
+
 # fm_lock_acquire_wait_bounded <lockdir> <positive-seconds>
 #
 # Bounded acquire variant. It preserves the ordinary wait/reclaim behavior
-# until fm-timeout-lib.sh's hard deadline, returns 124 when a live holder still
-# owns the lock, and leaves FM_LOCK_HELD_PID naming that holder.
+# until fm-timeout-lib.sh's hard deadline and returns 124 for contention or
+# owner turnover, with FM_LOCK_HELD_PID naming a known stable live blocker.
 # Use it where a caller must refuse rather than block: wake presentation, and
 # the guarded remote link clear, whose whole contract is to return a
 # reconciliation refusal instead of wedging an unattended close.
 # Mutation-critical callers that can safely block keep fm_lock_acquire_wait.
 fm_lock_acquire_wait_bounded() {
   local lockdir=$1 seconds=$2 caller_pid rc owner_pid
+  local primary_before steal_before primary_after steal_after steal_pid steal_before_pid
   case "$seconds" in ''|*[!0-9]*|0) return 2 ;; esac
   _fm_wake_require_timeout || return 1
   if fm_lock_try_acquire "$lockdir"; then
@@ -1257,6 +1286,10 @@ fm_lock_acquire_wait_bounded() {
     return 0
   fi
   [ "$rc" -ne 0 ] || rc=1
+  if [ "$rc" -eq 124 ]; then
+    _fm_lock_deadline_snapshot "$lockdir" primary_before owner_pid
+    _fm_lock_deadline_snapshot "$lockdir.steal" steal_before steal_before_pid
+  fi
   # A deadline can kill the helper just after it acquired and before handoff.
   # Give ordinary stale-owner recovery one final non-blocking chance so that
   # helper cleanup cannot manufacture a false contention advisory.
@@ -1264,18 +1297,32 @@ fm_lock_acquire_wait_bounded() {
     return 0
   fi
   if [ "$rc" -eq 124 ]; then
-    owner_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
-    case "$owner_pid" in
-      ''|*[!0-9]*|0) ;;
-      *)
-        if [ "$owner_pid" -gt 0 ] 2>/dev/null && fm_pid_alive "$owner_pid"; then
-          FM_LOCK_HELD_PID=$owner_pid
-          return 124
-        fi
-        ;;
-    esac
+    _fm_lock_deadline_snapshot "$lockdir" primary_after owner_pid
+    _fm_lock_deadline_snapshot "$lockdir.steal" steal_after steal_pid
     # shellcheck disable=SC2034 # Output read by callers after bounded acquisition.
     FM_LOCK_HELD_PID=
+    # A stable unsupported primary path must not become a contention skip,
+    # even when a separate steal holder turns over beside it.
+    if [ "$primary_before" = 'unsupported::' ] && [ "$primary_after" = "$primary_before" ]; then
+      return 1
+    fi
+    # The final attempt can reap a dead steal mutex left by its own helper.
+    # That cleanup alone says nothing about an unchanged unsafe primary path.
+    if [ "$primary_before" != "$primary_after" ] \
+      || { [ "$steal_before" != "$steal_after" ] && [ -n "$steal_before_pid" ]; }; then
+      return 124
+    fi
+    if [ -n "$owner_pid" ]; then
+      FM_LOCK_HELD_PID=$owner_pid
+      return 124
+    fi
+    if [ -n "$steal_pid" ]; then
+      FM_LOCK_HELD_PID=$steal_pid
+      return 124
+    fi
+    if [ "$primary_after" = 'absent::' ] && [ "$steal_after" = 'absent::' ]; then
+      return 124
+    fi
     return 1
   fi
   return "$rc"

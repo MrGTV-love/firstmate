@@ -782,9 +782,14 @@ print_status_presentation() {  # [<deduped-raw-rows>]
   else
     lock_rc=$?
     if [ "$lock_rc" -eq 124 ]; then
-      holder_pid=${FM_LOCK_HELD_PID:-unknown}
-      printf 'STATUS PRESENTATION SKIPPED: lock remains held by live pid %s after %ss; retry on the next drain.\n' \
-        "$holder_pid" "$PRESENTATION_LOCK_TIMEOUT"
+      holder_pid=${FM_LOCK_HELD_PID:-}
+      if [ -n "$holder_pid" ]; then
+        printf 'STATUS PRESENTATION SKIPPED: lock remains held by live pid %s after %ss; retry on the next drain.\n' \
+          "$holder_pid" "$PRESENTATION_LOCK_TIMEOUT"
+      else
+        printf 'STATUS PRESENTATION SKIPPED: lock acquisition reached its deadline after %ss; retry on the next drain.\n' \
+          "$PRESENTATION_LOCK_TIMEOUT"
+      fi
     else
       printf 'wake drain: status presentation lock could not be acquired safely\n' >&2
     fi
@@ -828,8 +833,13 @@ elif fm_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" "$PRESENTATION_LOCK_TIME
 else
   lock_rc=$?
   if [ "$lock_rc" -eq 124 ]; then
-    printf 'WAKE DRAIN SKIPPED: queue lock remains held by live pid %s after %ss; retry on the next drain.\n' \
-      "${FM_LOCK_HELD_PID:-unknown}" "$PRESENTATION_LOCK_TIMEOUT"
+    if [ -n "${FM_LOCK_HELD_PID:-}" ]; then
+      printf 'WAKE DRAIN SKIPPED: queue lock remains held by live pid %s after %ss; retry on the next drain.\n' \
+        "$FM_LOCK_HELD_PID" "$PRESENTATION_LOCK_TIMEOUT"
+    else
+      printf 'WAKE DRAIN SKIPPED: queue lock acquisition reached its deadline after %ss; retry on the next drain.\n' \
+        "$PRESENTATION_LOCK_TIMEOUT"
+    fi
     exit 0
   fi
   printf 'wake drain: queue lock could not be acquired safely\n' >&2
