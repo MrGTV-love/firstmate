@@ -541,35 +541,14 @@ async function stopSessionGeneration(generation: SessionGeneration, replacement:
   }
 }
 
-// omp restores a queued user follow-up into the composer instead of delivering
-// it when the run is interrupted (Esc, including bin/fm-control.sh interrupt)
-// or the operator dequeues it (Alt+Up). A watcher wake queued behind a running
-// turn then sits in the composer unsubmitted: omp accepted it, no turn ever
-// consumes it, and the lane looks idle. omp joins restored messages and the
-// operator's own draft with blank lines, and the composer may or may not carry
-// the invisible operational-input mark, so the wake is located with the mark
-// ignored and removed on its own, leaving every other character of the draft
-// exactly as the operator left it.
 function removeRestoredWake(editor: string, content: string): string | null {
-  const text = editor.replace(/\u2063/g, "");
-  const needle = content.replace(/\u2063/g, "");
-  const at = text.indexOf(needle);
-  if (at < 0) return null;
-  let start = 0;
-  let end = editor.length;
-  let normalizedIndex = 0;
-  for (let i = 0; i < editor.length; i++) {
-    if (editor[i] === "\u2063") continue;
-    if (normalizedIndex === at) start = i;
-    normalizedIndex++;
-    if (normalizedIndex === at + needle.length) {
-      end = i + 1;
-      break;
-    }
-  }
-  if (content.startsWith("\u2063") && start > 0 && editor[start - 1] === "\u2063") start--;
-  if (editor.slice(Math.max(0, start - 2), start) === "\n\n") start -= 2;
-  else if (editor.slice(end, end + 2) === "\n\n") end += 2;
+  const marked = content.startsWith("\u2063");
+  const needle = (marked ? content.slice(1) : content).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`(^|\\n\\n)${marked ? "\\u2063?" : ""}${needle}(?=\\n\\n|(?![\\s\\S]))`).exec(editor);
+  if (!match) return null;
+  const start = match.index;
+  let end = start + match[0].length;
+  if (match[1] === "" && editor.slice(end, end + 2) === "\n\n") end += 2;
   return editor.slice(0, start) + editor.slice(end);
 }
 

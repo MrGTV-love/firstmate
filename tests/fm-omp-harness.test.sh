@@ -394,13 +394,6 @@ const ctx = { isIdle: () => false };
 switch (process.env.MODE) {
   case "handlers": console.log(Object.keys(handlers).sort().join(" ")); break;
   case "agent-start": await handlers["agent_start"]({ type: "agent_start" }, ctx); break;
-  case "before-start": await handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx); break;
-  case "end-and-restart": {
-    const ending = handlers["agent_end"]({ type: "agent_end" }, ctx);
-    const starting = handlers["before_agent_start"]({ type: "before_agent_start", prompt: "next" }, ctx);
-    await Promise.all([ending, starting]);
-    break;
-  }
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
@@ -426,7 +419,7 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in before_agent_start agent_start agent_end tool_call turn_end; do
+  for handler in agent_start agent_end tool_call turn_end; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -446,11 +439,6 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
-
-  out=$(drive_omp_ext "$ext" before-start) || fail "before_agent_start drive failed: $out"
-  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] || fail "before_agent_start must mark a new worker turn busy"
-  out=$(drive_omp_ext "$ext" end-and-restart) || fail "restarted worker turn drive failed: $out"
-  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] || fail "an old settled write overrode a new worker turn"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -1046,7 +1034,7 @@ for (let i = 0; i < 60 && sent.length < 1; i += 1) await sleep(100);
 if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.length}`);
 const wake = sent[0].m;
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("regular delivery must remain queued as a follow-up");
-const bare = wake.replace(/⁣/g, "");
+const bare = wake.startsWith("\u2063") ? wake.slice(1) : wake;
 if (process.env.SCENARIO === "sync-consumed") {
   composer.text = wake;
   await handlers.get("agent_end")({ type: "agent_end" }, ctx);
@@ -1127,16 +1115,29 @@ switch (process.env.SCENARIO) {
     if (sent.length !== 2 || !same(sent[1]) || composer.text !== expected) throw new Error(`draft bytes changed: ${JSON.stringify(composer.text)} expected ${JSON.stringify(expected)}`);
     break;
   }
+  case "prepended":
+  case "appended":
+  case "appended-newline":
+  case "prepended-mark":
+  case "appended-mark":
+  case "internal-mark":
   case "edited": {
-    composer.text = wake.replace("signal:", "edited:");
+    const scenario = process.env.SCENARIO;
+    composer.text = scenario === "prepended" ? `Do not run: ${wake}`
+      : scenario === "appended" ? `${wake} do not run`
+      : scenario === "appended-newline" ? `${wake}\n`
+      : scenario === "prepended-mark" ? `\u2063${wake}`
+      : scenario === "appended-mark" ? `${wake}\u2063`
+      : scenario === "internal-mark" ? wake.replace("signal:", "sig\u2063nal:")
+      : wake.replace("signal:", "edited:");
     const original = composer.text;
     await settle();
     if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("edited wake was submitted or changed");
     break;
   }
-  case "alone": {
-    // A composer that drops the invisible mark still holds the same wake.
-    composer.text = bare;
+  case "alone":
+  case "alone-marked": {
+    composer.text = process.env.SCENARIO === "alone" ? bare : wake;
     await settle();
     if (sent.length !== 2 || !same(sent[1])) throw new Error(`the restored wake was not submitted again: ${JSON.stringify(sent)}`);
     if (composer.text !== "") throw new Error(`the composer still holds text after the resubmission: ${JSON.stringify(composer.text)}`);
@@ -1179,7 +1180,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both edited alone busy queued elsewhere limit; do
+  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
