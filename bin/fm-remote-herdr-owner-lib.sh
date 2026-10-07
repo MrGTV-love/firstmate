@@ -28,10 +28,11 @@
 #     runs `server` wins. Returns 2, printing nothing, when lsof does not
 #     resolve; the caller decides what an unprovable owner means.
 #   fm_remote_herdr_process_env <pid>
-#     Prints complete NAME=VALUE entries as lines, using Python 3 to read
+#     Prints complete single-line NAME=VALUE entries, using Python 3 to read
 #     Darwin KERN_PROCARGS2 or Linux /proc/<pid>/environ as NUL-delimited bytes.
-#     Returns nonzero without output for unreadable or ambiguous environments,
-#     including entries with line breaks or duplicate names.
+#     Omits unrelated entries that cannot be represented as unambiguous lines.
+#     Returns nonzero without output for unreadable environments or ambiguous
+#     ownership markers, including line breaks or duplicate marker names.
 #   fm_remote_herdr_process_ancestry <pid>
 #     Prints "<pid> <command>" for <pid> and each ancestor up to pid 1.
 #   fm_remote_herdr_owner_birth <pid>
@@ -140,16 +141,23 @@ try:
         entries = data[:-1].split(b"\0")
     else:
         raise ValueError()
+    markers = {b"SSH_CONNECTION", b"SSH_CLIENT", b"SSH_TTY",
+               b"XPC_SERVICE_NAME", b"FM_REMOTE_JOB_ACTIVE",
+               b"PATH", b"HOME", b"FM_SPAWN_GEN"}
     names = set()
+    output = []
     for entry in entries:
         name, separator, _ = entry.partition(b"=")
         if (not separator or not re.fullmatch(rb"[A-Za-z_][A-Za-z0-9_]*", name)
                 or b"\n" in entry or b"\r" in entry or name in names):
-            raise ValueError()
+            if name in markers:
+                raise ValueError()
+            continue
         names.add(name)
+        output.append(entry)
     if not entries:
         raise ValueError()
-    sys.stdout.buffer.write(b"\n".join(entries) + b"\n")
+    sys.stdout.buffer.write(b"\n".join(output) + b"\n")
 except (OSError, ValueError, OverflowError, struct.error, AttributeError):
     sys.exit(1)
 PY

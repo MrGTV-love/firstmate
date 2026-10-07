@@ -42,7 +42,13 @@ test_launch_proof_recorded_native_identity() {
   [ "$(fm_launch_proof_pid "$PID" expected)" = unmanaged ] || fail 'text inside another environment value must not impersonate a launch pin'
   stop_probe
   start_probe '' '' $'ordinary value\nFM_SPAWN_GEN=expected'
-  [ "$(fm_launch_proof_pid "$PID" expected)" = unknown ] || fail 'an ambiguous multiline environment must not authenticate a launch pin'
+  [ "$(fm_launch_proof_pid "$PID" expected)" = unmanaged ] || fail 'an embedded multiline value must not authenticate a launch pin'
+  stop_probe
+  start_probe expected '' $'ordinary value\nFM_SPAWN_GEN=spoof'
+  [ "$(fm_launch_proof_pid "$PID" expected)" = managed ] || fail 'an unrelated multiline value must not invalidate a genuine launch pin'
+  stop_probe
+  start_probe $'expected\nFM_SPAWN_GEN=spoof'
+  [ "$(fm_launch_proof_pid "$PID" expected)" = unknown ] || fail 'a line-breaking launch marker must refuse attribution'
   stop_probe
   start_probe expected
   [ "$(fm_launch_proof_pid "$PID" expected)" = managed ] || fail 'live matching incarnation must be managed'

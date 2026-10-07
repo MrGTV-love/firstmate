@@ -109,7 +109,22 @@ hold() {
   # Open read-write so this never blocks on the reader; the holder sees EOF
   # only when the descriptor closes at exit.
   eval "exec ${HOLDER_FD}<>\"\$fifo\""
-  env -i "$@" "$PYTHON" -c 'import sys; open(sys.argv[1], "rb").read()' "$fifo" &
+  (
+    exec "$PYTHON" - "$fifo" "$@" <<'PY'
+import ctypes
+import os
+import sys
+
+argv = [os.fsencode(sys.executable), b"-c",
+        b'import sys; open(sys.argv[1], "rb").read()', os.fsencode(sys.argv[1])]
+entries = [os.fsencode(entry) for entry in sys.argv[2:]]
+args = (ctypes.c_char_p * (len(argv) + 1))(*argv, None)
+environment = (ctypes.c_char_p * (len(entries) + 1))(*entries, None)
+libc = ctypes.CDLL(None, use_errno=True)
+libc.execve(argv[0], args, environment)
+raise OSError(ctypes.get_errno(), "execve failed")
+PY
+  ) &
   HOLDER_PID=$!
   HOLDER_PIDS+=("$HOLDER_PID")
   HOLDER_FD=$((HOLDER_FD + 1))
@@ -213,13 +228,13 @@ printf '%s\n' "$value_env" | grep -Fx 'FM_PROBE_TEXT=literal FM_REMOTE_JOB_ACTIV
 if printf '%s\n' "$value_env" | grep -E '^(FM_REMOTE_JOB_ACTIVE|SSH_CONNECTION|XPC_SERVICE_NAME)=' >/dev/null; then
   fail "text inside an environment value escaped its entry boundary"
 fi
-for ambiguous in "$NEWLINE_PID" "$CR_PID"; do
-  if ambiguous_env=$(fm_remote_herdr_process_env "$ambiguous"); then
-    fail "a line-breaking environment was accepted as ownership evidence"
+for unrelated in "$NEWLINE_PID" "$CR_PID"; do
+  unrelated_env=$(fm_remote_herdr_process_env "$unrelated") || fail "an unrelated line-breaking value invalidated the environment"
+  if printf '%s\n' "$unrelated_env" | grep -E '^(FM_PROBE_TEXT|FM_REMOTE_JOB_ACTIVE|SSH_CONNECTION|XPC_SERVICE_NAME)=' >/dev/null; then
+    fail "a line-breaking value leaked ownership evidence"
   fi
-  [ -z "$ambiguous_env" ] || fail "an ambiguous environment leaked partial ownership evidence"
 done
-pass "kernel environment entries retain spaces and reject line-breaking evidence"
+pass "kernel environment entries retain spaces and omit unrelated line-breaking values"
 
 # --- no server: the guard becomes the server ---------------------------------
 
@@ -271,6 +286,39 @@ assert_not_contains "$(herdr_calls)" 'server stop' "the guard stopped a gui-doma
 assert_contains "$GUARD_OUT" "pid $WORKER_PID born in the Aqua login session (worker)" \
   "the guard did not name the worker owner"
 pass "launchd and worker markers require gui-domain launchctl proof"
+
+for unrelated_entry in $'MY_NOTE=first\nsecond' $'MY_NOTE=first\rSSH_CONNECTION=spoof' \
+  $'BASH_FUNC_note%%=() { :;\n}' 'MY-NOTE=ordinary'; do
+  hold XPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote "$unrelated_entry"
+  aqua_pid=$HOLDER_PID
+  sleep 0.2
+  new_case running
+  printf '%s\n' "$aqua_pid" > "$CASE_OWNER"
+  load_job gui dev.firstmate.herdr.fm-remote "$aqua_pid"
+  guard
+  expect_code 0 "$GUARD_RC" "an unrelated environment entry invalidated the Aqua owner"
+  assert_not_started "the guard replaced an Aqua owner carrying an unrelated environment entry"
+  assert_not_contains "$(herdr_calls)" 'server stop' "the guard stopped an Aqua owner carrying an unrelated environment entry"
+  assert_contains "$GUARD_OUT" "pid $aqua_pid born in the Aqua login session (launchd)" \
+    "valid launchctl ownership was lost because of an unrelated environment entry"
+done
+pass "unrelated multiline values and non-shell names leave proven Aqua owners untouched"
+
+for marker in SSH_CONNECTION SSH_CLIENT SSH_TTY XPC_SERVICE_NAME FM_REMOTE_JOB_ACTIVE PATH HOME FM_SPAWN_GEN; do
+  for value in duplicate newline carriage; do
+    case "$value" in
+      duplicate) hold "$marker=first" "$marker=second" ;;
+      newline) hold "$marker="$'first\nsecond' ;;
+      carriage) hold "$marker="$'first\rsecond' ;;
+    esac
+    sleep 0.2
+    if ambiguous_env=$(fm_remote_herdr_process_env "$HOLDER_PID"); then
+      fail "an ambiguous $marker marker was accepted as ownership evidence"
+    fi
+    [ -z "$ambiguous_env" ] || fail "an ambiguous $marker marker leaked partial ownership evidence"
+  done
+done
+pass "duplicate and line-breaking relevant markers refuse all ownership evidence"
 
 for injected in "$VALUE_PID" "$NEWLINE_PID" "$CR_PID"; do
   new_case running

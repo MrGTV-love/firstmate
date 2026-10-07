@@ -150,6 +150,7 @@ The normal failed-launch and published-record reconciliation rules below still a
 
 The live spawn pin is an incarnation binding, not proof of the current omp conversation.
 **Accepted residual risk:** `/resume` inside an FM-spawned worker retains its live pin and remains undetected pending `fm-omp-current-session-proof`.
+- The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
 No extension-recorded current-session proof is implemented by this control plane.
 This inspection does not change Herdr's session-wide auto-resume setting.
 The [Herdr restart guide](herdr-backend.md#restart-and-liveness-behavior) owns that decision and its scope.
