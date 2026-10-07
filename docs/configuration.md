@@ -1333,7 +1333,7 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` when the rule has a fallback policy.
+Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` to preserve the selected rule's identity and fallback permission.
 
 **Spawn requirements**
 
@@ -1410,7 +1410,9 @@ Only proven primary exhaustion activates it; approval, confidence, unknown capac
 Spawn and recovery validate fallback fields even when typed resolution is off.
 The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
 Direct `fm-spawn.sh <id> --relaunch` restores a recorded rule together with its model and effort when neither a replacement rule nor a harness, model, or effort override is supplied.
-Omitted model and effort fields match their persisted `default` metadata values during recovery, without granting permission for a different explicit profile.
+Omitted model and effort fields match their persisted `default` metadata values during recovery.
+An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
+Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
 OMP workers keep native account rotation enabled and native model fallback disabled; model stand-ins are selected only through the shared exhaustion gate.
 An idle terminal quota error after native rotation is handled by recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, the absence of an open captain call, and the absence of a pending authoritative close (`state/<id>.backlog-close`, including a dangling symlink) before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
@@ -1467,7 +1469,7 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/fm-harness.sh validate-native-effort` and `bin/fm-spawn.sh` respectively.
 - Codex `max` is valid when the profile selects `gpt-5.6-luna`, whose installed catalog entry supports that reasoning level.
-- An omitted model or effort means the selected harness uses its own default for that axis.
+- An omitted model, or an effort left unspecified at launch, uses the selected harness's default for that axis.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
 - Every profile array is an implicit quota-aware choice resolved through `quota-array-dispatch`.
 - If no dispatch rule fits, firstmate resolves `default` through the same object-or-array path before falling back to `config/crew-harness`.

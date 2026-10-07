@@ -233,9 +233,10 @@ fm_dispatch_fallbacks() {
   result=$(jq -ce --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
     def profiles: if type == "array" then . else [.] end;
     def default_axis: if . == null or . == "" or . == "default" then "" else . end;
-    def matches:
+    def matches($complete_effort):
       .harness == $h and (.model | default_axis) == ($m | default_axis) and
-      (.effort | default_axis) == ($e | default_axis);
+      ((.effort | default_axis) == ($e | default_axis) or
+       ($complete_effort and (.effort | default_axis) == ""));
     def valid_fallback:
       type == "array" and all(.[];
         type == "object" and (.harness == "omp" or .harness == "claude") and
@@ -249,7 +250,8 @@ fm_dispatch_fallbacks() {
     ([((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: (.value.fallback // [])})] +
      [{rule: "default", use: (.default // []), fallback: (.default_fallback // [])}]) as $rules |
     [$rules[] | select($rule == "" or .rule == $rule) |
-      select(any((.use | profiles)[]; matches) or any(.fallback[]; matches))] as $matches |
+      ($rule != "" and (.fallback | length) == 0) as $complete_effort |
+      select(any((.use | profiles)[]; matches($complete_effort)) or any(.fallback[]; matches(false)))] as $matches |
     if ($matches | length) == 0 then
       if $rule != "" then error("dispatch rule does not contain the requested profile")
       else {rule: "", fallback: []} end

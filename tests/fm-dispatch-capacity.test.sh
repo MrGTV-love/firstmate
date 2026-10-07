@@ -461,6 +461,40 @@ fi
 assert_contains "$(cat "$TMP_ROOT/error")" 'fallback must be an array of explicit OMP profiles' "invalid fallback differs from an unmatched valid profile"
 pass "shared matching normalizes default axes without weakening fallback validation"
 
+for container in scalar array; do
+  for effort_axis in omitted empty default; do
+    for policy in omitted empty; do
+      jq -n --arg container "$container" --arg axis "$effort_axis" --arg policy "$policy" --argjson fallback "$allowed" '
+        ({harness:"claude",model:"sonnet"} +
+         (if $axis == "omitted" then {} elif $axis == "empty" then {effort:""} else {effort:"default"} end)) |
+        (if $container == "array" then [.] else . end) as $use |
+        {rules:[({use:$use} + (if $policy == "empty" then {fallback:[]} else {} end)),
+                {use:{harness:"claude",model:"sonnet",effort:"low"},fallback:$fallback}],
+         default:$use} + (if $policy == "empty" then {default_fallback:[]} else {} end)
+      ' > "$TMP_ROOT/config/crew-dispatch.json"
+      for rule in rule_1 default; do
+        set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" claude sonnet low) ||
+          fail "$rule $container $effort_axis effort must allow completion with $policy fallback"
+        assert_equals "$rule" "$(jq -r .rule <<<"$set")" "effort completion must preserve explicit rule identity"
+        assert_equals '[]' "$(jq -c .fallback <<<"$set")" "effort completion must not borrow a sibling rule's fallback"
+      done
+      set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' claude sonnet low) ||
+        fail "implicit matching must still resolve the exact-effort sibling"
+      assert_equals rule_2 "$(jq -r .rule <<<"$set")" "effort completion must remain limited to explicit rules"
+      assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "exact-effort sibling keeps its declared permission"
+    done
+  done
+done
+for mutation in '.rules[0].use.model="opus"' '.rules[0].use.harness="omp"' '.rules[0].use.effort="high"' '.rules[0].fallback=$fallback'; do
+  jq -n --argjson fallback "$allowed" \
+    "{rules:[{use:{harness:\"claude\",model:\"sonnet\"}}]} | $mutation" > "$TMP_ROOT/config/crew-dispatch.json"
+  if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 claude sonnet low > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "effort completion must not bypass harness, model, explicit effort, or fallback permission"
+  fi
+  assert_contains "$(cat "$TMP_ROOT/error")" 'dispatch rule does not contain the requested profile' "only unspecified effort on an explicit no-fallback rule can be completed"
+done
+pass "explicit no-fallback rules permit effort completion without borrowing stand-ins"
+
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[
  {"provider":"claude","accountKey":"other","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":0}]}},
