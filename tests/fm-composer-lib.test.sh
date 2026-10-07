@@ -183,9 +183,7 @@ test_matrix_claude_bare_nbsp_row() {
   assert_screen "claude idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
   typed=$'────────────────────────\n❯ fix the login bug\n────────────────────────'
   assert_screen "claude typed on tmux" pending "$CAPS_TMUX" "$typed" 1 probe-absent
-  # Plain capture cannot tell typed text from claude's rotating suggestion:
-  # the styled=0 degradation defers instead of fabricating pending.
-  assert_screen "claude typed on plain backends" unknown "$CAPS_PLAIN" "$typed"
+  assert_screen "claude typed on plain backends" pending "$CAPS_PLAIN" "$typed"
   pass "matrix: claude's ❯+NBSP row reads empty on every profile in both locales (#1988)"
 }
 
@@ -240,7 +238,7 @@ test_matrix_claude_titled_top_border() {
   assert_screen "claude titled typed on tmux" pending "$CAPS_TMUX" "$typed" 2 probe-absent
   assert_screen "claude titled typed on herdr" pending "$CAPS_STYLED" "$typed" '' "$claude_idle"
   assert_screen "claude titled typed on zellij" pending "$CAPS_STYLED_NOID" "$typed"
-  assert_screen "claude titled typed on plain backends" unknown "$CAPS_PLAIN" "$typed"
+  assert_screen "claude titled typed on plain backends" pending "$CAPS_PLAIN" "$typed"
   # The same plain-border shapes keep their verdicts beside the titled ones.
   screen=$'transcript line\n'"$plain_rule"$'\n❯'"$NBSP"$'\n'"$plain_rule"
   assert_screen "claude plain idle on herdr" empty "$CAPS_STYLED" "$screen" '' "$claude_idle"
@@ -266,8 +264,10 @@ assert_multiline_rule_pair() {
   assert_screen "$label requests lazy Herdr identity" need-identity "$CAPS_STYLED" "$screen"
   assert_screen "$label after absent Herdr identity probe" pending "$CAPS_STYLED" "$screen" '' probe-absent
   assert_screen "$label on Zellij without identity" pending "$CAPS_STYLED_NOID" "$screen"
-  assert_screen "$label on plain capture" unknown "$CAPS_PLAIN" "$screen"
+  assert_selected_content "$label on Zellij without identity" "$want" "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "$label on plain capture" pending "$CAPS_PLAIN" "$screen"
   assert_selected_content "$label on plain capture" "$want" "$CAPS_PLAIN" "$screen"
+  assert_selected_content "$label on tmux capture" "$want" "$CAPS_TMUX" "$screen"
   cursor=$first
   while [ "$cursor" -le "$last" ]; do
     assert_screen "$label on tmux row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor" probe-absent
@@ -335,6 +335,97 @@ test_rule_pair_continuations_never_prove_empty() {
     assert_selected_content "Pi literal rule-pair extraction $literal" "$literal" "$CAPS_STYLED" "$screen"
   done
   pass "rule-like continuations refuse proof and literal side characters remain draft content"
+}
+
+test_rule_pair_pasted_containers_remain_literal() {
+  local top bottom pasted screen want later cursor caps
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ╭───╮\n │ │\n ╰───╯\n'"$bottom"
+    assert_multiline_rule_pair "$top indented pasted rounded box" "$screen" 'keep this unsent text ╭───╮ │ │ ╰───╯' 2 5
+    for pasted in \
+      $'╭────────╮\n│ ❯     │\n╰────────╯' \
+      $'┌────────┐\n│ ❯     │\n└────────┘' \
+      $'┏━━━━━━━━┓\n┃ ❯     ┃\n┗━━━━━━━━┛' \
+      $'╔════════╗\n║ ❯     ║\n╚════════╝' \
+      $'+--------+\n| >      |\n+--------+'; do
+      case "$pasted" in
+        ╭*) want='╭────────╮ │ ❯ │ ╰────────╯' ;;
+        ┌*) want='┌────────┐ │ ❯ │ └────────┘' ;;
+        ┏*) want='┏━━━━━━━━┓ ┃ ❯ ┃ ┗━━━━━━━━┛' ;;
+        ╔*) want='╔════════╗ ║ ❯ ║ ╚════════╝' ;;
+        +*) want='+--------+ | > | +--------+' ;;
+      esac
+      screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top pasted box $pasted" "$screen" "$want" 2 5
+      screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n'"$pasted"$'\n ❯\n'"$bottom"
+      assert_multiline_rule_pair "$top pasted box with later glyph $pasted" "$screen" "keep this unsent text $want ❯" 2 6
+      later="$screen"$'\n\n────────────────\n❯\n────────────────'
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top newer empty pair below pasted box" empty "$caps" "$later"
+        assert_selected_content "$top newer empty pair below pasted box" '' "$caps" "$later"
+      done
+      for cursor in 2 3 4 5 6; do
+        assert_screen "$top cursor stays in earlier pasted-box pair on row $cursor" pending "$CAPS_TMUX" "$later" "$cursor" probe-absent
+      done
+    done
+    pasted="$(omp_box_top)"$'\n╰─ nested draft ─╯'
+    want="$(omp_box_top) ╰─ nested draft ─╯"
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested omp folded box" "$screen" "$want" 2 4
+    pasted="$(omp_box_top)"$'\n│ nested draft │\n'"$(omp_box_last '')"
+    want="$(omp_box_top) │ nested draft │ ╰─ ─╯"
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested omp multiline box" "$screen" "$want" 2 5
+    pasted=$'┃\n┃  Ask anything...\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high\n╹▀▀▀▀▀▀▀▀'
+    want='┃ ┃ Ask anything... ┃ ┃ Build · GPT-5.5 Fast OpenAI · high ╹▀▀▀▀▀▀▀▀'
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$pasted"$'\n'"$bottom"
+    assert_multiline_rule_pair "$top nested opencode leftbar" "$screen" "$want" 2 7
+    for later in \
+      $'────────────────\n❯ newer draft\n────────────────' \
+      $'╭────────────────────────╮\n│ ❯ newer draft          │\n╰────────────────────────╯'; do
+      later="$screen"$'\n\n'"$later"
+      for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top lower genuine candidate wins" pending "$caps" "$later"
+        assert_selected_content "$top lower genuine candidate wins" 'newer draft' "$caps" "$later"
+      done
+      assert_screen "$top newer genuine candidate on prompt row" pending "$CAPS_TMUX" "$later" 11 probe-absent
+      case "$later" in
+        *"$bottom")
+          assert_screen "$top cursor on newer pair closing border" unknown "$CAPS_TMUX" "$later" 12 probe-absent
+          ;;
+        *)
+          assert_screen "$top cursor on newer box folded border" pending "$CAPS_TMUX" "$later" 12 probe-absent
+          ;;
+      esac
+    done
+  done
+  pass "rule pairs retain pasted boxes and leftbars while newer genuine candidates win"
+}
+
+test_rule_pair_braille_is_literal_content() {
+  local top bottom literal screen caps
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    for literal in '⠋' '⠧' '⠀' '⣿⠿'; do
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only singleton $literal" "$screen" "$literal" 2 2
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only prompt followed by blank $literal" "$screen" "$literal" 2 3
+      screen=$'transcript line\n'"$top"$'\n❯ '"$literal"$'\n\n ordinary continuation\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only prompt with continuation $literal" "$screen" "$literal ordinary continuation" 2 4
+      screen=$'transcript line\n'"$top"$'\n❯\n '"$literal"$'\n'"$bottom"
+      assert_multiline_rule_pair "$top Braille-only continuation $literal" "$screen" "$literal" 2 3
+    done
+    screen=$'transcript line\n'"$top"$'\n❯\n'"$bottom"
+    for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+      assert_screen "$top empty singleton" empty "$caps" "$screen"
+      assert_selected_content "$top empty singleton" '' "$caps" "$screen"
+    done
+    assert_screen "$top empty singleton on cursor" empty "$CAPS_TMUX" "$screen" 2 probe-absent
+    assert_selected_content "$top empty singleton on tmux capture" '' "$CAPS_TMUX" "$screen"
+  done
+  pass "rule pairs preserve Braille prompt content and empty singletons stay empty"
 }
 
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape() {
@@ -1350,6 +1441,8 @@ test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
+test_rule_pair_pasted_containers_remain_literal
+test_rule_pair_braille_is_literal_content
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent
