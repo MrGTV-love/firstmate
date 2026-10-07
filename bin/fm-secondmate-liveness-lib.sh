@@ -34,8 +34,8 @@
 # per-task spawn lock.
 #
 # Modes:
-#   full - session-start sweep: remote routes run the full readiness repair
-#          sequence before probing, and an alive remote route is revalidated
+#   full - session-start sweep: admitted remote routes run the full readiness
+#          repair sequence before probing, and an alive remote route is revalidated
 #          (route readable, backend herdr) so the sweep reports drift.
 #   poll - watcher tick: remote routes take one read-only state probe per
 #          check; repair still happens, but inside fm-spawn's launch gate only
@@ -85,6 +85,14 @@ fm_secondmate_liveness_unlock() {  # <id>
 
 fm_sm_live_first_line() {
   printf '%s\n' "$1" | sed -n '1s/[[:space:]]\{1,\}/ /g;1p'
+}
+
+fm_sm_live_replacement_admit() {
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} enabled harness
+  enabled=$(fm_session_launch_policy_enabled "$config") || return 1
+  [ "$enabled" = 1 ] || return 0
+  harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || return 1
+  fm_session_launch_policy_check "$config" "$harness"
 }
 
 # One line per relaunch attempt and one per outcome, keyed by epoch, plus a
@@ -141,7 +149,7 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   harness=$(fm_meta_get "$meta" harness)
   remote_host=$(fm_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    if [ "$mode" = full ]; then
+    if [ "$mode" = full ] && fm_sm_live_replacement_admit >/dev/null 2>&1; then
       remote_rc=0
       fm_remote_readiness_ensure "$FM_SM_LIVE_LIB_DIR" "$id" || remote_rc=$?
       if [ "$remote_rc" -eq 255 ]; then
@@ -273,10 +281,7 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   if ! policy_error=$(
     {
       config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-      enabled=$(fm_session_launch_policy_enabled "$config") || exit 1
-      [ "$enabled" = 1 ] || exit 0
-      harness=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$config" "$FM_ROOT/bin/fm-harness.sh" secondmate) || exit 1
-      fm_session_launch_policy_check "$config" "$harness" || exit 1
+      fm_sm_live_replacement_admit || exit 1
       if [ -z "$(fm_meta_get "$meta" remote_host)" ]; then
         home=$(fm_meta_get "$meta" home)
         [ -n "$home" ] || home=$(fm_meta_get "$meta" worktree)

@@ -44,6 +44,10 @@ Each adapter:
 
 A failed follow-up never cancels continuity restoration.
 
+OpenCode treats launch-policy-refused readiness as close-handler-owned, including on a scheduled retry after a non-actionable startup failure.
+The refused host's close restores the ordinary watcher and delivers the actual refusal once after successor readiness; the retry callback does not emit a competing launch-failure prompt.
+`tests/fm-supervision-session-launch-policy.test.sh` exercises this transition with the real plugin and policy-refusal executable under a fake local runtime, without launching a vendor model session.
+
 ### Pi session replacement
 
 Pi same-process session replacement follows the generation-owner contract in `.pi/extensions/fm-primary-pi-watch.ts`:

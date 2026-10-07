@@ -566,7 +566,7 @@ SH
 
 test_away_launch_policy_guidance
 
-test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor>
+test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <initial|successor|retry>
   local consumer=$1 publication=$2 phase=$3 replay_policy=${4:-denied} selection=${5:-claude} case_dir repo home out status
   case_dir="$TMP_ROOT/$consumer-$publication-$phase-$replay_policy-$selection"
   repo="$case_dir/repo"
@@ -582,7 +582,9 @@ test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <i
     unverified) printf 'omp\n' ;;
     extra) printf 'claude sonnet extra\n' ;;
   esac > "$home/config/supervision-host"
-  printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
+  if [ "$phase" != retry ]; then
+    printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
+  fi
   cp "$TMP_ROOT/prior-host" "$home/state/.supervision-host"
   printf 'previous turn custody\n' > "$home/state/.supervision-host-turn"
   printf 'previous engine conversation\n' > "$home/state/.supervision-host-engine"
@@ -607,6 +609,12 @@ test_primary_consumer_policy_refusal() {  # <omp|opencode> <published|failed> <i
   cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'host=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
+if [ "$FM_POLICY_CONSUMER" = opencode ] && [ "$FM_POLICY_PHASE" = retry ] && [ ! -e "$FM_HOME/state/first-host" ]; then
+  : > "$FM_HOME/state/first-host"
+  printf 'watcher: FAILED - fixture host startup failure\n'
+  while [ ! -e "$FM_HOME/state/release-startup" ]; do sleep 0.02; done
+  exit 1
+fi
 if [ ! -e "$FM_HOME/config/session-launch-policy" ]; then
   printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-%s\n' "$$" "$$"
   trap 'exit 0' TERM INT
@@ -620,7 +628,7 @@ if [ "$FM_POLICY_PHASE" = successor ] && [ ! -e "$FM_HOME/state/first-host" ]; t
   printf 'signal: prior host close\n'
   exit 0
 fi
-if [ "$FM_POLICY_CONSUMER" = opencode ] && [ "$FM_POLICY_PHASE" = initial ]; then
+if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ]; }; then
   "$FM_POLICY_ROOT/bin/fm-supervision-host.sh" "$@" > "$FM_HOME/state/refusal-output" 2>&1
   status=$?
   cat "$FM_HOME/state/refusal-output"
@@ -637,7 +645,7 @@ if [ "${1:-}" = --handling-delivered ]; then
   exit 0
 fi
 printf 'plain=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/launches"
-if [ "$FM_POLICY_CONSUMER" = opencode ] && [ "$FM_POLICY_PHASE" = initial ] && [ ! -e "$FM_HOME/state/first-plain" ]; then
+if [ "$FM_POLICY_CONSUMER" = opencode ] && { [ "$FM_POLICY_PHASE" = initial ] || [ "$FM_POLICY_PHASE" = retry ]; } && [ ! -e "$FM_HOME/state/first-plain" ]; then
   : > "$FM_HOME/state/restoring-plain"
   while [ ! -e "$FM_HOME/state/release-restoration" ]; do sleep 0.02; done
 fi
@@ -668,7 +676,7 @@ const state = `${process.env.FM_HOME}/state`;
 const root = process.env.FM_ROOT_OVERRIDE;
 const consumer = process.env.FM_POLICY_CONSUMER;
 const phase = process.env.FM_POLICY_PHASE;
-const expectedHosts = phase === "successor" ? 2 : 1;
+const expectedHosts = phase === "successor" || phase === "retry" ? 2 : 1;
 const replayAllowed = process.env.FM_POLICY_REPLAY_POLICY === "removed";
 const replaying = process.env.FM_POLICY_REPLAY_STAGE === "replacement";
 const records = [".supervision-host", ".supervision-host-turn", ".supervision-host-engine", "task.meta", "task.lease", "wakes.jsonl"];
@@ -677,6 +685,7 @@ const rows = () => existsSync(`${state}/launches`) ? readFileSync(`${state}/laun
 const hosts = () => rows().filter((row) => row.startsWith("host="));
 const plains = () => rows().filter((row) => row.startsWith("plain="));
 const sent = [];
+const received = [];
 const handlers = new Map();
 let tool;
 let hooks;
@@ -688,6 +697,7 @@ const api = {
   sendUserMessage(message) { record(message); },
 };
 function record(message) {
+  received.push(message);
   if (message.includes("TURN WOULD END BLIND")) throw new Error(`competing blind prompt: ${message}`);
   const selected = existsSync(`${process.env.FM_HOME}/config/session-launch-policy`) ? plains().at(-1) : hosts().at(-1);
   const pid = selected?.match(/^(?:host|plain)=([0-9]+)/)?.[1];
@@ -745,6 +755,23 @@ try {
     }
     if (existsSync(`${state}/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("consumed refusal remained in replacement handoff");
   } else {
+  if (phase === "retry") {
+    if (await arm() !== "failed") throw new Error("fake host startup did not fail readiness");
+    if (hosts().length !== 1 || plains().length || received.length) throw new Error("startup failure did not retain the first host until close");
+    writeFileSync(`${process.env.FM_HOME}/config/session-launch-policy`, "omp-or-tc\n");
+    writeFileSync(`${state}/release-startup`, "release\n");
+    await until(() => existsSync(`${state}/refusal-output`) &&
+      readFileSync(`${state}/refusal-output`, "utf8").includes("supervision-host: launch policy refused:"),
+      "scheduled retry did not reach the real policy refusal");
+    if (hosts().length !== 2 || !readFileSync(`${state}/refusal-output`, "utf8").includes("supervision-host: launch policy refused:")) {
+      throw new Error(`scheduled retry did not refuse under the enabled policy: ${rows().join(" | ")}`);
+    }
+    if (received.length) throw new Error(`refused retry delivered before close-owned restoration: ${JSON.stringify(received)}`);
+    writeFileSync(`${state}/release-refusal`, "release\n");
+    await until(() => existsSync(`${state}/restoring-plain`), "retry refusal did not start ordinary restoration");
+    if (received.length) throw new Error(`retry refusal delivered before ordinary readiness: ${JSON.stringify(received)}`);
+    writeFileSync(`${state}/release-restoration`, "release\n");
+  }
   if (turnend && phase === "initial") {
     const idle = { event: { type: "session.idle", properties: { sessionID: "fixture-policy" } } };
     await turnend.event(idle);
@@ -782,6 +809,11 @@ try {
   writeFileSync(`${state}/release-plain`, "release\n");
   await until(() => sent.some(ordinary) && plains().length === 2, "ordinary close did not continue monitoring");
   if (sent.filter(ordinary).length !== 1 || sent.filter(refusal).length !== 1 || hosts().length !== expectedHosts) throw new Error(`ordinary close repeated denial or delivery: ${JSON.stringify({ sent, launches: rows() })}`);
+  if (phase === "retry" && (received.filter(refusal).length !== 1 ||
+      received.some((message) => message.includes("could not launch a continuity retry (refused)")) ||
+      received.length !== sent.length)) {
+    throw new Error(`scheduled refusal had competing or duplicate delivery: ${JSON.stringify({ received, sent })}`);
+  }
   if (turnend && existsSync(`${state}/generic-guard`)) throw new Error("coordinator-owned refusal or monitoring invoked generic guard");
   if (consumer === "omp") {
     await handlers.get("session_shutdown")({}, {});
@@ -835,6 +867,9 @@ if command -v bun >/dev/null 2>&1; then
         fi
       done
     done
+  done
+  for publication in published failed; do
+    test_primary_consumer_policy_refusal opencode "$publication" retry
   done
   for selection in empty default unverified extra; do
     for replay_policy in denied removed; do

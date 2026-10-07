@@ -86,6 +86,35 @@ test_supervision_host_protocol_on_every_arm_owner() {
   pass "renderer gives each non-Pi arm owner the host protocol in its own terms, and grok arms the host"
 }
 
+test_denied_grok_host_renders_only_ordinary_monitoring() {
+  local home policy out repair ordinary
+  home="$TMP_ROOT/grok-denied-home"
+  mkdir -p "$home/state" "$home/config"
+  printf 'claude\n' > "$home/config/supervision-host"
+  for policy in omp-or-tc malformed; do
+    printf '%s\n' "$policy" > "$home/config/session-launch-policy"
+    out=$(FM_HOME="$home" "$RENDER" --harness grok)
+    assert_contains "$out" "supervision-host: launch policy refused:" "denied rendering lost its diagnostic"
+    assert_contains "$out" 'exec bin/fm-watch-arm.sh`' "denied initial rendering did not select the ordinary watcher"
+    assert_not_contains "$out" "bin/fm-supervision-host.sh park" "denied rendering still selected the host"
+    ordinary=$(printf '%s\n' "$out" | grep -F -- '- Ordinary wake:')
+    assert_contains "$ordinary" "bin/fm-watch-arm.sh" "denied ordinary wake would retry the host"
+    repair=$(FM_HOME="$home" "$RENDER" --harness grok --repair-line)
+    assert_contains "$repair" "supervision-host: launch policy refused:" "denied repair lost its diagnostic"
+    assert_contains "$repair" "bin/fm-watch-arm.sh" "denied repair would not restore ordinary monitoring"
+    assert_not_contains "$repair" "bin/fm-supervision-host.sh park" "denied repair would retry the host"
+    FM_HOME="$home" "$RENDER" --harness grok --read-only 1 >/dev/null
+    assert_absent "$home/state/.lock" "renderer fabricated a session lock"
+    assert_absent "$home/state/.wake-queue" "renderer published a refusal wake"
+    assert_absent "$home/state/.session-launch-refused-.supervision-host" "renderer wrote a refusal receipt"
+  done
+  rm "$home/config/session-launch-policy"
+  out=$(FM_HOME="$home" "$RENDER" --harness grok)
+  assert_contains "$out" 'exec bin/fm-supervision-host.sh park`' "absent policy no longer permits the host"
+  assert_not_contains "$out" "launch policy refused:" "absent policy rendered a refusal"
+  pass "Grok renders read-only refusal diagnostics and ordinary initial, repair, and wake commands"
+}
+
 test_unknown_fallback() {
   local out
   out=$("$RENDER" --harness not-real)
@@ -289,6 +318,7 @@ test_pi_snippet_uses_effective_extension_path() {
 
 test_supervision_host_protocol_only_on_an_opted_in_claude_home
 test_supervision_host_protocol_on_every_arm_owner
+test_denied_grok_host_renders_only_ordinary_monitoring
 test_selected_harness_block_only
 test_unknown_fallback
 test_conditional_stanzas

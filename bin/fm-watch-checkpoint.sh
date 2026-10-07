@@ -111,7 +111,21 @@ positive_or() {  # <value> <default>
   case "$1" in ''|0*|*[!0-9]*) printf '%s\n' "$2" ;; *) printf '%s\n' "$1" ;; esac
 }
 
+HOST_MODE=0
 if [ -f "$CONFIG/supervision-host" ]; then
+  HOST_MODE=1
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  . "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
+  if fm_session_lock_owned_by_self "$STATE"; then
+    . "$SCRIPT_DIR/fm-wake-lib.sh"
+    if ! fm_supervision_host_autoarm_enabled "$CONFIG" codex "$STATE"; then
+      HOST_MODE=0
+      [ -z "$FM_SUPERVISION_HOST_REFUSAL_WAKE" ] || printf '%s\n' "$FM_SUPERVISION_HOST_REFUSAL_WAKE"
+    fi
+  fi
+fi
+
+if [ "$HOST_MODE" -eq 1 ]; then
   BOUND=$SECONDS_ARG
   if [ -f "$STATE/.afk-contract" ]; then
     AWAY_BOUND=$(positive_or "${FM_CODEX_WATCH_CHECKPOINT_AWAY:-}" 3600)
@@ -127,24 +141,32 @@ if [ -f "$CONFIG/supervision-host" ]; then
     run_bounded $((LIMIT + 120)) "$SCRIPT_DIR/fm-supervision-host.sh" park >"$OUT" 2>"$ERR"
   RC=$?
   set -e
-  if grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT" 2>/dev/null \
-    | grep -Ev '^supervision-host: cycle boundary' >/dev/null; then
-    grep -Ev '^watcher: (started|attached) ' "$OUT"
+  if grep -q '^supervision-host: launch policy refused:' "$OUT" 2>/dev/null; then
+    cat "$OUT"
     [ ! -s "$ERR" ] || cat "$ERR" >&2
-    exit 0
+    fm_session_lock_owned_by_self "$STATE" || exit 1
+    . "$SCRIPT_DIR/fm-wake-lib.sh"
+    fm_supervision_host_autoarm_enabled "$CONFIG" codex "$STATE" || true
+  else
+    if grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT" 2>/dev/null \
+      | grep -Ev '^supervision-host: cycle boundary' >/dev/null; then
+      grep -Ev '^watcher: (started|attached) ' "$OUT"
+      [ ! -s "$ERR" ] || cat "$ERR" >&2
+      exit 0
+    fi
+    if grep -E '^supervision-host: cycle boundary' "$OUT" >/dev/null 2>&1; then
+      printf 'checkpoint: no actionable wake within %ss\n' "$BOUND"
+      exit 124
+    fi
+    [ ! -s "$OUT" ] || cat "$OUT"
+    [ ! -s "$ERR" ] || cat "$ERR" >&2
+    if [ "$RC" -eq 124 ]; then
+      echo "checkpoint: the supervision host outlived its own bound of ${BOUND}s" >&2
+      exit 1
+    fi
+    [ "$RC" -ne 0 ] || RC=1
+    exit "$RC"
   fi
-  if grep -E '^supervision-host: cycle boundary' "$OUT" >/dev/null 2>&1; then
-    printf 'checkpoint: no actionable wake within %ss\n' "$BOUND"
-    exit 124
-  fi
-  [ ! -s "$OUT" ] || cat "$OUT"
-  [ ! -s "$ERR" ] || cat "$ERR" >&2
-  if [ "$RC" -eq 124 ]; then
-    echo "checkpoint: the supervision host outlived its own bound of ${BOUND}s" >&2
-    exit 1
-  fi
-  [ "$RC" -ne 0 ] || RC=1
-  exit "$RC"
 fi
 
 set +e

@@ -81,9 +81,15 @@ Hook, plugin, extension, and checkpoint owners pass their harness as the primary
 Grok's model-owned call relies on primary detection.
 The host pins dispatched work to the primary's crew harness rather than the engine's.
 
-Grok's arm command is fixed when the session-start block renders.
-So adding or removing the file on a Grok home takes effect at the next session start.
+Grok's rendered initial, repair, and ordinary-wake commands select the ordinary watcher when an enabled or malformed session launch policy refuses the host, and retain the refusal diagnostic.
+Rendering is read-only: it publishes no refusal wake or receipt and acquires no session lock.
+The command is selected at render time; policy changes after rendering still reach the host's own activation check, so main must follow a refusal's ordinary-supervision direction rather than repeat the rendered host command.
 The other owners read the file at every arm.
+
+Codex checks actual session-lock ownership before publishing a preflight refusal and runs the ordinary foreground watcher instead of the denied host.
+A host refusal after selection likewise retains the diagnostic and returns to ordinary foreground monitoring only while the primary still owns the session lock.
+The ordinary watcher and host retain their own ownership checks; refusal output alone is not a successful checkpoint.
+Without a session launch policy, existing opted-in host behavior is unchanged.
 
 ### The report surface
 
@@ -264,8 +270,8 @@ So it never stops the owner's host or watcher or releases its leases.
 
 ### A host that dies without a close
 
-The host's owner retries it.
-Grok's model and Codex's checkpoint see it as a failed cycle and start the next one.
+The host's owner retries a host that died without a close, not one that returned a launch-policy refusal.
+Grok's model and Codex's checkpoint see a missing close as a failed cycle and start the next one.
 Before it arms, the next host does two things:
 
 - It stops, by recorded identity, whatever its predecessor left running, including the engine descendants a killed turn recorded.
@@ -311,6 +317,8 @@ The checkpoint passes it as the boundary and reports the boundary as its ordinar
 |---|---|
 | Attended | `FM_CODEX_WATCH_CHECKPOINT` (default 180 seconds). |
 | Away record exists | Raised to `FM_CODEX_WATCH_CHECKPOINT_AWAY` (default 3,600) if longer, then capped at 27,000 seconds so a parked main is not woken every few minutes. |
+
+These raised host bounds do not apply after a launch-policy refusal: ordinary monitoring uses the requested foreground checkpoint bound.
 
 Because that bound is not a harness timeout, the checkpoint also sets `FM_SUPERVISION_HOST_PARK_LIMIT`.
 That setting lets an engine turn that starts before the boundary finish after it.

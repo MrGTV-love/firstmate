@@ -15,6 +15,96 @@ make_home() {
   printf '%s\n' "$home"
 }
 
+run_owned_checkpoint() {
+  local home=$1 command=${2:-$CHECKPOINT} seconds=${3:-5} repeat=${4:-once}
+  mkdir -p "$home/primary-bin"
+  [ -e "$home/primary-bin/codex" ] || ln -s /bin/bash "$home/primary-bin/codex"
+  STATUS=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 FM_HEARTBEAT=999999 \
+    "$home/primary-bin/codex" -c '
+      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      "$0" --seconds "$1"
+      first_status=$?
+      if [ -f "$FM_HOME/state/.last-watcher-beat" ]; then
+        cp "$FM_HOME/state/.last-watcher-beat" "$FM_HOME/first-watcher-beat"
+      fi
+      if [ "$2" = repeat ]; then
+        "$3" > "$FM_HOME/drained.txt" 2> "$FM_HOME/drained.err" || exit 1
+        generation=
+        while IFS= read -r line; do
+          case "$line" in
+            WAKE_ACK_REQUIRED:*)
+              read -r -a fields <<< "$line"
+              count=${#fields[@]}
+              cutoff=${fields[$((count - 3))]}
+              generation=${fields[$((count - 1))]}
+              ;;
+          esac
+        done < "$FM_HOME/drained.err"
+        [ -n "$generation" ] || exit 1
+        "$3" --ack-through "$cutoff" --recovery-generation "$generation" \
+          > "$FM_HOME/ack.txt" 2> "$FM_HOME/ack.err" || exit 1
+        "$0" --seconds "$1" > "$FM_HOME/second.out" 2> "$FM_HOME/second.err"
+        printf "%s\n" "$?" > "$FM_HOME/second.code"
+      fi
+      exit "$first_status"
+    ' "$command" "$seconds" "$repeat" "$ROOT/bin/fm-wake-drain.sh" >"$home/out.txt" 2>"$home/err.txt" || STATUS=$?
+}
+
+register_monitor_check() {
+  local home=$1
+  cat > "$home/state/ordinary-monitor.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'ordinary-monitor-ran\n' >> "$FM_HOME/monitor-effects"
+printf 'ordinary-monitor-active\n'
+SH
+  chmod 0700 "$home/state/ordinary-monitor.check.sh"
+  FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" ordinary-monitor >/dev/null \
+    || fail "could not register ordinary checkpoint monitor"
+}
+
+test_denied_host_preflight_runs_real_ordinary_monitor() {
+  local policy home drained
+  for policy in omp-or-tc malformed; do
+    home=$(make_home "denied-$policy")
+    printf 'claude\n' > "$home/config/supervision-host"
+    printf '%s\n' "$policy" > "$home/config/session-launch-policy"
+    register_monitor_check "$home"
+    run_owned_checkpoint "$home" "$CHECKPOINT" 5 repeat
+    expect_code 0 "$STATUS" "denied host ordinary check wake: $(cat "$home/out.txt" "$home/err.txt")"
+    assert_contains "$(cat "$home/out.txt")" "supervision-host: launch policy refused:" "preflight denial lost its diagnostic"
+    assert_contains "$(cat "$home/out.txt")" "check: rearm-resurface" "preflight denial did not deliver the real watcher's recovery wake"
+    expect_code 0 "$(cat "$home/second.code")" "second denied checkpoint ordinary check wake"
+    assert_contains "$(cat "$home/second.out")" "ordinary-monitor-active" "unchanged denial did not continue ordinary monitoring"
+    assert_not_contains "$(cat "$home/second.out" "$home/second.err")" "launch policy refused:" "unchanged denial redelivered its diagnostic"
+    assert_contains "$(cat "$home/monitor-effects")" "ordinary-monitor-ran" "denied host did not run ordinary monitoring"
+    assert_present "$home/first-watcher-beat" "first denied checkpoint did not start ordinary monitoring"
+    assert_present "$home/state/.last-watcher-beat" "denied host did not publish a real watcher beacon"
+    assert_absent "$home/state/.supervision-host.log" "denied preflight launched the host"
+    assert_absent "$home/state/.watch.lock/pid" "ordinary monitoring left its foreground watcher alive"
+    assert_contains "$(cat "$home/drained.txt")" "launch policy refused:" "owned preflight denial did not retain its refusal wake"
+    drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh")
+    assert_not_contains "$drained" "launch policy refused:" "unchanged denial requeued its refusal"
+  done
+  pass "denied and malformed host policies restore real ordinary foreground monitoring"
+}
+
+test_unowned_denial_cannot_publish_refusal() {
+  local home status
+  home=$(make_home denied-unowned)
+  printf 'claude\n' > "$home/config/supervision-host"
+  printf 'omp-or-tc\n' > "$home/config/session-launch-policy"
+  printf '%s\n' "$$" > "$home/state/.lock"
+  status=0
+  FM_HOME="$home" "$CHECKPOINT" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 1 "$status" "unowned denied checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "supervision-host stood down" "host did not retain ownership validation"
+  assert_absent "$home/state/.session-launch-refused-.supervision-host" "unowned checkpoint wrote a refusal receipt"
+  assert_absent "$home/state/.wake-queue" "unowned checkpoint published a refusal wake"
+  assert_absent "$home/state/.last-watcher-beat" "unowned checkpoint restored someone else's watcher"
+  pass "checkpoint checks actual ownership before refusal publication"
+}
+
 test_quiet_checkpoint_exits_124_cleanly() {
   local home out err status
   home=$(make_home quiet)
@@ -89,8 +179,18 @@ make_host_home() {  # <name>
   home=$(make_home "$1")
   mkdir -p "$home/root/bin"
   cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-session-lock-lib.sh" "$ROOT/bin/fm-cursor-lib.sh" \
+    "$ROOT/bin/fm-supervision-engine-lib.sh" "$ROOT/bin/fm-session-launch-policy-lib.sh" \
+    "$ROOT/bin/fm-config-inherit-lib.sh" "$ROOT/bin/fm-startup-memory-budget-lib.sh" \
+    "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-path-lib.sh" "$home/root/bin/"
+  cat > "$home/root/bin/fm-watch.sh" <<SH
+#!/usr/bin/env bash
+exec "$ROOT/bin/fm-watch.sh" "\$@"
+SH
+  chmod +x "$home/root/bin/fm-watch.sh"
   cat > "$home/root/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
+printf 'host-call\n' >> "$FM_HOME/host-calls"
 printf 'args=%s\nprimary=%s\npark=%s\nlimit=%s\n' "$*" "${FM_SUPERVISION_HOST_PRIMARY:-}" \
   "${FM_SUPERVISION_HOST_PARK_SECONDS:-}" "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" > "$FM_HOME/host-env"
 case "$(cat "$FM_HOME/host-kind")" in
@@ -100,6 +200,18 @@ case "$(cat "$FM_HOME/host-kind")" in
     printf 'signal: demo.status\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
     ;;
   stood-down) printf 'supervision-host stood down: this session no longer owns supervision\n' ;;
+  refusal|refusal-lost-owner)
+    printf 'omp-or-tc\n' > "$FM_HOME/config/session-launch-policy"
+    if [ "$(cat "$FM_HOME/host-kind")" = refusal-lost-owner ]; then
+      printf '0\n' > "$FM_HOME/state/.lock"
+    else
+      . "$(dirname "$0")/fm-wake-lib.sh"
+      fm_recovery_marker_publish "$FM_HOME/state/.watcher-down" downtime || exit 1
+      cp "$FM_HOME/state/.watcher-down" "$FM_HOME/runtime-recovery-marker"
+    fi
+    printf 'supervision-host: launch policy refused: transition-fixture\n'
+    exit 1
+    ;;
 esac
 SH
   chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-supervision-host.sh"
@@ -172,6 +284,40 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
   pass "checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint"
 }
 
+test_runtime_host_refusal_restores_real_monitor_only_for_owner() {
+  local home drained
+  home=$(make_host_home host-refusal-transition)
+  register_monitor_check "$home"
+  printf 'refusal\n' > "$home/host-kind"
+  run_owned_checkpoint "$home" "$home/root/bin/fm-watch-checkpoint.sh" 5 repeat
+  expect_code 0 "$STATUS" "runtime refused host ordinary check wake: $(cat "$home/out.txt" "$home/err.txt")"
+  assert_equals "host-call" "$(cat "$home/host-calls")" "runtime refusal retried the denied host"
+  assert_contains "$(cat "$home/out.txt")" "launch policy refused: transition-fixture" "runtime refusal was not retained"
+  assert_contains "$(cat "$home/out.txt")" "check: rearm-resurface" "runtime refusal bypassed the real watcher's recovery wake"
+  expect_code 0 "$(cat "$home/second.code")" "post-refusal checkpoint ordinary check wake"
+  assert_contains "$(cat "$home/second.out")" "ordinary-monitor-active" "post-refusal checkpoint did not continue ordinary monitoring"
+  assert_not_contains "$(cat "$home/second.out" "$home/second.err")" "launch policy refused:" "post-refusal checkpoint repeated the unchanged refusal"
+  assert_contains "$(cat "$home/monitor-effects")" "ordinary-monitor-ran" "runtime refusal did not execute the ordinary check"
+  assert_present "$home/first-watcher-beat" "runtime refusal checkpoint did not start ordinary monitoring"
+  assert_present "$home/runtime-recovery-marker" "runtime host fixture did not publish its recovery episode"
+  assert_present "$home/state/.last-watcher-beat" "runtime refusal did not start the ordinary watcher"
+  assert_contains "$(cat "$home/drained.txt")" "launch policy refused:" "runtime refusal did not publish the owned refusal"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh")
+  assert_not_contains "$drained" "launch policy refused:" "post-refusal checkpoint requeued its refusal"
+  home=$(make_host_home host-refusal-lost-owner)
+  register_monitor_check "$home"
+  printf 'refusal-lost-owner\n' > "$home/host-kind"
+  run_owned_checkpoint "$home" "$home/root/bin/fm-watch-checkpoint.sh"
+  expect_code 1 "$STATUS" "runtime refusal after losing ownership"
+  assert_equals "host-call" "$(cat "$home/host-calls")" "lost-owner refusal retried the host"
+  assert_absent "$home/monitor-effects" "lost owner restored ordinary monitoring"
+  assert_absent "$home/state/.wake-queue" "lost owner published a refusal wake"
+  assert_absent "$home/state/.session-launch-refused-.supervision-host" "lost owner wrote a refusal receipt"
+  assert_absent "$home/state/.watcher-down" "lost owner published a recovery marker"
+  assert_absent "$home/runtime-recovery-marker" "lost owner entered the owned recovery fixture"
+  pass "runtime policy refusal restores real foreground monitoring only while the primary still owns supervision"
+}
+
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
@@ -179,3 +325,6 @@ test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture
 test_host_checkpoint_passes_a_handback_and_reports_a_stand_down
 test_real_host_checkpoint_ends_quietly_at_its_bound
+test_denied_host_preflight_runs_real_ordinary_monitor
+test_unowned_denial_cannot_publish_refusal
+test_runtime_host_refusal_restores_real_monitor_only_for_owner

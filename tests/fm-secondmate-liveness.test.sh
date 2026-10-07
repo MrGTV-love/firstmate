@@ -39,6 +39,10 @@ BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 fm_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-liveness)
+FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
+mkdir -p "$FIXTURE_ROOT"
+ln -s "$ROOT/bin" "$FIXTURE_ROOT/bin"
+ln -s "$ROOT/.omp" "$FIXTURE_ROOT/.omp"
 
 # --- unit level: fm_backend_tmux_agent_state --------------------------------
 
@@ -206,8 +210,14 @@ test_agent_state_dispatcher_and_compatibility() {
 # diagnostics need to stay quiet (mirrors tests/fm-secondmate-sync.test.sh's
 # make_fake_toolchain), MINUS tmux - callers add their own controllable tmux.
 make_toolchain() {
-  local dir=$1 fakebin
+  local dir=$1 fakebin real_jq
   fakebin=$(fm_fakebin "$dir")
+  real_jq=$(command -v jq 2>/dev/null) || fail "jq is required for secondmate liveness tests"
+  cat > "$fakebin/jq" <<SH
+#!/usr/bin/env bash
+exec '$real_jq' "\$@"
+SH
+  chmod +x "$fakebin/jq"
   fm_fake_exit0 "$fakebin" node chrome-devtools-axi pi-signed
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.77
   cat > "$fakebin/gh-axi" <<'SH'
@@ -311,14 +321,9 @@ SH
 }
 
 # new_world <name>: a scratch firstmate HOME (state/, watcher beacon, pinned
-# harness) with no kind=secondmate meta yet. FM_ROOT is left to resolve
-# naturally to the real checkout under test ($ROOT), exactly as production
-# always has it - this sweep's own fm-spawn.sh invocation resolves the
-# secondmate harness through $FM_ROOT/bin/fm-harness.sh, which only exists in
-# the real tree. The harness is pinned because ambient own-harness detection is
-# environment-dependent: interactive harness sessions expose markers or parent
-# process names, while a plain pipeline shell can fall through to "unknown",
-# which has no fm-spawn.sh launch template.
+# harness) with no kind=secondmate meta yet. The operational homes are siblings
+# of FIXTURE_ROOT; its bin/ uses the checkout's production scripts. The pinned
+# harness keeps replacement selection independent of ambient harness detection.
 new_world() {
   local name=$1 w
   w="$TMP_ROOT/$name"
@@ -328,10 +333,8 @@ new_world() {
   printf '%s\n' "$w"
 }
 
-# add_sm_home <w> <id> <window>: a plain (non-git) secondmate home - the
-# probe/respawn machinery under test never requires the home to be a real
-# worktree; a non-git home just makes the unrelated fast-forward sweep log a
-# harmless "not a git repo" skip.
+# add_sm_home <w> <id> <window>: a seeded secondmate home with an independent
+# git repository and no origin.
 add_sm_home() {
   local w=$1 id=$2 window=$3 harness=${4:-claude}
   local home="$w/$id"
@@ -351,7 +354,7 @@ add_sm_home() {
 
 run_bootstrap() {  # <fakebin> <home> <pane-cmd> <call-log> [extra env...] -> stdout
   local fb=$1 home=$2 cmd=$3 log=$4; shift 4
-  PATH="$fb:$BASE_PATH" TMUX='' FM_BACKEND=tmux FM_HOME="$home" \
+  PATH="$fb:$BASE_PATH" TMUX='' FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
     FM_CONFIG_OVERRIDE="$home/config" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_TEST_PANE_CMD="$cmd" FM_TMUX_CALL_LOG="$log" \
     env "$@" "$ROOT/bin/fm-bootstrap.sh" 2>&1
@@ -365,6 +368,8 @@ test_sweep_respawns_confirmed_dead_secondmate() {
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
+  assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawn failed" \
+    "legacy recovery failed before allocating its replacement"
 
   assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawned" \
     "a successfully respawned secondmate should be handled silently"
@@ -374,6 +379,7 @@ test_sweep_respawns_confirmed_dead_secondmate() {
     "a confirmed-dead secondmate should actually be relaunched"
   assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-sm1" \
     "the shared library did not leave the durable per-mate relaunch record"
+  [ ! -e "$w/sm1/config/session-launch-policy" ] || fail "absent policy unexpectedly changed child policy"
   pass "sweep: a confirmed-dead secondmate endpoint is killed and respawned"
 }
 
@@ -486,6 +492,8 @@ test_sweep_launch_policy_allows_configured_omp_replacement() {
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
+  assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawn failed" \
+    "allowed recovery failed before allocating its replacement"
 
   assert_not_contains "$out" "SECONDMATE_LIVENESS:" "allowed replacement failed recovery"
   assert_contains "$(cat "$log")" "kill-window" "allowed replacement did not remove the dead endpoint"
@@ -494,6 +502,8 @@ test_sweep_launch_policy_allows_configured_omp_replacement() {
   assert_grep 'model=openai-codex/gpt-6.1-sol' "$w/home/state/sm1.meta" "recovery lost the configured model"
   assert_grep 'effort=high' "$w/home/state/sm1.meta" "recovery lost the configured effort"
   assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-sm1" "allowed replacement outcome was not ledgered"
+  assert_equals 'omp-or-tc' "$(cat "$w/sm1/config/session-launch-policy")" \
+    "allowed replacement did not converge its child policy"
   pass "sweep: policy accepts the configured omp profile rather than the previous harness"
 }
 
@@ -711,6 +721,7 @@ probe_remote() {
   local w=$1 mode=$2; shift 2
   # shellcheck disable=SC2016 # positional params expand in the child shell.
   env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$w/home/config" FM_STATE_OVERRIDE="$w/home/state" \
     FM_SSH_BIN="$w/fakebin/ssh" FM_FAKE_SSH_LOG="$w/ssh.log" "$@" \
     bash -c '
       . "$0/bin/fm-secondmate-liveness-lib.sh"
@@ -767,6 +778,178 @@ test_remote_poll_probe_unreachable_preserves_route() {
   pass "poll probe: unreachable or inconclusive remote reads preserve the route"
 }
 
+make_remote_readiness_world() {
+  local w
+  w=$(make_remote_probe_world "$1")
+  printf 'codex\n' > "$w/home/config/crew-harness"
+  printf 'alive\n' > "$w/endpoint"
+  printf 'spawn_gen=remote-generation\n' >> "$w/home/state/rsm1.meta"
+  cat > "$w/fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+set -u
+argv=${!#}
+encoded() { printf '%s\0' "$@" | base64 | tr -d '\n'; }
+if [ "$argv" = "$(encoded fm-remote-doctor.sh)" ]; then
+  printf 'doctor\n' >> "$FM_FAKE_SSH_LOG"
+  [ -e "$FM_FAKE_SSH_LOG.repaired" ] && exit 0
+  printf 'check herdr=fixable: foreign server\n'
+  exit 1
+elif [ "$argv" = "$(encoded fm-remote-doctor.sh --fix)" ]; then
+  printf 'doctor --fix\n' >> "$FM_FAKE_SSH_LOG"
+  : > "$FM_FAKE_SSH_LOG.repaired"
+  printf 'dead\n' > "$FM_FAKE_REMOTE_ENDPOINT"
+elif [ "$argv" = "$(encoded fm-remote-secondmate-control.sh state rsm1)" ]; then
+  printf 'state\n' >> "$FM_FAKE_SSH_LOG"
+  cat "$FM_FAKE_REMOTE_ENDPOINT"
+elif [ "$argv" = "$(encoded fm-remote-secondmate-control.sh route rsm1)" ]; then
+  printf 'route\n' >> "$FM_FAKE_SSH_LOG"
+  printf 'backend=herdr\n'
+else
+  printf 'unexpected remote command\n' >&2
+  exit 1
+fi
+SH
+  printf '%s\n' "$w"
+}
+
+recover_remote() {
+  local w=$1 mode=$2; shift 2
+  env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$w/home/config" FM_STATE_OVERRIDE="$w/home/state" \
+    FM_WAKE_QUEUE="$w/home/state/.wake-queue" FM_WAKE_QUEUE_LOCK="$w/home/state/.wake-queue.lock" \
+    FM_SSH_BIN="$w/fakebin/ssh" FM_FAKE_SSH_LOG="$w/ssh.log" \
+    FM_FAKE_REMOTE_ENDPOINT="$w/endpoint" "$@" bash -c '
+      . "$0/bin/fm-secondmate-liveness-lib.sh"
+      fm_secondmate_liveness_lock rsm1 || exit 1
+      fm_secondmate_liveness_probe "$1" rsm1 "$2"
+      rc=0
+      if [ "$FM_SM_LIVE_STATUS" = relaunchable ]; then
+        fm_secondmate_liveness_relaunch "$1" rsm1 || rc=$?
+      fi
+      printf "%s|%s|%s|%s\n%s\n%s\n" "$FM_SM_LIVE_STATUS" "$FM_SM_LIVE_STATE" \
+        "${FM_SM_LIVE_POLICY_REFUSED:-0}" "$rc" "$FM_SM_LIVE_REASON" "${FM_SM_LIVE_WAKE:-}"
+      fm_secondmate_liveness_unlock rsm1
+    ' "$ROOT" "$w/home/state/rsm1.meta" "$mode"
+}
+
+test_remote_full_probe_policy_precedes_readiness_repair() {
+  local w pin state config out expected
+  for pin in codex fallback malformed override; do
+    for state in alive dead missing ambiguous unreadable; do
+      w=$(make_remote_readiness_world "full-policy-$pin-$state")
+      config="$w/home/config"
+      printf 'omp-or-tc\n' > "$config/session-launch-policy"
+      case "$pin" in
+        codex) printf 'codex explicit-model high\n' > "$config/secondmate-harness" ;;
+        fallback) printf 'default\n' > "$config/secondmate-harness" ;;
+        malformed)
+          printf 'invalid\n' > "$config/session-launch-policy"
+          printf 'omp explicit-model high\n' > "$config/secondmate-harness" ;;
+        override)
+          printf 'omp\n' > "$config/secondmate-harness"
+          config="$w/override-config"
+          mkdir -p "$config"
+          printf 'omp-or-tc\n' > "$config/session-launch-policy"
+          printf 'codex explicit-model high\n' > "$config/secondmate-harness" ;;
+      esac
+      printf '%s\n' "$state" > "$w/endpoint"
+      cp "$w/home/state/rsm1.meta" "$w/meta-before"
+      out=$(probe_remote "$w" full FM_CONFIG_OVERRIDE="$config" FM_FAKE_REMOTE_ENDPOINT="$w/endpoint")
+      case "$state" in
+        alive) expected='alive|alive|0|||' ;;
+        dead|missing) expected="relaunchable|$state|0|remote endpoint $state on its configured host|host=lab-host|" ;;
+        *) expected="skipped|$state|0|||remote endpoint state is $state on lab-host" ;;
+      esac
+      [ "$out" = "$expected" ] || fail "$pin policy stopped read-only classification of $state: $out"
+      assert_not_contains "$(cat "$w/ssh.log")" doctor "$pin probe ran readiness before replacement admission"
+      assert_contains "$(cat "$w/ssh.log")" state "$pin probe did not classify the remote endpoint"
+      [ ! -e "$w/ssh.log.repaired" ] || fail "$pin probe repaired a denied endpoint"
+      [ "$(cat "$w/endpoint")" = "$state" ] || fail "$pin probe changed endpoint state"
+      cmp -s "$w/meta-before" "$w/home/state/rsm1.meta" || fail "$pin probe changed route metadata"
+      [ ! -e "$w/home/state/.secondmate-relaunch-rsm1" ] || fail "$pin probe recorded a relaunch attempt"
+      [ ! -e "$w/home/state/.session-launch-refused-rsm1" ] || fail "$pin read-only probe recorded a refusal"
+    done
+  done
+  pass "full probe: denied and malformed replacement policies preserve remote endpoints while classifying them"
+}
+
+test_remote_full_probe_admitted_readiness_still_repairs() {
+  local w policy out
+  for policy in allowed absent; do
+    w=$(make_remote_readiness_world "full-policy-$policy")
+    if [ "$policy" = allowed ]; then
+      printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
+      printf 'omp explicit-model high\n' > "$w/home/config/secondmate-harness"
+    fi
+    out=$(probe_remote "$w" full FM_FAKE_REMOTE_ENDPOINT="$w/endpoint")
+    [ "$out" = 'relaunchable|dead|0|remote endpoint dead on its configured host|host=lab-host|' ] \
+      || fail "$policy full probe did not preserve readiness behavior: $out"
+    [ "$(cat "$w/ssh.log")" = "$(printf 'doctor\ndoctor --fix\ndoctor\nstate')" ] \
+      || fail "$policy full probe changed the readiness repair sequence: $(cat "$w/ssh.log")"
+    [ -e "$w/ssh.log.repaired" ] || fail "$policy full probe did not run the doctor repair sentinel"
+    [ "$(cat "$w/endpoint")" = dead ] || fail "$policy repair sentinel did not exercise endpoint mutation"
+  done
+  pass "full probe: allowed omp and absent policy retain the readiness repair sequence"
+}
+
+test_remote_policy_refusal_survives_relaunch_boundary() {
+  local w mode policy state out
+  for mode in full poll; do
+    for policy in denied malformed; do
+      for state in dead missing; do
+        w=$(make_remote_readiness_world "remote-recovery-$mode-$policy-$state")
+        case "$policy" in
+          denied) printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy" ;;
+          malformed) printf 'invalid\n' > "$w/home/config/session-launch-policy" ;;
+        esac
+        printf '%s\n' "$state" > "$w/endpoint"
+        cp "$w/home/state/rsm1.meta" "$w/meta-before"
+        out=$(recover_remote "$w" "$mode")
+        assert_contains "$out" "skipped|$state|1|1" "$mode $policy recovery lost its policy refusal"
+        assert_contains "$out" 'config/session-launch-policy' "$mode recovery lost the admission diagnostic"
+        assert_contains "$out" 'auto-relaunch refused' "$mode recovery did not retain the refusal wake"
+        assert_equals 'remote-generation' "$(sed -n '1p' "$w/home/state/.session-launch-refused-rsm1")" \
+          "$mode recovery did not retain the generation-scoped refusal receipt"
+        assert_not_contains "$(cat "$w/ssh.log")" doctor "$mode refused recovery invoked readiness repair"
+        [ "$(cat "$w/endpoint")" = "$state" ] || fail "$mode refused recovery changed endpoint state"
+        cmp -s "$w/meta-before" "$w/home/state/rsm1.meta" || fail "$mode refused recovery changed metadata"
+        [ ! -e "$w/home/state/.secondmate-relaunch-rsm1" ] || fail "$mode refused recovery consumed an attempt"
+      done
+    done
+  done
+  pass "remote recovery: full and poll retain policy diagnostics and receipts without repair or attempts"
+}
+
+test_remote_relaunch_rechecks_probe_admission() {
+  local w out
+  w=$(make_remote_readiness_world remote-policy-recheck)
+  printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
+  printf 'omp explicit-model high\n' > "$w/home/config/secondmate-harness"
+  out=$(env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$w/home/config" FM_STATE_OVERRIDE="$w/home/state" \
+    FM_WAKE_QUEUE="$w/home/state/.wake-queue" FM_WAKE_QUEUE_LOCK="$w/home/state/.wake-queue.lock" \
+    FM_SSH_BIN="$w/fakebin/ssh" FM_FAKE_SSH_LOG="$w/ssh.log" FM_FAKE_REMOTE_ENDPOINT="$w/endpoint" \
+    bash -c '
+      . "$0/bin/fm-secondmate-liveness-lib.sh"
+      fm_secondmate_liveness_lock rsm1 || exit 1
+      fm_secondmate_liveness_probe "$1" rsm1 full
+      printf "probe=%s|%s\n" "$FM_SM_LIVE_STATUS" "$FM_SM_LIVE_STATE"
+      cp "$FM_FAKE_SSH_LOG" "$FM_FAKE_SSH_LOG.before-relaunch"
+      printf "codex explicit-model high\n" > "$FM_CONFIG_OVERRIDE/secondmate-harness"
+      rc=0
+      fm_secondmate_liveness_relaunch "$1" rsm1 || rc=$?
+      printf "%s|%s|%s|%s\n" "$FM_SM_LIVE_STATUS" "$FM_SM_LIVE_STATE" "$FM_SM_LIVE_POLICY_REFUSED" "$rc"
+      fm_secondmate_liveness_unlock rsm1
+    ' "$ROOT" "$w/home/state/rsm1.meta")
+  assert_contains "$out" 'probe=relaunchable|dead' "allowed probe did not reach a recovery verdict"
+  assert_contains "$out" 'skipped|dead|1|1' "relaunch reused stale probe admission"
+  assert_equals 'remote-generation' "$(sed -n '1p' "$w/home/state/.session-launch-refused-rsm1")" \
+    "changed replacement profile did not create a refusal receipt"
+  cmp -s "$w/ssh.log.before-relaunch" "$w/ssh.log" || fail "relaunch performed a remote mutation after policy changed"
+  [ ! -e "$w/home/state/.secondmate-relaunch-rsm1" ] || fail "changed replacement policy consumed an attempt"
+  pass "remote recovery: relaunch rechecks the current replacement profile after probe admission"
+}
+
 test_tmux_agent_state_classifies
 test_tmux_agent_state_rejects_malformed_targets_before_probe
 test_herdr_agent_state_preserves_husk_classifier
@@ -788,5 +971,9 @@ test_sweep_launch_policy_preserves_endpoint_and_records
 test_sweep_launch_policy_allows_configured_omp_replacement
 test_remote_poll_probe_maps_states
 test_remote_poll_probe_unreachable_preserves_route
+test_remote_full_probe_policy_precedes_readiness_repair
+test_remote_full_probe_admitted_readiness_still_repairs
+test_remote_policy_refusal_survives_relaunch_boundary
+test_remote_relaunch_rechecks_probe_admission
 
 echo "# all fm-secondmate-liveness tests passed"
