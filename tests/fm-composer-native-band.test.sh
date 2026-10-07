@@ -287,6 +287,48 @@ test_compact_omp_uses_folded_floor_semantics() {
   pass "compact omp retains conservative floor admission, styled hint remnants and misaligned-body refusal"
 }
 
+test_literal_ownership_is_scoped_to_selected_pair() {
+  local historical top screen caps styled cursor identity want expected newer_row
+  for historical in $'❯ old draft\n ╭── π > model > path ─╮\n ╰─ ─╯' \
+      $'❯ old draft\n   '"$HEADER"$'\n  ╰─\n     old continuation'; do
+    case "$historical" in *'old continuation') newer_row=6 ;; *) newer_row=5 ;; esac
+    for top in '────────' '──────── Session ─'; do
+      screen="$historical"$'\n\n'"$top"$'\n❯ newer draft\n────────'
+      for styled in 0 1; do
+        for cursor in 0 1; do
+          for identity in '' $'claude\tidle' $'pi\tidle'; do
+            caps=$(printf 'styled=%s\ncursor=%s\nidentity=%s' "$styled" "$cursor" "${identity:+1}")
+            assert_screen "historical literal rows outside selected pair" pending \
+              "$caps" "$screen" "$newer_row" "$identity"
+          done
+        done
+        caps=$(printf 'styled=%s\ncursor=0\nidentity=0' "$styled")
+        assert_content "selected pair excludes historical literal rows" 'newer draft' "$caps" "$screen"
+      done
+      screen="$top"$'\n'"$historical"$'\n────────'
+      case "$historical" in
+        *'old continuation') expected="old draft $HEADER ╰─ old continuation" ;;
+        *) expected='old draft ╭── π > model > path ─╮ ╰─ ─╯' ;;
+      esac
+      for styled in 0 1; do
+        for cursor in 0 1; do
+          for identity in '' $'claude\tidle' $'pi\tidle'; do
+            want=pending
+            if [ "$styled" = 0 ] && [ "${identity%%$'\t'*}" != pi ]; then want=unknown; fi
+            caps=$(printf 'styled=%s\ncursor=%s\nidentity=%s' "$styled" "$cursor" "${identity:+1}")
+            assert_screen "literal rows inside selected pair retain conservative verdict" "$want" \
+              "$caps" "$screen" 2 "$identity"
+          done
+        done
+        caps=$(printf 'styled=%s\ncursor=0\nidentity=0' "$styled")
+        assert_content "selected pair retains its literal draft" "$expected" "$caps" "$screen"
+      done
+    done
+  done
+  pass "only literal rows inside the selected pair degrade an unstyled non-Pi verdict"
+}
+
+test_literal_ownership_is_scoped_to_selected_pair
 test_literal_band_rows_never_dispatch
 test_compact_omp_uses_folded_floor_semantics
 test_cursor_ambiguity_survives_later_band_continuations

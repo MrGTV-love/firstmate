@@ -2527,12 +2527,18 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
 # told from furniture without styling, so an unstyled capture never proves
 # them input unless the backend identity is exactly Pi.
 _fm_composer_pair_glyph_verdict() {  # <screen> <styled> <has-identity> <identity>
-  local state
+  local state row
   state=$(_fm_composer_classify_bare_pi_overlap "$1" "$2" "$3" "$4")
   if [ "$2" != 1 ] && [ "$state" = pending ] \
-     && [ "${4%%$'\t'*}" != pi ] \
-     && [ "$FM_COMPOSER_SCAN_BARE_LITERAL_ROWS" != '|' ]; then
-    state=unknown
+     && [ "${4%%$'\t'*}" != pi ]; then
+    row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+    while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+      if _fm_composer_row_is_bare_literal "$row"; then
+        state=unknown
+        break
+      fi
+      row=$((row + 1))
+    done
   fi
   printf '%s' "$state"
 }
