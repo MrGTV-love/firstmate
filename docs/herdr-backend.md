@@ -638,8 +638,8 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 1. Wait for `working` or `blocked` across a bounded polling window.
 2. If native status stays idle, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery, and proven pending text retries Enter.
-3. After the retry budget, `fm_composer_queued_enter_verdict` treats proven pending text plus a generating busy signal as a queued delivered Enter.
-   It keeps an idle pending composer as a genuine swallow.
+3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
+   omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
 
 On an already active or unreadable baseline, the adapter falls back to conservative composer clearance.
 That fallback adds a pre-Enter rendered-footer transition when the baseline is unavailable.
@@ -663,7 +663,7 @@ The pane's verified busy footer is read once before the first Enter, and an idle
 It is the same semantic signal the native path uses and the same one the tmux submit core reads.
 
 A pane already mid-turn cannot borrow a rendered-footer transition as proof of this delivery.
-After retries, only proven pending text plus native `working` can establish that its Enter was accepted and queued.
+After retries, retained proven pending text plus native `working` establishes queued delivery only for positively identified OpenCode. omp's retained payload cannot use the earlier rendered-footer transition either.
 
 The composer verdict itself is deliberately unchanged.
 A right-aligned status token on the composer row stays content for every other caller, including the away-mode pre-injection guard.

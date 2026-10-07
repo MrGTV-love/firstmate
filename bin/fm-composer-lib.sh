@@ -2090,21 +2090,10 @@ fm_composer_submit_retry_core() {  # <send-key-fn> <state-fn> <target> <retries>
   done
 }
 
-# fm_composer_queued_enter_verdict: the ONE busy-queued-Enter policy.
-# After Enter retries are spent, convert a structurally proven pending
-# composer given a delivery-busy signal from the adapter:
-#   pending + busy  -> empty   (Enter was accepted and queued; do not re-send)
-#   pending + idle  -> pending (genuine swallow; caller must not assume delivery)
-#   pending + unknown -> pending (unreadable busy is not proof of a queue)
-# Every other composer verdict is returned unchanged, so pending-unproven,
-# empty, and unknown never receive this conversion.
-# Adapters supply their own busy primitive (tmux: fm_pane_is_busy; herdr:
-# native agent_status=working, or a rendered busy footer on an idle native
-# baseline). This function does not read a pane.
-fm_composer_queued_enter_verdict() {  # <composer-state> <busy|idle|unknown>
-  local state=$1 busy=${2:-}
+fm_composer_queued_enter_verdict() {
+  local state=$1 busy=${2:-} harness=${3:-}
   [ "$state" = pending ] || { printf '%s' "$state"; return 0; }
-  if [ "$busy" = busy ]; then
+  if [ "$busy" = busy ] && [ "$harness" = opencode ]; then
     printf 'empty'
   else
     printf 'pending'

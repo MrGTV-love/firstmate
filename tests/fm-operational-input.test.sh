@@ -247,27 +247,38 @@ test_record_prune_outgrows_one_argument_list() {
   pass "record pruning: expired records past one argument list are all pruned on a write"
 }
 
-# The watcher submits a wake that a harness put back into a composer only when
-# the composer holds nothing but wakes. The text is produced by the extensions;
-# the omp harness suite proves the real producer's text against this predicate.
 test_watcher_wakes_only_predicate() {
-  local wake two squeezed
+  local wake other two squeezed tmp record_dir
+  tmp=$(fm_test_tmproot fm-watcher-wake-records)
+  record_dir="$tmp/state/extensions/omp-primary-watch"
+  mkdir -p "$record_dir"
   wake=$(printf '%s' $'FIRSTMATE WATCHER WAKE: signal: /home/x/state/lane.status\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' | "$OWNER" encode watcher)
-  fm_operational_watcher_wakes_only "$wake" || fail "a single current watcher wake must qualify"
+  other=${wake/lane.status/other.status}
+  fm_operational_watcher_wakes_only "$wake" "$record_dir" && fail "a wake without an emitted record must refuse"
+  fm_operational_watcher_wakes_only "$wake" "$tmp/missing" && fail "a missing record directory must refuse"
+  fm_operational_watcher_wakes_only "$wake" && fail "an omitted record directory must refuse"
+  printf '%s' "$other" > "$record_dir/unconsumed-1-1000-1.wake"
+  printf '%s' "$wake" > "$record_dir/unconsumed-1-1000-2.wake"
+  fm_operational_watcher_wakes_only "$wake" "$record_dir" || fail "an exact emitted wake must qualify even when it is not the first record"
+  fm_operational_watcher_wakes_only "$other" "$record_dir" || fail "any single emitted wake record must qualify"
   squeezed=$(printf '%s' "$wake" | tr -d '[:space:]')
-  fm_operational_watcher_wakes_only "$squeezed" || fail "a composer re-wraps text, so whitespace must not matter"
-  fm_operational_watcher_wakes_only "${wake//$FM_OPERATIONAL_MARK/}" || fail "a composer that strips the invisible mark must still qualify"
-  two="$wake"$'\n\n'"$wake"
-  fm_operational_watcher_wakes_only "$two" || fail "two restored wakes must qualify"
-  fm_operational_watcher_wakes_only "$wake my draft" && fail "a draft after the wake must refuse"
-  fm_operational_watcher_wakes_only "my draft $wake" && fail "a draft before the wake must refuse"
-  fm_operational_watcher_wakes_only "$wake"$'\n\nmy draft\n\n'"$wake" && fail "a draft between two wakes must refuse"
-  fm_operational_watcher_wakes_only '' && fail "an empty composer is not a wake"
-  fm_operational_watcher_wakes_only 'FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: x' && fail "a wake without its continuity sentence is incomplete"
-  fm_operational_watcher_wakes_only "$(printf '%s' 'launch the build' | "$OWNER" encode launch-brief)" && fail "another operational kind is not a watcher wake"
-  fm_operational_watcher_wakes_only $'FIRSTMATE WATCHER WAKE: x\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
-    && fail "the untyped legacy form is not a current wake"
-  pass "fm_operational_watcher_wakes_only: accepts only current watcher wakes with nothing else in the composer"
+  fm_operational_watcher_wakes_only "$squeezed" "$record_dir" || fail "a composer re-wraps text, so whitespace must not matter"
+  fm_operational_watcher_wakes_only "${wake//$FM_OPERATIONAL_MARK/}" "$record_dir" || fail "a composer that strips the invisible mark must still qualify"
+  fm_operational_watcher_wakes_only "${wake/lane.status/edited.status}" "$record_dir" && fail "an edited reason must not match its emitted wake record"
+  fm_operational_watcher_wakes_only "${wake/Watcher continuity/$'\nmy inserted instruction\nWatcher continuity'}" "$record_dir" && fail "a line inserted before the continuity sentence must refuse"
+  two="$wake"$'\n\n'"$other"
+  fm_operational_watcher_wakes_only "$two" "$record_dir" && fail "two recorded wakes must not match any single emitted wake"
+  fm_operational_watcher_wakes_only "$wake my draft" "$record_dir" && fail "a draft after the wake must refuse"
+  fm_operational_watcher_wakes_only "my draft $wake" "$record_dir" && fail "a draft before the wake must refuse"
+  fm_operational_watcher_wakes_only "$wake"$'\n\nmy draft\n\n'"$other" "$record_dir" && fail "a draft between two wakes must refuse"
+  fm_operational_watcher_wakes_only '' "$record_dir" && fail "an empty composer is not a wake"
+  fm_operational_watcher_wakes_only 'FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: x' "$record_dir" && fail "an unrecorded wake-shaped input must refuse"
+  fm_operational_watcher_wakes_only "$(printf '%s' 'launch the build' | "$OWNER" encode launch-brief)" "$record_dir" && fail "an unrecorded operational input must refuse"
+  fm_operational_watcher_wakes_only $'FIRSTMATE WATCHER WAKE: x\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' "$record_dir" \
+    && fail "an unrecorded legacy wake must refuse"
+  mv "$record_dir/unconsumed-1-1000-2.wake" "$record_dir/consumed-1-1000-2.wake"
+  fm_operational_watcher_wakes_only "$wake" "$record_dir" && fail "a consumed record must not authorize a restored wake"
+  pass "fm_operational_watcher_wakes_only: exact any-single emitted record identity, ignoring only whitespace and U+2063"
 }
 
 test_watcher_wakes_only_predicate

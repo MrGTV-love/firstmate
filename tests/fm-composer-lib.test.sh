@@ -1622,16 +1622,16 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells
 
 test_queued_enter_verdict_busy_pending_is_empty() {
   local out
-  out=$(fm_composer_queued_enter_verdict pending busy)
+  out=$(fm_composer_queued_enter_verdict pending busy opencode)
   [ "$out" = empty ] || fail "busy + proven pending must be queued delivery (empty), got '$out'"
   pass "fm_composer_queued_enter_verdict: pending + busy returns empty (queued Enter)"
 }
 
 test_queued_enter_verdict_idle_pending_stays_pending() {
   local out
-  out=$(fm_composer_queued_enter_verdict pending idle)
+  out=$(fm_composer_queued_enter_verdict pending idle opencode)
   [ "$out" = pending ] || fail "idle + proven pending must stay a genuine swallow, got '$out'"
-  out=$(fm_composer_queued_enter_verdict pending unknown)
+  out=$(fm_composer_queued_enter_verdict pending unknown opencode)
   [ "$out" = pending ] || fail "unknown busy is not proof of a queue, got '$out'"
   pass "fm_composer_queued_enter_verdict: pending + idle/unknown stays pending"
 }
@@ -1639,13 +1639,25 @@ test_queued_enter_verdict_idle_pending_stays_pending() {
 test_queued_enter_verdict_does_not_convert_other_states() {
   local state out
   for state in empty pending-unproven unknown send-failed future-state; do
-    out=$(fm_composer_queued_enter_verdict "$state" busy)
+    out=$(fm_composer_queued_enter_verdict "$state" busy opencode)
     [ "$out" = "$state" ] || fail "busy must not convert '$state', got '$out'"
-    out=$(fm_composer_queued_enter_verdict "$state" idle)
+    out=$(fm_composer_queued_enter_verdict "$state" idle opencode)
     [ "$out" = "$state" ] || fail "idle must not convert '$state', got '$out'"
   done
   pass "fm_composer_queued_enter_verdict: only proven pending is converted"
 }
+
+test_queued_enter_requires_supported_harness() {
+  local harness out
+  for harness in omp claude codex unknown ''; do
+    out=$(fm_composer_queued_enter_verdict pending busy "$harness")
+    [ "$out" = pending ] || fail "unsupported '$harness' must retain pending, got '$out'"
+  done
+  out=$(fm_composer_queued_enter_verdict pending busy)
+  [ "$out" = pending ] || fail "missing harness must not confirm delivery"
+  pass "queued Enter requires positive OpenCode identity"
+}
+test_queued_enter_requires_supported_harness
 
 test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending

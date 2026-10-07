@@ -30,6 +30,7 @@
 #   7. The watch extension arms through fm_watch_arm_omp and delivers an
 #      actionable close as one follow-up.
 set -u
+unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
 
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -286,7 +287,7 @@ test_secondmate_config_pinned_model_is_validated() {
 # --- 3. Busy state -------------------------------------------------------------
 
 drive_omp_ext() {  # <ext-path> <mode>
-  EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
+  FM_HOME="$TMP_ROOT/ext-home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$TMP_ROOT/ext-home/state" FM_CONFIG_OVERRIDE="$TMP_ROOT/ext-home/config" FM_DATA_OVERRIDE="$TMP_ROOT/ext-home/data" EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 const handlers = {};
@@ -477,7 +478,7 @@ SH
   # shellcheck disable=SC2016 # $2 expands in the generated script
   printf '#!/usr/bin/env bash\nprintf "OMP DIGEST source=%%s\\n" "$2"\n' > "$repo/bin/fm-sessionstart-run.sh"
   chmod +x "$repo/bin/"*.sh
-  out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
+  out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
 const handlers = new Map();
@@ -538,7 +539,7 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, existsSync, readFileSync } from "node:fs";
@@ -612,7 +613,7 @@ printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-2\n' "$$"
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync } from "node:fs";
@@ -683,7 +684,7 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -763,7 +764,7 @@ printf '%s\n' "$started"
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync } from "node:fs";
@@ -822,18 +823,25 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_OMP_WAKE_RESTORE_CHECK_MS=100 \
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_OMP_WAKE_RESTORE_CHECK_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, mkdirSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
   registerTool(t) { tool = t; },
-  sendUserMessage(m, o) { sent.push({ m, o }); return undefined; },
+  sendUserMessage(m, o) {
+    const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+    if (!readdirSync(dir).some((name) => name.endsWith(".wake") && readFileSync(`${dir}/${name}`, "utf8") === m)) throw new Error("wake identity missing at synchronous send");
+    sent.push({ m, o });
+    if (process.env.SCENARIO === "sync-consumed") handlers.get("before_agent_start")({ prompt: m }, ctx);
+    if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
+    return undefined;
+  },
 };
 // The composer omp would show, with the editor calls the extension may use.
 const composer = { text: "", sets: [] };
@@ -847,18 +855,49 @@ const ctx = {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
+if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
+  const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+}
 await handlers.get("session_start")({ type: "session_start" }, ctx);
-await tool.execute();
+if (!["nonpending", "failed-send"].includes(process.env.SCENARIO)) await tool.execute();
+if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
+  const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+  const records = () => readdirSync(dir).filter((name) => name.endsWith(".wake"));
+  await sleep(50);
+  if (sent.length !== 1 || !sent[0].m.includes("could not load a replacement-session actionable wake")) throw new Error("expected nonpending load-failure wake");
+  if (process.env.SCENARIO === "failed-send") {
+    if (records().length !== 0) throw new Error("failed send retained its record");
+  } else {
+    if (records().length !== 1) throw new Error("nonpending wake was not recorded");
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: sent[0].m }] } }, ctx);
+    if (records().length !== 0) throw new Error("nonpending consumption retained its record");
+  }
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await sleep(100);
 if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.length}`);
 const wake = sent[0].m;
 const bare = wake.replace(/⁣/g, "");
+const recordDir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+const records = () => readdirSync(recordDir).filter((name) => /^unconsumed-\d+-\d+-\d+\.wake$/.test(name));
+if (process.env.SCENARIO === "sync-consumed") {
+  if (records().length !== 0) throw new Error("synchronous consumption retained its record");
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
+if (records().length !== 1 || readFileSync(`${recordDir}/${records()[0]}`, "utf8") !== wake) throw new Error("emitted wake must have one exact durable identity");
 const settle = async () => { await handlers.get("agent_end")({ type: "agent_end" }, ctx); await sleep(500); };
 const same = (item) => item.m === wake && item.o?.deliverAs === "followUp";
 
 switch (process.env.SCENARIO) {
+  case "normalized-consumed":
   case "consumed": {
-    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: wake }, ctx);
+    const prompt = process.env.SCENARIO === "normalized-consumed" ? bare.replace(/\s/g, "").replace(/(.{17})/g, "$1\n \t") : wake;
+    await handlers.get("before_agent_start")({ type: "before_agent_start", prompt }, ctx);
+    if (records().length !== 0) throw new Error("consumption did not remove the wake identity");
     await settle();
     if (sent.length !== 1) throw new Error(`a consumed wake was sent again: ${sent.length}`);
     if (composer.sets.length !== 0) throw new Error("a consumed wake changed the composer");
@@ -884,10 +923,30 @@ switch (process.env.SCENARIO) {
     if (composer.text !== "my unsent draft") throw new Error(`the operator draft was not preserved exactly: ${JSON.stringify(composer.text)}`);
     break;
   }
+  case "draft-after-bytes":
+  case "draft-before-bytes":
+  case "draft-both": {
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\u2063\n\nafter draft\n\n";
+    const scenario = process.env.SCENARIO;
+    composer.text = scenario === "draft-after-bytes" ? `${wake}\n\n${after}` : scenario === "draft-before-bytes" ? `${before}\n\n${bare}` : `${before}\n\n${wake}\n\n${after}`;
+    const expected = scenario === "draft-after-bytes" ? after : scenario === "draft-before-bytes" ? before : `${before}\n\n${after}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== expected) throw new Error(`draft bytes changed: ${JSON.stringify(composer.text)} expected ${JSON.stringify(expected)}`);
+    break;
+  }
+  case "edited": {
+    composer.text = wake.replace("signal:", "edited:");
+    const original = composer.text;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("edited wake was submitted or changed");
+    break;
+  }
   case "alone": {
     // The wake text the real producer sends, kept for the shell side to check
     // against the parent's wake-only predicate.
     writeFileSync(`${process.env.FM_HOME}/wake.txt`, wake);
+    writeFileSync(`${process.env.FM_HOME}/wake-normalized.txt`, bare.replace(/\s/g, ""));
     // A composer that drops the invisible mark still holds the same wake.
     composer.text = bare;
     await settle();
@@ -923,6 +982,7 @@ switch (process.env.SCENARIO) {
     throw new Error(`unknown scenario ${process.env.SCENARIO}`);
 }
 await handlers.get("session_shutdown")({}, ctx);
+if (!["consumed", "normalized-consumed", "draft"].includes(process.env.SCENARIO) && records().length !== 1) throw new Error("shutdown removed an unconsumed wake identity");
 process.exit(0);
 EOF
   local status=$?
@@ -932,16 +992,14 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in consumed draft draft-before alone busy queued elsewhere limit; do
+  for scenario in nonpending failed-send sync-consumed consumed normalized-consumed draft draft-before draft-after-bytes draft-before-bytes draft-both edited alone busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
     [ -z "$out" ] || fail "omp watch restore scenario $scenario printed output: $out"
   done
-  # The parent submits a restored wake only when the composer holds nothing but
-  # wakes, so the real producer's text must satisfy that predicate.
-  bash -c '. "$1/bin/fm-operational-input.sh"; fm_operational_watcher_wakes_only "$(cat "$2")"' _ "$ROOT" "$TMP_ROOT/watch-restore-alone/home/wake.txt" \
-    || fail "the omp watch extension's wake text is not recognized as a watcher wake by fm_operational_watcher_wakes_only"
+  bash -c '. "$1/bin/fm-operational-input.sh"; text=$(cat "$2"); fm_operational_watcher_wakes_only "$text" "$3" && fm_operational_watcher_wakes_only "$(cat "$4")" "$3" && ! fm_operational_watcher_wakes_only "$text edited" "$3" && ! fm_operational_watcher_wakes_only "$text$text" "$3"' _ "$ROOT" "$TMP_ROOT/watch-restore-alone/home/wake.txt" "$TMP_ROOT/watch-restore-alone/home/state/extensions/omp-primary-watch" "$TMP_ROOT/watch-restore-alone/home/wake-normalized.txt" \
+    || fail "the real emitted record must match only a single normalized wake"
   pass ".omp watch extension: a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn"
 }
 
@@ -958,7 +1016,7 @@ test_primary_extensions_ignore_a_descendant_session() {
   printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # The session lock names this shell, an ancestor of the node process below.
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
     WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" FM_SESSIONSTART_OFF=1 node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -1010,7 +1068,7 @@ cat >/dev/null
 exit 0
 SH
   chmod +x "$repo/bin/fm-turnend-guard.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" GUARD_EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" \
     node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";

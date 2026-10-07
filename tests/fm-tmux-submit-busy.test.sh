@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# tests/fm-tmux-submit-busy.test.sh - regression: busy pane + pending composer
-# after Enter retries must return "empty" (message queued), not "pending".
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -27,7 +25,7 @@ COMPOSER="${FM_FAKE_COMPOSER:?}"
 case "${1:-}" in
   display-message)
     for a in "$@"; do
-      case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac
+      case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; *pane_current_command*) printf '%s\n' "${FM_FAKE_HARNESS:-}"; exit 0 ;; esac
     done
     exit 0 ;;
   capture-pane)
@@ -79,13 +77,29 @@ test_busy_pane_pending_returns_empty() {
   [ "$(cat "$vfile")" = pending ] || fail "pre-check: composer state expected pending, got '$(cat "$vfile")'"
   # Now test the submit - write verdict to file to avoid nested $().
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=1 \
+    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=1 FM_FAKE_HARNESS=opencode \
     fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "busy-pane pending should return empty, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
     || fail "proven pending should consume the configured Enter retry budget"
   pass "fm_tmux_submit_enter_core: busy pane + pending composer returns empty (message queued)"
 }
+
+test_busy_omp_payload_stays_pending() {
+  local dir fakebin composer sent out
+  dir="$TMP_ROOT/omp-held"
+  fakebin=$(make_submit_mock "$dir")
+  composer="$dir/composer"; sent="$dir/sent"
+  printf '%s\n' '╭── π > model ──╮' '╰─ hello captain ─╯' > "$composer"
+  touch "$dir/.swallow"; : > "$sent"
+  out=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=1 FM_FAKE_HARNESS=omp \
+    fm_tmux_submit_enter_core win 2 0)
+  [ "$out" = pending ] || fail "busy omp held payload must remain pending, got '$out'"
+  [ "$(grep -c '^Enter$' "$sent")" -eq 2 ] || fail "omp must consume exactly two attempts"
+  pass "tmux busy omp held payload stays pending"
+}
+test_busy_omp_payload_stays_pending
 
 test_idle_pane_pending_returns_pending() {
   local dir fakebin composer sent vfile

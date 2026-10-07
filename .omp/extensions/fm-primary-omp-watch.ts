@@ -116,7 +116,7 @@ type ReplacementActionableHandoff = {
 
 type UnconsumedWake = {
   content: string;
-  pending: PendingActionableClose;
+  pending?: PendingActionableClose;
 };
 
 type SessionGeneration = {
@@ -556,9 +556,22 @@ function removeRestoredWake(editor: string, content: string): string | null {
   const needle = content.replace(/\u2063/g, "");
   const at = text.indexOf(needle);
   if (at < 0) return null;
-  const before = text.slice(0, at).replace(/\n+$/, "");
-  const after = text.slice(at + needle.length).replace(/^\n+/, "");
-  return before && after ? `${before}\n\n${after}` : before || after;
+  let start = 0;
+  let end = editor.length;
+  let normalizedIndex = 0;
+  for (let i = 0; i < editor.length; i++) {
+    if (editor[i] === "\u2063") continue;
+    if (normalizedIndex === at) start = i;
+    normalizedIndex++;
+    if (normalizedIndex === at + needle.length) {
+      end = i + 1;
+      break;
+    }
+  }
+  if (content.startsWith("\u2063") && start > 0 && editor[start - 1] === "\u2063") start--;
+  if (editor.slice(Math.max(0, start - 2), start) === "\n\n") start -= 2;
+  else if (editor.slice(end, end + 2) === "\n\n") end += 2;
+  return editor.slice(0, start) + editor.slice(end);
 }
 
 const cleanupOnProcessExit = () => {
@@ -580,11 +593,25 @@ export default function (pi: ExtensionAPI) {
       "watcher",
       `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     );
-    if (pending) owner.unconsumedWakes.set(pending.token, { content, pending });
+    const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
+    const record = `${handoffDir}/unconsumed-${token}.wake`;
+    const temporary = `${record}.tmp-${process.pid}-${++nextHandoffId}`;
+    mkdirSync(handoffDir, { recursive: true });
+    try {
+      writeFileSync(temporary, content, { mode: 0o600 });
+      renameSync(temporary, record);
+    } catch (error) {
+      try { unlinkSync(temporary); } catch {}
+      throw error;
+    }
+    owner.unconsumedWakes.set(token, { content, pending });
     try {
       await pi.sendUserMessage(content, { deliverAs: "followUp" });
     } catch (error) {
-      if (pending) owner.unconsumedWakes.delete(pending.token);
+      owner.unconsumedWakes.delete(token);
+      try { unlinkSync(record); } catch (cleanupError) {
+        if (nodeErrorCode(cleanupError) !== "ENOENT") throw cleanupError;
+      }
       throw error;
     }
     // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
@@ -597,9 +624,19 @@ export default function (pi: ExtensionAPI) {
   // omp consumed a main follow-up: an idle main at before_agent_start, a
   // streaming main at the user message_start that joins the running run.
   function consumeWake(owner: SessionGeneration, text: string): void {
+    const identity = text.replace(/[\u2063\s]/g, "");
     for (const [token, wake] of owner.unconsumedWakes) {
-      if (wake.content !== text) continue;
+      if (wake.content.replace(/[\u2063\s]/g, "") !== identity) continue;
+      try {
+        unlinkSync(`${handoffDir}/unconsumed-${token}.wake`);
+      } catch (error) {
+        if (nodeErrorCode(error) !== "ENOENT") {
+          surfaceCleanupFailure(owner, error);
+          return;
+        }
+      }
       owner.unconsumedWakes.delete(token);
+      if (!wake.pending) return;
       wake.pending.delivered = true;
       try {
         finishPendingActionable(owner, wake.pending);

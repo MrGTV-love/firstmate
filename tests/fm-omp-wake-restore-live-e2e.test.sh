@@ -28,6 +28,7 @@
 # ("omp injected text") from its output after any omp upgrade.
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
+unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -49,6 +50,7 @@ herdr_forget_inherited_pane
 ORIGINAL_PATH=$PATH
 SESSION=$("$LAB_HELPER" name omp-wake-restore)
 LAB=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-omp-wake-restore.XXXXXX")
+PROJECT="$LAB/project"
 FAKEBIN="$LAB/fakebin"
 MODEL=${FM_OMP_WAKE_RESTORE_LIVE_MODEL:-openai-codex/gpt-6-astra}
 mkdir -p "$FAKEBIN"
@@ -105,13 +107,12 @@ export PATH="$FAKEBIN:$ORIGINAL_PATH"
 set +e
 
 lab() { env PATH="$ORIGINAL_PATH" "$LAB_HELPER" run "$SESSION" "$@"; }
-VERSION=$(PATH="$ORIGINAL_PATH" omp --version 2>/dev/null | head -1 || printf 'version-unknown')
+VERSION=$(env PATH="$ORIGINAL_PATH" FM_HOME="$PROJECT" FM_ROOT_OVERRIDE="$PROJECT" FM_STATE_OVERRIDE="$PROJECT/state" FM_CONFIG_OVERRIDE="$PROJECT/config" FM_DATA_OVERRIDE="$PROJECT/data" omp --version 2>/dev/null | head -1 || printf 'version-unknown')
 HERDR_VER=$(PATH="$ORIGINAL_PATH" herdr --version 2>/dev/null | head -1 || printf 'herdr-unknown')
 SUBJECT="omp ($VERSION) on $HERDR_VER"
 
 # The tracked tree plus this working tree's pending edits, so the guard exercises
 # the extensions and scripts under review rather than the last commit.
-PROJECT="$LAB/project"
 git clone -q "$ROOT" "$PROJECT" || fail "could not clone the repository into the lab"
 while IFS= read -r path; do
   [ -n "$path" ] && [ -f "$ROOT/$path" ] || continue
@@ -151,6 +152,10 @@ is_idle() { screen | grep -Eq '^╭── (π|󰵗) [>·] '; }
 is_busy() { screen | grep -Eq '^╭── [⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷] [0-9]+[smh]'; }
 queue_drained() { [ "$(queue_rows)" -eq 0 ]; }
 composer_is() { [ "$(composer)" = "$1" ]; }
+live_idle_class() {
+  fm_backend_capture herdr "$1" 40 '' 2>/dev/null | grep -Eq '^╭── (π|󰵗) [>·] ' || return 1
+  printf '%s' idle
+}
 
 # start_omp <label> [ENV=value...]: a fresh omp in its own pane, idle and armed.
 start_omp() {
@@ -162,7 +167,7 @@ start_omp() {
   PANE=$(printf '%s' "$ws" | jq -er '.result.root_pane.pane_id') \
     || fail "workspace create did not return a pane id"
   TARGET="$SESSION:$PANE"
-  lab pane run "$PANE" "env -u CLAUDECODE -u FM_HOME FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 $* omp --config '$BOX_OVERLAY' --auto-approve --cwd '$PROJECT' --model $MODEL --thinking low" >/dev/null \
+  lab pane run "$PANE" "env -u CLAUDECODE FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 $* FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --config '$BOX_OVERLAY' --auto-approve --cwd '$PROJECT' --model $MODEL --thinking low" >/dev/null \
     || fail "could not launch $SUBJECT for $label"
   wait_for 90 is_idle || { screen >&2; fail "$SUBJECT never drew its idle box composer for $label"; }
   sleep 2
@@ -226,7 +231,7 @@ wait_for 20 composer_is empty || fail "$SUBJECT: could not clear the draft"
 
 # The descendant omp child must not take over the markers.
 wait_for 120 is_idle || fail "the lane did not settle before the child probe"
-send_text "Run this exact bash command and then reply CHILD_DONE: omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL"
+send_text "Run this exact bash command and then reply CHILD_DONE: env FM_HOME='$PROJECT' FM_ROOT_OVERRIDE='$PROJECT' FM_STATE_OVERRIDE='$PROJECT/state' FM_CONFIG_OVERRIDE='$PROJECT/config' FM_DATA_OVERRIDE='$PROJECT/data' omp --print 'reply with the word hi' --no-session --thinking low --model $MODEL"
 sleep 1
 send_key Enter
 wait_for 60 is_busy || fail "the lane never ran the child omp command"
@@ -251,7 +256,7 @@ busy_turn
 queue_wake
 send_key Escape
 wait_for 30 composer_is pending || { screen >&2; fail "$SUBJECT: the restored wake never showed as a pending composer"; }
-fm_task_inbox_composer_holds_wake herdr "$TARGET" \
+fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
   || fail "$SUBJECT: the pending composer was not recognized as holding only the restored wake"
 [ "$(queue_rows)" -gt 0 ] || fail "the wake queue drained before the parent recovery ran, so the case is vacuous"
 
@@ -259,18 +264,18 @@ fm_task_inbox_composer_holds_wake herdr "$TARGET" \
 send_text ' operator words'
 sleep 1
 before=$(fm_backend_herdr_composer_content "$TARGET" '')
-fm_task_inbox_composer_holds_wake herdr "$TARGET" \
+fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
   && fail "$SUBJECT: a composer holding a draft beside the wake was read as wake-only"
-fm_task_inbox_submit_held_wake herdr "$TARGET"
+fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_idle_class
 [ $? -eq 1 ] || fail "$SUBJECT: the recovery did not refuse a composer that also holds a draft"
 [ "$(fm_backend_herdr_composer_content "$TARGET" '')" = "$before" ] \
   || fail "$SUBJECT: the refused recovery changed the composer"
 pass "live omp parent recovery: $SUBJECT refused a composer that holds a draft beside the wake and changed nothing"
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do send_key backspace; done
-wait_for 20 fm_task_inbox_composer_holds_wake herdr "$TARGET" \
+wait_for 20 fm_task_inbox_composer_holds_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" \
   || { screen >&2; fail "$SUBJECT: could not remove the operator words from the composer"; }
 
-fm_task_inbox_submit_held_wake herdr "$TARGET"
+fm_task_inbox_submit_held_wake herdr "$TARGET" "$PROJECT/state/extensions/omp-primary-watch" live_idle_class
 rc=$?
 [ "$rc" -eq 0 ] || { screen >&2; fail "$SUBJECT: the parent recovery did not submit the restored wake (rc=$rc)"; }
 wait_for 90 queue_drained || fail "$SUBJECT: the lane did not handle the wake the parent submitted"
