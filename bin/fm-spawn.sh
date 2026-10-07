@@ -2587,6 +2587,7 @@ fm_dispatch_endpoint_query() {
   [ -z "$session" ] || [ "$session" = "$SES" ] || return 125
   [ -n "$cwd" ] && [ "$(real_path_or_raw "$cwd")" = "$(real_path_or_raw "$WT")" ] || return 125
   local command arg query_dir status rc=126 i runner
+  runner=$(resolve_pi_executable bash) || return 125
   case "$harness" in
     omp)
       case "$executable" in
@@ -2598,31 +2599,13 @@ fm_dispatch_endpoint_query() {
       ;;
     claude)
       case "${HOME:-}" in /*) ;; *) return 125 ;; esac
-      # shellcheck disable=SC2016
-      command='[ "${HOME-}" = '"$(shell_quote "$HOME")"' ] && [ -z "${CLAUDE_CONFIG_DIR-}" ] || exit 125; '
-      for arg in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-        case "$arg" in
-          CLAUDE_CODE_USE_*)
-            # shellcheck disable=SC2016
-            command="$command"'case "${'"$arg"'-}" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) exit 125 ;; esac; '
-            ;;
-          ANTHROPIC_FEDERATION_RULE_ID)
-            # shellcheck disable=SC2016
-            command="$command"'[ -z "${ANTHROPIC_FEDERATION_RULE_ID-}" ] || [ -z "${ANTHROPIC_ORGANIZATION_ID-}" ] || exit 125; '
-            ;;
-          *)
-            # shellcheck disable=SC2016
-            command="$command"'[ -z "${'"$arg"'-}" ] || exit 125; '
-            ;;
-        esac
-      done
+      command="$(shell_quote "$runner") -p -c $(shell_quote '[ "${HOME-}" = "$1" ] || exit 125; set +p; . "$2" || exit 125; if fm_worker_account_claude_quota_unbound; then exit 125; fi') _ $(shell_quote "$HOME") $(shell_quote "$SCRIPT_DIR/fm-worker-account-lib.sh")"
       command=$(spawn_claude_boundary_wrap "$command" "${WORKER_ACCOUNT:-}" "${WORKER_ACCOUNT_ROOT:-}")
       ;;
     *) return 125 ;;
   esac
   # shellcheck disable=SC2016
   command='[ "$(pwd -P)" = '"$(shell_quote "$(real_path_or_raw "$WT")")"' ] || exit 125; '"$command"
-  runner=$(resolve_pi_executable bash) || return 125
   command="$(shell_quote "$runner") -p -c $(shell_quote 'set +p; . "$1"; shift; fm_run_timed 20 /bin/sh -c "$1"') _ $(shell_quote "$SCRIPT_DIR/fm-timeout-lib.sh") $(shell_quote "$command")"
   command=$(spawn_launch_env_wrap "$command")
   query_dir=$(mktemp -d "$STATE/.dispatch-query.XXXXXX") || return 125

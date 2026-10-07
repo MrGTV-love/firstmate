@@ -437,10 +437,14 @@ test_changed_dependency_selection_and_unmapped_failure() {
 
   printf '\n' >>"$repo/bin/fm-quota-axi-lib.sh"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
-  assert_contains "$listed" "tests/fm-procevent-quota.test.sh" \
-    "shared quota validator selects process-event coverage"
-  assert_contains "$listed" "tests/fm-quota-choose.test.sh" \
-    "shared quota validator selects chooser coverage"
+  expected=$(printf '%s\n' \
+    tests/fm-dispatch-capacity.test.sh \
+    tests/fm-dispatch-resolve.test.sh \
+    tests/fm-procevent-quota.test.sh \
+    tests/fm-quota-choose.test.sh \
+    tests/fm-session-start.test.sh)
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "quota-library-only change must select exactly its curated suites and session-bootstrap coverage: $listed"
   git -C "$repo" add bin/fm-quota-axi-lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm quota-validator-change
 

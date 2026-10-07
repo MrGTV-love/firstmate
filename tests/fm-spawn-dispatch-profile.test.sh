@@ -251,6 +251,93 @@ test_claude_dispatch_binds_only_forwarded_api_credentials() {
   pass "Claude spawn retains forwarded API auth, filters excluded credentials, and treats an allow flag alone as native authentication"
 }
 
+test_claude_dispatch_inspects_initialized_settings() {
+  local rec id scenario quota out status source expected launch querylog selector worker_home worker_cwd
+  for scenario in user-helper project-helper env-key split-federation neutral caller-only; do
+    for quota in exhausted healthy; do
+      id="settings-$scenario-$quota"
+      rec=$(make_spawn_case "$id" claude "$id")
+      read_case_record "$rec"
+      enable_exhausted_claude_dispatch "$HOME_DIR" "$FAKEBIN_DIR"
+      mkdir -p "$HOME_DIR/user-home/.claude" "$WT_DIR/.claude" "$CASE_DIR/caller/.claude"
+      source="$HOME_DIR/user-home/.claude/settings.json"
+      case "$scenario" in
+        project-helper) source="$WT_DIR/.claude/settings.json" ;;
+        caller-only) source="$CASE_DIR/caller/.claude/settings.json" ;;
+      esac
+      case "$scenario" in
+        *helper|caller-only)
+          jq -n --arg command "touch '$CASE_DIR/helper-ran'; printf settings-secret" \
+            '{apiKeyHelper:$command}' > "$source"
+          ;;
+        env-key|split-federation)
+          case "$scenario" in
+            env-key) selector=ANTHROPIC_API_KEY ;;
+            split-federation)
+              selector=ANTHROPIC_ORGANIZATION_ID
+              printf '%s\n' 'export ANTHROPIC_FEDERATION_RULE_ID=worker-rule' >> "$HOME_DIR/pane-init.sh"
+              ;;
+          esac
+          jq -n --arg selector "$selector" '{env:{($selector):"settings-secret"}}' > "$source"
+          ;;
+        neutral) printf '%s\n' '{"hooks":{},"permissions":{"allow":[]},"model":"opus","env":{}}' > "$source" ;;
+      esac
+      case "$scenario" in
+        project-helper)
+          git -C "$WT_DIR" add .claude/settings.json
+          git -C "$WT_DIR" -c user.name=test -c user.email=test@example.invalid commit -qm project-auth-settings
+          git -C "$WT_DIR" push --quiet origin HEAD:main
+          ;;
+      esac
+      cat > "$FAKEBIN_DIR/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'called\n' >> "${0%/*}/quota.calls"
+remaining=0
+[ "${FM_SETTINGS_QUOTA:-exhausted}" != healthy ] || remaining=20
+jq -n --argjson remaining "$remaining" '{schemaVersion:6,providers:[{provider:"claude",accountKey:"default",quotaSemantics:{effectiveAvailability:[{scope:"all_models",status:"known",effectivePercentRemaining:$remaining,runway:{status:(if $remaining == 0 then "exhausted_now" else "through_reset" end)}}]}}]}'
+SH
+      cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$HOME" "$PWD" > "${0%/*}/worker.context"
+SH
+      chmod +x "$FAKEBIN_DIR/quota-axi" "$FAKEBIN_DIR/claude"
+      querylog="$CASE_DIR/query.log"
+      out=$(cd "$CASE_DIR/caller" && FM_SETTINGS_QUOTA="$quota" FM_FAKE_QUERY_LOG="$querylog" \
+        run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness claude --dispatch-rule rule_1)
+      status=$?
+      expect_code 0 "$status" "$scenario $quota must retain a usable launch: $out"
+      [ -s "$querylog" ] || fail "$scenario $quota did not execute an initialized pane query"
+      expected=claude
+      case "$scenario" in
+        neutral|caller-only)
+          [ -s "$FAKEBIN_DIR/quota.calls" ] || fail "$scenario $quota never queried default quota"
+          [ "$quota" != exhausted ] || expected=omp
+          ;;
+        *) [ ! -e "$FAKEBIN_DIR/quota.calls" ] || fail "$scenario $quota borrowed default quota" ;;
+      esac
+      assert_contains "$out" "spawned $id harness=$expected" "$scenario $quota selected the wrong launch"
+      if [ "$expected" = claude ]; then
+        assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
+      else
+        assert_meta_profile "$HOME_DIR/state/$id.meta" omp openrouter/z-ai/glm-5.3-flash high
+      fi
+      launch=$(cat "$LAUNCH_LOG")
+      fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" > "$CASE_DIR/worker.out" 2>&1 \
+        || fail "$scenario $quota could not execute delivered launch"
+      if [ "$expected" = claude ]; then
+        { IFS= read -r worker_home; IFS= read -r worker_cwd; } < "$FAKEBIN_DIR/worker.context"
+        [ "$worker_home" = "$HOME_DIR/user-home" ] || fail "$scenario $quota changed worker HOME"
+        [ "$worker_cwd" = "$WT_DIR" ] || fail "$scenario $quota changed worker cwd"
+      fi
+      [ ! -e "$CASE_DIR/helper-ran" ] || fail "$scenario $quota executed a settings helper"
+      case "$out$(cat "$CASE_DIR/worker.out")" in
+        *settings-secret*|*"helper-ran"*) fail "$scenario $quota leaked a settings helper or credential" ;;
+      esac
+    done
+  done
+  pass "initialized Claude settings retain unknown auth without borrowing quota or executing helpers; neutral settings preserve dispatch"
+}
+
 test_fallback_spawn_preserves_launch_delivery_declarations() {
   local rec id event declaration expected out status
   for event in 'done' failed paused; do
@@ -2087,6 +2174,7 @@ test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_no_dispatch_non_omp_spawn_does_not_require_jq
 test_claude_dispatch_binds_only_forwarded_api_credentials
+test_claude_dispatch_inspects_initialized_settings
 test_fallback_spawn_preserves_launch_delivery_declarations
 test_direct_relaunch_preserves_rule_and_honors_overrides
 test_claude_launch_brief_publishes_record_doorbell

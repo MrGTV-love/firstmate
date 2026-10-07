@@ -66,6 +66,67 @@ FM_WORKER_ACCOUNT_CHECK_SECONDS=${FM_WORKER_ACCOUNT_CHECK_SECONDS:-30}
 # code.claude.com/docs/en/env-vars).
 FM_WORKER_ACCOUNT_CLAUDE_SHED="CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID"
 
+fm_worker_account_claude_quota_unbound() {
+  local name value cwd project
+  case "${HOME:-}" in /*) ;; *) return 0 ;; esac
+  [ -z "${CLAUDE_CONFIG_DIR:-}" ] || return 0
+  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+    value=${!name-}
+    case "$name" in
+      CLAUDE_CODE_USE_*)
+        case "$value" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) return 0 ;; esac
+        ;;
+      ANTHROPIC_FEDERATION_RULE_ID)
+        if [ -n "$value" ] && [ -n "${ANTHROPIC_ORGANIZATION_ID:-}" ]; then return 0; fi
+        ;;
+      *) [ -z "$value" ] || return 0 ;;
+    esac
+  done
+  cwd=$(pwd -P) || return 0
+  project=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || project=$cwd
+  perl -MJSON::PP -MErrno=ENOENT -e '
+    my ($home, $cwd, $project, @shed) = @ARGV;
+    my %selectors = map { $_ => 1 } (@shed, qw(HOME CLAUDE_CONFIG_DIR ANTHROPIC_ORGANIZATION_ID ANTHROPIC_BASE_URL CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR));
+    sub inspect {
+      my ($file) = @_;
+      unless (lstat $file) { return $! == ENOENT ? 1 : 0; }
+      return 0 unless -f $file && -r $file;
+      open(my $fh, "<", $file) or return 0;
+      my $body = do { local $/; <$fh> };
+      return 0 unless defined $body;
+      my $settings = eval { decode_json($body) };
+      return 0 if $@ || ref($settings) ne "HASH";
+      for my $helper (qw(apiKeyHelper policyHelper)) {
+        next unless exists $settings->{$helper};
+        my $value = $settings->{$helper};
+        return 0 if ref($value) || (defined($value) && $value ne "");
+      }
+      if (exists $settings->{env}) {
+        return 0 unless ref($settings->{env}) eq "HASH";
+        for my $key (keys %{$settings->{env}}) {
+          return 0 if $selectors{$key};
+        }
+      }
+      return 1;
+    }
+    my @files = ("$home/.claude/settings.json", "$home/.claude/remote-settings.json",
+      "$cwd/.claude/settings.json", "$cwd/.claude/settings.local.json",
+      "$project/.claude/settings.json", "$project/.claude/settings.local.json");
+    for my $root ("/Library/Application Support/ClaudeCode", "/etc/claude-code") {
+      push @files, "$root/managed-settings.json";
+      my $dir = "$root/managed-settings.d";
+      unless (lstat $dir) { exit 0 unless $! == ENOENT; next; }
+      exit 0 unless -d $dir && -r $dir && -x $dir;
+      opendir(my $dh, $dir) or exit 0;
+      push @files, map { "$dir/$_" } sort grep { /^[^.].*\.json\z/ } readdir($dh);
+      closedir($dh);
+    }
+    for my $file (@files) { exit 0 unless inspect($file); }
+    exit 1;
+  ' -- "$HOME" "$cwd" "$project" $FM_WORKER_ACCOUNT_CLAUDE_SHED 2>/dev/null
+  case $? in 1) return 1 ;; *) return 0 ;; esac
+}
+
 # fm_worker_account_file <harness>
 # Prints the pin file name for a pinnable runner; returns 1 for any other.
 fm_worker_account_file() {

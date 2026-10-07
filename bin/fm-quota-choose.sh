@@ -376,23 +376,6 @@ effective_for_provider_model() {
   ' 2>/dev/null
 }
 
-worker_claude_quota_unbound() {
-  local name value
-  [ -z "${CLAUDE_CONFIG_DIR:-}" ] || return 0
-  for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-    value=${!name-}
-    case "$name" in
-      CLAUDE_CODE_USE_*)
-        case "$value" in 1|[tT][rR][uU][eE]|[yY][eE][sS]|[oO][nN]) return 0 ;; esac
-        ;;
-      ANTHROPIC_FEDERATION_RULE_ID)
-        if [ -n "$value" ] && [ -n "${ANTHROPIC_ORGANIZATION_ID:-}" ]; then return 0; fi
-        ;;
-      *) [ -z "$value" ] || return 0 ;;
-    esac
-  done
-  return 1
-}
 
 for c in "${CANDIDATES[@]}"; do
   harness=${c%%:*}
@@ -420,7 +403,7 @@ for c in "${CANDIDATES[@]}"; do
     fi
     continue
   fi
-  if [ "$harness" = claude ] && worker_claude_quota_unbound; then
+  if [ "$harness" = claude ] && fm_worker_account_claude_quota_unbound; then
     continue
   fi
   scope_model=$model

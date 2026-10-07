@@ -62,6 +62,8 @@ trap cleanup EXIT
 
 mkdir -p "$FAKEBIN"
 mkdir -p "$LAB/home/config"
+mkdir -p "$LAB/user-home/.claude" "$LAB/project/.claude"
+export HOME="$LAB/user-home"
 export FM_BACKEND=tmux
 unset BACKEND TMUX
 export FM_AUTH_DESTINATION="$LAB/tmux-auth"
@@ -211,7 +213,7 @@ QUOTA_AXI_CALLS="$CALLS" QUOTA_AXI_FIXTURE="$FIXTURE" "$FAKEBIN/quota-axi" --jso
 
 call_choose() {
   local output rc call_count
-  output=$(QUOTA_AXI_CALLS="$CALLS" QUOTA_AXI_FIXTURE="$FIXTURE" \
+  output=$(cd "${CHOOSE_CWD:-$LAB/project}" && QUOTA_AXI_CALLS="$CALLS" QUOTA_AXI_FIXTURE="$FIXTURE" \
     PATH="$FAKEBIN:$PATH" FM_HOME="$LAB/home" "$BIN/fm-quota-choose.sh" "$@")
   rc=$?
   call_count=$(wc -l < "$CALLS" | tr -d '[:space:]')
@@ -536,6 +538,66 @@ for backend in tmux herdr; do
 done
 rm "$FM_AUTH_DESTINATION"
 ok "native Claude classification uses worker selectors, truth switches and paired federation"
+
+for source in "$LAB/user-home/.claude/settings.json" "$LAB/user-home/.claude/remote-settings.json" \
+  "$LAB/project/.claude/settings.json" "$LAB/project/.claude/settings.local.json"; do
+  for helper in apiKeyHelper policyHelper; do
+    jq -n --arg helper "$helper" --arg command "touch '$LAB/helper-ran'; printf settings-secret" \
+      '{($helper):$command}' > "$source"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol 2>&1)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$source $helper borrowed default quota or leaked helper: $out"
+    [ ! -e "$LAB/helper-ran" ] || fail "quota chooser executed $helper"
+    if out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default 2>&1); then
+      fail "$source $helper ranked a Claude-only candidate"
+    fi
+    [ "$out" = none ] || fail "$source $helper leaked settings: $out"
+  done
+  for selector in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR ANTHROPIC_PROFILE \
+    CLAUDE_CONFIG_DIR HOME ANTHROPIC_BASE_URL ANTHROPIC_FEDERATION_RULE_ID ANTHROPIC_ORGANIZATION_ID \
+    CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE; do
+    jq -n --arg selector "$selector" '{env:{($selector):"settings-secret"}}' > "$source"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol 2>&1)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$source $selector borrowed or leaked default quota: $out"
+  done
+  for body in '{' '[]' '{"env":[]}' '{"env":{"ANTHROPIC_API_KEY":""}}' '{"env":{"CLAUDE_CODE_USE_BEDROCK":"false"}}'; do
+    printf '%s\n' "$body" > "$source"
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$source uncertain settings borrowed default quota: $out"
+  done
+  printf '%s\n' '{"model":"opus","permissions":{"allow":[]},"hooks":{},"env":{},"apiKeyHelper":""}' > "$source"
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+  [ "$out" = "claude default" ] || fail "$source neutral settings concealed default quota: $out"
+  chmod 000 "$source"
+  if [ ! -r "$source" ]; then
+    out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+    [ "$out" = "codex gpt-6.1-sol" ] || fail "$source unreadable settings borrowed default quota: $out"
+  fi
+  chmod 600 "$source"
+  rm "$source"
+  ln -s "$LAB/missing-settings" "$source"
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+  [ "$out" = "codex gpt-6.1-sol" ] || fail "$source dangling settings borrowed default quota: $out"
+  rm "$source"
+  mkdir "$source"
+  out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+  [ "$out" = "codex gpt-6.1-sol" ] || fail "$source nonregular settings borrowed default quota: $out"
+  rmdir "$source"
+done
+printf '%s\n' '{"env":{"ANTHROPIC_ORGANIZATION_ID":"settings-org"}}' > "$LAB/project/.claude/settings.json"
+out=$(ANTHROPIC_FEDERATION_RULE_ID=worker-rule call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+[ "$out" = "codex gpt-6.1-sol" ] || fail "cross-source federation borrowed default quota: $out"
+rm "$LAB/project/.claude/settings.json"
+git -C "$LAB/project" init -q
+mkdir -p "$LAB/project/subdir"
+printf '%s\n' '{"apiKeyHelper":"false"}' > "$LAB/project/.claude/settings.json"
+out=$(CHOOSE_CWD="$LAB/project/subdir" call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate codex:gpt-6.1-sol)
+[ "$out" = "codex gpt-6.1-sol" ] || fail "subdirectory chooser missed actual project settings: $out"
+rm "$LAB/project/.claude/settings.json"
+mkdir -p "$LAB/sibling/.claude"
+printf '%s\n' '{"apiKeyHelper":"false"}' > "$LAB/sibling/.claude/settings.json"
+out=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default)
+[ "$out" = "claude default" ] || fail "unrelated sibling settings concealed default quota: $out"
+ok "chooser inspects inherited settings without executing helpers or leaking credentials"
 
 cat > "$TOON" <<'TOON'
 bin: quota-axi
