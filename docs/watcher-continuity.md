@@ -78,6 +78,7 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.
 Before recording or sending a wake, `.omp/extensions/fm-primary-omp-watch.ts` normalizes CRLF and CR to LF, expands each tab to three spaces, and strips other C0 controls to match omp's editor restoration.
 Consumption still matches the emitted text exactly.
+The `before_agent_start` and user `message_start` callbacks for one idle submission consume one pending token together, so a second identical wake remains recoverable and eligible for replacement handoff.
 While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds; this is not continuous polling.
 The check requires the current generation to be live, a UI editor, positive idle state, and no pending messages.
 Recovery accepts only a complete unchanged emitted wake segment bounded by editor edges or omp's blank-line joins, with only its leading invisible transport mark allowed to be present or absent.
@@ -86,7 +87,7 @@ The extension removes only the wake and one transport blank-line separator, pres
 Recovery is bounded to three resubmission attempts per wake; another `agent_end` is needed to schedule another check.
 A wake restored by Alt+Up while idle without `agent_end` is not resubmitted, and rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
-`tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, and bounded recovery.
+`tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, and identical wakes across paired callbacks, streaming delivery, and session replacement.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
 
 ### Cursor stop hook

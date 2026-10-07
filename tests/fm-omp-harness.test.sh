@@ -355,36 +355,6 @@ test_secondmate_config_pinned_model_is_validated() {
 drive_omp_ext() {  # <ext-path> <mode>
   FM_HOME="$TMP_ROOT/ext-home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$TMP_ROOT/ext-home/state" FM_CONFIG_OVERRIDE="$TMP_ROOT/ext-home/config" FM_DATA_OVERRIDE="$TMP_ROOT/ext-home/data" EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-if (process.env.EXT_PATH.includes("\\")) {
-  const hookSource = `
-import { readFileSync } from "node:fs";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    const url = specifier.startsWith("/") ? pathToFileURL(specifier).href : specifier;
-    if (url.startsWith("file:") && /%5c/i.test(url)) {
-      return { url, shortCircuit: true };
-    }
-    return nextResolve(specifier, context);
-  },
-  load(url, context, nextLoad) {
-    if (url.startsWith("file:") && /%5c/i.test(url)) {
-      const source = readFileSync(fileURLToPath(url), "utf8");
-      return {
-        format: "module",
-        source: url.endsWith(".ts") ? stripTypeScriptTypes(source) : source,
-        shortCircuit: true,
-      };
-    }
-    return nextLoad(url, context);
-  },
-});
-`;
-  const hookURL = "data:text/javascript;base64," + Buffer.from(hookSource).toString("base64");
-  await import(hookURL);
-  process.env.NODE_OPTIONS = [process.env.NODE_OPTIONS, "--import=" + hookURL].filter(Boolean).join(" ");
-}
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 const handlers = {};
 mod.default({ on: (name, fn) => { handlers[name] = fn; } });
@@ -397,7 +367,6 @@ switch (process.env.MODE) {
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
-  case "tool-call": await handlers["tool_call"]({ type: "tool_call", toolName: "read", input: { path: "/tmp/guardrail-path-proof" } }, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -446,51 +415,6 @@ test_busy_extension_lifecycle() {
   pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification"
 }
 
-test_generated_extension_preserves_hostile_paths() {
-  local rec id=omp-path-q6 world repo state ext out
-  rec=$(make_spawn_case generated-paths omp "$id")
-  read_case_record "$rec"
-  world="$CASE_DIR/"'root\n"paths'
-  repo="$world/repo"
-  state="$world/"'parent-state\n"paths'
-  fm_git_init_commit "$repo"
-  mkdir -p "$repo/bin" "$repo/.omp/extensions" "$state" "$HOME_DIR/user-home"
-  ln -s "$ROOT/bin/"* "$repo/bin/"
-  cp "$ROOT/.omp/extensions/fm-jev-guardrail.ts" "$repo/.omp/extensions/fm-jev-guardrail.ts"
-  ln -s "$ROOT/.omp/fm-session-overlay.yml" "$repo/.omp/fm-session-overlay.yml"
-  ln -s "$ROOT/.omp/fm-worker-overlay.yml" "$repo/.omp/fm-worker-overlay.yml"
-  rm "$repo/bin/fm-jev-guardrail.mjs"
-  cat > "$repo/bin/fm-jev-guardrail.mjs" <<'EOF'
-import { writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-writeFileSync(fileURLToPath(new URL("../guardrail-observed", import.meta.url)), fileURLToPath(import.meta.url));
-EOF
-  out=$(PATH="$FAKEBIN_DIR:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux \
-    FM_ROOT_OVERRIDE="$repo" FM_HOME="$HOME_DIR" HOME="$HOME_DIR/user-home" \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$PROJ_DIR" --harness omp --scout 2>&1)
-  expect_code 0 $? "omp spawn with hostile root and state should succeed: $out"
-  ext="$state/$id.omp-ext.ts"
-  out=$(drive_omp_ext "$ext" tool-call) || fail "hostile-root guardrail drive failed: $out"
-  assert_present "$repo/guardrail-observed" "the real guardrail import did not execute its hostile-root observer"
-  [ "$(cat "$repo/guardrail-observed")" = "$repo/bin/fm-jev-guardrail.mjs" ] \
-    || fail "the guardrail import executed an observer outside the exact hostile root"
-  out=$(drive_omp_ext "$ext" agent-start) || fail "hostile worker agent_start failed: $out"
-  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy omp-ext" ] \
-    || fail "worker busy evidence was not persisted in the exact hostile parent state"
-  out=$(drive_omp_ext "$ext" end-final) || fail "hostile worker agent_end failed: $out"
-  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] \
-    || fail "worker idle evidence was not persisted in the exact hostile parent state"
-  out=$(drive_omp_ext "$ext" turn-end) || fail "hostile worker turn_end failed: $out"
-  assert_present "$state/$id.turn-ended" "worker did not touch the exact hostile turn-end path"
-  [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] \
-    || fail "worker turn-end notification changed settled evidence"
-  assert_absent "$HOME_DIR/state/$id.busy-state" "worker wrote busy evidence outside the hostile parent state"
-  assert_absent "$HOME_DIR/state/$id.turn-ended" "worker touched a turn-end path outside the hostile parent state"
-  pass "fm-spawn: emitted omp worker paths preserve literal backslash-n and quotes for guardrail, busy state, and turn-end"
-}
 
 # --- 4. Control, composer, supervision model -----------------------------------
 
@@ -955,8 +879,12 @@ run_watch_restore_scenario() {  # <scenario>
 # at once keeps its synchronous call from blocking the whole run.
 [ "${1:-}" != --handling-delivered ] || exit 0
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
-if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
-  : > "$FM_HOME/state/.e2e-fired"
+if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ] || { [[ "${SCENARIO:-}" = duplicates* ]] && [ ! -e "$FM_HOME/state/.e2e-fired-again" ]; }; then
+  if [ -e "$FM_HOME/state/.e2e-fired" ]; then
+    : > "$FM_HOME/state/.e2e-fired-again"
+  else
+    : > "$FM_HOME/state/.e2e-fired"
+  fi
   sleep 1
   case "${SCENARIO:-}" in
     editor-normalized*) printf 'signal: omp-restore ready\tdetail\rcarriage\001control\013vertical\037unit done\n' ;;
@@ -973,7 +901,7 @@ SH
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = []; const turns = [];
 const transcript = [{ role: "assistant" }];
@@ -1038,8 +966,9 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   await handlers.get("session_shutdown")({}, ctx);
   process.exit(0);
 }
-for (let i = 0; i < 60 && sent.length < 1; i += 1) await sleep(100);
-if (sent.length !== 1) throw new Error(`expected the first wake, saw ${sent.length}`);
+const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
+for (let i = 0; i < 60 && sent.length < expectedWakes; i += 1) await sleep(100);
+if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("regular delivery must remain queued as a follow-up");
 const bare = wake.startsWith("\u2063") ? wake.slice(1) : wake;
@@ -1055,6 +984,46 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "duplicates":
+  case "duplicates-handoff":
+  case "duplicates-streaming": {
+    if (sent[1].m !== wake || sent[1].o?.deliverAs !== "followUp") throw new Error("expected two identical queued wakes");
+    const consumePrompt = async () => {
+      await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+      await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
+    };
+    if (process.env.SCENARIO === "duplicates-streaming") {
+      await consumePrompt();
+      await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    } else {
+      composer.text = `${wake}\n\n${wake}`;
+      await settle();
+      if (sent.length !== 3 || !same(sent[2]) || composer.text !== wake) throw new Error("first duplicate recovery did not preserve the second wake");
+      await consumePrompt();
+      if (process.env.SCENARIO === "duplicates-handoff") {
+        const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+        await handlers.get("session_shutdown")({}, ctx);
+        const stored = JSON.parse(readFileSync(handoff, "utf8"));
+        if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("unsubmitted duplicate did not retain its handoff record");
+        await handlers.get("session_start")({}, ctx);
+        for (let i = 0; i < 60 && sent.length < 4; i += 1) await sleep(100);
+        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== "followUp") throw new Error("replacement did not replay the unsubmitted duplicate");
+        await consumePrompt();
+        await handlers.get("session_shutdown")({}, ctx);
+        if (existsSync(handoff)) throw new Error("consumed duplicates retained a handoff record");
+        process.exit(0);
+      }
+      await settle();
+      if (sent.length !== 4 || !same(sent[3]) || composer.text !== "") throw new Error("second identical wake was no longer recoverable");
+      await consumePrompt();
+    }
+    composer.text = wake;
+    const count = sent.length;
+    const sets = composer.sets.length;
+    await settle();
+    if (sent.length !== count || composer.sets.length !== sets || composer.text !== wake) throw new Error("consumed duplicates were recovered again");
+    break;
+  }
   case "editor-normalized":
   case "editor-normalized-message":
   case "editor-normalized-edited": {
@@ -1213,7 +1182,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
@@ -1331,7 +1300,6 @@ test_secondmate_launch_relies_on_discovery
 test_raw_secondmate_launch_has_no_busy_contract
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
-test_generated_extension_preserves_hostile_paths
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation

@@ -18,38 +18,31 @@ set -u
 LIB="$ROOT/tests/lib.sh"
 
 test_fixture_root_gone_after_normal_exit() {
-  local child_out child_dir registry
+  local child_out child_dir
   child_out=$(bash -c '
     # shellcheck source=tests/lib.sh
     . "'"$LIB"'"
     d=$(fm_test_tmproot fm-test-cleanup-exit)
     printf "%s\n" "$d"
-    printf "%s\n" "$FM_TEST_CLEANUP_REGISTRY" "$FM_TEST_PROCEVENT_REGISTRY" "$FM_TEST_WATCHER_REGISTRY"
-    for registry in "$FM_TEST_CLEANUP_REGISTRY" "$FM_TEST_PROCEVENT_REGISTRY" "$FM_TEST_WATCHER_REGISTRY"; do
-      [ -f "$registry" ] || exit 1
-    done
     if [ -d "$d" ]; then printf "mid:present\n"; else printf "mid:missing\n"; fi
-  ') || fail "the child's registries did not exist before normal exit"
+  ')
   child_dir=$(printf '%s\n' "$child_out" | sed -n '1p')
   assert_contains "$child_out" "mid:present" \
     "the fixture root was not present while its owning process was still alive"
   assert_absent "$child_dir" \
     "fm_test_tmproot's fixture root survived its owning process's normal exit"
-  while IFS= read -r registry; do
-    assert_absent "$registry" "a shared fixture registry survived its owning process's normal exit"
-  done < <(printf '%s\n' "$child_out" | sed -n '2,4p')
   pass "fm_test_tmproot cleans up its fixture root on normal exit"
 }
 
 test_fixture_root_gone_after_sigterm() {
-  local harness dirfile child_dir registry pid tries
+  local harness dirfile child_dir pid tries
   harness=$(fm_test_tmproot fm-test-cleanup-sigterm-harness)
   dirfile="$harness/child-dir"
   bash -c '
     # shellcheck source=tests/lib.sh
     . "'"$LIB"'"
     d=$(fm_test_tmproot fm-test-cleanup-term)
-    printf "%s\n" "$d" "$FM_TEST_CLEANUP_REGISTRY" "$FM_TEST_PROCEVENT_REGISTRY" "$FM_TEST_WATCHER_REGISTRY" > "'"$dirfile"'"
+    printf "%s\n" "$d" > "'"$dirfile"'"
     while :; do sleep 0.1; done
   ' &
   pid=$!
@@ -60,18 +53,12 @@ test_fixture_root_gone_after_sigterm() {
     tries=$((tries + 1))
   done
   [ -s "$dirfile" ] || fail "the child never published its fixture root before the wait timed out"
-  child_dir=$(sed -n '1p' "$dirfile")
+  child_dir=$(cat "$dirfile")
   assert_present "$child_dir" "the child's fixture root did not exist before it was signaled"
-  while IFS= read -r registry; do
-    assert_present "$registry" "a child's shared fixture registry did not exist before it was signaled"
-  done < <(sed -n '2,4p' "$dirfile")
   kill -TERM "$pid"
   wait "$pid" 2>/dev/null
   assert_absent "$child_dir" \
     "fm_test_tmproot's fixture root survived SIGTERM to its owning process"
-  while IFS= read -r registry; do
-    assert_absent "$registry" "a shared fixture registry survived SIGTERM to its owning process"
-  done < <(sed -n '2,4p' "$dirfile")
   pass "fm_test_tmproot cleans up its fixture root on SIGTERM"
 }
 

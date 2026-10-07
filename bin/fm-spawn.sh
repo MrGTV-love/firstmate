@@ -4918,10 +4918,6 @@ EOF
     # has no trust gate, yet its cwd-only extension auto-discovery would load a
     # worktree-resident copy a SECOND time next to the explicit -e (verified,
     # omp 18.1.11). Lives in state/, cleaned by teardown.
-    omp_busy_executable=$(jq -cn --arg path "$FM_ROOT/bin/fm-busy-event.sh" '$path') || exit 1
-    omp_state_path=$(jq -cn --arg path "$STATE_REAL" '$path') || exit 1
-    omp_guardrail_import=$(jq -cn --arg path "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts" '$path') || exit 1
-    omp_turnend_path=$(jq -cn --arg path "$TURNEND" '$path') || exit 1
     guardrail_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guardrail_config" --arg state "$STATE_REAL" \
       '{FM_HOME: $home, FM_CONFIG_OVERRIDE: $config, FM_STATE_OVERRIDE: $state}') || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
@@ -4937,11 +4933,11 @@ EOF
 // because session_stop is awaited before the session settles, so gating on it
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
-import { installGuardrail } from $omp_guardrail_import;
+import { installGuardrail } from "$FM_ROOT/.omp/extensions/fm-jev-guardrail.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
-    execFile($omp_busy_executable, [
-      "apply", $omp_state_path, "$ID", state,
+    execFile("$FM_ROOT/bin/fm-busy-event.sh", [
+      "apply", "$STATE_REAL", "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "omp-ext", "--event", event,
     ], () => resolve());
   });
@@ -4952,7 +4948,7 @@ export default function (pi: any) {
     if (event && event.willContinue === true) return;
     return busyEvent("idle", "agent-end");
   });
-  pi.on("turn_end", () => execFile("touch", [$omp_turnend_path]));
+  pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
 }
 EOF
     ;;
