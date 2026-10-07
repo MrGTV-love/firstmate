@@ -636,8 +636,8 @@ test_prospective_tmux_credentials() {
 }
 
 test_fresh_claude_dispatch_consumes_initialized_auth_boundary() {
-  local variant rec id out status percent expected_harness expected_config expected_home launch
-  for variant in caller-config pane-config filtered-config home-mismatch default-available default-exhausted; do
+  local variant rec id out status percent expected_harness expected_config expected_home expected_bash_env launch
+  for variant in caller-config pane-config filtered-config home-mismatch default-available default-exhausted startup-config startup-home startup-default; do
     id="fresh-auth-$variant"
     rec=$(make_case "$id" claude "$id")
     read_case "$rec"
@@ -647,19 +647,20 @@ test_fresh_claude_dispatch_consumes_initialized_auth_boundary() {
     [ "$variant" != default-available ] || percent=50
     printf '%s\n' "$percent" > "$FAKEBIN_DIR/remaining"
     cat > "$FAKEBIN_DIR/quota-axi" <<'SH'
-#!/usr/bin/env bash
+#!/bin/sh
 percent=$(cat "${0%/*}/remaining")
 printf '%s\n' "$HOME" > "${0%/*}/quota-home"
 printf '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":%s,"runway":{"status":"%s"}}]}}]}\n' \
   "$percent" "$([ "$percent" = 0 ] && printf exhausted_now || printf available)"
 SH
     cat > "$FAKEBIN_DIR/claude" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "HOME=$HOME" "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-}" "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" \
+#!/bin/sh
+printf '%s\n' "HOME=$HOME" "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-}" "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY-}" "ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN-}" "BASH_ENV=${BASH_ENV-}" \
   > "${0%/*}/worker.env"
+pwd -P > "${0%/*}/worker.cwd"
 SH
     cat > "$FAKEBIN_DIR/omp" <<'SH'
-#!/usr/bin/env bash
+#!/bin/sh
 case "${1:-}" in
   models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
   *) exec "${0%/*}/claude" "$@" ;;
@@ -669,21 +670,33 @@ SH
     expected_home="$HOME_DIR/user-home"
     expected_config=
     expected_harness=claude
+    expected_bash_env=
     case "$variant" in
       caller-config) expected_config="$CASE_DIR/caller-config" ;;
-      pane-config) expected_config="$CASE_DIR/pane-config" ;;
+      pane-config|startup-default) expected_config="$CASE_DIR/pane-config" ;;
       filtered-config)
         printf '%s\n' HOME PATH > "$HOME_DIR/config/launch-env-allowlist"
         expected_harness=omp
         ;;
       home-mismatch) expected_home="$CASE_DIR/other-home" ;;
-      default-exhausted) expected_harness=omp ;;
+      default-exhausted|startup-config|startup-home) expected_harness=omp ;;
     esac
     mkdir -p "$expected_home"
     printf 'export HOME=%q\nexport PATH=%q\n' "$expected_home" "$FAKEBIN_DIR:$PATH" > "$CASE_DIR/pane-init.sh"
     case "$variant" in
-      pane-config|filtered-config)
+      pane-config|filtered-config|startup-default)
         printf 'export CLAUDE_CONFIG_DIR=%q\n' "$CASE_DIR/pane-config" >> "$CASE_DIR/pane-init.sh"
+        ;;
+    esac
+    case "$variant" in
+      startup-config|startup-home|startup-default)
+        expected_bash_env="$CASE_DIR/bash-env.sh"
+        case "$variant" in
+          startup-config) printf 'export CLAUDE_CONFIG_DIR=%q\n' "$CASE_DIR/startup-config" > "$expected_bash_env" ;;
+          startup-home) printf 'export HOME=%q\n' "$CASE_DIR/startup-home" > "$expected_bash_env" ;;
+          startup-default) printf 'unset CLAUDE_CONFIG_DIR\n' > "$expected_bash_env" ;;
+        esac
+        printf 'export BASH_ENV=%q\n' "$expected_bash_env" >> "$CASE_DIR/pane-init.sh"
         ;;
     esac
     out=$(
@@ -712,6 +725,8 @@ SH
       > "$CASE_DIR/worker.out" 2>&1 || fail "$variant initialized-pane launch could not be consumed"
     grep -Fxq "HOME=$expected_home" "$FAKEBIN_DIR/worker.env" || fail "$variant worker HOME disagreed with its actual probe"
     grep -Fxq "CLAUDE_CONFIG_DIR=$expected_config" "$FAKEBIN_DIR/worker.env" || fail "$variant worker config root disagreed with its actual probe"
+    grep -Fxq "BASH_ENV=$expected_bash_env" "$FAKEBIN_DIR/worker.env" || fail "$variant worker must inherit BASH_ENV unchanged"
+    assert_equals "$(cd "$WT_DIR" && pwd -P)" "$(cat "$FAKEBIN_DIR/worker.cwd")" "$variant worker must consume the initialized destination cwd"
     grep -Fxq 'ANTHROPIC_API_KEY=' "$FAKEBIN_DIR/worker.env" || fail "$variant leaked billing credentials"
     grep -Fxq 'ANTHROPIC_AUTH_TOKEN=' "$FAKEBIN_DIR/worker.env" || fail "$variant leaked billing tokens"
     if [ -f "$FAKEBIN_DIR/quota-home" ]; then

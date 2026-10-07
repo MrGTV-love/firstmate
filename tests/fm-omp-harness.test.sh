@@ -121,7 +121,7 @@ test_lock_identity_and_liveness_classification() {
 # 0 for everything else (the launch itself is only recorded by the fake tmux).
 make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
-#!/usr/bin/env bash
+#!/bin/sh
 if [ -f "${0%/*}/scope-fixtures/project-env" ] && [ -f "$PWD/.env" ]; then
   set -a
   . "$PWD/.env"
@@ -138,7 +138,7 @@ record_scope() {
     "PI_CONFIG_DIR=${PI_CONFIG_DIR-unset}" "XDG_CONFIG_HOME=${XDG_CONFIG_HOME-unset}" \
     "XDG_DATA_HOME=${XDG_DATA_HOME-unset}" "XDG_STATE_HOME=${XDG_STATE_HOME-unset}" \
     "XDG_CACHE_HOME=${XDG_CACHE_HOME-unset}" \
-    "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" \
+    "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" "BASH_ENV=${BASH_ENV-unset}" \
     "OPENROUTER_API_KEY=$(safe_auth "${OPENROUTER_API_KEY-unset}")" \
     "CUSTOM_MODEL_TOKEN=$(safe_auth "${CUSTOM_MODEL_TOKEN-unset}")" > "$1"
 }
@@ -295,7 +295,7 @@ JSON
 }
 
 test_spawn_capacity_matches_destination_auth_and_allowlist() {
-  local rec id scenario out status destination_root caller_root caller_profile destination_profile expected_model expected_root expected_profile expected_config launch catalog_env
+  local rec id scenario out status destination_root caller_root caller_profile destination_profile expected_model expected_root expected_profile expected_config expected_bash_env launch catalog_env
   for scenario in destination-healthy destination-exhausted filtered empty-profile; do
     id="omp-scope-$scenario"
     rec=$(make_spawn_case "$scenario" omp "$id")
@@ -328,13 +328,29 @@ JSON
     expected_root=$destination_root
     expected_profile=$destination_profile
     expected_config="$CASE_DIR/pane-config"
+    expected_bash_env=unset
+    case "$scenario" in
+      destination-healthy|destination-exhausted)
+        expected_bash_env="$CASE_DIR/bash-env.sh"
+        printf 'export PI_CODING_AGENT_DIR=%q OMP_PROFILE=%q PI_CONFIG_DIR=%q HOME=%q\n' \
+          "$caller_root" "$caller_profile" "$CASE_DIR/startup-config" "$CASE_DIR/startup-home" > "$expected_bash_env"
+        cat > "$FAKEBIN_DIR/timeout" <<'SH'
+#!/bin/sh
+printf '%s\n' "${BASH_ENV-unset}" >> "${0%/*}/timeout.env"
+[ "${1:-}" != -k ] || shift 2
+shift
+exec "$@"
+SH
+        chmod +x "$FAKEBIN_DIR/timeout"
+        ;;
+    esac
     if [ "$scenario" = filtered ]; then
       printf 'PATH\n' > "$HOME_DIR/config/launch-env-allowlist"
       expected_root=
       expected_profile='unset'
       expected_config=unset
     else
-      printf '%s\n' PATH PI_CODING_AGENT_DIR OMP_PROFILE PI_PROFILE PI_CONFIG_DIR \
+      printf '%s\n' PATH PI_CODING_AGENT_DIR OMP_PROFILE PI_PROFILE PI_CONFIG_DIR BASH_ENV \
         XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME > "$HOME_DIR/config/launch-env-allowlist"
     fi
     [ "$scenario" != destination-exhausted ] || expected_model=openrouter/z-ai/glm-5.3-flash
@@ -343,6 +359,7 @@ JSON
       PI_CONFIG_DIR="$CASE_DIR/pane-config" XDG_CONFIG_HOME="$CASE_DIR/pane-xdg-config" \
       XDG_DATA_HOME="$CASE_DIR/pane-xdg-data" XDG_STATE_HOME="$CASE_DIR/pane-xdg-state" \
       XDG_CACHE_HOME="$CASE_DIR/pane-xdg-cache"
+    [ "$expected_bash_env" = unset ] || printf 'export BASH_ENV=%q\n' "$expected_bash_env" >> "$FAKEBIN_DIR/pane-init.sh"
     out=$(PI_CODING_AGENT_DIR="$caller_root" OMP_PROFILE="$caller_profile" PI_PROFILE=caller-profile \
       FM_FAKE_TMUX_ENV_HOME="$CASE_DIR/session-home" \
       FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR="$caller_root" \
@@ -356,11 +373,16 @@ JSON
     assert_grep "PI_CODING_AGENT_DIR=$expected_root" "$FAKEBIN_DIR/usage.env" "$scenario usage must respect the destination root and allowlist"
     assert_grep "OMP_PROFILE=$expected_profile" "$FAKEBIN_DIR/usage.env" "$scenario usage must preserve profile presence and allowlist filtering"
     assert_grep "PI_CONFIG_DIR=$expected_config" "$FAKEBIN_DIR/usage.env" "$scenario usage must follow initialized-pane profile roots"
+    assert_grep "BASH_ENV=$expected_bash_env" "$FAKEBIN_DIR/usage.env" "$scenario usage must inherit BASH_ENV without replaying it"
+    if [ "$expected_bash_env" != unset ]; then
+      grep -Fxq "$expected_bash_env" "$FAKEBIN_DIR/timeout.env" || fail "$scenario must exercise the non-Bash timeout with the initialized BASH_ENV"
+    fi
     launch=$(cat "$LAUNCH_LOG")
     fm_test_consume_pane_launch "$FAKEBIN_DIR" "$launch" \
       > "$CASE_DIR/worker.out" 2>&1 || fail "$scenario generated OMP command could not be consumed"
     cmp -s "$FAKEBIN_DIR/usage.env" "$FAKEBIN_DIR/worker.env" || fail "$scenario usage scope differs from the generated worker's effective authentication"
     cmp -s "$FAKEBIN_DIR/usage.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "$scenario capacity project scope differs from the generated worker"
+    assert_grep "BASH_ENV=$expected_bash_env" "$FAKEBIN_DIR/worker.env" "$scenario consumer must retain the initialized BASH_ENV"
     for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
       cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "$scenario catalog scope differs from the generated worker's effective authentication"
       cmp -s "${catalog_env%.env}.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "$scenario catalog project scope differs from the generated worker"

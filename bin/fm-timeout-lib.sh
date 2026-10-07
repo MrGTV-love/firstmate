@@ -154,7 +154,7 @@ fm_run_external_timeout() {
   # ignores TERM; timeout then considers the command finished and does not send
   # its configured KILL. Explicitly reap that leftover group on a real timeout.
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  "$runner" -k 1 "$seconds" bash -c '
+  "$runner" -k 1 "$seconds" /bin/sh -c '
     status_file=$1
     shift
     "$@"

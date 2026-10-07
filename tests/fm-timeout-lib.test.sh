@@ -480,9 +480,22 @@ SH
   pass "an outer Perl bound reaps a TERM-resistant nested command"
 }
 
+test_run_timed_preserves_initialized_environment_without_bash_startup() {
+  local startup="$TMP_ROOT/run-timed-bash-env.sh" out rc=0
+  printf 'export FM_TIMED_MARKER=startup\n' > "$startup"
+  out=$(
+    export BASH_ENV="$startup" FM_TIMED_MARKER=initialized
+    run_timed 5 /bin/sh -c 'printf "%s\n" "$FM_TIMED_MARKER" "$BASH_ENV"; exit 7'
+  ) || rc=$?
+  [ "$rc" -eq 7 ] || fail "the external timeout wrapper lost the consumer's exact status (rc=$rc)"
+  assert_equals "$(printf '%s\n' initialized "$startup")" "$out" "the external timeout wrapper must preserve initialized variables and inherited BASH_ENV without replay"
+  pass 'fm_run_timed preserves initialized environment and BASH_ENV through a non-Bash timeout and consumer'
+}
+
 test_passes_the_command_status_and_output_through
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death
 test_run_timed_passes_a_natural_exit_through_a_fired_bound
+test_run_timed_preserves_initialized_environment_without_bash_startup
 test_term_ends_a_cooperative_command_at_the_bound
 test_kill_ends_a_term_ignoring_command_after_the_grace
 test_the_bound_replaces_the_calling_shell
