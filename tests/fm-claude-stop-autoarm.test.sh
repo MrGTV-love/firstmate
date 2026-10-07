@@ -469,6 +469,56 @@ test_terminal_source_wake_survives_retirement() {
     [ -z "$out" ] || fail "acknowledged final feedback caused another notice: $out"
     [ "$(wc -l < "$dir/state/arm-ran")" = "$before" ] || fail "the idle home armed again after the final acknowledgement"
   done
+
+  # Keep one native-shaped session alive through two owned captures and the
+  # final idle Stop, rather than replacing the session between hook calls.
+  dir=$(make_primary_dir "$TMP_ROOT/terminal-two-cycles")
+  mkdir -p "$dir/state/procevent" "$dir/state/procevent-inbox"
+  write_arm_fixture "$dir" actionable
+  FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" "$FAKE_CLAUDE" -c '
+    set -eu
+    root=$1
+    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    "$root/bin/fm-procevent.sh" register lavish lavish-final -- /usr/bin/printf "unused fixture poll\n" >/dev/null
+    for round in 1 2; do
+      base="$FM_HOME/state/procevent-inbox/lavish-final.$round"
+      printf "session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,owned answer %s\n" "$round" > "$base.result"
+      printf "lavish\n" > "$base.adapter"
+      printf "%s\t%s\tcheck\tprocevent:lavish-final:%s\tcheck: procevent lavish lavish-final %s\n" \
+        "$(date +%s)" "$round" "$round" "$round" > "$FM_HOME/state/.wake-queue"
+      printf "%s\n" "$round" > "$FM_HOME/state/.wake-queue.seq"
+      if [ "$round" = 2 ]; then "$root/bin/fm-procevent.sh" retire lavish-final >/dev/null; fi
+      rc=0
+      printf "{\"session_id\":\"sess-two-cycles\",\"stop_hook_active\":false,\"transcript_path\":\"/fixture/.claude/projects/primary/session.jsonl\"}\n" \
+        | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/state/stop-$round.out" 2>&1 || rc=$?
+      [ "$rc" = 2 ]
+      "$root/bin/fm-wake-drain.sh" > "$FM_HOME/state/drain-$round.out" 2> "$FM_HOME/state/drain-$round.err"
+      [ -s "$FM_HOME/state/.wake-queue" ]
+      "$root/bin/fm-procevent-lavish.sh" read "$base.result" > "$FM_HOME/state/read-$round.out"
+      [ ! -e "$base.handled" ]
+      "$root/bin/fm-procevent.sh" handled lavish-final "$round" > "$FM_HOME/state/handled-$round.out"
+      cutoff=$(sed -n "s/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p" "$FM_HOME/state/drain-$round.err")
+      generation=$(sed -n "s/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p" "$FM_HOME/state/drain-$round.err")
+      [ "$cutoff" = "$round" ] && [ -n "$generation" ]
+      "$root/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null
+      [ ! -s "$FM_HOME/state/.wake-queue" ]
+    done
+    before=$(wc -l < "$FM_HOME/state/arm-ran")
+    printf "{\"session_id\":\"sess-two-cycles\",\"stop_hook_active\":false,\"transcript_path\":\"/fixture/.claude/projects/primary/session.jsonl\"}\n" \
+      | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/state/stop-idle.out" 2>&1
+    [ "$(wc -l < "$FM_HOME/state/arm-ran")" = "$before" ]
+  ' _ "$ROOT" || fail "same-session owned feedback did not complete two Stop rewakes and an idle finish"
+  for status in 1 2; do
+    assert_contains "$(cat "$dir/state/stop-$status.out")" 'firstmate watcher wake' "each Stop must deliver feedback"
+    assert_contains "$(cat "$dir/state/stop-$status.out")" 'do NOT run bin/fm-watch-arm.sh' "each handling turn must reject model re-arm"
+    assert_contains "$(cat "$dir/state/drain-$status.out")" "procevent lavish lavish-final $status" "drain must expose the exact owned capture"
+    assert_contains "$(cat "$dir/state/read-$status.out")" "owned answer $status" "each handling turn must read its actual result"
+    assert_contains "$(cat "$dir/state/handled-$status.out")" "handled: lavish-final $status" "each capture must receive its exact acknowledgement"
+    assert_present "$dir/state/procevent-inbox/lavish-final.$status.handled" "each handled capture must remain durably acknowledged"
+  done
+  assert_absent "$dir/state/procevent/lavish-final.source" "the final source must remain retired"
+  [ ! -s "$dir/state/.wake-queue" ] || fail "idle finish left owned feedback queued"
+  [ ! -s "$dir/state/stop-idle.out" ] || fail "idle finish emitted another feedback notice"
   pass "auto-arm: final feedback captured before or during Stop survives source retirement until acknowledged"
 }
 

@@ -3388,16 +3388,16 @@ wait_for "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim" || fail "home sweep fixture 
 sweep_pid_one=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/sweep-one.claim")
 sweep_pid_two=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim")
 # The claim-only case is an owned claim with no live runner, so build exactly
-# that: kill the runner's group so it cannot run its own cleanup, confirm it is
-# gone, and only then drop the registration. Deleting the registration out from
+# that: kill the runner's group so it cannot run its own cleanup, confirm the
+# whole group is gone, and only then drop the registration. Deleting the registration out from
 # under a LIVE runner no longer produces this case, because a superseded
 # generation now observes the identity mismatch, self-retires, and releases its
 # claim - so the sweep would race that exit and see one source or two depending
 # on which won.
 kill -KILL -"$sweep_pid_two" 2>/dev/null || true
-for _ in $(seq 1 50); do kill -0 "$sweep_pid_two" 2>/dev/null || break; sleep 0.1; done
-kill -0 "$sweep_pid_two" 2>/dev/null \
-  && fail "the claim-only sweep fixture runner did not stop"
+for _ in $(seq 1 50); do kill -0 -"$sweep_pid_two" 2>/dev/null || break; sleep 0.1; done
+kill -0 -"$sweep_pid_two" 2>/dev/null \
+  && fail "the claim-only sweep fixture runner group did not stop"
 assert_present "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim" \
   "a killed runner leaves its owned claim behind for the sweep"
 rm -f "$HM/state/procevent/sweep-two.source"
