@@ -1,0 +1,9 @@
+{
+  "retired_agent_unchanged": true,
+  "absent_agent_unchanged": true,
+  "retired_terminal_unchanged": true,
+  "absent_terminal_unchanged": true,
+  "absent_process_unchanged": true,
+  "meta_unchanged": true,
+  "no_control_journal": true
+}

@@ -1,0 +1,5 @@
+dispatch-resolve:
+  status: error
+  reason: model index: chosen claude model validation-catalog-absent-model failed its catalog check
+  timings: api_ms=4 quota_ms=116 local_ms=441 total_ms=561
+  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1

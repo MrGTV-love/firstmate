@@ -1,0 +1,5 @@
+$ bin/fm-control.sh launch-a relaunch --model role:deep --note 'Adversarial catalog-absent selector; must not reach worker.'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/home
+model-index: id 'fm-lab-catalog-absent-selector' absent or retired in claude catalog (role 'deep')
+
+exit=1

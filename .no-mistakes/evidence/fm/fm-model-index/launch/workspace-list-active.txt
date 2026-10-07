@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 workspace list
+{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":[]}}
+
+exit=0

@@ -1,0 +1,21 @@
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/model-index.json
+-----BEGIN config/model-index.json-----
+{"version": 1, "roles": {"incoming": {"codex": {"model": "current"}}}, "retired": []}
+-----END config/model-index.json-----
+
+config/crew-dispatch.json
+-----BEGIN config/crew-dispatch.json-----
+{"default": {"harness": "codex", "role": "incoming"}}
+-----END config/crew-dispatch.json-----
+
+config/crew-harness
+-----BEGIN config/crew-harness-----
+ABSENT
+-----END config/crew-harness-----
+
+config/backend
+-----BEGIN config/backend-----
+tmux
+-----END config/backend-----

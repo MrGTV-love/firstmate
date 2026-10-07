@@ -1,0 +1,126 @@
+[
+  {
+    "connect": "CONNECT api.typesafe.ai:443 HTTP/1.1",
+    "request_line": "POST /v1/systemone HTTP/1.1",
+    "headers": {
+      "Host": "api.typesafe.ai",
+      "User-Agent": "curl/8.7.1",
+      "Accept": "*/*",
+      "Content-Type": "application/json",
+      "Content-Length": "804"
+    },
+    "authorization": "dummy fixture key, omitted",
+    "body": {
+      "model": "jev-latest",
+      "state": {
+        "task": {
+          "project": "typed-dispatch-local-validation",
+          "brief": "## Captain's intent\nPerform routine local maintenance.\n\n## Firstmate spec\nRename an internal variable; no deployment, credentials, or network behavior changes.\n"
+        }
+      },
+      "questions": {
+        "rule": {
+          "type": "choice",
+          "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+          "criteria": {
+            "rule_1": "A routine local code maintenance task with no high-stakes work.",
+            "default": "No listed rule applies to this task."
+          }
+        }
+      }
+    }
+  },
+  {
+    "connect": "CONNECT api.typesafe.ai:443 HTTP/1.1",
+    "request_line": "POST /v1/systemone HTTP/1.1",
+    "headers": {
+      "Host": "api.typesafe.ai",
+      "User-Agent": "curl/8.7.1",
+      "Accept": "*/*",
+      "Content-Type": "application/json",
+      "Content-Length": "804"
+    },
+    "authorization": "dummy fixture key, omitted",
+    "body": {
+      "model": "jev-latest",
+      "state": {
+        "task": {
+          "project": "typed-dispatch-local-validation",
+          "brief": "## Captain's intent\nPerform routine local maintenance.\n\n## Firstmate spec\nRename an internal variable; no deployment, credentials, or network behavior changes.\n"
+        }
+      },
+      "questions": {
+        "rule": {
+          "type": "choice",
+          "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+          "criteria": {
+            "rule_1": "A routine local code maintenance task with no high-stakes work.",
+            "default": "No listed rule applies to this task."
+          }
+        }
+      }
+    }
+  },
+  {
+    "connect": "CONNECT api.typesafe.ai:443 HTTP/1.1",
+    "request_line": "POST /v1/systemone HTTP/1.1",
+    "headers": {
+      "Host": "api.typesafe.ai",
+      "User-Agent": "curl/8.7.1",
+      "Accept": "*/*",
+      "Content-Type": "application/json",
+      "Content-Length": "804"
+    },
+    "authorization": "dummy fixture key, omitted",
+    "body": {
+      "model": "jev-latest",
+      "state": {
+        "task": {
+          "project": "typed-dispatch-local-validation",
+          "brief": "## Captain's intent\nPerform routine local maintenance.\n\n## Firstmate spec\nRename an internal variable; no deployment, credentials, or network behavior changes.\n"
+        }
+      },
+      "questions": {
+        "rule": {
+          "type": "choice",
+          "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+          "criteria": {
+            "rule_1": "A routine local code maintenance task with no high-stakes work.",
+            "default": "No listed rule applies to this task."
+          }
+        }
+      }
+    }
+  },
+  {
+    "connect": "CONNECT api.typesafe.ai:443 HTTP/1.1",
+    "request_line": "POST /v1/systemone HTTP/1.1",
+    "headers": {
+      "Host": "api.typesafe.ai",
+      "User-Agent": "curl/8.7.1",
+      "Accept": "*/*",
+      "Content-Type": "application/json",
+      "Content-Length": "804"
+    },
+    "authorization": "dummy fixture key, omitted",
+    "body": {
+      "model": "jev-latest",
+      "state": {
+        "task": {
+          "project": "typed-dispatch-local-validation",
+          "brief": "## Captain's intent\nPerform routine local maintenance.\n\n## Firstmate spec\nRename an internal variable; no deployment, credentials, or network behavior changes.\n"
+        }
+      },
+      "questions": {
+        "rule": {
+          "type": "choice",
+          "instructions": "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule's own matching condition; pick `default` when no rule's condition is met, including when a rule's own exemption text excludes this task.",
+          "criteria": {
+            "rule_1": "A routine local code maintenance task with no high-stakes work.",
+            "default": "No listed rule applies to this task."
+          }
+        }
+      }
+    }
+  }
+]

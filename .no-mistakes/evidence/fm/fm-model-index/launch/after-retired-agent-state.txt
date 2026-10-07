@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 agent list
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_status":"blocked","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/project","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/pool/.treehouse/project-d7ca71/1/project","pane_id":"w2:p2","revision":0,"state_change_seq":1,"tab_id":"w2:t2","terminal_id":"term_65d346cd315b33","workspace_id":"w2"}],"type":"agent_list"}}
+
+exit=0

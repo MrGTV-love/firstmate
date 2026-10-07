@@ -1,0 +1,16 @@
+window=fm-lab-model-index-67395-20576:w2:p2
+endpoint_task_id=launch-a
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/pool/.treehouse/project-d7ca71/1/project
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/project
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-launch-a
+model=claude-sonnet-5-5
+effort=low
+busy_gen=g1791329608.29543.3690
+spawn_gen=s1791329609.14727.9779
+backend=herdr
+herdr_session=fm-lab-model-index-67395-20576
+herdr_workspace_id=w2
+herdr_tab_id=w2:t2
+herdr_pane_id=w2:p2

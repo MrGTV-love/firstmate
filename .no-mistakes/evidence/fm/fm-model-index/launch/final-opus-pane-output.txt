@@ -1,0 +1,33 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane read w3:p2 --source recent --lines 30 --format text
+*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(rm*/.tac/governance/
+*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the *
+is not expanded) and matches only commands containing a literal * at that position. Use Bash(
+rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(mv*/.tac/governance/
+*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the *
+is not expanded) and matches only commands containing a literal * at that position. Use Bash(
+mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (/Users/charlesabrooker/.claude/settings.json): Bash(*>*/.tac/governance/
+*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the *
+is not expanded) and matches only commands containing a literal * at that position. Use Bash(
+*>*/.tac/governance/*) for wildcard matching.
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working
+  directory. Never allow this for third-party repositories.
+
+  External imports:
+    /Users/charlesabrooker/.no-mistakes/worktr…ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose
+  security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel
+
+exit=0

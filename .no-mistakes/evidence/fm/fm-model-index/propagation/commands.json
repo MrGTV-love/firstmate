@@ -1,0 +1,1163 @@
+[
+  {
+    "name": "initialize-destination",
+    "argv": [
+      "git",
+      "init",
+      "-q",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-valid",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-consumer",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+      "profiles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config/crew-dispatch.json"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-removed-role",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-malformed-empty",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-empty-bytes",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-missing-index",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-source-symlink",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-source-hardlink",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-destination-refusal",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "lab-create",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-lab-home.sh",
+      "create",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "lab-tmux-dir",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-lab-home.sh",
+      "tmux-dir",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "code-init",
+    "argv": [
+      "git",
+      "init",
+      "-q",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "code-track",
+    "argv": [
+      "git",
+      "-C",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "add",
+      "bin"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "private-terminal-start",
+    "argv": [
+      "tmux",
+      "-L",
+      "propagation",
+      "new-session",
+      "-d",
+      "-s",
+      "fm-propagation-lab",
+      "-n",
+      "fm-propagation",
+      "cat"
+    ],
+    "env": {
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-valid",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/bin/fm-config-push.sh"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog",
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ",
+      "TMUX": "/tmp/fml.WECOlZ/tmux-501/propagation,0,0"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-consumer",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+      "profiles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config/crew-dispatch.json"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-removed-role",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/bin/fm-config-push.sh"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog",
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ",
+      "TMUX": "/tmp/fml.WECOlZ/tmux-501/propagation,0,0"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-malformed-empty",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/bin/fm-config-push.sh"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog",
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ",
+      "TMUX": "/tmp/fml.WECOlZ/tmux-501/propagation,0,0"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-missing-index",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/bin/fm-config-push.sh"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog",
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ",
+      "TMUX": "/tmp/fml.WECOlZ/tmux-501/propagation,0,0"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "private-terminal-capture",
+    "argv": [
+      "tmux",
+      "-L",
+      "propagation",
+      "capture-pane",
+      "-p",
+      "-t",
+      "fm-propagation-lab:fm-propagation"
+    ],
+    "env": {
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "receiver-valid-model-index.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/model-index.json",
+      "86",
+      "c063bb74cd3de6b62e25da0f53d7803c622b8c0a4fcbcc166f7105b186624591",
+      "2"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 86
+  },
+  {
+    "name": "receiver-valid-crew-dispatch.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/crew-dispatch.json",
+      "54",
+      "e2c880d20e186e6bfd197ce8607d2d230e1705a392edf7349aa1053c9cb00e6f",
+      "3"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 54
+  },
+  {
+    "name": "receiver-consumer",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+      "profiles",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote/config/crew-dispatch.json"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "receiver-model-index.json-symlink-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "4"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-model-index.json-symlink-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/model-index.json",
+      "86",
+      "c063bb74cd3de6b62e25da0f53d7803c622b8c0a4fcbcc166f7105b186624591",
+      "5"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 86
+  },
+  {
+    "name": "receiver-model-index.json-symlink-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "6"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-model-index.json-hardlink-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "7"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-model-index.json-hardlink-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/model-index.json",
+      "86",
+      "c063bb74cd3de6b62e25da0f53d7803c622b8c0a4fcbcc166f7105b186624591",
+      "8"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 86
+  },
+  {
+    "name": "receiver-model-index.json-hardlink-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "9"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-model-index.json-directory-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "10"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-model-index.json-directory-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/model-index.json",
+      "86",
+      "c063bb74cd3de6b62e25da0f53d7803c622b8c0a4fcbcc166f7105b186624591",
+      "11"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 86
+  },
+  {
+    "name": "receiver-model-index.json-directory-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "12"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-symlink-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "13"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-symlink-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/crew-dispatch.json",
+      "54",
+      "e2c880d20e186e6bfd197ce8607d2d230e1705a392edf7349aa1053c9cb00e6f",
+      "14"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 54
+  },
+  {
+    "name": "receiver-crew-dispatch.json-symlink-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "15"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-hardlink-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "16"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-hardlink-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/crew-dispatch.json",
+      "54",
+      "e2c880d20e186e6bfd197ce8607d2d230e1705a392edf7349aa1053c9cb00e6f",
+      "17"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 54
+  },
+  {
+    "name": "receiver-crew-dispatch.json-hardlink-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "18"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-directory-check",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "check",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "19"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-crew-dispatch.json-directory-put",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/crew-dispatch.json",
+      "54",
+      "e2c880d20e186e6bfd197ce8607d2d230e1705a392edf7349aa1053c9cb00e6f",
+      "20"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 54
+  },
+  {
+    "name": "receiver-crew-dispatch.json-directory-absent",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "21"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-oversize-model-index.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/model-index.json",
+      "1048577",
+      "9d78de4e5b12fc166bed811cd230621ea1e1e353553fe31b92a73bfbf45d68ee",
+      "22"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 1048577
+  },
+  {
+    "name": "receiver-oversize-crew-dispatch.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "put",
+      "config/crew-dispatch.json",
+      "1048577",
+      "9d78de4e5b12fc166bed811cd230621ea1e1e353553fe31b92a73bfbf45d68ee",
+      "23"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote"
+    },
+    "stdin_bytes": 1048577
+  },
+  {
+    "name": "absence-prove-no-jq",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin/bash",
+      "-c",
+      "if command -v jq; then exit 1; else printf \"jq unavailable\\n\"; fi"
+    ],
+    "env": {
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-both-absent-no-jq",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "receiver-absent-no-jq-model-index.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/model-index.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "24"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote",
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "receiver-absent-no-jq-crew-dispatch.json",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh",
+      "absent",
+      "config/crew-dispatch.json",
+      "0",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "25"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote",
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin"
+    },
+    "stdin_bytes": 0
+  },
+  {
+    "name": "ssh-authority-probe",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityFile=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "-o",
+      "ConnectTimeout=3",
+      "localhost",
+      "true"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-model-index.json-symlink",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-model-index.json-hardlink",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-model-index.json-oversize",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-crew-dispatch.json-symlink",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-crew-dispatch.json-hardlink",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "sender-source-crew-dispatch.json-oversize",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh",
+      "remote",
+      "100"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_INHERITABLE_CONFIG": "model-index.json crew-dispatch.json"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "ssh-key-host",
+    "argv": [
+      "ssh-keygen",
+      "-q",
+      "-t",
+      "ed25519",
+      "-N",
+      "",
+      "-f",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/host"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "ssh-key-client",
+    "argv": [
+      "ssh-keygen",
+      "-q",
+      "-t",
+      "ed25519",
+      "-N",
+      "",
+      "-f",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "disposable-sshd",
+    "argv": [
+      "/usr/sbin/sshd",
+      "-D",
+      "-e",
+      "-f",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/sshd_config"
+    ]
+  },
+  {
+    "name": "disposable-ssh-authority",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "true"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "ssh-receiver-valid-model-index.json",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 86 c063bb74cd3de6b62e25da0f53d7803c622b8c0a4fcbcc166f7105b186624591 26"
+    ],
+    "env": {},
+    "stdin_bytes": 86
+  },
+  {
+    "name": "ssh-receiver-valid-crew-dispatch.json",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 54 e2c880d20e186e6bfd197ce8607d2d230e1705a392edf7349aa1053c9cb00e6f 27"
+    ],
+    "env": {},
+    "stdin_bytes": 54
+  },
+  {
+    "name": "ssh-receiver-consumer",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote/config/crew-dispatch.json"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "stage-validate",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; fm_config_inherit_pair_stage \"$2\" \"$3\"; fm_config_inherit_pair_valid \"$3\"",
+      "stage",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary/config",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/frozen-stage"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  },
+  {
+    "name": "shared-frozen-after-source-mutation",
+    "argv": [
+      "bash",
+      "-c",
+      "source \"$1/bin/fm-config-inherit-lib.sh\"; propagate_secondmate_inheritance \"$2\" \"$3\"",
+      "propagate",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/primary",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second"
+    ],
+    "env": {
+      "FM_CONFIG_INHERIT_PAIR_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/frozen-stage"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "push-both-absent-no-jq",
+    "argv": [
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/bin/fm-config-push.sh"
+    ],
+    "env": {
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home",
+      "FM_ROOT_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/catalog",
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ",
+      "TMUX": "/tmp/fml.WECOlZ/tmux-501/propagation,0,0",
+      "PATH": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/no-jq-bin"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "ssh-receiver-destination-refusal-check",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 28"
+    ],
+    "env": {},
+    "stdin_bytes": 0
+  },
+  {
+    "name": "ssh-receiver-destination-refusal-put",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 83 2895f499b10836f94af122a70e8df05f6319d543ce7baf404dd11f68abda9f97 29"
+    ],
+    "env": {},
+    "stdin_bytes": 83
+  },
+  {
+    "name": "ssh-receiver-destination-refusal-absent",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh absent config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 30"
+    ],
+    "env": {},
+    "stdin_bytes": 0
+  },
+  {
+    "name": "ssh-receiver-refusal-unrelated-continues",
+    "argv": [
+      "ssh",
+      "-F",
+      "/dev/null",
+      "-p",
+      "56065",
+      "-i",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/client",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentityAgent=none",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/known_hosts",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "127.0.0.1",
+      "/usr/bin/env FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/remote PATH=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-harness 6 243b0dc9b847e66c440dca985e10fe0ce9e29c379b018ddd5747ba8948f84cc8 31"
+    ],
+    "env": {},
+    "stdin_bytes": 6
+  },
+  {
+    "name": "private-terminal-final-capture",
+    "argv": [
+      "tmux",
+      "-L",
+      "propagation",
+      "capture-pane",
+      "-p",
+      "-t",
+      "fm-propagation-lab:fm-propagation"
+    ],
+    "env": {
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "private-terminal-stop",
+    "argv": [
+      "tmux",
+      "-L",
+      "propagation",
+      "kill-server"
+    ],
+    "env": {
+      "TMUX_TMPDIR": "/tmp/fml.WECOlZ"
+    },
+    "stdin_bytes": null
+  },
+  {
+    "name": "lab-tmux-teardown",
+    "argv": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-lab-home.sh",
+      "teardown",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home"
+    ],
+    "env": {},
+    "stdin_bytes": null
+  }
+]

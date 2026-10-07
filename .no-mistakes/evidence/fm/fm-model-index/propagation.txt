@@ -1,0 +1,544 @@
+
+=== valid pair ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	pushed	
+crew-dispatch.json	pushed	
+backend	pushed	
+
+exit=0
+DESTINATION valid pair
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: tmux
+
+
+=== valid pair real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== removed role retains pair and unrelated pushes ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.E8O7KU/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.E8O7KU/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+model-index.json	skipped	jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.E8O7KU/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+crew-dispatch.json	skipped	jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.E8O7KU/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+backend	pushed	
+
+exit=1
+DESTINATION removed role retains pair and unrelated pushes
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-removed-role
+
+
+=== removed role retains pair and unrelated pushes real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== missing index retains pair ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.tbeehi/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.tbeehi/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+model-index.json	skipped	jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.tbeehi/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+crew-dispatch.json	skipped	jq: error (at /Users/charlesabrooker/tmp/fm-config-inherit-pair.tbeehi/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+backend	pushed	
+
+exit=1
+DESTINATION missing index retains pair
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-missing-index
+
+
+=== missing index retains pair real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== malformed empty index ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: model-index: malformed index: /Users/charlesabrooker/tmp/fm-config-inherit-pair.0L1Agu/model-index.json
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: model-index: malformed index: /Users/charlesabrooker/tmp/fm-config-inherit-pair.0L1Agu/model-index.json
+model-index.json	skipped	model-index: malformed index: /Users/charlesabrooker/tmp/fm-config-inherit-pair.0L1Agu/model-index.json
+crew-dispatch.json	skipped	model-index: malformed index: /Users/charlesabrooker/tmp/fm-config-inherit-pair.0L1Agu/model-index.json
+backend	unchanged	
+
+exit=1
+DESTINATION malformed empty index
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-missing-index
+
+
+=== malformed empty index real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== valid empty coherent pair ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	pushed	
+crew-dispatch.json	pushed	
+backend	unchanged	
+
+exit=0
+DESTINATION valid empty coherent pair
+model-index.json: {"version": 1, "roles": {}, "retired": []}
+crew-dispatch.json: {"default": []}
+backend: unrelated-missing-index
+
+
+=== valid empty coherent pair real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": []
+}
+
+exit=0
+
+=== stage snapshot ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; fm_config_inherit_pair_stage "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/frozen" 0; fm_config_inherit_pair_valid "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/frozen"
+
+exit=0
+
+=== staged snapshot after mutation ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	pushed	
+crew-dispatch.json	pushed	
+backend	unchanged	
+model-index.json	pushed	
+crew-dispatch.json	pushed	
+backend	unchanged	
+
+exit=0
+DESTINATION frozen snapshot
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-missing-index
+
+
+=== frozen snapshot real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== local symlink source dereferenced ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	unchanged	
+crew-dispatch.json	unchanged	
+backend	unchanged	
+
+exit=0
+DESTINATION local symlink source dereferenced
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-missing-index
+
+
+=== local symlink source dereferenced real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== local hardlink source copied ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	unchanged	
+crew-dispatch.json	unchanged	
+backend	unchanged	
+
+exit=0
+DESTINATION local hardlink source copied
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+backend: unrelated-missing-index
+
+
+=== local hardlink source copied real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+
+=== destination refuses pair ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config: destination does not allow inherited item (not gitignored or guard failed)
+model-index.json	skipped	destination does not allow inherited item (not gitignored or guard failed)
+crew-dispatch.json	skipped	destination does not allow inherited item (not gitignored or guard failed)
+backend	unchanged	
+
+exit=0
+DESTINATION destination refuses pair
+model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+crew-dispatch.json: [absent/non-file]
+backend: unrelated-missing-index
+
+
+=== both-source absence without jq ===
+$ . "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-inherit-lib.sh"; FM_CONFIG_INHERIT_REPORT="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report" propagate_inheritable_config "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config"; rc=$?; cat "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/report"; exit "$rc"
+model-index.json	skipped	destination does not allow inherited item (not gitignored or guard failed)
+crew-dispatch.json	skipped	destination does not allow inherited item (not gitignored or guard failed)
+backend	unchanged	
+model-index.json	pushed	mirrored primary absence
+crew-dispatch.json	unchanged	
+backend	unchanged	
+
+exit=0
+DESTINATION both absent
+model-index.json: [absent/non-file]
+crew-dispatch.json: [absent/non-file]
+backend: unrelated-missing-index
+
+
+=== config-push actual CLI coherent empty unchanged ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-push.sh"
+env: bash: No such file or directory
+
+exit=127
+
+=== config-push actual CLI removed role retains pair ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-push.sh"
+env: bash: No such file or directory
+
+exit=127
+DESTINATION CLI retained pair
+model-index.json: {"version": 1, "roles": {}, "retired": []}
+crew-dispatch.json: {"default": []}
+backend: unrelated-missing-index
+
+
+=== CLI retained pair real profiles consumer ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination/config/crew-dispatch.json"
+{
+  "default": []
+}
+
+exit=0
+
+=== config-push actual CLI coherent empty unchanged retry ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-push.sh"
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/product-root/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/product-root/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source -> live secondmate homes
+secondmate disposable (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination):
+  home: dirty working tree - local-material push continuing
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  backend: unchanged
+  data/captain-shared.md: unchanged
+
+exit=0
+
+=== config-push actual CLI removed role retry ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-push.sh"
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source -> live secondmate homes
+jq: error (at /Users/charlesabrooker/tmp/fm-config-push-pair.5QC5bL/crew-dispatch.json:0): role or stand-in not configured: omp:driver
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate disposable (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination):
+  home: dirty working tree - local-material push continuing
+  backend: unchanged
+  data/captain-shared.md: unchanged
+
+exit=1
+
+=== remote sender model-index.json symlink preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/model-index.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+=== remote sender model-index.json hardlink preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/model-index.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+=== remote sender model-index.json oversize preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/model-index.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+=== remote sender crew-dispatch.json symlink preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/crew-dispatch.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+=== remote sender crew-dispatch.json hardlink preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/crew-dispatch.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+=== remote sender crew-dispatch.json oversize preflight no SSH executable ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit-push.sh" remote-guard 1
+skipped: config/model-index.json and config/crew-dispatch.json (routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source/config/crew-dispatch.json)
+error: remote command is not a genuine tracked executable in this Firstmate checkout: fm-remote-inherit.sh
+
+exit=1
+
+Native SSH roundtrip: UNTESTED. No authorized disposable SSH server used. Remote sender preflight executed real CLI with no ssh executable; no mock transport. Local shared inheritance boundaries are live filesystem/product execution, not agent-reread transport evidence.
+
+=== latest single-object index validation rejects two JSON objects ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/config/crew-dispatch.json"
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/config/model-index.json
+
+exit=2
+
+Cleanup: all .test-propagation fixtures removed; no private servers started. Initial CLI restricted PATH attempts failed env bash lookup (127), corrected using standard PATH; successful CLI runs do not invoke transport because inherited items unchanged. Remote preflight also encounters genuine tracked-executable refusal for absent unrelated captain-shared item after pair withheld; not receiver/transport coverage.
+
+=== real receiver valid put model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 87 a093237853f57c81093e0132ea01493d4c67f61caa7a6fc43ef734be6a74fc34 1 < committed stdin payload
+pushed: config/model-index.json
+
+exit=0
+
+=== real receiver valid put crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 49 82886e4030b9d250a39827bea1f97541ac174c7515ac1cf95bfd33c766c72930 1 < committed stdin payload
+pushed: config/crew-dispatch.json
+
+exit=0
+
+=== real receiver destination normalized profiles ===
+$ FM_CONFIG_OVERRIDE="/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/receiver/config" "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh" profiles "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/receiver/config/crew-dispatch.json"
+{
+  "default": {
+    "harness": "omp",
+    "model": "fixture-model"
+  }
+}
+
+exit=0
+receiver destination model-index.json: {"version": 1, "roles": {"driver": {"omp": {"model": "fixture-model"}}}, "retired": []}
+receiver destination crew-dispatch.json: {"default": {"harness": "omp", "role": "driver"}}
+
+=== real receiver refuses symlink model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver actual put refuses symlink model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver refuses symlink model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver actual put refuses symlink model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver refuses symlink crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver actual put refuses symlink crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver refuses symlink crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver actual put refuses symlink crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is a symlink
+
+exit=1
+
+=== real receiver refuses hardlink model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver actual put refuses hardlink model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver refuses hardlink model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver actual put refuses hardlink model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver refuses hardlink crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver actual put refuses hardlink crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver refuses hardlink crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver actual put refuses hardlink crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is hardlinked
+
+exit=1
+
+=== real receiver refuses directory model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver actual put refuses directory model-index.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver refuses directory model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver actual put refuses directory model-index.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver refuses directory crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver actual put refuses directory crew-dispatch.json for model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/model-index.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver refuses directory crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh check config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver actual put refuses directory crew-dispatch.json for crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh put config/crew-dispatch.json 2 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a 2 < committed stdin payload
+error: inherited destination is not a regular file
+
+exit=1
+
+=== real receiver absence converges model-index.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh absent config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+removed: config/model-index.json
+
+exit=0
+
+=== real receiver absence converges crew-dispatch.json ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-remote-inherit.sh absent config/crew-dispatch.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2 < committed stdin payload
+removed: config/crew-dispatch.json
+
+exit=0
+
+=== actual config-push both-source absent restricted no-jq PATH ===
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-config-push.sh"
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/product-root/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/product-root/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/source -> live secondmate homes
+secondmate absence (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation/destination):
+  home: dirty working tree - local-material push continuing
+  model-index.json: unchanged
+  crew-dispatch.json: unchanged
+  backend: unchanged
+  data/captain-shared.md: unchanged
+
+exit=0
+Receiver coverage uses real product invoked directly with committed stdin; native SSH transport remains UNTESTED. All receiver destination fixtures removed after validation.

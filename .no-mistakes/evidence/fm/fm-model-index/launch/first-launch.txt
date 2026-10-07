@@ -1,0 +1,7 @@
+$ bin/fm-spawn.sh launch-a /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/project --scout --harness claude --model role:deep --effort low --backend herdr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/home
+model-index: notice: claude catalog unavailable (effective worker account context is not established); 'claude-sonnet-5-5' (role 'deep') not validated
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned launch-a harness=claude kind=scout window=fm-lab-model-index-67395-20576:w2:p2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/pool/.treehouse/project-d7ca71/1/project
+
+exit=0

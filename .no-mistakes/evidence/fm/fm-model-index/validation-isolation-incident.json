@@ -1,0 +1,23 @@
+{
+  "incident": "Ambient Claude trust-store mutation during live worker validation",
+  "observed": [
+    "Two canonical Claude scout launches succeeded in a disposable named Herdr lab with worktree-local project/home.",
+    "CLAUDE_CONFIG_DIR was unset; the successful Claude spawn path invokes fm-claude-trust.sh, whose documented store is ${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json.",
+    "Further ambient lifecycle checks stopped when this isolation gap was identified.",
+    "Guarded teardown succeeded; named session removed, default-session tripwire passed, disposable projects/homes and owned temporary launch roots removed."
+  ],
+  "inference": "[INFERENCE] Successful trust registration wrote disposable project/worktree trust entries to /Users/charlesabrooker/.claude.json, outside the permitted worktree. External store was not inspected to audit contents.",
+  "outside_restoration_attempted": false,
+  "credentials_modified": false,
+  "required_for_safe_rerun": "Worktree-local absolute CLAUDE_CONFIG_DIR with an authorized isolated login, or a real harness whose startup does not mutate ambient configuration. Do not reuse ambient Claude spawn path.",
+  "evidence": [
+    "launch/transcript.txt",
+    "launch/first-launch.meta",
+    "launch/changed-index-launch.meta",
+    "launch/cleanup.json"
+  ],
+  "source_contract": [
+    "bin/fm-spawn.sh:4457-4465",
+    "bin/fm-claude-trust.sh:178-187"
+  ]
+}

@@ -1,0 +1,1441 @@
+{
+  "interface_executed": true,
+  "external_services_used": false,
+  "source_changed": false,
+  "isolated_fixture_directory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli",
+  "environment_policy": "All inherited FM_* and TYPESAFE_API_KEY variables removed; exact per-command isolated variables below. Ordinary PATH and user environment otherwise retained. No harness spawn/lifecycle commands run.",
+  "scenario_count": 76,
+  "all_pass": true,
+  "results": [
+    {
+      "scenario": "role resolves claude",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "new-claude\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "explicit stand-in claude",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "stand-in:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "backup-claude\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "role resolves codex",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "codex",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "new-codex\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "explicit stand-in codex",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "codex",
+        "stand-in:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "backup-codex\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "retired selector old-model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "old-model"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "model-index: warning: literal model 'old-model' for claude is not an index entry; name its role so the next model release is one index edit\njq: error (at <stdin>:4): retired model: old-model\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "retired selector vendor/old-model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "vendor/old-model"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "model-index: warning: literal model 'vendor/old-model' for claude is not an index entry; name its role so the next model release is one index edit\njq: error (at <stdin>:4): retired model: vendor/old-model\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "retired selector old-model[1m]",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "old-model[1m]"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "model-index: warning: literal model 'old-model[1m]' for claude is not an index entry; name its role so the next model release is one index edit\njq: error (at <stdin>:4): retired model: old-model[1m]\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "retired selector vendor/old-model[1m]",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "vendor/old-model[1m]"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "model-index: warning: literal model 'vendor/old-model[1m]' for claude is not an index entry; name its role so the next model release is one index edit\njq: error (at <stdin>:4): retired model: vendor/old-model[1m]\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "registry retired keys and values",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: retired id 'old-model' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json\nmodel-index: retired id 'vendor/old-model[1m]' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "registry current identifiers and prose",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "model-index: registry checked; no retired identifiers\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "single-document index valid+valid model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "single-document index valid+valid check-registry",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "single-document index invalid+valid model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "single-document index invalid+valid check-registry",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "listed export id accepts",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "missing export id refuses",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: id 'new-claude' absent or retired in claude catalog (role 'work')\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "alias resolving retired refuses",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: id 'new-claude' absent or retired in claude catalog (role 'work')\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "multi-document catalog valid+valid",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "multi-document catalog invalid+valid",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "absent export notice only",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "unreadable export directory notice only",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "unknown omp provider notice only",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "omp",
+        "extension-only/new"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: omp provider 'extension-only' is not in 'omp models --json' (extension-registered providers are never listed); 'extension-only/new' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "unchanged dispatch resolves initial roles",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "{\n  \"rules\": [],\n  \"default\": [\n    {\n      \"harness\": \"claude\",\n      \"model\": \"new-claude\"\n    },\n    {\n      \"harness\": \"codex\",\n      \"model\": \"backup-codex\"\n    }\n  ]\n}\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "index-only edit unchanged dispatch resolves next ids",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "{\n  \"rules\": [],\n  \"default\": [\n    {\n      \"harness\": \"claude\",\n      \"model\": \"next-claude\"\n    },\n    {\n      \"harness\": \"codex\",\n      \"model\": \"next-backup-codex\"\n    }\n  ]\n}\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "real dispatch initial role accepts model-specific max",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/brief.txt"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs",
+        "TYPESAFE_API_KEY": "disposable-not-a-credential"
+      },
+      "status": 0,
+      "stdout": "dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "real dispatch index-only edit uses changed model for effort",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-dispatch-resolve.sh",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/brief.txt"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs",
+        "TYPESAFE_API_KEY": "disposable-not-a-credential"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "error: malformed rules file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json - each default profile effort must be supported by its harness and model\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects False",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects ''",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects 'has space'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field model rejects 'has\\ncontrol'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects False",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects ''",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects 'has space'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field stand_in rejects 'has\\ncontrol'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects False",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects ''",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects 'has space'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "index field retired rejects 'has\\ncontrol'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "model",
+        "claude",
+        "role:work"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/model-index.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable False",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field id unavailable ''",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable False",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "catalog field resolved_id unavailable ''",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'new-claude' (role 'work') not validated\n",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "registry empty refuses",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json:0): registry must contain exactly one JSON document\nmodel-index: invalid or unreadable registry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "registry multiple refuses",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json:1): registry must contain exactly one JSON document\nmodel-index: invalid or unreadable registry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "registry invalid refuses",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check-registry",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "jq: parse error: Unfinished JSON term at EOF at line 1, column 1\nmodel-index: invalid or unreadable registry: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/registry.json\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "documented examples resolve as real profiles",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/docs/examples/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "{\n  \"rules\": [\n    {\n      \"when\": \"The task depends on fresh news, current events, live public facts, or recent market and product changes.\",\n      \"use\": {\n        \"harness\": \"grok\"\n      },\n      \"why\": \"Grok is the preferred dispatch when current web-connected context is central to the work.\"\n    },\n    {\n      \"when\": \"The task is a trivial mechanical edit such as a rote rename, formatting sweep, targeted typo fix, or simple file gathering.\",\n      \"use\": {\n        \"harness\": \"claude\",\n        \"effort\": \"low\",\n        \"model\": \"haiku\"\n      },\n      \"why\": \"Use the cheapest fast profile when the task is narrow and low ambiguity.\"\n    },\n    {\n      \"when\": \"The task is a big or ambiguous multi-file feature, a risky refactor, or work that requires holding many moving parts in mind.\",\n      \"use\": [\n        {\n          \"harness\": \"claude\",\n          \"effort\": \"high\",\n          \"model\": \"opus[1m]\"\n        },\n        {\n          \"harness\": \"codex\",\n          \"effort\": \"high\",\n          \"model\": \"gpt-6.1-sol\"\n        }\n      ],\n      \"why\": \"Use a strong coding profile for big, ambiguous work; resolve the alternatives through quota-array-dispatch.\"\n    }\n  ],\n  \"default\": [\n    {\n      \"harness\": \"codex\",\n      \"effort\": \"medium\",\n      \"model\": \"gpt-6.1-sol\"\n    },\n    {\n      \"harness\": \"pi\",\n      \"effort\": \"medium\",\n      \"provider\": \"claude\",\n      \"model\": \"anthropic/claude-sonnet-5-5\"\n    }\n  ]\n}\n",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    },
+    {
+      "scenario": "check refuses retired selection old-model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "old-model"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: retired id 'old-model' selected (claude)\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "check refuses retired selection vendor/old-model",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "vendor/old-model"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: retired id 'vendor/old-model' selected (claude)\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "check refuses retired selection old-model[1m]",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "old-model[1m]"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: retired id 'old-model[1m]' selected (claude)\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "check refuses retired selection vendor/old-model[1m]",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "vendor/old-model[1m]"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 2,
+      "stdout": "",
+      "stderr": "model-index: retired id 'vendor/old-model[1m]' selected (claude)\n",
+      "expected_status": 2,
+      "pass": true
+    },
+    {
+      "scenario": "profile stand_in boolean rejects None",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json:0): stand_in must be boolean\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "profile stand_in boolean rejects 'true'",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json:0): stand_in must be boolean\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "profile stand_in boolean rejects 0",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json:0): stand_in must be boolean\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "profile stand_in boolean rejects {}",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json:0): stand_in must be boolean\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "profile stand_in boolean rejects []",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "profiles",
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 5,
+      "stdout": "",
+      "stderr": "jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config/crew-dispatch.json:0): stand_in must be boolean\n",
+      "expected_status": 5,
+      "pass": true
+    },
+    {
+      "scenario": "claude catalog context suffix equivalence",
+      "command": [
+        "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-model-index.sh",
+        "check",
+        "claude",
+        "new-claude[1m]"
+      ],
+      "environment": {
+        "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home",
+        "FM_CONFIG_OVERRIDE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/home/config",
+        "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-index-cli/catalogs"
+      },
+      "status": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_status": 0,
+      "pass": true
+    }
+  ],
+  "immutable_inputs": "Registry bytes checked unchanged after retired/current/invalid cases; crew-dispatch bytes checked unchanged across index-only changes.",
+  "unreadable_catalog_case": "Directory at claude.json is unopenable as a catalog regular file; no permission changes to operator data.",
+  "fixtures_cleaned": true
+}

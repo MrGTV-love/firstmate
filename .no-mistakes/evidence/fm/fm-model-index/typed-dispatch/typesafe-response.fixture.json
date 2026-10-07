@@ -1,0 +1,17 @@
+{
+  "model": "jev-1",
+  "answers": {
+    "rule": {
+      "choice": "rule_1",
+      "confidence": 0.98,
+      "probabilities": {
+        "rule_1": 0.98,
+        "default": 0.02
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 8
+  }
+}

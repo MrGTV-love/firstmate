@@ -1,0 +1,20 @@
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):
+  home: dirty working tree - local-material push continuing
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+WARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.
+jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-push-pair.TI8gEA/crew-dispatch.json:1): role or stand-in not configured: codex:incoming

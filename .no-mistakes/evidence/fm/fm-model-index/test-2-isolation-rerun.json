@@ -1,0 +1,52 @@
+{
+  "finding": "test-2",
+  "classification": "Validation setup/environment omission, not a demonstrated product failure",
+  "reproduction": {
+    "command": [
+      "bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/bin/fm-claude-trust.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/worker",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/project"
+    ],
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/operator-home",
+    "CLAUDE_CONFIG_DIR": "unset",
+    "exit": 0,
+    "observed": "Fixture HOME/.claude.json changed to register both trust entries."
+  },
+  "correction": {
+    "CLAUDE_CONFIG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/claude-config",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/operator-home",
+    "observed": "Both trust entries registered in selected isolated store; separate HOME/.claude.json operator tripwire byte-for-byte unchanged.",
+    "exit": 0
+  },
+  "isolated_real_cli": {
+    "command": [
+      "claude",
+      "auth",
+      "status"
+    ],
+    "exit": 1,
+    "stdout": {
+      "loggedIn": false,
+      "authMethod": "none",
+      "apiProvider": "firstParty",
+      "analyticsDisabled": true,
+      "projectsDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/claude-config/projects",
+      "configDirectory": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-claude-isolation/claude-config"
+    },
+    "stderr": ""
+  },
+  "blocker": "Authorized login for isolated Claude config unavailable. Authenticated live lab-worker startup not rerun. No ambient credentials or operator configuration reused or copied.",
+  "source_changes": "None: existing product store selection and spawn forwarding already support the corrected test environment.",
+  "not_run": [
+    "full suite",
+    "linters",
+    "formatters",
+    "static analysis",
+    "pipeline control",
+    "push",
+    "PR",
+    "CI"
+  ],
+  "cleanup": "Removed the entire disposable .test-claude-isolation fixture and confirmed absence. No source changes, lab sessions, services, or dependencies were created or changed by this reproduction."
+}

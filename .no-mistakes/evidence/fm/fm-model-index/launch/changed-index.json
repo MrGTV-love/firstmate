@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "roles": {
+    "deep": {
+      "claude": {
+        "model": "claude-opus-5-5"
+      }
+    }
+  },
+  "retired": [
+    "fm-lab-retired-model"
+  ]
+}

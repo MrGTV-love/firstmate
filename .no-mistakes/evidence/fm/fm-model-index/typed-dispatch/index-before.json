@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "roles": {
+    "maintenance": {
+      "claude": {
+        "model": "claude-sonnet-5-5"
+      }
+    }
+  },
+  "retired": []
+}

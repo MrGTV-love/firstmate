@@ -1,0 +1,88 @@
+{
+  "models": [
+    {
+      "id": "default",
+      "resolved_id": "claude-sonnet-5-5"
+    },
+    {
+      "id": "claude-sonnet-5-5"
+    },
+    {
+      "id": "opus",
+      "resolved_id": "claude-opus-5-5"
+    },
+    {
+      "id": "claude-opus-5-5"
+    },
+    {
+      "id": "fable",
+      "resolved_id": "claude-fable-5-1"
+    },
+    {
+      "id": "claude-fable-5-1"
+    },
+    {
+      "id": "sonnet",
+      "resolved_id": "claude-sonnet-5-5"
+    },
+    {
+      "id": "claude-sonnet-5-5"
+    },
+    {
+      "id": "haiku",
+      "resolved_id": "claude-haiku-4-5-20251001"
+    },
+    {
+      "id": "claude-haiku-4-5-20251001"
+    },
+    {
+      "id": "claude-sonnet-5",
+      "resolved_id": "claude-sonnet-5"
+    },
+    {
+      "id": "claude-sonnet-5"
+    },
+    {
+      "id": "claude-opus-5",
+      "resolved_id": "claude-opus-5"
+    },
+    {
+      "id": "claude-opus-5"
+    },
+    {
+      "id": "claude-fable-5",
+      "resolved_id": "claude-fable-5"
+    },
+    {
+      "id": "claude-fable-5"
+    },
+    {
+      "id": "claude-opus-4-8",
+      "resolved_id": "claude-opus-4-8"
+    },
+    {
+      "id": "claude-opus-4-8"
+    },
+    {
+      "id": "claude-opus-4-7",
+      "resolved_id": "claude-opus-4-7"
+    },
+    {
+      "id": "claude-opus-4-7"
+    },
+    {
+      "id": "claude-opus-4-6",
+      "resolved_id": "claude-opus-4-6"
+    },
+    {
+      "id": "claude-opus-4-6"
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "resolved_id": "claude-sonnet-4-6"
+    },
+    {
+      "id": "claude-sonnet-4-6"
+    }
+  ]
+}

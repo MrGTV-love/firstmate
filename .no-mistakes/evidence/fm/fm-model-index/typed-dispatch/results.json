@@ -1,0 +1,21 @@
+{
+  "scope": "Actual unmodified fm-dispatch-resolve.sh and real curl HTTPS CONNECT using ephemeral workspace-local TLS certificate via CURL_CA_BUNDLE; actual installed quota-axi using documented QUOTA_AXI_SNAPSHOT. Typesafe dependency responses are disposable fixtures, not live vendor responses. Catalog is the native Claude export captured by ValidateLaunch, used through supported FM_MODEL_CATALOG_DIR.",
+  "quota_isolation_contract": {
+    "help": "QUOTA_AXI_SNAPSHOT=<cache-format file> answers every provider from that file instead, for tests and fixtures.",
+    "readme": "quota-axi README.md lines 391-397: instead of any credential or vendor, no cache writes, unlisted providers unavailable.",
+    "source": "commands.js snapshotReadings never falls through to vendor; cache.js schema 3 parser read."
+  },
+  "results": {
+    "clear_before": true,
+    "clear_after_index_only": true,
+    "chosen_absent_structured_error": true,
+    "unavailable_export_notice_only": true,
+    "dispatch_rules_unchanged": true,
+    "brief_unchanged": true,
+    "api_requests_identical": true
+  },
+  "changed_between_clear_runs": [
+    "home/config/model-index.json"
+  ],
+  "dependency_request_count": 4
+}

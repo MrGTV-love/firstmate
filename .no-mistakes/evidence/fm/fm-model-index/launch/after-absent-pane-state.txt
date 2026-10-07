@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane get w2:p2
+{"id":"cli:pane:get","result":{"pane":{"agent":"claude","agent_status":"blocked","cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/project","focused":false,"foreground_cwd":"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/pool/.treehouse/project-d7ca71/1/project","pane_id":"w2:p2","revision":0,"scroll":{"max_offset_from_bottom":107,"offset_from_bottom":0,"viewport_rows":39},"tab_id":"w2:t2","terminal_id":"term_65d346cd315b33","workspace_id":"w2"},"type":"pane_info"}}
+
+exit=0

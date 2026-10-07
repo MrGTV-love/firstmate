@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "quota-axi",
+    "--json",
+    "--full"
+  ],
+  "env": {
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/operator-isolated-home",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-config",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-cache",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tmp",
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/home",
+    "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/catalog",
+    "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/quota-snapshot.json",
+    "TYPESAFE_API_KEY": "fixture-typesafe-key-not-a-real-credential",
+    "NO_PROXY": "",
+    "no_proxy": "",
+    "HTTPS_PROXY": null,
+    "https_proxy": null,
+    "CURL_CA_BUNDLE": null
+  },
+  "exit": 0,
+  "stdout_file": "native-quota.stdout.json",
+  "stderr_file": "native-quota.stderr.txt",
+  "note": "Run before TLS proxy creation. Full report records sourcesTried snapshot. Dispatch itself ran quota-axi --json via actual product."
+}

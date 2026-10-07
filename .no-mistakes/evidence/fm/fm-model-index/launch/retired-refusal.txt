@@ -1,0 +1,6 @@
+$ bin/fm-control.sh launch-a relaunch --model fm-lab-retired-model --note 'Adversarial retired selector; must not reach worker.'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/home
+model-index: warning: literal model 'fm-lab-retired-model' for claude is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: fm-lab-retired-model
+
+exit=1

@@ -1,0 +1,131 @@
+$ bin/fm-model-index.sh model codex role:strong
+current
+[exit 0]
+
+$ bin/fm-model-index.sh model claude role:strong
+opus
+[exit 0]
+
+$ bin/fm-model-index.sh model omp stand-in:routine
+provider/stand-in
+[exit 0]
+
+$ bin/fm-model-index.sh model codex role:missing
+jq: error (at <stdin>:4): role or stand-in not configured: codex:missing
+[exit 5]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/dispatch.json
+{
+  "rules": [
+    {
+      "when": "hard",
+      "use": {
+        "harness": "codex",
+        "effort": "high",
+        "model": "current"
+      }
+    }
+  ],
+  "default": {
+    "harness": "omp",
+    "model": "provider/stand-in"
+  }
+}
+[exit 0]
+
+$ bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/dispatch.json
+{
+  "rules": [
+    {
+      "when": "hard",
+      "use": {
+        "harness": "codex",
+        "effort": "high",
+        "model": "next"
+      }
+    }
+  ],
+  "default": {
+    "harness": "omp",
+    "model": "provider/stand-in"
+  }
+}
+[exit 0]
+
+$ bin/fm-model-index.sh model codex role:strong
+next
+[exit 0]
+
+$ bin/fm-model-index.sh model codex old
+model-index: warning: literal model 'old' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: old
+[exit 5]
+
+$ bin/fm-model-index.sh model omp provider/old
+model-index: warning: literal model 'provider/old' for omp is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: provider/old
+[exit 5]
+
+$ bin/fm-model-index.sh model claude old[1m]
+model-index: warning: literal model 'old[1m]' for claude is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: old[1m]
+[exit 5]
+
+$ bin/fm-model-index.sh model codex manual-unindexed
+manual-unindexed
+model-index: warning: literal model 'manual-unindexed' for codex is not an index entry; name its role so the next model release is one index edit
+[exit 0]
+
+$ bin/fm-model-index.sh check
+model-index: active ids checked; none absent or retired
+[exit 0]
+
+$ bin/fm-model-index.sh check codex current
+model-index: id 'current' absent or retired in codex catalog (role 'strong')
+[exit 2]
+
+$ bin/fm-model-index.sh check codex current
+model-index: notice: codex catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current' (role 'strong') not validated
+[exit 0]
+
+$ bin/fm-model-index.sh check codex current
+model-index: notice: codex catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'current' (role 'strong') not validated
+[exit 0]
+
+$ bin/fm-model-index.sh check claude opus
+model-index: id 'opus' absent or retired in claude catalog (role 'strong')
+[exit 2]
+
+$ bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: retired id 'old' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: retired id 'old[1m]' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: retired id 'provider/old' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+[exit 2]
+
+$ bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: registry checked; no retired identifiers
+[exit 0]
+
+$ bin/fm-model-index.sh model codex role:strong
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]
+
+$ bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]
+
+$ bin/fm-model-index.sh model codex role:strong
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]
+
+$ bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]
+
+$ bin/fm-model-index.sh model codex role:strong
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]
+
+$ bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/registry.json
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/home/config/model-index.json
+[exit 2]

@@ -1,0 +1,59 @@
+{
+  "live_product": true,
+  "native_harness": "Claude Code normal existing login",
+  "resolved_native_models": [
+    "claude-sonnet-5-5",
+    "claude-opus-5-5"
+  ],
+  "first_launch": {
+    "task": "launch-a",
+    "model": "claude-sonnet-5-5",
+    "pane": "w2:p2",
+    "real_agent_registered": true,
+    "process_group_id": 38292,
+    "response_turn_completed": false
+  },
+  "index_only_change_next_launch": {
+    "task": "launch-b",
+    "model": "claude-opus-5-5",
+    "pane": "w3:p2",
+    "real_agent_registered": true,
+    "process_group_id": 25547,
+    "response_turn_completed": false
+  },
+  "pre_stop_refusals": {
+    "retired_agent_unchanged": true,
+    "absent_agent_unchanged": true,
+    "retired_terminal_unchanged": true,
+    "absent_terminal_unchanged": true,
+    "absent_process_unchanged": true,
+    "meta_unchanged": true,
+    "no_control_journal": true
+  },
+  "missing_export_check": "notice-only exit 0",
+  "unparseable_export_check": "notice-only exit 0",
+  "positive_relaunch": "not exercised: real Claude stopped on ancestor external-import consent dialog; parent ordered immediate teardown due ambient trust-store side effect",
+  "safety_boundary": {
+    "ambient_trust_store_path_inferred": "/Users/charlesabrooker/.claude.json",
+    "CLAUDE_CONFIG_DIR_was_set": false,
+    "evidence": "Successful spawn necessarily ran bin/fm-spawn.sh:4456-4466 fm-claude-trust helper. bin/fm-claude-trust.sh:260,420 selects ${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json; lines 583,587 write then atomic rename. [INFERENCE] ambient trust entries for disposable project/two worktrees were persisted. No operator trust store or credentials read to audit and no restoration/edit attempted. Automatic product writes outside intended worktree boundary include this store and four /tmp roots; owned temp roots removed."
+  },
+  "visual_capture": "Real 40x120 guarded pty viewer attached; actual pane-rendered text captured with Herdr pane read. No GUI image screenshot captured; parent confirmed CLI/pane evidence sufficient for no UI source change.",
+  "cleanup": {
+    "session": "fm-lab-model-index-67395-20576",
+    "guarded_teardown_exit": 0,
+    "tripwire_removed": true,
+    "fixture_removed": true,
+    "product_owned_temp_roots_removed": [
+      "/tmp/fm-launch-a",
+      "/tmp/fm-launch-a+bd53fe8583793d93982032b814368c91864c3096c8f6ec658535aface0fa7c7f",
+      "/tmp/fm-launch-b",
+      "/tmp/fm-launch-b+bd53fe8583793d93982032b814368c91864c3096c8f6ec658535aface0fa7c7f"
+    ],
+    "operator_config_restored_or_edited": false,
+    "notice_fixture_removed": true
+  },
+  "source_edits": false,
+  "tests_run": false,
+  "evidence_dir": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/launch"
+}

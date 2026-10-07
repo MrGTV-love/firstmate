@@ -1,0 +1,28 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane read --help
+Read pane terminal output
+
+Usage: herdr pane read [OPTIONS] <PANE_ID>
+
+Arguments:
+  <PANE_ID>
+          
+
+Options:
+      --source <SOURCE>
+          Terminal snapshot source (default: recent)
+          
+          [possible values: visible, recent, recent-unwrapped, detection]
+
+      --lines <N>
+          
+
+      --format <FORMAT>
+          [possible values: text, ansi]
+
+      --ansi
+          
+
+      --raw
+
+
+exit=0

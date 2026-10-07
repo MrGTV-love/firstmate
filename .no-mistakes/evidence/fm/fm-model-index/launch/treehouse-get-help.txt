@@ -1,0 +1,59 @@
+$ treehouse get --help
+Acquire a worktree from the pool and open a subshell in it.
+
+Pass --lease for a non-interactive, durable acquire: treehouse reserves the
+worktree and marks it leased in persistent state. By default it prints only the
+absolute path to stdout; add --json for the lease identity and metadata. All
+banners go to stderr. A leased worktree is never handed out by a later get and
+never removed by prune, even with no process running inside it, until you release
+it with 'treehouse return <path>'.
+
+Worktrees are cut from the branch treehouse infers from the repository. Pass
+--base to cut this one from a different branch, or set base_branch in
+treehouse.toml to change it for the whole pool. The worktree is still handed
+over in detached HEAD; --base chooses the commit it starts at, it does not
+create or check out a branch. A base that cannot be resolved is an error, never
+a silent fall back to the inferred default.
+
+Pass --include-file <path> to replace committed .worktreeinclude for this
+acquisition. Relative paths use the current directory; patterns inside the file
+select ignored, untracked files from the main checkout root. A missing or
+unreadable file fails before a worktree is created or reset. An empty file
+seeds nothing. Without the flag, only the committed manifest is used.
+
+Every pool slot normally lives in a directory named after the repository, so
+tooling that derives per-checkout identity from the working directory's last
+path segment sees every slot as the same checkout. Pass --unique-leaf, set
+TREEHOUSE_UNIQUE_LEAF, or set unique_leaf in treehouse.toml to name new slots
+"<repo>-<slot>" instead. It is off by default and applies only to slots
+treehouse creates from now on; worktrees already in the pool keep their paths.
+
+New pool slots are placed at {pool}/{slot}/{repo}. Pass --worktree-path, set
+TREEHOUSE_WORKTREE_PATH, or set worktree_path in treehouse.toml to template that
+directory instead, for tooling that only works when a checkout sits at a
+particular location relative to something else. The template must contain {slot}
+and at least one of {pool} or {repo}; {repo_parent} is available too but does not
+count, because two repositories side by side expand it identically. A template
+supersedes --unique-leaf: it names every segment of the path including the leaf,
+so write {repo}-{slot} in it for a unique leaf. It applies only to slots
+treehouse creates from now on: worktrees already in the pool keep their recorded
+paths and are never moved.
+
+Usage:
+  treehouse get [flags]
+
+Flags:
+      --base string            Branch to cut this worktree from, overriding base_branch in config (default: inferred from the repository)
+  -h, --help                   help for get
+      --include-file string    Replace committed .worktreeinclude with this file (relative to the current directory)
+      --json                   Print lease allocation as JSON (requires --lease)
+      --lease                  Durably lease a worktree without opening a subshell; print only its path to stdout
+      --lease-holder string    Optional label recorded as the lease holder (defaults to $TREEHOUSE_LEASE_HOLDER)
+      --no-fetch               Skip fetching origin before acquiring; use existing local refs
+      --unique-leaf            Name a newly created worktree directory <repo>-<slot> instead of <repo>, overriding unique_leaf in config
+      --worktree-path string   Template for a newly created worktree's directory, overriding worktree_path in config (default: {pool}/{slot}/{repo})
+
+Global Flags:
+      --root string   Worktree root directory, overriding TREEHOUSE_ROOT and config; relative paths (e.g. "." for an in-project pool) resolve from the repo root
+
+exit=0

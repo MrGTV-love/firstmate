@@ -1,0 +1,98 @@
+Server listening on 127.0.0.1 port 56065.
+Connection from 127.0.0.1 port 56069 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56069 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56069 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 15234
+Starting session: command for charlesabrooker from 127.0.0.1 port 56069 id 0
+Received disconnect from 127.0.0.1 port 56069:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56069
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56139 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56139 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56139 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 5989
+Starting session: command for charlesabrooker from 127.0.0.1 port 56139 id 0
+Received disconnect from 127.0.0.1 port 56139:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56139
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56144 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56144 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56144 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 7230
+Starting session: command for charlesabrooker from 127.0.0.1 port 56144 id 0
+Received disconnect from 127.0.0.1 port 56144:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56144
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56145 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56145 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56145 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 8618
+Starting session: command for charlesabrooker from 127.0.0.1 port 56145 id 0
+Received disconnect from 127.0.0.1 port 56145:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56145
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56234 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56234 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56234 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 2168
+Starting session: command for charlesabrooker from 127.0.0.1 port 56234 id 0
+Received disconnect from 127.0.0.1 port 56234:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56234
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56235 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56235 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56235 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 2598
+Starting session: command for charlesabrooker from 127.0.0.1 port 56235 id 0
+Received disconnect from 127.0.0.1 port 56235:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56235
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56238 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56238 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56238 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 2949
+Starting session: command for charlesabrooker from 127.0.0.1 port 56238 id 0
+Received disconnect from 127.0.0.1 port 56238:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56238
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Connection from 127.0.0.1 port 56239 on 127.0.0.1 port 56065
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Postponed publickey for charlesabrooker from 127.0.0.1 port 56239 ssh2 [preauth]
+Accepted key ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs found at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/ssh/authorized_keys:1
+Accepted publickey for charlesabrooker from 127.0.0.1 port 56239 ssh2: ED25519 SHA256:av1tdeatYH8fOhh+VdZrUoCILBFLlOmujcgQtrMZVBs
+BSM audit: bsm_audit_session_setup: setaudit_addr failed: Operation not permitted
+BSM audit: bsm_audit_record failed to write "successful login charlesabrooker" record: Operation not permitted
+User child is on pid 3301
+Starting session: command for charlesabrooker from 127.0.0.1 port 56239 id 0
+Received disconnect from 127.0.0.1 port 56239:11: disconnected by user
+Disconnected from user charlesabrooker 127.0.0.1 port 56239
+BSM audit: bsm_audit_record failed to write "sshd logout charlesabrooker" record: Operation not permitted
+Received signal 15; terminating.

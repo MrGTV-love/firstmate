@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh name model-index
+fm-lab-model-index-30730-21418
+
+exit=0

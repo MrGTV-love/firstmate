@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 3,
+  "providers": [
+    {
+      "provider": "claude",
+      "label": "Claude",
+      "source": "oauth",
+      "plan": "fixture",
+      "windows": [
+        {
+          "id": "five_hour",
+          "label": "session",
+          "kind": "session",
+          "percentUsed": 10,
+          "percentRemaining": 90,
+          "startsAt": "2026-10-06T19:34:22.418712Z",
+          "resetsAt": "2026-10-07T00:34:22.418712Z",
+          "windowSeconds": 18000
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-06T23:34:22.418712Z",
+        "sourcesTried": [
+          "snapshot"
+        ]
+      }
+    }
+  ]
+}

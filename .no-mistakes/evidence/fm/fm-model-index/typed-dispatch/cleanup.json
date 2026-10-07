@@ -1,0 +1,12 @@
+{
+  "fixtures_removed": true,
+  "fixture_path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch",
+  "proxy_stopped": true,
+  "proxy_port_closed": true,
+  "proxy_port": 56209,
+  "persistent_trust_modified": false,
+  "operator_config_state_credentials_accessed": false,
+  "packages_installed": false,
+  "product_source_modified": false,
+  "evidence_preserved": "/Users/charlesabrooker/.no-mistakes/evidence/01M48Y55XHVMYKTXPFGKFKDR35/typed-dispatch"
+}

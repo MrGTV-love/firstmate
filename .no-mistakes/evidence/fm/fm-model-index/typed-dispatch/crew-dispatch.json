@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "when": "A routine local code maintenance task with no high-stakes work.",
+      "use": {
+        "harness": "claude",
+        "role": "maintenance",
+        "provider": "claude",
+        "effort": "high"
+      }
+    }
+  ]
+}

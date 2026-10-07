@@ -1,0 +1,10 @@
+dispatch-resolve:
+  status: clear
+  model: jev-1   latency_ms: 2   tokens: 120/8
+  rule: rule_1 (A routine local code maintenance task with no high-stakes wo)   confidence: 0.98
+  probabilities: rule_1=0.98 default=0.02
+  note: rule matched
+  candidate: claude:claude-opus-5-5  provider=claude  scope=all_models  remaining=90%  spendPriority=4.4298  runway=through_reset  -> eligible
+  profile: --harness 'claude' --model 'claude-opus-5-5' --effort 'high'
+  timings: api_ms=2 quota_ms=114 local_ms=282 total_ms=398
+  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1

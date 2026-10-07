@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh viewer start fm-lab-model-index-67395-20576
+viewer attached to fm-lab-model-index-67395-20576 (pid 13563)
+
+exit=0

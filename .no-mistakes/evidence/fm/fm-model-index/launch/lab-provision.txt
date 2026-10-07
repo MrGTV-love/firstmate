@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh provision fm-lab-model-index-30730-21418
+fm-herdr-lab: tripwire already exists for 'fm-lab-model-index-30730-21418'; refusing ambiguous ownership
+
+exit=1

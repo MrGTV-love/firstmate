@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane list
+{"id":"cli:pane:list","result":{"panes":[],"type":"pane_list"}}
+
+exit=0

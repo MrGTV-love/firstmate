@@ -1,0 +1,19 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane read w3:p2 --source recent --lines 25 --format text
+treehouse get
+charlesabrooker@Mac-Studio project % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test
+-launch-model-index-validate/pool/.treehouse/project-d7ca71/2/project. Type 'exit' to return.
+charlesabrooker@Mac-Studio project % cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/32d
+18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch-model-index-validate/pool/.treehouse/projec
+t-d7ca71/2/project'
+charlesabrooker@Mac-Studio project % export GOTMPDIR=/tmp/fm-launch-b/gotmp
+charlesabrooker@Mac-Studio project % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio project % export FM_TASK_ID=launch-b
+charlesabrooker@Mac-Studio project % . '/tmp/fm-launch-b+bd53fe8583793d93982032b814368c91864c
+3096c8f6ec658535aface0fa7c7f/launch.s1791329667.93304.11954.sh'
+
+exit=0

@@ -1,0 +1,13 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane process-info --help
+Show pane process information
+
+Usage: herdr pane process-info [OPTIONS]
+
+Options:
+      --pane <ID>
+          
+
+      --current
+
+
+exit=0

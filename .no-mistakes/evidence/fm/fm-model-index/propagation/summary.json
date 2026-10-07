@@ -1,0 +1,19 @@
+{
+  "live": [
+    "actual public config-push pair publication and consumer resolution (reread fails lab gate)",
+    "actual shared bootstrap/launch inheritance helper valid/invalid/refusal/source links/frozen stage",
+    "actual receiver stdin coherent pair, links, directory, oversize, no-jq removal",
+    "actual receiver over disposable authenticated OpenSSH coherent pair and consumer; destination refusal retains both while crew-harness converges",
+    "actual sender unsafe source preflight refuses both members before attempted transfer"
+  ],
+  "fixtures": "normalized dependency catalog export for current/prior; no fake product binaries",
+  "limitations": [
+    "full sender fm-on transport not exercised: fixed entrypoint resolves actual account HOME and provisions operator worker queue outside isolated fixture; forbidden by assignment",
+    "automatic validate-to-publish concurrent source mutation not reproduced; explicit product stage selection preserved validated bytes after real source mutation",
+    "config-push exit 1 caused by actual fm-send gate refusal for reread, independently successful propagation documented",
+    "native localhost SSH probe lacks trusted host authority, but disposable server with own host/client keys succeeded",
+    "terminal-render capture retained as text; no graphical screenshot apparatus used; nudge refused before terminal send"
+  ],
+  "assertions": "Every asserted invariant completed without assertion failure. Existing tests/build/lint were not run.",
+  "cleanup": "private tmux server stopped; supported lab tmux-dir teardown completed; disposable sshd stopped; all .test-propagation-validate fixture data and ephemeral keys removed; evidence retained"
+}

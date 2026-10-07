@@ -1,0 +1,6 @@
+{
+  "default": {
+    "harness": "codex",
+    "model": "current"
+  }
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "label": "before-index-edit",
+    "argv": [
+      "bash",
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/brief.txt",
+      "--project",
+      "typed-dispatch-local-validation"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/operator-isolated-home",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-cache",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tmp",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/home",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/catalog",
+      "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/quota-snapshot.json",
+      "TYPESAFE_API_KEY": "fixture-typesafe-key-not-a-real-credential",
+      "NO_PROXY": "",
+      "no_proxy": "",
+      "HTTPS_PROXY": "http://127.0.0.1:56209",
+      "https_proxy": "http://127.0.0.1:56209",
+      "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tls.crt"
+    },
+    "exit": 0,
+    "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1   latency_ms: 2   tokens: 120/8\n  rule: rule_1 (A routine local code maintenance task with no high-stakes wo)   confidence: 0.98\n  probabilities: rule_1=0.98 default=0.02\n  note: rule matched\n  candidate: claude:claude-sonnet-5-5  provider=claude  scope=all_models  remaining=90%  spendPriority=4.4039  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'claude-sonnet-5-5' --effort 'high'\n  timings: api_ms=2 quota_ms=107 local_ms=289 total_ms=398\n  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1\n",
+    "stderr": ""
+  },
+  {
+    "label": "after-index-only-edit",
+    "argv": [
+      "bash",
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/brief.txt",
+      "--project",
+      "typed-dispatch-local-validation"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/operator-isolated-home",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-cache",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tmp",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/home",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/catalog",
+      "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/quota-snapshot.json",
+      "TYPESAFE_API_KEY": "fixture-typesafe-key-not-a-real-credential",
+      "NO_PROXY": "",
+      "no_proxy": "",
+      "HTTPS_PROXY": "http://127.0.0.1:56209",
+      "https_proxy": "http://127.0.0.1:56209",
+      "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tls.crt"
+    },
+    "exit": 0,
+    "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1   latency_ms: 2   tokens: 120/8\n  rule: rule_1 (A routine local code maintenance task with no high-stakes wo)   confidence: 0.98\n  probabilities: rule_1=0.98 default=0.02\n  note: rule matched\n  candidate: claude:claude-opus-5-5  provider=claude  scope=all_models  remaining=90%  spendPriority=4.4298  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'claude-opus-5-5' --effort 'high'\n  timings: api_ms=2 quota_ms=114 local_ms=282 total_ms=398\n  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1\n",
+    "stderr": ""
+  },
+  {
+    "label": "chosen-catalog-absent",
+    "argv": [
+      "bash",
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/brief.txt",
+      "--project",
+      "typed-dispatch-local-validation"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/operator-isolated-home",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-cache",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tmp",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/home",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/catalog",
+      "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/quota-snapshot.json",
+      "TYPESAFE_API_KEY": "fixture-typesafe-key-not-a-real-credential",
+      "NO_PROXY": "",
+      "no_proxy": "",
+      "HTTPS_PROXY": "http://127.0.0.1:56209",
+      "https_proxy": "http://127.0.0.1:56209",
+      "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tls.crt"
+    },
+    "exit": 0,
+    "stdout": "dispatch-resolve:\n  status: error\n  reason: model index: chosen claude model validation-catalog-absent-model failed its catalog check\n  timings: api_ms=4 quota_ms=116 local_ms=441 total_ms=561\n  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1\n",
+    "stderr": "model-index: id 'validation-catalog-absent-model' absent or retired in claude catalog (role 'maintenance')\ndispatch-resolve: error (model index: chosen claude model validation-catalog-absent-model failed its catalog check)\n"
+  },
+  {
+    "label": "chosen-export-unavailable",
+    "argv": [
+      "bash",
+      "bin/fm-dispatch-resolve.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/brief.txt",
+      "--project",
+      "typed-dispatch-local-validation"
+    ],
+    "cwd": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35",
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/operator-isolated-home",
+      "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-config",
+      "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/xdg-cache",
+      "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tmp",
+      "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/home",
+      "FM_MODEL_CATALOG_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/missing-export",
+      "QUOTA_AXI_SNAPSHOT": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/quota-snapshot.json",
+      "TYPESAFE_API_KEY": "fixture-typesafe-key-not-a-real-credential",
+      "NO_PROXY": "",
+      "no_proxy": "",
+      "HTTPS_PROXY": "http://127.0.0.1:56209",
+      "https_proxy": "http://127.0.0.1:56209",
+      "CURL_CA_BUNDLE": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.validation-typed-dispatch/tls.crt"
+    },
+    "exit": 0,
+    "stdout": "dispatch-resolve:\n  status: clear\n  model: jev-1   latency_ms: 5   tokens: 120/8\n  rule: rule_1 (A routine local code maintenance task with no high-stakes wo)   confidence: 0.98\n  probabilities: rule_1=0.98 default=0.02\n  note: rule matched\n  candidate: claude:claude-opus-5-5  provider=claude  scope=all_models  remaining=90%  spendPriority=4.4672  runway=through_reset  -> eligible\n  profile: --harness 'claude' --model 'claude-opus-5-5' --effort 'high'\n  timings: api_ms=5 quota_ms=104 local_ms=298 total_ms=407\n  usage: input_tokens=120 output_tokens=8 jev_cost_usd=5.04e-06 jev_input_usd_per_million=0.042 returned_model=jev-1\n",
+    "stderr": "model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-opus-5-5' (role 'maintenance') not validated\n"
+  }
+]

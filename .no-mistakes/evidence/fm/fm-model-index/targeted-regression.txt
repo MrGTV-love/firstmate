@@ -1,0 +1,34 @@
+$ isolated HOME/TMPDIR bash tests/fm-model-index.test.sh
+Runner timed out at 300 seconds during the remote inheritance matrix; no assertion failure captured.
+Last product guard output:
+skipped: config/model-index.json and config/crew-dispatch.json (error: inherited destination is a symlink)
+pushed: config/dispatch-never-send
+unchanged: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md
+
+Last product success output:
+removed: config/model-index.json
+removed: config/crew-dispatch.json
+unchanged: config/dispatch-never-send
+unchanged: config/crew-harness
+unchanged: config/backlog-backend
+unchanged: config/backend
+unchanged: config/herdr-presentation-spaces
+unchanged: config/startup-memory-budget
+unchanged: config/trace-context
+unchanged: config/launch-env-allowlist
+unchanged: config/claude-permission-mode
+unchanged: config/claude-launcher
+unchanged: config/lavish-axi-host
+unchanged: config/keep-ai-trailers
+unchanged: data/captain-shared.md

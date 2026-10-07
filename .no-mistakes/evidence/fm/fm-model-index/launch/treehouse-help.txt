@@ -1,0 +1,29 @@
+$ treehouse --help
+Treehouse maintains a pool of reusable, pre-warmed git worktrees
+so that multiple AI coding agents can work on the same repo in parallel.
+
+Usage:
+  treehouse [flags]
+  treehouse [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  destroy     Remove worktrees from the pool, safely by default
+  enter       Open a subshell in an existing worktree by name, even if in use
+  get         Acquire a worktree from the pool and open a subshell
+  help        Help about any command
+  init        Create a default treehouse.toml config file
+  lease       Durably lease an existing pool worktree in place, without touching it
+  prune       Remove stale worktrees and opted-in orphans from the pool
+  return      Terminate lingering processes and return a worktree
+  status      Show the status of all worktrees in the pool
+  update      Update treehouse to the latest version
+
+Flags:
+  -h, --help          help for treehouse
+      --root string   Worktree root directory, overriding TREEHOUSE_ROOT and config; relative paths (e.g. "." for an in-project pool) resolve from the repo root
+  -v, --version       version for treehouse
+
+Use "treehouse [command] --help" for more information about a command.
+
+exit=0

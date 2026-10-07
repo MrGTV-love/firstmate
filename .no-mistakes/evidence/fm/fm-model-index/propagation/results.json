@@ -1,0 +1,357 @@
+[
+  {
+    "scenario": "initialize-destination",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "shared-valid",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "shared-consumer",
+    "status": 0,
+    "output": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"current\"\n  }\n}\n"
+  },
+  {
+    "scenario": "shared-removed-role",
+    "status": 1,
+    "output": "fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.l4Gl54/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\nfm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.l4Gl54/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\n"
+  },
+  {
+    "scenario": "shared-malformed-empty",
+    "status": 1,
+    "output": "fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.OinhaX/model-index.json\nfm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.OinhaX/model-index.json\n"
+  },
+  {
+    "scenario": "shared-empty-bytes",
+    "status": 1,
+    "output": "fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.yDUj7b/model-index.json\nfm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.yDUj7b/model-index.json\n"
+  },
+  {
+    "scenario": "shared-missing-index",
+    "status": 1,
+    "output": "fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.7akLj8/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\nfm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-inherit-pair.7akLj8/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\n"
+  },
+  {
+    "scenario": "shared-source-symlink",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "shared-source-hardlink",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "shared-destination-refusal",
+    "status": 0,
+    "output": "fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: destination does not allow inherited item (not gitignored or guard failed)\nfm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second/config: destination does not allow inherited item (not gitignored or guard failed)\n"
+  },
+  {
+    "scenario": "lab-create",
+    "status": 0,
+    "output": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home\n"
+  },
+  {
+    "scenario": "lab-tmux-dir",
+    "status": 0,
+    "output": "/tmp/fml.WECOlZ\n"
+  },
+  {
+    "scenario": "code-init",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "code-track",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "private-terminal-start",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "push-valid",
+    "status": 1,
+    "output": "config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes\nsecondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):\n  home: dirty working tree - local-material push continuing\n  model-index.json: pushed\n  crew-dispatch.json: pushed\n  dispatch-never-send: unchanged\n  crew-harness: pushed - mirrored primary absence\n  backlog-backend: unchanged\n  backend: pushed\n  herdr-presentation-spaces: unchanged\n  startup-memory-budget: unchanged\n  trace-context: unchanged - session-scoped\n  launch-env-allowlist: unchanged\n  claude-permission-mode: unchanged\n  claude-launcher: unchanged\n  lavish-axi-host: unchanged\n  keep-ai-trailers: unchanged\n  data/captain-shared.md: unchanged\nCONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\n\u25cf  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\n\u25cf  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/code/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+  },
+  {
+    "scenario": "push-consumer",
+    "status": 0,
+    "output": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"current\"\n  }\n}\n"
+  },
+  {
+    "scenario": "push-removed-role",
+    "status": 1,
+    "output": "config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes\nconfig-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun\nsecondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):\n  home: dirty working tree - local-material push continuing\n  dispatch-never-send: unchanged\n  crew-harness: pushed\n  backlog-backend: unchanged\n  backend: unchanged\n  herdr-presentation-spaces: unchanged\n  startup-memory-budget: unchanged\n  trace-context: unchanged - session-scoped\n  launch-env-allowlist: unchanged\n  claude-permission-mode: unchanged\n  claude-launcher: unchanged\n  lavish-axi-host: unchanged\n  keep-ai-trailers: unchanged\n  data/captain-shared.md: unchanged\nCONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\nWARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.\njq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-push-pair.zj6uBZ/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\n"
+  },
+  {
+    "scenario": "push-malformed-empty",
+    "status": 1,
+    "output": "config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes\nconfig-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun\nsecondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):\n  home: dirty working tree - local-material push continuing\n  dispatch-never-send: unchanged\n  crew-harness: pushed\n  backlog-backend: unchanged\n  backend: unchanged\n  herdr-presentation-spaces: unchanged\n  startup-memory-budget: unchanged\n  trace-context: unchanged - session-scoped\n  launch-env-allowlist: unchanged\n  claude-permission-mode: unchanged\n  claude-launcher: unchanged\n  lavish-axi-host: unchanged\n  keep-ai-trailers: unchanged\n  data/captain-shared.md: unchanged\nCONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\nWARNING: watcher still down (same stale episode; last beat: 5s ago, grace 300s) - full banner already printed this episode.\nmodel-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-push-pair.PHC7ln/model-index.json\n"
+  },
+  {
+    "scenario": "push-missing-index",
+    "status": 1,
+    "output": "config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes\nconfig-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun\nsecondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):\n  home: dirty working tree - local-material push continuing\n  dispatch-never-send: unchanged\n  crew-harness: pushed\n  backlog-backend: unchanged\n  backend: unchanged\n  herdr-presentation-spaces: unchanged\n  startup-memory-budget: unchanged\n  trace-context: unchanged - session-scoped\n  launch-env-allowlist: unchanged\n  claude-permission-mode: unchanged\n  claude-launcher: unchanged\n  lavish-axi-host: unchanged\n  keep-ai-trailers: unchanged\n  data/captain-shared.md: unchanged\nCONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\nWARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.\njq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/fm-config-push-pair.TI8gEA/crew-dispatch.json:1): role or stand-in not configured: codex:incoming\n"
+  },
+  {
+    "scenario": "private-terminal-capture",
+    "status": 0,
+    "output": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  {
+    "scenario": "receiver-valid-model-index.json",
+    "status": 0,
+    "output": "pushed: config/model-index.json\n"
+  },
+  {
+    "scenario": "receiver-valid-crew-dispatch.json",
+    "status": 0,
+    "output": "pushed: config/crew-dispatch.json\n"
+  },
+  {
+    "scenario": "receiver-consumer",
+    "status": 0,
+    "output": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"current\"\n  }\n}\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-symlink-check",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-symlink-put",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-symlink-absent",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-hardlink-check",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-hardlink-put",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-hardlink-absent",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-directory-check",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-directory-put",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-model-index.json-directory-absent",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-symlink-check",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-symlink-put",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-symlink-absent",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-hardlink-check",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-hardlink-put",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-hardlink-absent",
+    "status": 1,
+    "output": "error: inherited destination is hardlinked\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-directory-check",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-directory-put",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-crew-dispatch.json-directory-absent",
+    "status": 1,
+    "output": "error: inherited destination is not a regular file\n"
+  },
+  {
+    "scenario": "receiver-oversize-model-index.json",
+    "status": 1,
+    "output": "error: expected bytes exceed the byte bound\n"
+  },
+  {
+    "scenario": "receiver-oversize-crew-dispatch.json",
+    "status": 1,
+    "output": "error: expected bytes exceed the byte bound\n"
+  },
+  {
+    "scenario": "absence-prove-no-jq",
+    "status": 0,
+    "output": "jq unavailable\n"
+  },
+  {
+    "scenario": "shared-both-absent-no-jq",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "receiver-absent-no-jq-model-index.json",
+    "status": 0,
+    "output": "removed: config/model-index.json\n"
+  },
+  {
+    "scenario": "receiver-absent-no-jq-crew-dispatch.json",
+    "status": 0,
+    "output": "removed: config/crew-dispatch.json\n"
+  },
+  {
+    "scenario": "ssh-authority-probe",
+    "status": 255,
+    "output": "No ED25519 host key is known for localhost and you have requested strict checking.\r\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-model-index.json-symlink",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/model-index.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-model-index.json-hardlink",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/model-index.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-model-index.json-oversize",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/model-index.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-crew-dispatch.json-symlink",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/crew-dispatch.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-crew-dispatch.json-hardlink",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/crew-dispatch.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "sender-source-crew-dispatch.json-oversize",
+    "status": 255,
+    "output": "skipped: config/model-index.json and config/crew-dispatch.json (routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home/config/crew-dispatch.json)\nHost key verification failed.\r\n"
+  },
+  {
+    "scenario": "ssh-key-host",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "ssh-key-client",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "disposable-ssh-authority",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "ssh-receiver-valid-model-index.json",
+    "status": 0,
+    "output": "pushed: config/model-index.json\n"
+  },
+  {
+    "scenario": "ssh-receiver-valid-crew-dispatch.json",
+    "status": 0,
+    "output": "pushed: config/crew-dispatch.json\n"
+  },
+  {
+    "scenario": "ssh-receiver-consumer",
+    "status": 0,
+    "output": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"current\"\n  }\n}\n"
+  },
+  {
+    "scenario": "stage-validate",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "shared-frozen-after-source-mutation",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "push-both-absent-no-jq",
+    "status": 1,
+    "output": "config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/push-home -> live secondmate homes\nsecondmate propagation (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-propagation-validate/second):\n  home: dirty working tree - local-material push continuing\n  model-index.json: pushed - mirrored primary absence\n  crew-dispatch.json: pushed - mirrored primary absence\n  dispatch-never-send: unchanged\n  crew-harness: pushed\n  backlog-backend: unchanged\n  backend: pushed\n  herdr-presentation-spaces: unchanged\n  startup-memory-budget: unchanged\n  trace-context: unchanged - session-scoped\n  launch-env-allowlist: unchanged\n  claude-permission-mode: unchanged\n  claude-launcher: unchanged\n  lavish-axi-host: unchanged\n  keep-ai-trailers: unchanged\n  data/captain-shared.md: unchanged\nCONFIG_REREAD: secondmate propagation: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)\nWARNING: watcher still down (same stale episode; last beat: 91s ago, grace 300s) - full banner already printed this episode.\n"
+  },
+  {
+    "scenario": "ssh-receiver-destination-refusal-check",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "ssh-receiver-destination-refusal-put",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "ssh-receiver-destination-refusal-absent",
+    "status": 1,
+    "output": "error: inherited destination is a symlink\n"
+  },
+  {
+    "scenario": "ssh-receiver-refusal-unrelated-continues",
+    "status": 0,
+    "output": "pushed: config/crew-harness\n"
+  },
+  {
+    "scenario": "private-terminal-final-capture",
+    "status": 0,
+    "output": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  {
+    "scenario": "private-terminal-stop",
+    "status": 0,
+    "output": ""
+  },
+  {
+    "scenario": "lab-tmux-teardown",
+    "status": 0,
+    "output": ""
+  }
+]

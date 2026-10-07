@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "roles": {
+    "deep": {
+      "claude": {
+        "model": "fm-lab-catalog-absent-selector"
+      }
+    }
+  },
+  "retired": [
+    "fm-lab-retired-model"
+  ]
+}

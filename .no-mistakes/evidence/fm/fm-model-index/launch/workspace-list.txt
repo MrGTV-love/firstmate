@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-30730-21418 workspace list --json
+usage: herdr workspace list
+
+exit=2

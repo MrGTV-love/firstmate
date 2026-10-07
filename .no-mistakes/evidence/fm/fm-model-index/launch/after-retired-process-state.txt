@@ -1,0 +1,4 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane process-info w2:p2
+unknown option: w2:p2
+
+exit=2

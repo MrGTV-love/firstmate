@@ -1,0 +1,5 @@
+## Captain's intent
+Perform routine local maintenance.
+
+## Firstmate spec
+Rename an internal variable; no deployment, credentials, or network behavior changes.

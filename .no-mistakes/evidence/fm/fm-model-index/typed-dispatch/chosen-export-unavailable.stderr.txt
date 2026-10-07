@@ -1,0 +1,1 @@
+model-index: notice: claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-opus-5-5' (role 'maintenance') not validated

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "roles": {
+    "maintenance": {
+      "claude": {
+        "model": "validation-catalog-absent-model"
+      }
+    }
+  },
+  "retired": []
+}

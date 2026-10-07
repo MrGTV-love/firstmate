@@ -1,0 +1,16 @@
+$ bin/fm-herdr-lab.sh run fm-lab-model-index-67395-20576 pane send-keys --help
+Send key presses to a pane
+
+Usage: herdr pane send-keys <PANE_ID> <KEY>...
+
+Arguments:
+  <PANE_ID>
+          
+
+  <KEY>...
+          
+
+Use esc as the canonical Escape key name; escape is also accepted.
+
+
+exit=0

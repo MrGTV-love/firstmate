@@ -1,0 +1,19 @@
+{
+  "successful_targeted_commands": [
+    "FM_LIVE=0 bash tests/fm-model-index.test.sh",
+    "FM_LIVE=0 bash tests/fm-dispatch-resolve.test.sh",
+    "FM_LIVE=0 bash tests/fm-worker-account.test.sh",
+    "FM_LIVE=0 bash tests/fm-spawn-dispatch-profile.test.sh",
+    "FM_LIVE=0 bash tests/fm-control-relaunch.test.sh",
+    "FM_LIVE=0 bash tests/fm-agy-harness.test.sh"
+  ],
+  "environment": "Final runs used env -u TMPDIR, inherited fleet FM_HOME/FM_* path and catalog overrides unset, DISABLE_AUTOUPDATER=1. Standard self-cleaning test fixtures used the permitted ephemeral toolchain temp exception.",
+  "initial_attempts": [
+    "fm-model-index.test.sh hit a 240-second subprocess deadline with TMPDIR inside worktree.",
+    "Worktree-local TMPDIR batch stopped when fm-spawn-dispatch-profile.test.sh rejected a secondmate home inside the firstmate repository.",
+    "Corrected to standard test TMPDIR and longer command deadlines; all six targeted scripts passed."
+  ],
+  "test_fix": "Replaced non-portable sed -i in the Pi relaunch fixture with stream-to-temp replacement and explicit failure handling. Full fm-control-relaunch.test.sh rerun passed without the BSD sed errors. CONTRIBUTING.md documents fixture portability.",
+  "live_proof": "Separate actual CLI, typed-dispatch, native-catalog, real harness startup/pre-stop refusal, shared inheritance and real SSH receiver evidence retained.",
+  "unresolved": "Ambient Claude trust-store mutation during smoke validation; disclosed separately. Full remote sender/reread delivery and completed Claude response turn not demonstrated live."
+}

@@ -1,0 +1,6 @@
+These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.
+
+config/crew-harness
+-----BEGIN config/crew-harness-----
+malformed-empty
+-----END config/crew-harness-----

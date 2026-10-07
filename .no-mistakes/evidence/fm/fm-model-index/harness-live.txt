@@ -1,0 +1,917 @@
+Real isolated harness exercise. All HOME/PI_CODING_AGENT_DIR/CLAUDE_CONFIG_DIR/FM_HOME are worktree-local. Environment explicitly reconstructed; no cloud credentials inherited.
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+
+exit=0
+$ bash bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+/tmp/fml.2CxOCR
+
+exit=0
+$ /Users/charlesabrooker/.bun/bin/omp models --json
+{"models":[{"provider":"apple","kind":"chat","id":"on-device","selector":"apple/on-device","name":"Apple AFM 3 Core Advanced","contextWindow":8192,"maxTokens":8192,"reasoning":false,"thinking":null,"input":["text","image"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"pricingStatus":"unknown"}]}
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab -f /dev/null new-session -d -s firstmate -n primary -x 120 -y 36 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 '/Users/charlesabrooker/.bun/bin/omp --model apple/on-device --no-session --no-tools --no-skills --no-rules --no-extensions --no-lsp --no-title; printf "\nNATIVE_PRIMARY_EXIT=%s\n" "$?"; exec /bin/bash --noprofile --norc'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -100 -t firstmate:primary
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                        [3m[38;5;180mTip: [38;5;248mStart your prompt with `!` to run it as bash — `!!` runs it without[0m
+                                              [3m[38;5;248madding the output to context[0m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m [38;5;243mπ[39m [38;5;236m>[39m [38;5;39m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m>[39m [38;5;255m🌳 32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35[39m [38;5;236m>[39m [38;5;215m⑂ detached [38;5;248m?2[39m [38;5;233m[49m▶[38;5;39m──────────────[38;5;67m┃[38;5;39m─[38;5;67m8.2K[38;5;236m─[38;5;203m172%
+[38;5;239m╰─ [38;5;254m                                                                                         [38;5;39m⇧⇥[38;5;254m [3m[38;5;243mto change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary -l 'Reply exactly LOCAL_MODEL_READY.'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary Enter
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -150 -t firstmate:primary
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                        [3m[38;5;180mTip: [38;5;248mStart your prompt with `!` to run it as bash — `!!` runs it without[0m
+                                              [3m[38;5;248madding the output to context[0m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m
+ [38;5;254mReply exactly LOCAL_MODEL_READY.[39m
+
+
+[49m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;203m✘ Prompt is too long: 12747 tokens exceed the 8192 token context window (context_size_exceeded)[0m
+ [38;5;243mDismissed when you send your next message.[39m
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m [38;5;243mπ[39m [38;5;236m>[39m [38;5;39m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m>[39m [38;5;255m🌳 32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35[39m [38;5;236m>[39m [38;5;215m⑂ detached [38;5;248m?2[39m [38;5;233m[49m▶[38;5;39m──────────────[38;5;67m┃[38;5;39m─[38;5;67m8.2K[38;5;236m─[38;5;203m172%
+[38;5;239m╰─ [39m
+
+
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab list-panes -a -F '#{session_name}:#{window_name} pane=#{pane_id} command=#{pane_current_command} pid=#{pane_pid} cwd=#{pane_current_path}'
+firstmate:primary pane=%0 command=bash pid=17529 cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35
+
+exit=0
+$ /Users/charlesabrooker/.bun/bin/omp --help
+omp v18.6.3
+
+USAGE
+  $ omp [COMMAND]
+
+ARGUMENTS
+  MESSAGES   Messages to send (prefix files with @)
+
+FLAGS
+      --model=<value>                   Model to use (fuzzy match: "opus", "gpt-5.2", or "openai/gpt-5.2")
+      --smol=<value>                    Smol/fast model for lightweight tasks (or PI_SMOL_MODEL env)
+      --slow=<value>                    Slow/reasoning model for thorough analysis (or PI_SLOW_MODEL env)
+      --plan=<value>                    Plan model for architectural planning (or PI_PLAN_MODEL env)
+      --goal=<value>                    Start fresh in goal mode (interactive only; bypasses autoResume; no positional prompt, startup plan mode, or explicit resume)
+      --prewalk                         Switch from the active model to a fast/cheap model at the first edit/write after the plan's todo list exists (default off; see prewalk.enabled)
+      --no-prewalk                      Disable prewalk even if prewalk.enabled is set
+      --prewalk-into=<value>            Target model for prewalk (default the "smol" role)
+      --plan-yolo                       Force read-only plan mode at start, auto-approve the plan on the model's first resolve call, then switch to --plan-yolo-into to implement it
+      --plan-yolo-into=<value>          Target model for plan-yolo execution (default the "smol" role)
+      --provider=<value>                Provider to use (legacy; prefer --model)
+      --api-key=<value>                 API key (defaults to env vars)
+      --system-prompt=<value>           System prompt (default: coding assistant prompt)
+      --system-prompt-template=<value>  Handlebars system prompt template (mutually exclusive with --system-prompt)
+      --append-system-prompt=<value>    Append text or file contents to the system prompt
+      --allow-home                      Allow starting in ~ without auto-switching to a temp dir
+      --profile=<value>                 Use an isolated profile for auth, sessions, settings, and caches
+      --alias=<value>                   Create a shell shortcut for the selected profile and exit
+      --cwd=<value>                     Directory to start in (overrides the launch cwd)
+      --mode=<value>                    Output mode: text (default), json, rpc, or rpc-ui
+      --config=<value>                  Load an extra config.yml-style overlay for this run (repeatable)
+      --add-dir=<value>                 Add a workspace directory beyond the working directory (repeatable)
+  -p, --print                           Non-interactive mode: process prompt and exit
+  -c, --continue                        Continue previous session
+  -r, --resume=<value>                  Resume a session (by ID prefix, path, or picker if omitted)
+      --from-claude                     Import a Claude Code session into OMP
+      --from-codex                      Import a Codex session into OMP
+      --session-dir=<value>             Directory for session storage and lookup
+      --no-session                      Don't save session (ephemeral)
+      --models=<value>                  Comma-separated model patterns for Ctrl+P cycling
+      --no-tools                        Disable all built-in tools
+      --no-lsp                          Disable LSP tools, formatting, and diagnostics
+      --no-pty                          Disable PTY-based interactive bash execution
+      --tools=<value>                   Comma-separated list of tools to enable (default: all)
+      --thinking=<value>                Set thinking level: off, minimal, low, medium, high, xhigh, max, auto
+      --service-tier=<value>            OpenAI service tier for this session (none omits service_tier)
+      --hide-thinking                   Hide thinking blocks in TUI output (display only, does not disable model thinking)
+      --advisor                         Enable the advisor runtime (passively reviews each turn and injects notes)
+      --external-thinking               Use a private scratchpad while disabling supported GPT, Claude, and Gemini reasoning (at your own risk: providers have flagged this request shape as abuse)
+      --hook=<value>                    Load a hook/extension file (can be used multiple times)
+  -e, --extension=<value>               Load an extension file (can be used multiple times)
+      --no-extensions                   Disable extension discovery (explicit -e paths still work)
+      --no-skills                       Disable skills discovery and loading
+      --skills=<value>                  Comma-separated glob patterns to filter skills (e.g., git-*,docker)
+      --no-rules                        Disable rules discovery and loading
+      --export=<value>                  Export session file to HTML and exit
+      --no-title                        Disable title auto-generation
+      --no-ui                           With --mode rpc or rpc-ui: run extensions headless (rpc-ui tool UI remains enabled)
+      --print-thoughts                  Include thinking blocks in print mode text output
+      --max-time=<value>                Stop the session after this duration (e.g., 600, 10m, 1h)
+      --auto-approve                    Auto-approve all tool calls (skip approval prompts)
+      --approval-mode=<value>           Override tools.approvalMode for this session (always-ask|write|yolo)
+
+EXAMPLES
+  # Interactive mode
+    omp
+  # Interactive mode with initial prompt
+    omp "List all .ts files in src/"
+  # Start working on a goal immediately
+    omp --goal "Investigate the importer"
+  # Include files in initial message
+    omp @prompt.md @image.png "What color is the sky?"
+  # Non-interactive mode (process and exit)
+    omp -p "List all .ts files in src/"
+  # Continue previous session
+    omp --continue "What did we discuss?"
+  # Create a shell shortcut for a work profile
+    omp --profile work --alias omp-work
+  # Use different model (fuzzy matching)
+    omp --model opus "Help me refactor this code"
+  # Limit model cycling to specific models
+    omp --models claude-sonnet,claude-haiku,gpt-4o
+  # Export a session file to HTML
+    omp --export ~/.omp/agent/sessions/--path--/session.jsonl
+
+COMMANDS
+  acp            Run omp as an ACP (Agent Client Protocol) server over stdio
+  agents         Manage bundled task agents
+  auth-broker    Manage the omp auth-broker (credential vault)
+  auth-gateway   Run an auth-gateway: an HTTP forward proxy backed by the configured broker, or JSON lines on stdio with your own credentials
+  bench          Benchmark models: TTFT/prefill vs decode throughput with p50/p95, across chat, prefill, generation, and prompt-cache workloads, or single-user vs parallel load (--detailed)
+  browser-relay  Run the local CDP relay that lets the browser prelude drive your own Chrome tabs
+  cleanse        Detect and fix project diagnostics with weighted parallel subagents
+  clip           Upload a /record recording to live.omp.sh as a public clip and print its URL
+  collab         List active local Collab host metadata without URLs; use collab link <instanceId|pid> to retrieve a control link (--view for view-only)
+  commit         Generate a commit message and update changelogs
+  completions    Print a shell completion script (bash, zsh, or fish)
+  compress       Rewrite a text file into the dense prompt register, reporting what it drops
+  config         Manage configuration settings
+  dry-balance    Dry-run OAuth account balancing across random session ids
+  find           Semantic search: describe a behavior, get the files and line ranges that implement it
+  gallery        Preview tool, composer, and status-line renderers in a deterministic visual gallery
+  gc             Run storage garbage collection
+  git            Interactive fullscreen git UI: split diff viewer, staging sidebar, and commit composer
+  grep           Test grep tool
+  grievances     View, clean, or push reported tool issues (auto-QA grievances)
+  if-bench       Benchmark instruction following and working memory: one cached thread of glyph array actions with a moving cat-sound directive
+  images         Inspect, diagnose, probe, and purge image publication backends
+  install        Install or link an extension package (alias of `plugin install`/`plugin link`)
+  join           Join a shared collab session (same as /join)
+  login          Log in to a model provider (terminal counterpart of /login)
+  models         List, search, and refresh available models
+  play           Replay a /record session recording in the terminal (space pauses, q quits)
+  plugin         Manage plugins (install, uninstall, list, etc.)
+  predict        Type a prompt and compare every word-completion engine's ghost text live
+  ps             List and control daemon-supervised background processes (logs, stop, kill, restart)
+  read           Show what the read tool will return for a path, URL, or internal URI
+  render         Draw a session's entire thread through the production transcript pipeline (with repaint timing)
+  say            Synthesize text with the local TTS engine and play it through the speakers
+  search         Test web search providers
+  setup          Run onboarding setup or install dependencies for optional features
+  share          Share a saved session via an encrypted link (same as /share)
+  shell          Interactive shell console
+  skill          Install, search, publish, and manage skills on the Skillshare registry (skills.omp.sh)
+  ssh            Manage SSH host configurations
+  stats          View usage statistics
+  stream         Broadcast local omp session screens and chat to your public live channel
+  tiny-models    Download tiny local models (session titles, memory, word completion)
+  token          Get the API key or OAuth token for a provider
+  toks           Count a file or text with every embedded offline tokenizer (OpenAI, Claude, Qwen, …)
+  ttsr           Inspect and test Time-Traveling Stream Rules (TTSR)
+  update         Check for and install updates
+  usage          Show provider usage limits for every authenticated account
+  worktree       Add, list, or clear git worktrees (clone-first when enabled)
+
+Environment Variables:
+  # Core Providers
+  ANTHROPIC_API_KEY          - Anthropic Claude models
+  ANTHROPIC_OAUTH_TOKEN      - Anthropic OAuth (takes precedence over API key)
+  CLAUDE_CODE_USE_FOUNDRY    - Enable Anthropic Foundry mode (uses Foundry endpoint + mTLS)
+  FOUNDRY_BASE_URL           - Anthropic Foundry base URL (e.g., https://<foundry-host>)
+  ANTHROPIC_FOUNDRY_API_KEY  - Anthropic token used as Authorization: Bearer <token> in Foundry mode
+  ANTHROPIC_CUSTOM_HEADERS   - Extra headers for Foundry or any custom ANTHROPIC_BASE_URL gateway (e.g., "user-id: USERNAME")
+  CLAUDE_CODE_CLIENT_CERT    - Client certificate (PEM path or inline PEM) for mTLS
+  CLAUDE_CODE_CLIENT_KEY     - Client private key (PEM path or inline PEM) for mTLS
+  NODE_EXTRA_CA_CERTS        - CA bundle path (or inline PEM) for server certificate validation
+  OPENAI_API_KEY             - OpenAI GPT models
+  GEMINI_API_KEY             - Google Gemini models
+  COPILOT_GITHUB_TOKEN      - GitHub Copilot
+
+  # Additional LLM Providers
+  AZURE_OPENAI_API_KEY       - Azure OpenAI models
+  GROQ_API_KEY               - Groq models
+  CEREBRAS_API_KEY           - Cerebras models
+  XAI_API_KEY                - xAI Grok models
+  OPENROUTER_API_KEY         - OpenRouter aggregated models
+  KILO_API_KEY               - Kilo Gateway models
+  MISTRAL_API_KEY            - Mistral models
+  ZAI_API_KEY                - z.ai models (ZhipuAI/GLM)
+  UMANS_AI_CODING_PLAN_API_KEY - Umans AI Coding Plan models
+  ABLITERATION_API_KEY       - Abliteration uncensored GLM models
+  UMANS_WEBSEARCH_PROVIDER    - Umans gateway web search backend (native or exa)
+  MINIMAX_API_KEY            - MiniMax models
+  OPENCODE_API_KEY           - OpenCode Zen/OpenCode Go models
+  CURSOR_ACCESS_TOKEN        - Cursor AI models
+  CLINE_API_KEY              - ClinePass subscription models
+  COMMAND_CODE_API_KEY       - Command Code Provider API models
+  CHARM_HYPER_API_KEY        - Charm Hyper inference gateway models
+  AI_GATEWAY_API_KEY         - Vercel AI Gateway
+  STEPFUN_API_KEY            - StepFun Step models
+  HELMCODE_API_KEY           - Helmcode private EU inference
+  WAFER_SERVERLESS_API_KEY   - Wafer Serverless (pay-as-you-go)
+  YOLO_AUTO_API_KEY          - Yolo-Auto flat-rate Qwen models
+  SINGULARITYAPI_DEV_API_KEY - SingularityAPI universal gateway (300+ models)
+  SINGULARITYAPI_TECH_API_KEY - SingularityAPI reserved DeepSeek lanes
+
+  # Cloud Providers
+  AWS_PROFILE                - AWS Bedrock (or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)
+  GOOGLE_CLOUD_PROJECT       - Google Vertex AI (requires GOOGLE_CLOUD_LOCATION)
+  GOOGLE_APPLICATION_CREDENTIALS - Service account for Vertex AI
+
+  # Search & Tools
+  EXA_API_KEY                - Exa web search
+  BRAVE_API_KEY              - Brave web search
+  PERPLEXITY_API_KEY         - Perplexity web search API key (optional; anonymous fallback)
+  PERPLEXITY_COOKIES         - Perplexity web search (session cookie)
+  TAVILY_API_KEY             - Tavily web search
+  TINYFISH_API_KEY           - TinyFish web search
+  FIRECRAWL_API_KEY          - Firecrawl web search + fetch reader backend
+  ANTHROPIC_SEARCH_API_KEY   - Anthropic web search (override; isolates search from main ANTHROPIC_API_KEY)
+  ANTHROPIC_SEARCH_BASE_URL  - Anthropic web search base URL (override; pairs with ANTHROPIC_SEARCH_API_KEY)
+  TYPESAFE_API_KEY           - TypeSafe System One judgments (auto thinking, unexpected-stop, AI staging, eval judge())
+
+  # Configuration
+  OMP_PROFILE                 - Named profile for isolated agent state (same as --profile)
+  Use `omp --profile <name> --alias <command>` to create a shell shortcut for a profile
+  PI_CODING_AGENT_DIR        - Session storage directory (default: ~/.omp/agent)
+  PI_PACKAGE_DIR             - Override package directory (for Nix/Guix store paths)
+  PI_SMOL_MODEL              - Override smol/fast model (see --smol)
+  PI_SLOW_MODEL              - Override slow/reasoning model (see --slow)
+  PI_PLAN_MODEL              - Override planning model (see --plan)
+  PI_NO_PTY                  - Disable PTY-based interactive bash execution
+  For complete environment variable reference, see:
+  docs/environment-variables.md
+Available Tools (default-enabled unless noted):
+  read          - Read file contents
+  bash          - Execute bash commands
+  edit          - Edit files with find/replace
+  write         - Write files (creates/overwrites)
+  grep          - Search file contents
+  glob          - Find files by glob pattern
+  lsp           - Language server protocol (code intelligence)
+  python        - Execute Python code (requires: omp setup python)
+  notebook      - Edit Jupyter notebooks
+  browser       - Browser automation (Puppeteer)
+  computer      - Native host desktop capture and input (disabled by default)
+  task          - Launch sub-agents for parallel tasks
+  todo          - Manage todo/task lists
+  web_search    - Search the web
+  ask           - Ask user questions (interactive mode only)
+
+Plugin Options:
+  --plugin-dir <path>        Load plugin from directory (repeatable)
+
+Useful Commands:
+  omp agents unpack           - Export bundled subagents to ~/.omp/agent/agents (default)
+  omp agents unpack --project - Export bundled subagents to ./.omp/agents
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary C-c
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab respawn-pane -k -t firstmate:primary -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 '/Users/charlesabrooker/.bun/bin/omp --model apple/on-device --no-session --no-tools --no-skills --no-rules --no-extensions --no-lsp --no-title --system-prompt '"'"'You are an assistant. Reply briefly.'"'"'; printf "\nNATIVE_PRIMARY_EXIT=%s\n" "$?"; exec /bin/bash --noprofile --norc'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary -l 'Reply exactly LOCAL_MODEL_READY.'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary Enter
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -150 -t firstmate:primary
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                         [3m[38;5;180mTip: [38;5;248mPair up live: `/collab` shares your session through an end-to-end[0m
+                          [3m[38;5;248mencrypted relay link — a teammate runs `/join <link>` to watch tool[0m
+                                  [3m[38;5;248mcalls stream and prompt the agent from their own omp[0m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m
+ [38;5;254mReply exactly LOCAL_MODEL_READY.[39m
+
+
+[49m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;203m✘ Prompt is too long: 10883 tokens exceed the 8192 token context window (context_size_exceeded)[0m
+ [38;5;243mDismissed when you send your next message.[39m
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m [38;5;243mπ[39m [38;5;236m>[39m [38;5;39m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m>[39m [38;5;255m🌳 32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35[39m [38;5;236m>[39m [38;5;215m⑂ detached [38;5;248m?2[39m [38;5;233m[49m▶[38;5;39m──────────────[38;5;67m┃[38;5;39m─[38;5;67m8.2K[38;5;236m─[38;5;203m149%
+[38;5;239m╰─ [39m
+
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab respawn-pane -k -t firstmate:primary -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 '/Users/charlesabrooker/.bun/bin/omp --model apple/on-device --no-session --no-tools --no-skills --no-rules --no-extensions --no-lsp --no-title --system-prompt '"'"'You are an assistant. Reply briefly.'"'"' --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home; printf "\nNATIVE_PRIMARY_EXIT=%s\n" "$?"; exec /bin/bash --noprofile --norc'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary -l 'Reply exactly LOCAL_MODEL_READY.'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab send-keys -t firstmate:primary Enter
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -150 -t firstmate:primary
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                        [3m[38;5;180mTip: [38;5;248mType `#` anywhere in your prompt for quick actions — copy the line[0m
+                                       [3m[38;5;248mor the whole prompt, undo, jump the cursor[0m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m
+ [38;5;254mReply exactly LOCAL_MODEL_READY.[39m
+
+
+[49m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;203m✘ Prompt is too long: 10889 tokens exceed the 8192 token context window (context_size_exceeded)[0m
+ [38;5;243mDismissed when you send your next message.[39m
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m[48;5;233m [38;5;243mπ[39m [38;5;236m>[39m [38;5;39m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m>[39m [38;5;255m🌳 32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35[39m [38;5;236m>[39m [38;5;215m⑂ detached [38;5;248m?2[39m [38;5;233m[49m▶[38;5;39m──────────────[38;5;67m┃[38;5;39m─[38;5;67m8.2K[38;5;236m─[38;5;203m149%
+[38;5;239m╰─ [39m
+
+
+
+exit=0
+$ git init /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project/.git/
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project -c 'user.name=Disposable Lab' -c user.email=lab@example.invalid commit --allow-empty -m 'Disposable native launch fixture'
+[main (root-commit) 8b0250d] Disposable native launch fixture
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project worktree add --detach /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+Preparing worktree (detached HEAD 8b0250d)
+HEAD is now at 8b0250d Disposable native launch fixture
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab new-window -d -t firstmate: -n fm-native-local -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker '/bin/bash --noprofile --norc'
+
+exit=0
+$ bash bin/fm-spawn.sh native-local --relaunch --harness omp --model role:local
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model-index: notice: omp catalog unavailable (effective worker account context is not established); 'apple/on-device' (role 'local') not validated
+spawned native-local harness=omp kind=scout window=firstmate:fm-native-local worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -150 -t firstmate:fm-native-local
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                         [3m[38;5;180mTip: [38;5;248mUse /tan to fork the current conversation into a background agent[0m
+
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[48;5;233m
+ ⁣[38;5;254mFIRSTMATE_OP: v1 launch-brief: # Current worker role contract[39m
+ [38;5;254mYou are a crewmate: an autonomous worker agent managed by firstmate.[39m
+ [38;5;254mThis section establishes your current identity before every project or task instruction below and supersedes any
+[39m [38;5;254mconflicting role identity in those instructions.[39m
+ [38;5;254mDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+[39m [38;5;254midentity, delegate the task, run fleet supervision, or address the captain.[39m
+ [38;5;254mYour steering inbox is
+[39m [38;5;48m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-l
+[39m [38;5;48mocal.inbox[38;5;254m; this exact path belongs to your current task even when it is outside the worktree or under the supervising
+[39m [38;5;254mfirstmate home, so read and acknowledge its messages and do not reject it as another home's state.[39m
+ [38;5;254mNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+[39m [38;5;254mnamed by this brief.[39m
+ [38;5;254mWhen this task works on Firstmate itself, the repository root [38;5;48mAGENTS.md[38;5;254m (also imported by [38;5;48mCLAUDE.md[38;5;254m) is project
+[39m [38;5;254mcontent and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+[39m [38;5;254mcontract.[39m
+ [38;5;254mProject instructions still govern the work wherever they do not conflict with this worker identity, including
+[39m [38;5;48mCONTRIBUTING.md[38;5;254m and [38;5;48mfirstmate-coding-guidelines[38;5;254m for Firstmate changes.[39m
+
+ [1;4m[38;5;254mTask[0m[48;5;233m
+
+ [1m[38;5;254mCaptain's intent[0m[48;5;233m
+
+ [38;5;254mObserve actual local model launch; do not edit files.[39m
+
+ [1m[38;5;254mFirstmate spec[0m[48;5;233m
+
+ [38;5;254mReport the configured model and stop. Do not read files outside this disposable lab.[39m
+
+
+[49m [38;5;96m ⎋[39m [38;5;243mWorking…[39m
+
+❯
+ [38;5;204m⠴ 5s[39m [38;5;236m·[39m [38;5;204m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m·[39m [38;5;255m🌳 project/worker[39m [38;5;236m·[39m [38;5;48m⑂ detached[39m [38;5;236m·[39m ◫ [38;5;39m85.9%/8.2K[39m [38;5;39m⟲[39m        [38;5;204mObserve local model launch[39m
+
+exit=0
+
+ACTUAL TASK METADATA AFTER LAUNCH
+window=firstmate:fm-native-local
+endpoint_task_id=native-local
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-native-local
+model=apple/on-device
+effort=default
+busy_gen=g1791331539.3772.19234
+spawn_gen=s1791331540.92113.24867
+id=native-local
+status=working
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -200 -t firstmate:fm-native-local
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                         [3m[38;5;180mTip: [38;5;248mUse /tan to fork the current conversation into a background agent[0m
+
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[48;5;233m
+ ⁣[38;5;254mFIRSTMATE_OP: v1 launch-brief: # Current worker role contract[39m
+ [38;5;254mYou are a crewmate: an autonomous worker agent managed by firstmate.[39m
+ [38;5;254mThis section establishes your current identity before every project or task instruction below and supersedes any
+[39m [38;5;254mconflicting role identity in those instructions.[39m
+ [38;5;254mDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+[39m [38;5;254midentity, delegate the task, run fleet supervision, or address the captain.[39m
+ [38;5;254mYour steering inbox is
+[39m [38;5;48m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-l
+[39m [38;5;48mocal.inbox[38;5;254m; this exact path belongs to your current task even when it is outside the worktree or under the supervising
+[39m [38;5;254mfirstmate home, so read and acknowledge its messages and do not reject it as another home's state.[39m
+ [38;5;254mNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+[39m [38;5;254mnamed by this brief.[39m
+ [38;5;254mWhen this task works on Firstmate itself, the repository root [38;5;48mAGENTS.md[38;5;254m (also imported by [38;5;48mCLAUDE.md[38;5;254m) is project
+[39m [38;5;254mcontent and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+[39m [38;5;254mcontract.[39m
+ [38;5;254mProject instructions still govern the work wherever they do not conflict with this worker identity, including
+[39m [38;5;48mCONTRIBUTING.md[38;5;254m and [38;5;48mfirstmate-coding-guidelines[38;5;254m for Firstmate changes.[39m
+
+ [1;4m[38;5;254mTask[0m[48;5;233m
+
+ [1m[38;5;254mCaptain's intent[0m[48;5;233m
+
+ [38;5;254mObserve actual local model launch; do not edit files.[39m
+
+ [1m[38;5;254mFirstmate spec[0m[48;5;233m
+
+ [38;5;254mReport the configured model and stop. Do not read files outside this disposable lab.[39m
+
+
+[49m [38;5;203m✘[39m [1mRead[0m
+[38;5;39m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-loc
+al.inbox[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;96m ⎋[39m [38;5;243mWorking…[39m
+
+❯
+ [38;5;204m⠇ 18s[39m [38;5;236m·[39m [38;5;204m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m·[39m [38;5;255m🌳 project/worker[39m [38;5;236m·[39m [38;5;48m⑂ detached[39m [38;5;236m·[39m ◫ [38;5;39m86.6%/8.2K[39m [38;5;39m⟲[39m       [38;5;204mObserve local model launch[39m
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab list-panes -a -F '#{session_name}:#{window_name} pane=#{pane_id} command=#{pane_current_command} pid=#{pane_pid}'
+firstmate:primary pane=%0 command=bash pid=73777
+firstmate:fm-native-local pane=%1 command=omp pid=92101
+
+exit=0
+$ bash bin/fm-control.sh native-local relaunch --harness omp --model apple/fm-retired --note 'Disposable retired-model pre-stop refusal'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+model-index: warning: literal model 'apple/fm-retired' for omp is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: apple/fm-retired
+
+exit=1
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -200 -t firstmate:fm-native-local
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                         [3m[38;5;180mTip: [38;5;248mUse /tan to fork the current conversation into a background agent[0m
+
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[48;5;233m
+ ⁣[38;5;254mFIRSTMATE_OP: v1 launch-brief: # Current worker role contract[39m
+ [38;5;254mYou are a crewmate: an autonomous worker agent managed by firstmate.[39m
+ [38;5;254mThis section establishes your current identity before every project or task instruction below and supersedes any
+[39m [38;5;254mconflicting role identity in those instructions.[39m
+ [38;5;254mDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+[39m [38;5;254midentity, delegate the task, run fleet supervision, or address the captain.[39m
+ [38;5;254mYour steering inbox is
+[39m [38;5;48m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-l
+[39m [38;5;48mocal.inbox[38;5;254m; this exact path belongs to your current task even when it is outside the worktree or under the supervising
+[39m [38;5;254mfirstmate home, so read and acknowledge its messages and do not reject it as another home's state.[39m
+ [38;5;254mNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+[39m [38;5;254mnamed by this brief.[39m
+ [38;5;254mWhen this task works on Firstmate itself, the repository root [38;5;48mAGENTS.md[38;5;254m (also imported by [38;5;48mCLAUDE.md[38;5;254m) is project
+[39m [38;5;254mcontent and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+[39m [38;5;254mcontract.[39m
+ [38;5;254mProject instructions still govern the work wherever they do not conflict with this worker identity, including
+[39m [38;5;48mCONTRIBUTING.md[38;5;254m and [38;5;48mfirstmate-coding-guidelines[38;5;254m for Firstmate changes.[39m
+
+ [1;4m[38;5;254mTask[0m[48;5;233m
+
+ [1m[38;5;254mCaptain's intent[0m[48;5;233m
+
+ [38;5;254mObserve actual local model launch; do not edit files.[39m
+
+ [1m[38;5;254mFirstmate spec[0m[48;5;233m
+
+ [38;5;254mReport the configured model and stop. Do not read files outside this disposable lab.[39m
+
+
+[49m [38;5;203m✘[39m [1mRead[0m
+[38;5;39m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-loc
+al.inbox[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;96m ⎋[39m [38;5;204mW[38;5;243morking…[39m
+
+❯
+ [38;5;204m⠹ 18s[39m [38;5;236m·[39m [38;5;204m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m·[39m [38;5;255m🌳 project/worker[39m [38;5;236m·[39m [38;5;48m⑂ detached[39m [38;5;236m·[39m ◫ [38;5;39m86.6%/8.2K[39m [38;5;39m⟲[39m       [38;5;204mObserve local model launch[39m
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab list-panes -a -F '#{session_name}:#{window_name} pane=#{pane_id} command=#{pane_current_command} pid=#{pane_pid}'
+firstmate:primary pane=%0 command=bash pid=73777
+firstmate:fm-native-local pane=%1 command=omp pid=92101
+
+exit=0
+
+FINAL TASK METADATA
+window=firstmate:fm-native-local
+endpoint_task_id=native-local
+worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+project=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-native-local
+model=apple/on-device
+effort=default
+busy_gen=g1791331539.3772.19234
+spawn_gen=s1791331540.92113.24867
+id=native-local
+status=working
+
+Enabled disposable config/supervision-host = claude; no engine turn attempted (no authorized isolated cloud login).
+$ bash bin/fm-control.sh native-local relaunch --harness omp --model apple/fm-retired --note 'Retired refusal with supervision host opted in'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+model-index: warning: literal model 'apple/fm-retired' for omp is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: apple/fm-retired
+
+exit=1
+$ /bin/ps -p 92101 -o pid=,ppid=,command=
+92101 17493 /bin/bash --noprofile --norc
+
+exit=0
+$ /usr/bin/pgrep -P 92101
+18268
+
+exit=0
+$ /bin/ps -p 18268 -o pid=,ppid=,command=
+18268 92101 /Users/charlesabrooker/.bun/bin/omp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-session-overlay.yml --auto-approve --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-worker-overlay.yml --model apple/on-device -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.omp-ext.ts \040-cFIRSTMATE_OP: v1 launch-brief: # Current worker role contract\012You are a crewmate: an autonomous worker agent managed by firstmate.\012This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\012Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\012Your steering inbox is `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\012Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\012When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\012Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\012\012# Task\012## Captain's intent\012Observe actual local model launch; do not edit files.\012## Firstmate spec\012Report the configured model and stop. Do not read files outside this disposable lab.
+
+exit=0
+$ bash bin/fm-model-index.sh check omp apple/on-device
+
+exit=0
+$ bash bin/fm-model-index.sh check omp apple/fm-intentionally-absent
+model-index: id 'apple/fm-intentionally-absent' absent or retired in omp catalog (role 'absent')
+
+exit=2
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -250 -t firstmate:fm-native-local
+
+                                            [38;5;206m██[38;5;170m████[38;5;134m████[38;5;99m██[39m
+                                               [38;5;134m██[39m  [38;5;99m██[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;99m▒▒[39m  [38;5;69m██[39m       [1m           █[0m
+                                                   [38;5;74m██[39m       [38;5;243mv18.6.3[39m
+
+                         [3m[38;5;180mTip: [38;5;248mUse /tan to fork the current conversation into a background agent[0m
+
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;215mUpdate Available[0m
+ [38;5;248mNew version 18.7.0 is available. Run: [38;5;39momp update[39m
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[48;5;233m
+ ⁣[38;5;254mFIRSTMATE_OP: v1 launch-brief: # Current worker role contract[39m
+ [38;5;254mYou are a crewmate: an autonomous worker agent managed by firstmate.[39m
+ [38;5;254mThis section establishes your current identity before every project or task instruction below and supersedes any
+[39m [38;5;254mconflicting role identity in those instructions.[39m
+ [38;5;254mDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+[39m [38;5;254midentity, delegate the task, run fleet supervision, or address the captain.[39m
+ [38;5;254mYour steering inbox is
+[39m [38;5;48m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-l
+[39m [38;5;48mocal.inbox[38;5;254m; this exact path belongs to your current task even when it is outside the worktree or under the supervising
+[39m [38;5;254mfirstmate home, so read and acknowledge its messages and do not reject it as another home's state.[39m
+ [38;5;254mNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+[39m [38;5;254mnamed by this brief.[39m
+ [38;5;254mWhen this task works on Firstmate itself, the repository root [38;5;48mAGENTS.md[38;5;254m (also imported by [38;5;48mCLAUDE.md[38;5;254m) is project
+[39m [38;5;254mcontent and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+[39m [38;5;254mcontract.[39m
+ [38;5;254mProject instructions still govern the work wherever they do not conflict with this worker identity, including
+[39m [38;5;48mCONTRIBUTING.md[38;5;254m and [38;5;48mfirstmate-coding-guidelines[38;5;254m for Firstmate changes.[39m
+
+ [1;4m[38;5;254mTask[0m[48;5;233m
+
+ [1m[38;5;254mCaptain's intent[0m[48;5;233m
+
+ [38;5;254mObserve actual local model launch; do not edit files.[39m
+
+ [1m[38;5;254mFirstmate spec[0m[48;5;233m
+
+ [38;5;254mReport the configured model and stop. Do not read files outside this disposable lab.[39m
+
+
+[49m [38;5;203m✘[39m [1mRead[0m
+[38;5;39m/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-loc
+al.inbox[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+ [38;5;215mWarning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a
+[39m [38;5;215mcompaction loop. The most recent turn alone is too large to reduce further; shrink it (e.g. clear large tool output)
+[39m [38;5;215mor switch to a larger-context model.[39m
+
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;203m✘ Prompt is too long: 8195 tokens exceed the 8192 token context window (context_size_exceeded)[0m
+ [38;5;243mDismissed when you send your next message.[39m
+[38;5;203m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m  [38;5;243mF5[38;5;248m to retry[39m
+
+❯
+ [38;5;243mπ[39m [38;5;236m·[39m [38;5;204m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m·[39m [38;5;255m🌳 project/worker[39m [38;5;236m·[39m [38;5;48m⑂ detached[39m [38;5;236m·[39m ◫ [38;5;203m98.3%/8.2K[39m [38;5;203m⟲[39m           [38;5;204mObserve local model launch[39m
+
+exit=0
+
+ASSESSMENT
+Canonical fm-spawn role:local launched native omp with concrete --model apple/on-device; native model attempted a read tool call. Worker subsequently failed context_size_exceeded (8195 > 8192), so task completion and functioning Firstmate-primary supervision are not demonstrated. Worktree-root primary failed context_size_exceeded (12747 > 8192); compact system prompt still 10883 > 8192 and explicit lab cwd 10889 > 8192. Retired pre-stop control refusal preserved actual omp endpoint. Launch/control catalog validation skips without established effective worker account context; absent-id pre-stop control not attempted because it would not fail closed safely. Separate real isolated native check accepted apple/on-device and refused apple/fm-intentionally-absent. No normal/operator cloud login conclusion.
+$ /opt/homebrew/bin/tmux -L fm-lab kill-server
+
+exit=0
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+
+exit=0
+Removed freshly created home-scoped launch namespace /tmp/fm-native-local+9160e585ddcecfc4a41f2189c8d7c1650a062d1c57562f96a11f50bad3a2620b
+Removed disposable task scratch /tmp/fm-native-local
+Removed all .test-launch fixtures (made Firstmate-created read-only git-hooks directory writable for cleanup). Private fm-lab server killed and helper socket directory torn down. No source changes.
+$ bash bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+
+exit=0
+$ bash bin/fm-lab-home.sh tmux-dir /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+/tmp/fml.KW9HhB
+
+exit=0
+$ git init /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project/.git/
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project -c 'user.name=Disposable Lab' -c user.email=lab@example.invalid commit --allow-empty -m 'Disposable catalog-drop fixture'
+[main (root-commit) 88c4ba9] Disposable catalog-drop fixture
+
+exit=0
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/project worktree add --detach /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+Preparing worktree (detached HEAD 88c4ba9)
+HEAD is now at 88c4ba9 Disposable catalog-drop fixture
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab -f /dev/null new-session -d -s firstmate -n primary -x 120 -y 36 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35 '/Users/charlesabrooker/.bun/bin/omp --model apple/on-device --no-session --no-tools --no-skills --no-rules --no-extensions --no-lsp --no-title'
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab new-window -d -t firstmate: -n fm-native-local -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker '/bin/bash --noprofile --norc'
+
+exit=0
+$ bash bin/fm-spawn.sh native-local --relaunch --harness omp --model role:local
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model-index: notice: omp catalog unavailable (effective worker account context is not established); 'apple/on-device' (role 'local') not validated
+spawned native-local harness=omp kind=scout window=firstmate:fm-native-local worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab display-message -p -t firstmate:fm-native-local '#{pane_pid}'
+67173
+
+exit=0
+$ /usr/bin/pgrep -P 67173
+47383
+
+exit=0
+$ /bin/ps -p 47383 -o pid=,ppid=,command=
+47383 67173 /Users/charlesabrooker/.bun/bin/omp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-session-overlay.yml --auto-approve --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-worker-overlay.yml --model apple/on-device -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.omp-ext.ts \040-cFIRSTMATE_OP: v1 launch-brief: # Current worker role contract\012You are a crewmate: an autonomous worker agent managed by firstmate.\012This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\012Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\012Your steering inbox is `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\012Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\012When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\012Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\012\012# Task\012## Captain's intent\012Observe catalog refusal; do not edit files.\012## Firstmate spec\012Report configured model. Do not read beyond this disposable lab.
+
+exit=0
+
+SUPPLEMENTAL CATALOG-DROP SCENARIO: supported FM_MODEL_CATALOG_DIR export intentionally omits apple/on-device to represent a catalog dropping selected entry. Input is a disposable catalog scenario, not native provider availability. Actual CLI/model launch remains real.
+$ bash bin/fm-control.sh native-local relaunch --harness omp --model role:local --note 'Disposable catalog drop before stopping actual worker'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+model-index: id 'apple/on-device' absent or retired in omp catalog (role 'local')
+
+exit=1
+$ /usr/bin/pgrep -P 67173
+47383
+
+exit=0
+$ /bin/ps -p 47383 -o pid=,ppid=,command=
+47383 67173 /Users/charlesabrooker/.bun/bin/omp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-session-overlay.yml --auto-approve --cwd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/worker --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.omp/fm-worker-overlay.yml --model apple/on-device -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.omp-ext.ts \040-cFIRSTMATE_OP: v1 launch-brief: # Current worker role contract\012You are a crewmate: an autonomous worker agent managed by firstmate.\012This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\012Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\012Your steering inbox is `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home/state/native-local.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\012Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\012When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\012Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\012\012# Task\012## Captain's intent\012Observe catalog refusal; do not edit files.\012## Firstmate spec\012Report configured model. Do not read beyond this disposable lab.
+
+exit=0
+Exact native omp PID before=47383 after=47383 unchanged=True
+$ /opt/homebrew/bin/tmux -L fm-lab capture-pane -p -e -S -150 -t firstmate:fm-native-local
+
+                                            [38;5;170m███[38;5;134m████[38;5;99m████[38;5;69m█[39m
+                                               [38;5;134m█[38;5;99m█[39m  [38;5;99m█[38;5;69m█[39m       [1m▄▀▀▄ █▀▄▀▄ █▀▀▄[0m
+                                               [38;5;99m██[39m  [38;5;69m██[39m       [1m▀▄▄▀ █ █ █ █▄▄▀[0m
+                                               [38;5;69m▒▒[39m  [38;5;74m██[39m       [1m           █[0m
+                                                   [38;5;44m██[39m       [38;5;243mv18.6.3[39m
+
+                        [3m[38;5;180mTip: [38;5;248mBulk data to classify or triage? Say `jevify` in your message — the[0m
+                         [3m[38;5;248meval kernel's `judge()` processes the batch and you read only what it[0m
+                                           [3m[38;5;248mflags — watch it glow as you type[0m
+
+[38;5;215m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [38;5;215mor switch to a larger-context model.[39m
+[48;5;233m [38;5;254mNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths
+[39m [38;5;254mnamed by this brief.[39m
+ [38;5;254mWhen this task works on Firstmate itself, the repository root [38;5;48mAGENTS.md[38;5;254m (also imported by [38;5;48mCLAUDE.md[38;5;254m) is project
+[39m [38;5;254mcontent and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor
+[39m [38;5;254mcontract.[39m
+ [38;5;254mProject instructions still govern the work wherever they do not conflict with this worker identity, including
+[39m [38;5;48mCONTRIBUTING.md[38;5;254m and [38;5;48mfirstmate-coding-guidelines[38;5;254m for Firstmate changes.[39m
+
+ [1;4m[38;5;254mTask[0m[48;5;233m
+
+ [1m[38;5;254mCaptain's intent[0m[48;5;233m
+
+ [38;5;254mObserve catalog refusal; do not edit files.[39m
+
+ [1m[38;5;254mFirstmate spec[0m[48;5;233m
+
+ [38;5;254mReport configured model. Do not read beyond this disposable lab.[39m
+
+
+[49m [38;5;248m ⎋[39m [38;5;243mWorking…[39m
+
+❯
+ [38;5;67m⠦ 0s[39m [38;5;236m·[39m [38;5;39m⬢ Apple AFM 3 Core Advanced[39m [38;5;236m·[39m [38;5;255m🌳 project/worker[39m [38;5;236m·[39m [38;5;48m⑂ detached[39m [38;5;236m·[39m ◫ [38;5;39m85.8%/8.2K[39m [38;5;39m⟲[39m
+
+exit=0
+$ /opt/homebrew/bin/tmux -L fm-lab kill-server
+
+exit=0
+$ bash bin/fm-lab-home.sh teardown /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-launch/home
+
+exit=0
+Supplemental fixtures, private server, socket, launch namespace and scratch removed. Different-model next native launch remains untested: only apple/on-device in isolated native catalog, no authorized isolated cloud login.

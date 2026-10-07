@@ -1,0 +1,2 @@
+model-index: id 'validation-catalog-absent-model' absent or retired in claude catalog (role 'maintenance')
+dispatch-resolve: error (model index: chosen claude model validation-catalog-absent-model failed its catalog check)

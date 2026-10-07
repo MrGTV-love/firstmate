@@ -1,0 +1,19 @@
+All values below are disposable test environment inputs, not operator credentials.
+
+$ source bin/fm-worker-account-lib.sh; fm_worker_account_run claude /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/pinned-claude <print selected environment>
+claude=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/pinned-claude
+pi=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/ambient-pi
+anthropic=unset
+[exit 0]
+
+$ source bin/fm-worker-account-lib.sh; fm_worker_account_run pi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/pinned-pi <print selected environment>
+claude=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/ambient-claude
+pi=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/pinned-pi
+anthropic=disposable-test-key
+[exit 0]
+
+$ source bin/fm-worker-account-lib.sh; fm_worker_account_run codex /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/pinned-codex <print selected environment>
+claude=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/ambient-claude
+pi=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-index-live/user/ambient-pi
+anthropic=disposable-test-key
+[exit 0]

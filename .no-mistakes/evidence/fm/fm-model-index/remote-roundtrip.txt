@@ -1,0 +1,368 @@
+LIVE REMOTE ROUNDTRIP EVIDENCE
+
+Scope: assigned live scenarios only; no pipeline/tests/build/lint/source changes. Product sender, fm-on SSH route, entrypoint, job worker, receiver and profiles consumer executed unchanged.
+
+Isolation: host native /usr/bin/ssh, -F /dev/null, isolated Ed25519 client key, pinned fixture host key, IdentityAgent=none, IdentitiesOnly=yes, fixture-only known_hosts. localhost 127.0.0.1:55287. Existing Docker engine used with env -i, fixture HOME/DOCKER_CONFIG and explicit unix:///var/run/docker.sock. Read-only python:3.13-bookworm arm64 container image sha256:073ffebb96ae4d0ed73ccad59f08c47bd84af8a79f5258130f8458ac50ad9ff4. All intentional files/config/dependencies in bind-mounted worktree fixture. Existing container root account /root bind-mounted fixture/home: unchanged entrypoint unset HOME then cd ~ resolves isolated /root, never operator home. Paramiko transport server accepted actual SSH public-key auth and exec requests and ran requested unchanged fm-remote-entrypoint.sh; no canned product responses. Real remote worker and receiver executed actual requests. Remote root /fixture/code was an exact copy of current bin and AGENTS.md with genuine git-tracked bin; local FM_ROOT_OVERRIDE was actual current worktree (not dummy root). Workspace-local wheel-only Paramiko installation and downloaded jq; no system installs or user account changes.
+
+Outcomes:
+- Positive pair transfer: sender exit0, persisted files byte-identical source; real remote profiles normalized stable role to live-stable-model.
+- Removed-role withholding: sender exit1 expected, reports coherent pair skipped; both remote pair members retain exact previous bytes; unrelated material advances to v2.
+- Destination symlink refusal: real preflight refuses both pair members; index and dispatch symlink/referent retain exact previous bytes. Unrelated material eventually advances to v3. Sender nevertheless returned exit70 'remote job state is invalid' during wait for that unrelated put, before persistence was observed. This is not a clean acknowledged refusal run. Job was automatically cancelled/reaped; no failed job record remained at inspection. Same env/root/generation shape previously completed 28 jobs; later frozen and absence runs passed without any fixture or product correction. Exact transient wait-state cause unobserved and not attributed to changed inheritance code. Captured stderr/SSH completion below, not suppressed.
+- Frozen snapshot: transport-only instrumentation edited both original source pair files after the actual remote check completed, before returning check result to sender; sender exit0, remote files exact pre-edit snapshots, original source now later pair, real remote profiles normalized to live-frozen-model (not live-later-model).
+- Pair absence: sender exit0, remote reports both removed; both files absent, both generation records committed generation5 empty hash/absent; unrelated v3 retained.
+
+Product provenance SHA256:
+{
+  "fm-remote-inherit-push.sh": {
+    "local_sha256": "0be3f3d5078289bbc8e00f62e46f4826a906d6d93e472b22f6416138bf2ca189",
+    "remote_sha256": "0be3f3d5078289bbc8e00f62e46f4826a906d6d93e472b22f6416138bf2ca189"
+  },
+  "fm-on.sh": {
+    "local_sha256": "3f8a255ab097d34285d72ab16e40dc69cb2cc0cd079b5d777f20eec639f8a19d",
+    "remote_sha256": "3f8a255ab097d34285d72ab16e40dc69cb2cc0cd079b5d777f20eec639f8a19d"
+  },
+  "fm-remote-entrypoint.sh": {
+    "local_sha256": "7b1a40404f78dd89fdd97e3627a8a00cae8cfb284bc8c78de1bc127aab774f57",
+    "remote_sha256": "7b1a40404f78dd89fdd97e3627a8a00cae8cfb284bc8c78de1bc127aab774f57"
+  },
+  "fm-remote-job-worker.sh": {
+    "local_sha256": "4ef70470032d849eac84136cccb9bdb6d357c64177b8815d14fc262a8ec4d29e",
+    "remote_sha256": "4ef70470032d849eac84136cccb9bdb6d357c64177b8815d14fc262a8ec4d29e"
+  },
+  "fm-remote-inherit.sh": {
+    "local_sha256": "73671ef03999d61caba9d53a2339928e9f331641f582f5aee1d75d033c0c2020",
+    "remote_sha256": "73671ef03999d61caba9d53a2339928e9f331641f582f5aee1d75d033c0c2020"
+  },
+  "fm-model-index.sh": {
+    "local_sha256": "5ef12b59217852c834bdd9c5be1f770c0abe80e9f9f0bda4b366967860699ddf",
+    "remote_sha256": "5ef12b59217852c834bdd9c5be1f770c0abe80e9f9f0bda4b366967860699ddf"
+  }
+}
+
+SCENARIO
+{
+  "scenario": "positive routing pair sender -> native SSH -> unchanged entrypoint -> real worker -> receiver",
+  "generation": 1,
+  "sender_exit": 0,
+  "stdout": "pushed: config/model-index.json\npushed: config/crew-dispatch.json\npushed: config/dispatch-never-send\nunchanged: config/crew-harness\nunchanged: config/backlog-backend\nunchanged: config/backend\nunchanged: config/herdr-presentation-spaces\nunchanged: config/startup-memory-budget\nunchanged: config/trace-context\nunchanged: config/launch-env-allowlist\nunchanged: config/claude-permission-mode\nunchanged: config/claude-launcher\nunchanged: config/lavish-axi-host\nunchanged: config/keep-ai-trailers\nunchanged: data/captain-shared.md\n",
+  "stderr": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n"
+}
+
+SCENARIO
+{
+  "scenario": "positive persisted routing normalized via profiles",
+  "consumer": "real remote fm-model-index.sh profiles",
+  "exit": 0,
+  "stdout": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"live-stable-model\"\n  },\n  \"rules\": [\n    {\n      \"match\": {\n        \"labels\": [\n          \"roundtrip\"\n        ]\n      },\n      \"use\": {\n        \"harness\": \"codex\",\n        \"model\": \"live-stable-model\"\n      }\n    }\n  ]\n}\n",
+  "stderr": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+  "persisted_pair": {
+    "model-index.json": "{\"version\": 1, \"roles\": {\"stable\": {\"codex\": {\"model\": \"live-stable-model\"}}}, \"retired\": []}\n",
+    "crew-dispatch.json": "{\"default\": {\"harness\": \"codex\", \"role\": \"stable\"}, \"rules\": [{\"match\": {\"labels\": [\"roundtrip\"]}, \"use\": {\"harness\": \"codex\", \"role\": \"stable\"}}]}\n"
+  }
+}
+
+SCENARIO
+{
+  "scenario": "removed-role source withholding preserves both receiver pair members while unrelated material propagates",
+  "generation": 2,
+  "sender_exit": 1,
+  "stdout": "pushed: config/dispatch-never-send\nunchanged: config/crew-harness\nunchanged: config/backlog-backend\nunchanged: config/backend\nunchanged: config/herdr-presentation-spaces\nunchanged: config/startup-memory-budget\nunchanged: config/trace-context\nunchanged: config/launch-env-allowlist\nunchanged: config/claude-permission-mode\nunchanged: config/claude-launcher\nunchanged: config/lavish-axi-host\nunchanged: config/keep-ai-trailers\nunchanged: data/captain-shared.md\n",
+  "stderr": "skipped: config/model-index.json and config/crew-dispatch.json (jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-remote-live/tmp/fm-remote-inherit-push.r0kIU0/pair/crew-dispatch.json:1): role or stand-in not configured: codex:stable)\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+  "observations": [
+    "both remote pair members exactly retain positive baseline",
+    "unrelated dispatch-never-send advanced to v2"
+  ]
+}
+
+SCENARIO
+{
+  "scenario": "remote destination symlink preflight refuses both pair members while unrelated material propagates",
+  "generation": 3,
+  "sender_exit": 70,
+  "stdout": "",
+  "stderr": "skipped: config/model-index.json and config/crew-dispatch.json (** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nerror: inherited destination is a symlink)\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nerror: remote job state is invalid\n",
+  "observations": {
+    "pair_index_retained": true,
+    "dispatch_symlink_retained": true,
+    "dispatch_referent_retained": true,
+    "unrelated_actual": "roundtrip-unrelated-v3-destination-refusal\n",
+    "unrelated_expected": "roundtrip-unrelated-v3-destination-refusal\n",
+    "queue_after_failure": "failed job cancelled/reaped by product; jobs directory empty",
+    "diagnosis": "Actual preflight returned destination guard exit1, following unrelated put returned entrypoint wait-state error exit70. File modes/links and prior same HOME/root/SSH settings successfully handled 28 jobs. Atomic state publisher/readers inspected; exact source of invalid state unobserved, not attributed to changed inheritance code."
+  }
+}
+
+SCENARIO
+{
+  "scenario": "frozen sender snapshot survives source edit after actual remote check before first put",
+  "generation": 4,
+  "sender_exit": 0,
+  "stdout": "pushed: config/model-index.json\npushed: config/crew-dispatch.json\nunchanged: config/dispatch-never-send\nunchanged: config/crew-harness\nunchanged: config/backlog-backend\nunchanged: config/backend\nunchanged: config/herdr-presentation-spaces\nunchanged: config/startup-memory-budget\nunchanged: config/trace-context\nunchanged: config/launch-env-allowlist\nunchanged: config/claude-permission-mode\nunchanged: config/claude-launcher\nunchanged: config/lavish-axi-host\nunchanged: config/keep-ai-trailers\nunchanged: data/captain-shared.md\n",
+  "stderr": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nConnection to 127.0.0.1 closed by remote host.\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nConnection to 127.0.0.1 closed by remote host.\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+  "observations": {
+    "source_edit_fired": true,
+    "receiver_exact_pre_edit_pair": true,
+    "source_now_late_pair": true
+  }
+}
+
+SCENARIO
+{
+  "scenario": "frozen persisted routing normalized via profiles",
+  "consumer": "real remote fm-model-index.sh profiles",
+  "exit": 0,
+  "stdout": "{\n  \"default\": {\n    \"harness\": \"codex\",\n    \"model\": \"live-frozen-model\"\n  }\n}\n",
+  "stderr": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+  "persisted_pair": {
+    "model-index.json": "{\"version\": 1, \"roles\": {\"frozen\": {\"codex\": {\"model\": \"live-frozen-model\"}}}, \"retired\": []}\n",
+    "crew-dispatch.json": "{\"default\": {\"harness\": \"codex\", \"role\": \"frozen\"}}\n"
+  }
+}
+
+SCENARIO
+{
+  "scenario": "absent source routing pair mirrors removal through actual SSH sender and receiver",
+  "generation": 5,
+  "sender_exit": 0,
+  "stdout": "removed: config/model-index.json\nremoved: config/crew-dispatch.json\nunchanged: config/dispatch-never-send\nunchanged: config/crew-harness\nunchanged: config/backlog-backend\nunchanged: config/backend\nunchanged: config/herdr-presentation-spaces\nunchanged: config/startup-memory-budget\nunchanged: config/trace-context\nunchanged: config/launch-env-allowlist\nunchanged: config/claude-permission-mode\nunchanged: config/claude-launcher\nunchanged: config/lavish-axi-host\nunchanged: config/keep-ai-trailers\nunchanged: data/captain-shared.md\n",
+  "stderr": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+  "observations": {
+    "source_pair_absent": true,
+    "remote_pair_absent": true,
+    "receiver_generation_records": {
+      "model-index.json": "5\n0\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\nabsent\n",
+      "crew-dispatch.json": "5\n0\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\nabsent\n"
+    },
+    "unrelated_material_retained": "roundtrip-unrelated-v3-destination-refusal\n"
+  }
+}
+
+ACTUAL SSH SERVER COMMAND/COMPLETION LOG
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAY2hlY2sAY29uZmlnL21vZGVsLWluZGV4Lmpzb24AMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9tb2RlbC1pbmRleC5qc29uADk0AGM3MjhhNWQxNmVkZTFlYTJmYWE5ZWM0MDFmYzc1YjAwOGQwOTY4YTE4MTJjMjllZjZhYTAxMWRiZGIyMDk0YTQAMQA=
+receiver completion=0 input-bytes=94
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9jcmV3LWRpc3BhdGNoLmpzb24AMTQ4ADYzM2QwNzhkNTIwOWI5OGU2MTc3NTlmZjI5MzI3NWUxZjBiZjJmYjk1ZTJkNTVkNjk5Njg4N2ZjZDEyNmYzYTQAMQA=
+receiver completion=0 input-bytes=148
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9kaXNwYXRjaC1uZXZlci1zZW5kADIzADA1ODgwOTQwYTZmM2NjOTc4ZmVmODk0ZjIwYWNlYTE3MThlYjNhOWUwM2NiOThkZDU2NzIwNDljOTkwMWMzYmIAMQA=
+receiver completion=0 input-bytes=23
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jcmV3LWhhcm5lc3MAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrbG9nLWJhY2tlbmQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrZW5kADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAxAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9oZXJkci1wcmVzZW50YXRpb24tc3BhY2VzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAxAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9zdGFydHVwLW1lbW9yeS1idWRnZXQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXVuY2gtZW52LWFsbG93bGlzdAAwAGUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUAMQA=
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtcGVybWlzc2lvbi1tb2RlADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAxAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtbGF1bmNoZXIAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXZpc2gtYXhpLWhvc3QAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9rZWVwLWFpLXRyYWlsZXJzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAxAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGRhdGEvY2FwdGFpbi1zaGFyZWQubWQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADEA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tbW9kZWwtaW5kZXguc2gAcHJvZmlsZXMAL2ZpeHR1cmUvcmVtb3RlL2NvbmZpZy9jcmV3LWRpc3BhdGNoLmpzb24A
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9kaXNwYXRjaC1uZXZlci1zZW5kADM2ADIwODIxMzAzMDMwYmU3N2Q5YTM2Zjg1YjgxZmI1NGY0MDNhNDk3NWI3YzZhOWE5ZTlmYzQ4OWE3MWY0OTQ5MTIAMgA=
+receiver completion=0 input-bytes=36
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jcmV3LWhhcm5lc3MAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrbG9nLWJhY2tlbmQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrZW5kADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAyAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9oZXJkci1wcmVzZW50YXRpb24tc3BhY2VzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAyAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9zdGFydHVwLW1lbW9yeS1idWRnZXQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXVuY2gtZW52LWFsbG93bGlzdAAwAGUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUAMgA=
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtcGVybWlzc2lvbi1tb2RlADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAyAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtbGF1bmNoZXIAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXZpc2gtYXhpLWhvc3QAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9rZWVwLWFpLXRyYWlsZXJzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQAyAA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGRhdGEvY2FwdGFpbi1zaGFyZWQubWQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADIA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAY2hlY2sAY29uZmlnL21vZGVsLWluZGV4Lmpzb24AMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADMA
+receiver completion=1 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9kaXNwYXRjaC1uZXZlci1zZW5kADQzADQwMWQ1OTExMmI1MzQzYzFmNDJlZDU1Yzc3YjU3YTk5ZTVjODY4ZjdhOWNmN2E5Y2EyNjc0MGIxODRkMTJlMTIAMwA=
+receiver completion=70 input-bytes=43
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAY2hlY2sAY29uZmlnL21vZGVsLWluZGV4Lmpzb24AMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+SOURCE EDIT after real check, before result returned to sender
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9tb2RlbC1pbmRleC5qc29uADk0ADQxYWM1N2UzODYzNDQ1YTkxMGFjMTg4M2VmNmQ5ZmRhMzg1NTIyZmVhYjRmZDE1OWE0MDkxOTgxMWRmZGNhMTQANAA=
+receiver completion=0 input-bytes=94
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9jcmV3LWRpc3BhdGNoLmpzb24ANTIANzFhYmE1ZDk3NjYyMzc3Mjc3Y2ZhNjE4ZDI0YzVkMTAzMWRiMDVkM2ZjZWFlZDhkY2JhYTgzMTQ3OTgyMTRhMgA0AA==
+receiver completion=0 input-bytes=52
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9kaXNwYXRjaC1uZXZlci1zZW5kADQzADQwMWQ1OTExMmI1MzQzYzFmNDJlZDU1Yzc3YjU3YTk5ZTVjODY4ZjdhOWNmN2E5Y2EyNjc0MGIxODRkMTJlMTIANAA=
+receiver completion=0 input-bytes=43
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jcmV3LWhhcm5lc3MAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrbG9nLWJhY2tlbmQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrZW5kADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA0AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9oZXJkci1wcmVzZW50YXRpb24tc3BhY2VzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA0AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9zdGFydHVwLW1lbW9yeS1idWRnZXQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXVuY2gtZW52LWFsbG93bGlzdAAwAGUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUANAA=
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtcGVybWlzc2lvbi1tb2RlADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA0AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtbGF1bmNoZXIAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXZpc2gtYXhpLWhvc3QAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9rZWVwLWFpLXRyYWlsZXJzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA0AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGRhdGEvY2FwdGFpbi1zaGFyZWQubWQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADQA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tbW9kZWwtaW5kZXguc2gAcHJvZmlsZXMAL2ZpeHR1cmUvcmVtb3RlL2NvbmZpZy9jcmV3LWRpc3BhdGNoLmpzb24A
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAY2hlY2sAY29uZmlnL21vZGVsLWluZGV4Lmpzb24AMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9tb2RlbC1pbmRleC5qc29uADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA1AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jcmV3LWRpc3BhdGNoLmpzb24AMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAcHV0AGNvbmZpZy9kaXNwYXRjaC1uZXZlci1zZW5kADQzADQwMWQ1OTExMmI1MzQzYzFmNDJlZDU1Yzc3YjU3YTk5ZTVjODY4ZjdhOWNmN2E5Y2EyNjc0MGIxODRkMTJlMTIANQA=
+receiver completion=0 input-bytes=43
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jcmV3LWhhcm5lc3MAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrbG9nLWJhY2tlbmQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9iYWNrZW5kADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA1AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9oZXJkci1wcmVzZW50YXRpb24tc3BhY2VzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA1AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9zdGFydHVwLW1lbW9yeS1idWRnZXQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXVuY2gtZW52LWFsbG93bGlzdAAwAGUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUANQA=
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtcGVybWlzc2lvbi1tb2RlADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA1AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9jbGF1ZGUtbGF1bmNoZXIAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9sYXZpc2gtYXhpLWhvc3QAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGNvbmZpZy9rZWVwLWFpLXRyYWlsZXJzADAAZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NQA1AA==
+receiver completion=0 input-bytes=0
+SSH exec unchanged: fm-remote-entrypoint.sh 1 L2ZpeHR1cmUvY29kZQ== L2ZpeHR1cmUvcmVtb3Rl Zm0tcmVtb3RlLWluaGVyaXQuc2gAYWJzZW50AGRhdGEvY2FwdGFpbi1zaGFyZWQubWQAMABlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1ADUA
+receiver completion=0 input-bytes=0
+
+ACTUAL WORKER LOG
+(empty)
+
+DISPOSABLE TRANSPORT SOURCE (removed)
+import base64
+import os
+import pathlib
+import shlex
+import socket
+import subprocess
+import sys
+import threading
+sys.path.insert(0, '/fixture/python-deps')
+import paramiko
+
+FIXTURE = pathlib.Path('/fixture')
+HOST_KEY = paramiko.Ed25519Key.from_private_key_file('/fixture/host-key')
+CLIENT_BLOB = (FIXTURE / 'client-key.pub').read_text().split()[1]
+LOG = FIXTURE / 'server.log'
+ENV = {'HOME': '/root', 'PATH': '/fixture/code/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin', 'TMPDIR': '/fixture/tmp', 'GIT_CONFIG_GLOBAL': '/root/.gitconfig', 'GIT_CONFIG_NOSYSTEM': '1'}
+
+def log(value):
+    with LOG.open('a') as f:
+        f.write(value + '\n')
+
+class Server(paramiko.ServerInterface):
+    def __init__(self):
+        self.event = threading.Event()
+        self.command = None
+    def check_auth_publickey(self, username, key):
+        return paramiko.AUTH_SUCCESSFUL if username == 'root' and key.get_base64() == CLIENT_BLOB else paramiko.AUTH_FAILED
+    def get_allowed_auths(self, username):
+        return 'publickey'
+    def check_channel_request(self, kind, chanid):
+        return paramiko.OPEN_SUCCEEDED if kind == 'session' else paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+    def check_channel_exec_request(self, channel, command):
+        self.command = command.decode()
+        self.event.set()
+        return True
+
+def serve(connection):
+    transport = paramiko.Transport(connection)
+    try:
+        transport.add_server_key(HOST_KEY)
+        server = Server()
+        transport.start_server(server=server)
+        channel = transport.accept(30)
+        if channel is None or not server.event.wait(30):
+            return
+        args = shlex.split(server.command)
+        if len(args) != 5 or args[0] != 'fm-remote-entrypoint.sh':
+            raise RuntimeError('unexpected requested executable')
+        protocol_args = base64.b64decode(args[4]).split(b'\0')
+        log('SSH exec unchanged: ' + server.command)
+        data = bytearray()
+        while True:
+            chunk = channel.recv(32768)
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > 1048576:
+                raise RuntimeError('fixture payload bound exceeded')
+        result = subprocess.run(args, input=bytes(data), env=ENV, cwd='/root', stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180)
+        # Instrument the transport boundary only: the real check and all other
+        # entrypoint commands execute unchanged before any source mutation.
+        if result.returncode == 0 and protocol_args[1:3] == [b'check', b'config/model-index.json'] and (FIXTURE / 'freeze-arm').exists():
+            for name in ('model-index.json', 'crew-dispatch.json'):
+                (FIXTURE / 'local/config' / name).write_bytes((FIXTURE / 'later' / name).read_bytes())
+            (FIXTURE / 'freeze-arm').unlink()
+            (FIXTURE / 'freeze-fired').write_text('edited original pair after actual remote preflight; before transfer\n')
+            log('SOURCE EDIT after real check, before result returned to sender')
+        log('receiver completion=' + str(result.returncode) + ' input-bytes=' + str(len(data)))
+        if result.stdout:
+            channel.sendall(result.stdout)
+        if result.stderr:
+            channel.sendall_stderr(result.stderr)
+        channel.send_exit_status(result.returncode)
+        channel.shutdown_write()
+        channel.close()
+    except Exception as error:
+        log('fixture exception: ' + repr(error))
+    finally:
+        transport.close()
+        connection.close()
+
+listener = socket.socket()
+listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+listener.bind(('0.0.0.0', 2222))
+listener.listen(10)
+print('SSH ready isolated root home=/root mounted fixture', flush=True)
+while True:
+    connection, _ = listener.accept()
+    threading.Thread(target=serve, args=(connection,), daemon=True).start()
+
+NATIVE SSH WRAPPER (removed)
+#!/bin/bash
+exec /usr/bin/ssh -F /dev/null -i /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-remote-live/client-key -p 55287 -l root -o HostName=127.0.0.1 -o IdentitiesOnly=yes -o IdentityAgent=none -o UserKnownHostsFile=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35/.test-remote-live/known_hosts -o GlobalKnownHostsFile=/dev/null -o StrictHostKeyChecking=yes "$@"
+
+ACTUAL CLEANUP
+Named isolated container stopped and auto-removed: fm-remote-live-01m48y55-drive
+Untagged: python:3.13-bookworm
+Deleted: sha256:073ffebb96ae4d0ed73ccad59f08c47bd84af8a79f5258130f8458ac50ad9ff4
+Removed dedicated .test-remote-live fixture: HOME/remote home/SSH private keys/known_hosts/configs/copied product code/Paramiko wheels and pip cache/jq/server; fixture exists=False
+Cleanup note: first image removal raced Docker auto-removal and failed while the stopped container still referenced it; subsequent cleanup removal succeeded. Supervised SSH exec exited137 as expected when own container was stopped.

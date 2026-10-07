@@ -1,0 +1,14 @@
+{
+  "session": "fm-lab-model-index-67395-20576",
+  "guarded_teardown_exit": 0,
+  "tripwire_removed": true,
+  "fixture_removed": true,
+  "product_owned_temp_roots_removed": [
+    "/tmp/fm-launch-a",
+    "/tmp/fm-launch-a+bd53fe8583793d93982032b814368c91864c3096c8f6ec658535aface0fa7c7f",
+    "/tmp/fm-launch-b",
+    "/tmp/fm-launch-b+bd53fe8583793d93982032b814368c91864c3096c8f6ec658535aface0fa7c7f"
+  ],
+  "operator_config_restored_or_edited": false,
+  "notice_fixture_removed": true
+}
