@@ -689,6 +689,45 @@ test_extraction_retains_blank_paragraphs() {
   pass "composer extraction: boxed and borderless blank paragraphs preserve all content through EOF or a structural boundary"
 }
 
+test_extraction_refuses_reanchored_editor_suffixes() {
+  local caps glyph suffix gap screen out
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    for glyph in '❯' '›' '⟩' '→' '❭'; do
+      for gap in $'\n' $'\n\n' $'\n   \n'; do
+        for suffix in '' $'\nπ · model · ◫ 15.4%/272K'; do
+          screen="$glyph my unsent draft$gap$glyph exact wake$suffix"
+          if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+            fail "a later prompt-looking paragraph must not replace the complete editor: '$out'"
+          fi
+          if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
+            fail "a later prompt-looking paragraph must refuse suffix extraction under LC_ALL=C"
+          fi
+        done
+      done
+    done
+    for screen in \
+      $'❯ my unsent draft\n\n╭────────────────────────╮\n│ ❯ exact wake           │\n╰────────────────────────╯' \
+      $'❯ my unsent draft\n\n'"$(omp_box_top)"$'\n'"$(omp_box_last 'exact wake')" \
+      $'❯ my unsent draft\n\n┃ exact wake' \
+      $'❯ my unsent draft\n\n────────────────────────\n\n────────────────────────' \
+      $'┃ my unsent draft\n\n❯ exact wake' \
+      $'┃ my unsent draft\n\n┃ exact wake'; do
+      if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "a lower envelope must not discard an unbounded earlier editor: '$out'"
+      fi
+      if out=$(LC_ALL=C fm_composer_extract_selected_content "$caps" "$screen"); then
+        fail "an unbounded earlier editor must refuse envelope suffix extraction under LC_ALL=C"
+      fi
+    done
+    screen=$'╭────────────────────────╮\n│ ❯ my unsent draft      │\n│                        │\n│ ❯ exact wake           │\n╰────────────────────────╯'
+    out=$(fm_composer_extract_selected_content "$caps" "$screen") \
+      || fail "a bounded box must retain all prompt-looking paragraphs"
+    [ "$out" = 'my unsent draft ❯ exact wake' ] \
+      || fail "a box must strip only its actual prompt glyph: '$out'"
+  done
+  pass "composer extraction refuses reanchored suffixes across bare and bounded selections"
+}
+
 test_extraction_refuses_unproven_suffixes() {
   local caps suffix screen out
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
@@ -1699,7 +1738,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
   local pair menu screen want out caps scenario
   pair=$'────────────────────────\n❯ /exit\n────────────────────────'
   menu='  ❯ /exit                       Exit the CLI'
-  for scenario in unindented same-indent draft unpadded mismatch empty slash-only unproven blank activity; do
+  for scenario in unindented same-indent draft unpadded mismatch empty slash-only blank activity; do
     want='/exit Exit the CLI'
     case "$scenario" in
       unindented) screen="$pair"$'\n❯ /exit                       Exit the CLI' ;;
@@ -1709,7 +1748,6 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
       mismatch) screen=$'────────────────────────\n❯ /context\n────────────────────────\n'"$menu" ;;
       empty) screen=$'────────────────────────\n❯\n────────────────────────\n'"$menu" ;;
       slash-only) screen=$'────────────────────────\n❯ /\n────────────────────────\n'"$menu" ;;
-      unproven) screen=$'❯ /exit\n────────────────────────\n'"$menu" ;;
       blank) screen="$pair"$'\n\n'"$menu" ;;
       activity) screen="$pair"$'\nWorking on request...\n'"$menu" ;;
     esac
@@ -1722,6 +1760,12 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
     assert_screen "$scenario lower candidate on styled backends" pending "$CAPS_STYLED_NOID" "$screen"
     assert_screen "$scenario lower candidate on plain backends" unknown "$CAPS_PLAIN" "$screen"
   done
+  screen=$'❯ /exit\n────────────────────────\n'"$menu"
+  for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+    if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
+      fail "a lone rule cannot prove the earlier editor closed: '$out'"
+    fi
+  done
   screen="$pair"$'\n'"$menu"$'\n$ live shell'
   for caps in "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
     if out=$(fm_composer_extract_selected_content "$caps" "$screen"); then
@@ -1733,6 +1777,7 @@ test_claude_slash_menu_demotion_preserves_lower_drafts_and_shells() {
 }
 
 test_extraction_retains_blank_paragraphs
+test_extraction_refuses_reanchored_editor_suffixes
 test_extraction_refuses_unproven_suffixes
 test_extraction_codex_terminal_footer
 test_extraction_omp_terminal_footer

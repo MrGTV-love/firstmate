@@ -1884,7 +1884,7 @@ _fm_composer_select_cursorless() {
 
 fm_composer_extract_selected_content() {  # <caps> <screen>
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1 strip_sides=1
-  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain
+  local leading_blank=1 placeholder_position=0 prompt_is_shell=0 is_last omp_plain prefix_end prefix close
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1895,6 +1895,29 @@ EOF
   _fm_composer_scan_screen "$plain" ''
   _fm_composer_select_cursorless "$plain" 1 || return 1
   case "$FM_COMPOSER_SELECTED_KIND" in bare) strip_sides=0 ;; esac
+  prefix_end=$FM_COMPOSER_SELECTED_FIRST
+  case "$FM_COMPOSER_SELECTED_KIND" in
+    box) prefix_end=$FM_COMPOSER_SCAN_BOX_TOP ;;
+    ompbox) prefix_end=$FM_COMPOSER_SCAN_OMPBOX_TOP ;;
+    pi) prefix_end=$FM_COMPOSER_SCAN_PI_OPEN ;;
+  esac
+  if [ "$prefix_end" -gt 0 ]; then
+    prefix=$(printf '%s\n' "$plain" | awk -v end="$prefix_end" 'NR <= end')
+    (
+      _fm_composer_scan_screen "$prefix" ''
+      close=$FM_COMPOSER_SCAN_BOX_BOTTOM
+      [ "$FM_COMPOSER_SCAN_OMPBOX_BOTTOM" -le "$close" ] || close=$FM_COMPOSER_SCAN_OMPBOX_BOTTOM
+      [ "$FM_COMPOSER_SCAN_PI_CLOSE" -le "$close" ] || close=$FM_COMPOSER_SCAN_PI_CLOSE
+      raw=$(_fm_composer_screen_row "$((FM_COMPOSER_SCAN_LEFTBAR_END + 1))" "$prefix")
+      fm_composer_normalize_trim_var raw
+      if _fm_composer_leftbar_floor_row "$raw" \
+         && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -ge "$close" ]; then
+        close=$((FM_COMPOSER_SCAN_LEFTBAR_END + 1))
+      fi
+      [ "$FM_COMPOSER_SCAN_BARE_ROW" -le "$close" ] \
+        && [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -le "$close" ]
+    ) || return 1
+  fi
   row=$FM_COMPOSER_SELECTED_FIRST
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
