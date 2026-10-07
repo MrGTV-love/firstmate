@@ -645,14 +645,9 @@ retire_busy_incarnation() {
 }
 
 deliberate_exit_generation() {
-  local gen identity
+  local gen
   gen=$(cat "$(fm_busy_gen_path "$STATE" "$ID")" 2>/dev/null || true)
   [ -n "$gen" ] || gen=$(fm_meta_get "$META" busy_gen)
-  if [ -z "$gen" ] || [ "$gen" = - ]; then
-    . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
-    identity=$(fm_session_end_quota_journal_identity "$STATE" "$ID" "$META" 2>/dev/null || true)
-    gen=${identity%% *}
-  fi
   printf '%s' "${gen:--}"
 }
 
@@ -794,10 +789,6 @@ NOTE_FILE="$JOURNAL.note"
 RELAUNCH_META_PUBLISHED=0
 RELAUNCH_AGENT_CONFIRMED=0
 RELAUNCH_TX=
-RELAUNCH_QUOTA_GEN=
-RELAUNCH_QUOTA_SEQ=
-RELAUNCH_FROM_BUSY_GEN=
-RELAUNCH_FROM_TX=
 RELAUNCH_BRIEF=
 PRIOR_HARNESS=$HARNESS
 PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
@@ -832,12 +823,6 @@ journal_write() {  # <phase> [extra-line]...
     echo "to_model=$TARGET_MODEL"
     echo "to_effort=$TARGET_EFFORT"
     echo "relaunch_tx=$RELAUNCH_TX"
-    if [ -n "$RELAUNCH_QUOTA_GEN" ]; then
-      echo "quota_gen=$RELAUNCH_QUOTA_GEN"
-      echo "quota_seq=$RELAUNCH_QUOTA_SEQ"
-      echo "from_busy_gen=$RELAUNCH_FROM_BUSY_GEN"
-      echo "from_relaunch_tx=$RELAUNCH_FROM_TX"
-    fi
     local line
     for line in "$@"; do
       echo "$line"
@@ -1042,7 +1027,7 @@ resolve_relaunch_profile() {
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_profile" "$dispatch_fallback" "" "$T") || return 1
+        "$dispatch_profile" "$dispatch_fallback" "" "$T" "$WT") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_DISPATCH_CAPACITY=$(jq -r .capacity.status <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
@@ -1176,7 +1161,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home quota_identity quota_record quota_current_gen=
+  local exit_result state note_line secondmate_home quota_identity quota_record
   local quota_last quota_verb quota_hold_rc
   local -a spawn_args
 
@@ -1238,19 +1223,13 @@ do_relaunch() {
   if [ -n "${FM_CONTROL_QUOTA_GEN:-}" ]; then
     # shellcheck source=bin/fm-session-end-relaunch-lib.sh
     . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
-    quota_identity=$(fm_session_end_quota_journal_identity "$STATE" "$ID" "$META" 2>/dev/null || true)
-    if [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ]; then
-      [ "$(agent_state)" = dead ] || die "quota recovery journal no longer names a proven-dead agent for $ID"
-      quota_current_gen=$(fm_meta_get "$META" busy_gen)
-    else
-      quota_identity=$(fm_session_end_identity "$STATE" "$ID" 2>/dev/null || true)
-      quota_record=$(fm_busy_record_read "$STATE" "$ID" 2>/dev/null || true)
-      [ "$RECORDED_HARNESS" = omp ] \
-        && [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ] \
-        && [[ "$quota_record" = "idle "*" quota-exhausted ${FM_CONTROL_QUOTA_SEQ:-}" ]] \
-        || die "quota recovery identity no longer names the current event for $ID"
-    fi
-    if fm_session_end_exit_cancelled "$STATE" "$ID" "$FM_CONTROL_QUOTA_GEN" "$quota_current_gen"; then
+    quota_identity=$(fm_session_end_identity "$STATE" "$ID" 2>/dev/null || true)
+    quota_record=$(fm_busy_record_read "$STATE" "$ID" 2>/dev/null || true)
+    [ "$RECORDED_HARNESS" = omp ] \
+      && [ "$quota_identity" = "$FM_CONTROL_QUOTA_GEN ${FM_CONTROL_QUOTA_SEQ:-}" ] \
+      && [[ "$quota_record" = "idle "*" quota-exhausted ${FM_CONTROL_QUOTA_SEQ:-}" ]] \
+      || die "quota recovery identity no longer names the current event for $ID"
+    if fm_session_end_exit_cancelled "$STATE" "$ID" "$FM_CONTROL_QUOTA_GEN"; then
       die "quota recovery cancelled by explicit exit for $ID"
     fi
     [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
@@ -1269,12 +1248,6 @@ do_relaunch() {
     if [ "$TARGET_DISPATCH_CAPACITY" = unknown ]; then
       die "quota-exhausted: automatic recovery capacity is unknown; use a fresh spawn with known capacity or a manual relaunch profile for $ID (adopted authentication scope)"
     fi
-    RELAUNCH_QUOTA_GEN=$FM_CONTROL_QUOTA_GEN
-    RELAUNCH_QUOTA_SEQ=$FM_CONTROL_QUOTA_SEQ
-    RELAUNCH_FROM_BUSY_GEN=$(fm_meta_get "$META" busy_gen)
-    RELAUNCH_FROM_BUSY_GEN=${RELAUNCH_FROM_BUSY_GEN:--}
-    RELAUNCH_FROM_TX=$(fm_meta_get "$META" control_relaunch_tx)
-    RELAUNCH_FROM_TX=${RELAUNCH_FROM_TX:--}
   fi
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   safe_checkpoint

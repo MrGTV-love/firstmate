@@ -127,6 +127,9 @@ record_scope() {
     "OMP_PROFILE=${OMP_PROFILE-unset}" "PI_PROFILE=${PI_PROFILE-unset}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY-unset}" "CUSTOM_MODEL_TOKEN=${CUSTOM_MODEL_TOKEN-unset}" > "$1"
 }
+record_project() {
+  printf 'process=%s\n' "$(pwd -P)" > "$1"
+}
 case "$1" in
   models)
     if [ -d "${0%/*}/scope-fixtures" ]; then
@@ -135,9 +138,14 @@ case "$1" in
       count=$((count + 1))
       printf '%s\n' "$count" > "${0%/*}/models.count"
       record_scope "${0%/*}/models.$count.env"
+      record_project "${0%/*}/models.$count.cwd"
       if [ -f "${0%/*}/scope-fixtures/catalog-auth" ]; then
         if [ "${OPENROUTER_API_KEY-unset}|${CUSTOM_MODEL_TOKEN-unset}" = 'destination|destination' ]; then
-          cat "${0%/*}/scope-fixtures/destination-models.json"
+          if [ -f "$PWD/.omp/config.yml" ] && jq -e '(.disabledProviders // []) | index("openrouter") != null' "$PWD/.omp/config.yml" >/dev/null; then
+            jq '.models |= map(select(.provider != "openrouter"))' "${0%/*}/scope-fixtures/destination-models.json"
+          else
+            cat "${0%/*}/scope-fixtures/destination-models.json"
+          fi
         else
           cat "${0%/*}/scope-fixtures/caller-models.json"
         fi
@@ -149,6 +157,7 @@ case "$1" in
   usage)
     if [ -d "${0%/*}/scope-fixtures" ]; then
       record_scope "${0%/*}/usage.env"
+      record_project "${0%/*}/usage.cwd"
       case "${PI_CODING_AGENT_DIR-}|${OMP_PROFILE-${PI_PROFILE-}}" in
         *exhausted-dir*|*'|exhausted') cat "${0%/*}/scope-fixtures/exhausted.json" ;;
         *) cat "${0%/*}/scope-fixtures/healthy.json" ;;
@@ -158,6 +167,7 @@ case "$1" in
   *)
     if [ -d "${0%/*}/scope-fixtures" ]; then
       record_scope "${0%/*}/worker.env"
+      record_project "${0%/*}/worker.cwd"
     fi
     ;;
 esac
@@ -279,7 +289,7 @@ JSON
   cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
 {"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
 JSON
-  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$CASE_DIR/usage.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
   status=$?
   expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
@@ -299,7 +309,7 @@ test_spawn_capacity_matches_destination_auth_and_allowlist() {
     cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
 {"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}
 JSON
-    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' \
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' \
       > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
     jq '.reports[].metadata.meterStates.chat = {allowed:true,limitReached:false}' \
       "$FAKEBIN_DIR/scope-fixtures/exhausted.json" > "$FAKEBIN_DIR/scope-fixtures/healthy.json"
@@ -350,6 +360,7 @@ JSON
     fm_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "${pane_env[@]}" \
       > "$CASE_DIR/worker.out" 2>&1 || fail "$scenario generated OMP command could not be consumed"
     cmp -s "$FAKEBIN_DIR/usage.env" "$FAKEBIN_DIR/worker.env" || fail "$scenario usage scope differs from the generated worker's effective authentication"
+    cmp -s "$FAKEBIN_DIR/usage.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "$scenario capacity project scope differs from the generated worker"
     for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
       cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "$scenario catalog scope differs from the generated worker's effective authentication"
     done
@@ -360,13 +371,13 @@ JSON
 test_spawn_catalog_matches_destination_provider_auth() {
   local rec id scenario out status model expected_model launch catalog_env expected_auth expected_custom destination_custom unreadable
   local -a pane_env
-  for scenario in destination-only caller-only unsupported filtered removed empty explicit-destination explicit-caller unreadable; do
+  for scenario in destination-only caller-only unsupported filtered removed empty explicit-destination explicit-caller unreadable project-destination-enabled project-caller-enabled; do
     id="omp-catalog-$scenario"
     rec=$(make_spawn_case "catalog-$scenario" omp "$id")
     read_case_record "$rec"
     mkdir -p "$HOME_DIR/config" "$FAKEBIN_DIR/scope-fixtures" "$CASE_DIR/destination-home"
     jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
-      metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
+      metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}]}' > "$FAKEBIN_DIR/scope-fixtures/exhausted.json"
     jq '.reports[].metadata.meterStates.chat={allowed:true,limitReached:false}' \
       "$FAKEBIN_DIR/scope-fixtures/exhausted.json" > "$FAKEBIN_DIR/scope-fixtures/healthy.json"
     : > "$FAKEBIN_DIR/scope-fixtures/catalog-auth"
@@ -404,8 +415,19 @@ test_spawn_catalog_matches_destination_provider_auth() {
       explicit-destination) model=openrouter/destination-model; expected_model=$model ;;
       explicit-caller) model=openrouter/caller-model; expected_model=$model ;;
       unreadable) model=openrouter/caller-model; expected_model=$model; unreadable=1 ;;
+      project-destination-enabled|project-caller-enabled)
+        mkdir -p "$PROJ_DIR/.omp" "$WT_DIR/.omp"
+        printf '.omp/\n' >> "$PROJ_DIR/.git/info/exclude"
+        if [ "$scenario" = project-destination-enabled ]; then
+          printf '%s\n' '{"disabledProviders":["openrouter"]}' > "$PROJ_DIR/.omp/config.yml"
+          printf '%s\n' '{"disabledProviders":[]}' > "$WT_DIR/.omp/config.yml"
+        else
+          printf '%s\n' '{"disabledProviders":[]}' > "$PROJ_DIR/.omp/config.yml"
+          printf '%s\n' '{"disabledProviders":["openrouter"]}' > "$WT_DIR/.omp/config.yml"
+        fi
+        ;;
     esac
-    out=$(OPENROUTER_API_KEY=caller CUSTOM_MODEL_TOKEN=caller \
+    out=$(cd "$PROJ_DIR" && OPENROUTER_API_KEY=caller CUSTOM_MODEL_TOKEN=caller \
       FM_FAKE_TMUX_ENV_HOME="$CASE_DIR/destination-home" \
       FM_FAKE_TMUX_ENV_PI_CODING_AGENT_DIR="$CASE_DIR/exhausted-dir" \
       FM_FAKE_TMUX_GLOBAL_ENV_OPENROUTER_API_KEY=destination \
@@ -415,10 +437,13 @@ test_spawn_catalog_matches_destination_provider_auth() {
       run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
         "$id" "$PROJ_DIR" --harness omp --model "$model" --effort high)
     status=$?
-    if [ "$scenario" = unsupported ]; then
+    if [ "$scenario" = unsupported ] || [ "$scenario" = project-caller-enabled ]; then
       expect_code 1 "$status" "exhausted destination without any supported fallback must refuse: $out"
       assert_contains "$out" 'no supported permitted fallback' "caller catalog must not supply destination fallback support"
       assert_absent "$HOME_DIR/state/$id.meta" "unsupported fallback refusal must publish no record"
+      if [ "$scenario" = project-caller-enabled ]; then
+        assert_grep "process=$(cd "$WT_DIR" && pwd -P)" "$FAKEBIN_DIR/models.1.cwd" "refused fallback catalog must run in worker WT"
+      fi
       [ ! -s "$LAUNCH_LOG" ] || fail "unsupported fallback refusal must create no launch"
       continue
     fi
@@ -445,8 +470,10 @@ test_spawn_catalog_matches_destination_provider_auth() {
     assert_grep "OPENROUTER_API_KEY=$expected_auth" "$FAKEBIN_DIR/worker.env" "destination provider auth must survive launch policy"
     assert_grep "CUSTOM_MODEL_TOKEN=$expected_custom" "$FAKEBIN_DIR/worker.env" "arbitrary model interpolation auth must follow launch policy"
     for catalog_env in "$FAKEBIN_DIR"/models.*.env; do
+      assert_grep "process=$(cd "$WT_DIR" && pwd -P)" "${catalog_env%.env}.cwd" "$scenario discovery and validation must run in worker WT"
       cmp -s "$catalog_env" "$FAKEBIN_DIR/worker.env" || fail "$scenario catalog scope differs from executed worker scope"
     done
+    cmp -s "$FAKEBIN_DIR/models.1.cwd" "$FAKEBIN_DIR/worker.cwd" || fail "$scenario catalog project scope differs from executed worker scope"
   done
   pass "OMP fallback discovery and post-selection validation share destination provider auth and arbitrary model interpolation scope"
 }
@@ -456,7 +483,7 @@ test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
   rec=$(make_spawn_case strongest omp "$id")
   read_case_record "$rec"
   printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
-  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}],resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
   status=$?
   expect_code 1 "$status" "Sol without an available same-class stand-in must refuse: $out"
@@ -510,6 +537,7 @@ test_secondmate_launch_relies_on_discovery() {
   git -C "$home" init -q -b main
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
+  mkdir -p "$fakebin/scope-fixtures"
   launchlog="$world/launch.log"
   : > "$launchlog"
   # FM_BACKEND=tmux pins the fake tmux even where the developer shell carries a
@@ -519,10 +547,11 @@ test_secondmate_launch_relies_on_discovery() {
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/fm-spawn.sh" sm "$home" omp --secondmate 2>&1)
+    "$ROOT/bin/fm-spawn.sh" sm "$home" omp --secondmate --model openai-codex/gpt-6-luna 2>&1)
   status=$?
   expect_code 0 "$status" "omp secondmate spawn should succeed: $out"
   assert_grep "harness=omp" "$world/home/state/sm.meta" "secondmate meta missing harness=omp"
+  assert_grep "process=$(cd "$home" && pwd -P)" "$fakebin/models.1.cwd" "secondmate validation must run in its own home"
   launch=$(cat "$launchlog")
   case "$launch" in
     *" -e "*) fail "an omp secondmate launch must name no -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch" ;;
@@ -536,10 +565,6 @@ test_secondmate_launch_relies_on_discovery() {
 }
 
 test_secondmate_config_pinned_model_is_validated() {
-  # The same seeded secondmate home, but the harness and model come from the
-  # primary's config/secondmate-harness rather than the command line: the
-  # durable pin lands on MODEL after the harness case arm, so an unlisted id
-  # under a listed provider must still be refused before endpoint creation.
   local world home fakebin launchlog out status
   world="$TMP_ROOT/secondmate-config-model"
   home="$world/sm"
@@ -552,6 +577,7 @@ test_secondmate_config_pinned_model_is_validated() {
   printf 'omp openai-codex/gpt-nope\n' > "$world/home/config/secondmate-harness"
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
+  mkdir -p "$fakebin/scope-fixtures"
   launchlog="$world/launch.log"
   : > "$launchlog"
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
@@ -565,6 +591,7 @@ test_secondmate_config_pinned_model_is_validated() {
   assert_contains "$out" "omp model 'openai-codex/gpt-nope' is not listed by 'omp models --json' although provider 'openai-codex' is" \
     "the refusal did not name the config-pinned model under its listed provider: $out"
   assert_absent "$world/home/state/sm.meta" "a refused secondmate spawn must publish no sm.meta"
+  assert_grep "process=$(cd "$home" && pwd -P)" "$fakebin/models.1.cwd" "config-pinned validation must run in secondmate home"
   [ ! -s "$launchlog" ] || fail "a refused secondmate spawn must record no launch: $(cat "$launchlog")"
   pass "fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch"
 }

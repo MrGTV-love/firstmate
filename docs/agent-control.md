@@ -89,9 +89,9 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 4. **Stop the old agent** through the shared exit postcondition, without marking the internal relaunch stop as an explicit exit.
    Before the stop, a Claude replacement must pass the [Claude API key guard](configuration.md#claude-api-key-guard), so a relaunch whose replacement an Anthropic credential would reach refuses while the old agent and its instructions are untouched.
    Every successful explicit `exit`, including an already-stopped agent or a proven-gone endpoint, writes `state/<id>.control-exit` as `gen=TOKEN` to cancel recovery of that incarnation.
-   The token names the current busy generation, then the recorded metadata generation if retired, or an identity validated against the existing quota-recovery journal if neither exists.
+   The token names the current busy generation, then the recorded metadata generation if retired.
    Explicit exit also writes the marker before typing its exit command so a late SessionEnd remains deliberate after an unconfirmed wait; a known non-delivery (`send-failed`) removes it before refusing, including the [Herdr pre-Enter proof refusals](herdr-backend.md#claude-composer-proof).
-   Successful stopping retires the busy record without recreating it, and `bin/fm-session-end-relaunch-lib.sh` owns marker validation for ordinary session-end and partial quota-recovery scans; automatic quota control revalidates cancellation against the captured origin and journal-bound current incarnation while holding the lifecycle lock, before changing instructions or launching.
+   Successful stopping retires the busy record without recreating it, and `bin/fm-session-end-relaunch-lib.sh` owns marker validation for session-end and current quota-event scans; automatic quota control revalidates cancellation against the captured current event while holding the lifecycle lock, before changing instructions or launching.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which reuses the recorded worktree instead of creating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
    When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that same worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
 6. **Preserve runtime-bound status authority where supported.**
@@ -186,10 +186,6 @@ The worktree and the task's records are unaffected either way.
 - A launch failure **after** the agent is stopped keeps the prior durable record, keeps the progress note so a later recovery still has it, marks the journal `failed:launching`, and reports plainly that no agent is running and where the work is preserved.
 - If the launch owner already published the new record but no running agent can be confirmed, the new record is kept: the task is recorded on the new harness with no agent confirmed, which is exactly what recovery reconciles.
   Rewriting it back to the old harness would be a second, worse inaccuracy.
-- Automatic quota recovery carries its original event identity across journal transitions and rollback, separately from the current incarnation and publication transaction; the session-end library validates those bindings subject to the [one-attempt containment contract](configuration.md#pooled-omp-capacity-and-declared-stand-ins).
-  Every accepted journal phase requires the current endpoint to be proven dead, including a published replacement and a failed stop that restored instructions while the old worker was alive or its state was uncertain.
-  Current death establishes journal eligibility, not permission to repeat a spent automatic attempt; prior-record identity checks and explicit-exit cancellation still apply to both the quota origin and current incarnation.
-  A live published replacement's new quota event instead uses its own current event identity, never the old journal identity.
 - The [automatic quota-recovery guard contract](configuration.md#pooled-omp-capacity-and-declared-stand-ins) owns locked recovery eligibility, including the pending-authoritative-close guard.
 
 ## Fail-closed boundaries

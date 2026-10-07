@@ -27,6 +27,11 @@ BRIEF="$TMP_ROOT/brief.md"
 BASE_RULES="$TMP_ROOT/rules.json"
 RULES="$HOME_DIR/config/crew-dispatch.json"
 QUOTA="$TMP_ROOT/quota.json"
+CATALOG_PROJECT="$TMP_ROOT/destination project"
+CATALOG_CALLER="$TMP_ROOT/caller project"
+mkdir -p "$CATALOG_PROJECT/.omp" "$CATALOG_CALLER/.omp"
+CATALOG_PROJECT=$(cd "$CATALOG_PROJECT" && pwd -P)
+CATALOG_CALLER=$(cd "$CATALOG_CALLER" && pwd -P)
 BASE_PATH=$PATH
 mkdir -p "$HOME_DIR/config" "$LOG" "$NO_CURL_BIN"
 export FM_BACKEND=tmux
@@ -211,6 +216,7 @@ if [ -f "${0%/*}/omp-controls" ]; then
 fi
 case "$1" in
   usage)
+    printf '%s\n' "$PWD" > "$OMP_CATALOG_LOG/usage-cwd"
     [ "${OMP_USAGE_FAIL:-0}" = 0 ] || exit 7
     [ "${OMP_USAGE_EMPTY:-0}" = 0 ] || exit 0
     if [ "${OMP_USAGE_INVALID:-0}" != 0 ]; then printf 'not-json\n'; exit 0; fi
@@ -229,6 +235,12 @@ case "$1" in
     fi
     cat "${OMP_USAGE_FIXTURE:?}" ;;
   models)
+    printf '%s\n' "$PWD" > "$OMP_CATALOG_LOG/catalog-cwd"
+    if [ -f "$PWD/.omp/config.yml" ] &&
+      [ "$("$OMP_FIXTURE_JQ" -r '(.disabledProviders // []) | index("openrouter") != null' "$PWD/.omp/config.yml")" = true ]; then
+      printf '%s\n' '{"models":[]}'
+      exit 0
+    fi
     if [ -f "${0%/*}/catalog-key" ]; then
       if [ "${OPENROUTER_API_KEY-unset}" = destination ]; then
         printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"}]}'
@@ -272,6 +284,7 @@ run() {
   shift 3
   {
     printf 'OMP_FIXTURE_JQ=%q\n' "$(command -v jq)"
+    printf 'OMP_CATALOG_LOG=%q\n' "$LOG"
     for control in OMP_USAGE_FIXTURE OMP_AUTH_SELECTOR OMP_AUTH_EXPECTED OMP_USAGE_FAIL OMP_USAGE_EMPTY OMP_USAGE_INVALID; do
       printf '%s=%q\n' "$control" "${!control-}"
     done
@@ -1577,8 +1590,10 @@ jq '(.providers[] | select(.provider=="codex").quotaSemantics.effectiveAvailabil
   (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/native-empty.json"
 export OMP_USAGE_FIXTURE="$TMP_ROOT/omp-usage.json"
 jq -n --argjson now "$(date +%s)" '{reports:[
-  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
-  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
+  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},
+   limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]},
+  {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},
+   limits:[{id:"openai-codex:primary",amount:{unit:"percent",remaining:0}}]}
 ]}' > "$OMP_USAGE_FIXTURE"
 write_response "$RESPONSE" rule_4 0.9
 reset_log
@@ -1600,7 +1615,7 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$destination" run code out err "$BRIEF"
   assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "$selector destination headroom retains Luna despite caller exhaustion"
   reset_log
-  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY OMP_AUTH_SELECTOR=$selector OMP_AUTH_EXPECTED="$selector=$caller" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "$selector destination exhaustion cannot borrow caller headroom"
   printf '%s\n' PATH > "$HOME_DIR/config/launch-env-allowlist"
   if [ "$selector" = HOME ]; then expected="$selector=$destination"; else expected="-$selector"; fi
@@ -1650,9 +1665,43 @@ pass "OMP resolver acquisition follows destination auth selectors, precedence, a
 jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
 mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
 reset_log
-TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
 assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
+for unknown_scope in absent label; do
+  reset_log
+  case "$unknown_scope" in
+    absent) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" ;;
+    label) TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --project "$CATALOG_PROJECT" ;;
+  esac
+  assert_contains "$out" '  status: escalate' "$unknown_scope destination scope retains escalation despite exhausted pool"
+  assert_not_contains "$out" '  profile:' "$unknown_scope destination scope cannot approve a catalog stand-in"
+  assert_absent "$LOG/catalog-cwd" "$unknown_scope destination scope does not query a caller catalog"
+done
+saved_cwd=$PWD
+for destination_enabled in false true; do
+  if [ "$destination_enabled" = false ]; then
+    destination_disabled='["openrouter"]'; caller_disabled='[]'
+  else
+    destination_disabled='[]'; caller_disabled='["openrouter"]'
+  fi
+  printf '{"disabledProviders":%s}\n' "$destination_disabled" > "$CATALOG_PROJECT/.omp/config.yml"
+  printf '{"disabledProviders":%s}\n' "$caller_disabled" > "$CATALOG_CALLER/.omp/config.yml"
+  reset_log
+  cd "$CATALOG_CALLER" || exit 1
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT/."
+  cd "$saved_cwd" || exit 1
+  if [ "$destination_enabled" = false ]; then
+    assert_contains "$out" '  status: escalate' "disabled destination route retains escalation despite enabled caller"
+    assert_not_contains "$out" '  profile:' "disabled destination route authorizes no profile"
+  else
+    assert_contains "$out" '  status: clear' "enabled destination route clears despite disabled caller"
+    assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "enabled destination selects its supported declared stand-in"
+  fi
+  assert_equals "$CATALOG_PROJECT" "$(cat "$LOG/catalog-cwd")" "catalog process cwd uses the normalized destination with spaces"
+  assert_equals "$CATALOG_PROJECT" "$(cat "$LOG/usage-cwd")" "usage process cwd uses the normalized destination with spaces"
+done
+rm "$CATALOG_PROJECT/.omp/config.yml" "$CATALOG_CALLER/.omp/config.yml"
 : > "$FAKEBIN/catalog-key"
 cp "$RULES" "$TMP_ROOT/catalog-rules.json"
 jq '.rules[3].fallback += [{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]' \
@@ -1668,7 +1717,7 @@ for policy in inherited retained filtered removed empty; do
     empty) printf 'OPENROUTER_API_KEY=\n' > "$FM_AUTH_DESTINATION" ;;
   esac
   reset_log
-  OPENROUTER_API_KEY=caller TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+  OPENROUTER_API_KEY=caller TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   case "$policy" in inherited|retained) expected=openrouter/z-ai/glm-5.3-flash ;; *) expected=openrouter/deepseek/deepseek-v4-flash ;; esac
   assert_contains "$out" "--model '$expected'" "$policy resolver support must use destination-only provider credentials"
   rm -f "$FM_AUTH_DESTINATION" "$FM_AUTH_DESTINATION.global" "$HOME_DIR/config/launch-env-allowlist"
@@ -1780,7 +1829,7 @@ for exhaustion in runway percent; do
     (.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
       (.effectivePercentRemaining=0 | .runway.status=(if $exhaustion=="runway" then "exhausted_now" else "unknown" end))
   ' "$QUOTA" > "$TMP_ROOT/direct-claude-empty.json"
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
+  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
   assert_contains "$out" '  status: clear' "native Claude $exhaustion exhaustion activates a permitted stand-in"
   assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "native Claude uses its declared stand-in"
   for floor_state in below unknown ok; do
@@ -1794,7 +1843,7 @@ for exhaustion in runway percent; do
       .rules[3].use.floor={scope:$scope,min_percent:$min}
     ' "$RULES" > "$TMP_ROOT/claude-profile-floor.json"
     cp "$TMP_ROOT/claude-profile-floor.json" "$RULES"
-    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF"
+    TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/direct-claude-empty.json" run code out err "$BRIEF" --cwd "$CATALOG_PROJECT"
     if [ "$floor_state" = ok ]; then
       assert_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "a verified passing floor permits $exhaustion fallback"
     else

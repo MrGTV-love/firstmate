@@ -1384,7 +1384,7 @@ This section is the single owner of the canonical schema and its per-field seman
 OMP's own `usage --provider openai-codex --json`, measured with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
-Chat and Spark consume independent windows and meter verdicts; paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify.
+Chat and Spark consume independent windows and meter verdicts; negative shared meter flags alone cannot prove exhaustion without a current model-scoped limit, and paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify regardless of model-ID casing.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
 When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
 For merged reports, report-wide `fetchedAt` cannot make elapsed chat or Spark windows current or establish current Spark capacity.
@@ -1399,7 +1399,7 @@ An adopted pane retains its existing shell environment, which current tmux sessi
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
 
 Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
-An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication scope as capacity, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
+An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication and project scope as launch, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
 Capacity and catalog probes normalize relative-PATH executables in the same way as launch.
 Standalone discovery preserves primary ownership evidence: the paired OMP primary extensions publish their loaded-build and process markers on `session_start`, not factory initialization.
 A Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
@@ -1424,9 +1424,8 @@ When adopted-target selection returns unknown capacity, automatic quota control 
 Under the lifecycle lock, control rechecks explicit-exit cancellation, terminal status, declared waits, the absence of an open captain call, and the absence of a pending authoritative close (`state/<id>.backlog-close`, including a dangling symlink) before automatic quota recovery checkpoints, changes instructions, or stops an agent; deliberate manual relaunch remains exempt.
 Automatic quota recovery spends one attempt per quota-origin generation before invoking control; advancing the event sequence or emitting a later session-end from that incarnation does not reset a failed or interrupted allowance, and ordinary session-end attempt history does not consume it.
 The quota-exhausted recovery check is queued once, duplicate successful handling of the same generation and event remains suppressed, and each command retains its execution timeout.
-An interrupted attempt bound to the current generation reports once even after ordinary turn events or endpoint death; cancellation and active-control guards still apply, and an older replacement journal cannot override that generation's pending or failed quota outcome.
-The limit applies both to a still-current quota event and to its journal-backed partial recovery; a matching control transaction journal establishes the original event identity only when the current endpoint is proven dead.
-Retired busy generations are never restored, and confirmed replacements or superseding incarnations are not retried through that journal.
+An interrupted attempt bound to the current generation reports once even after ordinary turn events or endpoint death; cancellation and active-control guards still apply.
+Quota recovery does not infer a retired event from a control transaction journal or restore retired busy generations.
 Deliberate manual relaunch remains available, and a fresh worker generation is evaluated independently.
 A failed recovery without a replacement does not prevent later eligible tasks from being considered within the scan's shared execution budget; scans prioritize the least recently attempted tasks and break timestamp ties by attempt count and task name.
 Each scan stops after one successful relaunch or a transaction-bound confirmed or published-alive replacement, retaining any control failure report.
@@ -1513,8 +1512,11 @@ This section is the single owner of the tool's operator contract; the script hea
 Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFIG_OVERRIDE` selects the config directory for tests and specialized setup like the other scripts.
 
 ```sh
-bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>        # TOON block on stdout
+bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name> --cwd <project-path>
 ```
+
+The project name is a task label, not a filesystem scope; supply the intended destination directory when asking intake to establish fallback catalog support.
+Without that directory, catalog support remains unestablished and typed intake does not approve an OMP stand-in from the caller's project settings; fresh spawn performs selection in the acquired worker worktree.
 
 **When firstmate invokes the resolver**
 

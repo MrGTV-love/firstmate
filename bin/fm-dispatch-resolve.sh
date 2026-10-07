@@ -3,7 +3,7 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file> [--project <name>]
+#   fm-dispatch-resolve.sh <brief-file> [--project <name>] [--cwd <project-path>]
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -128,16 +128,20 @@ usage() {
   ' "$0"
 }
 
-BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
+BRIEF='' PROJECT='' PROJECT_CWD='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
 NEVER_SEND_PATH="$CONFIG/dispatch-never-send"
 while [ $# -gt 0 ]; do
   case "$1" in
     --project) [ $# -ge 2 ] || die "--project needs a value"; PROJECT=$2; shift 2 ;;
+    --cwd) [ $# -ge 2 ] || die "--cwd needs a value"; PROJECT_CWD=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
   esac
 done
+if [ -n "$PROJECT_CWD" ]; then
+  PROJECT_CWD=$(cd "$PROJECT_CWD" 2>/dev/null && pwd -P) || die "--cwd must name an existing project directory"
+fi
 
 # ---- opt-in gate ---------------------------------------------------------------
 if ! fm_typesafe_key "$FM_HOME"; then
@@ -471,7 +475,7 @@ omp_models=$(jq -r '[(.rules[]?.use // []), (.default // [])] | .[] |
   (if type == "array" then .[] else . end) |
   select(.harness == "omp" and (.model // "" | startswith("openai-codex/"))) | .model' "$RULES" | sort -u)
 if [ -n "$omp_models" ]; then
-  omp_usage=$(fm_dispatch_omp_usage "$CONFIG") || omp_usage='{}'
+  omp_usage=$(fm_dispatch_omp_usage "$CONFIG" "" "$PROJECT_CWD") || omp_usage='{}'
   while IFS= read -r omp_model; do
     omp_capacity=$(fm_omp_codex_capacity "$omp_model" "$omp_usage")
     OMP_POOLS=$(jq -cn --argjson pools "$OMP_POOLS" --arg m "$omp_model" --argjson capacity "$omp_capacity" '$pools + {($m): $capacity}')
@@ -679,7 +683,7 @@ if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" 
   primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
   fallbacks=$(fm_dispatch_fallbacks "$CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
     "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
-  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' 2>/dev/null); then
+  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' "" "$PROJECT_CWD" 2>/dev/null); then
     if [ "$(jq -r .switched <<<"$selected")" = true ]; then
       RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
         .fallback = "primary capacity exhausted; declared model-matrix fallback" |

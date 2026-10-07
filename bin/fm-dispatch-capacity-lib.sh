@@ -3,14 +3,14 @@
 # Sourced by routing, spawn, and recovery; docs/configuration.md owns the matrix
 # schema. Never reads stored tokens, changes account pins, redeems saved resets, or
 # ranks accounts by a fabricated spendPriority. OMP owns credential rotation.
-# fm_dispatch_omp_query <config-dir> <tmux-session|empty> <executable> <args...>
+# fm_dispatch_omp_query <config-dir> <tmux-session|empty> <cwd|empty> <executable> <args...>
 # prints destination-scoped OMP output; unestablished scope exits 125.
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
-# fm_dispatch_capacity <harness> <model> [config-dir] [tmux-session] prints evidence.
+# fm_dispatch_capacity <harness> <model> [config-dir] [tmux-session] [cwd] prints evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
 # prints {rule, fallback}; without a rule, identical matching lists are safe,
 # but different lists require the explicit rule chosen at intake.
-# fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array> [evidence] [tmux-session]
+# fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array> [evidence] [tmux-session] [cwd]
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
 
@@ -27,8 +27,8 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-backend.sh"
 
 fm_dispatch_omp_query_scoped() {
-  local config=$1 session=$2 backend=$3 executable=$4
-  shift 4
+  local config=$1 session=$2 backend=$3 cwd=$4 executable=$5
+  shift 5
   local global_env session_env= name names= present entry value
   local assignments=() discovered=()
   case "$session" in *:*) return 125 ;; esac
@@ -72,12 +72,18 @@ fm_dispatch_omp_query_scoped() {
     assignments+=("$entry")
   done <<<"$global_env
 $session_env"
+  [ -z "$cwd" ] || cd "$cwd" || return 125
   /usr/bin/env -i "${assignments[@]+"${assignments[@]}"}" OMP_SKIP_SETUP=1 "$executable" "$@"
 }
 
 fm_dispatch_omp_query() {
-  local config=$1 session=$2 executable=$3 backend=${BACKEND:-} shell_bin dir
-  shift 3
+  local config=$1 session=$2 cwd=$3 executable=$4 backend=${BACKEND:-} shell_bin dir
+  shift 4
+  if [ -n "$cwd" ]; then
+    cwd=$(cd "$cwd" 2>/dev/null && pwd -P) || return 125
+  elif [ "${1:-}" = models ]; then
+    return 125
+  fi
   executable=$(type -P -- "$executable" 2>/dev/null) || return 127
   [ -x "$executable" ] || return 127
   case "$executable" in
@@ -100,14 +106,14 @@ fm_dispatch_omp_query() {
     backend=$(FM_BACKEND_CONFIG_DIR="$config" fm_backend_name) || return 125
   fi
   fm_run_timed 20 "$shell_bin" -c '. "$1"; shift; fm_dispatch_omp_query_scoped "$@"' _ \
-    "$FM_DISPATCH_CAPACITY_DIR/fm-dispatch-capacity-lib.sh" "$config" "$session" "$backend" "$executable" "$@" \
+    "$FM_DISPATCH_CAPACITY_DIR/fm-dispatch-capacity-lib.sh" "$config" "$session" "$backend" "$cwd" "$executable" "$@" \
     2>/dev/null </dev/null
 }
 
 fm_dispatch_omp_usage() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  local session=${2:-} usage rc=0
-  usage=$(fm_dispatch_omp_query "$config" "$session" omp usage --provider openai-codex --json) || rc=$?
+  local session=${2:-} cwd=${3:-} usage rc=0
+  usage=$(fm_dispatch_omp_query "$config" "$session" "$cwd" omp usage --provider openai-codex --json) || rc=$?
   if [ "$rc" -eq 125 ]; then
     printf '%s\n' '{"reason":"destination OMP authentication scope is not established"}'
     return
@@ -128,6 +134,7 @@ fm_omp_codex_capacity() {
       elif .unit == "percent" and (.remaining | type) == "number" then .remaining
       elif (.limit | type) == "number" and .limit > 0 and (.used | type) == "number"
       then (100 * (1 - .used / .limit)) else null end;
+    ($model | ascii_downcase) as $model |
     ($model | contains("-spark")) as $spark |
     (if $spark then "spark" else "chat" end) as $tier |
     (if $spark then "pro"
@@ -157,9 +164,9 @@ fm_omp_codex_capacity() {
         else (.id | split(":")[1]) == $tier end
       elif .scope.tier != null then
         .scope.tier == $tier and
-          ($tier == "spark" or .scope.modelId == null or .scope.modelId == $model)
+          ($tier == "spark" or .scope.modelId == null or (.scope.modelId | ascii_downcase) == $model)
       else
-        (.scope.modelId == $model) or ($tier == "chat" and .scope.modelId == null)
+        ((.scope.modelId // "" | ascii_downcase) == $model) or ($tier == "chat" and .scope.modelId == null)
       end;
     def account:
       entitlement as $entitlement |
@@ -181,8 +188,7 @@ fm_omp_codex_capacity() {
             any($limits[]; .status == "exhausted" or
               ((.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning"))
        then "unknown"
-       elif $meter.allowed == false or $meter.limitReached == true or
-            any($limits[]; .status == "exhausted") then "exhausted"
+       elif any($limits[]; .status == "exhausted") then "exhausted"
        elif ($expired | length) > 0 then
          (if any($limits[]; (.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning")
           then "exhausted" else "unknown" end)
@@ -255,10 +261,10 @@ fm_dispatch_claude_quota_unbound() {
 }
 
 fm_dispatch_capacity() {
-  local harness=$1 model=$2 quota config session=${4:-}
+  local harness=$1 model=$2 quota config session=${4:-} cwd=${5:-}
   case "$harness:$model" in
     omp:openai-codex/*)
-      quota=$(fm_dispatch_omp_usage "${3:-}" "$session")
+      quota=$(fm_dispatch_omp_usage "${3:-}" "$session" "$cwd")
       fm_omp_codex_capacity "$model" "$quota"
       return ;;
     claude:*)
@@ -318,12 +324,12 @@ fm_dispatch_fallbacks() {
 }
 
 fm_dispatch_fallback_supported() {
-  local config=$1 profile=$2 session=${3:-} harness model catalog launcher
+  local config=$1 profile=$2 session=${3:-} cwd=${4:-} harness model catalog launcher
   harness=$(jq -r .harness <<<"$profile")
   model=$(jq -r .model <<<"$profile")
   case "$harness" in
     omp)
-      catalog=$(fm_dispatch_omp_query "$config" "$session" omp models --json) || return 1
+      catalog=$(fm_dispatch_omp_query "$config" "$session" "$cwd" omp models --json) || return 1
       jq -e --arg m "$model" 'any(.models[]?; .selector == $m)' <<<"$catalog" >/dev/null
       ;;
     claude)
@@ -342,9 +348,9 @@ fm_dispatch_fallback_supported() {
 }
 
 fm_dispatch_select() {
-  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} session=${6:-} candidate state
+  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} session=${6:-} cwd=${7:-} candidate state
   if [ -z "$evidence" ]; then
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config" "$session")
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config" "$session" "$cwd")
   fi
   state=$(jq -r .status <<<"$evidence")
   if [ "$state" != exhausted ]; then
@@ -354,8 +360,8 @@ fm_dispatch_select() {
   fi
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
-    fm_dispatch_fallback_supported "$config" "$candidate" "$session" || continue
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session")
+    fm_dispatch_fallback_supported "$config" "$candidate" "$session" "$cwd" || continue
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config" "$session" "$cwd")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \
       '{profile: $profile, capacity: $capacity, rule: $rule, switched: true}'

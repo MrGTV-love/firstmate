@@ -23,6 +23,7 @@ if [ -f "${0%/*}/auth-selector" ]; then
 fi
 case "$1" in
   usage)
+    printf '%s\n' "$PWD" > "${0%/*}/../usage-process-cwd"
     if [ -n "${OMP_AUTH_SELECTOR:-}" ]; then
       value=${!OMP_AUTH_SELECTOR:-}
       [ "$OMP_AUTH_SELECTOR" != OMP_PROFILE ] || value=${OMP_PROFILE-${PI_PROFILE:-}}
@@ -33,6 +34,16 @@ case "$1" in
     fi
     cat "$OMP_USAGE_FIXTURE" ;;
   models)
+    printf '%s\n' "$PWD" > "${0%/*}/../catalog-process-cwd"
+    if [ -f "$PWD/.omp/config.yml" ] &&
+      jq -e '(.disabledProviders // []) | index("openrouter") != null' "$PWD/.omp/config.yml" >/dev/null; then
+      printf '%s\n' '{"models":[]}'
+      exit
+    fi
+    if [ -f "${0%/*}/catalog-codex" ]; then
+      printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"}]}'
+      exit
+    fi
     if [ -f "${0%/*}/catalog-key" ]; then
       if [ "${OPENROUTER_API_KEY-unset}" = destination ]; then
         printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"}]}'
@@ -156,6 +167,51 @@ out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark "$(cat "$TMP_ROOT/c
 assert_equals unknown "$(jq -r .status <<<"$out")" "missing Spark evidence never borrows exhausted broad chat metadata"
 pass "model-scoped native and explicit-tier meters stay independent"
 
+for tier in chat spark legacy; do
+  for negative in denied reached both; do
+    for current in absent healthy exhausted zero warning; do
+      jq -n --argjson at "$(date +%s)" --arg tier "$tier" --arg negative "$negative" --arg current "$current" '
+        (if $tier=="spark" then "spark" else "chat" end) as $scope |
+        (if $negative=="denied" then {allowed:false}
+         elif $negative=="reached" then {limitReached:true}
+         else {allowed:false,limitReached:true} end) as $meter |
+        {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
+          metadata:({planType:"pro"} + if $tier=="legacy" then $meter else {meterStates:{($scope):$meter}} end),
+          limits:(if $current=="absent" then [] else
+            [{scope:{tier:$scope},status:(if $current=="exhausted" then "exhausted" elif $current=="warning" then "warning" else "ok" end),
+              amount:{unit:"percent",remaining:(if $current=="healthy" then 80 else 0 end)}}] end)}]}' > "$OMP_USAGE_FIXTURE"
+      if [ "$tier" = spark ]; then model=gpt-5.3-codex-spark; else model=gpt-6.1-sol; fi
+      case "$current" in absent) expected=unknown ;; exhausted|zero) expected=exhausted ;; *) expected=usable ;; esac
+      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+      assert_equals "$expected" "$(jq -r .status <<<"$out")" "$tier $negative shared flags require current scoped exhaustion with $current bounds"
+      if [ "$expected" != exhausted ]; then
+        selected=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 \
+          "{\"harness\":\"omp\",\"model\":\"openai-codex/$model\",\"effort\":\"high\"}" \
+          '[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]' "$out")
+        assert_equals false "$(jq -r .switched <<<"$selected")" "$tier $negative shared flags with $current bounds cannot authorize a paid stand-in"
+      fi
+      jq --arg tier "$tier" '.reports += [(.reports[0] | .metadata={planType:"pro"} |
+        .limits=[{scope:{tier:(if $tier=="spark" then "spark" else "chat" end)},amount:{unit:"percent",remaining:80}}])]' \
+        "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/negative-healthy-sibling.json"
+      out=$(fm_omp_codex_capacity "openai-codex/$model" "$(cat "$TMP_ROOT/negative-healthy-sibling.json")")
+      assert_equals usable "$(jq -r .status <<<"$out")" "$tier ordinary healthy sibling wins over $negative shared flags and $current bounds"
+    done
+  done
+done
+for model in gpt-6.1-sol GPT-6.1-SOL; do
+  for scope in gpt-6.1-sol GPT-6.1-SOL; do
+    for tier in absent chat; do
+      jq -n --argjson at "$(date +%s)" --arg scope "$scope" --arg tier "$tier" '
+        {reports:[{provider:"openai-codex",fetchedAt:($at*1000),
+          limits:[{scope:({modelId:$scope} + if $tier=="chat" then {tier:"chat"} else {} end),
+            status:"exhausted",amount:{unit:"percent",remaining:0}}]}]}' > "$OMP_USAGE_FIXTURE"
+      out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+      assert_equals exhausted "$(jq -r .status <<<"$out")" "$model matches explicit $tier scoped model ID $scope case-insensitively"
+    done
+  done
+done
+pass "shared negative flags require scoped exhaustion and explicit model scopes ignore ASCII casing"
+
 for plan in pro ' ChatGPT-Pro ' CHATGPT_PRO plus business team enterprise edu education teacher teachers health gov government prolite pro_lite 'ChatGPT Pro-Lite' free go mystery ''; do
   case "$plan" in
     pro|' ChatGPT-Pro '|CHATGPT_PRO) paid_status=usable; spark_status=usable ;;
@@ -164,15 +220,17 @@ for plan in pro ' ChatGPT-Pro ' CHATGPT_PRO plus business team enterprise edu ed
     *) paid_status=usable; spark_status=exhausted ;;
   esac
   write_model_pool 80 80 "$plan"
-  for model in gpt-5.6 gpt-5.6-sol gpt-5.6-sol-pro gpt-5.6-luna gpt-5.6-luna-pro; do
-    out=$(fm_omp_codex_capacity "openai-codex/$model")
+  for model in gpt-5.6 gpt-5.6-sol gpt-5.6-sol-pro gpt-5.6-luna gpt-5.6-luna-pro GPT-5.6 GPT-5.6-SOL GPT-5.6-SOL-PRO GPT-5.6-LUNA GPT-5.6-LUNA-PRO; do
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
     assert_equals "$paid_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for $model"
     if [ "$paid_status" = exhausted ]; then
       assert_equals ineligible "$(jq -r '.accounts[0].status' <<<"$out")" "a known free account is excluded rather than unmeasured"
     fi
   done
-  out=$(fm_omp_codex_capacity openai-codex/gpt-5.3-codex-spark)
-  assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for Pro-only Spark"
+  for model in gpt-5.3-codex-spark GPT-5.3-CODEX-SPARK; do
+    out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model "openai-codex/$model" --json)
+    assert_equals "$spark_status" "$(jq -r .status <<<"$out")" "$plan entitlement is respected for Pro-only $model"
+  done
   for model in gpt-6.1-sol gpt-5.6-terra gpt-5.6-sol-fast; do
     out=$(fm_omp_codex_capacity "openai-codex/$model")
     assert_equals usable "$(jq -r .status <<<"$out")" "$model must not inherit an unlisted plan requirement"
@@ -329,25 +387,25 @@ allowed='[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"hig
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high)
 write_pool 98
-out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$(jq -c .fallback <<<"$set")")
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$(jq -c .fallback <<<"$set")" '' '' "$TMP_ROOT")
 assert_equals openai-codex/gpt-6-luna "$(jq -r .profile.model <<<"$out")" "native pooled capacity precedes paid model fallback"
 write_pool 0
 jq '.reports[1].metadata={source:"ratelimit-headers"} |
   .reports[1].limits[0].status="warning"' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/headers.json"
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/headers.json")")
 assert_equals usable "$(jq -r .status <<<"$out")" "native successful-response warnings do not authorize paid model fallback from zero percent"
-out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT")
 assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r .profile.model <<<"$out")" "whole-pool exhaustion selects the permitted Luna stand-in"
 assert_equals true "$(jq -r .switched <<<"$out")" "selection reports a model switch"
 assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "unknown fallback quota is disclosed, never invented"
-if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" '[]' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" '[]' '' '' "$TMP_ROOT" > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "a route with no permitted stand-in must stop"
 fi
 strong='{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}'
 team='[{"harness":"claude","model":"claude-opus-5-5[1m]","effort":"high","requires":"teamclaude"}]'
 # A bare Claude executable is not the required configured TeamClaude route,
 # whether or not the separate launch-owner library has landed.
-if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team" > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team" '' '' "$TMP_ROOT" > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "bare Claude must not impersonate the supported TeamClaude route"
 fi
 write_pool 98
@@ -401,10 +459,10 @@ for selector in HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XD
   out=$(env "$selector=$OMP_AUTH_EXHAUSTED_VALUE" "$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
   assert_equals usable "$(jq -r .status <<<"$out")" "caller-only $selector must not select the worker's authentication"
   printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-global-env"
-  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "destination $selector exhaustion must authorize declared fallback"
   printf -- '-%s\n' "$selector" > "$TMP_ROOT/tmux-session-env"
-  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals false "$(jq -r .switched <<<"$out")" "session removal must override global $selector"
   printf '%s=%s\n' "$selector" "$OMP_AUTH_EXHAUSTED_VALUE" > "$TMP_ROOT/tmux-session-env"
   printf '# filtered selectors\n' > "$TMP_ROOT/config/launch-env-allowlist"
@@ -452,15 +510,76 @@ for policy in inherited retained filtered removed empty; do
     removed) printf -- '-OPENROUTER_API_KEY\n' > "$TMP_ROOT/tmux-session-env" ;;
     empty) printf 'OPENROUTER_API_KEY=\n' > "$TMP_ROOT/tmux-session-env" ;;
   esac
-  out=$(OPENROUTER_API_KEY=caller fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  out=$(OPENROUTER_API_KEY=caller fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '' '' "$TMP_ROOT")
   case "$policy" in inherited|retained) expected=openrouter/z-ai/glm-5.3-flash ;; *) expected=openrouter/deepseek/deepseek-v4-flash ;; esac
   assert_equals "$expected" "$(jq -r .profile.model <<<"$out")" "$policy catalog must retain only destination provider auth"
   rm -f "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/config/launch-env-allowlist"
 done
+mkdir -p "$TMP_ROOT/caller disabled/.omp" "$TMP_ROOT/destination enabled/.omp" \
+  "$TMP_ROOT/caller enabled/.omp" "$TMP_ROOT/destination disabled/.omp"
+cat > "$TMP_ROOT/caller disabled/.omp/config.yml" <<'JSON'
+{"disabledProviders":["openrouter"]}
+JSON
+cat > "$TMP_ROOT/destination disabled/.omp/config.yml" <<'JSON'
+{"disabledProviders":["openrouter"]}
+JSON
+cat > "$TMP_ROOT/caller enabled/.omp/config.yml" <<'JSON'
+{"disabledProviders":[]}
+JSON
+cat > "$TMP_ROOT/destination enabled/.omp/config.yml" <<'JSON'
+{"disabledProviders":[]}
+JSON
+printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
+(
+  cd "$TMP_ROOT/caller disabled" || exit 1
+  out=$(OPENROUTER_API_KEY=caller fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT/destination enabled") ||
+    fail "enabled destination must permit fallback despite disabled caller project"
+  assert_equals true "$(jq -r .switched <<<"$out")" "destination project enables the declared fallback"
+  assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r .profile.model <<<"$out")" "destination catalog selects its supported fallback"
+  destination=$(cd "$TMP_ROOT/destination enabled" && pwd -P)
+  assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "models process must run in the explicit destination"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "primary usage must run in the explicit destination"
+  write_pool 98
+  : > "$FAKEBIN/catalog-codex"
+  candidate='[{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}]'
+  rm "$TMP_ROOT/usage-process-cwd"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$candidate" '{"status":"exhausted"}' '' "$TMP_ROOT/destination enabled") ||
+    fail "permitted Codex candidate must use destination-scoped capacity"
+  assert_equals openai-codex/gpt-6.1-sol "$(jq -r .profile.model <<<"$out")" "supported Codex candidate must be selected"
+  assert_equals usable "$(jq -r .capacity.status <<<"$out")" "candidate quota must come from its measured pool"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "candidate usage must run in the explicit destination"
+  rm "$FAKEBIN/catalog-codex"
+  write_pool 0
+) || fail "disabled caller must not override enabled destination catalog"
+(
+  cd "$TMP_ROOT/caller enabled" || exit 1
+  if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" '' '' "$TMP_ROOT/destination disabled" \
+    > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "enabled caller must not approve fallback disabled in destination"
+  fi
+  destination=$(cd "$TMP_ROOT/destination disabled" && pwd -P)
+  assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "disabled catalog must be queried in the destination"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "disabled destination must still scope primary usage"
+  rm "$TMP_ROOT/catalog-process-cwd"
+  if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed" \
+    > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "missing explicit project cwd must not approve a fallback from caller catalog"
+  fi
+  resolved=$(type -P omp)
+  if fm_dispatch_omp_query "$TMP_ROOT/config" '' '' "$resolved" models --json \
+    > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+    fail "models query without explicit project cwd must fail closed"
+  fi
+  [ ! -e "$TMP_ROOT/catalog-process-cwd" ] ||
+    fail "missing project cwd must not invoke models in caller directory"
+) || fail "catalog project scope must fail closed without a supported destination"
+rm "$TMP_ROOT/tmux-global-env"
+pass "OMP fallback approval uses explicit destination project configuration"
 (
   ln -s "$(type -P bash)" "$FAKEBIN/bash"
   cd "$(dirname "$FAKEBIN")" || exit 1
   export PATH="$(basename "$FAKEBIN"):$PATH" OPENROUTER_API_KEY=caller
+  destination=$(cd "$TMP_ROOT/destination enabled" && pwd -P)
   printf 'OPENROUTER_API_KEY=destination\n' > "$TMP_ROOT/tmux-global-env"
   printf 'OPENROUTER_API_KEY\n' > "$TMP_ROOT/config/launch-env-allowlist"
   write_pool 98
@@ -470,14 +589,19 @@ done
   out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness omp --model openai-codex/gpt-6.1-sol --json)
   assert_equals exhausted "$(jq -r .status <<<"$out")" "relative PATH executables must measure whole-pool exhaustion"
   resolved="$(cd "$(dirname "$(type -P omp)")" && pwd -P)/$(basename "$(type -P omp)")"
-  catalog=$(fm_dispatch_omp_query "$TMP_ROOT/config" '' "$resolved" models --json)
+  catalog=$(fm_dispatch_omp_query "$TMP_ROOT/config" '' 'destination enabled' "$resolved" models --json)
   assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r '.models[0].selector' <<<"$catalog")" "explicit launch-resolved executable must query the destination catalog"
-  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "relative project cwd must normalize before catalog process cd"
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '' '' 'destination enabled')
   assert_equals true "$(jq -r .switched <<<"$out")" "relative PATH exhaustion must authorize declared selection"
   assert_equals openrouter/z-ai/glm-5.3-flash "$(jq -r .profile.model <<<"$out")" "relative PATH catalog must accept the destination selector"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "relative PATH selection must query models in the destination"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "relative PATH selection must query usage in the destination"
   : > "$TMP_ROOT/config/launch-env-allowlist"
-  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered")
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '' '' 'destination enabled')
   assert_equals openrouter/deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "relative PATH normalization must preserve catalog authentication filtering"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/catalog-process-cwd")" "auth-filtered catalog process must retain destination cwd"
+  assert_equals "$destination" "$(cat "$TMP_ROOT/usage-process-cwd")" "auth-filtered usage must retain destination cwd"
   rm "$FAKEBIN/bash" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
 ) || fail "relative PATH queries must match executable launch normalization"
 for scope in adopted unreadable daemon relative; do
@@ -489,7 +613,7 @@ for scope in adopted unreadable daemon relative; do
   if OPENROUTER_API_KEY=destination \
     BACKEND=$([ "$scope" != daemon ] && printf tmux || printf herdr) \
     FM_FAKE_TMUX_UNREADABLE=$([ "$scope" != unreadable ] && printf 0 || printf 1) \
-    fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '{"status":"exhausted"}' "$session" \
+    fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$ordered" '{"status":"exhausted"}' "$session" "$TMP_ROOT" \
       > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
     fail "$scope catalog acquisition must not authorize fallback from caller credentials"
   fi
@@ -604,7 +728,7 @@ out=$(FM_FAKE_TMUX_UNREADABLE=1 "$ROOT/bin/fm-dispatch-capacity.sh" --harness cl
 assert_equals unknown "$(jq -r .status <<<"$out")" "unavailable tmux destination does not establish native authentication"
 out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
 assert_equals exhausted "$(jq -r .status <<<"$out")" "readable empty destination restores measured native exhaustion"
-out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
 assert_equals true "$(jq -r .switched <<<"$out")" "native default exhaustion authorizes a permitted fallback"
 for remaining in 0 70; do
   jq --argjson remaining "$remaining" \
@@ -623,7 +747,7 @@ for remaining in 0 70; do
       if [ "$filtering" = active ]; then
         printf '# HOME floor is retained\n' > "$TMP_ROOT/config/launch-env-allowlist"
       fi
-      out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+      out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
       assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "$scope destination HOME cannot borrow caller quota $remaining with $filtering filtering"
       assert_equals false "$(jq -r .switched <<<"$out")" "unbound default-store identity cannot authorize a model switch"
     done
@@ -644,7 +768,7 @@ pass "native Claude quota requires established matching destination default-stor
 export CLAUDE_CONFIG_DIR="$TMP_ROOT/alternate-claude"
 out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
 assert_equals unknown "$(jq -r .status <<<"$out")" "ambient alternate authentication must not inherit default exhaustion"
-out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
 assert_equals false "$(jq -r .switched <<<"$out")" "ambient alternate authentication must not switch on unrelated default exhaustion"
 assert_equals "$native_primary" "$(jq -c .profile <<<"$out")" "alternate-auth uncertainty retains the original profile"
 export CLAUDE_CONFIG_DIR=''
@@ -660,14 +784,14 @@ for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
     fi
     out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
     assert_equals unknown "$(jq -r .status <<<"$out")" "$forwarding $credential must not inherit subscription exhaustion"
-    out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+    out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
     assert_equals false "$(jq -r .switched <<<"$out")" "$forwarding $credential must retain the original route"
     assert_equals "$native_primary" "$(jq -c .profile <<<"$out")" "$forwarding $credential must not substitute a model"
   done
   printf '# no alternate API authentication\n' > "$TMP_ROOT/config/launch-env-allowlist"
   out=$("$ROOT/bin/fm-dispatch-capacity.sh" --harness claude --model claude-sonnet-5-5 --json)
   assert_equals exhausted "$(jq -r .status <<<"$out")" "filtered $credential must not conceal real subscription exhaustion"
-  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "filtered $credential permits the declared exhaustion fallback"
   printf '%s\n' "$credential" > "$TMP_ROOT/config/launch-env-allowlist"
   export "$credential="
@@ -682,24 +806,24 @@ pass "capacity and selection bind API authentication only when actually retained
 
 for credential in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
   printf '%s=global-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-global-env"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals false "$(jq -r .switched <<<"$out")" "destination global $credential must not inherit subscription exhaustion"
   printf '%s=session-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-session-env"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "destination session $credential is alternate authentication"
   printf -- '-%s\n' "$credential" > "$TMP_ROOT/tmux-recorded-env"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" "" recorded)
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" "" recorded "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "the explicit recorded session must override the current session's $credential"
   rm "$TMP_ROOT/tmux-recorded-env"
   printf -- '-%s\n' "$credential" > "$TMP_ROOT/tmux-session-env"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "session removal of $credential must suppress the global credential"
   printf '%s=\n' "$credential" > "$TMP_ROOT/tmux-session-env"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "empty session $credential must override the global credential"
   printf '%s=session-routing-fixture\n' "$credential" > "$TMP_ROOT/tmux-session-env"
   printf '# filter destination credentials\n' > "$TMP_ROOT/config/launch-env-allowlist"
-  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed")
+  out=$(BACKEND=tmux fm_dispatch_select "$TMP_ROOT/config" rule_1 "$native_primary" "$allowed" '' '' "$TMP_ROOT")
   assert_equals true "$(jq -r .switched <<<"$out")" "the allowlist must strip destination $credential"
   rm "$TMP_ROOT/tmux-session-env" "$TMP_ROOT/tmux-global-env" "$TMP_ROOT/config/launch-env-allowlist"
 done

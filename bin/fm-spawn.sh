@@ -376,8 +376,8 @@
 #   destination pane's ambient account. A present file pins every launch of
 #   that runner from this home - ship, scout, local secondmate, raw Claude
 #   command, and relaunch - to the declared account root, and the spawn
-#   refuses before any endpoint, worktree, or record exists when the file is
-#   malformed, the root is unusable, or the runner's own check says it is not
+#   refuses before launch or record publication when the file is malformed,
+#   the root is unusable, or the runner's own check says it is not
 #   signed in. A pinned Claude launch sheds the environment credentials Claude
 #   ranks above the root's login; a pinned Pi launch needs a resolved model
 #   <provider>/<id> for a declared provider and also carries --provider, and a
@@ -388,8 +388,8 @@
 # Claude launcher (config/claude-launcher):
 #   docs/configuration.md "Claude launcher" owns selection and inheritance;
 #   bin/fm-teamclaude-launch.sh owns the wrapper's invocation mechanics.
-#   bin/fm-claude-launcher-lib.sh checks the selection before any endpoint,
-#   worktree, or record exists; the wrapper checks again in the pane rather
+#   bin/fm-claude-launcher-lib.sh checks the final selection before launch or
+#   record publication; the wrapper checks again in the pane rather
 #   than launch Claude unproxied.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
 #     __BRIEF__    absolute path to the worker launch-brief.md or secondmate charter/brief
@@ -2104,12 +2104,12 @@ pi_supports_tui_mode() {
 # IS listed must be listed too, a provider the listing does not know passes
 # through with a notice, a bare fuzzy pattern is omp's own matcher's job, and an
 # unreadable listing establishes nothing (harness-adapters model-and-effort.md).
-omp_model_validate() { # <omp-bin> <model> <config-dir> [tmux-session]
-  local bin=$1 model=$2 config=$3 session=${4:-} provider listing providers
+omp_model_validate() { # <omp-bin> <model> <config-dir> <cwd> [tmux-session]
+  local bin=$1 model=$2 config=$3 cwd=$4 session=${5:-} provider listing providers
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$model" in */*) ;; *) return 0 ;; esac
   command -v jq >/dev/null 2>&1 || return 0
-  listing=$(fm_dispatch_omp_query "$config" "$session" "$bin" models --json) || return 0
+  listing=$(fm_dispatch_omp_query "$config" "$session" "$cwd" "$bin" models --json) || return 0
   providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || return 0
   [ -n "$providers" ] || return 0
   provider=${model%%/*}
@@ -2470,19 +2470,6 @@ case "$ARG3" in
   }
   ;;
 esac
-COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
-COMPACT_ADVISER_SWITCH=1
-# A reused pane shell may still hold the flag an earlier automatic launch
-# marked as adviser-only; drop it before this launch resolves its own policy.
-# shellcheck disable=SC2016
-COMPACT_ADVISER_HOOKS='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
-if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
-  COMPACT_ADVISER_SWITCH=0
-  if [ "$HARNESS" = claude ] && [ "$RAW_FUNCTION_HOOKS_SET" = 0 ]; then
-    # shellcheck disable=SC2016
-    COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
-  fi
-fi
 
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 # config/secondmate-harness may carry optional model/effort tokens alongside the
@@ -2545,233 +2532,285 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   else
     DISPATCH_RULE=
   fi
-  if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
-    dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$dispatch_tmux_session") || exit 1
-    DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
-    if [ "$DISPATCH_SWITCHED" = true ]; then
-      HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
-      MODEL=$(jq -r .profile.model <<<"$dispatch_result")
-      EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
-      LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
-    fi
-  fi
 fi
 
-if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
-  echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
-  exit 1
-fi
-
-# config/claude-launcher (header above): prove the TeamClaude proxy before any
-# endpoint, worktree, or record exists.
-CLAUDE_LAUNCH_BIN=claude
-if [ "$HARNESS" = claude ]; then
-  CLAUDE_LAUNCH_BIN=$(fm_claude_launcher_select "$CONFIG") || exit 1
-fi
-
-# muse, gemini, agy, and devin are verified as CREWMATE/SCOUT adapters only. A secondmate is
-# a firstmate instance, so it needs a primary supervision protocol.
-# gemini has none: docs/supervision-protocols/ carries no gemini wake protocol
-# and this task verified only crewmate-side launch, busy state, interrupt, and
-# exit, so a gemini secondmate is refused rather than stood up on an unverified
-# supervision path. muse has none either, and its
-# Claude-compatible hook dialect explicitly rejects the model-reawakening and
-# asyncRewake handlers that firstmate's primary turn-end supervision is built on
-# (muse 0.1.0-R708.1). Refusing here keeps that gap loud instead of standing up a
-# secondmate whose supervision cycle could never be armed.
-# agy has none either: it exposes no hook surface for primary supervision and
-# docs/supervision-protocols/ carries no agy wake protocol (agy 1.2.0).
-# devin has none either: only its worker lifecycle hooks are verified, and
-# docs/supervision-protocols/ carries no devin wake protocol (devin 3000.11.1).
-if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ] || [ "$HARNESS" = devin ]; }; then
-  echo "error: $HARNESS is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
-  exit 1
-fi
-
-# rovo carries the same primary-supervision gap as muse: no turn-end hook, no
-# verified primary integration, so a secondmate (a firstmate instance that must
-# itself act as a primary) could never be supervised. Refuse loudly rather than
-# standing one up with no way to arm its watch cycle.
-if [ "$KIND" = secondmate ] && [ "$HARNESS" = rovo ]; then
-  echo "error: rovo is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
-  exit 1
-fi
-
-case "$HARNESS" in
-devin)
-  DEVIN_BIN=$(command -v devin) || {
-    echo "error: devin executable not found on PATH" >&2
-    exit 1
-  }
-  ;;
-pi | pi-signed)
-  PI_BIN=$(resolve_pi_executable "$HARNESS") || {
-    echo "error: $HARNESS executable not found on PATH; install it or select a different verified harness" >&2
-    exit 1
-  }
-  PI_TUI_MODE=
-  if pi_supports_tui_mode "$PI_BIN"; then
-    PI_TUI_MODE=' --tui-mode regular'
-  fi
-  LAUNCH=${LAUNCH//__PITUIMODE__/$PI_TUI_MODE}
-  LAUNCH="FM_PI_HARNESS=$HARNESS $LAUNCH"
-  ;;
-cursor)
-  # `cursor` is not the CLI name, and the legacy alias `agent` is far too
-  # generic to launch on its name alone, so resolution runs through the
-  # verified owner rather than a bare command lookup. Refusing here keeps a
-  # missing install a loud spawn refusal instead of a pane that dies with a
-  # command-not-found the supervisor would read as a wedged worker.
-  CURSOR_BIN=$(fm_cursor_resolve_binary) || exit 1
-  if [ "$MODEL_INDEXED" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
-    if CURSOR_MODELS=$(fm_cursor_list_models "$CURSOR_BIN"); then
-      if ! printf '%s\n' "$CURSOR_MODELS" | fm_cursor_catalog_has_model "$MODEL"; then
-        echo "error: Cursor model '$MODEL' is not available from '$CURSOR_BIN --list-models'; choose an id listed by that command or omit --model" >&2
-        exit 1
+spawn_profile_preflight() {
+  local dispatch_cwd=${1:-}
+  if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
+    if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
+      dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
+      dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$dispatch_tmux_session" "$dispatch_cwd") || exit 1
+      DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
+      if [ "$DISPATCH_SWITCHED" = true ]; then
+        HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
+        MODEL=$(jq -r .profile.model <<<"$dispatch_result")
+        EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
+        LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
       fi
     fi
   fi
-  ;;
-omp)
-  OMP_BIN=$(resolve_pi_executable omp) || {
-    echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
-    exit 1
-  }
-  OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
-  OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
-  [ -f "$OMP_SESSION_CFG" ] || {
-    echo "error: omp session posture overlay missing at $OMP_SESSION_CFG; a session launched without it can park on the captain's own approval or plan-mode settings" >&2
-    exit 1
-  }
-  if [ "$KIND" != secondmate ] && [ ! -f "$OMP_WORKER_CFG" ]; then
-    echo "error: omp worker memory overlay missing at $OMP_WORKER_CFG" >&2
+  COMPACT_ADVISER_MODE=$(jq -r --arg harness "$HARNESS" '.[$harness] // "off"' <<<"$COMPACT_ADVISER_CONFIG")
+  COMPACT_ADVISER_SWITCH=1
+  # A reused pane shell may still hold the flag an earlier automatic launch
+  # marked as adviser-only; drop it before this launch resolves its own policy.
+  # shellcheck disable=SC2016
+  COMPACT_ADVISER_HOOKS='[ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; '
+  if [ "$COMPACT_ADVISER_MODE" = auto ] && [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ]; then
+    COMPACT_ADVISER_SWITCH=0
+    if [ "$HARNESS" = claude ] && [ "$RAW_FUNCTION_HOOKS_SET" = 0 ]; then
+      # shellcheck disable=SC2016
+      COMPACT_ADVISER_HOOKS+='[ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-}" = 1 ] || export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 FM_COMPACT_ADVISER_HOOKS=1; '
+    fi
+  fi
+
+  if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
+    echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
     exit 1
   fi
-  ;;
-agy)
-  AGY_BIN=$(resolve_pi_executable agy) || {
-    echo "error: agy executable not found on PATH; install Antigravity CLI or select a different verified harness" >&2
-    exit 1
-  }
-  ;;
-esac
 
-# Ultra is an explicit native capability, never a Pi thinking-level alias.
-# Validate the fully resolved profile before worktree or endpoint provisioning.
-if [ "$EFFORT" = ultra ]; then
-  "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$HARNESS" "$MODEL" "$EFFORT" || exit 1
-  [ "$RAW_LAUNCH" = 0 ] || {
-    echo "error: --effort ultra requires the canonical --harness pi or pi-signed launch so its native flag cannot be omitted" >&2
-    exit 1
-  }
-fi
-if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
-  omp_model_validate "$OMP_BIN" "$MODEL" "$CONFIG" "$dispatch_tmux_session" || exit 1
-fi
-if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
-  agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
-fi
-# Worker account pin (header above): resolved before any endpoint, worktree, or
-# record exists. An absent pin selects nothing and leaves every later launch
-# step exactly as it was. A pinned Claude root is exported here as well, so the
-# trust registration below writes the store the worker will actually read.
-RAW_COMMAND=
-[ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
-WORKER_ACCOUNT=$(fm_worker_account_select "$HARNESS" "$CONFIG" "$MODEL" "${PI_BIN:-$HARNESS}" "$RAW_COMMAND") || exit 1
-WORKER_ACCOUNT_DECLARED=${WORKER_ACCOUNT%%$'\t'*}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT#*$'\t'}
-WORKER_ACCOUNT_PROVIDER=${WORKER_ACCOUNT_ROOT#*$'\t'}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT_ROOT%%$'\t'*}
-if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
-  if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
-    export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
-  else
-    unset CLAUDE_CONFIG_DIR
+  CLAUDE_LAUNCH_BIN=claude
+  if [ "$HARNESS" = claude ]; then
+    CLAUDE_LAUNCH_BIN=$(fm_claude_launcher_select "$CONFIG") || exit 1
   fi
-fi
 
-if [ "$MODEL_INDEXED" = 1 ]; then
-  MODEL_CATALOG_CONTEXT=selected
-  if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
-    MODEL_CATALOG_CONTEXT=unavailable
+  # muse, gemini, agy, and devin are verified as CREWMATE/SCOUT adapters only. A secondmate is
+  # a firstmate instance, so it needs a primary supervision protocol.
+  # gemini has none: docs/supervision-protocols/ carries no gemini wake protocol
+  # and this task verified only crewmate-side launch, busy state, interrupt, and
+  # exit, so a gemini secondmate is refused rather than stood up on an unverified
+  # supervision path. muse has none either, and its
+  # Claude-compatible hook dialect explicitly rejects the model-reawakening and
+  # asyncRewake handlers that firstmate's primary turn-end supervision is built on
+  # (muse 0.1.0-R708.1). Refusing here keeps that gap loud instead of standing up a
+  # secondmate whose supervision cycle could never be armed.
+  # agy has none either: it exposes no hook surface for primary supervision and
+  # docs/supervision-protocols/ carries no agy wake protocol (agy 1.2.0).
+  # devin has none either: only its worker lifecycle hooks are verified, and
+  # docs/supervision-protocols/ carries no devin wake protocol (devin 3000.11.1).
+  if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ] || [ "$HARNESS" = devin ]; }; then
+    echo "error: $HARNESS is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
+    exit 1
   fi
-  FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
-fi
 
-# Claude API key guard: refuse to launch a Claude worker when an Anthropic API
-# key would reach the worker, unless the caller explicitly opts in with
-# --allow-api-key. A key set in the spawning environment silently redirects
-# Claude Code to API billing even when the user has a valid claude.ai
-# subscription (issue #5723). The worker-account pin shed
-# (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
-# ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
-# refuse when a pin is active: the key cannot reach the worker.
-if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
-  if [ -z "$WORKER_ACCOUNT" ]; then
-    # No pin shed: determine whether each variable would reach the worker.
-    if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-      route_text=' through config/launch-env-allowlist'
+  # rovo carries the same primary-supervision gap as muse: no turn-end hook, no
+  # verified primary integration, so a secondmate (a firstmate instance that must
+  # itself act as a primary) could never be supervised. Refuse loudly rather than
+  # standing one up with no way to arm its watch cycle.
+  if [ "$KIND" = secondmate ] && [ "$HARNESS" = rovo ]; then
+    echo "error: rovo is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
+    exit 1
+  fi
+
+  case "$HARNESS" in
+  devin)
+    DEVIN_BIN=$(command -v devin) || {
+      echo "error: devin executable not found on PATH" >&2
+      exit 1
+    }
+    ;;
+  pi | pi-signed)
+    PI_BIN=$(resolve_pi_executable "$HARNESS") || {
+      echo "error: $HARNESS executable not found on PATH; install it or select a different verified harness" >&2
+      exit 1
+    }
+    PI_TUI_MODE=
+    if pi_supports_tui_mode "$PI_BIN"; then
+      PI_TUI_MODE=' --tui-mode regular'
+    fi
+    LAUNCH=${LAUNCH//__PITUIMODE__/$PI_TUI_MODE}
+    LAUNCH="FM_PI_HARNESS=$HARNESS $LAUNCH"
+    ;;
+  cursor)
+    # `cursor` is not the CLI name, and the legacy alias `agent` is far too
+    # generic to launch on its name alone, so resolution runs through the
+    # verified owner rather than a bare command lookup. Refusing here keeps a
+    # missing install a loud spawn refusal instead of a pane that dies with a
+    # command-not-found the supervisor would read as a wedged worker.
+    CURSOR_BIN=$(fm_cursor_resolve_binary) || exit 1
+    if [ "$MODEL_INDEXED" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+      if CURSOR_MODELS=$(fm_cursor_list_models "$CURSOR_BIN"); then
+        if ! printf '%s\n' "$CURSOR_MODELS" | fm_cursor_catalog_has_model "$MODEL"; then
+          echo "error: Cursor model '$MODEL' is not available from '$CURSOR_BIN --list-models'; choose an id listed by that command or omit --model" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
+  omp)
+    OMP_BIN=$(resolve_pi_executable omp) || {
+      echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
+      exit 1
+    }
+    OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
+    OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
+    [ -f "$OMP_SESSION_CFG" ] || {
+      echo "error: omp session posture overlay missing at $OMP_SESSION_CFG; a session launched without it can park on the captain's own approval or plan-mode settings" >&2
+      exit 1
+    }
+    if [ "$KIND" != secondmate ] && [ ! -f "$OMP_WORKER_CFG" ]; then
+      echo "error: omp worker memory overlay missing at $OMP_WORKER_CFG" >&2
+      exit 1
+    fi
+    ;;
+  agy)
+    AGY_BIN=$(resolve_pi_executable agy) || {
+      echo "error: agy executable not found on PATH; install Antigravity CLI or select a different verified harness" >&2
+      exit 1
+    }
+    ;;
+  esac
+
+  if [ "$EFFORT" = ultra ]; then
+    "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$HARNESS" "$MODEL" "$EFFORT" || exit 1
+    [ "$RAW_LAUNCH" = 0 ] || {
+      echo "error: --effort ultra requires the canonical --harness pi or pi-signed launch so its native flag cannot be omitted" >&2
+      exit 1
+    }
+  fi
+  if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
+    agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
+  fi
+  RAW_COMMAND=
+  [ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
+  WORKER_ACCOUNT=$(fm_worker_account_select "$HARNESS" "$CONFIG" "$MODEL" "${PI_BIN:-$HARNESS}" "$RAW_COMMAND") || exit 1
+  WORKER_ACCOUNT_DECLARED=${WORKER_ACCOUNT%%$'\t'*}
+  WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT#*$'\t'}
+  WORKER_ACCOUNT_PROVIDER=${WORKER_ACCOUNT_ROOT#*$'\t'}
+  WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT_ROOT%%$'\t'*}
+  if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
+    if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
+      export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
     else
-      route_text=' through ambient environment inheritance'
+      unset CLAUDE_CONFIG_DIR
     fi
-    caller_env_reaches=1
-    if [ "$BACKEND" = tmux ] && tmux show-environment -g >/dev/null 2>&1; then
-      caller_env_reaches=0
-    fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      would_reach=1
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
-        esac
-      fi
-      if [ "$caller_env_reaches" -eq 1 ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-        echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-      fi
-    done
   fi
-  # Also check the environment a new tmux window gives the worker. The window
-  # inherits the tmux session environment layered over the tmux global
-  # environment, which can hold a key the spawning process no longer has (the
-  # server started while the shell exported it). A session entry wins, and a
-  # session removal marker (-NAME) means unset; otherwise the global value
-  # applies. The global environment is checked even before the target session
-  # exists, because a session created later inherits it. The pin shed
-  # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
-  # Pane rc files and direnv .envrc exports are not detected by this check.
-  if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
-    tmux_session=
-    if [ "$RELAUNCH" -eq 1 ]; then
-      tmux_session=${RELAUNCH_TARGET%%:*}
-    elif [ -n "${TMUX:-}" ]; then
-      tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
-    elif tmux has-session -t firstmate 2>/dev/null; then
-      tmux_session=firstmate
+
+  if [ "$MODEL_INDEXED" = 1 ]; then
+    MODEL_CATALOG_CONTEXT=selected
+    if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
+      MODEL_CATALOG_CONTEXT=unavailable
     fi
-    for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
-      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-        case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
-        *$'\n'"$check_var"$'\n'*) ;;
-        *) continue ;;  # Allowlist filters it out at launch time
-        esac
-      fi
-      tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session")
-      case "$tmux_env_scope" in
-      session)
-        echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      global)
-        echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
-        exit 1
-        ;;
-      esac
-    done
+    FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
   fi
-fi
+
+  # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
+  # key would reach the worker, unless the caller explicitly opts in with
+  # --allow-api-key. A key set in the spawning environment silently redirects
+  # Claude Code to API billing even when the user has a valid claude.ai
+  # subscription (issue #5723). The worker-account pin shed
+  # (fm_worker_account_claude_shed) strips both ANTHROPIC_API_KEY and
+  # ANTHROPIC_AUTH_TOKEN from the launch environment, so the guard does not
+  # refuse when a pin is active: the key cannot reach the worker.
+  if [ "$HARNESS" = claude ] && [ "$ALLOW_API_KEY" -eq 0 ]; then
+    if [ -z "$WORKER_ACCOUNT" ]; then
+      # No pin shed: determine whether each variable would reach the worker.
+      if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+        route_text=' through config/launch-env-allowlist'
+      else
+        route_text=' through ambient environment inheritance'
+      fi
+      caller_env_reaches=1
+      if [ "$BACKEND" = tmux ] && tmux show-environment -g >/dev/null 2>&1; then
+        caller_env_reaches=0
+      fi
+      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+        would_reach=1
+        if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+          case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+          *$'\n'"$check_var"$'\n'*) ;;
+          *) would_reach=0 ;;  # Filtered out by allowlist, no refusal
+          esac
+        fi
+        if [ "$caller_env_reaches" -eq 1 ] && [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
+          echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+          exit 1
+        fi
+      done
+    fi
+    # Also check the environment a new tmux window gives the worker. The window
+    # inherits the tmux session environment layered over the tmux global
+    # environment, which can hold a key the spawning process no longer has (the
+    # server started while the shell exported it). A session entry wins, and a
+    # session removal marker (-NAME) means unset; otherwise the global value
+    # applies. The global environment is checked even before the target session
+    # exists, because a session created later inherits it. The pin shed
+    # (WORKER_ACCOUNT) and allowlist (LAUNCH_ENV_ENABLED) filters apply as above.
+    # Pane rc files and direnv .envrc exports are not detected by this check.
+    if [ "$BACKEND" = tmux ] && [ -z "$WORKER_ACCOUNT" ]; then
+      tmux_session=
+      if [ "$RELAUNCH" -eq 1 ]; then
+        tmux_session=${RELAUNCH_TARGET%%:*}
+      elif [ -n "${TMUX:-}" ]; then
+        tmux_session=$(tmux display-message -p '#S' 2>/dev/null) || tmux_session=
+      elif tmux has-session -t firstmate 2>/dev/null; then
+        tmux_session=firstmate
+      fi
+      for check_var in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+        if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
+          case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+          *$'\n'"$check_var"$'\n'*) ;;
+          *) continue ;;  # Allowlist filters it out at launch time
+          esac
+        fi
+        tmux_env_scope=$(fm_worker_account_tmux_env "$check_var" "$tmux_session")
+        case "$tmux_env_scope" in
+        session)
+          echo "error: $check_var is set in the tmux session environment and would reach the claude worker; unset it (tmux set-environment -t $tmux_session -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+          exit 1
+          ;;
+        global)
+          echo "error: $check_var is set in the tmux global environment and would reach the claude worker; unset it (tmux set-environment -g -u $check_var) or pass --allow-api-key to deliberately bill the API" >&2
+          exit 1
+          ;;
+        esac
+      done
+    fi
+  fi
+  case "$LAUNCH" in
+  *__MUSEBIN__*)
+    MUSE_BIN=$(resolve_muse_binary) || exit 1
+    MUSE_CONFIG_HOME=$(resolve_directory_input XDG_CONFIG_HOME "${XDG_CONFIG_HOME:-${HOME:-}/.config}") || exit 1
+    MUSE_DATA_HOME=$(resolve_directory_input XDG_DATA_HOME "${XDG_DATA_HOME:-${HOME:-}/.local/share}") || exit 1
+    MUSE_AUTH_FILE="$MUSE_CONFIG_HOME/muse/auth.json"
+    if ! muse_credential_present "$MUSE_AUTH_FILE"; then
+      if [ -n "${META_API_KEY:-}" ]; then
+        echo "error: muse has no worker-reachable credential; META_API_KEY is set for fm-spawn but cannot be proven present in the $BACKEND worker environment. Store the fleet credential at '$MUSE_AUTH_FILE' with 'muse login' or 'muse auth set --api-key-stdin'. The secret will not be copied into the launch command." >&2
+      else
+        echo "error: muse has no worker-reachable credential; META_API_KEY cannot be proven present in the $BACKEND worker environment and '$MUSE_AUTH_FILE' is absent or empty. Store the fleet credential with 'muse login' or 'muse auth set --api-key-stdin'." >&2
+      fi
+      exit 1
+    fi
+    LAUNCH=${LAUNCH//__MUSEBIN__/$(shell_quote "$MUSE_BIN")}
+    LAUNCH=${LAUNCH//__MUSECONFIG__/$(shell_quote "$MUSE_CONFIG_HOME")}
+    LAUNCH=${LAUNCH//__MUSEDATA__/$(shell_quote "$MUSE_DATA_HOME")}
+    ;;
+  esac
+
+  case "$LAUNCH" in
+  *__KIMIBIN__*)
+    KIMI_BIN=$(resolve_kimi_binary) || exit 1
+    LAUNCH=${LAUNCH//__KIMIBIN__/$(shell_quote "$KIMI_BIN")}
+    fm_backend_visible_capture_supported "$BACKEND" || {
+      echo "error: refusing Kimi spawn because backend '$BACKEND' has no verified viewport-bounded capture; Kimi 2.0.0 gates a fresh worktree on a trust dialog that can only be answered and confirmed cleared from a scrollback-free read of the live pane" >&2
+      exit 1
+    }
+    if [ "$KIND" != secondmate ]; then
+      "$FM_ROOT/bin/fm-kimi-turnend-hook.sh" install || {
+        echo "error: refusing Kimi spawn because the global turn-end hook could not be installed safely" >&2
+        exit 1
+      }
+    fi
+    ;;
+  esac
+
+  case "$LAUNCH" in
+  *__ROVOBIN__*)
+    ROVO_BIN=$(resolve_rovo_binary) || exit 1
+    LAUNCH=${LAUNCH//__ROVOBIN__/$(shell_quote "$ROVO_BIN")}
+    ;;
+  esac
+}
+
 
 secondmate_registry_value() {
   secondmate_registry_field "$DATA/secondmates.md" "$1" "$2"
@@ -3052,49 +3091,12 @@ effort_flag_for_harness() {
   esac
 }
 
-case "$LAUNCH" in
-*__MUSEBIN__*)
-  MUSE_BIN=$(resolve_muse_binary) || exit 1
-  MUSE_CONFIG_HOME=$(resolve_directory_input XDG_CONFIG_HOME "${XDG_CONFIG_HOME:-${HOME:-}/.config}") || exit 1
-  MUSE_DATA_HOME=$(resolve_directory_input XDG_DATA_HOME "${XDG_DATA_HOME:-${HOME:-}/.local/share}") || exit 1
-  MUSE_AUTH_FILE="$MUSE_CONFIG_HOME/muse/auth.json"
-  if ! muse_credential_present "$MUSE_AUTH_FILE"; then
-    if [ -n "${META_API_KEY:-}" ]; then
-      echo "error: muse has no worker-reachable credential; META_API_KEY is set for fm-spawn but cannot be proven present in the $BACKEND worker environment. Store the fleet credential at '$MUSE_AUTH_FILE' with 'muse login' or 'muse auth set --api-key-stdin'. The secret will not be copied into the launch command." >&2
-    else
-      echo "error: muse has no worker-reachable credential; META_API_KEY cannot be proven present in the $BACKEND worker environment and '$MUSE_AUTH_FILE' is absent or empty. Store the fleet credential with 'muse login' or 'muse auth set --api-key-stdin'." >&2
-    fi
-    exit 1
-  fi
-  LAUNCH=${LAUNCH//__MUSEBIN__/$(shell_quote "$MUSE_BIN")}
-  LAUNCH=${LAUNCH//__MUSECONFIG__/$(shell_quote "$MUSE_CONFIG_HOME")}
-  LAUNCH=${LAUNCH//__MUSEDATA__/$(shell_quote "$MUSE_DATA_HOME")}
-  ;;
-esac
-
-case "$LAUNCH" in
-*__KIMIBIN__*)
-  KIMI_BIN=$(resolve_kimi_binary) || exit 1
-  LAUNCH=${LAUNCH//__KIMIBIN__/$(shell_quote "$KIMI_BIN")}
-  fm_backend_visible_capture_supported "$BACKEND" || {
-    echo "error: refusing Kimi spawn because backend '$BACKEND' has no verified viewport-bounded capture; Kimi 2.0.0 gates a fresh worktree on a trust dialog that can only be answered and confirmed cleared from a scrollback-free read of the live pane" >&2
-    exit 1
-  }
-  if [ "$KIND" != secondmate ]; then
-    "$FM_ROOT/bin/fm-kimi-turnend-hook.sh" install || {
-      echo "error: refusing Kimi spawn because the global turn-end hook could not be installed safely" >&2
-      exit 1
-    }
-  fi
-  ;;
-esac
-
-case "$LAUNCH" in
-*__ROVOBIN__*)
-  ROVO_BIN=$(resolve_rovo_binary) || exit 1
-  LAUNCH=${LAUNCH//__ROVOBIN__/$(shell_quote "$ROVO_BIN")}
-  ;;
-esac
+SPAWN_PREFLIGHT_DEFERRED=0
+if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ] && [ "$DISPATCH_FALLBACK" != '[]' ]; then
+  SPAWN_PREFLIGHT_DEFERRED=1
+else
+  spawn_profile_preflight
+fi
 
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -4708,6 +4710,13 @@ fi
 # tab's original project directory.
 spawn_enter_recorded_worktree
 spawn_assert_agent_worktree
+
+if [ "$SPAWN_PREFLIGHT_DEFERRED" = 1 ]; then
+  spawn_profile_preflight "$WT"
+fi
+if [ "$HARNESS" = omp ]; then
+  omp_model_validate "$OMP_BIN" "$MODEL" "$CONFIG" "$WT" "$dispatch_tmux_session" || exit 1
+fi
 
 # Pre-register Claude's workspace trust for the directory this launch starts in,
 # at the first point that directory is known and before any per-task state is
