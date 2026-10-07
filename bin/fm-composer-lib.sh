@@ -1486,13 +1486,13 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
 # suggestion happened to wrap; any surviving text is pending when styling can
 # prove it real and unknown otherwise (the same styled=0 degradation as the
 # glyph row itself).
-_fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row>
-  local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0
+_fm_composer_classify_bare_wrap() {  # <screen> <styled> <first-row> <last-row> [prompt-row]
+  local screen=$1 styled=$2 g=$3 cy=$4 row raw content glyph='' text_seen=0 prompt_row=${5:-$3}
   row=$g
   while [ "$row" -le "$cy" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     content=$(_fm_composer_row_content "$raw" "$styled")
-    if [ "$row" -eq "$g" ]; then
+    if [ "$row" -eq "$prompt_row" ]; then
       _fm_composer_bare_row_strip_furniture_var content
       if fm_composer_leading_agent_glyph_var glyph "$content"; then
         content=${content#*"$glyph"}
@@ -1742,6 +1742,14 @@ _fm_composer_select_cursorless() {
     FM_COMPOSER_SELECTED_KIND=
     return 1
   fi
+  if [ "$FM_COMPOSER_SELECTED_KIND" = bare ] \
+     && [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+     && [ "$bare" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+     && [ "$bare" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    generic=$FM_COMPOSER_SCAN_PI_CLOSE
+    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+    FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  fi
   if [ "$FM_COMPOSER_SCAN_SHELL_ROW" -gt "$generic" ]; then
     FM_COMPOSER_SELECTED_KIND=
     return 1
@@ -1828,7 +1836,13 @@ EOF
         fi
         ;;
       bare)
-        if [ "$row" -eq "$FM_COMPOSER_SELECTED_FIRST" ] \
+        prompt_row=$FM_COMPOSER_SELECTED_FIRST
+        if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+           && [ "$prompt_row" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+           && [ "$FM_COMPOSER_SELECTED_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+          prompt_row=$FM_COMPOSER_SCAN_PI_GLYPH_ROW
+        fi
+        if [ "$row" -eq "$prompt_row" ] \
            && fm_composer_leading_agent_glyph_var glyph "$content"; then
           content=${content#*"$glyph"}
         fi
@@ -1925,14 +1939,15 @@ EOF
         "$FM_COMPOSER_SCAN_LEFTBAR_START" "$FM_COMPOSER_SCAN_LEFTBAR_END"
       return 0
     fi
+    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ] \
+       && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+       && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+      _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity"
+      return 0
+    fi
     if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$FM_COMPOSER_SCAN_BARE_ROW" ]; then
-      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-         && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-         && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" "$cy"
-      else
-        _fm_composer_classify_bare_row "$screen" "$styled" "$cy"
-      fi
+      _fm_composer_classify_bare_row "$screen" "$styled" "$cy"
       return 0
     fi
     # A bare composer's WRAP region: long typed input wraps below the glyph
@@ -1978,14 +1993,13 @@ EOF
         "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
       ;;
     bare)
-      if [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
+      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+         && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
+         && [ "$FM_COMPOSER_SELECTED_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+        _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity"
+      elif [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
         _fm_composer_classify_bare_wrap "$screen" "$styled" \
           "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
-      elif [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-         && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-         && [ "$FM_COMPOSER_SELECTED_FIRST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        _fm_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" \
-          "$FM_COMPOSER_SELECTED_FIRST"
       else
         _fm_composer_classify_bare_row "$screen" "$styled" "$FM_COMPOSER_SELECTED_FIRST"
       fi
@@ -2064,25 +2078,25 @@ _fm_composer_classify_pi_rows() {  # <screen> <styled>
   printf 'empty'
 }
 
-_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> <bare-row>
-  local screen=$1 styled=$2 has_identity=$3 identity=$4 row=$5 agent
-  if [ "$has_identity" != 1 ]; then
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
-    return 0
+_fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity>
+  local screen=$1 styled=$2 has_identity=$3 identity=$4 agent first last
+  if [ "$has_identity" = 1 ]; then
+    if [ -z "$identity" ]; then
+      printf 'need-identity'
+      return 0
+    fi
+    agent=${identity%%$'\t'*}
+    if [ "$agent" = pi ]; then
+      _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+      return 0
+    fi
   fi
-  if [ -z "$identity" ]; then
-    printf 'need-identity'
-    return 0
-  fi
-  if [ "$identity" = probe-absent ]; then
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
-    return 0
-  fi
-  agent=${identity%%$'\t'*}
-  if [ "$agent" = pi ]; then
-    _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+  first=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+  last=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  if [ "$first" = "$last" ]; then
+    _fm_composer_classify_bare_row "$screen" "$styled" "$first"
   else
-    _fm_composer_classify_bare_row "$screen" "$styled" "$row"
+    _fm_composer_classify_bare_wrap "$screen" "$styled" "$first" "$last" "$FM_COMPOSER_SCAN_PI_GLYPH_ROW"
   fi
 }
 

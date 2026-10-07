@@ -250,6 +250,56 @@ while [ "$i" -lt 20 ]; do
 done
 [ "$state" = empty ] || fail "$SUBJECT: the cleared titled-border composer read '$state', not empty"
 
+MULTILINE_DRAFT=$'keep this unsent text\n❯'
+MULTILINE_CONTENT='keep this unsent text ❯'
+fm_backend_herdr_send_literal "$TARGET" "$MULTILINE_DRAFT" \
+  || fail "$SUBJECT: could not type a multiline draft into the titled-border composer"
+i=0
+content=
+while [ "$i" -lt 20 ]; do
+  sleep 1
+  content=$(fm_backend_herdr_composer_content "$TARGET" claude) || content=
+  [ "$content" != "$MULTILINE_CONTENT" ] || break
+  i=$((i + 1))
+done
+[ "$content" = "$MULTILINE_CONTENT" ] \
+  || fail "$SUBJECT: multiline composer content lost draft rows or the later glyph: '$content'"
+screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
+titled_over_prompt "$screen" \
+  || fail "$SUBJECT: the multiline draft no longer has a titled composer border"
+state=$(fm_backend_herdr_composer_state "$TARGET")
+[ "$state" = pending ] \
+  || fail "$SUBJECT: a titled-border composer holding a multiline draft read '$state', not pending"
+if out=$(control "$TASK_ID" exit); then
+  fail "$SUBJECT: fm-control exit typed over a pending multiline draft: $out"
+fi
+case "$out" in
+  *'composer visibly holds pending text'*) ;;
+  *) fail "$SUBJECT: fm-control exit did not name the pending multiline draft: $out" ;;
+esac
+[ ! -e "$CONTROL_HOME/state/$TASK_ID.control-exit" ] \
+  || fail "$SUBJECT: a refused multiline exit left a deliberate-exit marker"
+content=$(fm_backend_herdr_composer_content "$TARGET" claude) \
+  || fail "$SUBJECT: could not read multiline content after the refused exit"
+[ "$content" = "$MULTILINE_CONTENT" ] \
+  || fail "$SUBJECT: the refused exit changed the multiline draft: '$content'"
+pass "live claude titled border: $SUBJECT retains a multiline draft and its later glyph, reads pending, and refuses exit without typing"
+
+fm_backend_herdr_composer_clear "$TARGET" "$MULTILINE_DRAFT" "$(fm_backend_herdr_composer_identity "$TARGET")" \
+  || fail "$SUBJECT: could not safely clear the multiline draft"
+i=0
+state=
+while [ "$i" -lt 20 ]; do
+  state=$(fm_backend_herdr_composer_state "$TARGET")
+  [ "$state" != empty ] || break
+  i=$((i + 1))
+  sleep 1
+done
+[ "$state" = empty ] || fail "$SUBJECT: the cleared multiline composer read '$state', not empty"
+content=$(fm_backend_herdr_composer_content "$TARGET" claude) \
+  || fail "$SUBJECT: could not read content after clearing the multiline draft"
+[ -z "$content" ] || fail "$SUBJECT: clearing left multiline draft content: '$content'"
+
 if [ "${FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND:-0}" = 1 ]; then
   INBOX="$CONTROL_HOME/state/$TASK_ID.inbox"
   out=$(FM_HOME="$CONTROL_HOME" "$ROOT/bin/fm-send.sh" "$TASK_ID" \

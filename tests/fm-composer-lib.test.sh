@@ -247,6 +247,59 @@ test_matrix_claude_titled_top_border() {
   pass "matrix: claude's titled top border reads empty when idle and pending when typed on every profile"
 }
 
+assert_selected_content() {
+  local label=$1 want=$2 out
+  shift 2
+  out=$(fm_composer_extract_selected_content "$@") \
+    || fail "$label: selected content extraction failed"
+  [ "$out" = "$want" ] || fail "$label: expected '$want', got '$out'"
+  out=$(LC_ALL=C fm_composer_extract_selected_content "$@") \
+    || fail "$label under LC_ALL=C: selected content extraction failed"
+  [ "$out" = "$want" ] || fail "$label under LC_ALL=C: expected '$want', got '$out'"
+}
+
+assert_multiline_rule_pair() {
+  local label=$1 screen=$2 want=$3 first=$4 last=$5 claude_idle cursor
+  claude_idle=$(printf 'claude\tidle')
+  assert_screen "$label on idle Herdr Claude" pending "$CAPS_STYLED" "$screen" '' "$claude_idle"
+  assert_selected_content "$label on styled capture" "$want" "$CAPS_STYLED" "$screen"
+  assert_screen "$label requests lazy Herdr identity" need-identity "$CAPS_STYLED" "$screen"
+  assert_screen "$label after absent Herdr identity probe" pending "$CAPS_STYLED" "$screen" '' probe-absent
+  assert_screen "$label on Zellij without identity" pending "$CAPS_STYLED_NOID" "$screen"
+  assert_screen "$label on plain capture" unknown "$CAPS_PLAIN" "$screen"
+  assert_selected_content "$label on plain capture" "$want" "$CAPS_PLAIN" "$screen"
+  cursor=$first
+  while [ "$cursor" -le "$last" ]; do
+    assert_screen "$label on tmux row $cursor" pending "$CAPS_TMUX" "$screen" "$cursor" probe-absent
+    cursor=$((cursor + 1))
+  done
+}
+
+test_multiline_rule_pair_retains_all_interior_rows() {
+  local top bottom screen earlier later
+  bottom='────────────────'
+  for top in '──────── Session ─' "$bottom"; do
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top concrete multiline draft" "$screen" 'keep this unsent text ❯' 2 3
+    screen=$'transcript line\n'"$top"$'\n❯ keep this unsent text\n\n ordinary continuation\n ❯\n\n final continuation\n'"$bottom"
+    assert_multiline_rule_pair "$top blank and ordinary continuations" "$screen" 'keep this unsent text ordinary continuation ❯ final continuation' 2 7
+    screen=$'transcript line\n'"$top"$'\n❯\n\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top empty proof with a later glyph" "$screen" '❯' 2 4
+    screen=$'transcript line\n'"$top"$'\n\n❯ keep this unsent text\n\n ❯\n'"$bottom"
+    assert_multiline_rule_pair "$top leading blank before proof" "$screen" 'keep this unsent text ❯' 2 5
+    earlier=$'────────────────\n❯ old draft\n────────────────\n\n'"$screen"
+    assert_screen "$top real earlier composer does not replace multiline draft" pending "$CAPS_STYLED_NOID" "$earlier"
+    assert_selected_content "$top real earlier composer does not replace multiline draft" 'keep this unsent text ❯' "$CAPS_STYLED_NOID" "$earlier"
+    later="$screen"$'\n\n────────────────\n❯\n────────────────'
+    assert_screen "$top later real empty composer wins" empty "$CAPS_STYLED_NOID" "$later"
+    assert_selected_content "$top later real empty composer wins" '' "$CAPS_STYLED_NOID" "$later"
+    later="$screen"$'\n\n────────────────\n❯ newer draft\n────────────────'
+    assert_screen "$top later real pending composer wins" pending "$CAPS_STYLED_NOID" "$later"
+    assert_selected_content "$top later real pending composer wins" 'newer draft' "$CAPS_STYLED_NOID" "$later"
+  done
+  pass "multiline rule pairs retain every interior row and strip only the proving prompt glyph"
+}
+
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape() {
   # A titled rule only OPENS a composer pair, and the pair needs the agent glyph
   # row inside it. Anything short of that exact shape keeps the refusal.
@@ -1258,6 +1311,7 @@ test_real_text_is_pending
 test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
+test_multiline_rule_pair_retains_all_interior_rows
 test_claude_titled_top_border_needs_glyph_proof_and_exact_shape
 test_composer_footer_demotion_needs_a_proven_pair
 test_composer_footer_zone_is_shape_independent
