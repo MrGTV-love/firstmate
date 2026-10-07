@@ -90,6 +90,7 @@ fm_session_launch_policy_refusal_notify() {
     printf '%s\n' "$key" >> "$marker" || exit 1
     [ "$new" = 0 ] || printf '%s' "$reason"
   ) || return 1
+  # shellcheck disable=SC2034 # Output is read by the sourcing recovery owners.
   FM_SESSION_LAUNCH_REFUSAL_WAKE=$notified
   return 0
 }
