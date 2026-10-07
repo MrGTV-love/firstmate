@@ -371,7 +371,7 @@
 #   worktree, or record exists; the wrapper checks again in the pane rather
 #   than launch Claude unproxied.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
-#     __BRIEF__    absolute path to data/<task-id>/brief.md
+#     __BRIEF__    absolute path to the worker launch-brief.md or secondmate charter/brief
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
 #     __CLAUDEBIN__ the quoted claude executable selected by config/claude-launcher
 #     __CLAUDEADDDIRS__ quoted --add-dir flags granting exactly this task's
