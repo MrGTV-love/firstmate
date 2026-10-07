@@ -27,6 +27,7 @@ make_case() {
   ID="launch-policy-$RUN_TAG-$name"
   CHILD_HOME=
   CASE_TMPDIR=
+  CASE_ROOT=
   INHERIT_REPORT=
   EXPECT_CHILD_POLICY=0
   SKIP_CHILD_INHERIT=0
@@ -133,7 +134,7 @@ run_cli() {
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     FM_HOME="$HOME_DIR" HOME="$HOME_DIR/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+    FM_ROOT_OVERRIDE="$CASE_ROOT" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_SPAWN_NO_GUARD=1 \
     FM_FAKE_PANE_PATH="$WT" FM_POLICY_CASE="$CASE" FM_POLICY_ID="$ID" \
     FM_POLICY_CHILD="$CHILD_HOME" FM_POLICY_EXPECT_ENABLED="$EXPECT_CHILD_POLICY" \
@@ -182,6 +183,11 @@ assert_preserved() {
 make_secondmate_case() {
   local name=$1 harness=$2 entry=$3
   make_case "$name" "$harness"
+  # Keep the logical code root beside the child even when TMPDIR is under ROOT.
+  # Only link the source resources; execute the real scripts and keep fixtures local.
+  CASE_ROOT="$CASE/project"
+  ln -s "$ROOT/bin" "$CASE_ROOT/bin"
+  ln -s "$ROOT/.omp" "$CASE_ROOT/.omp"
   CHILD_HOME=$WT
   SKIP_CHILD_SYNC=1
   CASE_TMPDIR="$CASE/tmp"

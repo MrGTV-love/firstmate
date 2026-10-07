@@ -31,7 +31,7 @@ When activation is permitted, it runs beside a Claude, Cursor, OpenCode, omp, Gr
 - Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
 - Away (the record exists), the host hands each close to the engine.
   Main stays parked unless the host hands the wake back.
-- `/afk` launches no away daemon on an opted-in home of those harnesses, because the host is the away session there.
+- `/afk` launches no away daemon on an opted-in home of those harnesses even if host activation is refused; the [away procedure](../.agents/skills/afk/SKILL.md#entering-afk-words) owns entry and main-side handling.
 - `/quiet` enters nothing where the attended host runs, and elsewhere launches the daemon; see [Quiet mode](#quiet-mode).
   While the daemon's flag `state/.afk` exists, the host stands aside exactly as the plain arm does.
 - Pi keeps its in-process branch whether or not the file exists, and no Pi engine is built.

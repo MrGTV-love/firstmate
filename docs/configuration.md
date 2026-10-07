@@ -300,7 +300,7 @@ Both choices are local to each Firstmate home and are not part of secondmate inh
 
 ## Supervision host (config/supervision-host)
 
-The optional local, gitignored `config/supervision-host` enables a supervision host for this home.
+The optional local, gitignored `config/supervision-host` selects a supervision host for this home.
 The host runs the supervision branch's contract on a headless engine session beside a non-Pi primary.
 [docs/supervision-host.md](supervision-host.md) defines its design, current scope, and verified engines.
 A Claude, Cursor, OpenCode, omp, Grok, or Codex primary can run the host.
@@ -319,7 +319,7 @@ The file may be empty, or hold one line `<engine> [<model>]`:
 - empty or `default` selects the primary harness's own engine at that engine's default model (`sonnet` for the Claude engine);
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
-Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
+When host activation is permitted, a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file because only Claude has a verified engine of its own.
 
 ### Failures and when changes apply
 
@@ -784,7 +784,7 @@ Those inherited values are defaults and rules only; explicit runtimes remain sub
 
 The optional local, gitignored `config/session-launch-policy` contains exactly `omp-or-tc`, with an optional single trailing newline.
 The shared template leaves this restriction off by default: absence preserves existing launch behavior, including standalone Codex launches.
-Enabling it in each captain home is the operator's responsibility; Main owns that activation for the captain's fleet.
+Enabling it in each captain home is the operator's responsibility.
 An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
 Local recovery converges this setting before stopping the old endpoint and refuses if the child restriction cannot be established, while unrelated inheritance remains best-effort.
