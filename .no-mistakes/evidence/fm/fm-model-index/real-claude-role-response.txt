@@ -1,0 +1,6 @@
+$ bin/fm-model-index.sh model claude role:opus-grade
+opus
+$ claude -p <literal confirmation prompt> --model opus --no-session-persistence --setting-sources "" --tools ""
+FM_MODEL_INDEX_LIVE_OK
+
+exit=0

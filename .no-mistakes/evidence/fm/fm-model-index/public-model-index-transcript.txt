@@ -1,0 +1,393 @@
+## Resolve strongest Codex role
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model codex role:opus-grade
+gpt-6.1-sol
+
+exit=0
+
+## Resolve explicit Claude stand-in
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model claude stand-in:opus-grade
+sonnet
+
+exit=0
+
+## Resolve dispatch to concrete profile
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-6.1-sol"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## One index edit changes unchanged dispatch
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-next-release"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## Prior generation selected directly refuses
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model codex gpt-6-sol
+model-index: warning: literal model 'gpt-6-sol' for codex is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: gpt-6-sol
+
+exit=5
+
+## Qualified context-suffixed retired model refuses
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model omp provider/gpt-6-sol[1m]
+model-index: warning: literal model 'provider/gpt-6-sol[1m]' for omp is not an index entry; name its role so the next model release is one index edit
+jq: error (at <stdin>:4): retired model: provider/gpt-6-sol[1m]
+
+exit=5
+
+## Current registry and historical prose pass
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+model-index: registry checked; no retired identifiers
+
+exit=0
+
+## Registry retired keys and qualified ids refuse
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+model-index: retired id 'gpt-6-sol' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+model-index: retired id 'provider/gpt-6-sol[1m]' in registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+
+exit=2
+
+## Concatenated index version 1 refuses role resolution
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model codex role:opus-grade
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/model-index.json
+
+exit=2
+
+## Concatenated index version 1 refuses registry checking
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/model-index.json
+
+exit=2
+
+## Concatenated index version 2 refuses role resolution
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh model codex role:opus-grade
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/model-index.json
+
+exit=2
+
+## Concatenated index version 2 refuses registry checking
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check-registry /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/registry.json
+model-index: malformed index: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/home/config/model-index.json
+
+exit=2
+
+## Real Claude catalog accepts listed id and refuses absent id
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check
+model-index: id 'fm-intentionally-absent-model-index-guard' absent or retired in claude catalog (role 'absent')
+
+exit=2
+
+## Real Claude catalog accepts listed role
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check
+model-index: active ids checked; none absent or retired
+
+exit=0
+
+## Readable authoritative export accepts configured models
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check codex
+model-index: active ids checked; none absent or retired
+
+exit=0
+
+## Readable authoritative export missing selected id refuses
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check codex gpt-6.1-sol
+model-index: id 'gpt-6.1-sol' absent or retired in codex catalog (role 'opus-grade')
+
+exit=2
+
+## Concatenated catalog reports unavailable evidence instead of contradiction
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check codex gpt-6.1-sol
+model-index: notice: codex catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'gpt-6.1-sol' (role 'opus-grade') not validated
+
+exit=0
+
+## Missing authoritative export reports uncertainty without inventing refusal
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check codex gpt-6.1-sol
+model-index: notice: codex catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'gpt-6.1-sol' (role 'opus-grade') not validated
+
+exit=0
+
+## Inherited routing is usable in destination home
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+
+exit=0
+
+## Destination resolves propagated role
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-6.1-sol"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## Single primary index edit propagates to lane
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+
+exit=0
+
+## Lane unchanged dispatch selects new model
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-next-release"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## Removing role preserves both destination routing members
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/tmp/fm-config-inherit-pair.HhBRMm/crew-dispatch.json:0): role or stand-in not configured: codex:opus-grade
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/tmp/fm-config-inherit-pair.HhBRMm/crew-dispatch.json:0): role or stand-in not configured: codex:opus-grade
+
+exit=1
+
+Persisted-state assertion: both routing members retained=True; unrelated crew-harness converged=True
+
+## Missing index with role dispatch preserves pair
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/tmp/fm-config-inherit-pair.gxVr5F/crew-dispatch.json:0): role or stand-in not configured: codex:easy
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/tmp/fm-config-inherit-pair.gxVr5F/crew-dispatch.json:0): role or stand-in not configured: codex:easy
+
+exit=1
+
+## Destination directory guard withholds sibling index
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: destination does not allow inherited item (not gitignored or guard failed)
+
+exit=0
+
+## Stage and validate routing generation
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$SOURCE/config" "$STAGE" && fm_config_inherit_pair_valid "$STAGE"
+
+exit=0
+
+## Publish validated selection after primary mutation
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+
+exit=0
+
+## Destination still consumes frozen valid pair
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-6.1-sol"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## Both-source absence converges without jq
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-destination/config: bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source dispatch-never-send at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/dispatch-never-send
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source crew-harness at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/crew-harness
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source backlog-backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/backlog-backend
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source backend at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/backend
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source herdr-presentation-spaces at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/herdr-presentation-spaces
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source startup-memory-budget at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/startup-memory-budget
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source trace-context at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/trace-context
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source launch-env-allowlist at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/launch-env-allowlist
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source claude-permission-mode at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/claude-permission-mode
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source claude-launcher at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/claude-launcher
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source lavish-axi-host at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/lavish-axi-host
+bin/fm-config-inherit-lib.sh: line 114: perl: command not found
+fm-config-inherit: error: cannot inspect primary source keep-ai-trailers at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/inherit-source/config/keep-ai-trailers
+
+exit=1
+
+Persisted-state assertion: absence removed both routing files=False
+
+Setup correction: restricted no-jq PATH initially also omitted required Perl; exposed installed Perl without jq and re-drove absence convergence.
+
+## Both-source absence converges without jq
+$ bash -c source bin/fm-config-inherit-lib.sh; propagate_secondmate_inheritance "$SOURCE" "$DEST"
+
+exit=0
+
+Persisted-state assertion: both routing files removed=True; jq executable absent from restricted PATH=True
+
+## Real receiver publishes model-index.json
+$ fm-remote-inherit.sh put config/model-index.json 197 bdc911e41ebb54185c5e530de870b033294f32b5998b8bb2ad52931761ede87c 1
+pushed: config/model-index.json
+
+exit=0
+
+## Real receiver publishes crew-dispatch.json
+$ fm-remote-inherit.sh put config/crew-dispatch.json 150 08d93853d233626bcdf6fb485417869429af00661f5cb6031056924efb9b6bdf 1
+pushed: config/crew-dispatch.json
+
+exit=0
+
+## Receiver home resolves inherited routing
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh profiles /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/receiver-home/config/crew-dispatch.json
+{
+  "default": {
+    "harness": "codex",
+    "effort": "high",
+    "model": "gpt-6.1-sol"
+  },
+  "rules": [
+    {
+      "when": "routine",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-6-luna"
+      }
+    }
+  ]
+}
+
+exit=0
+
+## Receiver preflight refuses linked sibling
+$ fm-remote-inherit.sh check config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2
+error: inherited destination is a symlink
+
+exit=1
+
+## Receiver put refuses linked sibling
+$ fm-remote-inherit.sh put config/model-index.json 197 bdc911e41ebb54185c5e530de870b033294f32b5998b8bb2ad52931761ede87c 2
+error: inherited destination is a symlink
+
+exit=1
+
+## Receiver absence refuses linked sibling
+$ fm-remote-inherit.sh absent config/model-index.json 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 2
+error: inherited destination is a symlink
+
+exit=1
+
+## Receiver rejects payload beyond transfer bound
+$ fm-remote-inherit.sh put config/model-index.json 1048774 807dad9f21e3db641611d36ecdefc8080eaef1bf6d4c844c4e4577268d548749 2
+error: expected bytes exceed the byte bound
+
+exit=1
+
+## Remote pair staging refuses model-index.json symlink
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-model-index.json-symlink/model-index.json
+
+exit=1
+
+## Remote pair staging refuses model-index.json hardlink
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-model-index.json-hardlink/model-index.json
+
+exit=1
+
+## Remote pair staging refuses model-index.json oversize
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-model-index.json-oversize/model-index.json
+
+exit=1
+
+## Remote pair staging refuses crew-dispatch.json symlink
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-crew-dispatch.json-symlink/crew-dispatch.json
+
+exit=1
+
+## Remote pair staging refuses crew-dispatch.json hardlink
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source has unsafe links: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-crew-dispatch.json-hardlink/crew-dispatch.json
+
+exit=1
+
+## Remote pair staging refuses crew-dispatch.json oversize
+$ bash -c source bin/fm-config-inherit-lib.sh; fm_config_inherit_pair_stage "$CONFIG" "$STAGE" 1
+routing source exceeds 1048576 bytes: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/remote-stage-crew-dispatch.json-oversize/crew-dispatch.json
+
+exit=1
+
+## Real omp catalog accepts listed provider model and refuses absent id
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check
+model-index: id 'google/fm-intentionally-absent-model-index-guard' absent or retired in omp catalog (role 'absent')
+
+exit=2
+
+## Real omp catalog accepts listed current model
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/bin/fm-model-index.sh check
+model-index: active ids checked; none absent or retired
+
+exit=0

@@ -1,0 +1,206 @@
+$ product-snapshot/bin/fm-home-seed.sh routing-lane <isolated lane home> --no-projects
+scaffolded: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home/data/routing-lane/brief.md (secondmate charter)
+home=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane
+
+exit=0
+
+## routing-push-live
+$ bin/fm-config-push.sh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+secondmate routing-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane):
+  model-index.json: pushed
+  crew-dispatch.json: pushed
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate routing-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+exit=1
+
+Lane consumer profiles:
+{
+  "default": {
+    "harness": "claude",
+    "model": "default"
+  }
+}
+
+## routing-push-one-edit
+$ bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+secondmate routing-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane):
+  model-index.json: pushed
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: pushed
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate routing-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+exit=1
+
+After one index edit, unchanged dispatch:
+{
+  "default": {
+    "harness": "claude",
+    "model": "opus"
+  }
+}
+
+Validation limit: both positive pushes published and consumed the expected routing bytes, but exited 1 solely because nested reread fm-send sets FM_ROOT_OVERRIDE and FM_STATE_OVERRIDE, which the mandatory marked-lab allowance rejects. No bypass was used; successful reread delivery is not claimed.
+
+## routing-push-catalog-refusal
+$ bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+model-index: id 'fm-intentionally-absent-model-index-guard' absent or retired in claude catalog (role 'strong')
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate routing-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane):
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate routing-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+exit=1
+Persisted-state contract: prior pair retained=True; unrelated crew-harness converged=True
+
+## routing-push-removed-role
+$ bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+jq: error (at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/tmp/fm-config-push-pair.LBrury/crew-dispatch.json:0): role or stand-in not configured: claude:strong
+config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun
+secondmate routing-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane):
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate routing-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+exit=1
+Persisted-state contract: removed role retained prior pair=True
+
+Owned private tmux server stopped; helper-owned socket teardown exit=0
+
+## Post-validation source mutation
+Stopped only our config-push PID after its native catalog validation and before routing publication; removed strong role and dispatch from primary; resumed same process.
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+secondmate routing-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-lane):
+  model-index.json: pushed
+  crew-dispatch.json: unchanged
+  dispatch-never-send: unchanged
+  crew-harness: unchanged
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: unchanged
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate routing-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+Validated pair retained byte-for-byte=True; stop before index pushed=True
+
+## Real both-source absence without jq
+Setup correction: no-jq dependency directory initially omitted sh/sleep; supplied those installed binaries while the bounded caller was running, without exposing jq.
+ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 39: exec: sh: not found
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/product-snapshot/bin/fm-wake-lib.sh: line 1178: sleep: command not found
+  config-reread: error - could not acquire per-home lock
+
+exit=1; both destination routing files removed=False
+
+## routing-push-absence-no-jq-corrected
+$ bin/fm-config-push.sh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+config-push: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-live-home -> live secondmate homes
+secondmate absence-lane (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A2J6ENDRSX124XXEZ5XC1T/.model-index-live-gv2l20hb/push-absence-lane):
+  model-index.json: pushed - mirrored primary absence
+  crew-dispatch.json: pushed - mirrored primary absence
+  dispatch-never-send: unchanged
+  crew-harness: pushed
+  backlog-backend: unchanged
+  backend: unchanged
+  herdr-presentation-spaces: unchanged
+  startup-memory-budget: pushed
+  trace-context: unchanged - session-scoped
+  launch-env-allowlist: unchanged
+  claude-permission-mode: unchanged
+  claude-launcher: unchanged
+  lavish-axi-host: unchanged
+  keep-ai-trailers: unchanged
+  data/captain-shared.md: unchanged
+CONFIG_REREAD: secondmate absence-lane: send failed: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+exit=1
+Corrected no-jq fixture: required sh/sleep now present; fresh product-seeded receiver avoids failed setup lock. Both routing files removed=True. Successful notification still not claimed.

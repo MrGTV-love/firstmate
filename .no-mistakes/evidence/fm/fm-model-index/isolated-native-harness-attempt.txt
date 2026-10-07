@@ -1,0 +1,5 @@
+omp apple/on-device: no response; process timed out at 65s.
+Isolated Claude attempt initially had prompt swallowed by greedy --tools parsing; corrected prompt-before-flags.
+claude -p <literal confirmation prompt> --model default --no-session-persistence --setting-sources "" --tools ""; CLAUDE_CONFIG_DIR=worktree fixture, stdin=/dev/null
+exit=1
+Not logged in · Please run /login

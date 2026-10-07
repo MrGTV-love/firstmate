@@ -1,0 +1,25 @@
+ok - roles select the correct harness id and only explicitly configured stand-ins
+ok - entry membership is exact, per-harness, and includes configured stand-ins
+ok - one index edit changes the next selection; literal ids work but warn while an index exists
+ok - retired literals, qualified ids, context-suffixed ids, index entries, and alias targets are refused; Claude ids match listed suffixed or base forms
+ok - registry comparison reports every retired token key and value offline, rejects invalid inputs and missing index, and leaves inputs unchanged
+ok - concatenated valid or invalid index objects cannot split resolution, membership, catalog checking, and registry policy
+ok - the index-edit check refuses any absent id; a selected-entry check reads only its own entry
+ok - unavailable, empty, undiscoverable, and extension-provider catalogs are notices; a listed provider with an absent id refuses
+ok - multi-document and malformed catalog exports remain unavailable evidence, not contradictory evidence
+ok - conflicting profile axes and misspelled index fields are actionable errors
+ok - homes without an index keep literal compatibility but cannot resolve roles
+model-index: active ids checked; none absent or retired
+ok - native Codex, Claude initialization with a context-suffixed alias, omp selector, and padded, colored Cursor catalogs are checked
+ok - secondmate inheritance changes the model selected by the destination home
+ok - local pair guards retain both members in either direction for copy and absence while unrelated items converge
+ok - local pair propagation still safely replaces or removes destination symlinks and hardlinks
+ok - bootstrap and local launch refuse removed-role and missing-index pairs offline, preserve resolvable destination routing, and honor selected frozen pairs
+ok - real local and remote inheritance consume the frozen pair after native catalog mutation, including staged dispatch absence
+ok - remote sender and direct receiver guard both pair members for put and absent; refusal preserves unrelated propagation
+ok - bootstrap and remote launch refuse incoherent source routing while real receiver convergence continues, and publish valid selected pairs without live catalog checks
+ok - automatic remote source guards withhold both members before transfer for either unsafe source while local source links remain consumable
+ok - automatic local and remote boundaries publish validated bytes and absences after source replacement, removal, and late appearance of either member
+ok - both-source absence removes routing without jq at local, remote, and config-push boundaries while either present member still requires validation
+ok - fm-config-push withholds an index with an absent id together with its dispatch profiles, pushes with a notice when catalogs are unreadable, pushes a valid pair, and reads each catalog under only its own worker account pin
+# all fm-model-index tests passed
