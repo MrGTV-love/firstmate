@@ -870,7 +870,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_GLYPH=
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
-  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0
+  local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_open_titled=0 pi_open_indent=''
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   pi_max=$FM_COMPOSER_PI_MAX_LINES
@@ -917,7 +917,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # closes the preceding candidate and immediately opens the next, so an
     # earlier transcript rule can never outrank the live bottom composer pair.
     if _fm_composer_pi_separator_row "$trimmed"; then
-      if [ -n "$indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
+      if [ "$indent" != "$pi_open_indent" ] && [ "$pi_glyph_row" -ge 0 ]; then
         FM_COMPOSER_SCAN_UNSAFE=1
       fi
       if [ "$pi_glyph_row" -ge 0 ] \
@@ -948,6 +948,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
       fi
       pi_open=$row
+      pi_open_indent=$indent
       pi_open_titled=0
       pi_lines=0
       pi_glyph_row=-1
@@ -960,6 +961,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       # transcript row can never end a composer region.
       FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
       pi_open=$row
+      pi_open_indent=$indent
       pi_open_titled=1
       pi_lines=0
       pi_glyph_row=-1

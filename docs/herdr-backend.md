@@ -721,6 +721,7 @@ Unpaired bare agent-glyph rows and left-bar rows carrying trailing non-idle text
 That refusal defers injection and eventually raises the wedge alarm.
 A proven prompt-bearing rule pair instead retains its entire interior: any nonblank content surviving the capture's styling policy and removal of the single proving prompt glyph reads `pending`, even in a plain capture.
 Complete pasted containers, literal side characters, later prompt glyphs, and Braille remain draft content rather than nested-composer or animation furniture.
+Rendered rule pairs may be indented, provided the opening and closing rules have the same indentation.
 Ambiguous rule continuations and unsafe geometry still refuse proof; exact selection and refusal predicates are owned by `bin/fm-composer-lib.sh`.
 The captured Claude shape, focused regression pointers, and live lifecycle refresh command are recorded in [Claude titled top border through Herdr](verification/runtime-backends.md#2026-10-06-claude-titled-top-border-through-herdr).
 

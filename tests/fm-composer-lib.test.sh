@@ -275,6 +275,34 @@ assert_multiline_rule_pair() {
   done
 }
 
+test_rule_pair_equal_indentation() {
+  local top bottom screen caps draft want verdict claude_idle
+  bottom='────────────────'
+  claude_idle=$(printf 'claude\tidle')
+  for top in '──────── Session ─' "$bottom"; do
+    for draft in '' 'keep this unsent text'; do
+      want=$draft
+      verdict=empty
+      [ -z "$draft" ] || verdict=pending
+      screen=$'transcript line\n  '"$top"$'\n  ❯ '"$draft"$'\n  '"$bottom"
+      assert_screen "$top equally indented $verdict on cursor" "$verdict" "$CAPS_TMUX" "$screen" 2 probe-absent
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "$top equally indented $verdict cursorless" "$verdict" "$caps" "$screen" '' "$claude_idle"
+        assert_selected_content "$top equally indented $verdict extraction" "$want" "$caps" "$screen"
+      done
+      assert_selected_content "$top equally indented $verdict tmux extraction" "$want" "$CAPS_TMUX" "$screen"
+    done
+    # A less-indented closing rule is also a mismatch, not a proven pair.
+    screen=$'transcript line\n  '"$top"$'\n  ❯ keep this unsent text\n'"$bottom"
+    assert_screen "$top outdented closer on cursor" unknown "$CAPS_TMUX" "$screen" 2 probe-absent
+    assert_screen "$top outdented closer cursorless" unknown "$CAPS_STYLED_NOID" "$screen"
+    if fm_composer_extract_selected_content "$CAPS_STYLED_NOID" "$screen"; then
+      fail "$top outdented closer must refuse extraction"
+    fi
+  done
+  pass "equally indented plain and titled rule pairs classify and extract while mismatched closers refuse"
+}
+
 test_multiline_rule_pair_retains_all_interior_rows() {
   local top bottom screen earlier later
   bottom='────────────────'
@@ -1439,6 +1467,7 @@ test_real_text_is_pending
 test_matrix_claude_bare_nbsp_row
 test_matrix_claude_arrow_statusline_footer
 test_matrix_claude_titled_top_border
+test_rule_pair_equal_indentation
 test_multiline_rule_pair_retains_all_interior_rows
 test_rule_pair_continuations_never_prove_empty
 test_rule_pair_pasted_containers_remain_literal
