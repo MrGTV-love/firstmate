@@ -1,0 +1,6 @@
+[
+  {
+    "name": "001.msg",
+    "content": "schema=fm-task-inbox.v1\nat=2026-10-07T04:06:57Z\n--\nLavish review feedback is captured for task board-worker at /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/state/procevent-inbox/lavish-a0e6a52469642be0.1.result. Read it with bin/fm-procevent-lavish.sh read /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/state/procevent-inbox/lavish-a0e6a52469642be0.1.result, apply the round, and re-arm the board with the reply."
+  }
+]

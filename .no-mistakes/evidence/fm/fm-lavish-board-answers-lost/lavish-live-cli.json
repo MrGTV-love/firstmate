@@ -1,0 +1,498 @@
+[
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html\n  url: \"http://127.0.0.1:56033/session/dd298740f52a1688?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: this board has page scripts that do not parse, so an answer entered on it would be lost: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html\n  <form> question d5-branch-pointer onsubmit (line 1): Unexpected identifier 's'\nfix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: this board has page scripts that do not parse, so an answer entered on it would be lost: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html\n  <form> question d5-branch-pointer onsubmit (line 1): Unexpected identifier 's'\nfix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-dd298740f52a1688\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html\n  url: \"http://127.0.0.1:56033/session/aef46366ddbe4b80?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: this board has page scripts that do not parse, so an answer entered on it would be lost: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html\n  inline script (line 1): Unexpected token ';'\nfix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: this board has page scripts that do not parse, so an answer entered on it would be lost: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html\n  inline script (line 1): Unexpected token ';'\nfix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/script-comments.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-aef46366ddbe4b80\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html"
+    ],
+    "rc": 0,
+    "stdout": "check: ok handlers=1 scripts=1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html"
+    ],
+    "rc": 0,
+    "stdout": "check: ok handlers=1 scripts=1\n",
+    "stderr": "warning: this board has inline form handlers but no data-fm-lavish-form-guard script; a form that fails to cancel its own submit would lose the answer silently. Add .agents/skills/bearings/assets/lavish-form-guard.html: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html"
+    ],
+    "rc": 0,
+    "stdout": "check: ok handlers=1 scripts=1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "check",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html"
+    ],
+    "rc": 0,
+    "stdout": "check: ok handlers=1 scripts=1\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound-alias.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html\n  url: \"http://127.0.0.1:56033/session/22db081534d6fd27?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound-alias.html"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-22db081534d6fd27 (lavish)\narmed: lavish-22db081534d6fd27\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-22db081534d6fd27\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound-alias.html"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-22db081534d6fd27 (lavish)\nstill-listening: lavish-22db081534d6fd27\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound.html\nnote: an earlier listener is still live and serving this board; this registration takes effect only after the source is retired and armed again\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/sound-alias.html"
+    ],
+    "rc": 0,
+    "stdout": "retired: lavish-22db081534d6fd27\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html\n  url: \"http://127.0.0.1:56033/session/df2c0f1fd526d127?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-df2c0f1fd526d127 (lavish)\narmed: lavish-df2c0f1fd526d127\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html\n",
+    "stderr": "warning: this board has inline form handlers but no data-fm-lavish-form-guard script; a form that fails to cancel its own submit would lose the answer silently. Add .agents/skills/bearings/assets/lavish-form-guard.html: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-df2c0f1fd526d127\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html\n  url: \"http://127.0.0.1:56033/session/d1cacd3667e08982?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-d1cacd3667e08982 (lavish)\narmed: lavish-d1cacd3667e08982\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-d1cacd3667e08982\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "answers",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/state/procevent-inbox/lavish-d1cacd3667e08982.1.result"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/commented.html"
+    ],
+    "rc": 0,
+    "stdout": "retired: lavish-df2c0f1fd526d127\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/guard-failure.html"
+    ],
+    "rc": 0,
+    "stdout": "retired: lavish-d1cacd3667e08982\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tmux",
+      "-S",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-socket",
+      "new-session",
+      "-d",
+      "-s",
+      "fm-lab-validation",
+      "-x",
+      "100",
+      "-y",
+      "30",
+      "-c",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP",
+      "sleep 300"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tmux",
+      "-S",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-socket",
+      "display-message",
+      "-p",
+      "-t",
+      "fm-lab-validation",
+      "#{socket_path},#{pane_id}"
+    ],
+    "rc": 0,
+    "stdout": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-socket,%0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html\n  url: \"http://127.0.0.1:56033/session/599b428a1f81ce1b?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-599b428a1f81ce1b (lavish)\narmed: lavish-599b428a1f81ce1b\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-599b428a1f81ce1b\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/skipped.html"
+    ],
+    "rc": 0,
+    "stdout": "retired: lavish-599b428a1f81ce1b\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tmux",
+      "-S",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-socket",
+      "rename-window",
+      "-t",
+      "fm-lab-validation:0",
+      "fm-board-worker"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html",
+      "--no-open",
+      "--no-gate"
+    ],
+    "rc": 0,
+    "stdout": "session:\n  file: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html\n  url: \"http://127.0.0.1:56033/session/a0e6a52469642be0?no-gate=1\"\n  status: opened\nnext_step: \"Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period, and it stays silent the whole time - that is normal, never kill it. Layout issues the browser detects do not return this poll; they wait in the user's Layout issues inbox until the user queues them, then arrive as an ordinary tag \\\"layout-warnings\\\" prompt. Do not pass --timeout-ms during normal agent use. Keep the poll in the foreground by default and let it return the feedback directly to the agent. A background poll is allowed only through a harness-native tracked background-job facility whose completion result is guaranteed to resume or notify the same agent. Never use `nohup`, shell `&`, `disown`, redirected fire-and-forget processes, or a detached terminal without an explicit verified callback merely to keep polling alive. If the harness has no completion-aware background facility, use the foreground poll or first wire a verified wake callback into the surrounding supervisor. Do not tell the user the artifact is being monitored until that wake path is live. If the poll gets killed or times out before feedback arrives, re-run it - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely. If it returns browser_disconnected, the review window stayed disconnected past its reconnect grace period but the session remains resumable; ask the user whether to reopen or end it, and do neither uninvited. After applying feedback, run `lavish-axi poll /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html --agent-reply \\\"<message for the user>\\\"` without --timeout-ms to show a concise response in Lavish Editor and wait for more feedback. Keep the reply concise. Only when a longer reply is genuinely necessary, use Markdown structure - blank-line paragraphs, `- ` / `1. ` lists, `## ` headings - so it renders scannably instead of a wall of text, and pass that body with `--agent-reply-file <path>` (`-` reads stdin) so newlines survive quoting. The Conversation panel's Markdown subset is in `lavish-axi poll --help` and README. If the user ends the session, stop polling and do not reopen it by re-running `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html` unless the user asks for further review or something genuinely important needs their visual attention - deliver routine updates directly in this conversation instead. When reopening is warranted, run `lavish-axi /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html --reopen`.\"\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html",
+      "--for",
+      "board-worker"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-a0e6a52469642be0 (lavish, task=board-worker)\narmed: lavish-a0e6a52469642be0\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html\nowner-task: board-worker\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "source-id",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html"
+    ],
+    "rc": 0,
+    "stdout": "lavish-a0e6a52469642be0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html",
+      "--for",
+      "board-worker"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: cannot re-arm source lavish-a0e6a52469642be0: task board-worker already holds this board and no captured round is waiting to be acknowledged\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html",
+      "--for",
+      "board-worker"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: this board has page scripts that do not parse, so an answer entered on it would be lost: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/broken.html\n  <form> question d5-branch-pointer onsubmit (line 1): Unexpected identifier 's'\nfix: never paste text into an inline handler string; build the handler with addEventListener or read the text from a data attribute\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "arm",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html",
+      "--for",
+      "board-worker"
+    ],
+    "rc": 0,
+    "stdout": "registered: lavish-a0e6a52469642be0 (lavish, task=board-worker)\narmed: lavish-a0e6a52469642be0\nartifact: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-sound.html\nowner-task: board-worker\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent.sh",
+      "list"
+    ],
+    "rc": 0,
+    "stdout": "SOURCE                       ADAPTER      OWNER      PENDING\nlavish-a0e6a52469642be0      lavish       task:board-worker/listening 0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html"
+    ],
+    "rc": 1,
+    "stdout": "",
+    "stderr": "error: cannot retire task-owned source lavish-a0e6a52469642be0 while a captured round for task board-worker is unacknowledged; acknowledge it with bin/fm-procevent.sh handled lavish-a0e6a52469642be0 <sequence>\n"
+  },
+  {
+    "command": [
+      "bin/fm-procevent.sh",
+      "handled",
+      "lavish-a0e6a52469642be0",
+      "2"
+    ],
+    "rc": 0,
+    "stdout": "handled: lavish-a0e6a52469642be0 2\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent-lavish.sh",
+      "retire",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-validation-t70aaac1/boards/task-alias.html"
+    ],
+    "rc": 0,
+    "stdout": "retired: lavish-a0e6a52469642be0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "bin/fm-procevent.sh",
+      "list"
+    ],
+    "rc": 0,
+    "stdout": "no sources registered\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "tmux",
+      "-S",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4A7STHEHGBXVCC8GXB2J2BP/.fm-lab-socket",
+      "kill-server"
+    ],
+    "rc": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "lavish-axi",
+      "stop",
+      "--port",
+      "56033"
+    ],
+    "rc": 0,
+    "stdout": "server:\n  status: stopped\n  port: 56033\n",
+    "stderr": ""
+  }
+]

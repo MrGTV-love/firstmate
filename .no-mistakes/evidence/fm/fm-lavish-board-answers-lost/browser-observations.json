@@ -1,0 +1,13 @@
+{
+  "brokenAfterReload": "This artifact load is no longer current. Reload Lavish to continue.",
+  "guard": {
+    "url": "http://127.0.0.1:56033/artifact/d1cacd3667e08982/index.html?artifact_revision=1&artifact_load_token=xMmz_io6prwCSuXirpIFZfi8KcA-UmAy",
+    "alerts": [
+      "This answer was NOT recorded: the form's page script is broken. Tell the agent (form d5-branch-pointer)."
+    ]
+  },
+  "sound": {
+    "url": "http://127.0.0.1:56033/artifact/22db081534d6fd27/index.html?artifact_revision=1&artifact_load_token=He5GED21eQC5OPBKOjxBR3qECjp8fuPD",
+    "alerts": []
+  }
+}
