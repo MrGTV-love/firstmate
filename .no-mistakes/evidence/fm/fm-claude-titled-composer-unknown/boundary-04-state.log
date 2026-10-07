@@ -1,0 +1,3 @@
+composer=unknown
+content=
+control=error: task claudetitled138's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'

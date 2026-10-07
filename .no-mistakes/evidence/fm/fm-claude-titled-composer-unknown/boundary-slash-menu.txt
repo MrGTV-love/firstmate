@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 (1M context) with high effort · Claude API
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.bhUmGx/wt
+
+
+❯ : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49
+  JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.bhUmGx/control-home/state/claudetitled138.inbox'/*.msg and, in
+  numeric order, read and act on each, then mv each handled file to
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau
+  de-titled-live.bhUmGx/control-home/state/claudetitled138.inbox'/handled/.
+
+  Ran 2 shell commands
+
+⏺ Historical example:
+   ──────── Old example ─
+   ❯ old example
+  ────────────────
+
+✻ Cooked for 10s · done 1:24 AM
+
+
+
+
+
+
+
+
+
+
+
+
+  ❯ /exit                       Exit the CLI
+    /context                    Visualize current context usage as a colored grid
+    /usage-credits              Configure usage credits or request them from your admin when you hit a limit
+──────────────────────────────────────────────────────────────── Firstmate operational input waiting read Users probe ─
+❯ /exit
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 5% 54k/1.0M claudetitled138 wt:713631f3
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

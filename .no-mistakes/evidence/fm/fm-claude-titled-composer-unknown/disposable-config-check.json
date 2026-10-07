@@ -1,0 +1,8 @@
+{
+  "source_config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.gate-live-tmp/claude-seed",
+  "source_settings_unchanged": true,
+  "source_metadata_unchanged": true,
+  "source_secure_storage": "normal login, read-only credential retrieval by guard",
+  "destination_config": "a fresh worktree-local .no-mistakes/test-tmp/fm-claude-titled-live.*/claude-config on each run",
+  "lab_roots_remaining": []
+}

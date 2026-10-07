@@ -1,0 +1,14 @@
+[
+  {
+    "credential": "ANTHROPIC_API_KEY",
+    "exit": 1,
+    "output": "not ok - live Claude relaunch does not authorize API billing; unset ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and use the subscription route\n",
+    "new_lab_roots": 0
+  },
+  {
+    "credential": "ANTHROPIC_AUTH_TOKEN",
+    "exit": 1,
+    "output": "not ok - live Claude relaunch does not authorize API billing; unset ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and use the subscription route\n",
+    "new_lab_roots": 0
+  }
+]

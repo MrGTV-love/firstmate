@@ -1,0 +1,4 @@
+schema=fm-task-inbox.v1
+at=2026-10-07T06:24:48Z
+--
+Live guard probe: take no action beyond acknowledging this message.

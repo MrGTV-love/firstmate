@@ -1,0 +1,26 @@
+[0m[38;5;3mat that position. Use Bash(rm*/.claude/settings*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(mv*/.claude/hooks/*:*) mixes * with the trailing :* prefix s[0m
+[0m[38;5;3myntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at[0m
+[0m[38;5;3m that position. Use Bash(mv*/.claude/hooks/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(mv*/.claude/settings*:*) mixes * with the trailing :* prefix[0m
+[0m[38;5;3m syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * [0m
+[0m[38;5;3mat that position. Use Bash(mv*/.claude/settings*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(*>*/.claude/settings*:*) mixes * with the trailing :* prefix[0m
+[0m[38;5;3m syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * [0m
+[0m[38;5;3mat that position. Use Bash(*>*/.claude/settings*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing :* prefix s[0m
+[0m[38;5;3myntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at[0m
+[0m[38;5;3m that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trailing :* prefix[0m
+[0m[38;5;3m syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * [0m
+[0m[38;5;3mat that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix[0m
+[0m[38;5;3m syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * [0m
+[0m[38;5;3mat that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.[0m
+[0m[38;5;3mPermission ask rule (../claude-config/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix[0m
+[0m[38;5;3m syntax, so it is matched as a literal prefix (the * is not expanded) and matches only commands containing a literal * [0m
+[0m[38;5;3mat that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.[0m
+
+[0m[2mResume this session with:[0m
+[0m[2mclaude --resume "Firstmate operational input waiting read Users probe"[0m
+charlesabrooker@Mac-Studio wt % 

@@ -1,0 +1,5 @@
+composer=empty
+content=
+control=warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.5LPkXA/control-home/data/claudetitled99781/launch-brief.md records no ship branch; defaulting to legacy branch fm/claudetitled99781
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.5LPkXA/control-home/data/claudetitled99781/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched claudetitled99781 harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-claude-titled-li-5280-19755:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.5LPkXA/wt

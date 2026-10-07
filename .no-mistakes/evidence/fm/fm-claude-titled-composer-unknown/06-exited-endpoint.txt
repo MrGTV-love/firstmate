@@ -1,0 +1,13 @@
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/te
+st-tmp/fm-claude-titled-live.OJwB6T/claude-config CLAUDE_SECURESTORAGE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/w
+orktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/claude-config claud
+e -n 'Firstmate operational input waiting read Users probe' --dangerously-skip-permissions
+charlesabrooker@Mac-Studio wt % CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADS
+C1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/claude-config CLAUDE_SECURESTORAGE_CONFIG_DIR=/User
+s/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled
+-live.OJwB6T/claude-config claude -n 'Firstmate operational input waiting read Users probe' --dangerously-skip-permissi
+ons
+
+Resume this session with:
+claude --resume "Firstmate operational input waiting read Users probe"
+charlesabrooker@Mac-Studio wt % 

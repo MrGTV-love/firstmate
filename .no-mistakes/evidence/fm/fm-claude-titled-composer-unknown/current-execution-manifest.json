@@ -1,0 +1,9 @@
+{
+  "guard_command": "FM_CLAUDE_TITLED_COMPOSER_LIVE=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 bash tests/.gate-claude-live.sh",
+  "guard_exit": 0,
+  "boundary_command": "FM_CLAUDE_TITLED_COMPOSER_LIVE=1 FM_CLAUDE_TITLED_COMPOSER_LIVE_SEND=1 bash tests/.gate-claude-boundary.sh",
+  "boundary_exit": 0,
+  "notes": "Disposable instrumented copies of the existing live guard added actual viewport/state evidence capture and normal startup consent. Both ran their original guarded teardown EXIT trap; a teardown or fleet-tripwire failure would set the exit code to 1. No production lifecycle code was replaced.",
+  "initial_attempts": "Both initially stopped at the installed Claude external-CLAUDE-import consent. After accepting the trusted worktree import in each disposable store, both completed successfully.",
+  "ui_evidence": "Rendered original Herdr ANSI viewport captures as HTML and captured four Chromium PNGs of those rendered terminal grids; these are not native desktop screenshots."
+}

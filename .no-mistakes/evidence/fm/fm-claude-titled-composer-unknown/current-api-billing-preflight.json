@@ -1,0 +1,14 @@
+[
+  {
+    "command": "ANTHROPIC_API_KEY=<disposable-marker> FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 bash tests/fm-claude-titled-composer-live-e2e.test.sh",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "not ok - live Claude relaunch does not authorize API billing; unset ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and use the subscription route\n"
+  },
+  {
+    "command": "ANTHROPIC_AUTH_TOKEN=<disposable-marker> FM_CLAUDE_TITLED_COMPOSER_LIVE_RELAUNCH=1 bash tests/fm-claude-titled-composer-live-e2e.test.sh",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "not ok - live Claude relaunch does not authorize API billing; unset ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and use the subscription route\n"
+  }
+]

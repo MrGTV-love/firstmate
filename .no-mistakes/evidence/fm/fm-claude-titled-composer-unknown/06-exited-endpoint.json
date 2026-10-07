@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-07T05:44:42.463692+00:00",
+  "phase": "pass \"live claude titled border: $SUBJECT fm-control exit stops the idle titled-border worker and preserves its endpoint\"",
+  "session": "fm-lab-claude-titled-li-65767-6247",
+  "pane": "w1:p1",
+  "adapter_state": "empty",
+  "control_output": "stopped claudetitled65194 harness=claude backend=herdr endpoint=fm-lab-claude-titled-li-65767-6247:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt",
+  "composer_content": "",
+  "product_reads": [
+    {
+      "command": [
+        "pane",
+        "read",
+        "w1:p1",
+        "--source",
+        "visible",
+        "--format",
+        "ansi"
+      ],
+      "exit": 0,
+      "stdout": "CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/te\nst-tmp/fm-claude-titled-live.OJwB6T/claude-config CLAUDE_SECURESTORAGE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/w\norktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/claude-config claud\ne -n 'Firstmate operational input waiting read Users probe' --dangerously-skip-permissions\ncharlesabrooker@Mac-Studio wt % CLAUDE_CONFIG_DIR=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADS\nC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/claude-config CLAUDE_SECURESTORAGE_CONFIG_DIR=/User\ns/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled\n-live.OJwB6T/claude-config claude -n 'Firstmate operational input waiting read Users probe' --dangerously-skip-permissi\nons\n\n\u001b[0m\u001b[2mResume this session with:\u001b[0m\n\u001b[0m\u001b[2mclaude --resume \"Firstmate operational input waiting read Users probe\"\u001b[0m\ncharlesabrooker@Mac-Studio wt % ",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "pane",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 0,
+      "stdout": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent_status\":\"unknown\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"pane_id\":\"w1:p1\",\"revision\":2,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d399ab3bd451\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "agent",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"error\":{\"code\":\"agent_not_found\",\"message\":\"agent target w1:p1 not found\"},\"id\":\"cli:agent:get\"}\n"
+    }
+  ],
+  "handled_records": []
+}

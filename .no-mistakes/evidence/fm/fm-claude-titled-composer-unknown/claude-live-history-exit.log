@@ -1,0 +1,56 @@
+setup: approved imports of the trusted worktree AGENTS.md inside disposable Claude configuration
+evidence: extra-01-titled-idle
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 draws the session title in the prompt box's top border in isolated session fm-lab-claude-titled-li-12693-17053
+evidence: extra-02-empty-adapter
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+evidence: extra-03-singleline-draft
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 reads a typed draft pending and fm-control exit refuses it by name without typing
+evidence: extra-04-multiline-draft
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 retains a multiline draft and its later glyph, reads pending, and refuses exit without typing
+evidence: extra-05-doorbell-acknowledged
+evidence: extra-08-historical-example
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Sonnet 5.5 · Claude API
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.izfTTs/wt
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49
+  JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.izfTTs/control-home/state/claudetitled10094.inbox'/*.msg and,
+  in numeric order, read and act on each, then mv each handled file to
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau
+  de-titled-live.izfTTs/control-home/state/claudetitled10094.inbox'/handled/.
+
+  Read 1 file, listed 1 directory, ran 1 shell command
+
+⏺ Acknowledged the one waiting message (001), a live guard probe that asked for no action beyond acknowledgement. I
+  moved it to handled/.
+
+✻ Worked for 12s · done 12:55 AM
+
+❯ : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49
+  JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.izfTTs/control-home/state/claudetitled10094.inbox'/*.msg and,
+  in numeric order, read and act on each, then mv each handled file to
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau
+  de-titled-live.izfTTs/control-home/state/claudetitled10094.inbox'/handled/.
+
+  Ran 2 shell commands
+
+⏺ Historical example:
+
+   ──────── Old example ─
+   ❯ old example
+  ────────────────
+
+✻ Cooked for 6s · done 12:55 AM
+
+──────────────────────────────────────────────────────────────── Firstmate operational input waiting read Users probe ─
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+ok - extra historical example: real rendered mismatched transcript above live titled composer reads empty
+ok - live claude titled border: claude (2.1.292 (Claude Code)) on herdr 0.9.1 fm-send doorbell reaches the titled-border worker, which acts on the record and acknowledges it
+live failed-exit diagnosis: composer=unknown content_extraction=refused
+evidence: extra-11-exit-failure
+not ok - claude (2.1.292 (Claude Code)) on herdr 0.9.1: fm-control exit refused an idle titled-border composer: error: the exit command could not be sent to task claudetitled10094 on herdr

@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Sonnet 5.5 · Claude API
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate operational input waiting: read                                                                          
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau 
+  de-titled-live.OJwB6T/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg' and handle its contents  
+  as Firstmate operational input.                                                                                      
+
+  Reading ~/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.
+  OJwB6T/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg
+  ⎿  ~/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6
+     T/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✶ Perusing… (3s · ↓ 153 tokens)
+                                                                                                   ◐ medium · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents

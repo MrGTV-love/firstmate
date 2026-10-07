@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-07T05:44:17.274679+00:00",
+  "phase": "pass \"live claude titled border: $SUBJECT idle empty composer reads empty through the production Herdr adapter\"",
+  "session": "fm-lab-claude-titled-li-65767-6247",
+  "pane": "w1:p1",
+  "adapter_state": "empty",
+  "control_output": "",
+  "composer_content": "",
+  "product_reads": [
+    {
+      "command": [
+        "pane",
+        "read",
+        "w1:p1",
+        "--source",
+        "visible",
+        "--format",
+        "ansi"
+      ],
+      "exit": 0,
+      "stdout": "\n\u001b[0m\u001b[38;2;215;119;87m \u2590\u001b[0m\u001b[38;2;215;119;87m\u001b[48;2;0;0;0m\u259b\u2588\u2588\u2588\u259b\u2588   \u001b[0m\u001b[1mClaude Code \u001b[0m\u001b[38;2;153;153;153mv2.1.292\u001b[0m\n\u001b[0m\u001b[38;2;215;119;87m\u259d\u259c\u001b[0m\u001b[38;2;215;119;87m\u001b[48;2;0;0;0m\u2588\u2588\u2588\u2588\u2588\u001b[0m\u001b[38;2;215;119;87m\u2588\u2580  \u001b[0m\u001b[38;2;153;153;153mSonnet 5.5 \u00b7 Claude API\u001b[0m\n\u001b[0m\u001b[38;2;215;119;87m \u259d\u259d   \u259d\u259d   \u001b[0m\u001b[38;2;153;153;153m~/\u2026/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\u001b[0m\n\n  Get to finished work sooner with Opus 5.5. Switch anytime with \u001b[0m\u001b[38;2;177;185;249m/model\u001b[0m.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n                                                                                                   \u001b[0m\u001b[38;2;153;153;153m\u25d0 medium \u00b7 /effort\u001b[0m\n\u001b[0m\u001b[38;2;136;136;136m\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Firstmate operational input waiting read Users probe \u2500\u001b[0m\n\u276f\u00a0\u001b[0m\u001b[2mTry \"edit <filepath> to...\"\u001b[0m\n\u001b[0m\u001b[38;2;136;136;136m\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u001b[0m\n  \u001b[0m\u001b[38;2;255;107;128m\u23f5\u23f5 bypass permissions on\u001b[0m\u001b[38;2;153;153;153m (shift+tab to cycle) \u00b7 \u2190 for agents\u001b[0m",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "pane",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 0,
+      "stdout": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent\":\"claude\",\"agent_status\":\"idle\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"pane_id\":\"w1:p1\",\"revision\":1,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d399ab3bd451\",\"terminal_title\":\"\u2733 Firstmate operational input waiting read Users probe\",\"terminal_title_stripped\":\"Firstmate operational input waiting read Users probe\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "agent",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 0,
+      "stdout": "{\"id\":\"cli:agent:get\",\"result\":{\"agent\":{\"agent\":\"claude\",\"agent_status\":\"idle\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"pane_id\":\"w1:p1\",\"revision\":1,\"state_change_seq\":1,\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d399ab3bd451\",\"terminal_title\":\"\u2733 Firstmate operational input waiting read Users probe\",\"terminal_title_stripped\":\"Firstmate operational input waiting read Users probe\",\"workspace_id\":\"w1\"},\"type\":\"agent_info\"}}\n",
+      "stderr": ""
+    }
+  ],
+  "handled_records": []
+}

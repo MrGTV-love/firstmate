@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-07T05:45:01.051202+00:00",
+  "phase": "pass \"live claude titled border: $SUBJECT fm-control relaunch replaces the titled-border worker with a live agent in the same endpoint\"",
+  "session": "fm-lab-claude-titled-li-65767-6247",
+  "pane": "w1:p1",
+  "adapter_state": "empty",
+  "control_output": "warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/control-home/data/claudetitled65194/launch-brief.md records no ship branch; defaulting to legacy branch fm/claudetitled65194\nwarning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/control-home/data/claudetitled65194/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches\nrelaunched claudetitled65194 harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-claude-titled-li-65767-6247:w1:p1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt",
+  "composer_content": "",
+  "product_reads": [
+    {
+      "command": [
+        "pane",
+        "read",
+        "w1:p1",
+        "--source",
+        "visible",
+        "--format",
+        "ansi"
+      ],
+      "exit": 0,
+      "stdout": "\n\u001b[0m\u001b[38;2;215;119;87m \u2590\u001b[0m\u001b[38;2;215;119;87m\u001b[48;2;0;0;0m\u259b\u2588\u2588\u2588\u259b\u2588   \u001b[0m\u001b[1mClaude Code \u001b[0m\u001b[38;2;153;153;153mv2.1.292\u001b[0m\n\u001b[0m\u001b[38;2;215;119;87m\u259d\u259c\u001b[0m\u001b[38;2;215;119;87m\u001b[48;2;0;0;0m\u2588\u2588\u2588\u2588\u2588\u001b[0m\u001b[38;2;215;119;87m\u2588\u2580  \u001b[0m\u001b[38;2;153;153;153mSonnet 5.5 \u00b7 Claude API\u001b[0m\n\u001b[0m\u001b[38;2;215;119;87m \u259d\u259d   \u259d\u259d   \u001b[0m\u001b[38;2;153;153;153m~/\u2026/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\u001b[0m\n\n  Get to finished work sooner with Opus 5.5. Switch anytime with \u001b[0m\u001b[38;2;177;185;249m/model\u001b[0m.\n\n\u001b[0m\u001b[38;2;153;153;153m\u001b[48;2;55;55;55m\u276f \u001b[0m\u001b[38;2;255;255;255m\u001b[48;2;55;55;55m: Firstmate operational input waiting: read \u001b[0m\u001b[48;2;55;55;55m                                                                         \u001b[0m\n\u001b[0m\u001b[48;2;55;55;55m  \u001b[0m\u001b[38;2;255;255;255m\u001b[48;2;55;55;55m'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau\u001b[0m\u001b[48;2;55;55;55m \u001b[0m\n\u001b[0m\u001b[48;2;55;55;55m  \u001b[0m\u001b[38;2;255;255;255m\u001b[48;2;55;55;55mde-titled-live.OJwB6T/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg' and handle its contents \u001b[0m\u001b[48;2;55;55;55m \u001b[0m\n\u001b[0m\u001b[48;2;55;55;55m  \u001b[0m\u001b[38;2;255;255;255m\u001b[48;2;55;55;55mas Firstmate operational input.\u001b[0m\u001b[48;2;55;55;55m                                                                                      \u001b[0m\n\n\u001b[0m\u001b[38;2;153;153;153m  \u001b[0mReading ~/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.\n  OJwB6T/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg\n\u001b[0m\u001b[38;2;153;153;153m  \u23bf  ~/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6\u001b[0m\n     \u001b[0m\u001b[38;2;153;153;153mT/control-home/state/operational-inbox/1791351895-cb77f0ed766c1de7.msg\u001b[0m\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\u001b[0m\u001b[38;2;215;119;87m\u2736 P\u001b[0m\u001b[38;2;235;159;127meru\u001b[0m\u001b[38;2;215;119;87msing\u2026 \u001b[0m\u001b[38;2;153;153;153m(3s \u00b7 \u2193\u001b[0m \u001b[0m\u001b[38;2;153;153;153m153 tokens)\u001b[0m\n                                                                                                   \u001b[0m\u001b[38;2;153;153;153m\u25d0 medium \u00b7 /effort\u001b[0m\n\u001b[0m\u001b[38;2;136;136;136m\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u001b[0m\n\u001b[0m\u001b[38;2;153;153;153m\u276f\u00a0\u001b[0m\n\u001b[0m\u001b[38;2;136;136;136m\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u001b[0m\n  \u001b[0m\u001b[38;2;255;107;128m\u23f5\u23f5 bypass permissions on\u001b[0m\u001b[38;2;153;153;153m (shift+tab to cycle) \u00b7 esc to interrupt \u00b7 \u2190 for agents\u001b[0m",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "pane",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 0,
+      "stdout": "{\"id\":\"cli:pane:get\",\"result\":{\"pane\":{\"agent\":\"claude\",\"agent_status\":\"working\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"pane_id\":\"w1:p1\",\"revision\":6,\"scroll\":{\"max_offset_from_bottom\":0,\"offset_from_bottom\":0,\"viewport_rows\":40},\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d399ab3bd451\",\"terminal_title\":\"\u25d1 Firstmate operational input handling\",\"terminal_title_stripped\":\"Firstmate operational input handling\",\"workspace_id\":\"w1\"},\"type\":\"pane_info\"}}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "agent",
+        "get",
+        "w1:p1"
+      ],
+      "exit": 0,
+      "stdout": "{\"id\":\"cli:agent:get\",\"result\":{\"agent\":{\"agent\":\"claude\",\"agent_status\":\"working\",\"cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"focused\":true,\"foreground_cwd\":\"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt\",\"pane_id\":\"w1:p1\",\"revision\":6,\"state_change_seq\":7,\"tab_id\":\"w1:t1\",\"terminal_id\":\"term_65d399ab3bd451\",\"terminal_title\":\"\u25d1 Firstmate operational input handling\",\"terminal_title_stripped\":\"Firstmate operational input handling\",\"workspace_id\":\"w1\"},\"type\":\"agent_info\"}}\n",
+      "stderr": ""
+    }
+  ],
+  "handled_records": []
+}

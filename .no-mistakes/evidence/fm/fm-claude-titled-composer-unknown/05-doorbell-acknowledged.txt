@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Sonnet 5.5 · Claude API
+ ▝▝   ▝▝   ~/…/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/wt
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ : Firstmate instruction waiting: list '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49 
+  JB6J416H/.no-mistakes/test-tmp/fm-claude-titled-live.OJwB6T/control-home/state/claudetitled65194.inbox'/*.msg and,   
+  in numeric order, read and act on each, then mv each handled file to                                                 
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/fm-clau 
+  de-titled-live.OJwB6T/control-home/state/claudetitled65194.inbox'/handled/.                                          
+
+  Moving handled message 
+  ⎿  $ D='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M49Z3ADSC1G73B49JB6J416H/.no-mistakes/test-tmp/f
+     m-claude-titled-live.OJwB6T/control-home/state/claudetitled65194.inbox'; mv "$D"/001.msg "$D"/handled/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+· Elucidating… (9s · ↓ 403 tokens)
+                                                                                                   ◐ medium · /effort
+──────────────────────────────────────────────────────────────── Firstmate operational input waiting read Users probe ─
+❯ 
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents
