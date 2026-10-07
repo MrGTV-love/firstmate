@@ -23,6 +23,9 @@
 //     hooks exist.
 //   - The arming tool is fm_watch_arm_omp and its human fallback
 //     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
+//     Loaded-build/process markers initialize on session_start, not factory
+//     loading: standalone model or usage discovery must not replace the live
+//     primary's ownership evidence. The paired turn-end guard follows this rule.
 //   - Supervision host: a home opted in with config/supervision-host
 //     (docs/configuration.md "Supervision host" owns the opt-in) spawns
 //     bin/fm-supervision-host.sh park --restart in the arm's place, which

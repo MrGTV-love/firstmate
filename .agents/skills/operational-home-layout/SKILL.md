@@ -119,7 +119,7 @@ state/               runtime records and signals; gitignored
   .cursor-park-owner .cursor-park-owner.lock .turnend-cursor-blocks   Cursor stop-hook owner record, publication and commit lock, and bounded repair-nag budget; never touch
   .hash-* .count-* .stale-* .stale-since-* .churn-since-* .paused-* .wedge-escalations-* .dead-reported-* .writing-* .waiting-* .seen-* .hb-surfaced-* .last-* .heartbeat-streak .secondmate-liveness-tick .secondmate-liveness-*.lock*   watcher internals; never touch
   .secondmate-relaunch-<id> .secondmate-relaunch-bound-<id>   durable relaunch history and parked-bound state; never touch (bin/fm-secondmate-liveness-lib.sh owns the ledger contract)
-  .session-end-relaunch-<id> .session-end-handled-<id> <id>.control-exit   ship/scout session-end auto-relaunch attempt ledger, handled marker, and fm-control timed-out-exit marker (a completed exit retires the busy record instead); never touch (bin/fm-session-end-relaunch-lib.sh owns them); removed by teardown
+  .session-end-relaunch-<id> .session-end-handled-<id> <id>.control-exit   ship/scout session-end and quota-recovery attempt ledger, handled marker, and explicit-exit cancellation marker; never touch (bin/fm-session-end-relaunch-lib.sh owns recovery bookkeeping; docs/agent-control.md owns explicit-exit cancellation); removed by teardown
   .watch-triage.log  watcher's absorbed-wake debug log (size-capped); never relied on, safe to delete
   .last-watcher-beat watcher liveness beacon, touched every poll (including while absorbing benign wakes); guard scripts read it
   .subsuper-* .supervise-daemon.*   sub-supervisor internals; never touch

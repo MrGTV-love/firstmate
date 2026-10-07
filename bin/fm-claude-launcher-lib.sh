@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # fm-claude-launcher-lib.sh - the single owner of config/claude-launcher: how
 # the file is parsed and the TeamClaude proxy check every Claude launch
-# must pass before anything changes.
+# must pass before worker execution.
 #
-# docs/configuration.md "Claude launcher" owns the operator-facing contract.
-# Sourced by bin/fm-spawn.sh, which selects the launch executable before any
-# endpoint, worktree, or record exists, and by bin/fm-control.sh, which runs
-# the same selection before a relaunch stops the old agent.
+# docs/configuration.md "Claude launcher" owns the operator-facing contract,
+# including preflight timing. Spawn selects before worker launch or task-record
+# publication; control selects before a relaunch stops the old agent.
 
 FM_CLAUDE_LAUNCHER_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Both callers load fm-config-inherit-lib.sh through fm-session-launch-policy-lib.sh.

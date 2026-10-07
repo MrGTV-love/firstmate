@@ -124,18 +124,6 @@ $ bash tests/fm-dispatch-resolve.test.sh | tail -1
 # all fm-dispatch-resolve tests passed
 ```
 
-## Runway calibration replay
-
-Replayed 2026-09-30 offline, with no new model or quota call, from frozen inputs rather than fresh live quota: the recorded Jev answers for four real firstmate ship briefs, a `quota-axi --json` snapshot generated 2026-09-30T17:30:58.104Z, and a read-only copy of the live rules file.
-All four answers matched a rule whose only profile is an `omp` Codex-pool profile, at confidences 0.79, 0.92, 0.78, and 0.93.
-The snapshot's one Codex row read 60% remaining, `projected_exhaustion`, `usableRunwaySeconds` 80796 (about 22 hours), and `projectionConfidence` `early`.
-
-| Snapshot | clear | escalate |
-| --- | --- | --- |
-| Frozen snapshot as generated (early projection, 80796 seconds) | 4 | 0 |
-| Same snapshot with an `established` projection of 3600 seconds | 0 | 4 |
-
-Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, because early confidence is warning-only regardless of projected duration.
-Each escalation named the `omp` profile as the highest-ranked candidate with established runway shorter than the 240-minute task horizon and emitted no profile.
+Native pooled-capacity routing and its declared stand-ins are covered by [`tests/fm-dispatch-resolve.test.sh`](../../tests/fm-dispatch-resolve.test.sh) and [`tests/fm-dispatch-capacity.test.sh`](../../tests/fm-dispatch-capacity.test.sh), under the [pooled-capacity contract](../configuration.md#pooled-omp-capacity-and-declared-stand-ins), not quota-axi's single-account runway projections.
 
 A live run needs a key and is not part of the suite; rerun the live rule-match tables above by pointing the tool at a brief with the key injected for that one command.

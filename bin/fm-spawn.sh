@@ -205,8 +205,8 @@
 #   name from PATH once, probes that concrete path with --help, and launches the
 #   same path. It adds --tui-mode regular only when that help advertises the flag;
 #   a failed or inconclusive probe omits it so older Pi versions remain launchable.
-#   A missing selected executable refuses before endpoint creation, and pi-signed
-#   never falls back to pi.
+#   A missing selected executable refuses before worker launch or task-record
+#   publication, and pi-signed never falls back to pi.
 #   config/session-launch-policy can restrict even explicit launches; its schema
 #   and tc-run prerequisite are owned by docs/configuration.md "Session launch policy".
 #   Devin is worker-only: --permission-mode dangerous and
@@ -416,7 +416,7 @@
 #                  turn-end extension, written by this script; outside the worktree so
 #                  omp's cwd-only auto-discovery cannot load it a second time)
 #     __OMPSESSIONCFG__ absolute path to the tracked .omp/fm-session-overlay.yml posture overlay
-#     __OMPWORKERCFG__ quoted --config arguments for worker memory and task-owned model policy
+#     __OMPWORKERCFG__ quoted absolute path to the tracked .omp/fm-worker-overlay.yml
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
 #     __BRIEFDOORBELL__ quoted printable doorbell naming the launch-brief record this
 #                  script published into the receiving home's operational inbox

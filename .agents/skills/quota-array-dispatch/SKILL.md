@@ -24,18 +24,10 @@ The [worker helper](../../../bin/fm-quota-choose.sh) and [typed resolver](../../
 The canonical shell helper for a worker that has already performed its model-selection reasoning and now needs to pick the first viable candidate is `bin/fm-quota-choose.sh`.
 Pass it the intake's already-captured default TOON or permitted JSON fallback through stdin or `--snapshot`; it never takes another quota-axi snapshot.
 Pass each candidate as `harness:model`, with earlier candidates preferred.
-The helper's header owns its provider mapping and quota selection mechanics.
-An `exhausted_now` runway vetoes the candidate.
-The helper selects a candidate only when its applicable quota has known positive headroom, except that OMP Codex uses its own native pooled serving evidence rather than the single-account Codex row.
-This is an optional narrow helper with a known limitation: it maps each harness to one primary provider family only, so a candidate whose established provider differs from that primary family is checked against the wrong quota row.
-omp has no primary family, so the helper keys an `omp:` candidate on its model prefix, mapping only `openai-codex/` and `claude-bridge/` and refusing every other prefix; the helper's header owns that mapping.
-For OMP `openai-codex/` candidates it reads one additional pooled OMP usage report, preserves native successful-response warnings at 0%, and never redeems saved resets.
-The running worker's quota chooser measures OMP usage in its actual inherited process environment, preserving `HOME`, `PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, `OMP_PROFILE`, `PI_PROFILE`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, and `XDG_CACHE_HOME`, including empty and unset values.
-Native Claude quota is unmapped when that process retains an alternate config directory, credential or profile, a true backend switch, or a federation rule paired with an organization.
-Future launch configuration, allowlists, tmux session or server authentication, and runtime backend selection do not replace that worker evidence; prelaunch dispatch, spawn, and control still measure their destination launch scope.
-For a TeamClaude-selected launch or a Claude account pin without an established quota mapping, native Claude's default row is unrelated evidence: typed resolution keeps the route eligible but unranked and cannot activate a stand-in from that row.
+The helper's [header](../../../bin/fm-quota-choose.sh) owns provider mappings, headroom eligibility, the OMP Codex pool exception, supported OMP prefixes, and the running worker's inherited-authentication boundary.
+Prelaunch dispatch follows the separate [destination-scoped capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins).
 Authoritative multi-provider routing - including provider discovery from the harness catalog and quota matching by that explicit provider - stays owned by this skill's intake procedure above and AGENTS.md section 4, not by the helper.
-Use it only when the brief already fixed the candidate order and every candidate's provider is the harness's primary family.
+Use it only when the brief already fixed the candidate order and every candidate's established provider fits the helper's documented mapping.
 It does not replace the reasoning-class, runway-feasibility, or authentication gates above.
 Firstmate can optionally arm `bin/fm-procevent-quota.sh` for a recurring mid-task check that wakes when the tracked provider drops below its configured threshold or its runway becomes `exhausted_now`.
 The opt-in [typed resolver](../../../docs/configuration.md#typed-dispatch-resolution-env-typesafe_api_key) has its own documented gates.
@@ -60,11 +52,9 @@ Below-floor is rare: bootstrap enforces `FM_QUOTA_AXI_MIN` and normally reports 
 `--json` is a defensive belt, not a habit; never reach for it because it feels more complete.
 Read `quota-axi auth --json` only when a candidate's credential surface is in question.
 
-For an OMP `openai-codex/` candidate, also inspect `bin/fm-dispatch-capacity.sh --harness omp --model <selector>` before deciding that Codex is exhausted.
-It reads OMP's native account pool; quota-axi's single Codex account, account keys, and `exhausted_now` row cannot veto a usable OMP sibling.
-Unknown pooled accounts prevent a whole-pool exhaustion conclusion, and saved resets are not current headroom.
-OMP reports no pool `spendPriority` or completion runway, so disclose those unknowns and never synthesize a scalar, sum account percentages, or reuse the exhausted sibling's economics.
-The selected rule's machine-readable stand-ins and automatic recovery are owned by the crew-dispatch schema in `docs/configuration.md`; strongest-class work still cannot use an undeclared weaker stand-in.
+For an OMP `openai-codex/` candidate, inspect native capacity through [`fm-dispatch-capacity.sh`](../../../bin/fm-dispatch-capacity.sh) under the [pooled-capacity contract](../../../docs/configuration.md#pooled-omp-capacity-and-declared-stand-ins) before declaring exhaustion or applying the selected rule's stand-ins.
+Quota-axi's single Codex account cannot veto a usable OMP sibling.
+Disclose pool economics as unknown and apply the [selection procedure below](#rank-by-spendpriority), not the exhausted sibling's economics.
 Provider-level quota notifications from `fm-procevent-quota.sh` are not proof that an OMP account pool is exhausted; reconcile the concrete OMP route before parking it.
 
 

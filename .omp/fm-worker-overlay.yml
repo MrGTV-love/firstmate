@@ -7,8 +7,8 @@ mnemopi:
   noEmbeddings: true
 
 retry:
-  # Native credential rotation is available in omp 18.6.1; inspect pooled
-  # headroom rather than quota-axi's single Codex account before routing away.
+  # Avoid interactive reserve confirmation and reset waits after quota exhaustion;
+  # native retry retains the destination's own model-fallback policy.
   enabled: true
   usageAwareFallback: true
   usageReservePct: 0

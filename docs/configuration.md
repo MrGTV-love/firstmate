@@ -955,7 +955,7 @@ The [Claude adapter reference](../.agents/skills/harness-adapters/references/har
 The optional local, gitignored `config/claude-launcher` routes every Claude worker launch through the local TeamClaude proxy: crewmates, scouts, Claude secondmates, and every relaunch, including `fm-control` relaunch, the session-end auto-relaunch, and secondmate restart, on every runtime backend.
 Its one accepted token is `teamclaude`, which starts Claude through [`bin/fm-teamclaude-launch.sh`](../bin/fm-teamclaude-launch.sh).
 An absent file launches the bare `claude` command.
-Any other value, or an unreadable file, refuses the launch before any worker, copy, or record exists.
+Any other value, or an unreadable file, refuses before worker launch or task-record publication; dispatch fallback selection may already have acquired a local copy and an empty endpoint.
 
 With `teamclaude`, the spawn first runs the launcher's `--check`, which refuses the launch when TeamClaude is not installed, is ambiguous, or its proxy does not answer `teamclaude status`.
 `fm-control` relaunch runs the same check before it stops the running agent, so a stopped proxy leaves that agent running.
@@ -1006,7 +1006,8 @@ A raw Claude launch command refuses if its leading assignments set `CLAUDE_CONFI
 The assignment would override the pin.
 The refusal names the variable; remove that assignment from the raw command, or change or remove `config/claude-account`.
 
-Before any worker endpoint, local copy, or task record exists, and before a relaunch stops the running worker, Firstmate asks the runner itself whether the pinned account is signed in: `claude auth status` for Claude, and `pi auth check --provider <provider> --json --no-refresh` for Pi, falling back to `pi --list-models <provider>` for a provider an extension registers.
+Before worker launch or task-record publication, and before a control-plane relaunch stops the running worker, Firstmate asks the runner itself whether the pinned account is signed in: `claude auth status` for Claude, and `pi auth check --provider <provider> --json --no-refresh` for Pi, falling back to `pi --list-models <provider>` for a provider an extension registers.
+Dispatch fallback selection may acquire the local copy and an empty endpoint before that final-profile check.
 The check runs with only `HOME`, `PATH`, `TMPDIR`, `USER`, `LOGNAME`, and the pinned root in its environment, so a credential variable in firstmate's own environment cannot answer for an empty root.
 
 A pinned Claude launch also unsets the environment credentials Claude ranks above a stored login, such as `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and the Bedrock and Vertex switches ([authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence)).
@@ -1233,7 +1234,7 @@ Per-machine Cursor `cli-config.json` attribution-off is not this contract: it do
 
 ### Claude API key guard
 
-Every claude worker Firstmate launches is refused before creation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through ambient environment inheritance or an explicit allowlist entry.
+Every claude worker Firstmate launches is refused before worker execution when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` would reach the worker through ambient environment inheritance or an explicit allowlist entry.
 Claude Code prefers an API key over a claude.ai subscription login and silently bills the API, so this guard prevents accidental API charges when the captain intends subscription billing.
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
@@ -1380,7 +1381,7 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ### Pooled OMP capacity and declared stand-ins
 
-`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports each pooled account as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials.
+`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports pool status and classifies accounts with native usage reports as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials; the displayed account count is not necessarily the pool size.
 OMP's own `usage --provider openai-codex --json`, measured with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
@@ -1389,7 +1390,7 @@ A snapshot fetched before a window's elapsed reset cannot establish current capa
 When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
 For merged reports, report-wide `fetchedAt` cannot make elapsed chat or Spark windows current or establish current Spark capacity.
 The pool has no synthesized `spendPriority` or completion runway: manual intake and typed resolution can dispatch a sole eligible native-usable OMP route when every alternative is proven exhausted or blocked and no explicit floor remains unverifiable, disclosing both economics as `unknown`; unknown or unmeasured pools do not qualify, and percentages cannot economically rank competing unranked routes.
-An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles.
+An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles; typed intake also recognizes an explicit `provider: "codex"` as a pooled OMP route without a model.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
@@ -1401,7 +1402,6 @@ An unreadable tmux destination or a non-tmux daemon whose authentication environ
 Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
 An OMP fallback uses a concrete selector from a catalog discovered in the same established destination authentication and project scope as launch, including provider credentials retained by the launch allowlist; a caller-only catalog cannot establish support.
 Capacity and catalog probes normalize relative-PATH executables in the same way as launch.
-Standalone discovery preserves primary ownership evidence: the paired OMP primary extensions publish their loaded-build and process markers on `session_start`, not factory initialization.
 A Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
@@ -1416,8 +1416,10 @@ Direct `fm-spawn.sh <id> --relaunch` restores a recorded rule together with its 
 Omitted model and effort fields match their persisted `default` metadata values during recovery.
 An explicitly selected rule with an empty or omitted fallback list also permits completing unspecified effort at intake and retains that rule's identity and zero fallback permission during recovery.
 Harness and model matching remain exact after default normalization; rules granting stand-ins and implicit rule selection also require matching effort.
-OMP workers keep native account rotation enabled and preserve destination-owned native model-fallback settings.
-In-worker model switching belongs to OMP's `retry.fallbackChains`, including the configured chain `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`; Firstmate neither installs nor changes that chain.
+OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`, including review processes launched with extensions disabled.
+Firstmate's worker overlay enables usage-aware selection without a generic percentage reserve or reset wait and preserves destination-owned native model-fallback settings.
+In-worker model switching belongs to OMP's `retry.fallbackChains`; for example, an operator may configure `openai-codex/gpt-6.1-sol` -> `openrouter/openai/gpt-6.1-sol` -> `openrouter/deepseek/deepseek-v4-flash`.
+Firstmate neither installs nor changes that chain.
 Firstmate does not promise live terminal fallback: its shared selector applies declared stand-ins at fresh spawn and at relaunch only where authoritative destination capacity proves exhaustion.
 An idle terminal quota error invokes recovery through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 When adopted-target selection returns unknown capacity, automatic quota control refuses before changing instructions or stopping the worker and raises the quota-exhausted recovery check so the supervisor can arrange a fresh spawn with selection.
@@ -1600,12 +1602,7 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
-- OMP Codex profiles use native pooled capacity, independently of quota-axi's individual-account rows.
-  A fresh usable entitled account keeps the pool usable; exhaustion requires every eligible measured account to be exhausted, with no unknown-entitlement or potentially eligible unmeasured siblings.
-  Unknown capacity stays eligible but unranked, and exhausted capacity is ineligible.
-  The pool has no synthesized spendPriority or completion runway, and its profile and rule floors remain unverifiable.
-  An explicit `provider: "codex"` identifies an OMP pooled route even when the model is omitted; capacity then remains unknown, and an unverifiable rule floor escalates without selecting a measured default or declared stand-in.
-  See "Pooled OMP capacity and declared stand-ins" above for exhaustion-only fallback and authentication-scope rules.
+- OMP Codex assessment, unknown economics, unverifiable floors, and exhaustion-only fallback follow the [pooled-capacity contract](#pooled-omp-capacity-and-declared-stand-ins).
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 

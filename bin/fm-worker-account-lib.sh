@@ -224,9 +224,9 @@ fm_worker_account_check() {
 # the caller keeps today's launch unchanged. For a pinned one prints
 # "declared<TAB>root<TAB>provider", where provider is the Pi launch model's
 # own (empty for Claude), after the model guard and the sign-in check pass. On
-# refusal prints one error and returns 1. bin/fm-spawn.sh runs it before any
-# endpoint exists, and bin/fm-control.sh before a relaunch stops the live
-# agent.
+# refusal prints one error and returns 1. Callers must follow the preflight
+# timing contract in docs/configuration.md "Worker account pin"; control checks
+# before stopping a live agent, while spawn may already have acquired a copy.
 fm_worker_account_select() {
   local harness=$1 config=$2 model=$3 executable=$4 raw=${5:-} selection declared root providers word provider=
   selection=$(fm_worker_account_resolve "$harness" "$config") || return 1

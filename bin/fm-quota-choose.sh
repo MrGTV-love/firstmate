@@ -7,12 +7,12 @@
 # Reads one already-captured quota-axi default TOON or JSON snapshot from the
 # provided file, or from stdin when --snapshot is omitted.
 # bin/fm-quota-axi-lib.sh owns schema compatibility and the shared row join.
-# For each --candidate in order, it maps <harness> to its primary provider
-# family, then applies the matched row's provider-wide scopes and exact model
-# or product scopes for <model>. A candidate is eligible only when no
-# applicable runway is `exhausted_now` and its known
-# effective percent remaining is greater than zero. The first eligible
-# candidate is printed as "<harness> <model>" and the script exits 0.
+# For quota-axi-backed candidates in order, it maps <harness> to its primary
+# provider family, then applies the matched row's provider-wide scopes and exact
+# model or product scopes for <model>. Such a candidate is eligible only when no
+# applicable runway is `exhausted_now` and its known effective percent remaining
+# is greater than zero. OMP Codex uses native pool evidence as described below.
+# The first eligible candidate is printed as "<harness> <model>" and exits 0.
 # If no candidate is quota-eligible, it prints "none" and exits 1.
 #
 # Candidates are accepted as `--candidate <harness:model>` or as positional
@@ -23,7 +23,7 @@
 # The helper is the canonical worker-side selection used after the agent has
 # already run `quota-axi` for its model selection. It never replaces the agent's
 # reasoning-class or runway-feasibility gates; it only answers which ordered
-# candidate remains eligible under the captured quota evidence.
+# candidate remains eligible under its own quota evidence.
 #
 # Multi-provider limitation: this helper maps each harness to ONE primary
 # provider family (fm_quota_provider_for_harness in bin/fm-quota-axi-lib.sh)
@@ -45,6 +45,12 @@
 # claude-bridge/<id> retains the matched claude row and bare-id scoped bounds.
 # Other or absent prefixes are refused because this helper does not model them.
 # No pool spendPriority is invented; candidate order was fixed at intake.
+#
+# Native OMP usage is measured in the running worker's inherited process
+# environment, not a reconstructed future launch or tmux environment.
+# Native Claude candidates are skipped when that process retains an alternate
+# store, credential, profile, enabled cloud backend, or paired federation rule
+# and organization: the captured default-account quota cannot establish theirs.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
