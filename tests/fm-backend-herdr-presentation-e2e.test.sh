@@ -26,6 +26,13 @@ HERDR_ORIGINAL_PATH=$PATH
 # daemon did not inherit the controller's TREEHOUSE_ROOT.
 mkdir -p "$ROOT/.no-mistakes/test-tmp"
 TMP_ROOT=$(mktemp -d "$ROOT/.no-mistakes/test-tmp/fm-herdr-presentation.XXXXXX")
+# The code root and operational homes must be siblings: secondmate safety
+# correctly refuses homes inside the declared Firstmate repository.
+FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
+mkdir -p "$FIXTURE_ROOT"
+cp -R "$ROOT/bin" "$FIXTURE_ROOT/bin"
+git -C "$FIXTURE_ROOT" init -q
+export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/herdr-lab-state"
 export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
 mkdir -p "$CLAUDE_CONFIG_DIR"
 # Ambient path templates can otherwise bypass even an explicitly confined root.
@@ -306,6 +313,8 @@ EOF
       "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" >/dev/null 2>&1 || true
     LAB_READY=0
   fi
+  # Spawn-owned Git-hook directories are intentionally read-only.
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf "$TMP_ROOT"
 }
 trap cleanup_all EXIT
@@ -455,8 +464,8 @@ EOF
 
 spawn_task() {  # <id> <home> <project>
   local id=$1 home=$2 project=$3
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$project" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
+  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
+    "$FIXTURE_ROOT/bin/fm-spawn.sh" "$id" "$project" "sh -c 'while :; do sleep 60; done'" --mode no-mistakes --yolo off --backend herdr
 }
 
 finish_concurrent_spawn() {  # <id> <status> <stdout> <stderr>
@@ -480,16 +489,16 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
 
 spawn_secondmate_task() {
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
+  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
+    "$FIXTURE_ROOT/bin/fm-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
 }
 
 teardown_task() {  # <id> <home>
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$FIXTURE_ROOT" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" \
-    "$ROOT/bin/fm-teardown.sh" "$id" --force
+    "$FIXTURE_ROOT/bin/fm-teardown.sh" "$id" --force
 }
 
 finish_concurrent_teardown() {  # <id> <status> <stdout> <stderr>
