@@ -219,20 +219,34 @@ test("snapshot scrubs escaped and nested saved-key JSON fields before any Jev re
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-// A clipped adviser view over a transcript whose recent tool results are large, built
-// the way the real package reports it: every recent tool result cut to 512 bytes and
-// the whole window marked incomplete. `messages` is what the host would rebuild.
 function clippedView(messages, over = {}) {
-  const recent = messages.filter(m => m.role === "assistant" || m.role === "toolResult").map(m => {
-    const text = typeof m.content === "string" ? m.content : m.content.map(c => c.text).join("\n");
-    const clipped = m.role === "toolResult" && Buffer.byteLength(text) > 512;
-    return { role: m.role, text: clipped ? text.slice(0, 509) + "..." : text,
-      ...(m.role === "toolResult" ? { tool: m.toolName, error: m.isError } : {}) };
-  });
+  let remaining = 14000, recentTextTruncated = false;
+  const recent = [];
+  for (const m of messages.slice(-64).reverse()) {
+    if (m.role !== "assistant" && m.role !== "toolResult") continue;
+    const text = typeof m.content === "string" ? m.content
+      : m.content.filter(c => c.type === "text").map(c => c.text).join("\n");
+    const limit = Math.min(m.role === "toolResult" ? 512 : 8000, remaining);
+    let retained = text;
+    if (Buffer.byteLength(text) > limit) {
+      recentTextTruncated = true;
+      let prefix = "", bytes = 0;
+      for (const char of text) {
+        const size = Buffer.byteLength(char);
+        if (bytes + size > (limit >= 3 ? limit - 3 : limit)) break;
+        prefix += char; bytes += size;
+      }
+      retained = prefix + (limit >= 3 ? "..." : "");
+    }
+    remaining -= Buffer.byteLength(retained);
+    recent.unshift({ role: m.role, text: retained,
+      ...(m.role === "toolResult" ? { tool: m.toolName, error: m.isError } : {}) });
+  }
   return { state: { userConstraints: [], recent, previousSummary: "", savedArtifacts: [],
-    coverage: { omittedUserMessages: 0, olderMessagesOmitted: 0, recentTextTruncated: true, hasImages: false,
+    coverage: { omittedUserMessages: 0, olderMessagesOmitted: Math.max(0, messages.length - 64),
+      recentTextTruncated, hasImages: false,
       redacted: false, unknownContext: false, transcriptRecoverable: true, ...over } },
-  conversationTokens: 50000, checkpointKey: "k", autoCoverage: false };
+  conversationTokens: 50000, checkpointKey: "k", autoCoverage: !recentTextTruncated };
 }
 const reading = (id, text, extra = {}) => [
   { role: "assistant", content: [{ type: "toolCall", id, name: "read", arguments: { path: "source.txt" } }] },
@@ -290,6 +304,50 @@ test("a long tool-result transcript is attested complete, judged, and then nativ
   assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
 });
 
+test("original tail-budget clipping of a small successful read is attested before judging and native compaction", async () => {
+  for (const blocks of [false, true]) {
+    const small = blocks ? "\u{1f642}".repeat(100) : "s".repeat(400);
+    const large = blocks ? "€".repeat(400) : longRead(30);
+    const encode = text => blocks ? [{ type: "text", text }] : text;
+    const reads = [small, ...Array(27).fill(large)].flatMap((body, i) =>
+      reading(`budget-${i}`, body, { content: encode(body) }));
+    const answer = "Final answer ready";
+    const messages = [{ role: "user", content: "Read everything." }, ...reads,
+      { role: "assistant", content: encode(answer), stopReason: "stop" }];
+    assert.equal(Buffer.byteLength(small), 400);
+    assert.equal(Buffer.byteLength(answer), 18);
+    const f = fixture();
+    let sent;
+    withHost(f, messages);
+    f.adviser.judge = (state, _key, signal) => {
+      sent = state;
+      const call = deferred(); f.evaluations.push({ ...call, signal }); return call.promise;
+    };
+    f.ctx.idle = true; f.emit("agent_end", { willContinue: false });
+    const work = f.fireTimer();
+    assert.equal(f.evaluations.length, 1, `${blocks ? "blocks" : "strings"}: Jev receives the checkpoint`);
+    f.evaluations[0].resolve({ finished: true, model: "jev-1.13.0", inputTokens: 1000, outputTokens: 20 });
+    await work;
+    assert.equal(sent.recent.length, 57, "all assistant and tool-result entries are retained");
+    assert.deepEqual(sent.recent.map(entry => entry.role), messages.slice(1).map(message => message.role));
+    const tools = sent.recent.filter(entry => entry.role === "toolResult");
+    assert.equal(tools.length, 28);
+    const digest = createHash("sha256").update(small).digest("hex");
+    assert.ok(tools[0].text === small || tools[0].text.includes(`sha256 ${digest}`),
+      "the original 400-byte result is fully present or digest-attested");
+    assert.ok(!tools[0].text.includes("\ufffd"), "multibyte boundaries do not produce replacement characters");
+    assert.equal(sent.recent.at(-1).text, answer);
+    const attested = tools.filter(entry => entry.text.includes("sha256 ")).length;
+    assert.equal(attested, 28, "the small originally clipped result is attested with the newer large reads");
+    assert.equal(sent.coverage.recentBulkAttested, attested);
+    assert.equal(sent.coverage.recentTextTruncated, false);
+    assert.equal(f.records.find(row => row.event === "judge-start")?.attestedResults, attested);
+    assert.ok(!f.records.some(row => row.event === "coverage-ineligible"));
+    assert.equal(f.compactions.length, 1);
+    assert.ok(f.records.some(row => row.event === "native-persisted"));
+  }
+});
+
 test("genuinely incomplete views are still rejected and name their reason", async () => {
   const bigRead = reading("r", longRead(300));
   const cases = {
@@ -315,6 +373,51 @@ test("genuinely incomplete views are still rejected and name their reason", asyn
   }
 });
 
+test("original tail-budget clipping still rejects small errors, non-read tools, and assistants", async () => {
+  for (const blocks of [false, true]) {
+    const encode = text => blocks ? [{ type: "text", text }] : text;
+    const small = "s".repeat(400);
+    const newer = Array.from({ length: 27 }, (_, i) =>
+      reading(`newer-${i}`, longRead(30), { content: encode(longRead(30)) })).flat();
+    const cases = {
+      "small errored read": reading("early", small, { isError: true, content: encode(small) }),
+      "small non-read tool": [
+        { role: "assistant", content: [{ type: "toolCall", id: "early", name: "bash", arguments: { command: "pwd" } }] },
+        { role: "toolResult", toolCallId: "early", toolName: "bash", isError: false, content: encode(small) },
+      ],
+      "small earliest assistant": [{ role: "assistant", content: encode(small), stopReason: "stop" }],
+    };
+    for (const [name, earliest] of Object.entries(cases)) {
+      const messages = [{ role: "user", content: "Read everything." }, ...earliest, ...newer,
+        { role: "assistant", content: encode("Final answer ready"), stopReason: "stop" }];
+      const f = fixture(); withHost(f, messages);
+      await checkpoint(f);
+      assert.equal(f.evaluations.length, 0, `${name}: no Jev request`);
+      assert.equal(f.compactions.length, 0, `${name}: no compaction`);
+      assert.deepEqual(f.records.find(row => row.event === "coverage-ineligible")?.reasons,
+        ["recent-text-clipped"], name);
+    }
+  }
+});
+
+test("altered non-attested package text cannot authorize a checkpoint", async () => {
+  for (const blocks of [false, true]) {
+    const small = "unchanged small read";
+    const messages = transcript(reading("large", longRead(300)),
+      reading("small", small, { content: blocks ? [{ type: "text", text: small }] : small }));
+    const f = fixture();
+    withHost(f, messages, {}, view => {
+      view.state.recent.find(entry => entry.role === "toolResult" && entry.text === small).text = "altered small read";
+      return view;
+    });
+    await checkpoint(f);
+    assert.equal(f.evaluations.length, 0, "a mismatched non-attested result never reaches Jev");
+    assert.equal(f.compactions.length, 0);
+    assert.deepEqual(f.records.find(row => row.event === "coverage-ineligible")?.reasons,
+      ["recent-text-clipped"]);
+  }
+});
+
 test("attestation refuses an unexpected package shape or host", async () => {
   const messages = transcript(reading("r", longRead(300)));
   const variants = {
@@ -326,6 +429,8 @@ test("attestation refuses an unexpected package shape or host", async () => {
     const f = fixture(); withHost(f, messages); change(f);
     await checkpoint(f);
     assert.equal(f.evaluations.length, 0, name);
+    assert.equal(f.compactions.length, 0, name);
+    assert.ok(f.records.some(row => row.event === "coverage-ineligible"), name);
   }
 });
 

@@ -999,8 +999,8 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 The fork includes an opt-in timing-only comparison arm in [`extensions/omp-jev-pipeline.mjs`](../extensions/omp-jev-pipeline.mjs).
 Jev judges a successful, genuinely settled turn; a qualifying judgment requests omp's own compaction, leaving summary generation, retention and persistence to omp.
 Judging requires no queued messages or editor draft, context usage at least `minContextTokens`, and a snapshot with more than 20,000 conversation tokens and complete automatic coverage (`autoCoverage`).
-The adviser's own snapshot clips every recent tool result to 512 bytes and then reports the window incomplete, so any turn that read a large file would never qualify.
-The controller therefore proves completeness itself: the body of a successful `read` result that exceeds the clip is replaced in the request by its exact byte count, line count and SHA-256 over the full sanitized text, so the recent window holds every message with nothing clipped and the request stays under the adviser's request cap.
+The adviser's own snapshot caps each recent tool result at 512 bytes and recent text at 14,000 bytes total, marking clipped windows incomplete.
+The controller therefore proves completeness itself: the body of a successful `read` result clipped by either the per-result limit or the original cumulative tail budget is replaced in the request by its exact byte count, line count and SHA-256 over the full sanitized text, so the recent window holds every message with nothing clipped and the request stays under the adviser's request cap.
 Only successful `read` results are attested.
 Clipped assistant or user text, errored results, shell or other tool output too large to send verbatim, redaction, images, unknown context, an unrecoverable transcript and any unexpected adviser package shape still leave the view incomplete, and the checkpoint is not judged.
 A rejected checkpoint records `coverage-ineligible` with categorical `reasons`, and a judged one records how many results and bytes were attested on `judge-start`.

@@ -42,11 +42,15 @@ export function completeCoverage(adviser, ctx, secrets) {
   if (typeof buildSessionContext !== "function" || typeof redact !== "function" ||
       typeof scrubKnownSecrets !== "function" || !Number.isInteger(RECENT_TAIL_MESSAGES)) return base;
   const messages = buildSessionContext(ctx.sessionManager.getBranch()).messages;
+  const original = base.state.recent;
+  if (!Array.isArray(original)) return base;
   const recent = [], bulk = [];
-  let budget = TAIL_BYTES, attestedBytes = 0;
+  let budget = TAIL_BYTES, originalBudget = TAIL_BYTES, attestedBytes = 0;
   for (let i = messages.length - 1; i >= messages.length - RECENT_TAIL_MESSAGES && i >= 0; i--) {
     const message = messages[i];
     if (message.role !== "assistant" && message.role !== "toolResult") continue;
+    const first = original[original.length - recent.length - 1];
+    if (!first) return base;
     const cleaned = redact(textOf(message));
     const scrubbed = scrubKnownSecrets(cleaned.text, secrets);
     if (cleaned.redacted || scrubbed.redacted) return base;
@@ -54,7 +58,7 @@ export function completeCoverage(adviser, ctx, secrets) {
     const bytes = Buffer.byteLength(text);
     const isTool = message.role === "toolResult";
     let kept = text, summarized = false;
-    if (bytes > Math.min(budget, isTool ? TOOL_RESULT_BYTES : ASSISTANT_BYTES)) {
+    if (bytes > Math.min(budget, originalBudget, isTool ? TOOL_RESULT_BYTES : ASSISTANT_BYTES)) {
       if (!isTool || message.isError || !ATTESTED_TOOLS.has(message.toolName)) return base;
       const lines = text === "" ? 0 : text.split("\n").length;
       kept = `[${message.toolName} result fully received, body not sent: ${bytes} bytes, ` +
@@ -64,6 +68,7 @@ export function completeCoverage(adviser, ctx, secrets) {
       attestedBytes += bytes;
     }
     budget -= Buffer.byteLength(kept);
+    originalBudget -= Buffer.byteLength(first.text);
     recent.push({
       role: message.role, text: kept,
       ...(isTool ? { tool: message.toolName, error: message.isError } : {}),
@@ -75,7 +80,6 @@ export function completeCoverage(adviser, ctx, secrets) {
   const attested = bulk.filter(Boolean).length;
   // Defensive: the rebuilt window must match the package's own, entry for entry,
   // except where a bulk body was attested.
-  const original = base.state.recent;
   if (!attested || recent.length !== original.length) return base;
   for (let i = 0; i < recent.length; i++) {
     const kept = recent[i], first = original[i];
