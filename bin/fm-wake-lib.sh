@@ -192,18 +192,15 @@ fm_watcher_healthy() {
 # that - it decides whether to start, attach to, or replace a real watcher
 # process, so a leftover beacon must never satisfy it. bin/fm-turnend-guard.sh
 # also keeps this strict check because it fires at the turn boundary where the
-# auto-arm brings a fresh watcher up. The pull warning (bin/fm-guard.sh) fires
-# mid-turn, where the auto-arm model runs no watcher at all, so it wants a
-# different, model-aware question:
+# auto-arm brings a fresh watcher up. docs/turnend-guard.md "Pull-warning verdict
+# by supervision model" owns the different, model-aware question used by the
+# mid-turn pull warning (bin/fm-guard.sh).
 
 # fm_supervision_model
 # Print the supervision model of this home's PRIMARY harness:
-#   autoarm     Claude's Stop-hook auto-arm and Cursor's stop-hook park: the
-#               watcher is armed at each turn end and exits on its wake, so it
-#               runs only BETWEEN turns. Mid-turn a fresh beacon with no live
-#               watcher process is healthy, and a stale beacon is still healthy
-#               while a Claude auto-arm generation explains the gap
-#               (fm_autoarm_midturn_healthy).
+#   autoarm     Claude's Stop-hook auto-arm and Cursor's stop-hook park.
+#               docs/watcher-continuity.md owns Claude handling succession;
+#               docs/turnend-guard.md owns model-aware pull-warning health.
 #   extension   Pi (and pi-signed): .pi/extensions/fm-primary-pi-watch.ts owns
 #               continuity. It tears the watcher down on every actionable wake and
 #               spawns the replacement itself, so a genuinely unheld singleton lock
@@ -1663,13 +1660,12 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 
 # True when a stale mid-turn beacon is explained by a healthy Claude Stop
 # auto-arm generation, so the pull guard must not cry supervision-off.
-# The watcher runs only between turns; turn-end re-arms.
+# docs/turnend-guard.md owns the model-aware pull-warning contract.
 #
 # Healthy means outcome=rewake with no exhausted-failure marker, bound to the
 # current session-lock pid and current watcher recovery generation. The rewake
-# ledger must also be at least as new as the last watcher beacon: a later beacon
-# proves another between-turns watcher cycle has begun, so the rewake belongs to
-# an earlier handling turn.
+# ledger must also be at least as new as the last watcher beacon: later watcher
+# activity supersedes that rewake, so it cannot explain the current gap.
 #
 # A missing generation, a failed or exhausted episode, an open arming claim, a
 # changed or dead session lock, a moved recovery generation, or an absent/later
