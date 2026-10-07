@@ -73,8 +73,8 @@ Run the real-harness guard after any harness upgrade and before trusting refresh
 Agent liveness and composer safety are separate checks.
 The tmux reader is a thin adapter over the [fleet-wide classifier and its shape catalogue](../bin/fm-composer-lib.sh): it contributes one styled full-pane capture, the `#{cursor_y}` cursor row, and foreground-process identity probes, and the shape containing the cursor normally decides the verdict.
 Real text in an identified shape is pending, while only positively proven emptiness reads empty.
-A blank or otherwise unidentified cursor row is `unknown` and every consumer defers, except that a foreground process proven to be Cursor is re-read cursorlessly because Cursor parks its terminal cursor below its footer.
-That identity-gated exception preserves the strict container-proof rule for every other pane, so a modal dialog, a dead shell between stale rules, or a mid-redraw pane is never an injection target.
+A blank or otherwise unidentified cursor row is `unknown`, so guards requiring proven emptiness defer, except that a foreground process proven to be Cursor is re-read cursorlessly because Cursor parks its terminal cursor below its footer.
+That identity-gated exception preserves the strict container-proof rule for fail-closed injection into every other pane; the [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
 The shared supported shapes, prompt-glyph limits, and plain-capture safety boundary are owned by [Composer and injection safety](herdr-backend.md#composer-and-injection-safety).
 
 Busy state is not read from rendered text on this backend.
@@ -83,19 +83,12 @@ The isolated rendered-tail busy fallbacks that remain are harness-scoped, so one
 The submit acknowledgement and away-mode supervisor-pane busy guard below still consult rendered output, but only to decide whether input can be delivered, never to decide recorded task state.
 The supervisor guard selects only the detected primary harness's signature rather than a global union of vendor patterns.
 
-`bin/fm-tmux-lib.sh` owns exact type-and-submit mechanics.
-It types a message once and retries Enter only until the composer clears.
-Only a proven empty composer is a positive delivery acknowledgement.
-Text left in established structure remains `pending`, text in ambiguous structure remains unproven, and unreadable or unsafe state remains unknown.
+[`bin/fm-tmux-lib.sh`](../bin/fm-tmux-lib.sh) owns exact type-and-submit mechanics, Enter retry limits, and submission acknowledgement.
 An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
-OpenCode 1.18.4 has one busy-queue exception.
-While OpenCode is mid-turn, Enter queues the message but leaves its text visible until the turn completes.
-After the normal retry budget, only structurally proven pending text in a provably busy pane is accepted as queued, while an idle pane remains `pending` as a genuine swallowed Enter.
-Ambiguous pending text never receives the busy-queue conversion.
-A second, baseline-gated conversion covers harnesses whose mid-turn screen the classifier cannot identify (Pi replaces its separated composer while working): when and only when the pane was idle before the text was typed, an idle-to-busy transition across the submit's own Enter confirms delivery, the same turn-started signal Herdr reads natively.
-Without that baseline, an `unknown` verdict is preserved untouched, so a busy-looking pane can never convert an unread composer into a confirmation.
+The [shared queued-Enter policy](../bin/fm-composer-lib.sh) owns acceptance of structurally proven pending text in a busy pane after retries.
+The [tmux submit owner](../bin/fm-tmux-lib.sh) also defines baseline-gated idle-to-busy confirmation and preservation of unconfirmed verdicts, including `unknown-draft`.
 `tests/fm-tmux-submit-busy.test.sh` covers busy and idle panes with proven, ambiguous, and cleared composers.
 
 ## Limits and regression entry points

@@ -938,10 +938,9 @@ secondmate_busy_class() {  # <window>
   printf '%s' "${verdict%% *}"
 }
 
-# 0 iff a child ring is authorized: exact idle, a live agent, and a composer
-# without pending text or identified draft risk. Busy, unknown, dead, missing,
-# pending and unknown-draft composer all refuse, so a Kimi or Claude pane
-# without an exact idle verdict is never typed into.
+# A child ring requires exact semantic idle and a live agent; unknown busy
+# state is not idle proof. The composer rejects pending and unknown-draft,
+# while ordinary unknown remains advisory, as in fm-task-inbox-lib.sh.
 secondmate_idle_ring_safe() {  # <window>
   local w=$1 backend agent_state cstate
   [ -n "$w" ] || return 1

@@ -13,7 +13,7 @@
 # from bounded local reads while these checks run in a detached worker, and
 # their result is reported back inline when it finishes in time, or as a durable
 # wake when it does not. Recorded Herdr launch recovery also runs here through
-# bootstrap; docs/agent-control.md "Recovering a bare native restore" owns it.
+# bootstrap; docs/agent-control.md "Inspecting a bare native restore" owns it.
 # The locked startup's bounded inactive-outcome scan also runs here because its
 # local current-state reads can be just as slow; it publishes its own findings
 # to the durable wake queue.

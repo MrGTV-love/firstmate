@@ -417,7 +417,10 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
-Every admitted Herdr runtime requires `python3` on its runtime PATH to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform. On macOS, remote Herdr also requires `python3` on the Aqua launch agent PATH to prove server ownership. Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available. Ownership remains unproven rather than being accepted from an unreadable environment.
+Every admitted Herdr runtime requires `python3` on its runtime PATH to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
+On macOS, remote Herdr also requires `python3` on the Aqua launch agent PATH to prove server ownership.
+Missing Python is a human prerequisite gap: doctor/readiness will not reload the server to repair it, and the launch guard refuses server start or takeover until it is available.
+Ownership remains unproven rather than being accepted from an unreadable environment.
 
 ### Backend selection order
 
@@ -725,7 +728,7 @@ muse is verified for crewmate and scout launches ONLY, and `fm-spawn.sh` refuses
 muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`, because a caller-only `META_API_KEY` does not cross a long-lived backend daemon.
 
 gemini is likewise refused for secondmates because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
-rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns that evidence, including the OAuth token's silent background refresh from a stored refresh token and both tmux and herdr pane liveness (herdr placement is verified live, with a Herdr-side agent-detection gap left open for recovery classification).
+rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns the live launch, OAuth refresh, and pane-liveness evidence, while [Herdr's process-backed liveness contract](herdr-backend.md#stale-agent-registrations) owns current recovery classification.
 
 agy is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no hook surface and no primary supervision protocol; [`docs/verification/agy.md`](verification/agy.md) owns that evidence, including the spawn-time worktree trust pre-registration through `bin/fm-agy-trust.sh` and Herdr's native agy pane recognition.
 devin is verified for crewmate and scout launches only; a secondmate is refused because Devin has no verified primary supervision protocol.

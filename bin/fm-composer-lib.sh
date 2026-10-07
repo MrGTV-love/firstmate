@@ -40,12 +40,13 @@
 #
 # THE STRICT BLANK-ROW RULE (captain decision blank-row-injection-posture,
 # 2026-08-09): a blank or otherwise unidentified input row with no positive
-# container proof is `unknown` and callers defer. This replaced tmux's
-# permissive "blank cursor row = empty = safe to inject" rule fleet-wide: a
+# container proof is `unknown`; consumers requiring proven emptiness defer.
+# This replaced tmux's permissive blank-cursor-row injection rule fleet-wide: a
 # blank row under the cursor can be a modal dialog, a dead shell between
 # transcript rules, or a mid-redraw pane, and the away-mode injector types
 # escalations into whatever it calls empty. Positive container proof means one
-# of the shapes in the catalogue below.
+# of the shapes in the catalogue below. fm-task-inbox-lib.sh separately owns
+# the advisory doorbell pre-check.
 #
 # THE SHAPE CATALOGUE (all verified against real harnesses; byte-level
 # captures in data/fm-composer-consolidation-audit-s1/report.md and

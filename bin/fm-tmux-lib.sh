@@ -242,8 +242,8 @@ fm_pane_is_busy() {  # <target> [harness]
 # The busy read is polled across the remaining retry budget because the turn
 # takes a beat to render. Without the baseline (a direct
 # fm_tmux_submit_enter_core caller, or a pane already busy before typing) an
-# `unknown` verdict is preserved untouched: busy conversion without the
-# transition evidence could mark an undelivered message delivered.
+# `unknown` or `unknown-draft` verdict is preserved untouched: busy conversion
+# without transition evidence could mark an undelivered message delivered.
 fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle]
   local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state
   while :; do

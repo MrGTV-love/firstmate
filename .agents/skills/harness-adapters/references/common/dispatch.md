@@ -27,7 +27,7 @@ Follow [advisory skill selection](../../../docs/configuration.md#advisory-skill-
 Natural-language rules stay with firstmate, while scripts receive concrete axes.
 
 `../../../bin/fm-busy-lib.sh` owns semantic busy trust.
-Composer shapes, glyphs, placeholders, popups, rendered delivery signals, and the `empty` / `pending` / `pending-unproven` / `unknown` decision belong only to `../../../bin/fm-composer-lib.sh`.
+Composer shapes, glyphs, placeholders, popups, rendered delivery signals, and the verdict contract belong only to [`bin/fm-composer-lib.sh`](../../../bin/fm-composer-lib.sh).
 Tool references record empirical knowledge for those executable owners.
 
 ## Adapter verification

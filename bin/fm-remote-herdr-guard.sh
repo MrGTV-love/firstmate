@@ -18,6 +18,8 @@
 # Decision, made once per launch (exit codes matter under SuccessfulExit=false:
 # 0 tells launchd the job is done until something restarts it, non-zero asks
 # for a retry after the throttle interval):
+#   ownership reader unavailable (python3 missing from launch agent PATH)
+#                                      -> exit 1 before server start or takeover
 #   no server owns the session socket  -> exec `herdr server --session <s>`
 #                                          (foreground, launchd-supervised)
 #   the owner was born in the Aqua session (launchd or the Aqua remote-job
@@ -34,8 +36,9 @@
 # secondmate liveness sweep relaunches its mates into the Aqua-born server.
 # bin/fm-remote-herdr-owner-lib.sh owns the owner discovery and the birth
 # markers; FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
-# release wait in tenths of a second. Every decision prints one line to
-# stdout, which launchd routes to the agent's log.
+# release wait in tenths of a second.
+# Every socket-owner decision prints one line to stdout, which launchd routes
+# to the agent's log; prerequisite refusals print to stderr.
 set -u
 
 SCRIPT_SELF=${BASH_SOURCE[0]}

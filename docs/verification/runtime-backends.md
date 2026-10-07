@@ -1200,7 +1200,7 @@ ok - muse (Muse Code 0.2.1 (0.2.1-R1215.1)): the doorbell reached a real worker,
 
 All six installed harnesses honored the doorbell contract with real model turns: each listed the inbox named by the doorbell, read its record, executed the instruction inside it, and acknowledged with the atomic `mv`.
 Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is a recoverable constant line, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
-The current ring contract is owned by `bin/fm-task-inbox-lib.sh`: exact pending text and identified draft risk (`unknown-draft`) defer ordinary doorbells and watcher re-rings, while ordinary unknown idle screens remain advisory. The inbox's exact own-doorbell retry remains limited to proven pending content; ambiguous drafts never receive that Enter exception.
+The [inbox ring owner](../../bin/fm-task-inbox-lib.sh) defines the current advisory pre-check, draft-risk deferral, and own-doorbell retry contract.
 Kimi was not installed on the verification machine; its receive path is the same one-line-plus-shell contract, and the portable ladder and enqueue regressions in `tests/fm-task-inbox.test.sh` and `tests/fm-send-inbox.test.sh` cover every harness-independent half.
 This guard is the refresh command after any harness upgrade; it spends a small number of real tokens per installed harness, reports an absent harness explicitly, and refuses a run that verified nothing.
 
@@ -2293,7 +2293,8 @@ The saved actual renderer captures and focused portable checks are refreshed wit
 
 ### Bare native omp restoration and managed recovery
 
-The native-restored recovery results below predate the current safety decision. Bare native-restored omp processes are now always unmanaged and receive no lifecycle action; these measurements remain renderer and historical transport evidence, not current recovery authorization.
+The native-restored recovery results below predate the current safety decision and are not current recovery authorization.
+The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns the current boundary.
 
 Measured 2026-10-04 on macOS aarch64 (Darwin 25.5.0), Herdr 0.9.1 protocol 22, and omp 18.6.1.
 The earlier composer captures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` are real omp 18.6.0 frames from the same guarded named-lab procedure.
@@ -2307,13 +2308,13 @@ The live test starts actual `omp --resume=<ref>` with a valid native session hea
 It exercises the native command used by Herdr restoration, rather than rebooting the host or claiming a full OS-reboot test.
 All Herdr calls, including production-adapter calls through the test's session-pinning shim, use the guarded lab helper.
 The helper's default-session tripwire remains unchanged through cleanup.
-Both replacement agents visibly answer their instructions before the test stops them.
+The historical recovery run observed both replacement agents answer their instructions before stopping them; the current live test instead checks preservation of unmanaged task and local-secondmate agents without lifecycle input.
 
 The fixture pins `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, `FM_CONFIG_OVERRIDE`, and `FM_PROJECTS_OVERRIDE` to its private home before lifecycle calls and profile setup.
 Both native task and secondmate launches also use an owned HOME and private XDG config, data, state, and cache roots. Their omp config directory, agent directory, and profile selectors are pinned independently of inherited operator settings; the real Herdr omp integration is installed into that private profile.
 The private profile selects the native boxed composer, and the seeded session selects a built-in model with a fixture-only placeholder key, so it can render without operator settings or authentication; the preservation check never submits a model request.
-It uses an invocation-unique task identifier and exclusively reserves the task-temp and home-hashed launch namespaces; cleanup removes only successfully reserved namespaces.
-A focused live rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
+The current fixture stages native launch commands inside its private tree and does not allocate production spawn namespaces.
+A historical live recovery rerun with all four inherited overrides pointing at operator-owned sentinel directories preserved those directories and removed both owned staging namespaces after task and local-secondmate recovery.
 The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns the fixture's teardown-gated dependency cleanup.
 A focused actual-script smoke with a controlled helper and worktree-local resources verified retention on teardown refusal, removal on success, and both outcomes after an injected fresh-claim provision failure; it did not contact Herdr or launch an agent.
 
@@ -2359,7 +2360,7 @@ The actual recorded-profile replacement and preserved-work assertions still pass
 The focused relaunch fixtures also passed with all five inherited state/data/config/projects/source-root overrides pointing at separate owned poison paths, which remained untouched. Actual cleanup preserved pre-existing task and home-hashed launch directories while removing only exclusively claimed namespaces; unique fixture task IDs retained bounded-scan fairness and interruption progress.
 
 No remote secondmate, unrelated pane, shared worktree pool, or global Herdr configuration is modified.
-The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-restoration) owns the decision to retain global auto-resume and repair only the recorded fleet.
+The [Herdr restart guide](../herdr-backend.md#ownership-after-native-restoration) owns the decision to retain global auto-resume and the scope of recorded-fleet inspection.
 
 #### Recorded-task attribution (2026-10-06)
 
