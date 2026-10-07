@@ -2322,9 +2322,9 @@ Under the default ordering, this happens after the initial `check` publication.
 **Apply built-in results automatically**
 
 Applying a captured result through code is a built-in adapter seam, and some built-in results carry no judgement at all: they must simply be applied idempotently to this home's own durable state.
-Leaving that to a handler means it can silently not happen, so immediately after the terminal check above the runner calls `bin/fm-procevent-<adapter>.sh autohandle <source-id> <sequence> <result-file>` and lets the built-in adapter apply and acknowledge its own result.
+Leaving that to a handler means it can silently not happen, so after capture the runner calls `bin/fm-procevent-<adapter>.sh autohandle <source-id> <sequence> <result-file>` according to the announcement ordering below and lets the built-in adapter apply and acknowledge its own result.
 
-That call runs strictly after terminal retirement, because a handling adapter re-arms its own next source and retiring afterwards would drop that fresh registration and leave the source silently dead.
+Terminal retirement follows automatic application and targets only the registration generation held by the runner's claim, preserving any replacement the handling adapter registered for its next round.
 Exit 0 means the adapter fully applied and acknowledged the result; a missing command, an error, or any other exit is not a capture failure but leaves the result unacknowledged and therefore still eligible for re-announcement, so a handler receives it exactly as before and an adapter with no such command needs no change.
 
 **Adapter-controlled announcement order**
