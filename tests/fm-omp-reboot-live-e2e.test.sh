@@ -10,6 +10,36 @@ TMP=$(cd "$TMP" && pwd -P)
 TASK_ID="reboot-${TMP##*/}"
 REAL_PATH=$PATH
 OWNED_SESSION=0
+NATIVE_LAUNCH_PENDING=0
+NATIVE_PROCESSES="$TMP/native-processes"
+: > "$NATIVE_PROCESSES"
+
+# Session deletion can return before a native omp finishes its exit writes.
+# Keep its private dependencies until each captured PID/start pair is gone;
+# neither a timeout nor an unreadable launch authorizes deleting the tree.
+wait_native_exit() {
+  local pid expected_start current_start deadline=$((SECONDS + 10))
+  [ "$NATIVE_LAUNCH_PENDING" = 0 ] || {
+    printf 'native launch identity was not captured; refusing private tree removal\n' >&2
+    return 1
+  }
+  while IFS=$'\t' read -r pid expected_start; do
+    while kill -0 "$pid" 2>/dev/null; do
+      current_start=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) || current_start=
+      if [ -n "$current_start" ] && [ "$current_start" != "$expected_start" ]; then
+        break # The original child exited and this PID was reused; never signal it.
+      fi
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        printf 'native child exit not confirmed within 10s: pid=%s start=%s current=%s\n' \
+          "$pid" "$expected_start" "${current_start:-<unreadable>}" >&2
+        return 1
+      fi
+      sleep 0.1
+    done
+    printf 'native child exit confirmed: pid=%s start=%s\n' "$pid" "$expected_start"
+  done < "$NATIVE_PROCESSES"
+}
+
 cleanup() {
   local status=$?
   if [ "$OWNED_SESSION" = 1 ] && ! PATH="$REAL_PATH" "$HELPER" teardown "$SESSION"; then
@@ -17,8 +47,20 @@ cleanup() {
       "$SESSION" "$TMP" >&2
     exit 1
   fi
+  if [ "$OWNED_SESSION" = 1 ]; then
+    printf "guarded teardown completed for session '%s'; waiting for native child exit\n" "$SESSION"
+  fi
+  if ! wait_native_exit; then
+    printf "native cleanup refused for session '%s'; retained private tree for manual cleanup: %s\n" \
+      "$SESSION" "$TMP" >&2
+    exit 1
+  fi
   chmod -R u+w "$TMP" || status=1
-  rm -rf "$TMP" || status=1
+  if rm -rf "$TMP"; then
+    printf 'private fixture tree removed: %s\n' "$TMP"
+  else
+    status=1
+  fi
   exit "$status"
 }
 trap cleanup EXIT
@@ -199,11 +241,12 @@ exercise_native_refusals() {
 }
 
 exercise_native_pane() {
-  local proof composer live environment launch
+  local proof composer live environment launch start
   printf -v launch '%q ' env "${NATIVE_ENV[@]}" omp "--resume=$REF"
   printf '#!/usr/bin/env bash\nexec %s\n' "$launch" > "$TMP/native-launch.sh"
   printf -v launch '%q ' bash "$TMP/native-launch.sh"
   run pane send-text "$PANE" "$launch"
+  NATIVE_LAUNCH_PENDING=1
   run pane send-keys "$PANE" Enter
   for _ in $(seq 1 60); do
     proof=$(fm_launch_proof_herdr "$META")
@@ -215,6 +258,11 @@ exercise_native_pane() {
   [ "$proof" = unmanaged ] && [ "$composer" = empty ] && [ "$live" = alive ] \
     || fail "native omp: bare resume did not reach a live unmanaged empty composer ($proof/$composer/$live)"
   PID=$(native_pid) || fail 'native omp live PID could not be identified'
+  start=$(LC_ALL=C ps -p "$PID" -o lstart=) \
+    && [ -n "$start" ] || fail 'native omp process start identity could not be captured'
+  printf '%s\t%s\n' "$PID" "$start" >> "$NATIVE_PROCESSES"
+  NATIVE_LAUNCH_PENDING=0
+  printf 'native child captured: pid=%s start=%s\n' "$PID" "$start"
   environment=$(fm_remote_herdr_process_env "$PID") || fail 'native omp live environment could not be read'
   printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' \
     || fail 'native omp live environment was not positively readable'
@@ -240,6 +288,9 @@ expected = {
 for key, value in expected.items():
     assert environment.get(key) == value, (key, environment.get(key), value)
 PY
+  # Opt-in cleanup smoke uses both real native launches but skips the unchanged
+  # lifecycle matrix below; its proof is emitted by the shared EXIT cleanup.
+  [ "${FM_OMP_REBOOT_CLEANUP_SMOKE:-0}" != 1 ] || return 0
   RETAINED_GEN=$("$ROOT/bin/fm-busy-event.sh" arm "$FM_STATE_OVERRIDE" "$TASK_ID" \
     --state busy --source omp-ext --event agent_start)
   printf 'busy_gen=%s\n' "$RETAINED_GEN" >> "$META"
@@ -314,4 +365,8 @@ PRESERVED+=("$WT/.fm-secondmate-home" "$WT/AGENTS.md" "$WT/data/charter.md" "$WT
 exercise_native_pane
 printf 'Herdr lab runtime: '
 run status --json
-pass "native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep"
+if [ "${FM_OMP_REBOOT_CLEANUP_SMOKE:-0}" = 1 ]; then
+  pass "native omp cleanup smoke: task and local secondmate reached live unmanaged composers in isolated homes"
+else
+  pass "native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep"
+fi

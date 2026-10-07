@@ -816,12 +816,17 @@ test_task_session_proof_tracks_active_session() {
   mkdir -p "$case_dir"
   FM_PROOF_CASE="$case_dir" EXT="$ROOT/.omp/extensions/lib/fm-task-session.ts" node --input-type=module <<'EOF'
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
 const state = process.env.FM_PROOF_CASE;
-const task = `${state}/task.jsonl`, personal = `${state}/personal.jsonl`;
-writeFileSync(task, "{}\n"); writeFileSync(personal, "{}\n");
+const sessions = `${state}/sessions`, linkedSessions = `${state}/linked-sessions`;
+mkdirSync(sessions);
+symlinkSync(sessions, linkedSessions, "dir");
+const task = `${linkedSessions}/task.jsonl`, personal = `${linkedSessions}/personal.jsonl`;
+const canonicalTask = `${realpathSync(sessions)}/task.jsonl`;
+writeFileSync(personal, "{}\n");
 writeFileSync(`${state}/demo.meta`, "spawn_gen=proof-gen\n");
 process.env.FM_SPAWN_GEN = "proof-gen";
 const handlers = new Map(), warnings = [];
@@ -834,6 +839,11 @@ const stop = () => handlers.get("session_shutdown")({}, ctx);
 const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
 const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
 const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
+assert.equal(existsSync(task), false);
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: canonicalTask, current_session_file: canonicalTask });
+assert.equal(existsSync(task), false);
+writeFileSync(task, "{}\n");
 start();
 assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
 stop();
@@ -856,11 +866,26 @@ assert.equal(record().current_session_file, record().task_session_file);
 const originalWarn = console.warn; console.warn = () => {};
 try {
   beforeSwitch();
-  file = `${state}/absent.jsonl`;
-  assert.throws(afterSwitch);
+  file = `${linkedSessions}/absent.jsonl`;
+  afterSwitch();
+  assert.equal(record().current_session_file, `${realpathSync(sessions)}/absent.jsonl`);
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.notEqual(record().current_session_file, record().task_session_file);
+  assert.equal(existsSync(file), false);
+  installTaskSessionProof(pi, state, "demo"); start();
+  assert.equal(record().task_session_file, realpathSync(task));
+  file = task; start();
+  assert.equal(record().current_session_file, record().task_session_file);
+  beforeSwitch();
+  file = `${linkedSessions}/missing-parent/session.jsonl`;
+  assert.throws(afterSwitch, { code: "ENOENT" });
   assert.equal(record().current_session_file, "");
   assert.equal(record().task_session_file, realpathSync(task));
   assert.ok(warnings.length);
+  file = `${personal}/session.jsonl`;
+  assert.throws(start, { code: "ENOTDIR" });
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
   writeFileSync(`${state}/demo.meta`, "spawn_gen=other-gen\n");
   file = task; assert.throws(start);
   assert.equal(record().current_session_file, "");
@@ -873,6 +898,52 @@ try {
   installTaskSessionProof(pi, state, "corrupt");
   assert.throws(start);
   assert.equal(readFileSync(`${state}/corrupt.omp-session.json`, "utf8"), "{bad");
+  // Relaunch replaces the old generation's binding before its JSONL exists.
+  const replacement = `${linkedSessions}/replacement.jsonl`;
+  const canonicalReplacement = `${realpathSync(sessions)}/replacement.jsonl`;
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=replacement-gen\n");
+  const child = spawnSync(process.execPath, ["--input-type=module", "-"], {
+    encoding: "utf8",
+    env: { ...process.env, FM_SPAWN_GEN: "replacement-gen", FM_REPLACEMENT_FILE: replacement },
+    input: `
+      import assert from "node:assert/strict";
+      import { existsSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+      import { pathToFileURL } from "node:url";
+      const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+      const state = process.env.FM_PROOF_CASE;
+      const handlers = new Map();
+      const pi = { on(event, handler) { handlers.set(event, handler); } };
+      installTaskSessionProof(pi, state, "demo");
+      let file = process.env.FM_REPLACEMENT_FILE;
+      const ctx = { sessionManager: { getSessionFile() { return file; } } };
+      const start = () => handlers.get("session_start")({}, ctx);
+      const record = () => JSON.parse(readFileSync(state + "/demo.omp-session.json", "utf8"));
+      const canonical = ${JSON.stringify(canonicalReplacement)};
+      assert.equal(existsSync(file), false);
+      start();
+      const expected = { version: 1, spawn_gen: "replacement-gen", pid: process.pid, task_session_file: canonical, current_session_file: canonical };
+      assert.deepEqual(record(), expected);
+      assert.equal(existsSync(file), false);
+      writeFileSync(file, "{}\\n");
+      start();
+      assert.deepEqual(record(), expected);
+      file = ${JSON.stringify(personal)};
+      start();
+      assert.deepEqual(record(), { ...expected, current_session_file: realpathSync(file) });
+      assert.notEqual(record().current_session_file, record().task_session_file);
+      file = ${JSON.stringify(`${linkedSessions}/replacement-personal.jsonl`)};
+      start();
+      assert.equal(existsSync(file), false);
+      assert.deepEqual(record(), { ...expected, current_session_file: ${JSON.stringify(`${realpathSync(sessions)}/replacement-personal.jsonl`)} });
+      installTaskSessionProof(pi, state, "demo"); start();
+      assert.equal(record().task_session_file, canonical);
+      file = process.env.FM_REPLACEMENT_FILE; start();
+      assert.deepEqual(record(), expected);
+    `,
+  });
+  assert.equal(child.status, 0, child.stderr || child.error?.message);
+  assert.notEqual(child.pid, process.pid);
+  assert.deepEqual(record(), { version: 1, spawn_gen: "replacement-gen", pid: child.pid, task_session_file: canonicalReplacement, current_session_file: canonicalReplacement });
   delete process.env.FM_SPAWN_GEN;
   installTaskSessionProof(pi, state, "absent");
   start();
@@ -881,7 +952,7 @@ try {
 EOF
   status=$?
   expect_code 0 "$status" "omp task-session proof follows activation and fails closed"
-  pass ".omp task-session proof: task binding survives shutdown, personal resume, reload, and return"
+  pass ".omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement"
 }
 
 if [ -n "${FM_TEST_ONLY:-}" ]; then

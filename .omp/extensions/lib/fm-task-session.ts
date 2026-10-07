@@ -2,7 +2,7 @@
 // lifecycle observers cannot see the previous session after a switch completes.
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 
 type Context = { sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
 type Proof = { version: 1; spawn_gen: string; pid: number; task_session_file: string; current_session_file: string };
@@ -81,7 +81,11 @@ export function createTaskSessionProof(state: string, id: string): { start: (ctx
         const old = previous();
         const file = ctx?.sessionManager?.getSessionFile?.();
         if (!file || !isAbsolute(file)) throw new Error("active session file is missing or ambiguous");
-        const current = realpathSync(file);
+        let current: string;
+        try { current = realpathSync(file); } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          current = resolve(realpathSync(dirname(file)), basename(file));
+        }
         publish({ version: 1, spawn_gen: gen, pid: process.pid, task_session_file: old?.spawn_gen === gen ? old.task_session_file : current, current_session_file: current });
       } catch (error) {
         // A failed switch must never leave the previous active session proven.

@@ -914,10 +914,11 @@ Its before/after tripwire requires the live default-session snapshot to remain b
 Fixtures must successfully `prepare` a fresh name before claiming cleanup authority, and must call `teardown` only after that claim succeeds.
 `provision` accepts the prepared tripwire after checking it against the current default-session snapshot.
 A refused claim leaves existing running or stopped sessions and their tripwires untouched.
-The reboot live fixture must retain its private home, worktree, resume file, and exclusively claimed staging namespaces until guarded teardown succeeds.
-On teardown refusal or failure it reports the named session and retained paths for manual cleanup and exits unsuccessfully.
+The reboot live fixture must retain its private home, worktree, resume file, and exclusively claimed staging namespaces until guarded teardown succeeds and every captured native omp PID/start identity has exited.
+It waits up to 10 seconds for those children after teardown; an uncaptured launch, unconfirmed exit, or teardown refusal/failure reports the named session and retained paths for manual cleanup and exits unsuccessfully without deleting the private tree.
 This also applies after provision fails following a fresh ownership claim; successful cleanup removes only owned resources and preserves the original exit status unless resource removal fails.
 [`tests/fm-omp-reboot-live-e2e.test.sh`](../tests/fm-omp-reboot-live-e2e.test.sh) implements that dependency-preserving cleanup order.
+For focused real-native cleanup proof without rerunning the lifecycle matrix, use `FM_OMP_REBOOT_LIVE=1 FM_OMP_REBOOT_CLEANUP_SMOKE=1 bash tests/fm-omp-reboot-live-e2e.test.sh`; it launches the task and secondmate fixtures and reports guarded teardown, each child exit, and private-tree removal.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.

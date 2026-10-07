@@ -22,8 +22,16 @@ TMP_ROOT=$(fm_test_tmproot fm-remote-herdr-guard)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 HOLDER_PIDS=()
-HOLDER_FD=5
-trap 'if [ "${#HOLDER_PIDS[@]}" -gt 0 ]; then kill "${HOLDER_PIDS[@]}" 2>/dev/null || true; fi; fm_test_cleanup || true' EXIT
+HOLDER_N=0
+cleanup_holders() {
+  exec 4>&-
+  if [ "${#HOLDER_PIDS[@]}" -gt 0 ]; then
+    kill "${HOLDER_PIDS[@]}" 2>/dev/null || true
+    wait "${HOLDER_PIDS[@]}" 2>/dev/null || true
+  fi
+  fm_test_cleanup || true
+}
+trap cleanup_holders EXIT
 
 GUARD="$ROOT/bin/fm-remote-herdr-guard.sh"
 JQ=$(command -v jq)
@@ -100,54 +108,78 @@ SH
 chmod +x "$FAKE/lsof" "$FAKE/launchctl" "$FAKE/herdr"
 cp "$FAKE/lsof" "$TMP_ROOT/lsof.fake"
 
-# hold <marker-env...> -> HOLDER_PID: a real non-platform process (Python blocked
-# on a fifo this test keeps open) whose environment is exactly the markers.
+# This code runs only in the final exec environment. Opening the blocking fifo
+# read-write keeps the holder alive without inherited fixture descriptors.
+# Its flushed pid is the readiness handshake, not a startup-delay guess.
+HOLDER_CODE='import os
+import sys
+with open(sys.argv[1], "r+b", buffering=0) as fifo:
+    print(os.getpid(), flush=True)
+    fifo.read()'
+
+holder_ready() { # <ready-fifo> [expected-pid]
+  local ready=$1 expected=${2:-} pid
+  if ! IFS= read -r -t "$FM_TEST_STUB_MAX_BLOCK_SECONDS" -u 4 pid; then
+    exec 4>&-
+    fail "holder did not signal readiness from its final exec environment"
+  fi
+  exec 4>&-
+  rm -f "$ready"
+  case "$pid" in ''|*[!0-9]*) fail "holder reported an invalid readiness pid: $pid" ;; esac
+  if [ -n "$expected" ]; then
+    [ "$pid" = "$expected" ] || fail "holder readiness came from pid $pid, expected $expected"
+  else
+    HOLDER_PIDS+=("$pid")
+  fi
+  HOLDER_PID=$pid
+}
+
+# hold <marker-env...> -> HOLDER_PID: a real non-platform process whose kernel
+# exec environment is exactly the markers, confirmed before this call returns.
 hold() {
-  local fifo="$TMP_ROOT/holder-$HOLDER_FD.fifo"
-  rm -f "$fifo"
-  mkfifo "$fifo"
-  # Open read-write so this never blocks on the reader; the holder sees EOF
-  # only when the descriptor closes at exit.
-  eval "exec ${HOLDER_FD}<>\"\$fifo\""
+  HOLDER_N=$((HOLDER_N + 1))
+  local fifo="$TMP_ROOT/holder-$HOLDER_N.fifo" ready="$TMP_ROOT/holder-$HOLDER_N.ready"
+  mkfifo "$fifo" "$ready"
+  exec 4<>"$ready"
   (
-    exec "$PYTHON" - "$fifo" "$@" <<'PY'
+    exec "$PYTHON" - "$fifo" "$HOLDER_CODE" "$@" <<'PY'
 import ctypes
 import os
 import sys
 
 argv = [os.fsencode(sys.executable), b"-c",
-        b'import sys; open(sys.argv[1], "rb").read()', os.fsencode(sys.argv[1])]
-entries = [os.fsencode(entry) for entry in sys.argv[2:]]
+        os.fsencode(sys.argv[2]), os.fsencode(sys.argv[1])]
+entries = [os.fsencode(entry) for entry in sys.argv[3:]]
 args = (ctypes.c_char_p * (len(argv) + 1))(*argv, None)
 environment = (ctypes.c_char_p * (len(entries) + 1))(*entries, None)
 libc = ctypes.CDLL(None, use_errno=True)
 libc.execve(argv[0], args, environment)
 raise OSError(ctypes.get_errno(), "execve failed")
 PY
-  ) &
+  ) 4>&- > "$ready" &
   HOLDER_PID=$!
   HOLDER_PIDS+=("$HOLDER_PID")
-  HOLDER_FD=$((HOLDER_FD + 1))
+  holder_ready "$ready" "$HOLDER_PID"
 }
 
 # hold_under <argv0> <arg...> -- : a marker-free holder whose PARENT process
 # carries the given argv[0] and arguments (the ancestry the guard inspects).
 hold_under() {
-  local argv0=$1 fifo="$TMP_ROOT/holder-$HOLDER_FD.fifo" pidfile="$TMP_ROOT/holder-$HOLDER_FD.pid"
+  HOLDER_N=$((HOLDER_N + 1))
+  local argv0=$1 fifo="$TMP_ROOT/holder-$HOLDER_N.fifo" ready="$TMP_ROOT/holder-$HOLDER_N.ready"
   shift
-  rm -f "$fifo" "$pidfile"
-  mkfifo "$fifo"
-  eval "exec ${HOLDER_FD}<>\"\$fifo\""
-  ( export FM_HOLDER_PYTHON="$PYTHON" FM_HOLDER_FIFO="$fifo" FM_HOLDER_PIDFILE="$pidfile"
-    export FM_HOLDER_CODE='import sys; open(sys.argv[1], "rb").read()'
-    exec -a "$argv0" bash -c 'env -i FM_HOLDER=1 "$FM_HOLDER_PYTHON" -c "$FM_HOLDER_CODE" "$FM_HOLDER_FIFO" & printf "%s\n" "$!" > "$FM_HOLDER_PIDFILE"; wait' "$@" ) &
+  mkfifo "$fifo" "$ready"
+  exec 4<>"$ready"
+  ( export FM_HOLDER_PYTHON="$PYTHON" FM_HOLDER_FIFO="$fifo" FM_HOLDER_CODE="$HOLDER_CODE"
+    exec -a "$argv0" bash -c '
+      env -i FM_HOLDER=1 "$FM_HOLDER_PYTHON" -c "$FM_HOLDER_CODE" "$FM_HOLDER_FIFO" &
+      child=$!
+      trap "kill $child 2>/dev/null || true; wait $child 2>/dev/null || true" EXIT
+      trap "exit 0" HUP INT TERM
+      wait "$child"
+    ' "$@" ) 4>&- > "$ready" &
   HOLDER_PIDS+=("$!")
-  HOLDER_FD=$((HOLDER_FD + 1))
-  local i=0
-  while [ ! -s "$pidfile" ] && [ "$i" -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
-  [ -s "$pidfile" ] || fail "holder under $argv0 did not report its pid"
-  HOLDER_PID=$(cat "$pidfile")
-  HOLDER_PIDS+=("$HOLDER_PID")
+  holder_ready "$ready"
 }
 
 CASE_N=0
@@ -205,7 +237,6 @@ assert_stop_before_start() {
 # must be readable, or every marker case would be vacuous.
 hold FM_PROBE_MARKER=1
 PROBE_PID=$HOLDER_PID
-sleep 0.2
 # shellcheck source=bin/fm-remote-herdr-owner-lib.sh
 . "$ROOT/bin/fm-remote-herdr-owner-lib.sh"
 probe_env=$(fm_remote_herdr_process_env "$PROBE_PID")
@@ -221,7 +252,6 @@ hold FM_PROBE_TEXT=$'literal\nFM_REMOTE_JOB_ACTIVE=1'
 NEWLINE_PID=$HOLDER_PID
 hold FM_PROBE_TEXT=$'literal\rXPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote'
 CR_PID=$HOLDER_PID
-sleep 0.2
 value_env=$(fm_remote_herdr_process_env "$VALUE_PID") || fail "an ordinary space-bearing value was unreadable"
 printf '%s\n' "$value_env" | grep -Fx 'FM_PROBE_TEXT=literal FM_REMOTE_JOB_ACTIVE=1 SSH_CONNECTION=spoof XPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote' >/dev/null \
   || fail "environment values were split into false marker entries: $value_env"
@@ -264,7 +294,6 @@ hold_under herdr --session "$SESSION" remote-client-bridge
 BRIDGE_CHILD_PID=$HOLDER_PID
 hold_under 'sshd-session:' kunchen@notty
 SSHD_CHILD_PID=$HOLDER_PID
-sleep 0.3
 
 new_case running
 printf '%s\n' "$LAUNCHD_PID" > "$CASE_OWNER"
@@ -291,7 +320,6 @@ for unrelated_entry in $'MY_NOTE=first\nsecond' $'MY_NOTE=first\rSSH_CONNECTION=
   $'BASH_FUNC_note%%=() { :;\n}' 'MY-NOTE=ordinary'; do
   hold XPC_SERVICE_NAME=dev.firstmate.herdr.fm-remote "$unrelated_entry"
   aqua_pid=$HOLDER_PID
-  sleep 0.2
   new_case running
   printf '%s\n' "$aqua_pid" > "$CASE_OWNER"
   load_job gui dev.firstmate.herdr.fm-remote "$aqua_pid"
@@ -311,7 +339,6 @@ for marker in SSH_CONNECTION SSH_CLIENT SSH_TTY XPC_SERVICE_NAME FM_REMOTE_JOB_A
       newline) hold "$marker="$'first\nsecond' ;;
       carriage) hold "$marker="$'first\rsecond' ;;
     esac
-    sleep 0.2
     if ambiguous_env=$(fm_remote_herdr_process_env "$HOLDER_PID"); then
       fail "an ambiguous $marker marker was accepted as ownership evidence"
     fi

@@ -148,7 +148,7 @@ Neither unmanaged nor unknown proof authorizes lifecycle action.
 Every Herdr replacement must have matching managed-launch proof, including current-session proof for omp, before transaction completion.
 The normal failed-launch and published-record reconciliation rules below still apply.
 
-The omp task record binds its initial session file once per launch generation and updates the active file and PID synchronously on session activation or switch.
+The omp task record binds its initial session pathname once per launch generation and updates the active pathname and PID synchronously on session activation or switch, including before JSONL persistence under an existing canonical session directory; managed authority still requires persisted task and active files identifying the same file.
 The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
 - The composer scanner family "pasted omp frame inside a draft / unsafe Enter variants" is a documented known limit tracked by follow-up fm-omp-composer-pasted-frame-variants.
 Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
