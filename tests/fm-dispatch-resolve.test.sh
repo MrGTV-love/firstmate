@@ -32,6 +32,7 @@ mkdir -p "$HOME_DIR/config" "$LOG" "$NO_CURL_BIN"
 export FM_BACKEND=tmux
 unset BACKEND TMUX
 export FM_AUTH_DESTINATION="$TMP_ROOT/tmux-auth"
+export FM_AUTH_HOME="$HOME"
 cat > "$FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
@@ -42,10 +43,15 @@ case "$1" in
     name=${!#}
     file=$FM_AUTH_DESTINATION
     [ "$2" != -g ] || file=$FM_AUTH_DESTINATION.global
-    [ -f "$file" ] || exit 1
-    while IFS= read -r entry; do
-      case "$entry" in "$name"=*|-"$name") printf '%s\n' "$entry"; exit 0 ;; esac
-    done < "$file"
+    if [ -f "$file" ]; then
+      while IFS= read -r entry; do
+        case "$entry" in "$name"=*|-"$name") printf '%s\n' "$entry"; exit 0 ;; esac
+      done < "$file"
+    fi
+    if [ "$2" = -g ] && [ "$name" = HOME ]; then
+      printf 'HOME=%s\n' "$FM_AUTH_HOME"
+      exit 0
+    fi
     exit 1 ;;
   *) exit 1 ;;
 esac

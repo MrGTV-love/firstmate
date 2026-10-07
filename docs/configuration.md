@@ -1381,22 +1381,24 @@ This section is the single owner of the canonical schema and its per-field seman
 ### Pooled OMP capacity and declared stand-ins
 
 `bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports each pooled account as `usable`, `exhausted`, `unknown`, or `ineligible` for that model, without account identities or credentials.
-OMP's own `usage --provider openai-codex --json`, measured with the destination worker's effective authentication-directory and profile selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
+OMP's own `usage --provider openai-codex --json`, measured with the destination worker's effective authentication-directory, profile, and `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` selectors, is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable entitled sibling keeps the model available; an unmeasured or unknown-entitlement sibling prevents a whole-pool exhaustion verdict unless it is known to be ineligible.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 Chat and Spark consume independent windows and meter verdicts; paid-only and Pro-only model requirements exclude accounts whose known plan does not qualify.
 A snapshot fetched before a window's elapsed reset cannot establish current capacity; another still-current exhausted bound can establish exhaustion, but dropping obsolete windows never proves replenishment.
-When response headers update a native report, current chat limit statuses supersede retained chat meter verdicts; the merged report's timestamp cannot establish current Spark capacity.
+When response headers update a native report, chat limit statuses supersede retained chat meter verdicts, but conflicting warning and exhausted or non-warning zero bounds remain unknown because report-wide timestamps do not establish their order.
+The merged report's timestamp cannot establish current Spark capacity.
 The pool has no synthesized `spendPriority` or completion runway: manual intake and typed resolution can dispatch a sole eligible native-usable OMP route when every alternative is proven exhausted or blocked and no explicit floor remains unverifiable, disclosing both economics as `unknown`; unknown or unmeasured pools do not qualify, and percentages cannot economically rank competing unranked routes.
 An OMP Codex profile that omits its model retains unknown, unranked capacity without preventing evaluation of other profiles.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger or proof of a pinned account's capacity, an alternate store selected through `CLAUDE_CONFIG_DIR`, or a route using retained API credentials, `CLAUDE_CODE_OAUTH_TOKEN`, or supported cloud-auth overrides.
 Those routes remain eligible with unranked, unknown quota until a mapping is established; unrelated native exhaustion cannot activate their stand-ins, native positive headroom cannot rank them, and their quota floors remain unverifiable.
 For new tmux panes, credential binding resolves the launch backend and applies the launch allowlist to the destination session/global environment, with explicit forwarded stores and account-pin credential shedding taking precedence; caller-only API credentials, filtered credentials, and empty credentials do not hide subscription exhaustion, and `--allow-api-key` grants permission without establishing headroom.
+Native Claude default-store quota is bound only when the destination's absolute `HOME` is established as matching the measuring process's `HOME`; a different, absent, removed, empty, or relative destination `HOME` keeps capacity unknown.
 An adopted pane retains its existing shell environment, which current tmux session/global settings cannot establish, so its native Claude and OMP quota remain unknown.
 An unreadable tmux destination or a non-tmux daemon whose authentication environment is not established also keeps native Claude and OMP quota unknown.
 
-Each fallback profile requires `harness`, `model`, and `effort`.
+Each fallback profile requires `harness`, `model`, and `effort`; `floor` declarations are unsupported and rejected in both rule `fallback` and top-level `default_fallback` arrays.
 An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.

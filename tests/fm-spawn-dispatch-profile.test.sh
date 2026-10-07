@@ -166,6 +166,7 @@ SH
 
 enable_exhausted_claude_dispatch() {
   local home=$1 fakebin=$2
+  export FM_FAKE_TMUX_GLOBAL_ENV_HOME="$home/user-home"
   printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' \
     > "$home/config/crew-dispatch.json"
   cat > "$fakebin/quota-axi" <<'SH'

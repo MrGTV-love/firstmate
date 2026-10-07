@@ -28,7 +28,7 @@ fm_dispatch_omp_usage() {
   local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
   local session=${2:-} backend=${BACKEND:-} name names= present entry value usage
   local unknown='{"reason":"destination OMP authentication scope is not established"}'
-  local selectors='HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME'
+  local selectors='HOME PI_CODING_AGENT_DIR PI_CONFIG_DIR OMP_PROFILE PI_PROFILE XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME OMP_AUTH_BROKER_URL OMP_AUTH_BROKER_TOKEN'
   local assignments=() unset_args=()
   case "$session" in *:*) printf '%s\n' "$unknown"; return ;; esac
   if [ -z "$backend" ]; then
@@ -121,8 +121,10 @@ fm_omp_codex_capacity() {
        elif $entitlement == "unknown" or
             ($fetched | type) != "number" or $fetched < (($now - 300) * 1000)
        then "unknown"
-       elif $merged and any($limits[]; .status == "warning" and
-            (.amount | percent) != null and (.amount | percent) <= 0) then "usable"
+       elif $merged and any($limits[]; .status == "warning") and
+            any($limits[]; .status == "exhausted" or
+              ((.amount | percent) != null and (.amount | percent) <= 0 and .status != "warning"))
+       then "unknown"
        elif $meter.allowed == false or $meter.limitReached == true or
             any($limits[]; .status == "exhausted") then "exhausted"
        elif ($expired | length) > 0 then
@@ -173,6 +175,9 @@ fm_dispatch_claude_quota_unbound() {
   fi
   [ "$backend" = tmux ] || return 0
   fm_worker_account_tmux_env '' "$session" readable || return 0
+  value=$(fm_worker_account_tmux_env HOME "$session" assignment) || return 0
+  case "${HOME:-}" in /*) ;; *) return 0 ;; esac
+  [ "$value" = "HOME=$HOME" ] || return 0
   value=$(fm_worker_account_tmux_filtered_env CLAUDE_CONFIG_DIR "$session" "$present" "${names:-}")
   [ -z "$value" ] || return 0
   for name in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
@@ -236,6 +241,7 @@ fm_dispatch_fallbacks() {
         type == "object" and (.harness == "omp" or .harness == "claude") and
         (.model | type) == "string" and (.model | length) > 0 and
         (.effort == "low" or .effort == "medium" or .effort == "high" or .effort == "xhigh" or .effort == "max") and
+        (has("floor") | not) and
         (if .harness == "claude" then .requires == "teamclaude" else (has("requires") | not) end));
     if any((.rules // [])[]; has("fallback") and (.fallback | valid_fallback | not)) or
        (has("default_fallback") and (.default_fallback | valid_fallback | not))
