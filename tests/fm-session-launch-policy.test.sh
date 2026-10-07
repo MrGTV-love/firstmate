@@ -81,24 +81,34 @@ case "$1" in
     [ -z "${FM_POLICY_CHILD:-}" ] || printf 'send-keys\n' >> "$FM_POLICY_CASE/terminal-input"
     shift
     literal=0
+    target=default
     while [ "$#" -gt 0 ]; do
       case "$1" in
-        -t) shift 2 ;;
+        -t) target=$2; shift 2 ;;
         -l) literal=1; shift ;;
         *) break ;;
       esac
     done
+    mkdir -p "$FM_POLICY_CASE/input"
+    buffer="$FM_POLICY_CASE/input/$target"
     if [ "$literal" = 1 ]; then
-      payload=${1:-}
-      case "$payload" in
-        /exit|/quit)
-          printf 'stop\n' >> "$FM_POLICY_CASE/effects"
-          check_child_policy stop
-          printf 'zsh\n' > "$FM_POLICY_CASE/command" ;;
-        ". '"*"'")
-          staged=${payload#". '"}; staged=${staged%"'"}
-          /bin/bash "$staged" ;;
-      esac
+      printf '%s' "$@" >> "$buffer"
+    else
+      for key in "$@"; do
+        [ "$key" = Enter ] || continue
+        payload=
+        [ ! -f "$buffer" ] || payload=$(cat "$buffer")
+        rm -f "$buffer"
+        case "$payload" in
+          /exit|/quit)
+            printf 'stop\n' >> "$FM_POLICY_CASE/effects"
+            check_child_policy stop
+            printf 'zsh\n' > "$FM_POLICY_CASE/command" ;;
+          ". '"*"'")
+            staged=${payload#". '"}; staged=${staged%"'"}
+            /bin/bash "$staged" ;;
+        esac
+      done
     fi
     exit 0 ;;
 esac
@@ -410,6 +420,27 @@ assert_secondmate_launched() {
         "$HOME_DIR/state/.secondmate-relaunch-$ID" || fail 'automatic recovery did not record exactly one successful attempt' ;;
   esac
 }
+
+make_case terminal-submission omp
+printf 'omp\n' > "$CASE/launch.sh"
+run_cli tmux send-keys -t firstmate:worker -l ". '$CASE/launch.sh'"
+run_cli tmux send-keys -t firstmate:other -l /exit
+[ ! -s "$CASE/effects" ] || fail 'literal input executed without Enter'
+[ "$(cat "$CASE/command")" = zsh ] || fail 'literal input changed the foreground command'
+run_cli tmux send-keys -t firstmate:other Enter
+[ "$(cat "$CASE/effects")" = stop ] || fail 'Enter submitted another target buffer'
+run_cli tmux send-keys -t firstmate:worker Enter
+[ "$(cat "$CASE/effects")" = "$(printf 'stop\nlaunch:omp')" ] || fail 'Enter did not submit the buffered launch'
+[ "$(cat "$CASE/command")" = omp ] || fail 'submitted launch did not become foreground command'
+run_cli tmux send-keys -t firstmate:worker Enter
+[ "$(grep -Fxc 'launch:omp' "$CASE/effects")" = 1 ] || fail 'Enter resubmitted consumed input'
+run_cli tmux send-keys -t firstmate:worker -l /qu
+run_cli tmux send-keys -t firstmate:worker -l it
+[ "$(cat "$CASE/command")" = omp ] || fail 'literal quit input stopped the agent'
+run_cli tmux send-keys -t firstmate:worker Enter
+[ "$(cat "$CASE/command")" = zsh ] || fail 'Enter did not submit accumulated quit input'
+[ "$(grep -Fxc stop "$CASE/effects")" = 2 ] || fail 'submitted exit and quit did not each stop once'
+pass 'terminal fixture buffers each target until Enter and consumes submitted input'
 
 for harness in codex claude pi 'env codex' 'omp --model anything'; do
   make_case "fresh-$RANDOM" "$harness"

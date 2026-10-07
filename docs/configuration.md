@@ -320,6 +320,7 @@ The file may be empty, or hold one line `<engine> [<model>]`:
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
 Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
+The worker and secondmate session launch policy does not restrict supervision-host engine sessions; engine selection follows the rules above.
 
 ### Failures and when changes apply
 
@@ -785,7 +786,7 @@ Those inherited values are defaults and rules only; explicit runtimes remain sub
 The optional local, gitignored `config/session-launch-policy` contains exactly `omp-or-tc`, with an optional single trailing newline.
 The shared template leaves this restriction off by default: absence preserves existing launch behavior, including standalone Codex launches.
 Enabling it in each captain home is the operator's responsibility.
-An unreadable or malformed present file refuses new sessions instead of disabling the restriction.
+An unreadable or malformed present file refuses new worker and secondmate sessions instead of disabling the restriction.
 The setting is inherited through the existing local and remote secondmate configuration contract; an enabled parent requires a valid enabled child policy after local launch convergence.
 Local admission also requires the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
 This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
@@ -793,7 +794,7 @@ Dirty edits outside those owners, wrong-branch homes, and preserved divergence r
 Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt, while unrelated inheritance remains best-effort.
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
-This opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
+For worker and secondmate launches, this opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
 Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
 A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
 Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
@@ -813,7 +814,7 @@ Select an explicit allowed dispatch profile and use the replacement flags docume
 Already-running agents, unpublished work, durable task records, and validation custody are not migrated or discarded by enabling this setting.
 
 [`bin/fm-session-launch-policy-lib.sh`](../bin/fm-session-launch-policy-lib.sh) owns the shared launch check, exercised through executable entrypoints in [`tests/fm-session-launch-policy.test.sh`](../tests/fm-session-launch-policy.test.sh).
-This setting governs Firstmate-owned launches only, not separately configured validation tools or the operator's own primary session.
+This setting governs Firstmate-owned worker and secondmate launches only, not supervision-host engine sessions, separately configured validation tools, or the operator's own primary session.
 The Pi supervision branch is an in-process part of the exempt operator primary session, not a Firstmate-invoked worker, and is also exempt.
 
 ### Installed hooks and launch details
