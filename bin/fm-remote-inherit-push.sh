@@ -42,10 +42,42 @@ trap 'rm -rf -- "$TMP"' EXIT
 EMPTY="$TMP/empty"
 : > "$EMPTY"
 EMPTY_HASH=$(sha256_file "$EMPTY") || die "cannot hash empty inheritance payload"
+PAIR_ALLOWED=1
+RC=0
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*|*" crew-dispatch.json "*)
+    PAIR_DIR="$TMP/pair"
+    pair_check=
+    if mkdir "$PAIR_DIR" &&
+      pair_check=$(fm_config_inherit_pair_stage "$CONFIG" "$PAIR_DIR" 1 2>&1) &&
+      pair_check=$(fm_config_inherit_pair_valid "$PAIR_DIR" 2>&1); then
+      FM_CONFIG_INHERIT_PAIR_DIR=$PAIR_DIR
+      export FM_CONFIG_INHERIT_PAIR_DIR
+      if pair_check=$("$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-inherit.sh check \
+        config/model-index.json 0 "$EMPTY_HASH" "$GENERATION" < /dev/null 2>&1); then
+        :
+      else
+        RC=$?
+        PAIR_ALLOWED=0
+      fi
+    else
+      RC=1
+      PAIR_ALLOWED=0
+    fi
+    if [ "$PAIR_ALLOWED" = 0 ]; then
+      printf 'skipped: config/model-index.json and config/crew-dispatch.json (%s)\n' "$pair_check" >&2
+    fi
+    ;;
+esac
 
 ITEMS=$(fm_config_inherit_items)
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
+  case "$rel" in
+    config/model-index.json|config/crew-dispatch.json)
+      [ "$PAIR_ALLOWED" = 1 ] || continue
+      ;;
+  esac
   if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ]; then
     case "$rel" in
       config/*)
@@ -57,7 +89,7 @@ while IFS= read -r rel; do
     esac
   fi
   case "$rel" in
-    config/*) source="$CONFIG/${rel#config/}" ;;
+    config/*) source=$(fm_config_inherit_source "$CONFIG" "${rel#config/}") ;;
     data/*) source="$DATA/${rel#data/}" ;;
   esac
   source_present=$(fm_config_source_present "$source") || exit 1
@@ -71,9 +103,14 @@ while IFS= read -r rel; do
         die "$reason"
       fi
     fi
-    snapshot="$TMP/$(printf '%s' "$rel" | tr '/' '_')"
-    cp -p -- "$source" "$snapshot" || die "cannot snapshot inherited source: $source"
-    [ -f "$snapshot" ] && [ ! -L "$snapshot" ] || die "inherited source snapshot is unsafe: $source"
+    case "$rel" in
+      config/model-index.json|config/crew-dispatch.json) snapshot=$source ;;
+      *)
+        snapshot="$TMP/$(printf '%s' "$rel" | tr '/' '_')"
+        cp -p -- "$source" "$snapshot" || die "cannot snapshot inherited source: $source"
+        [ -f "$snapshot" ] && [ ! -L "$snapshot" ] || die "inherited source snapshot is unsafe: $source"
+        ;;
+    esac
     bytes=$(LC_ALL=C wc -c < "$snapshot" | tr -d ' ')
     hash=$(sha256_file "$snapshot") || die "cannot hash inherited source: $source"
     "$SCRIPT_DIR/fm-on.sh" --stdin "$ID" fm-remote-inherit.sh put "$rel" "$bytes" "$hash" "$GENERATION" < "$snapshot"
@@ -84,3 +121,4 @@ while IFS= read -r rel; do
 done <<EOF
 $ITEMS
 EOF
+exit "$RC"

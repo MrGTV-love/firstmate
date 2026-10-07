@@ -23,6 +23,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+unset FM_MODEL_CATALOG_DIR
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-control-lib.sh"
 # shellcheck source=/dev/null
@@ -146,7 +147,7 @@ case "${1:-}" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*) cat "$D/command"; printf '\n'; exit 0 ;;
         *pane_current_path*)
-          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ]; then
+          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ] && [ ! -e "$FM_FAKE_CWD_RACE_READY" ]; then
             : > "$FM_FAKE_CWD_RACE_READY"
             /bin/sleep 1
           fi
@@ -963,6 +964,148 @@ test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop() {
   pass "native Ultra relaunch preserves its profile and rejects an unsupported model before stopping"
 }
 
+test_model_index_resolves_and_refuses_before_stop() {
+  local dir out rc id=rl-index
+  dir=$(new_case model-index "$id")
+  add_ship_task "$dir" "$id" pi
+  printf pi > "$dir/fake/command"
+  printf pi > "$dir/fake/becomes"
+  printf '#!/usr/bin/env bash\nprintf "Options: --tui-mode\\n"\n' > "$dir/fakebin/pi"
+  chmod +x "$dir/fakebin/pi"
+  sed 's|^model=default$|model=codex-native/gpt-old|; s/^effort=default$/effort=ultra/' \
+    "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.tmp"
+  mv "$dir/home/state/$id.meta.tmp" "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config" "$dir/catalogs"
+  printf '%s\n' '{"version":1,"roles":{"native":{"pi":{"model":"codex-native/gpt-6-astra"}}},"retired":["gpt-old"]}' \
+    > "$dir/home/config/model-index.json"
+  printf '%s\n' '{"models":[{"id":"codex-native/gpt-6-astra"}]}' > "$dir/catalogs/pi.json"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --note "recorded model since retired"); rc=$?
+  expect_code 1 "$rc" "a recorded model the index has retired must refuse"
+  assert_contains "$out" "retired model: codex-native/gpt-old" "the refusal should name the retired id"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a retired-model relaunch stopped the running agent"
+  [ ! -s "$dir/fake/literal" ] || fail "a retired-model relaunch sent lifecycle input"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --model role:native --note "move to the indexed role"); rc=$?
+  expect_code 0 "$rc" "a role relaunch with native Ultra should resolve before its effort check: $out"
+  [ "$(meta_field "$dir" "$id" model)" = codex-native/gpt-6-astra ] || fail "the relaunch should record the resolved id"
+  assert_contains "$(cat "$dir/fake/literal")" "--codex-effort 'ultra'" "the resolved native model should keep its Ultra flag"
+  assert_not_contains "$(cat "$dir/fake/literal")" "role:native" "a role reference must not reach the harness"
+  printf '%s\n' '{"models":[{"id":"codex-native/gpt-7"}]}' > "$dir/catalogs/pi.json"
+  cp "$dir/fake/literal" "$dir/literal-before"
+  out=$(FM_MODEL_CATALOG_DIR="$dir/catalogs" run_control "$dir" "$id" relaunch --note "vendor dropped the id"); rc=$?
+  expect_code 1 "$rc" "an index entry its catalog no longer lists must refuse"
+  assert_contains "$out" "id 'codex-native/gpt-6-astra' absent or retired in pi catalog" "the refusal should name the absent id"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a catalog-absent relaunch stopped the running agent"
+  cmp -s "$dir/literal-before" "$dir/fake/literal" || fail "a catalog-absent relaunch sent lifecycle input"
+  pass "fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop"
+}
+
+test_model_index_generation_survives_account_checks_and_replacement() {
+  local dir out rc id request verdict selected
+  for request in role:chosen stand-in:chosen openai/selected; do
+    id="rl-generation-${request//[:\/]/-}"
+    dir=$(new_case model-generation "$id")
+    add_ship_task "$dir" "$id" pi
+    printf pi > "$dir/fake/command"
+    printf pi > "$dir/fake/becomes"
+    mkdir -p "$dir/home/config" "$dir/account"
+    printf '%s\nopenai\n' "$dir/account" > "$dir/home/config/pi-account"
+    printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/selected","stand_in":"openai/standby"}}},"retired":[]}' \
+      > "$dir/original-index.json"
+    selected=openai/selected
+    [ "$request" != stand-in:chosen ] || selected=openai/standby
+    cat > "$dir/fakebin/pi" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  auth)
+    cp '$dir/later.json' '$dir/home/config/model-index.json'
+    printf '%s\n' "\$PI_CODING_AGENT_DIR" >> '$dir/auth-roots'
+    printf '{"status":"ready"}\n'
+    ;;
+  --list-models)
+    printf '%s\n' "\$PI_CODING_AGENT_DIR" >> '$dir/catalog-roots'
+    printf 'provider model context\n'
+    cat "\$PI_CODING_AGENT_DIR/listed"
+    ;;
+  *) printf 'Options: --tui-mode\n' ;;
+esac
+SH
+    chmod +x "$dir/fakebin/pi"
+    for verdict in absent available; do
+      cp "$dir/original-index.json" "$dir/home/config/model-index.json"
+      : > "$dir/auth-roots"
+      : > "$dir/catalog-roots"
+      : > "$dir/fake/literal"
+      : > "$dir/fake/keys"
+      if [ "$verdict" = available ]; then
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":["selected","standby"]}' > "$dir/later.json"
+        printf 'openai selected 272K 32K yes no\nopenai standby 272K 32K yes no\n' > "$dir/account/listed"
+      else
+        printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/later","stand_in":"openai/later-standby"}}},"retired":[]}' > "$dir/later.json"
+        printf 'openai later 272K 32K yes no\n' > "$dir/account/listed"
+      fi
+      cp "$dir/home/state/$id.meta" "$dir/meta-before"
+      out=$(run_control "$dir" "$id" relaunch --model "$request" --note "preserve selected routing generation"); rc=$?
+      cmp -s "$dir/later.json" "$dir/home/config/model-index.json" || fail "account check did not mutate the source generation"
+      [ "$(cat "$dir/catalog-roots" | sort -u)" = "$dir/account" ] || fail "generation check changed the worker account"
+      if [ "$verdict" = absent ]; then
+        expect_code 1 "$rc" "an absent originally selected entry must refuse before stopping: $out"
+        assert_contains "$out" "id '$selected' absent or retired in pi catalog" "the frozen entry must remain catalog-gated"
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "generation refusal changed the running task record"
+        [ "$(cat "$dir/fake/command")" = pi ] || fail "generation refusal stopped the working agent"
+        [ ! -s "$dir/fake/literal" ] || fail "generation refusal sent lifecycle input"
+      else
+        expect_code 0 "$rc" "the selected available generation must survive auth mutation and replacement: $out"
+        [ "$(meta_field "$dir" "$id" model)" = "$selected" ] || fail "replacement switched model generations"
+        assert_contains "$(cat "$dir/fake/literal")" "--model '$selected'" "replacement lost the frozen model"
+        [ "$(wc -l < "$dir/catalog-roots" | tr -d ' ')" = 2 ] || fail "both pre-stop and replacement must check the selected entry"
+      fi
+    done
+  done
+  pass "relaunch freezes role, stand-in, and literal membership across authentication and replacement"
+}
+
+test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account() {
+  local dir out rc id=rl-context model
+  dir=$(new_case model-context "$id")
+  add_ship_task "$dir" "$id" pi
+  printf pi > "$dir/fake/command"
+  printf pi > "$dir/fake/becomes"
+  mkdir -p "$dir/home/config" "$dir/supervisor" "$dir/pane"
+  : > "$dir/home/config/launch-env-allowlist"
+  printf 'openai  supervisor-only  272K  32K  yes  no\n' > "$dir/supervisor/listed"
+  printf 'openai  pane-only  272K  32K  yes  no\n' > "$dir/pane/listed"
+  cat > "$dir/fakebin/pi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = --list-models ]; then
+  printf '%s\n' "\${PI_CODING_AGENT_DIR-unset}" >> '$dir/catalog-calls'
+  printf 'provider model context\n'
+  cat "\$PI_CODING_AGENT_DIR/listed"
+  exit
+fi
+printf 'Options: --tui-mode\n'
+SH
+  chmod +x "$dir/fakebin/pi"
+  for model in pane-only supervisor-only; do
+    printf '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/%s"}}},"retired":[]}\n' "$model" > "$dir/home/config/model-index.json"
+    out=$(PI_CODING_AGENT_DIR="$dir/supervisor" run_control "$dir" "$id" relaunch \
+      --model role:chosen --note "replace without supervisor catalog evidence"); rc=$?
+    expect_code 0 "$rc" "an unknown replacement context must not refuse from the supervisor catalog: $out"
+    assert_contains "$out" "effective worker account context is not established" "pre-stop and spawn checks must disclose unknown context"
+    assert_absent "$dir/catalog-calls" "neither pre-stop nor replacement spawn may query the supervisor Pi catalog"
+    [ "$(meta_field "$dir" "$id" model)" = "openai/$model" ] || fail "the replacement must retain its chosen model"
+  done
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  cp "$dir/fake/literal" "$dir/literal-before"
+  printf '%s\n' '{"version":1,"roles":{"chosen":{"pi":{"model":"openai/supervisor-only"}}},"retired":["supervisor-only"]}' > "$dir/home/config/model-index.json"
+  out=$(PI_CODING_AGENT_DIR="$dir/supervisor" run_control "$dir" "$id" relaunch --note "retired selector"); rc=$?
+  expect_code 1 "$rc" "unknown context must still refuse offline retirement before stopping"
+  assert_contains "$out" "retired model" "retirement must remain authoritative"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "an offline refusal must preserve metadata"
+  cmp -s "$dir/literal-before" "$dir/fake/literal" || fail "an offline refusal must not send lifecycle input"
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "an offline refusal must leave the running agent alone"
+  pass "unpinned indexed relaunch discloses unknown context before stopping without supervisor catalog evidence"
+}
+
 # A fake claude that answers `claude auth status` the way the real runner
 # does: signed in only when the selected config root holds a stored login.
 make_claude_auth_stub() {  # <case-dir>
@@ -1769,6 +1912,42 @@ test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
   pass "fm-control relaunch: a secondmate's child work is accounted for and its charter is left alone"
 }
 
+test_default_secondmate_relaunch_survives_unsafe_routing_sources() {
+  local dir home source_kind out rc
+  for source_kind in dangling directory; do
+    dir=$(new_case "default-routing-$source_kind" sm-default)
+    home="$dir/home"
+    mkdir -p "$home/config"
+    printf 'claude\n' > "$home/config/secondmate-harness"
+    printf 'codex\n' > "$home/config/crew-harness"
+    case "$source_kind" in
+      dangling) ln -s "$home/missing-index" "$home/config/model-index.json" ;;
+      directory) mkdir "$home/config/crew-dispatch.json" ;;
+    esac
+    fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+    mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/config" "$dir/smhome/bin"
+    printf 'sm-default\n' > "$dir/smhome/.fm-secondmate-home"
+    printf '# charter\n' > "$dir/smhome/data/charter.md"
+    printf '# agents\n' > "$dir/smhome/AGENTS.md"
+    printf 'config/\n' > "$dir/smhome/.gitignore"
+    {
+      printf 'window=fmses:fm-sm-default\nendpoint_task_id=sm-default\n'
+      printf 'worktree=%s\nproject=%s\nhome=%s\n' "$dir/smhome" "$dir/smhome" "$dir/smhome"
+      printf 'harness=claude\nkind=secondmate\nmode=secondmate\nyolo=off\nmodel=default\neffort=default\n'
+    } > "$home/state/sm-default.meta"
+    printf 'fm-sm-default\n' > "$dir/fake/windows"
+    printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+    out=$(run_control "$dir" sm-default relaunch); rc=$?
+    expect_code 0 "$rc" "default secondmate relaunch must survive $source_kind routing source"$'\n'"$out"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail 'default-model replacement left no running agent'
+    [ "$(journal_field "$dir" sm-default phase)" = complete ] || fail 'default-model replacement did not complete'
+    [ "$(meta_field "$dir" sm-default model)" = default ] || fail 'default-model replacement changed model selection'
+    [ "$(cat "$dir/smhome/config/crew-harness")" = codex ] || fail 'routing refusal blocked unrelated inheritance'
+    assert_contains "$out" 'inheritance failed' 'unsafe routing source must remain a warning'
+  done
+  pass 'default-model secondmate replacements keep warning-only routing inheritance'
+}
+
 test_secondmate_relaunch_refuses_an_unmarked_home() {
   local dir home out rc
   dir=$(new_case smbad sm2)
@@ -2529,8 +2708,10 @@ test_herdr_relaunch_resumes_only_the_registered_pi_session() {
     }
     dir=$HERDR_CASE_DIR
     rm -f "$dir/fake/herdr-stopped"
-    sed 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta" > "$dir/pi.meta"
-    mv "$dir/pi.meta" "$dir/home/state/resume-$registered.meta"
+    sed 's/^harness=claude$/harness=pi/' "$dir/home/state/resume-$registered.meta" > "$dir/pi.meta" \
+      || fail 'could not prepare Pi relaunch metadata'
+    mv "$dir/pi.meta" "$dir/home/state/resume-$registered.meta" \
+      || fail 'could not publish Pi relaunch metadata'
     # Keep the pane's status authority registered to an existing Pi session,
     # while process-info proves that its previous agent has exited.
     printf '{"result":{"agent":{"agent":"%s","agent_status":"idle","agent_session":{"kind":"path","value":"/tmp/pi-bound-session.jsonl"}}}}\n' \
@@ -3687,6 +3868,9 @@ test_harness_switch_resolves_a_prefixed_recorded_harness
 test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
+test_model_index_resolves_and_refuses_before_stop
+test_model_index_generation_survives_account_checks_and_replacement
+test_unpinned_indexed_relaunch_does_not_query_the_supervisor_account
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch
 test_recorded_api_key_opt_in_follows_the_relaunch
@@ -3722,6 +3906,7 @@ test_complete_journal_failure_rolls_back_from_durable_phase
 test_prepublication_abort_retires_replacement_wiring_and_busy_state
 test_journal_records_the_checkpoint_it_proved
 test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter
+test_default_secondmate_relaunch_survives_unsafe_routing_sources
 test_secondmate_relaunch_refuses_an_unmarked_home
 test_secondmate_checkpoint_refuses_unreadable_child_state
 test_secondmate_checkpoint_ignores_a_vanished_scratch_find_walk

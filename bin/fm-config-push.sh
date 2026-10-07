@@ -14,6 +14,12 @@
 # through their SSH route. Unchanged config and data/captain-shared.md-only
 # updates send no reread unless a previous send failure is pending for that home.
 # Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
+# config/model-index.json is pushed only after its schema, the dispatch roles
+# it resolves, and bin/fm-model-index.sh check pass; a malformed index, an id
+# absent from a readable catalog, an unresolvable worker account pin, or
+# config/crew-dispatch.json roles that do not resolve against the index
+# withholds both files from every home, while the other material still pushes,
+# and the run exits non-zero.
 set -u
 
 usage() {
@@ -31,6 +37,10 @@ This is local-material-only:
   - reports each live home and each inheritable item as pushed, unchanged,
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
+  - withholds config/model-index.json and config/crew-dispatch.json from
+    every home when the index is malformed, bin/fm-model-index.sh check finds
+    an id absent from a readable catalog, a worker account pin does not
+    resolve, or the dispatch roles do not resolve against the index
 
 Live homes come from state/*.meta records with kind=secondmate.
 data/secondmates.md is only a fallback for missing home= fields in older or
@@ -76,6 +86,8 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 
@@ -93,10 +105,12 @@ print_item_report() {
 
 records=$(mktemp "${TMPDIR:-/tmp}/fm-config-push-records.XXXXXX" 2>/dev/null) || exit 1
 reports=""
+pair_dir=""
 # shellcheck disable=SC2317,SC2329 # Invoked by trap handlers below.
 cleanup() {
   local report_file
   rm -f "$records"
+  [ -z "$pair_dir" ] || rm -rf -- "$pair_dir"
   for report_file in $reports; do
     rm -f "$report_file"
   done
@@ -113,6 +127,53 @@ echo "config-push: $FM_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
+# An edited fleet model index is checked before it reaches any home: each
+# harness's entries against that harness's catalog, under only that harness's
+# worker account pin. An id proven absent, or a declared pin that does not
+# resolve, keeps every home on its current index and the dispatch profiles
+# whose roles it resolves; so does an inheritable crew-dispatch.json that does
+# not resolve against the index. An unavailable catalog is only a notice.
+
+index_check() {
+  local harnesses harness selection root
+  fm_config_inherit_pair_valid "$pair_dir" || return 1
+  [ -e "$pair_dir/model-index.json" ] || return 0
+  harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$pair_dir/model-index.json" 2>/dev/null) || return 1
+  for harness in $harnesses; do
+    selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
+    if [ -n "$selection" ]; then
+      root=${selection#*$'\t'}
+      FM_CONFIG_OVERRIDE="$pair_dir" fm_worker_account_run "$harness" "${root%%$'\t'*}" \
+        "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    else
+      FM_CONFIG_OVERRIDE="$pair_dir" "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    fi
+  done
+}
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*|*" crew-dispatch.json "*)
+    remote=0
+    while IFS='|' read -r _id home _window meta; do
+      [ -n "$home" ] || continue
+      if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then remote=1; break; fi
+    done < "$records"
+    if pair_dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-push-pair.XXXXXX") &&
+      fm_config_inherit_pair_stage "$CONFIG" "$pair_dir" "$remote" &&
+      index_check; then
+      FM_CONFIG_INHERIT_PAIR_DIR=$pair_dir
+      export FM_CONFIG_INHERIT_PAIR_DIR
+    else
+      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun"
+      errors=1
+      inheritable=
+      for item in $FM_INHERITABLE_CONFIG; do
+        case "$item" in model-index.json | crew-dispatch.json) ;; *) inheritable="$inheritable $item" ;; esac
+      done
+      FM_INHERITABLE_CONFIG=${inheritable# }
+      export FM_INHERITABLE_CONFIG
+    fi
+    ;;
+esac
 while IFS='|' read -r id home _window meta; do
   [ -n "$id" ] || continue
   if [ -z "$home" ]; then
@@ -147,25 +208,26 @@ while IFS='|' read -r id home _window meta; do
     fi
     if remote_out=$(FM_CONFIG_INHERIT_LIVE=1 \
       "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
-      printf '%s\n' "$remote_out" | sed 's/^/  /'
-      remote_nudge=0
-      if printf '%s\n' "$remote_out" | grep -Eq '^(pushed|removed):'; then remote_nudge=1; fi
-      [ "$remote_pending" -eq 0 ] || remote_nudge=1
-      if [ "$remote_nudge" -eq 1 ]; then
-        if FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
-          "$SCRIPT_DIR/fm-send.sh" "fm-$id" "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
-          rm -f -- "$remote_marker"
-          echo "  config-reread: sent"
-        else
-          echo "  config-reread: send failed; retry retained"
-          errors=1
-        fi
-      else
-        rm -f -- "$remote_marker"
-      fi
+      remote_ok=1
     else
-      [ -z "$remote_out" ] || printf '%s\n' "$remote_out" | sed 's/^/  /'
+      remote_ok=0
       errors=1
+    fi
+    [ -z "$remote_out" ] || printf '%s\n' "$remote_out" | sed 's/^/  /'
+    remote_nudge=0
+    if printf '%s\n' "$remote_out" | grep -Eq '^(pushed|removed):'; then remote_nudge=1; fi
+    [ "$remote_pending" -eq 0 ] || remote_nudge=1
+    if [ "$remote_nudge" -eq 1 ]; then
+      if FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
+        "$SCRIPT_DIR/fm-send.sh" "fm-$id" "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
+        rm -f -- "$remote_marker"
+        echo "  config-reread: sent"
+      else
+        echo "  config-reread: send failed; retry retained"
+        errors=1
+      fi
+    elif [ "$remote_ok" -eq 1 ]; then
+      rm -f -- "$remote_marker"
     fi
     fm_lock_release "$remote_lock" || true
     continue

@@ -4,6 +4,7 @@
 # Usage:
 #   fm-remote-inherit.sh put <allowlisted-relative-path> <bytes> <sha256> <generation> < stdin
 #   fm-remote-inherit.sh absent <allowlisted-relative-path> 0 <empty-sha256> <generation>
+#   fm-remote-inherit.sh check config/model-index.json 0 <empty-sha256> <generation>
 #
 # Only the inherited-material allowlist is writable or removable. Writes are
 # atomic ordinary-file replacements. data/captain-shared.md is read-only and is
@@ -20,12 +21,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
-usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 file_link_count() {
   if [ "$(uname)" = Darwin ]; then /usr/bin/stat -f %l "$1" 2>/dev/null; else stat -c %h "$1" 2>/dev/null; fi
 }
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
+}
+guard_destination() {
+  local dest=$1
+  [ ! -L "$dest" ] || die "inherited destination is a symlink"
+  if [ -e "$dest" ]; then
+    [ -f "$dest" ] || die "inherited destination is not a regular file"
+    [ "$(file_link_count "$dest")" = 1 ] || die "inherited destination is hardlinked"
+  fi
 }
 # Writable set, derived from the ONE declared inherited-material owner
 # (FM_INHERITABLE_CONFIG in bin/fm-config-inherit-lib.sh), so this code root's
@@ -66,10 +75,20 @@ mkdir -p "$PARENT" || die "cannot create inherited destination parent"
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" && pwd -P)
 case "$PARENT_REAL" in "$HOME_REAL/config"|"$HOME_REAL/data") ;; *) die "inherited destination escapes FM_HOME" ;; esac
 DEST="$PARENT_REAL/$(basename "$REL")"
-[ ! -L "$DEST" ] || die "inherited destination is a symlink"
-if [ -e "$DEST" ]; then
-  [ -f "$DEST" ] || die "inherited destination is not a regular file"
-  [ "$(file_link_count "$DEST")" = 1 ] || die "inherited destination is hardlinked"
+case "$REL" in
+  config/model-index.json|config/crew-dispatch.json)
+    guard_destination "$PARENT_REAL/model-index.json"
+    guard_destination "$PARENT_REAL/crew-dispatch.json"
+    ;;
+  *) guard_destination "$DEST" ;;
+esac
+if [ "$COMMAND" = check ]; then
+  case "$REL" in
+    config/model-index.json|config/crew-dispatch.json) ;;
+    *) die "only the model-index and crew-dispatch pair supports preflight" ;;
+  esac
+  printf 'checked: %s\n' "$REL"
+  exit 0
 fi
 
 BASE=$(basename "$REL")

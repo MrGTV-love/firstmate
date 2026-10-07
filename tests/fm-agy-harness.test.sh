@@ -11,9 +11,10 @@
 #      inherited CLAUDECODE - tests/fm-harness-precedence.test.sh owns the
 #      general boundary.
 #   3. The launch carries the brief via --prompt-interactive with --model,
-#      --effort, and --dangerously-skip-permissions; a requested model a
-#      reachable `agy models` omits refuses loudly instead of wedging a pane,
-#      while a hung or unreachable listing is cut off and never blocks.
+#      --effort, and --dangerously-skip-permissions; a native non-index-entry
+#      literal that reachable `agy models` omits refuses loudly instead of
+#      wedging a pane, while a hung or unreachable listing never blocks.
+#      Indexed selections follow docs/configuration.md "Fleet model index".
 #   4. A fresh worktree would park agy on its folder-trust dialog, so the spawn
 #      pre-registers the worktree in agy's own trustedWorkspaces store through
 #      bin/fm-agy-trust.sh (scope-refused for anything but a linked worktree
@@ -36,6 +37,7 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+unset FM_MODEL_CATALOG_DIR
 
 # bin/fm-harness.sh checks verified ENV markers before ancestry. A suite run
 # from inside another harness inherits those markers, which outrank the fake
@@ -592,6 +594,10 @@ EOF
 NODE_BIN=$(command -v node) || fail "test needs node"
 NODE_BIN_DIR=$(dirname "$NODE_BIN")
 BASE_PATH=${FM_TEST_BASE_PATH:-$NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
+JQ_BIN=$(command -v jq) || fail "test needs jq"
+DEPENDENCY_BIN=$(fm_fakebin "$TMP_ROOT/dependencies")
+ln -s "$JQ_BIN" "$DEPENDENCY_BIN/jq"
+BASE_PATH="$DEPENDENCY_BIN:$BASE_PATH"
 
 run_agy_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6
@@ -887,6 +893,78 @@ test_agy_spawn_arms_no_busy_wiring() {
   pass "fm-spawn: agy arms no busy wiring and writes no sidecar"
 }
 
+test_agy_indexed_selection_never_queries_the_supervisor_catalog() {
+  local id rec out rc model
+  for model in gemini-pane-only gemini-supervisor-only; do
+    id="agy-index-$model-$$"
+    rec=$(make_agy_spawn_case "index-$model" "$id")
+    read_agy_spawn_record "$rec"
+    cat > "$FAKEBIN_DIR/agy" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = models ]; then
+  printf '%s\n' "\$*" >> '$CASE_DIR/catalog-calls'
+  printf 'gemini-supervisor-only\tSupervisor model\n'
+  exit 0
+fi
+echo "fake agy must never execute" >&2
+exit 9
+SH
+    chmod +x "$FAKEBIN_DIR/agy"
+    printf '{"version":1,"roles":{"chosen":{"agy":{"model":"%s"}}},"retired":[]}\n' "$model" \
+      > "$HOME_DIR/config/model-index.json"
+    out=$(run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" \
+      --model role:chosen); rc=$?
+    expect_code 0 "$rc" "an indexed agy spawn must not refuse from supervisor catalog listing or omission: $out"
+    assert_contains "$out" "spawned $id harness=agy" "the indexed agy selection must complete its ordinary launch"
+    assert_contains "$out" "effective worker account context is not established" "the agy selected-entry check must disclose precise context uncertainty"
+    assert_contains "$out" "not validated" "a matching supervisor catalog must not imply worker validation"
+    assert_absent "$CASE_DIR/catalog-calls" "neither legacy nor selected-entry agy checks may query the supervisor catalog"
+    [ -s "$CASE_DIR/launch.log" ] || fail "an indexed agy spawn must publish a launch command"
+    assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the ordinary agy launch must carry the selected indexed model"
+    [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the indexed agy spawn must reach the existing fixture's processing turn"
+    assert_agy_trusted "$HOME_DIR/.gemini/antigravity-cli/settings.json" "$WT_DIR" \
+      "the indexed agy launch must retain normal worktree trust registration"
+  done
+  pass "fm-spawn: indexed agy selections launch into a processing turn without supervisor catalog evidence"
+}
+
+test_agy_unrelated_index_retains_native_literal_validation() {
+  local id rec out rc model selected
+  for selected in unsupported supported primary stand-in; do
+    id="agy-index-literal-$selected-$$"
+    rec=$(make_agy_spawn_case "index-literal-$selected" "$id")
+    read_agy_spawn_record "$rec"
+    printf '%s\n' '{"version":1,"roles":{"unrelated":{"agy":{"model":"gemini-primary-only","stand_in":"gemini-stand-in-only"}},"other_harness":{"claude":{"model":"gemini-unsupported"}}},"retired":[]}' \
+      > "$HOME_DIR/config/model-index.json"
+    case "$selected" in
+      unsupported) model=gemini-unsupported ;;
+      supported) model=gemini-3.8-flash-low ;;
+      primary) model=gemini-primary-only ;;
+      stand-in) model=gemini-stand-in-only ;;
+    esac
+    out=$(run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" \
+      --model "$model"); rc=$?
+    if [ "$selected" = unsupported ]; then
+      expect_code 1 "$rc" "an unrelated index must not disable agy's literal model guard: $out"
+      assert_contains "$out" "not listed by 'agy models'" "the non-entry agy refusal must retain concrete native evidence"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused non-entry agy literal must publish no metadata"
+      [ ! -s "$CASE_DIR/launch.log" ] || fail "an unsupported non-entry agy literal must not launch"
+    else
+      expect_code 0 "$rc" "supported nonentries and actual indexed agy literals must launch: $out"
+      assert_contains "$(cat "$CASE_DIR/launch.log")" "--model '$model'" "the launch must retain its literal selector"
+      [ "$(cat "$CASE_DIR/agy.state")" = busy ] || fail "the agy literal spawn must complete its processing-turn gate"
+      if [ "$selected" = supported ]; then
+        assert_contains "$out" "not an index entry" "a supported non-entry literal must retain the warning"
+        assert_not_contains "$out" "effective worker account context is not established" "a supported non-entry must not delegate its native guard"
+      else
+        assert_contains "$out" "effective worker account context is not established" "an exact primary or stand-in literal must delegate its native guard"
+        assert_contains "$out" "not validated" "unknown indexed context must not claim validation"
+      fi
+    fi
+  done
+  pass "fm-spawn: agy delegates only exact entry literals and keeps native validation for unrelated indexed literals"
+}
+
 test_agy_ancestry_detects_the_native_command_name
 test_agy_ancestry_rejects_unrelated_mentions
 test_agy_claims_no_inherited_launcher_marker
@@ -910,6 +988,8 @@ test_agy_trust_registers_the_logical_and_resolved_worktree_paths
 test_agy_trust_creates_a_missing_store
 test_agy_trust_refuses_out_of_scope_paths
 test_agy_fresh_worktree_is_pre_trusted_and_launches_without_a_dialog
+test_agy_indexed_selection_never_queries_the_supervisor_catalog
+test_agy_unrelated_index_retains_native_literal_validation
 test_agy_dialog_despite_registration_is_answered_once
 test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered
 test_agy_unregistered_path_without_a_dialog_fails_the_spawn

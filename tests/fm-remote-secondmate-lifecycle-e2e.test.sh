@@ -1136,7 +1136,8 @@ assert_grep '"revision":2' "$REMOTE_HOME/config/crew-dispatch.json" "partial inh
 [ "$(cat "$REMOTE_HOME/config/crew-harness")" != grok ] \
   || fail "partial inheritance unexpectedly applied the failed file"
 NUDGE_MARKER="$PARENT/state/.secondmate-nudge-pending/ios.pending"
-assert_grep 'remote=1' "$NUDGE_MARKER" "partial inheritance left no durable remote reread marker"
+assert_absent "$NUDGE_MARKER" "successful partial inheritance reread retained its retry marker"
+assert_grep 'config-reread: sent' "$TMP_ROOT/config-partial.out" "completed partial inheritance writes were not notified"
 publish_healthy_watcher_identity "$PARENT/state" "$PARENT" "$REMOTE_ROOT/bin/fm-watch.sh"
 remote_env "$ROOT/bin/fm-bootstrap.sh" > "$TMP_ROOT/config-partial-retry.out" \
   || fail "bootstrap did not converge partial remote inheritance"
@@ -1151,7 +1152,7 @@ await_reply_result "$PARENT/state/procevent-inbox/$SID.2.result" \
 PARTIAL_CONFIG_RESULT="$PARENT/state/procevent-inbox/$SID.2.result"
 remote_env "$ROOT/bin/fm-procevent-remote-reply.sh" handle ios 2 "$PARTIAL_CONFIG_RESULT" >/dev/null \
   || fail "converged remote config acknowledgment was not ingested"
-pass "partial remote inheritance retains reread intent through bootstrap convergence"
+pass "partial remote inheritance notifies completed writes before bootstrap convergence"
 
 rm -f "$TMP_ROOT/inherit.entered" "$TMP_ROOT/inherit.release" "$TMP_ROOT/inherit.payload"
 cat > "$PARENT/data/captain-shared.md" <<'EOF'

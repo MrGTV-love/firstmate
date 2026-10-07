@@ -75,6 +75,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    A Claude or Pi replacement must also pass the home's [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account), so a pin that no longer resolves or is signed out refuses before the old agent stops.
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
    The resolved replacement is also subject to the home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) before checkpointing.
+   Model resolution and selected-entry catalog preflight follow the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson) before the old agent stops.
 2. **Check replacement admission, then checkpoint.**
    The control plane checks the launch owner's read-only backlog admission before appending a note or stopping the old agent, so a predictable held or dependency-blocked replacement refusal leaves that owner intact.
    [`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh) owns the shared rule; both control and direct replacement launch recheck it.

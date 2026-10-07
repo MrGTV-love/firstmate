@@ -1186,6 +1186,31 @@ test_claude_secondmate_launch_omits_task_control_channel_authority() {
   pass "a persistent claude secondmate keeps its supervisor contract without a task-worker authority overlay"
 }
 
+test_default_secondmate_launch_survives_unsafe_routing_sources() {
+  local rec id sm out status source_kind
+  for source_kind in dangling directory; do
+    id="profile-default-routing-$source_kind"
+    rec=$(make_spawn_case "$id" claude "$id")
+    read_case_record "$rec"
+    printf 'claude\n' > "$HOME_DIR/config/secondmate-harness"
+    printf 'codex\n' > "$HOME_DIR/config/crew-harness"
+    case "$source_kind" in
+      dangling) ln -s "$HOME_DIR/missing-index" "$HOME_DIR/config/model-index.json" ;;
+      directory) mkdir "$HOME_DIR/config/crew-dispatch.json" ;;
+    esac
+    sm="$CASE_DIR/secondmate-home"
+    make_seeded_secondmate_home "$sm" "$id"
+    out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+      run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+    status=$?
+    expect_code 0 "$status" "default secondmate launch must survive $source_kind routing source"$'\n'"$out"
+    assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
+    [ "$(cat "$sm/config/crew-harness")" = codex ] || fail 'routing refusal blocked unrelated launch inheritance'
+    assert_contains "$out" 'inheritance failed' 'unsafe routing source must remain a warning'
+  done
+  pass 'fresh default-model secondmates retain warning-only routing inheritance'
+}
+
 test_claude_crewmate_launch_carries_the_attribution_policy() {
   local rec id out status launch
   id=profile-claude-attribution-z22
@@ -1737,6 +1762,59 @@ test_claude_permission_mode_invalid_refuses_before_endpoint_or_metadata() {
   pass "an unrecognized config/claude-permission-mode token refuses before any endpoint or metadata"
 }
 
+test_model_index_resolves_launch_and_refuses_retired_literals() {
+  local rec id out status launch catalogs
+  id='model-role-z24'
+  rec=$(make_spawn_case model-role codex "$id" retired-model-z25)
+  read_case_record "$rec"
+  catalogs="$CASE_DIR/catalogs"
+  mkdir -p "$catalogs"
+  printf '%s\n' '{"models":[{"id":"current-sol"}]}' > "$catalogs/codex.json"
+  printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"current-sol"}}},"retired":["prior-sol"]}' > "$HOME_DIR/config/model-index.json"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness codex --model role:strong)
+  status=$?
+  expect_code 0 "$status" "role-based spawn should succeed"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex current-sol default
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "--model 'current-sol'" "spawn must launch the resolved concrete id"
+  assert_not_contains "$launch" "role:strong" "a role reference must not reach the harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" retired-model-z25 "$PROJ_DIR" --harness codex --model prior-sol 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "retired literal model was launched: $out"
+  assert_absent "$HOME_DIR/state/retired-model-z25.meta" "retired model must refuse before metadata publication"
+  [ ! -s "$LAUNCH_LOG" ] || fail "retired model sent a launch"
+  pass "spawn records and launches concrete role ids and refuses retired literals before publication"
+}
+
+test_secondmate_model_pin_resolves_through_the_model_index() {
+  local rec id sm out status catalogs
+  id="model-role-secondmate-z26"
+  rec=$(make_spawn_case model-role-secondmate codex "$id")
+  read_case_record "$rec"
+  catalogs="$CASE_DIR/catalogs"
+  mkdir -p "$catalogs"
+  printf '%s\n' '{"models":[{"id":"current-sol"}]}' > "$catalogs/codex.json"
+  printf '%s\n' '{"version":1,"roles":{"strong":{"codex":{"model":"current-sol"}}},"retired":["prior-sol"]}' > "$HOME_DIR/config/model-index.json"
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$id"
+  printf '%s\n' 'codex prior-sol high' > "$HOME_DIR/config/secondmate-harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a retired secondmate model pin was launched: $out"
+  assert_contains "$out" "retired model: prior-sol" "the secondmate pin refusal should name the retired id"
+  assert_absent "$HOME_DIR/state/$id.meta" "a retired secondmate pin must refuse before metadata publication"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a retired secondmate pin sent a launch"
+  printf '%s\n' 'codex role:strong high' > "$HOME_DIR/config/secondmate-harness"
+  out=$(FM_MODEL_CATALOG_DIR="$catalogs" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
+  status=$?
+  expect_code 0 "$status" "a role secondmate model pin should launch: $out"
+  assert_meta_profile "$HOME_DIR/state/$id.meta" codex current-sol high
+  assert_not_contains "$(cat "$LAUNCH_LOG")" "role:strong" "a secondmate role pin must not reach the harness"
+  pass "a config/secondmate-harness model pin resolves roles and refuses retired ids through the model index"
+}
+
+test_model_index_resolves_launch_and_refuses_retired_literals
+test_secondmate_model_pin_resolves_through_the_model_index
 test_worker_launch_delivers_role_scope
 test_no_profile_keeps_claude_profile_defaults
 test_claude_launch_brief_publishes_record_doorbell
@@ -2083,5 +2161,6 @@ test_teamclaude_config_paths_reach_only_teamclaude
 test_teamclaude_snapshot_overrides_stale_pane_configuration
 test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
+test_default_secondmate_launch_survives_unsafe_routing_sources
 
 echo "# all fm-spawn-dispatch-profile tests passed"

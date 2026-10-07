@@ -315,9 +315,9 @@ The intake and authority contract in `AGENTS.md` owns when separate scout resear
 ## Dispatch profiles
 
 Crewmate and scout dispatch can stay on the static crewmate harness resolved by `config/crew-harness`, or it can use local dispatch profiles in `config/crew-dispatch.json`.
-Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing concrete launch axes to `fm-spawn.sh`.
+Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing the selected profile to `fm-spawn.sh` under the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson).
 Bootstrap and spawn validate configuration and verified harness/effort combinations; the optional [typed resolver](configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns its documented rule-matching and deterministic profile-selection boundary.
-The session-start bootstrap step keeps valid dispatch configuration silent unless verbose facts are enabled and surfaces a concise invalid-config line when validation fails.
+The [dispatch configuration owner](configuration.md#crew-dispatch-profiles-configcrew-dispatchjson) documents bootstrap validation and diagnostics.
 When the file exists, `fm-spawn.sh` refuses crewmate and scout launches without an explicit harness, so `config/crew-harness` is only automatic when no dispatch profile file is active.
 Secondmate launches are exempt because they resolve the secondmate harness and any optional secondmate model or effort tokens instead.
 Unsupported effort values are still recorded in task meta when passed to `fm-spawn.sh`, but the launch template omits any effort flag that the selected harness does not accept.
@@ -353,15 +353,7 @@ Secondmate homes converge conservatively to the primary's version and declared i
 The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the full guarded sync, propagation, nudge, and mid-session local-material push contract.
 
 Secondmate agents can run on a different verified harness than crewmates.
-`config/secondmate-harness` controls the primary's secondmate launch harness and may also carry optional model and effort tokens as `<harness> [<model>] [<effort>]` on the first non-empty, non-comment line.
-A bare harness line remains harness-only, so existing `config/secondmate-harness` files keep their previous behavior.
-When the harness token is unset or `default`, launch falls back to `config/crew-harness`, then to the primary's own harness, and the model and effort tokens are ignored.
-Those optional tokens are re-read on every secondmate spawn or respawn and are overridden by explicit per-spawn `--model` or `--effort` flags.
-For a local route, an explicit per-spawn harness or raw launch command does not inherit model or effort tokens from `config/secondmate-harness`.
-Remote routes accept verified harness adapters only and reject raw launch commands.
-`config/crew-harness` remains the crewmate harness and is inherited into secondmate homes.
-`config/crew-dispatch.json` is inherited too; secondmates use the same natural-language dispatch profiles when spawning their own crewmates.
-The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the inherited-local-material propagation contract and points to the implementation's item declaration.
+The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns secondmate harness/model/effort pins, launch overrides, and inherited-local-material propagation.
 
 The `data/secondmates.md` line contract is owned by the [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md#routing-table), and the secondmate environment variables are documented in [configuration.md](configuration.md).
 

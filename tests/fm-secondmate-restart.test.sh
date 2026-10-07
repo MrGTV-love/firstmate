@@ -77,6 +77,7 @@ case "${1:-}" in
           if [ ! -e "$D/remote-relaunch-end" ]; then
             : > "$D/local-relaunch-before-remote-end"
           fi
+          : > "$D/local-relaunch-seen"
           printf 'zsh' > "$D/command.$target"
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) cat "$D/becomes" > "$D/command.$target" ;;
@@ -457,7 +458,11 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -u
-cat > /dev/null
+if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
+  cat > "$FM_FAKE_DIR/ssh-input"
+else
+  cat > /dev/null
+fi
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
@@ -467,6 +472,12 @@ decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | 
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 printf '%s\n' "${rargs[*]}" >> "$FM_FAKE_SSH_LOG"
+if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ "${rargs[0]}" = fm-remote-inherit.sh ]; then
+  remote_root=$(decode "$2")
+  remote_home=$(decode "$3")
+  FM_HOME="$remote_home" FM_CONFIG_OVERRIDE="$remote_home/config" FM_STATE_OVERRIDE="$remote_home/state" \
+    exec "$remote_root/bin/${rargs[0]}" "${rargs[@]:1}" < "$FM_FAKE_DIR/ssh-input"
+fi
 case "${FM_FAKE_SSH_MODE:-ok}" in
   unreachable) exit 255 ;;
 esac
@@ -476,15 +487,29 @@ case "${rargs[1]:-}" in
     # parent channel, carrying the correlation token the request embedded.
     if [ -n "${FM_FAKE_ANSWER_STATUS:-}" ]; then
       corr=$(printf '%s' "${rargs[3]:-}" | grep -oE 'corr=[0-9a-f]{16}' | head -1)
+      if [ -n "$corr" ] && [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ] && [ ! -e "$FM_FAKE_DIR/persist-mutated" ]; then
+        cp "$FM_FAKE_DIR/later-index.json" "$FM_HOME/config/model-index.json"
+        cp "$FM_FAKE_DIR/later-dispatch.json" "$FM_HOME/config/crew-dispatch.json"
+        : > "$FM_FAKE_DIR/persist-mutated"
+      fi
       [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
         >> "$FM_FAKE_ANSWER_STATUS"
     fi
     ;;
   relaunch)
+    if [ "${FM_FAKE_SSH_MODE:-ok}" = mutate-persist ]; then
+      remote_root=$(decode "$2")
+      remote_home=$(decode "$3")
+      FM_HOME="$remote_home" FM_CONFIG_OVERRIDE="$remote_home/config" FM_STATE_OVERRIDE="$remote_home/state" FM_MODEL_CATALOG_DIR='' \
+        "$remote_root/bin/fm-model-index.sh" check "${rargs[3]}" "${rargs[4]}" || exit 93
+    fi
     case "${FM_FAKE_SSH_MODE:-ok}" in
       slow-relaunch)
         : > "$FM_FAKE_DIR/remote-relaunch-start"
         /bin/sleep 2
+        if [ -e "$FM_FAKE_DIR/local-relaunch-seen" ]; then
+          : > "$FM_FAKE_DIR/local-relaunch-during-remote"
+        fi
         : > "$FM_FAKE_DIR/remote-relaunch-end"
         ;;
       coordinated-relaunch)
@@ -563,6 +588,53 @@ test_remote_fleet_restart_obeys_initiating_policy() {
     "fleet restart transported a forbidden replacement"
   cmp -s "$dir/meta-before" "$dir/home/state/sm2.meta" || fail "fleet refusal changed route metadata"
   pass "remote fleet restart retains its route without transporting a forbidden replacement"
+}
+
+test_remote_role_restart_resolves_the_pair_selected_after_persist() {
+  local dir out rc selector expected before stand_in relaunch_line selected
+  for selector in role:routine stand-in:routine; do
+    dir=$(new_case remote-role-persist)
+    setup_remote_case "$dir" sm2 mutate-persist
+    mkdir -p "$dir/sm2-home/config" "$dir/sm2-home/state" "$dir/codex"
+    printf -- '- sm2 - remote domain (host: remote-mac; root: %s; home: %s; scope: things; projects: p; added 2026-09-03)\n' \
+      "$ROOT" "$dir/sm2-home" > "$dir/home/data/secondmates.md"
+    printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"before-model","stand_in":"before-stand-in"}}},"retired":[]}' \
+      > "$dir/home/config/model-index.json"
+    printf '%s\n' '{"version":1,"roles":{"routine":{"codex":{"model":"after-model","stand_in":"after-stand-in"}}},"retired":[]}' \
+      > "$dir/fake/later-index.json"
+    case "$selector" in
+      role:routine) before='before-model'; expected='after-model'; stand_in=false ;;
+      stand-in:routine) before='before-stand-in'; expected='after-stand-in'; stand_in=true ;;
+    esac
+    printf '{"default":{"harness":"codex","role":"routine","stand_in":%s}}\n' "$stand_in" \
+      > "$dir/home/config/crew-dispatch.json"
+    cp "$dir/home/config/crew-dispatch.json" "$dir/fake/later-dispatch.json"
+    printf '%s\n' '{"models":[{"slug":"before-model"},{"slug":"before-stand-in"},{"slug":"after-model"},{"slug":"after-stand-in"}]}' \
+      > "$dir/codex/models_cache.json"
+    printf 'codex %s high\n' "$selector" > "$dir/home/config/secondmate-harness"
+    selected=$(FM_HOME="$dir/home" FM_CONFIG_OVERRIDE="$dir/home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" model codex "$selector")
+    [ "$selected" = "$before" ] || fail "initial $selector did not select the early model: $selected"
+    export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+    out=$(FM_CONFIG_OVERRIDE="$dir/home/config" FM_MODEL_CATALOG_DIR='' CODEX_HOME="$dir/codex" run_restart "$dir" sm2); rc=$?
+    unset FM_FAKE_ANSWER_STATUS
+    expect_code 0 "$rc" "remote $selector restart did not accept the changed pair: $out"
+    assert_present "$dir/fake/persist-mutated" "the persist request did not mutate the parent index"
+    assert_contains "$out" "restarted: sm2 on remote-mac (codex)" \
+      "remote $selector was not reported restarted"
+    selected=$(FM_HOME="$dir/sm2-home" FM_CONFIG_OVERRIDE="$dir/sm2-home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" model codex "$selector")
+    [ "$selected" = "$expected" ] || fail "published destination $selector selected $selected instead of $expected"
+    selected=$(FM_HOME="$dir/sm2-home" FM_CONFIG_OVERRIDE="$dir/sm2-home/config" FM_MODEL_CATALOG_DIR='' "$ROOT/bin/fm-model-index.sh" profiles "$dir/sm2-home/config/crew-dispatch.json" | jq -r '.default.model')
+    [ "$selected" = "$expected" ] || fail "published dispatch selected $selected instead of $expected"
+    relaunch_line=$(grep '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
+    [ "$relaunch_line" = "fm-remote-secondmate-control.sh relaunch sm2 codex $expected high" ] \
+      || fail "relaunch froze the early $selector model: $relaunch_line"
+    grep -Fx "model=$expected" "$dir/home/state/sm2.meta" >/dev/null \
+      || fail "parent route did not publish the relaunched model"
+    [ "$(grep -n '^fm-remote-inherit.sh put config/model-index.json ' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
+       -lt "$(grep -n '^fm-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
+      || fail "relaunch preceded publication of the selected index"
+  done
+  pass "remote role and stand-in restart resolve the published pair selected after persistence"
 }
 
 # --- T7: an unreachable host is unknown, never a claimed reload --------------
@@ -911,6 +983,7 @@ test_local_restart_uses_the_home_pin_and_reports_what_ran
 test_native_ultra_restart_keeps_local_and_remote_profiles
 test_remote_mate_restarts_over_the_transport_hop
 test_remote_fleet_restart_obeys_initiating_policy
+test_remote_role_restart_resolves_the_pair_selected_after_persist
 test_unreachable_host_is_reported_unknown
 test_concurrent_reply_cannot_release_persist_gate
 test_persist_waits_are_polled_together

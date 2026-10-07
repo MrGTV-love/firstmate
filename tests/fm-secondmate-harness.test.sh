@@ -61,6 +61,9 @@ unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_IN
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 fm_git_identity fmtest fmtest@example.com
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-harness)
+DEPENDENCY_BIN=$(fm_fakebin "$TMP_ROOT/dependencies")
+ln -s "$(command -v jq)" "$DEPENDENCY_BIN/jq"
+BASE_PATH="$DEPENDENCY_BIN:$BASE_PATH"
 export FM_BACKEND=tmux
 
 # Every claude launch pre-registers workspace trust for the directory it starts
@@ -1062,6 +1065,7 @@ new_world() {
   {
     printf 'projects/\nstate/\ndata/\n.no-mistakes/\n'
     [ "$dispatch_ignore" = no ] || printf 'config/crew-dispatch.json\n'
+    printf 'config/model-index.json\n'
     printf 'config/crew-harness\nconfig/secondmate-harness\nconfig/backlog-backend\n'
     printf 'config/backend\nconfig/herdr-presentation-spaces\nconfig/startup-memory-budget\n'
     printf 'config/claude-permission-mode\n'
