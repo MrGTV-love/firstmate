@@ -968,51 +968,62 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
 # A harness can put a queued watcher wake back into the composer unsubmitted
 # (omp does when a run is interrupted), which leaves the mate idle with its queue
 # frozen and a pending composer the idle ring refuses to type into.
-install_secondmate_composer_tmux() {  # <fakebin>
+install_secondmate_composer_herdr() {  # <fakebin>
   local fakebin=$1
-  cat > "$fakebin/tmux" <<'SH'
+  cat > "$fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-case "${1:-}" in
-  list-windows) printf '%s\n' 'fm-mate' ;;
-  capture-pane)
-    [ ! -e "${FM_FAKE_TMUX_SCREEN:?}.unavailable" ] || exit 1
-    cat "$FM_FAKE_TMUX_SCREEN"
+printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
+case "${1:-} ${2:-}" in
+  'status --json')
+    printf '{"client":{"version":"0.9.1","protocol":22},"server":{"running":true}}\n'
     ;;
-  display-message)
+  'pane get')
+    printf '{"result":{"pane":{"pane_id":"w1:p1","tab_id":"t1","workspace_id":"w1"}}}\n'
+    ;;
+  'pane process-info')
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p1","shell_pid":10,"foreground_processes":[{"pid":11,"name":"omp","argv":["omp"],"cmdline":"omp"}]}}}\n'
+    ;;
+  'agent get')
+    printf '{"result":{"agent":{"agent":"omp","agent_status":"idle"}}}\n'
+    ;;
+  'pane read')
     case "$*" in
-      *pane_current_command*) printf 'omp\n' ;;
-      *pane_tty*) exit 1 ;;
-      *cursor_y*) awk 'END { print NR - 1 }' "${FM_FAKE_TMUX_SCREEN:?}" ;;
-      *) printf '0\n' ;;
+      *'--source visible --format ansi'*)
+        [ ! -e "${FM_FAKE_HERDR_SCREEN:?}.unavailable" ] || exit 1
+        cat "$FM_FAKE_HERDR_SCREEN"
+        ;;
+      *) cat "${FM_FAKE_PLAIN_SCREEN:-$FM_FAKE_HERDR_SCREEN}" ;;
     esac
     ;;
-  send-keys)
+  'pane send-text')
+    printf 'TYPED:%s\n' "${4:-}" >> "${FM_FAKE_HERDR_SENT:?}"
+    ;;
+  'pane send-keys')
     while [ "$#" -gt 0 ]; do
       case "$1" in
-        -l) shift; [ "$#" -gt 0 ] && printf 'TYPED:%s\n' "$1" >> "${FM_FAKE_TMUX_SENT:-/dev/null}" ;;
-        Enter)
-          printf '[ENTER]\n' >> "${FM_FAKE_TMUX_SENT:-/dev/null}"
+        enter|Enter)
+          printf '[ENTER]\n' >> "${FM_FAKE_HERDR_SENT:-/dev/null}"
           if [ -n "${FM_FAKE_EDIT_AFTER_WAKE_ENTER:-}" ] \
-            && [ "$(wc -l < "${FM_FAKE_TMUX_SENT:?}" | tr -d '[:space:]')" = "$FM_FAKE_EDIT_AFTER_WAKE_ENTER" ]; then
-            cat "${FM_FAKE_EDITED_COMPOSER:?}" > "${FM_FAKE_TMUX_SCREEN:?}"
+            && [ "$(wc -l < "${FM_FAKE_HERDR_SENT:?}" | tr -d '[:space:]')" = "$FM_FAKE_EDIT_AFTER_WAKE_ENTER" ]; then
+            cat "${FM_FAKE_EDITED_COMPOSER:?}" > "${FM_FAKE_HERDR_SCREEN:?}"
           elif [ "${FM_FAKE_AFTER_ENTER_CAPTURE_FAIL:-0}" = 1 ]; then
-            : > "${FM_FAKE_TMUX_SCREEN:?}.unavailable"
+            : > "${FM_FAKE_HERDR_SCREEN:?}.unavailable"
           elif [ "${FM_FAKE_AFTER_ENTER_EXTRACT_FAIL:-0}" = 1 ]; then
-            printf '$ no readable composer\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+            printf '$ no readable composer\n' > "${FM_FAKE_HERDR_SCREEN:?}"
           elif [ "${FM_FAKE_HOLD_WAKE_ENTER:-0}" = 1 ]; then
             if [ -n "${FM_FAKE_AFTER_ENTER_BUSY_CLASS:-}" ]; then
               "${FM_FAKE_BUSY_EVENT:?}" apply "${FM_FAKE_BUSY_STATE_DIR:?}" mate \
                 "$FM_FAKE_AFTER_ENTER_BUSY_CLASS" --current-gen --source omp-ext --event agent-start >/dev/null || exit 1
             fi
           elif [ "${FM_FAKE_LOSE_FIRST_WAKE_ENTER:-0}" = 1 ] \
-            && [ "$(cat "${FM_FAKE_TMUX_SENT:?}")" = '[ENTER]' ]; then
+            && [ "$(cat "${FM_FAKE_HERDR_SENT:?}")" = '[ENTER]' ]; then
             :
           else
             if [ "${FM_FAKE_CLEAR_WAKE_SHAPE:-box}" = bare ]; then
-              printf '❯ \033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m\nπ · model · ◫ 7.5%%/272K\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+              printf '❯ \033[38;2;0;180;255m⇧⇥\033[38;2;229;229;231m \033[38;2;107;114;128mto change thinking effort\033[0m\nπ · model · ◫ 7.5%%/272K\n' > "${FM_FAKE_HERDR_SCREEN:?}"
             else
-              printf '╭── π > ◒ GPT-6-Astra ──╮\n╰─ \033[38;2;0;180;255m⇧⇥\033[0m \033[3m\033[38;2;107;114;128mto change thinking effort\033[0m ─╯\n' > "${FM_FAKE_TMUX_SCREEN:?}"
+              printf '╭── π > ◒ GPT-6-Astra ──╮\n╰─ \033[38;2;0;180;255m⇧⇥\033[0m \033[3m\033[38;2;107;114;128mto change thinking effort\033[0m ─╯\n' > "${FM_FAKE_HERDR_SCREEN:?}"
             fi
             if [ -n "${FM_FAKE_CHILD_WAKE_QUEUE:-}" ]; then
               : > "$FM_FAKE_CHILD_WAKE_QUEUE"
@@ -1026,7 +1037,7 @@ case "${1:-}" in
   *) exit 0 ;;
 esac
 SH
-  chmod +x "$fakebin/tmux"
+  chmod +x "$fakebin/herdr"
 }
 
 secondmate_wake_text() {
@@ -1058,12 +1069,12 @@ setup_secondmate_composer_case() {  # <case> <composer-text>  (sets dir state su
   fakebin="$dir/fakebin"
   mkdir -p "$sub/state/extensions/omp-primary-watch"
   printf 'mate\n' > "$sub/.fm-secondmate-home"
-  printf 'window=firstmate:fm-mate\nkind=secondmate\nharness=omp\nbackend=tmux\nhome=%s\n' \
+  printf 'window=firstmate:w1:p1\nkind=secondmate\nharness=omp\nbackend=herdr\nherdr_session=firstmate\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
   emitted_wake=$(secondmate_wake_text)
   printf '%s' "$emitted_wake" > "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake"
-  install_secondmate_composer_tmux "$fakebin"
+  install_secondmate_composer_herdr "$fakebin"
   install_secondmate_stall_date "$fakebin"
   real_sleep=$(command -v sleep) || fail "sleep is unavailable for the composer fixture"
   printf '%s\n' "$real_sleep" > "$dir/real-sleep"
@@ -1089,7 +1100,8 @@ stall_composer_leg() {  # <leg> <now> <mode> [arg...]  (uses dir state sub fakeb
   shift 3
   printf '%s\n' "$now" > "$dir/now"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" FM_FAKE_TMUX_SCREEN="$dir/screen" \
+    FM_STATE_OVERRIDE="$state" FM_FAKE_HERDR_SENT="$dir/sent" FM_FAKE_HERDR_SCREEN="$dir/screen" \
+    FM_FAKE_HERDR_LOG="$dir/backend-log" \
     FM_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
     FM_FAKE_REAL_SLEEP="$(cat "$dir/real-sleep")" FM_FAKE_SUBMIT_SLEEP_LOG="$dir/submit-sleeps" \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
@@ -1122,6 +1134,8 @@ test_secondmate_wake_left_unsubmitted_in_the_composer_is_submitted() {
         || fail "an omp $shape wake must get one bare Enter and no typed text: $(cat "$dir/sent" 2>/dev/null)"
       [ "$(cat "$dir/submit-sleeps")" = 0.5 ] \
         || fail "an omp $shape wake must use the fixed first confirmation wait"
+      grep -Fx 'pane read w1:p1 --source visible --format ansi --session firstmate' "$dir/backend-log" >/dev/null \
+        || fail "the $shape recovery did not capture the Herdr ANSI viewport"
       ! grep -F 'secondmate wake-loop stalled' "$dir/watch-submit.out" >/dev/null \
         || fail "a recovered omp $shape wake still alarmed the parent: $(cat "$dir/watch-submit.out")"
       [ ! -s "$state/.wake-queue" ] || fail "the recovery published a parent stall notification"
@@ -1338,12 +1352,102 @@ test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm() {
   pass "operator edits after either swallowed Enter remain unconfirmed without submitting edited or mixed box and bare composers"
 }
 
-test_secondmate_restored_wake_below_visible_draft_is_never_submitted() {
-  local dir state sub fakebin wake shape confirmation expected
+test_secondmate_restored_wake_unsupported_capture_keeps_parent_alarm() {
+  local dir state sub fakebin wake scenario before backend target captured
   wake=$(secondmate_wake_text)
-  for shape in bare box pasted-box-after-draft; do
+  for scenario in tmux-truncated zellij-truncated herdr-ansi-failure herdr-missing-footer; do
+    setup_secondmate_composer_case "secondmate-wake-capture-refusal-$scenario" "$wake" bare
+    render_secondmate_composer bare "$wake" > "$dir/plain-screen"
+    {
+      printf '❯ my unsent draft\n'
+      render_secondmate_composer bare "$wake"
+    } > "$dir/screen"
+    if [ "$scenario" = herdr-missing-footer ]; then
+      printf '❯ %s\n' "${wake//$'\xe2\x81\xa3'/}" > "$dir/screen"
+    fi
+    before=$(cat "$dir/screen")
+    if [ "$scenario" = zellij-truncated ]; then
+      printf 'window=firstmate:1\nkind=secondmate\nharness=omp\nbackend=zellij\nhome=%s\n' \
+        "$sub" > "$state/mate.meta"
+      cat > "$fakebin/zellij" <<'SH'
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
+case "$*" in
+  *list-sessions*) printf 'firstmate\n' ;;
+  *list-panes*) printf '[{"id":1,"tab_id":1,"is_plugin":false}]\n' ;;
+  *list-tabs*) printf '[{"tab_id":1,"name":"fm-mate"}]\n' ;;
+  *dump-screen*) cat "${FM_FAKE_PLAIN_SCREEN:?}" ;;
+  *write-chars*|*send-keys*)
+    printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}"
+    ;;
+esac
+SH
+      chmod +x "$fakebin/zellij"
+    elif [ "$scenario" = tmux-truncated ]; then
+      printf 'window=firstmate:fm-mate\nkind=secondmate\nharness=omp\nbackend=tmux\nhome=%s\n' \
+        "$sub" > "$state/mate.meta"
+      cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
+case "${1:-}" in
+  list-windows) printf 'fm-mate\n' ;;
+  capture-pane) cat "${FM_FAKE_PLAIN_SCREEN:?}" ;;
+  display-message)
+    case "$*" in
+      *pane_current_command*) printf 'omp\n' ;;
+      *pane_tty*) exit 1 ;;
+      *cursor_y*) awk 'END { print NR - 1 }' "${FM_FAKE_PLAIN_SCREEN:?}" ;;
+      *) printf '0\n' ;;
+    esac
+    ;;
+  send-keys) printf 'UNEXPECTED:%s\n' "$*" >> "${FM_FAKE_HERDR_SENT:?}" ;;
+esac
+SH
+      chmod +x "$fakebin/tmux"
+    elif [ "$scenario" = herdr-ansi-failure ]; then
+      : > "$dir/screen.unavailable"
+    fi
+    backend=${scenario%%-*}
+    case "$backend" in
+      tmux) target=firstmate:fm-mate ;;
+      zellij) target=firstmate:1 ;;
+      herdr) target=firstmate:w1:p1 ;;
+    esac
+    captured=$(
+      export PATH="$fakebin:$PATH" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state"
+      export FM_FAKE_HERDR_LOG="$dir/backend-log" FM_FAKE_HERDR_SCREEN="$dir/screen"
+      export FM_FAKE_PLAIN_SCREEN="$dir/plain-screen"
+      . "$ROOT/bin/fm-backend.sh"
+      fm_backend_capture "$backend" "$target" 200 fm-mate
+    ) || fail "$scenario fixture did not expose its readable plain capture"
+    [ "$captured" = "$(cat "$dir/plain-screen")" ] \
+      || fail "$scenario fixture did not expose the matching wake without the earlier draft"
+    FM_FAKE_PLAIN_SCREEN="$dir/plain-screen" stall_composer_leg first 1000 progress mate "$(printf '1000\t100-7')"
+    FM_FAKE_PLAIN_SCREEN="$dir/plain-screen" stall_composer_leg stall 1002 alert
+    [ ! -e "$dir/sent" ] || fail "$scenario received input despite unproven viewport ownership"
+    [ "$(cat "$dir/screen")" = "$before" ] || fail "$scenario changed the visible draft"
+    grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+      || fail "$scenario hid the parent alarm"
+    [ -s "$state/.wake-queue" ] || fail "$scenario lost the parent alarm queue"
+    [ "$(cat "$sub/state/.wake-queue")" = "$(printf '100\t7\tcheck\trouted\tcheck: routed row')" ] \
+      || fail "$scenario changed the foreign queue"
+    [ -e "$sub/state/extensions/omp-primary-watch/unconsumed-1-1000-1.wake" ] \
+      || fail "$scenario consumed the recorded wake"
+    [ ! -e "$state/.secondmate-wake-ring-mate" ] || fail "$scenario recorded a successful ring"
+    [ ! -e "$state/mate.inbox" ] || fail "$scenario wrote a drain steer"
+  done
+  pass "truncated captures, failed Herdr ANSI captures with readable plain fallback, and bare composers without a terminal footer retain alarms without input"
+}
+
+test_secondmate_restored_wake_below_visible_draft_is_never_submitted() {
+  local dir state sub fakebin wake shape confirmation expected initial_shape row
+  wake=$(secondmate_wake_text)
+  for shape in bare box pasted-box-after-draft box-draft-before-box box-draft-before-bare; do
     for confirmation in 0 1 2; do
-      setup_secondmate_composer_case "secondmate-wake-below-draft-$shape-$confirmation" "$wake" "${shape/pasted-box-after-draft/box}"
+      initial_shape=${shape/pasted-box-after-draft/box}
+      setup_secondmate_composer_case "secondmate-wake-below-draft-$shape-$confirmation" "$wake" "${initial_shape##*-}"
       {
         case "$shape" in
           bare)
@@ -1352,12 +1456,19 @@ test_secondmate_restored_wake_below_visible_draft_is_never_submitted() {
             ;;
           box)
             printf '❯ my unsent draft\n'
+            for row in {1..25}; do printf '\n'; done
             render_secondmate_composer box "$wake"
             printf '\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
             ;;
           pasted-box-after-draft)
+            printf '❯ my unsent draft\n\n'
             render_secondmate_composer box "$wake"
-            printf '\n| my unsent draft\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
+            printf '\n| \n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
+            ;;
+          box-draft-before-box|box-draft-before-bare)
+            render_secondmate_composer box 'my unsent draft'
+            render_secondmate_composer "${shape##*-}" "$wake"
+            printf '\n π · ◔ GPT-6-Astra · 🌳 /home/lane · ⑂ main · ◫ 15.4%%/272K ⟲ · (sub)\n'
             ;;
         esac
       } > "$dir/edited-screen"
@@ -3845,6 +3956,11 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
@@ -3869,6 +3985,7 @@ test_secondmate_restored_wake_lost_enter_retries_while_idle
 test_secondmate_restored_wake_unavailable_after_enter_keeps_parent_alarm
 test_secondmate_restored_wake_operator_edit_after_enter_keeps_parent_alarm
 test_secondmate_restored_wake_below_visible_draft_is_never_submitted
+test_secondmate_restored_wake_unsupported_capture_keeps_parent_alarm
 test_secondmate_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt

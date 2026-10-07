@@ -5104,6 +5104,15 @@ EOF
     exclude_path '.fm-kimi-turnend'
     ;;
   esac
+elif [ "$HARNESS" = omp ]; then
+  "$FM_ROOT/bin/fm-busy-event.sh" retire "$STATE_REAL" "$ID" --current-gen || {
+    echo "error: could not retire busy-state authority for raw omp secondmate $ID; refusing to launch the replacement" >&2
+    exit 1
+  }
+  clear_relaunch_harness_wiring omp "$WT" "$STATE_REAL" "$ID" || {
+    echo "error: could not retire omp wiring for raw secondmate $ID; refusing to launch the replacement" >&2
+    exit 1
+  }
 fi
 
 # Per-task git hooksPath that strips AI commit trailers at the commit object.
