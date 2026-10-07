@@ -86,6 +86,7 @@ The sweep reads and files; it never fixes.
    Use `bin/fm-tasks-axi.sh add` for tasks-axi homes and the documented manual path for manual homes.
    Dispatch follows normal intake and the project's delivery mode.
    Never fix inline, and never edit a project's `AGENTS.md` or `CLAUDE.md`; guidance for firstmate's own material goes through `firstmate-coding-guidelines`.
-6. Report each qualifying class with its evidence count, chosen rung, and filed task id.
+6. Report only qualifying classes with their evidence counts, chosen rungs, and filed task ids.
+   Keep nonqualifying classes out of the entire final response: do not name or describe them, even in exclusion notes or explanations of why they did not qualify.
 
 A learnings entry records the gotcha until a guard lands; it is never the remedy for a class that qualified for one.
