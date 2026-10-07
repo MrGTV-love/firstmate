@@ -9,8 +9,7 @@ const HEALTH_MS = 60000;
 const RETRY_MS = 60000;
 const IDLE_WAIT_MS = 2000;
 const INPUT_PRICE_PER_MILLION = 0.042;
-// The adviser snapshot keeps at most this many bytes of one recent tool result and
-// 14000 bytes of recent text; anything larger is clipped and marked incomplete.
+// Keep these limits aligned with the adviser's snapshot clipping budgets.
 const TOOL_RESULT_BYTES = 512;
 const TAIL_BYTES = 14000;
 const ASSISTANT_BYTES = 8000;
@@ -22,15 +21,8 @@ const ATTESTED_TOOLS = new Set(["read"]);
 const textOf = message => typeof message.content === "string" ? message.content :
   message.content.filter(part => part.type === "text").map(part => part.text).join("\n");
 
-// The adviser snapshot clips each recent tool result to 512 bytes and then reports
-// the whole view as incomplete, so a turn that read a large file can never be judged.
-// This returns a view whose completeness is proven instead of assumed: the bulk body
-// of a successful file read is replaced by a record of its exact size, line count and
-// SHA-256 over the full sanitized text, so the recent window holds every message with
-// nothing clipped. Any other reason for incomplete coverage (clipped assistant or user
-// text, an errored or non-read tool result too large to send verbatim, redaction,
-// images, unknown context, no recoverable transcript, or an unexpected package shape)
-// returns the original view untouched and therefore still ineligible.
+// See docs/configuration.md, "Experimental omp-native Jev bake-off", for the
+// coverage eligibility and attestation contract.
 export function completeCoverage(adviser, ctx, secrets) {
   const base = adviser.snapshot(ctx, secrets, "omp");
   if (base.autoCoverage) return base;
@@ -68,6 +60,8 @@ export function completeCoverage(adviser, ctx, secrets) {
       attestedBytes += bytes;
     }
     budget -= Buffer.byteLength(kept);
+    // Split UTF-8 sequences can expand the adviser's retained text beyond its
+    // slice budget; clamp at zero to preserve its original-tail accounting.
     originalBudget = Math.max(0, originalBudget - Buffer.byteLength(first.text));
     recent.push({
       role: message.role, text: kept,

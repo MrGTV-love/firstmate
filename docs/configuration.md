@@ -999,12 +999,12 @@ This applies only to agents Firstmate launches; the captain's own primary Firstm
 The fork includes an opt-in timing-only comparison arm in [`extensions/omp-jev-pipeline.mjs`](../extensions/omp-jev-pipeline.mjs).
 Jev judges a successful, genuinely settled turn; a qualifying judgment requests omp's own compaction, leaving summary generation, retention and persistence to omp.
 Judging requires no queued messages or editor draft, context usage at least `minContextTokens`, and a snapshot with more than 20,000 conversation tokens and complete automatic coverage (`autoCoverage`).
-The adviser's own snapshot caps each recent tool result at 512 bytes and recent text at 14,000 bytes total, marking clipped windows incomplete.
-The controller therefore proves completeness itself: the body of a successful `read` result clipped by either the per-result limit or the original cumulative tail budget is replaced in the request by its exact byte count, line count and SHA-256 over the full sanitized text, so the recent window holds every message with nothing clipped and the request stays under the adviser's request cap.
-Original-tail accounting clamps the remaining budget to zero, matching the adviser even when byte clipping splits UTF-8 sequences and replacement characters expand the retained text.
-Only successful `read` results are attested.
-Clipped assistant or user text, errored results, shell or other tool output too large to send verbatim, redaction, images, unknown context, an unrecoverable transcript and any unexpected adviser package shape still leave the view incomplete, and the checkpoint is not judged.
-A rejected checkpoint records `coverage-ineligible` with categorical `reasons`, and a judged one records how many results and bytes were attested on `judge-start`.
+The adviser's own snapshot uses a 512-byte limit for each recent tool result and a 14,000-byte cumulative recent-text budget, marking clipped windows incomplete.
+For an otherwise eligible snapshot, the controller replaces each successful `read` body clipped by either limit with its exact byte count, line count and SHA-256 over the full sanitized text.
+Recovery preserves every assistant and tool-result entry in the adviser's original recent window without clipped text, within the same cumulative recent-text budget; it does not send the attested bodies or reconstruct the entire conversation.
+Clipped assistant or user text, errored or non-`read` tool results that would require clipping, redaction, images, unknown context and an unrecoverable transcript remain ineligible.
+Missing reconstruction helpers or a rebuilt window that does not match the adviser's original window cannot restore eligibility.
+A checkpoint rejected for conversation size or incomplete coverage records `coverage-ineligible` with categorical `reasons`; each judge request records `attestedResults` and `attestedBytes` (the full sanitized body bytes, not bytes transmitted) on `judge-start`.
 A completed judgment that marks work unfinished can defer an eligible automatic threshold or idle attempt once per agent loop; busy work can also defer once when Jev has returned a successful judgment within the last 60 seconds.
 Manual compaction, overflow recovery, incomplete-turn recovery, usage at or above 90% of the context window and unavailable Jev retain native precedence.
 This does not alter Firstmate's launch policy or enable the experiment by default in unattended workers.
@@ -1024,7 +1024,7 @@ COMPACT_ADVISER_DISABLE=1 FM_JEV_OMP_PIPELINE=1 \
   omp --no-extensions -e "$PWD/.fm-adviser-root/omp-jev-entry.mjs"
 ```
 
-The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and its full dependency tree; the unadapted registry package is not a substitute.
+The fork package must provide the existing `snapshot(ctx, secrets, "omp")` adapter and exported redaction and recent-window helpers, with its full dependency tree and `@earendil-works/pi-coding-agent` resolvable from the copied static entry; the unadapted registry package is not a substitute.
 The static entry is necessary for the compiled host's transitive dependency rewriting; loading helpers through computed dynamic imports is not equivalent.
 Use an isolated copy of the existing adviser configuration for the bake-off, with `mode: "auto"`, `autoAcknowledged: true`, a suitable `minContextTokens` and `logRequests: false`.
 The controller reuses that package's request format, profile parsing, snapshot/redaction and environment/saved/`.env` key resolution without creating another credential store.
@@ -1041,7 +1041,7 @@ omp does not notify extensions of native model changes, so a managed identity ch
 Native idle compaction requires the interactive TUI and the host's idle settings; an RPC session alone does not exercise that path.
 Native recovery also requires a runnable method for the selected model: a remote-only configuration does not make a custom provider support remote compaction.
 The portable boundary regressions run through [`tests/fm-omp-jev-pipeline.test.sh`](../tests/fm-omp-jev-pipeline.test.sh).
-Set `FM_JEV_ADVISER_DIR` to the installed package directory to include the actual helper's structured secret-redaction regression under Bun.
+Set `FM_JEV_ADVISER_DIR` to the installed dependency-complete adviser package directory to include the real helper's structured secret-redaction and snapshot/attestation/request-cap integration regressions under Bun.
 
 ### Commit attribution
 
