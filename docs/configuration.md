@@ -791,7 +791,9 @@ The setting is inherited through the existing local and remote secondmate config
 Local admission and live inheritance also require the child's policy parser/configuration dependency and spawn, control, automatic-recovery, and remote-replacement owners to match the authoritative launching code's bytes.
 The remote inheritance receiver verifies destination-home owners against its separate authoritative code root before reporting a policy put as pushed or unchanged; equal policy bytes do not bypass verification.
 This conservative tooling-capability check does not invoke child scripts or rewrite the child checkout: missing, outdated, unreadable, or locally changed policy owners refuse, even when inheritance is skipped and the child already has a valid policy.
-An unsupported policy reports an error rather than usable convergence. Its copied configuration may remain in place, while unrelated inheritance remains best-effort and primary policy absence still clears the restriction without requiring compatible owners.
+An enabled child policy retained by a guarded removal also requires verified tooling, even when the primary policy is absent.
+An unsupported policy reports an error rather than usable convergence.
+Its copied configuration may remain in place, while unrelated inheritance remains best-effort and successful policy removal clears the restriction without requiring compatible owners.
 Dirty edits outside those owners, wrong-branch homes, and preserved divergence remain supported when their policy tooling matches; restore the named owner from the primary while preserving unrelated work before retrying a refusal.
 Local recovery converges this setting and verifies the tooling before stopping the old endpoint or consuming a recovery attempt.
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
@@ -1656,7 +1658,7 @@ It uses the same live secondmate discovery and propagation helper as bootstrap; 
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
 - That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.
-- Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures.
+- Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures unless the [session launch policy](#session-launch-policy-configsession-launch-policy) cannot be verified.
 
 ## Watched tool updates (config/watched-tools.json)
 

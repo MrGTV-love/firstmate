@@ -114,6 +114,48 @@ for owner in $OWNERS; do
   done
 done
 
+for primary_policy in enabled absent; do
+  new_home "guard-skipped-$primary_policy"
+  [ "$primary_policy" != absent ] || rm "$PRIMARY/config/session-launch-policy"
+  printf '/config/*\n!/config/session-launch-policy\n/data/\n/state/\n' > "$CHILD/.gitignore"
+  printf 'omp-or-tc' > "$CHILD/config/session-launch-policy"
+  cp "$CHILD/config/session-launch-policy" "$CASE/protected-policy"
+  owner=fm-spawn.sh
+  printf 'obsolete owner\n' > "$CHILD/bin/$owner"
+  snapshot
+  run_local
+  assert_local_error
+  cmp -s "$CASE/protected-policy" "$CHILD/config/session-launch-policy" || fail 'guarded policy was overwritten or removed'
+  cp "$ROOT/bin/$owner" "$CHILD/bin/$owner"
+  snapshot
+  run_local
+  [ "$rc" = 0 ] || fail "capable guarded home refused: $(cat "$CASE/err")"
+  grep -F "$(printf 'session-launch-policy\tskipped\t')" "$CASE/report" >/dev/null || fail 'capable protected policy did not retain skip result'
+  cmp -s "$CASE/protected-policy" "$CHILD/config/session-launch-policy" || fail 'capable guarded policy was overwritten or removed'
+  assert_preserved
+  pass "guard-skipped live policy with $primary_policy primary requires capable tooling without changing protected bytes"
+done
+
+new_home already-valid-local
+cp "$PRIMARY/config/session-launch-policy" "$CHILD/config/session-launch-policy"
+snapshot
+run_local
+[ "$rc" = 0 ] || fail 'capable already-valid policy refused'
+assert_preserved
+owner=fm-spawn.sh
+printf 'obsolete owner\n' > "$CHILD/bin/$owner"
+snapshot
+run_local
+assert_local_error
+cmp -s "$PRIMARY/config/session-launch-policy" "$CHILD/config/session-launch-policy" || fail 'already-valid policy changed during capability refusal'
+cp "$ROOT/bin/$owner" "$CHILD/bin/$owner"
+snapshot
+run_local
+[ "$rc" = 0 ] || fail 'restored owner did not recover already-valid convergence'
+grep -F "$(printf 'session-launch-policy\tunchanged\t')" "$CASE/report" >/dev/null || fail 'restored already-valid policy was not unchanged'
+assert_preserved
+pass 'already-valid policy rechecks degraded owners and converges after restoration'
+
 new_home capable-local
 snapshot
 run_local

@@ -593,7 +593,7 @@ propagate_secondmate_inheritance() {
 }
 
 propagate_inheritable_config() {
-  local src_config=$1 dest_config=$2 item src dest source_present reason rc status
+  local src_config=$1 dest_config=$2 item src dest source_present reason rc status policy_config policy_error
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
@@ -655,14 +655,13 @@ propagate_inheritable_config() {
         fi
       fi
     fi
+    reason=
     if [ -f "$src" ]; then
       if ! destination_allows_inherited_item "$dest_config" "$item"; then
         reason=$(inheritable_config_skip_reason)
         warn_inheritable_config_skip "$item" "$dest_config" "$reason"
-        record_inheritable_config_result "$item" skipped "$reason"
-        continue
-      fi
-      if [ -L "$dest" ] || [ ! -f "$dest" ] || ! cmp -s "$src" "$dest"; then
+        status=skipped
+      elif [ -L "$dest" ] || [ ! -f "$dest" ] || ! cmp -s "$src" "$dest"; then
         if copy_inheritable_file "$src" "$dest"; then
           status=pushed
         else
@@ -675,38 +674,41 @@ propagate_inheritable_config() {
       else
         status=unchanged
       fi
-      if [ "$item" = session-launch-policy ] \
-        && ! reason=$(fm_session_launch_policy_check_child "$src_config" "$(dirname "$dest_config")" 2>&1); then
-        warn_inheritable_config_error "$item" "$dest" "$reason"
-        record_inheritable_config_result "$item" error "$reason"
-        rc=1
-        continue
-      fi
-      record_inheritable_config_result "$item" "$status" ""
     elif [ "$source_present" = 1 ]; then
       reason="primary source is not a regular file"
       warn_inheritable_config_error "$item" "$src" "$reason"
       record_inheritable_config_result "$item" error "$reason"
       rc=1
+      continue
     elif [ -e "$dest" ] || [ -L "$dest" ]; then
       if ! destination_allows_inherited_item "$dest_config" "$item"; then
         reason=$(inheritable_config_skip_reason)
         warn_inheritable_config_skip "$item" "$dest_config" "$reason"
-        record_inheritable_config_result "$item" skipped "$reason"
-        continue
-      fi
-      # Primary has no value for this item: mirror the absence downstream.
-      if rm -f "$dest" 2>/dev/null; then
-        record_inheritable_config_result "$item" pushed "mirrored primary absence"
+        status=skipped
+      elif rm -f "$dest" 2>/dev/null; then
+        status=pushed
+        reason="mirrored primary absence"
       else
         reason="failed to remove"
         warn_inheritable_config_error "$item" "$dest" "$reason"
         record_inheritable_config_result "$item" error "$reason"
         rc=1
+        continue
       fi
     else
-      record_inheritable_config_result "$item" unchanged ""
+      status=unchanged
     fi
+    if [ "$item" = session-launch-policy ]; then
+      policy_config=$src_config
+      [ "$source_present" = 1 ] || policy_config=$dest_config
+      if ! policy_error=$(fm_session_launch_policy_check_child "$policy_config" "$(dirname "$dest_config")" 2>&1); then
+        warn_inheritable_config_error "$item" "$dest" "$policy_error"
+        record_inheritable_config_result "$item" error "$policy_error"
+        rc=1
+        continue
+      fi
+    fi
+    record_inheritable_config_result "$item" "$status" "$reason"
   done
   return "$rc"
 }
