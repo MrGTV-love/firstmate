@@ -202,6 +202,72 @@ test_owned_band_blank_and_braille_continuations() {
   pass "owned band blank and braille gutters retain every content row while unproven gutters refuse extraction"
 }
 
+test_bare_owned_band_resumed_continuations() {
+  local prefix shape frame gutter short suffix screen tail cursor caps cursor_cap
+  local enclosing expected newer newer_row
+  for prefix in '' '  '; do
+    for shape in aligned reported; do
+      case "$shape" in
+        aligned)
+          frame="${prefix}   $HEADER"$'\n'"${prefix}  ╰─"
+          gutter="${prefix}     "
+          short="${prefix}   "
+          ;;
+        reported)
+          frame="${prefix} $HEADER"$'\n'"${prefix} ╰─"
+          gutter="${prefix}    "
+          short="${prefix} "
+          ;;
+      esac
+      for suffix in $'\n'"${gutter}keep tail" "${prefix}  "$'\n'"${gutter}keep tail" $'\n\n'"${gutter}keep tail" "${short}keep tail"; do
+        case "$suffix" in
+          $'\n\n'*) tail=5 ;;
+          *$'\n'*) tail=4 ;;
+          *) tail=3 ;;
+        esac
+        screen="${prefix}❯ preface"$'\n'"$frame"$'\n'"$suffix"
+        assert_refused "bare-owned $shape band resumed '$suffix', root '$prefix'" "$screen" unknown-draft
+        for cursor in 0 2 "$tail"; do
+          assert_screen "bare-owned $shape resumed continuation cursor $cursor, root '$prefix'" \
+            unknown-draft "$CAPS_TMUX" "$screen" "$cursor"
+        done
+        enclosing=$'────────\n'"$screen"$'\n────────'
+        expected="❯ preface $HEADER ╰─ keep tail"
+        for cursor_cap in 0 1; do
+          caps=$(printf 'styled=%s\ncursor=%s\nidentity=1' "$cursor_cap" "$cursor_cap")
+          cursor=$((tail + 1))
+          assert_screen "Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
+            pending "$caps" "$enclosing" "$cursor" $'pi\tidle'
+          assert_screen "denied Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
+            unknown-draft "$caps" "$enclosing" "$cursor" probe-absent
+          assert_screen "foreign Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
+            unknown-draft "$caps" "$enclosing" "$cursor" $'claude\tidle'
+          assert_screen "unavailable Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
+            unknown-draft "$(printf 'styled=%s\ncursor=%s\nidentity=0' "$cursor_cap" "$cursor_cap")" \
+            "$enclosing" "$cursor"
+        done
+        for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+          assert_content "enclosing Pi retains complete $shape resumed band, root '$prefix'" \
+            "$expected" "$caps" "$enclosing"
+        done
+        newer="$screen"$'\n\n❯'
+        newer_row=$((tail + 2))
+        for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+          assert_screen "newer composer clears $shape resumed band risk, root '$prefix'" empty "$caps" "$newer"
+          assert_content "newer composer excludes $shape resumed band draft, root '$prefix'" '' "$caps" "$newer"
+        done
+        assert_screen "newer cursor clears $shape resumed band risk, root '$prefix'" \
+          empty "$CAPS_TMUX" "$newer" "$newer_row"
+        for cursor in 0 2 "$tail"; do
+          assert_screen "old cursor retains $shape resumed band risk at $cursor, root '$prefix'" \
+            unknown-draft "$CAPS_TMUX" "$newer" "$cursor"
+        done
+      done
+    done
+  done
+  pass "bare-owned band gaps and short gutters refuse truncation while proven Pi and newer composers retain selection"
+}
+
 test_stale_ambiguous_band_does_not_veto_newer_composer() {
   local stale shape draft candidate screen caps candidate_caps want cursor
   stale=$'π > model > 📁 /work > ⑂ main ▶86%┃8.2K─\n╰─'
@@ -351,4 +417,5 @@ test_literal_band_rows_never_dispatch
 test_compact_omp_uses_folded_floor_semantics
 test_cursor_ambiguity_survives_later_band_continuations
 test_owned_band_blank_and_braille_continuations
+test_bare_owned_band_resumed_continuations
 test_stale_ambiguous_band_does_not_veto_newer_composer

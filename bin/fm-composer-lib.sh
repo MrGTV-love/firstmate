@@ -904,6 +904,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local box_omp=0 pi_native_draft_risk=0
   local band_top=-1 band_floor=-1 band_indent='' band_continuation=0 band_gap=0
   local bare_line bare_indent literal_line literal_indent literal_row literal_rows
+  local literal_last literal_gap
   FM_COMPOSER_SCAN_BARE_LITERAL_ROWS='|'
   FM_COMPOSER_SCAN_BARE_AMBIG_FIRST=-1
   FM_COMPOSER_SCAN_BARE_AMBIG_LAST=-1
@@ -1052,7 +1053,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       if [ "$family" = omp-band ] && [ "$literal_owned" -gt 0 ]; then
         case "$indent" in
           "$bare_indent   "*) ;;
-          "$bare_indent  "*) literal_owned=2 ;;
+          "$bare_indent "*) literal_owned=2 ;;
           *) literal_owned=0 ;;
         esac
       fi
@@ -1063,19 +1064,48 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
           literal_line=$(_fm_composer_screen_row "$literal_row" "$pane")
           literal_indent=${literal_line%%[![:space:]]*}
           fm_composer_normalize_trim_var literal_line
-          if [ "$indent" = "$literal_indent " ]; then
+          if [ "$indent" = "$literal_indent " ] \
+             || { [ "$literal_owned" = 2 ] && [ "$indent" = "$literal_indent" ]; }; then
             case "$literal_line" in
               '╰─'|'╰─ '*)
                 literal_rows="${literal_rows}${literal_row}|"
-                while :; do
+                literal_last=$literal_row
+                literal_row=-1
+                literal_gap=0
+                while IFS= read -r literal_line; do
                   literal_row=$((literal_row + 1))
-                  literal_line=$(_fm_composer_screen_row "$literal_row" "$pane")
+                  [ "$literal_row" -gt "$literal_last" ] || continue
                   case "$literal_line" in
-                    "$literal_indent   "*) literal_rows="${literal_rows}${literal_row}|" ;;
-                    *) break ;;
+                    "$literal_indent   "*)
+                      literal_rows="${literal_rows}${literal_row}|"
+                      literal_last=$literal_row
+                      [ "$literal_gap" = 0 ] || literal_owned=2
+                      ;;
+                    *)
+                      probe=$literal_line
+                      fm_composer_normalize_trim_var probe
+                      if [ -z "$probe" ]; then
+                        literal_gap=1
+                        continue
+                      fi
+                      case "$literal_line" in
+                        "$literal_indent "*)
+                          literal_owned=2
+                          literal_last=$literal_row
+                          ;;
+                        "$literal_indent"*)
+                          if [ "$literal_owned" = 2 ] && [ -n "$literal_indent" ]; then
+                            literal_last=$literal_row
+                          fi
+                          ;;
+                      esac
+                      break
+                      ;;
                   esac
-                done
-                literal_row=$((literal_row - 1))
+                done <<EOF
+$pane
+EOF
+                literal_row=$literal_last
                 if [ "$literal_owned" = 1 ]; then
                   FM_COMPOSER_SCAN_BARE_LITERAL_ROWS="${FM_COMPOSER_SCAN_BARE_LITERAL_ROWS}${literal_rows}"
                 elif [ -z "$cy" ] || [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -lt 0 ] \
