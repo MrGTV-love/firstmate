@@ -283,6 +283,9 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Initial queue lock | One PID-naming advisory, and the whole drain is skipped before any claim or mutation. |
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
+A live steal-mutex holder also counts as contention when the primary owner is absent or dead.
+Owner turnover at the deadline remains a retriable skip without naming an unverified live PID; stable malformed or unreclaimable lock paths still report an unsafe-acquire failure.
+
 Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics, so acknowledgement atomicity is unchanged.
 
 ### Guard counts for branch-held rows
