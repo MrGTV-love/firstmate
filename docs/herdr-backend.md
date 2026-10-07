@@ -696,6 +696,7 @@ It hands the visible pane's ANSI viewport plus Herdr's capability facts to the f
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
 - opencode's left bar.
 - The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.
+- Claude's prompt-proven rule pair, with a plain or session-titled top rule and a plain closing rule.
 
 ### Pi composer states
 
@@ -716,8 +717,13 @@ A plain capture of those exact bytes stays `unknown` and preserves them during c
 The verified shape and live exit/relaunch refresh command are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
-The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.
-That safely defers injection and eventually raises the wedge alarm.
+Unpaired bare agent-glyph rows and left-bar rows carrying trailing non-idle text then degrade to `unknown` instead of misreading ghost suggestions as typed input.
+That refusal defers injection and eventually raises the wedge alarm.
+A proven prompt-bearing rule pair instead retains its entire interior: any nonblank content surviving the capture's styling policy and removal of the single proving prompt glyph reads `pending`, even in a plain capture.
+Complete pasted containers, literal side characters, later prompt glyphs, and Braille remain draft content rather than nested-composer or animation furniture.
+Rendered rule pairs may be indented, provided the opening and closing rules have the same indentation.
+Ambiguous rule continuations and unsafe geometry still refuse proof; exact selection and refusal predicates are owned by `bin/fm-composer-lib.sh`.
+The captured Claude shape, focused regression pointers, and live lifecycle refresh command are recorded in [Claude titled top border through Herdr](verification/runtime-backends.md#2026-10-06-claude-titled-top-border-through-herdr).
 
 ### Away-mode injection
 
@@ -906,7 +912,7 @@ Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never 
 - Presentation ordering needs protocol 16 and Python and is best-effort only.
 - Mutable labels can collide; they are never placement or destructive authority.
 - A Firstmate outside Herdr cannot resolve a launcher workspace, so a colliding home label refuses new spawns until the collision is cleared.
-- Ghost and placeholder recognition uses ANSI de-emphasis when available; an unstyled glyph row carrying trailing non-idle text fails safely to `unknown`.
+- For ghost and placeholder recognition limits, see [Placeholder and ghost text](#placeholder-and-ghost-text).
 - Only tmux and Herdr can host the away-mode supervisor terminal.
 
 ## Regression entry points

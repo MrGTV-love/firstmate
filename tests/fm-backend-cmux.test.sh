@@ -762,24 +762,27 @@ test_composer_state_borderless_claude_nbsp_prompt_is_empty() {
   pass "fm_backend_cmux_composer_state: a borderless Claude '❯'+NBSP composer row reads empty under LC_ALL=C"
 }
 
-test_composer_state_borderless_claude_text_is_unknown_plain() {
-  # Capability degradation (the consolidated classifier's styled=0 rule): on
-  # cmux's plain-text capture, text after a bare agent glyph is unreadable -
-  # it may be the harness's own idle suggestion (claude's rotating dim hint,
-  # codex's "Use /skills ..."), which a plain read cannot tell from typed
-  # input. The verdict is `unknown` (defer, loud refusal at fm-send), never a
-  # false `pending` that would misreport an idle pane as holding unsent text.
-  # The same bytes on a styled backend (tmux/herdr/zellij) classify pending
-  # when bright and empty when ghost - pinned in tests/fm-composer-lib.test.sh.
-  local dir fb out
-  dir="$TMP_ROOT/composer-borderless-claude-text"; mkdir -p "$dir/responses"
-  cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
-  cmux_read_screen_response "$dir" 2 $'────────────────────────\n❯ retain this message\n────────────────────────\nHaiku 4.5'
-  fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
-    bash -c '. "$0/bin/backends/cmux.sh"; fm_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
-  [ "$out" = unknown ] || fail "plain-capture text after a bare glyph must degrade to unknown, got '$out'"
-  pass "fm_backend_cmux_composer_state: plain-capture text after a bare glyph degrades to unknown (never false pending)"
+test_composer_state_plain_text_respects_rule_pair_proof() {
+  # A plain capture cannot distinguish an unbounded bare-row hint from input.
+  # A prompt-proven rule pair retains surviving text as pending instead.
+  local dir fb out shape screen want
+  for shape in bare pair; do
+    if [ "$shape" = bare ]; then
+      screen='❯ retain this message'
+      want=unknown
+    else
+      screen=$'────────────────────────\n❯ retain this message\n────────────────────────\nHaiku 4.5'
+      want=pending
+    fi
+    dir="$TMP_ROOT/composer-plain-text-$shape"; mkdir -p "$dir/responses"
+    cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
+    cmux_read_screen_response "$dir" 2 "$screen"
+    fb=$(make_cmux_fakebin "$dir")
+    out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+      bash -c '. "$0/bin/backends/cmux.sh"; fm_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
+    [ "$out" = "$want" ] || fail "plain-capture $shape text must read $want, got '$out'"
+  done
+  pass "fm_backend_cmux_composer_state: plain text degrades only without rule-pair proof"
 }
 
 test_composer_state_ghost_placeholder_is_empty() {
@@ -1146,7 +1149,7 @@ test_composer_state_bare_prompt_is_empty
 test_composer_state_borderless_claude_prompt_is_empty
 test_composer_state_borderless_claude_prompt_outranks_stale_bordered_row
 test_composer_state_borderless_claude_nbsp_prompt_is_empty
-test_composer_state_borderless_claude_text_is_unknown_plain
+test_composer_state_plain_text_respects_rule_pair_proof
 test_composer_state_ghost_placeholder_is_empty
 test_composer_state_real_text_is_pending
 test_composer_state_popup_placeholder_fill_is_pending
