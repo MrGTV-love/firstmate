@@ -3,7 +3,7 @@
 // Usage: node bin/fm-jev-guardrail.mjs hook --host claude|omp < native-tool.json
 //        node bin/fm-jev-guardrail.mjs metrics [--log <jsonl>]
 //        node bin/fm-jev-guardrail.mjs evaluate --cases <json> [--log <jsonl>]
-// Key: existing TYPESAFE_API_KEY, else fmx_env_get in the resolved home/.env.
+// Key: existing TYPESAFE_API_KEY, else fm_typesafe_key (bin/fm-typesafe-lib.sh): home/.env, then the primary home's.
 // Uses the TypeSafe endpoint and Choice schema; no SDK or retries.
 // Commands, paths, contents, response bodies and keys never enter records or state.
 // Records: attempt (before HTTP); result (including selection and unavailable usage).
@@ -767,7 +767,7 @@ function collect(child, input) {
 
 async function key() {
   if (privateKey) return privateKey;
-  const child = spawn('bash', ['-c', '. "$1"; fmx_env_get TYPESAFE_API_KEY "$2"', 'guardrail', resolve(root, 'bin/fm-env-lib.sh'), resolve(home, '.env')], { stdio: ['pipe', 'pipe', 'ignore'] });
+  const child = spawn('bash', ['-c', '. "$1"; fm_typesafe_key "$2" && printf %s "$TYPESAFE_API_KEY_PRIVATE"', 'guardrail', resolve(root, 'bin/fm-typesafe-lib.sh'), resolve(home)], { stdio: ['pipe', 'pipe', 'ignore'] });
   return (await collect(child, '')).output;
 }
 

@@ -1361,7 +1361,9 @@ Secondmate homes inherit this file from the primary, so a secondmate's own crewm
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
-It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or a gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the shared accessor in `bin/fm-env-lib.sh` reads the line.
+The `.env` consulted is the home's own, then the top-most local home reached through the home's `.fm-secondmate-parent` record, so a secondmate home and its crews share the primary home's single key without a copy (`fm_typesafe_key` in `bin/fm-typesafe-lib.sh` owns the order).
+A home bound to a remote parent has no local primary and stops at its own `.env`.
 
 Off means one `dispatch-resolve: off` line on stderr, nothing on stdout, exit 0, and no network call, so firstmate dispatches exactly as it does without the tool.
 This section is the single owner of the tool's operator contract; the script header owns its exact flags and output lines, and "Crew dispatch profiles" above owns the declared rule and profile fields it applies.
@@ -1534,7 +1536,7 @@ Generated worker callers pin `FM_HOME`, `FM_CONFIG_OVERRIDE` and `FM_STATE_OVERR
 The shared hook resolves its operational home as `FM_HOME`, then `FM_ROOT_OVERRIDE`, then its physical code root; explicit config/state overrides still select those directories independently.
 Other harnesses and validation agents that suppress project hooks/extensions are not instrumented by this integration.
 
-The screen uses the existing `TYPESAFE_API_KEY` environment-first/home-`.env` accessor and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
+The screen uses the existing `TYPESAFE_API_KEY` environment-first, home-then-primary-`.env` accessor (`fm_typesafe_key`) and TypeSafe endpoint, with pinned `jev-1.13.0`, one two-second attempt and no retries.
 Automated curl requests disable implicit curlrc loading before any other option, so ambient trace, retry and timeout settings cannot alter that transport.
 It does not grant account, billing, egress, command, or secret-access authority.
 No key means `missing_key`, not a synthetic judgment.
