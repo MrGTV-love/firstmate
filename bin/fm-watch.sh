@@ -2785,11 +2785,6 @@ while :; do
     exit 1
   }
   watcher_beat
-  reboot_recovery_tick || {
-    echo "watcher: Herdr reboot launch recovery failed" >&2
-    exit 1
-  }
-  watcher_beat
   # An in-flight ship or scout whose SessionEnd record says the worker is
   # gone is relaunched through the existing control path. The tick wakes and
   # exits the cycle like every other wake, so a restarted watcher sees the
@@ -3364,6 +3359,11 @@ EOF
       triage_log "absorbed heartbeat (no captain-relevant change)"
     fi
   fi
+  reboot_recovery_tick || {
+    echo "watcher: Herdr reboot launch recovery failed" >&2
+    exit 1
+  }
+  watcher_beat
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
   # else the blind poll sleep. See event_wait_or_sleep.

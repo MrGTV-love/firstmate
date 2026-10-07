@@ -2360,18 +2360,18 @@ The [Herdr restart guide](../herdr-backend.md#managed-recovery-after-native-rest
 
 #### Recorded-task attribution (2026-10-06)
 
-Focused executable regressions reproduced lifecycle input to stale recorded panes before the ownership correction, then passed after it:
+Historical focused executable regressions reproduced lifecycle input to stale recorded panes before the ownership correction, then passed after it. The maintained ownership regression and launch-proof check can now be selected with:
 
 ```bash
 TMPDIR="$PWD/state/.ownership-regression-tmp" \
-  FM_TEST_ONLY=test_reboot_recovery_requires_recorded_native_identity \
+  FM_TEST_ONLY=test_reboot_recovery_inspects_without_native_attribution \
   bash tests/fm-control-relaunch.test.sh
 TMPDIR="$PWD/state/.ownership-regression-tmp" \
   FM_TEST_ONLY=test_launch_proof_recorded_native_identity \
   bash tests/fm-launch-proof.test.sh
 ```
 
-The first check failed 16 negative scenarios before the correction and passed all 22 scenarios afterward, covering direct and sweep recovery, versioned and legacy records, unrecorded personal panes, preserved work and drafts, legitimate recorded native recovery, and managed no-op behavior.
+The historical first check failed 16 negative scenarios before the correction and passed all 22 scenarios afterward, covering direct and sweep recovery, versioned and legacy records, unrecorded personal panes, preserved work and drafts, legitimate recorded native recovery, and managed no-op behavior.
 The second check passed six groups covering native startup provenance, malformed and unrelated conversations, local-secondmate startup sources, kernel environments, and foreground ancestry.
 On actual omp 18.6.3 and Herdr 0.9.1 protocol 22, `fm_launch_proof_herdr "$meta"` returned `unmanaged` for a bare resume whose fixture-seeded native initial message contained the owner-generated task launch envelope, and `managed` for a process launched with the matching incarnation.
 These positive native records were generated protocol fixtures rendered by omp, not user messages emitted by a submitted model turn.

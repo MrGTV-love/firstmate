@@ -4499,7 +4499,7 @@ SH
 
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
-  exit 0
+  exit "$?"
 fi
 
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
